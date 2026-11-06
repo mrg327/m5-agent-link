@@ -1,0 +1,37 @@
+{
+  "desc": "Snapshot with one working Copilot session and one Claude session needing approval",
+  "symbolic": {
+    "t": "snapshot",
+    "id": 2,
+    "b": {
+      "sessions": [
+        {
+          "sid": 1,
+          "ag": "copilot",
+          "st": "work",
+          "repo": "m5-agent-link",
+          "br": "main",
+          "tool": "bash",
+          "t0": 1793994000,
+          "tst": 1793995100,
+          "sum": "Running tests",
+          "seen": false,
+          "host": 0
+        },
+        {
+          "sid": 2,
+          "ag": "claude",
+          "st": "input",
+          "sub": "approval",
+          "repo": "webapp",
+          "br": "feat/login",
+          "t0": 1793993000,
+          "tst": 1793995150,
+          "seen": false,
+          "host": 0
+        }
+      ]
+    }
+  },
+  "cbor_hex": "a30003010203a10082ab000101000201046d6d352d6167656e742d6c696e6b05646d61696e066462617368071a6aee2d10081a6aee315c096d52756e6e696e672074657374730af40b00aa00020101020203000466776562617070056a666561742f6c6f67696e071a6aee2928081a6aee318e0af40b00"
+}

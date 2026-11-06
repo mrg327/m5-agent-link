@@ -1,0 +1,13 @@
+{
+  "desc": "Debug: inject a double-tap at the screen centre",
+  "symbolic": {
+    "t": "dbg_inject_input",
+    "id": 11,
+    "b": {
+      "kind": "double_tap",
+      "x": 233,
+      "y": 233
+    }
+  },
+  "cbor_hex": "a3001844010b03a300010118e90218e9"
+}

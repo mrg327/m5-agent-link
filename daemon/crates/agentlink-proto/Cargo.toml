@@ -1,0 +1,14 @@
+[package]
+name = "agentlink-proto"
+description = "agentlink wire protocol: types and CBOR codec (normative schema: protocol/agentlink.cddl)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+minicbor.workspace = true
+serde.workspace = true
+hex.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

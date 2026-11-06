@@ -1,0 +1,14 @@
+{
+  "desc": "Device approves rid 7 after a 1250 ms hold",
+  "symbolic": {
+    "t": "cmd",
+    "id": 6,
+    "b": {
+      "op": "approve",
+      "sid": 2,
+      "rid": 7,
+      "hold_ms": 1250
+    }
+  },
+  "cbor_hex": "a30008010603a4000301020207041904e2"
+}

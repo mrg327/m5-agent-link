@@ -1,0 +1,12 @@
+{
+  "desc": "Attention 7 cleared because the user answered in the terminal",
+  "symbolic": {
+    "t": "clear",
+    "id": 6,
+    "b": {
+      "rid": 7,
+      "why": "answered_pc"
+    }
+  },
+  "cbor_hex": "a30007010603a200070100"
+}

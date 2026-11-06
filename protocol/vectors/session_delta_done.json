@@ -1,0 +1,13 @@
+{
+  "desc": "Delta: session 1 finished",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 3,
+    "b": {
+      "sid": 1,
+      "st": "done",
+      "tst": 1793995300
+    }
+  },
+  "cbor_hex": "a30004010303a300010204081a6aee3224"
+}

@@ -1,0 +1,9 @@
+{
+  "desc": "Keepalive",
+  "symbolic": {
+    "t": "ping",
+    "id": 9,
+    "b": {}
+  },
+  "cbor_hex": "a3000d010903a0"
+}

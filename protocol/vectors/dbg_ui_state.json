@@ -1,0 +1,23 @@
+{
+  "desc": "Device reports it is showing the attention card",
+  "symbolic": {
+    "t": "dbg_ui_state",
+    "id": 10,
+    "re": 8,
+    "b": {
+      "screen": "attention",
+      "sel_sid": 2,
+      "rid": 7,
+      "visible": [
+        "webapp · feat/login",
+        "Run shell command",
+        "Approve",
+        "Deny",
+        "Open on PC"
+      ],
+      "power": "active",
+      "fps": 30
+    }
+  },
+  "cbor_hex": "a4001841010a020803a60069617474656e74696f6e0102020703857477656261707020c2b720666561742f6c6f67696e7152756e207368656c6c20636f6d6d616e6467417070726f76656444656e796a4f70656e206f6e205043046661637469766505181e"
+}

@@ -1,0 +1,149 @@
+//! JSONL trace (DESIGN §0): one line per hook event, state transition and protocol message.
+//!
+//! `{ts_us, ts, src, dir, kind, sid?, rid?, msg, bytes?}` in `~/.agentlink/trace/YYYY-MM-DD.jsonl`.
+//! Approvals and focus actions are also appended to `audit.jsonl`.
+
+use agentlink_proto::Envelope;
+use serde_json::{json, Value};
+use std::fs::{File, OpenOptions};
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+
+#[derive(Clone, Copy, Debug)]
+pub enum Dir {
+    In,
+    Out,
+    Internal,
+}
+
+impl Dir {
+    fn as_str(self) -> &'static str {
+        match self {
+            Dir::In => "in",
+            Dir::Out => "out",
+            Dir::Internal => "internal",
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Trace {
+    inner: Arc<Mutex<Inner>>,
+}
+
+struct Inner {
+    dir: Option<PathBuf>,
+    audit: Option<PathBuf>,
+    day: String,
+    file: Option<File>,
+}
+
+fn open_append(path: &Path) -> std::io::Result<File> {
+    if let Some(p) = path.parent() {
+        std::fs::create_dir_all(p)?;
+    }
+    OpenOptions::new().create(true).append(true).open(path)
+}
+
+impl Trace {
+    pub fn new(dir: PathBuf, audit: PathBuf) -> Self {
+        Trace {
+            inner: Arc::new(Mutex::new(Inner {
+                dir: Some(dir),
+                audit: Some(audit),
+                day: String::new(),
+                file: None,
+            })),
+        }
+    }
+
+    #[cfg(test)]
+    /// A trace that discards everything (unit tests).
+    pub fn null() -> Self {
+        Trace {
+            inner: Arc::new(Mutex::new(Inner {
+                dir: None,
+                audit: None,
+                day: String::new(),
+                file: None,
+            })),
+        }
+    }
+
+    /// Logs one event. Failures to write are reported on stderr but never propagate.
+    #[allow(clippy::too_many_arguments)] // flat on purpose: mirrors the JSONL fields
+    pub fn record(
+        &self,
+        src: &str,
+        dir: Dir,
+        kind: &str,
+        sid: Option<u64>,
+        rid: Option<u64>,
+        msg: Value,
+        bytes: Option<&[u8]>,
+    ) {
+        if self.inner.lock().unwrap().dir.is_none() {
+            return;
+        }
+        let now = chrono::Local::now();
+        let mut line = json!({
+            "ts_us": now.timestamp_micros(),
+            "ts": now.to_rfc3339(),
+            "src": src,
+            "dir": dir.as_str(),
+            "kind": kind,
+            "msg": msg,
+        });
+        if let Some(s) = sid {
+            line["sid"] = s.into();
+        }
+        if let Some(r) = rid {
+            line["rid"] = r.into();
+        }
+        if let Some(b) = bytes {
+            line["bytes"] = hex::encode(b).into();
+        }
+        let mut text = line.to_string();
+        text.push('\n');
+
+        let mut g = self.inner.lock().unwrap();
+        let day = now.format("%Y-%m-%d").to_string();
+        if g.day != day || g.file.is_none() {
+            let dir = g.dir.clone().unwrap_or_default();
+            match open_append(&dir.join(format!("{day}.jsonl"))) {
+                Ok(f) => {
+                    g.file = Some(f);
+                    g.day = day;
+                }
+                Err(e) => return eprintln!("trace: cannot open trace file: {e}"),
+            }
+        }
+        if let Some(f) = g.file.as_mut() {
+            if let Err(e) = f.write_all(text.as_bytes()) {
+                eprintln!("trace: write failed: {e}");
+            }
+        }
+    }
+
+    /// Logs a protocol message with its decoded JSON and raw bytes.
+    pub fn proto(&self, src: &str, dir: Dir, env: &Envelope, bytes: &[u8]) {
+        let msg = serde_json::to_value(env).unwrap_or(Value::Null);
+        let kind = msg["t"].as_str().unwrap_or("?").to_owned();
+        let sid = msg["b"]["sid"].as_u64();
+        let rid = msg["b"]["rid"].as_u64();
+        self.record(src, dir, &kind, sid, rid, msg, Some(bytes));
+    }
+
+    /// Appends to the audit log (and the trace) for approvals and focus actions.
+    pub fn audit(&self, kind: &str, sid: Option<u64>, rid: Option<u64>, msg: Value) {
+        let line = json!({"ts": chrono::Local::now().to_rfc3339(), "kind": kind, "sid": sid, "rid": rid, "msg": msg});
+        let path = self.inner.lock().unwrap().audit.clone();
+        if let Some(path) = path {
+            if let Err(e) = open_append(&path).and_then(|mut f| writeln!(f, "{line}")) {
+                eprintln!("audit: write failed: {e}");
+            }
+        }
+        self.record("audit", Dir::Internal, kind, sid, rid, msg, None);
+    }
+}

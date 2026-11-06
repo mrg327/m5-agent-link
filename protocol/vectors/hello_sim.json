@@ -1,0 +1,46 @@
+{
+  "desc": "Simulator hello with round 466x466 display",
+  "symbolic": {
+    "t": "hello",
+    "id": 1,
+    "b": {
+      "proto": [
+        0,
+        1
+      ],
+      "dev": {
+        "class": "sim",
+        "board": "sim",
+        "fw": "0.1.0",
+        "uid": "0102030405060708"
+      },
+      "caps": {
+        "disp": {
+          "shape": "round",
+          "w": 466,
+          "h": 466,
+          "color": true
+        },
+        "input": [
+          "touch",
+          "btn",
+          "imu"
+        ],
+        "nbtn": 2,
+        "haptic": true,
+        "spk": true,
+        "mic": true,
+        "batt": true,
+        "max_msg": 4096,
+        "feats": [
+          "focus",
+          "ack",
+          "approve",
+          "badge",
+          "debug"
+        ]
+      }
+    }
+  },
+  "cbor_hex": "a30001010103a30082000101a40003016373696d0265302e312e300348010203040506070802a900a40000011901d2021901d203f50183000103020203f504f505f506f50719100008850001020506"
+}

@@ -1,0 +1,13 @@
+{
+  "desc": "Daemon rejects approve because the prompt was already answered on PC",
+  "symbolic": {
+    "t": "result",
+    "id": 5,
+    "re": 6,
+    "b": {
+      "ok": false,
+      "err": "stale"
+    }
+  },
+  "cbor_hex": "a400090105020603a200f40100"
+}

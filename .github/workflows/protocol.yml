@@ -1,0 +1,29 @@
+name: protocol
+
+on:
+  push:
+    branches: [main]
+    paths: ["protocol/**", ".github/workflows/protocol.yml"]
+  pull_request:
+    paths: ["protocol/**", ".github/workflows/protocol.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  vectors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Validate vectors against CDDL
+        run: uv run protocol/tools/validate_vectors.py
+      - name: Regenerate vectors
+        run: uv run protocol/tools/gen_vectors.py
+      - name: Check for vector drift
+        run: git diff --exit-code protocol/vectors

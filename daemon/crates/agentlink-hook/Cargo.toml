@@ -1,0 +1,9 @@
+[package]
+name = "agentlink-hook"
+description = "Tiny shim called by agent hooks; forwards the hook JSON to agentlinkd and never blocks the agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde_json.workspace = true

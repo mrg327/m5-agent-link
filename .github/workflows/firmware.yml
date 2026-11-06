@@ -1,0 +1,36 @@
+name: firmware
+
+on:
+  push:
+    branches: [main]
+    paths: ["firmware/**", "protocol/**", ".github/workflows/firmware.yml"]
+  pull_request:
+    paths: ["firmware/**", "protocol/**", ".github/workflows/firmware.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (ESP-IDF v5.5, esp32s3)
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5
+          target: esp32s3
+          path: firmware
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-esp32s3
+          path: |
+            firmware/build/*.bin
+            firmware/build/bootloader/*.bin
+            firmware/build/partition_table/*.bin
+          if-no-files-found: error

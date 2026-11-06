@@ -1,0 +1,130 @@
+# Firmware architecture (draft)
+
+> Status: **[P] draft for discussion.** The target is the StopWatch first (DESIGN.md R10). The code is designed so a second board needs only a new BSP.
+> Hardware facts come from `docs/StopWatch.md` (pin map) and `docs/arduino/api/m5pm1_m5ioe1.md`.
+
+## 1. Stack
+- **ESP-IDF 5.5**, **LVGL 9.5**, **NimBLE** (BLE peripheral only; Wi-Fi and Classic BT are compiled out), and **zcbor** (generated from `protocol/agentlink.cddl`).
+- The StopWatch BSP uses the M5GFX `Panel_CO5300` (QSPI 80 MHz) as the panel driver, with LVGL flush glue. This follows the factory firmware approach (`docs/research/ui-animation.md`).
+- M5PM1 / M5IOE1 drivers are taken from the M5Stack libraries, either ported or wrapped as IDF components.
+
+## 2. Source layout
+```
+firmware/
+  CMakeLists.txt, sdkconfig.defaults, sdkconfig.<board>
+  components/
+    agentlink_proto/   generated zcbor C + envelope, COBS, fragmenter, AEAD (mbedTLS/libsodium-lite)
+    core/              portable: app model, controllers, UI (LVGL), power policy, haptic/sound patterns
+      model/           session store (fixed pool, ~32 sessions), attention queue, settings (NVS)
+      link/            link manager: transport-agnostic, pairing, session keys, resync
+      ui/              screens: glance, list, detail, attention, badge, settings, pairing; layout profiles
+      fx/              creature sprites + animation engine, easter eggs (IMU)
+      power/           power state machine (policy only; calls HAL)
+    hal/               C interface headers only (display, touch, buttons, haptic, audio, imu, rtc, power, batt, link_ble, link_usb)
+  boards/
+    stopwatch/         BSP implementing hal/ for CO5300, CST820B, BMI270, RX8130CE, ES8311, M5PM1, M5IOE1
+  main/                app_main: board_init() → core_start()
+simulator/             same core/ + proto/ on desktop: SDL display, mouse = touch, keys = buttons, WS link
+```
+The rule is that `core/` never includes a board header; it only talks to `hal/`. A second board adds `boards/<name>/` and a layout profile.
+
+## 3. Tasks (FreeRTOS)
+| Task | Core | Prio | Role |
+|---|---|---|---|
+| `ui` | 1 | mid | `lv_timer_handler`. It is the **only** task that touches LVGL and consumes the `ui_evt` queue |
+| `link` | 0 | high | NimBLE host + USB CDC RX/TX, framing/crypto, decodes messages → `model_evt` queue |
+| `app` | 0 | mid | Owns the model. It applies `model_evt`, produces `ui_evt` + haptic/sound, and turns input events into `cmd`s |
+| `input` | 0 | mid | Touch (CST820B) and buttons (G1/G2) → gesture recognizer → `input_evt`; IMU interrupts (lift, shake, tilt) |
+| `audio` | 1 | high | (v3) Mic capture + ADPCM encode → link; chimes via ES8311 |
+| `power` | 0 | low | Idle timers, decides power state transitions, battery sampling |
+
+Communication between tasks uses queues only, with no shared mutable model across tasks except read-only snapshots for the UI.
+
+## 4. Power states [P]
+
+Measured rails (from vendor docs): **L0** = M5PM1 only. **L1** = + IMU + RTC. **L2** = + ESP32-S3 (sleeping). **L3A** = ESP32 active. **L3B** = AMOLED supply (PYG8). Audio power is PYG3, and the speaker amp is PYG10.
+
+```
+            lift/btn/attention                     no input 8 s
+ STANDBY ───────────────────────► ACTIVE ─────────────────────► STANDBY
+ (BLE connected,                 (display on,                   
+  display rail off,               30 fps UI,
+  light sleep)                    BLE fast interval)
+    │  BLE lost > 10 min / batt < 10% / user "deep sleep"
+    ▼
+ DEEP (L1: only IMU+RTC+PM1; BLE off)  ── lift / button / RTC timer (adaptive backoff) ──► boot → reconnect
+ BADGE: like ACTIVE, display always on (dimmed after 60 s), animations at 30 fps
+```
+- **STANDBY** is the default "multi-day" state (Q4). Its properties:
+  - ESP32 in auto light-sleep, with NimBLE kept connected (supported in IDF with modem sleep).
+  - The connection interval is negotiated to about 1 s with slave latency, so the radio wakes rarely.
+  - AMOLED rail (L3B) **off**, touch controller in sleep, audio rail off.
+  - Wake sources: the BLE event, the button GPIOs, and **G12** (M5PM1 IRQ chained from the IMU INT1 on PMG0).
+- **Alert at rest:** a BLE `attention` arrives during STANDBY. The device vibrates (PYG9 PWM). If the user is in quiet mode the speaker stays off; otherwise it plays the chime. It then turns on L3B and shows the **dim ring glow** for about 2 s, then turns L3B off again.
+- **Lift detection on a lanyard:** plain any-motion would fire constantly while walking. Instead we use BMI270 features:
+  - **orientation/flat change** plus a **"tilt toward face"** heuristic. When hanging, gravity runs along the screen's −Y axis. When lifted to read, the screen normal points roughly up or toward the user.
+  - It must be held for ≥ 300 ms.
+  - The BMI270 "wrist wear wake-up" feature may be repurposed for this, which needs a spike.
+  - The same IMU data picks a 0° or 180° rotation.
+- **DEEP [D]:** when the host is lost, the device keeps advertising and reconnecting with **adaptive backoff** (5 → 10 → 20 → 40 → 60 min windows, via RTC timer wake). After about 4 h without success it stays in DEEP until the user **lifts the device or presses a button**, which triggers a manual reconnect.
+- **Touch-to-wake [D]:** off in STANDBY. Only lifting or a button wakes the device.
+
+**Budget estimate (to be measured in spike S4):**
+
+| State | Est. avg current | Notes |
+|---|---|---|
+| STANDBY (BLE 1 s interval, light sleep, display off) | ~1.5–3 mA | ESP32-S3 light sleep + BLE; PM1, IMU, and RTC are in the µA range |
+| ACTIVE (display on, mid brightness) | ~60–120 mA | AMOLED cost depends on the content (black = cheap) |
+| BADGE | ~50–100 mA | Mostly black scenes |
+| DEEP (L1) | < 0.1 mA | |
+
+With 450 mAh, STANDBY at 2.5 mA is about 7 days, and 40 lifts × 10 s/day at 100 mA adds about 11 mAh/day. **3 working days is plausible** if STANDBY stays under ~5 mA. Badge mode costs about 4–8 h of display-on time.
+
+## 5. Display pipeline (StopWatch BSP)
+- 466×466 RGB565. LVGL partial render with two 466×48 buffers in internal DMA RAM (~90 KB).
+- A rounder callback aligns areas to even x/y (CO5300).
+- Flush is DMA via the M5GFX panel. It is optionally gated on TE (G38) when the dirty area is larger than 25% of the screen.
+- 30 fps cap for the UI, `LV_DEF_REFR_PERIOD 33`. The only full-screen animations are screen transitions (~250 ms) and the badge.
+- Brightness uses CO5300 `0x51`. The display sleeps with `0x28` + `0x10` before cutting L3B.
+- Burn-in: no static bright elements in ambient/badge; a ±2 px orbit shift every 60 s.
+
+## 6. Input & gestures
+- Touch: CST820B on I2C (G47/G48) with INT on G13. The raw points are fed to LVGL. A small recognizer in `core/` handles the following:
+  - tap, **double-tap (≤ 300 ms)**
+  - long-press (≥ 600 ms)
+  - swipe (≥ 60 px, ≤ 400 ms)
+  - hold-to-confirm (progress events)
+- Buttons: KEYA (yellow, G2) and KEYB (blue, G1) with debounce. Short, long and the sequence detector (easter egg).
+- Touch-panel wake is optional (off in STANDBY to save power; lift or a button wakes the device).
+
+## 7. Link manager
+- BLE peripheral with the custom service (PROTOCOL.md §1). It advertises only when unpaired or disconnected, with a slow advertising interval (1–2 s) to save power. It bonds with LE-SC.
+- USB CDC is always available when plugged in. It is used for pairing, logs, and a docked mode. With USB connected, the device is in "docked" power policy (no sleep limits).
+- On (re)connect: `hello` → `welcome` → `snapshot`. The link manager handles the app-layer AEAD and replay counters.
+- Multi-host is future work. The model already tags each session with `host`, and NimBLE supports several connections.
+
+## 8. Storage (NVS)
+- Bonds/keys (encrypted NVS), user settings (alert mode, quiet hours, brightness, privacy, handle for the badge), and the last snapshot (optional, for a "stale" view after reboot).
+
+## 9. OTA (v3)
+- Dual OTA partitions on the 16 MB flash. The image is pushed by the daemon over BLE (slow but fine) or USB. It is signed with the project's key and rolls back if it doesn't boot.
+
+## 10. Spikes to de-risk
+| ID | Spike | Exit criteria |
+|---|---|---|
+| S1 | Copilot/Claude permission hook: can device + terminal answer in parallel? | A documented flow that works for both agents |
+| S2 | Rust BLE central (`btleplug`) ↔ NimBLE peripheral on mac/Win/Linux, including bonding | Notify/write round trip < 100 ms on all 3 |
+| S3 | CO5300 + LVGL 9.5 on IDF using the M5GFX panel | 30 fps for a list scroll; screen off/on works |
+| S4 | Power: STANDBY with BLE connected, display rail off | Measured mA; ≥ 3 days projected |
+| S5 | BMI270 lift-to-read on a lanyard | < 1 false wake per 10 min of walking, wake in < 500 ms |
+| S6 | Focus drivers: kitty, Terminal.app, Windows Terminal | Double-tap focuses the correct tab |
+
+## 11. Observability (DESIGN §0) [D]
+- **Debug channel:** the USB CDC carries two logical streams, protocol frames (COBS) and a debug stream. The debug stream is JSON lines prefixed with `#`, so it never collides with COBS frames, because COBS output contains no `#`-led lines after the zero delimiters. Each debug line has the shape `{"ts_us":…,"cat":"ui|input|power|link|fx|haptic|perf","ev":…,…}`.
+- **What is logged:**
+  - **ui:** every screen change, selection change, and the `ui_state` snapshot on request
+  - **input:** every recognized gesture with its coordinates and timing
+  - **power:** every state transition and the reason for it
+  - **haptic/sound:** each pattern played
+  - **perf:** frame time p50/p95 every 5 s while active, plus free heap and PSRAM
+- **Debug commands** (USB, or BLE when debug mode is enabled): `ui_state`, `screenshot` (the RGB565 framebuffer streamed in chunks and converted to PNG by the daemon), `inject_input {tap|swipe|button|lift}`, `set_log_level`. The simulator implements the same commands, so the agent tooling is identical for both.

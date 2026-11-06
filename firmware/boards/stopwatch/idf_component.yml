@@ -1,0 +1,10 @@
+dependencies:
+  idf: ">=5.5"
+  lvgl/lvgl: "~9.5.0"
+  m5stack/m5gfx: "0.2.19"
+  m5stack/M5PM1:
+    git: https://github.com/m5stack/M5PM1.git
+    version: "1.0.6"
+  m5stack/M5IOE1:
+    git: https://github.com/m5stack/M5IOE1.git
+    version: "1.0.8"

@@ -1,0 +1,378 @@
+; agentlink protocol v0.1 — single source of truth.
+; See docs/design/PROTOCOL.md for semantics. Integer keys; symbolic names in comments.
+; Rule: decoders MUST ignore unknown map keys and unknown message types.
+; Keys are scoped per map (key 0 in `session` is unrelated to key 0 in `hello`).
+
+; ───────────────────────── envelope ─────────────────────────
+; Every message is a CBOR map. Key 0 (t) is the message type and determines the body
+; schema, which makes the envelope a discriminated union.
+;   { 0: t, 1: id, ?2: re, 3: body }
+;   id = sender's monotonic per-link message counter; re = id this message replies to.
+envelope = msg_hello / msg_welcome / msg_snapshot / msg_session_upd / msg_gone
+         / msg_attention / msg_clear / msg_cmd / msg_result / msg_detail
+         / msg_cfg / msg_batt / msg_ping / msg_pong / msg_log
+         / msg_audio_start / msg_audio / msg_audio_end / msg_transcript
+         / msg_dbg_ui_state_req / msg_dbg_ui_state / msg_dbg_screenshot_req
+         / msg_dbg_screenshot_chunk / msg_dbg_inject_input / msg_dbg_set_log_level
+
+hdr = (1 => uint, ? 2 => uint)
+
+msg_hello                = { 0 => mt_hello, hdr, 3 => hello }
+msg_welcome              = { 0 => mt_welcome, hdr, 3 => welcome }
+msg_snapshot             = { 0 => mt_snapshot, hdr, 3 => snapshot }
+msg_session_upd          = { 0 => mt_session_upd, hdr, 3 => session }
+msg_gone                 = { 0 => mt_gone, hdr, 3 => gone }
+msg_attention            = { 0 => mt_attention, hdr, 3 => attention }
+msg_clear                = { 0 => mt_clear, hdr, 3 => clear }
+msg_cmd                  = { 0 => mt_cmd, hdr, 3 => cmd }
+msg_result               = { 0 => mt_result, hdr, 3 => result }
+msg_detail               = { 0 => mt_detail, hdr, 3 => detail }
+msg_cfg                  = { 0 => mt_cfg, hdr, 3 => device_cfg }
+msg_batt                 = { 0 => mt_batt, hdr, 3 => batt }
+msg_ping                 = { 0 => mt_ping, hdr, 3 => empty }
+msg_pong                 = { 0 => mt_pong, hdr, 3 => empty }
+msg_log                  = { 0 => mt_log, hdr, 3 => log }
+msg_audio_start          = { 0 => mt_audio_start, hdr, 3 => audio_start }
+msg_audio                = { 0 => mt_audio, hdr, 3 => audio }
+msg_audio_end            = { 0 => mt_audio_end, hdr, 3 => audio_end }
+msg_transcript           = { 0 => mt_transcript, hdr, 3 => transcript }
+msg_dbg_ui_state_req     = { 0 => mt_dbg_ui_state_req, hdr, 3 => empty }
+msg_dbg_ui_state         = { 0 => mt_dbg_ui_state, hdr, 3 => dbg_ui_state }
+msg_dbg_screenshot_req   = { 0 => mt_dbg_screenshot_req, hdr, 3 => empty }
+msg_dbg_screenshot_chunk = { 0 => mt_dbg_screenshot_chunk, hdr, 3 => dbg_screenshot_chunk }
+msg_dbg_inject_input     = { 0 => mt_dbg_inject_input, hdr, 3 => dbg_inject_input }
+msg_dbg_set_log_level    = { 0 => mt_dbg_set_log_level, hdr, 3 => dbg_set_log_level }
+
+; types 64+ are debug / observability (DESIGN §0)
+mt_hello = 1
+mt_welcome = 2
+mt_snapshot = 3
+mt_session_upd = 4
+mt_gone = 5
+mt_attention = 6
+mt_clear = 7
+mt_cmd = 8
+mt_result = 9
+mt_detail = 10
+mt_cfg = 11
+mt_batt = 12
+mt_ping = 13
+mt_pong = 14
+mt_log = 15
+mt_audio_start = 16
+mt_audio = 17
+mt_audio_end = 18
+mt_transcript = 19
+mt_dbg_ui_state_req = 64
+mt_dbg_ui_state = 65
+mt_dbg_screenshot_req = 66
+mt_dbg_screenshot_chunk = 67
+mt_dbg_inject_input = 68
+mt_dbg_set_log_level = 69
+
+empty = {}
+
+; ───────────────────────── handshake ─────────────────────────
+hello = {
+  0 => [major: uint, minor: uint],   ; proto  (currently [0, 1])
+  1 => device_info,                  ; dev
+  2 => caps,                         ; caps
+  ? 3 => uint                       ; batt_pct
+}
+
+device_info = {
+  0 => device_class,   ; class
+  1 => tstr,           ; board   e.g. "m5stopwatch", "sim"
+  2 => tstr,           ; fw      semver
+  3 => bstr .size 8   ; uid     stable device id
+}
+device_class = device_class_watch / device_class_desk / device_class_pad /
+  device_class_sim / device_class_other
+device_class_watch = 0
+device_class_desk = 1
+device_class_pad = 2
+device_class_sim = 3
+device_class_other = 15
+
+caps = {
+  ? 0 => display_caps,   ; disp
+  1 => [0*4 input_kind],   ; input
+  ? 2 => uint,           ; nbtn
+  3 => bool,             ; haptic
+  4 => bool,             ; spk
+  5 => bool,             ; mic
+  6 => bool,             ; batt
+  7 => uint,             ; max_msg (bytes)
+  8 => [0*8 feature]      ; feats
+}
+display_caps = {
+  0 => disp_shape,   ; shape
+  1 => uint,                   ; w
+  2 => uint,                   ; h
+  3 => bool                   ; color
+}
+input_kind = input_kind_touch / input_kind_btn / input_kind_rotary / input_kind_imu
+input_kind_touch = 0
+input_kind_btn = 1
+input_kind_rotary = 2
+input_kind_imu = 3
+
+feature = feature_focus / feature_ack / feature_approve / feature_reply /
+  feature_voice / feature_badge / feature_debug
+feature_focus = 0
+feature_ack = 1
+feature_approve = 2
+feature_reply = 3
+feature_voice = 4
+feature_badge = 5
+feature_debug = 6
+
+welcome = {
+  0 => [major: uint, minor: uint],   ; proto
+  1 => host_info,                    ; host
+  2 => time_sync,                    ; time
+  3 => device_cfg                   ; cfg
+}
+host_info = {
+  0 => bstr .size 8,                  ; id
+  1 => tstr,                          ; name
+  2 => host_os      ; os
+}
+time_sync = {
+  0 => uint,   ; unix (seconds)
+  1 => int    ; tz_off (minutes)
+}
+device_cfg = {
+  ? 0 => privacy,      ; privacy
+  ? 1 => alert_mode,   ; alert
+  ? 2 => uint,         ; quiet_until (unix, 0 = none)
+  ? 3 => uint,         ; brightness 0..255
+  ? 4 => tstr         ; badge_handle
+}
+privacy = privacy_meta / privacy_preview / privacy_full
+privacy_meta = 0
+privacy_preview = 1
+privacy_full = 2
+
+alert_mode = alert_mode_full / alert_mode_quiet / alert_mode_silent
+alert_mode_full = 0
+alert_mode_quiet = 1
+alert_mode_silent = 2
+
+; ───────────────────────── state ─────────────────────────
+snapshot = {
+  0 => [0*32 session],        ; sessions
+  ? 1 => [0*16 away_event]   ; away   events missed while disconnected
+}
+away_event = {
+  0 => uint,        ; sid
+  1 => att_kind,    ; kind
+  2 => uint        ; ts (unix)
+}
+
+; `session` is used both as a full object (in snapshot) and as a delta
+; (session_upd): in a delta only `sid` is required; absent keys = unchanged.
+session = {
+  0 => uint,                 ; sid   daemon-assigned, stable for session lifetime
+  ? 1 => agent,              ; ag
+  ? 2 => sess_state,         ; st
+  ? 3 => input_sub,          ; sub   when st = input
+  ? 4 => tstr,               ; repo  ≤ 32 chars
+  ? 5 => tstr,               ; br    ≤ 32 chars
+  ? 6 => tstr,               ; tool  current tool
+  ? 7 => uint,               ; t0    start (unix)
+  ? 8 => uint,               ; tst   last state change (unix)
+  ? 9 => tstr,               ; sum   preview ≤ 80 chars (privacy-dependent)
+  ? 10 => bool,              ; seen
+  ? 11 => uint              ; host  host index (0 in v1)
+}
+agent = agent_copilot / agent_claude / agent_cloud / agent_other
+agent_copilot = 0
+agent_claude = 1
+agent_cloud = 2
+agent_other = 15
+
+sess_state = sess_state_start / sess_state_work / sess_state_input / sess_state_error /
+  sess_state_done / sess_state_idle / sess_state_ended
+sess_state_start = 0
+sess_state_work = 1
+sess_state_input = 2
+sess_state_error = 3
+sess_state_done = 4
+sess_state_idle = 5
+sess_state_ended = 6
+
+input_sub = input_sub_approval / input_sub_question
+input_sub_approval = 0
+input_sub_question = 1
+
+gone = { 0 => uint }   ; sid
+
+attention = {
+  0 => uint,              ; rid   request id (required for approve/deny/reply)
+  1 => uint,              ; sid
+  2 => att_kind,          ; kind
+  ? 3 => tstr,            ; title  e.g. "Run shell command"
+  ? 4 => tstr,            ; text   preview ≤ 160 chars
+  ? 5 => [0*4 tstr],        ; opts   ≤ 4 choices, each ≤ 24 chars
+  6 => [0*5 action],        ; acts   actions the device may offer
+  ? 7 => uint            ; exp    unix time after which to drop
+}
+att_kind = att_kind_approval / att_kind_question / att_kind_error / att_kind_done
+att_kind_approval = 0
+att_kind_question = 1
+att_kind_error = 2
+att_kind_done = 3
+
+action = action_approve / action_deny / action_focus / action_reply / action_ack
+action_approve = 0
+action_deny = 1
+action_focus = 2
+action_reply = 3
+action_ack = 4
+
+clear = {
+  0 => uint,   ; rid
+  1 => clear_why   ; why
+}
+
+; ───────────────────────── commands ─────────────────────────
+cmd = {
+  0 => cmd_op,     ; op
+  ? 1 => uint,     ; sid
+  ? 2 => uint,     ; rid
+  ? 3 => any,      ; arg   snooze minutes, reply option index, quiet secs, {aid}
+  ? 4 => uint     ; hold_ms  measured hold-to-confirm (approve)
+}
+cmd_op = cmd_op_focus / cmd_op_ack / cmd_op_snooze / cmd_op_approve / cmd_op_deny /
+  cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet
+cmd_op_focus = 0
+cmd_op_ack = 1
+cmd_op_snooze = 2
+cmd_op_approve = 3
+cmd_op_deny = 4
+cmd_op_reply = 5
+cmd_op_cancel = 6
+cmd_op_detail = 7
+cmd_op_notify_done = 8
+cmd_op_quiet = 9
+
+result = {
+  0 => bool,         ; ok
+  ? 1 => result_err,   ; err
+  ? 2 => tstr       ; msg
+}
+
+detail = {
+  ? 0 => uint,   ; rid
+  ? 1 => uint,   ; sid
+  2 => tstr     ; text (full)
+}
+
+
+batt = {
+  0 => uint,   ; pct
+  1 => bool   ; chg
+}
+
+log = {
+  0 => log_level,   ; lvl
+  1 => tstr                                   ; msg
+}
+
+; ───────────────────────── audio (v3) ─────────────────────────
+audio_start = {
+  0 => uint,                              ; aid
+  1 => audio_codec,   ; codec
+  ? 2 => uint                            ; sid
+}
+audio = {
+  0 => uint,               ; aid
+  1 => uint,               ; seq
+  2 => bstr .size (0..240) ; data
+}
+audio_end = { 0 => uint }  ; aid
+transcript = {
+  0 => uint,   ; aid
+  1 => tstr,   ; text
+  2 => uint   ; autosend_ms
+}
+
+; ───────────────────────── debug / observability ─────────────────────────
+dbg_ui_state = {
+  0 => tstr,          ; screen   "glance" | "list" | "detail" | "attention" | "badge" | "settings" | "pairing" | "off"
+  ? 1 => uint,        ; sel_sid
+  ? 2 => uint,        ; rid      attention card shown
+  3 => [0*8 tstr],      ; visible  short labels of visible elements, top→bottom
+  4 => tstr,          ; power    "active" | "standby" | "badge" | "deep" | "docked"
+  ? 5 => uint        ; fps
+}
+dbg_screenshot_chunk = {
+  0 => uint,      ; w
+  1 => uint,      ; h
+  2 => uint,      ; offset (bytes into RGB565 little-endian buffer)
+  3 => bstr,      ; data
+  4 => bool      ; last
+}
+dbg_inject_input = {
+  0 => input_event,   ; kind
+  ? 1 => int,   ; x
+  ? 2 => int   ; y
+}
+dbg_set_log_level = {
+  0 => log_level
+}
+
+; ───────────────────────── named enums ─────────────────────────
+disp_shape = disp_shape_round / disp_shape_rect
+disp_shape_round = 0
+disp_shape_rect = 1
+
+host_os = host_os_mac / host_os_win / host_os_linux
+host_os_mac = 0
+host_os_win = 1
+host_os_linux = 2
+
+clear_why = clear_why_answered_pc / clear_why_answered_dev / clear_why_expired /
+  clear_why_cancelled
+clear_why_answered_pc = 0
+clear_why_answered_dev = 1
+clear_why_expired = 2
+clear_why_cancelled = 3
+
+result_err = result_err_stale / result_err_denied / result_err_unsupported /
+  result_err_no_window / result_err_timeout / result_err_internal
+result_err_stale = 0
+result_err_denied = 1
+result_err_unsupported = 2
+result_err_no_window = 3
+result_err_timeout = 4
+result_err_internal = 5
+
+log_level = log_level_err / log_level_warn / log_level_info / log_level_debug
+log_level_err = 0
+log_level_warn = 1
+log_level_info = 2
+log_level_debug = 3
+
+audio_codec = audio_codec_adpcm16k / audio_codec_opus16k
+audio_codec_adpcm16k = 0
+audio_codec_opus16k = 1
+
+input_event = input_event_tap / input_event_double_tap / input_event_long_press /
+  input_event_swipe_up / input_event_swipe_down / input_event_swipe_left /
+  input_event_swipe_right / input_event_btn_a / input_event_btn_b /
+  input_event_btn_a_long / input_event_btn_b_long / input_event_lift / input_event_shake
+input_event_tap = 0
+input_event_double_tap = 1
+input_event_long_press = 2
+input_event_swipe_up = 3
+input_event_swipe_down = 4
+input_event_swipe_left = 5
+input_event_swipe_right = 6
+input_event_btn_a = 7
+input_event_btn_b = 8
+input_event_btn_a_long = 9
+input_event_btn_b_long = 10
+input_event_lift = 11
+input_event_shake = 12

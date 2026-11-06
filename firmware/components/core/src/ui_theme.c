@@ -1,0 +1,127 @@
+#include "ui_theme.h"
+
+#include <math.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "hal.h"
+
+uint32_t theme_state_rgb(sess_state_t s)
+{
+    switch (s) {
+    case SESS_INPUT: return RGB_AMBER;
+    case SESS_ERROR: return RGB_DANGER;
+    case SESS_DONE: return RGB_SUCCESS;
+    case SESS_WORK:
+    case SESS_START: return RGB_ACCENT;
+    default: return RGB_IDLE;
+    }
+}
+
+const char *theme_state_label(const session_t *s)
+{
+    switch (s->state) {
+    case SESS_START: return "starting";
+    case SESS_WORK: return "working";
+    case SESS_INPUT: return s->sub == 1 ? "question" : "needs approval";
+    case SESS_ERROR: return "error";
+    case SESS_DONE: return "done";
+    case SESS_IDLE: return "idle";
+    default: return "ended";
+    }
+}
+
+const char *theme_agent_symbol(agent_t a)
+{
+    switch (a) {
+    case AGENT_COPILOT: return LV_SYMBOL_KEYBOARD;
+    case AGENT_CLAUDE: return LV_SYMBOL_EDIT;
+    case AGENT_CLOUD: return LV_SYMBOL_UPLOAD;
+    default: return LV_SYMBOL_FILE;
+    }
+}
+
+const char *theme_agent_name(agent_t a)
+{
+    switch (a) {
+    case AGENT_COPILOT: return "Copilot CLI";
+    case AGENT_CLAUDE: return "Claude Code";
+    case AGENT_CLOUD: return "Cloud agent";
+    default: return "Agent";
+    }
+}
+
+const lv_font_t *theme_font(int px)
+{
+    if (px >= 48) {
+#if LV_FONT_MONTSERRAT_48
+        return &lv_font_montserrat_48;
+#endif
+    }
+    if (px >= 32) {
+#if LV_FONT_MONTSERRAT_32
+        return &lv_font_montserrat_32;
+#endif
+    }
+    if (px >= 24) {
+#if LV_FONT_MONTSERRAT_24
+        return &lv_font_montserrat_24;
+#endif
+    }
+    if (px >= 20) {
+#if LV_FONT_MONTSERRAT_20
+        return &lv_font_montserrat_20;
+#endif
+    }
+#if LV_FONT_MONTSERRAT_16
+    return &lv_font_montserrat_16;
+#else
+    return LV_FONT_DEFAULT;
+#endif
+}
+
+lv_obj_t *theme_label(lv_obj_t *parent, int px, lv_color_t color)
+{
+    lv_obj_t *l = lv_label_create(parent);
+    lv_obj_set_style_text_font(l, theme_font(px), 0);
+    lv_obj_set_style_text_color(l, color, 0);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
+    return l;
+}
+
+int theme_chord(int y, int margin)
+{
+    float dy = (float)(y - 233);
+    float r2 = 233.0f * 233.0f - dy * dy;
+    int w = r2 > 0 ? (int)(2.0f * sqrtf(r2)) - 2 * margin : 0;
+    return w > 0 ? w : 0;
+}
+
+/* The built-in Montserrat fonts cover ASCII plus LV_SYMBOL_*; U+00B7 is usually missing there. */
+const char *theme_sep(void)
+{
+    static const char *sep;
+    if (sep) return sep;
+    lv_font_glyph_dsc_t dsc;
+    if (lv_font_get_glyph_dsc(theme_font(20), &dsc, 0xB7, 0)) sep = " \xC2\xB7 ";
+    else if (lv_font_get_glyph_dsc(theme_font(20), &dsc, 0x2022, 0)) sep = " \xE2\x80\xA2 ";
+    else sep = " - ";
+    return sep;
+}
+
+void theme_session_label(char *dst, size_t cap, const session_t *s, bool display)
+{
+    const char *sep = display ? theme_sep() : " \xC2\xB7 ";
+    if (s->repo[0] && s->branch[0]) snprintf(dst, cap, "%s%s%s", s->repo, sep, s->branch);
+    else if (s->repo[0]) snprintf(dst, cap, "%s", s->repo);
+    else snprintf(dst, cap, "%s", theme_agent_name(s->agent));
+}
+
+void theme_elapsed(char *dst, size_t cap, uint32_t secs)
+{
+    if (secs < 60) snprintf(dst, cap, "%us", (unsigned)secs);
+    else if (secs < 3600) snprintf(dst, cap, "%um", (unsigned)(secs / 60));
+    else snprintf(dst, cap, "%uh%02um", (unsigned)(secs / 3600), (unsigned)(secs / 60 % 60));
+}
+
+uint32_t theme_now_unix(void) { return hal_rtc_get_unix(); }

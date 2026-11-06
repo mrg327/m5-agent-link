@@ -1,0 +1,12 @@
+{
+  "desc": "Device asks daemon to focus session 2",
+  "symbolic": {
+    "t": "cmd",
+    "id": 5,
+    "b": {
+      "op": "focus",
+      "sid": 2
+    }
+  },
+  "cbor_hex": "a30008010503a200000102"
+}

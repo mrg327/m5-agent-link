@@ -1,0 +1,21 @@
+{
+  "desc": "Approval request for session 2 (agent-raised prompt)",
+  "symbolic": {
+    "t": "attention",
+    "id": 4,
+    "b": {
+      "rid": 7,
+      "sid": 2,
+      "kind": "approval",
+      "title": "Run shell command",
+      "text": "npm test -- --watch=false",
+      "acts": [
+        "approve",
+        "deny",
+        "focus"
+      ],
+      "exp": 1793995450
+    }
+  },
+  "cbor_hex": "a30006010403a7000701020200037152756e207368656c6c20636f6d6d616e640478196e706d2074657374202d2d202d2d77617463683d66616c73650683000102071a6aee32ba"
+}

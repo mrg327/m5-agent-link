@@ -1,0 +1,117 @@
+//! agentlinkd: the agentlink PC daemon.
+//!
+//! sources (hooks, …) → registry → device links (WebSocket now; BLE/USB later),
+//! with everything traced to `~/.agentlink/trace/`.
+
+#[allow(dead_code)] // TODO stub, not wired up yet
+mod ble;
+mod device;
+mod focus;
+mod hook_source;
+mod ipc;
+mod paths;
+mod registry;
+mod source;
+mod trace;
+mod transport;
+#[allow(dead_code)] // TODO stub, not wired up yet
+mod usb;
+mod ws;
+
+use anyhow::Result;
+use device::Shared;
+use serde_json::json;
+use source::AgentSource;
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use transport::Transport;
+
+const DEFAULT_WS_ADDR: &str = "127.0.0.1:7878";
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
+        )
+        .with_writer(std::io::stderr)
+        .init();
+
+    let trace = trace::Trace::new(paths::trace_dir(), paths::audit_log());
+    let registry = Arc::new(registry::Registry::new(trace.clone()));
+    let shared = Arc::new(Shared::new(
+        registry.clone(),
+        trace.clone(),
+        Arc::new(focus::LoggingFocus),
+    ));
+    let started = registry::now_unix();
+
+    let status: hook_source::StatusFn = {
+        let shared = shared.clone();
+        Arc::new(move || {
+            json!({
+                "ok": true,
+                "version": env!("CARGO_PKG_VERSION"),
+                "pid": std::process::id(),
+                "uptime_s": registry::now_unix().saturating_sub(started),
+                "host": shared.host,
+                "devices": shared.devices.lock().unwrap().values().collect::<Vec<_>>(),
+                "sessions": shared.registry.snapshot(),
+            })
+        })
+    };
+
+    let (tx, mut rx) = mpsc::channel(256);
+    let sources: Vec<Box<dyn AgentSource>> = vec![Box::new(hook_source::HookSource {
+        socket: paths::hook_socket(),
+        trace: trace.clone(),
+        status,
+    })];
+    for s in sources {
+        let tx = tx.clone();
+        tokio::spawn(async move {
+            let name = s.name();
+            if let Err(e) = s.run(tx).await {
+                tracing::error!("source {name} stopped: {e:#}");
+            }
+        });
+    }
+    drop(tx);
+    let reg = registry.clone();
+    tokio::spawn(async move {
+        while let Some(ev) = rx.recv().await {
+            reg.apply(ev);
+        }
+    });
+
+    let addr = std::env::var("AGENTLINK_WS_ADDR").unwrap_or_else(|_| DEFAULT_WS_ADDR.into());
+    let ws = ws::WsTransport::bind(&addr).await?;
+    tracing::info!("websocket transport listening on ws://{}", ws.local_addr()?);
+    // TODO: also run ble::BleTransport and usb::UsbTransport once implemented.
+    tokio::spawn(accept_loop(Box::new(ws), shared));
+
+    tokio::signal::ctrl_c().await?;
+    tracing::info!("shutting down");
+    let _ = std::fs::remove_file(paths::hook_socket());
+    Ok(())
+}
+
+async fn accept_loop(mut transport: Box<dyn Transport>, shared: Arc<Shared>) {
+    let name = transport.name();
+    loop {
+        match transport.accept().await {
+            Ok(link) => {
+                let shared = shared.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = device::run_link(shared, link, name).await {
+                        tracing::warn!("{name} link ended: {e:#}");
+                    }
+                });
+            }
+            Err(e) => {
+                tracing::error!("{name} accept failed: {e:#}");
+                return;
+            }
+        }
+    }
+}
