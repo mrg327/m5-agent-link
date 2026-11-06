@@ -1,7 +1,8 @@
 //! `AgentSource` fed by `agentlink-hook` over the IPC socket. Also answers control
 //! requests (`{"ctl":"status"}`) from the CLI on the same socket.
 //!
-//! Hook line: `{"agent","event","ts","cwd","env":{..},"ppid","payload":{..}}`.
+//! Hook line: `{"agent","event","ts","cwd","env":{..},"ppid","tty","pids":[..],"payload":{..}}`.
+//! `cwd` is the hook process's; the agent's own cwd, when sent, is `payload.cwd`.
 
 use crate::ipc::{self, IpcStream};
 use crate::registry::{HostCtx, SessionEvent, SessionPatch};
@@ -101,9 +102,11 @@ pub fn to_session_event(v: &Value) -> Option<SessionEvent> {
     let agent_name = v["agent"].as_str()?;
     let event = v["event"].as_str()?.to_ascii_lowercase();
     let payload = &v["payload"];
-    let cwd = v["cwd"]
+    // The payload's cwd is the agent's; the top-level one is the hook process's own.
+    let cwd = payload["cwd"]
         .as_str()
-        .or_else(|| payload["cwd"].as_str())
+        .or_else(|| v["cwd"].as_str())
+        .filter(|c| !c.is_empty())
         .map(str::to_owned);
     let sid = payload["sessionId"]
         .as_str()
@@ -175,7 +178,19 @@ pub fn to_session_event(v: &Value) -> Option<SessionEvent> {
     Some(SessionEvent::Update {
         key,
         patch: p,
-        ctx: HostCtx { cwd, env },
+        ctx: HostCtx {
+            cwd,
+            env,
+            tty: v["tty"].as_str().map(str::to_owned),
+            pids: v["pids"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|p| u32::try_from(p.as_u64()?).ok())
+                        .collect()
+                })
+                .unwrap_or_default(),
+        },
     })
 }
 
@@ -197,6 +212,27 @@ mod tests {
             (Some(SessState::Input), Some(InputSub::Approval))
         );
         assert_eq!(patch.repo.as_deref(), Some("proj"));
+    }
+
+    #[test]
+    fn payload_cwd_beats_hook_process_cwd_and_ctx_is_captured() {
+        let v = json!({"agent":"claude","event":"Stop","cwd":"/hook/proc/dir","tty":"/dev/ttys004",
+                       "pids":[10,20],"env":{"TERM_PROGRAM":"kitty"},
+                       "payload":{"session_id":"s","cwd":"/nonexistent/agent-proj"}});
+        let Some(SessionEvent::Update { patch, ctx, .. }) = to_session_event(&v) else {
+            panic!()
+        };
+        assert_eq!(patch.repo.as_deref(), Some("agent-proj"));
+        assert_eq!(ctx.cwd.as_deref(), Some("/nonexistent/agent-proj"));
+        assert_eq!(ctx.tty.as_deref(), Some("/dev/ttys004"));
+        assert_eq!(ctx.pids, vec![10, 20]);
+        assert_eq!(ctx.env["TERM_PROGRAM"], "kitty");
+        let v =
+            json!({"agent":"claude","event":"Stop","cwd":"/hook/dir","payload":{"session_id":"s"}});
+        let Some(SessionEvent::Update { patch, .. }) = to_session_event(&v) else {
+            panic!()
+        };
+        assert_eq!(patch.repo.as_deref(), Some("dir"));
     }
 
     #[test]

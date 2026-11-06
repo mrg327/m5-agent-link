@@ -22,8 +22,8 @@ pub struct Shared {
     pub trace: Trace,
     pub focus: Arc<dyn FocusDriver>,
     pub host: HostInfo,
-    /// Connected, handshaken devices, for `agentlink status`.
-    pub devices: Mutex<BTreeMap<u64, Value>>,
+    /// Connected, handshaken devices keyed by device uid, for `agentlink status`.
+    pub devices: Mutex<BTreeMap<String, Value>>,
     next_link: AtomicU64,
 }
 
@@ -155,6 +155,53 @@ pub async fn run_link(
             None => return Ok(()),
         }
     };
+    let link_id = shared.next_link.fetch_add(1, Ordering::Relaxed);
+    let mut dev_key = None;
+    let mut updates = handshake(
+        &shared,
+        &mut c,
+        hello,
+        link_id,
+        transport,
+        &peer,
+        &mut dev_key,
+    )
+    .await?;
+    tracing::info!("device connected: {peer} ({transport})");
+
+    let result = serve(
+        &shared,
+        &mut c,
+        &mut updates,
+        link_id,
+        transport,
+        &peer,
+        &mut dev_key,
+    )
+    .await;
+    if let Some(key) = dev_key {
+        let mut devices = shared.devices.lock().unwrap();
+        // A newer link for the same device may already have replaced our entry.
+        if devices.get(&key).and_then(|d| d["link"].as_u64()) == Some(link_id) {
+            devices.remove(&key);
+        }
+    }
+    tracing::info!("device disconnected: {peer}");
+    result
+}
+
+/// hello → welcome → snapshot. Also used for a hello on a live link (device reboot or
+/// link timeout), which restarts the link's protocol state. Returns a fresh update
+/// subscription.
+async fn handshake(
+    shared: &Shared,
+    c: &mut Conn,
+    hello: (u64, Hello),
+    link_id: u64,
+    transport: &'static str,
+    peer: &str,
+    dev_key: &mut Option<String>,
+) -> Result<tokio::sync::broadcast::Receiver<Update>> {
     if hello.1.proto.0 != PROTO.0 {
         bail!(
             "{peer}: protocol major {} not supported (daemon speaks {})",
@@ -162,9 +209,10 @@ pub async fn run_link(
             PROTO.0
         );
     }
+    c.next_id = 1;
 
     // Subscribe before taking the snapshot so no update is lost in between.
-    let (sessions, mut updates) = shared.registry.subscribe();
+    let (sessions, updates) = shared.registry.subscribe();
     c.send(Some(hello.0), Message::Welcome(welcome(&shared.host)))
         .await?;
     c.send(
@@ -176,29 +224,39 @@ pub async fn run_link(
     )
     .await?;
 
-    let link_id = shared.next_link.fetch_add(1, Ordering::Relaxed);
+    // One entry per device id, so a re-handshake or a reconnect on a new link replaces it.
+    let key = hex::encode(hello.1.dev.uid);
     let info = serde_json::to_value(&hello.1.dev).unwrap_or_default();
-    shared.devices.lock().unwrap().insert(
-        link_id,
-        json!({"transport": transport, "peer": peer, "dev": info}),
+    let mut devices = shared.devices.lock().unwrap();
+    if let Some(old) = dev_key.take().filter(|k| *k != key) {
+        devices.remove(&old);
+    }
+    devices.insert(
+        key.clone(),
+        json!({"transport": transport, "peer": peer, "dev": info, "link": link_id}),
     );
-    tracing::info!("device connected: {peer} ({transport})");
-
-    let result = serve(&shared, &mut c, &mut updates).await;
-    shared.devices.lock().unwrap().remove(&link_id);
-    tracing::info!("device disconnected: {peer}");
-    result
+    *dev_key = Some(key);
+    Ok(updates)
 }
 
 async fn serve(
     shared: &Shared,
     c: &mut Conn,
     updates: &mut tokio::sync::broadcast::Receiver<Update>,
+    link_id: u64,
+    transport: &'static str,
+    peer: &str,
+    dev_key: &mut Option<String>,
 ) -> Result<()> {
     loop {
         tokio::select! {
             env = c.recv() => match env? {
                 None => return Ok(()),
+                Some(Envelope { id, msg: Message::Hello(h), .. }) => {
+                    shared.trace.record(&c.src, Dir::Internal, "rehandshake", None, None, json!({"peer": peer}), None);
+                    *updates = handshake(shared, c, (id, h), link_id, transport, peer, dev_key).await?;
+                    tracing::info!("device re-handshake: {peer} ({transport})");
+                }
                 Some(env) => handle(shared, c, env).await?,
             },
             u = updates.recv() => match u {
@@ -289,5 +347,137 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
             msg: None,
         },
         _ => fail(ResultErr::Unsupported, "command not implemented"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use tokio::sync::mpsc;
+
+    struct NoFocus;
+    #[async_trait]
+    impl FocusDriver for NoFocus {
+        async fn focus(&self, _: &FocusTarget) -> Result<(), FocusError> {
+            Err(FocusError::Unsupported)
+        }
+    }
+
+    struct ChanLink {
+        rx: mpsc::UnboundedReceiver<Vec<u8>>,
+        tx: mpsc::UnboundedSender<Vec<u8>>,
+    }
+    #[async_trait]
+    impl Link for ChanLink {
+        fn peer(&self) -> String {
+            "test".into()
+        }
+        async fn send(&mut self, frame: Vec<u8>) -> Result<()> {
+            let _ = self.tx.send(frame);
+            Ok(())
+        }
+        async fn recv(&mut self) -> Result<Option<Vec<u8>>> {
+            Ok(self.rx.recv().await)
+        }
+    }
+
+    struct Dev {
+        to_daemon: mpsc::UnboundedSender<Vec<u8>>,
+        from_daemon: mpsc::UnboundedReceiver<Vec<u8>>,
+    }
+    impl Dev {
+        async fn next(&mut self) -> Envelope {
+            let b =
+                tokio::time::timeout(std::time::Duration::from_secs(5), self.from_daemon.recv())
+                    .await
+                    .expect("timeout")
+                    .expect("link closed");
+            Envelope::from_bytes(&b).unwrap()
+        }
+    }
+
+    fn hello_bytes(fw: &str) -> Vec<u8> {
+        let p = format!(
+            "{}/../../../protocol/vectors/hello_sim.json",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let v: Value = serde_json::from_slice(&std::fs::read(p).unwrap()).unwrap();
+        let mut env =
+            Envelope::from_bytes(&hex::decode(v["cbor_hex"].as_str().unwrap()).unwrap()).unwrap();
+        if let Message::Hello(h) = &mut env.msg {
+            h.dev.fw = fw.into();
+        }
+        env.to_bytes().unwrap()
+    }
+
+    fn shared() -> Arc<Shared> {
+        let trace = Trace::null();
+        Arc::new(Shared::new(
+            Arc::new(Registry::new(trace.clone())),
+            trace,
+            Arc::new(NoFocus),
+        ))
+    }
+
+    fn spawn_link(shared: &Arc<Shared>) -> Dev {
+        let (to_daemon, rx) = mpsc::unbounded_channel();
+        let (tx, from_daemon) = mpsc::unbounded_channel();
+        let shared = shared.clone();
+        tokio::spawn(async move {
+            let _ = run_link(shared, Box::new(ChanLink { rx, tx }), "test").await;
+        });
+        Dev {
+            to_daemon,
+            from_daemon,
+        }
+    }
+
+    fn fws(shared: &Shared) -> Vec<String> {
+        shared
+            .devices
+            .lock()
+            .unwrap()
+            .values()
+            .map(|d| d["dev"]["fw"].as_str().unwrap().to_owned())
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn second_hello_restarts_ids_and_updates_device() {
+        let shared = shared();
+        let mut d = spawn_link(&shared);
+        for fw in ["1.0.0", "1.0.1"] {
+            d.to_daemon.send(hello_bytes(fw)).unwrap();
+            let w = d.next().await;
+            assert!(matches!(w.msg, Message::Welcome(_)));
+            assert_eq!(w.id, 1);
+            let s = d.next().await;
+            assert!(matches!(s.msg, Message::Snapshot(_)));
+            assert_eq!(s.id, 2);
+        }
+        assert_eq!(fws(&shared), ["1.0.1"]);
+    }
+
+    #[tokio::test]
+    async fn reconnect_on_new_link_replaces_device_entry() {
+        let shared = shared();
+        let mut a = spawn_link(&shared);
+        a.to_daemon.send(hello_bytes("1.0.0")).unwrap();
+        a.next().await;
+        a.next().await;
+        let mut b = spawn_link(&shared);
+        b.to_daemon.send(hello_bytes("1.0.1")).unwrap();
+        b.next().await;
+        b.next().await;
+        assert_eq!(fws(&shared), ["1.0.1"]);
+
+        // The stale link ending must not remove the newer entry.
+        drop(a);
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        assert_eq!(fws(&shared), ["1.0.1"]);
+        drop(b);
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        assert!(fws(&shared).is_empty());
     }
 }

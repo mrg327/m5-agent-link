@@ -1,5 +1,5 @@
 //! Local IPC endpoint for `agentlink-hook` and the `agentlink` CLI: newline-delimited JSON
-//! over a Unix domain socket (`~/.agentlink/hook.sock`).
+//! over a Unix domain socket (`~/.agentlink/hook.sock`) or, on Windows, a named pipe.
 
 use anyhow::Result;
 use std::path::Path;
@@ -40,8 +40,53 @@ mod imp {
     }
 }
 
-// TODO(windows): named pipe `\\.\pipe\agentlink-hook` via tokio::net::windows::named_pipe.
-#[cfg(not(unix))]
+/// Named pipe `\\.\pipe\agentlink-<user>-<hash>` (see `paths::hook_pipe_name`). The pipe
+/// keeps the default DACL (creator/owner, SYSTEM and Administrators; not Everyone) and
+/// rejects remote clients, so it is reachable only from this machine by the same user
+/// or admins.
+#[cfg(windows)]
+mod imp {
+    use super::*;
+    use anyhow::Context;
+    use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
+    use tokio::sync::Mutex;
+
+    pub type IpcStream = NamedPipeServer;
+    pub struct IpcListener {
+        name: String,
+        next: Mutex<NamedPipeServer>,
+    }
+
+    fn create(name: &str, first: bool) -> std::io::Result<NamedPipeServer> {
+        ServerOptions::new()
+            .first_pipe_instance(first)
+            .reject_remote_clients(true)
+            .create(name)
+    }
+
+    pub fn bind(path: &Path) -> Result<IpcListener> {
+        let name = crate::paths::hook_pipe_name(path);
+        let first = create(&name, true).with_context(|| {
+            format!("creating pipe {name} (is another agentlinkd already running?)")
+        })?;
+        Ok(IpcListener {
+            name,
+            next: Mutex::new(first),
+        })
+    }
+
+    impl IpcListener {
+        pub async fn accept(&self) -> Result<IpcStream> {
+            let mut next = self.next.lock().await;
+            next.connect().await?;
+            // Open the next instance before handing over this one so clients never miss it.
+            let fresh = create(&self.name, false)?;
+            Ok(std::mem::replace(&mut *next, fresh))
+        }
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
 mod imp {
     use super::*;
 
@@ -49,7 +94,7 @@ mod imp {
     pub struct IpcListener;
 
     pub fn bind(_path: &Path) -> Result<IpcListener> {
-        anyhow::bail!("hook IPC over a named pipe is not implemented on this platform yet")
+        anyhow::bail!("hook IPC is not implemented on this platform")
     }
 
     impl IpcListener {

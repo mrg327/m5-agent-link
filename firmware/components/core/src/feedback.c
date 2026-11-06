@@ -15,8 +15,8 @@ static void sound(hal_sound_t s)
 void feedback_attention(att_kind_t kind)
 {
     static const uint16_t needs_input[] = {250, 120, 250};
-    static const uint16_t error[] = {70, 60, 70, 60, 70};
-    static const uint16_t done[] = {70};
+    static const uint16_t error[] = {80, 70, 80, 70, 80};
+    static const uint16_t done[] = {80};
     switch (kind) {
     case ATT_APPROVAL:
     case ATT_QUESTION: haptic(needs_input, 3); sound(HAL_SOUND_CHIME_INPUT); break;
@@ -27,12 +27,24 @@ void feedback_attention(att_kind_t kind)
 
 void feedback_tick(void)
 {
-    static const uint16_t tick[] = {12};
+    static const uint16_t tick[] = {35};
     haptic(tick, 1);
 }
 
 void feedback_confirm(void)
 {
-    static const uint16_t ok[] = {40, 50, 40};
+    static const uint16_t ok[] = {45, 50, 45};
     haptic(ok, 3);
+}
+
+void feedback_reject(void)
+{
+    static const uint16_t no[] = {35, 60, 35};
+    haptic(no, 3);
+}
+
+void feedback_hello(void)
+{
+    static const uint16_t hello[] = {60};
+    hal_haptic_play(hello, 1); /* unconditional: proves the motor path regardless of the alert mode */
 }

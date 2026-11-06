@@ -47,3 +47,24 @@ add_test(NAME gesture_recognizer COMMAND test_gesture)
 add_test(NAME sim_headless_selftest
          COMMAND agentlink_sim --headless --no-ws --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/selftest.txt)
 set_tests_properties(sim_headless_selftest PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30)
+
+function(sim_script_test name script)
+    add_test(NAME ${name}
+             COMMAND agentlink_sim --headless --no-ws --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/${script})
+    set_tests_properties(${name} PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30 ${ARGN})
+endfunction()
+
+# Double-tap on a row sends exactly the focus command and never opens the detail screen first.
+sim_script_test(sim_double_tap_focus dtap_focus.txt
+                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_cmd\",\"id\":[0-9]+,\"op\":0,\"sid\":[0-9]+"
+                FAIL_REGULAR_EXPRESSION "\"screen\":\"detail\"")
+sim_script_test(sim_tap_deferred tap_deferred.txt
+                FAIL_REGULAR_EXPRESSION "\"ev\":\"tx_cmd\"")
+sim_script_test(sim_link_indicator link_indicator.txt)
+
+# Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
+add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c
+               ${FW}/core/src/link_tx.c ${FW}/core/src/model.c)
+target_include_directories(test_link_arb PRIVATE ${FW}/core/src)
+target_link_libraries(test_link_arb PRIVATE agentlink_hal agentlink_proto lvgl::lvgl m)
+add_test(NAME link_arbitration COMMAND test_link_arb)

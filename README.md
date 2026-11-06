@@ -31,6 +31,34 @@ and a double-tap brings that agent's terminal to the front on your PC.
 3. **Device-agnostic.** The daemon sends semantic data, never pixels, and devices
    declare their capabilities.
 
+## Setup (user)
+
+Run the daemon (`cargo run -p agentlinkd` in `daemon/`; see `daemon/README.md`). It serves USB, BLE and a WebSocket simulator link at once.
+
+**macOS permissions**
+- **Bluetooth:** allow the terminal (or the `agentlinkd` binary) under System Settings › Privacy & Security › Bluetooth, or BLE scanning finds nothing.
+- **Automation:** to focus Terminal.app, allow your terminal/`agentlinkd` to control Terminal under System Settings › Privacy & Security › Automation.
+
+**kitty:** add this to `kitty.conf`, then restart kitty (a config reload is not enough):
+```
+allow_remote_control socket-only
+listen_on unix:/tmp/kitty
+```
+
+**Daemon environment**
+
+| Variable | Effect |
+|---|---|
+| `AGENTLINK_USB=0` / `AGENTLINK_BLE=0` | Disable that transport (`0`, `false` or `off`) |
+| `AGENTLINK_HOME` | State directory (default `~/.agentlink`: hook socket, trace, audit log) |
+| `AGENTLINK_WS_ADDR` | WebSocket listen address (default `127.0.0.1:7878`) |
+| `AGENTLINK_USB_PORT` | Serial port to use instead of auto-discovery (VID 0x303A, PID 0x1001) |
+| `AGENTLINK_BLE_NAME` | Connect only to the device advertising this name (`AgentLink-XXXX`) |
+| `AGENTLINK_BLE_WRITE_LEN` | BLE write size in bytes (default 20) |
+| `AGENTLINK_PIPE` | Windows only: hook named-pipe name override |
+
+Hook IPC uses `$AGENTLINK_HOME/hook.sock` on Unix. On Windows it is the named pipe `\\.\pipe\agentlink-<USERNAME>-<fnv64 of the socket path>`.
+
 ## Status
 
 Early scaffold. See `docs/design/DESIGN.md` §13 for phasing.

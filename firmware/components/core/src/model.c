@@ -1,5 +1,6 @@
 #include "model.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "debug.h"
@@ -11,14 +12,24 @@ static bool s_att_used[MODEL_MAX_ATTENTION];
 static settings_t s_settings;
 static uint32_t s_rev;
 
+static char s_host[33];
+
 void model_init(void)
 {
     memset(s_used, 0, sizeof s_used);
     memset(s_att_used, 0, sizeof s_att_used);
     memset(&s_settings, 0, sizeof s_settings);
+    s_host[0] = 0;
     s_settings.privacy = PRIVACY_PREVIEW;
     s_rev = 1;
 }
+
+void model_set_host(const char *host)
+{
+    snprintf(s_host, sizeof s_host, "%s", host ? host : "");
+    s_rev++;
+}
+const char *model_host(void) { return s_host; }
 
 uint32_t model_rev(void) { return s_rev; }
 

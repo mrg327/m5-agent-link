@@ -252,16 +252,21 @@ All easter eggs are rate-limited and are off in quiet mode.
 
 ## 10. Focus drivers per OS/terminal
 
-| Terminal | Focus method | Confidence |
+| Terminal | Focus method | Status |
 |---|---|---|
-| kitty (mac/Linux) | `kitty @ --to $KITTY_LISTEN_ON focus-window --match id:$KITTY_WINDOW_ID` + raise the OS window | High (requires `allow_remote_control` + `listen_on`) |
-| Windows Terminal | Find the window/tab owning the agent's PID tree (UI Automation), `SetForegroundWindow` with the AttachThreadInput workaround; `wt -w <id> focus-tab -t <n>` | Medium |
-| macOS Terminal.app | AppleScript: match `tty` across windows/tabs, then set `selected` and `frontmost` | High (Automation permission prompt) |
-| Linux X11 | `_NET_WM_PID` → `_NET_ACTIVE_WINDOW` (via `x11rb`) | High |
-| Linux Wayland | GNOME: shell extension D-Bus; KDE: KWin script; sway/Hyprland: IPC; others: notification fallback | Low/varies |
-| Cloud agent | Open the PR URL in the default browser | High |
+| kitty (mac/Linux) | `kitty @ --to $KITTY_LISTEN_ON focus-window --match id:$KITTY_WINDOW_ID` + raise the OS window (requires `allow_remote_control` + `listen_on`) | **Verified live on macOS** |
+| macOS Terminal.app | AppleScript: match `tty` across windows/tabs, then select the tab and bring the window to the front (Automation permission prompt) | **Verified live** |
+| Windows Terminal | Walk the agent's process tree to the owning `WindowsTerminal.exe`, restore the window, `SetForegroundWindow` with the AttachThreadInput workaround. **No tab selection** (no public process→tab API) | Compiles; untested on a device |
+| tmux | Select the pane (`TMUX_PANE`), then focus the outer terminal | Untested |
+| Other macOS apps (iTerm, VS Code, WezTerm, Ghostty, Hyper) | Activate the app by name (`open -a`) | Untested |
+| Linux X11 | `xdotool windowactivate`, falling back to `wmctrl -i -a` (by `WINDOWID`/kitty window) | Untested |
+| Linux Wayland | GNOME: shell extension D-Bus; KDE: KWin script; sway/Hyprland: IPC; others: notification fallback | Not implemented |
+| Cloud agent | Open the PR URL in the default browser | Not implemented |
 
-Focus drivers are also a daemon trait (`FocusDriver`) with per-OS/per-terminal impls.
+Focus drivers are also a daemon trait (`FocusDriver`) with per-OS/per-terminal impls in `daemon/crates/agentlinkd/src/focus/`.
+
+- **Identity capture:** `agentlink-hook` records, with every event, the terminal identity from the agent's environment (`TERM_PROGRAM`, `KITTY_WINDOW_ID`/`KITTY_LISTEN_ON`/`KITTY_PID`, `TMUX`/`TMUX_PANE`, `WT_SESSION`, `WINDOWID`, and a few more), plus the controlling `tty` and the parent pid chain (`pids`, up to 8).
+- **Input policy:** that identity is untrusted (it travels hook → daemon → device → `cmd focus`). The daemon validates every value before use (tty path, kitty id, `listen_on`, tmux pane). External tools run as `Command` args with a 3 s timeout, never through a shell, and AppleScript gets values as `argv`, never interpolated.
 
 ## 11. Firmware stack [P]
 ESP-IDF 5.5 + LVGL 9.5 for the core UI. This is portable to any LVGL-capable board, and the simulator uses LVGL on SDL. For StopWatch, the BSP drives the panel through M5GFX's CO5300 QSPI driver, the same approach as the factory UserDemo. The display uses two 466×48 RGB565 partial buffers in internal DMA RAM, a rounder callback for even alignment, and 30 fps with 60 fps only for small regions. NimBLE handles BLE.

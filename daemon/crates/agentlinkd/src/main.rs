@@ -87,10 +87,16 @@ async fn main() -> Result<()> {
     tracing::info!("websocket transport listening on ws://{}", ws.local_addr()?);
     tokio::spawn(accept_loop(Box::new(ws), shared.clone()));
     if env_enabled("AGENTLINK_USB") {
-        tokio::spawn(accept_loop(Box::new(usb::UsbTransport::new()), shared.clone()));
+        tokio::spawn(accept_loop(
+            Box::new(usb::UsbTransport::new()),
+            shared.clone(),
+        ));
     }
     if env_enabled("AGENTLINK_BLE") {
-        tokio::spawn(accept_loop(Box::new(ble::BleTransport::new()), shared.clone()));
+        tokio::spawn(accept_loop(
+            Box::new(ble::BleTransport::new()),
+            shared.clone(),
+        ));
     }
 
     tokio::signal::ctrl_c().await?;

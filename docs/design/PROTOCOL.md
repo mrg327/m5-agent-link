@@ -20,14 +20,24 @@
 
   | Item | UUID / value |
   |---|---|
-  | Service | `a9e1f000-…` (custom 128-bit) |
-  | `rx` (write w/o response, daemon→device) | `a9e1f001-…` |
-  | `tx` (notify, device→daemon) | `a9e1f002-…` |
+  | Service | `a9e1f000-7c3b-4d52-9e18-b06a35c4d2f1` |
+  | `rx` (write w/o response, daemon→device) | `a9e1f001-7c3b-4d52-9e18-b06a35c4d2f1` |
+  | `tx` (notify, device→daemon) | `a9e1f002-7c3b-4d52-9e18-b06a35c4d2f1` |
+  | Advertised name | `AgentLink-XXXX` |
   | MTU | 247 requested |
   | PHY | 2M preferred |
 
   `Device Information Service` and `Battery Service` are standard 0x180A/0x180F.
-- **USB CDC:** each frame is `COBS(payload ‖ crc16)` followed by `0x00`. The daemon opens the port **without toggling DTR/RTS** so the ESP32-S3 doesn't reset.
+  - **Fragmentation:** each write/notification is `[FIRST|LAST|seq:6] data…` (`FIRST=0x80`, `LAST=0x40`). `seq` starts at 0 on the FIRST fragment and wraps mod 64. A `seq` gap, a continuation without a FIRST, or a message over `max_msg` drops the partial message. A FIRST in the middle of a message drops the partial and starts a new one.
+  - **Fragment size:** the device sends fragments of MTU−4 data bytes (ATT header 3 + fragment header 1). The daemon cannot read the negotiated MTU on every OS, so it writes 20-byte fragments (header included) by default. `AGENTLINK_BLE_WRITE_LEN` overrides this.
+  - **Discovery:** the daemon connects to devices that advertise the service or a name starting with `AgentLink-`. `AGENTLINK_BLE_NAME` pins one device by name.
+  - **Security (current state):** no bonding and no encryption yet (`sm_bonding = 0`, no-IO capability). The LESC passkey and app-layer AEAD in §8 are planned, not implemented.
+- **USB CDC:** each frame is `0x00 ‖ COBS(payload ‖ crc16_be) ‖ 0x00`. The CRC is CRC-16/CCITT-FALSE (poly `0x1021`, init `0xFFFF`, no reflection, xorout 0), and the payload is at most 4096 B.
+  - **Shared stream:** the same port carries ESP-IDF log text and `#`-prefixed JSON debug lines. These never contain `0x00`. A receiver splits on `0x00`: chunks that COBS-decode and pass the CRC are frames, and everything else is text.
+  - **Liveness:** after `hello` the daemon sends `ping` every 5 s. The device re-handshakes (sends a new `hello`) after 12 s without a frame.
+  - **Ping ids:** the CDDL declares `id` as an unbounded `uint`, but the device decodes it as `uint32`. The daemon's USB pings therefore use ids from 2^30 up, so they fit in 32 bits.
+  - **Reset hazard:** the daemon opens the port **without touching DTR/RTS**. Explicitly setting DTR=false and then RTS=false resets the ESP32-S3.
+  - **Discovery:** USB VID `0x303A`, PID `0x1001` (ESP32-S3 USB Serial/JTAG). `AGENTLINK_USB_PORT` overrides the port path.
 
 ## 2. Envelope
 
@@ -54,6 +64,10 @@ device                                 daemon
   │◄── result {ok|err} ────────────────│
   │◄─► ping/pong (only if idle > 60 s; BLE supervision timeout covers most)
 ```
+
+- **Re-handshake:** a `hello` on a live link is a full re-handshake (device reboot or link timeout). The link's message ids reset, and the daemon replies with `welcome` and a full `snapshot`. The daemon's device registry is keyed by the device `uid`, so a re-handshake updates the same entry.
+- **USB timing:** on USB the daemon pings every 5 s and the device re-handshakes after 12 s of silence (§1).
+- TODO: transport arbitration (behaviour when the same device is reachable over both USB and BLE).
 
 ### `hello` (device → daemon)
 ```cddl

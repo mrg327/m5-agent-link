@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "hal.h"
 #include "ui_internal.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
@@ -50,6 +51,35 @@ static void update_clock(void)
     lv_label_set_text(s_clock, t);
 }
 
+/* Offline / USB / BLE (+ host once welcomed). Amber while connecting or offline, green when live. */
+static void link_text(char *dst, size_t cap, lv_color_t *col)
+{
+    int k = ui_link_transport();
+    const char *sym = k == HAL_LINK_USB ? LV_SYMBOL_USB : k == HAL_LINK_BLE ? LV_SYMBOL_BLUETOOTH : LV_SYMBOL_WIFI;
+    const char *name = k == HAL_LINK_USB ? "USB" : k == HAL_LINK_BLE ? "BLE" : "PC";
+    if (k < 0) {
+        snprintf(dst, cap, "%s Offline", LV_SYMBOL_WARNING);
+        *col = lv_color_hex(RGB_AMBER);
+    } else if (!ui_link_connected()) {
+        snprintf(dst, cap, "%s %s...", sym, name);
+        *col = lv_color_hex(RGB_AMBER);
+    } else {
+        const char *host = model_host();
+        if (host[0]) snprintf(dst, cap, "%s %s %s %.14s", sym, name, theme_sep(), host);
+        else snprintf(dst, cap, "%s %s", sym, name);
+        *col = lv_color_hex(RGB_SUCCESS);
+    }
+}
+
+static void update_link(void)
+{
+    char buf[48];
+    lv_color_t col;
+    link_text(buf, sizeof buf, &col);
+    lv_label_set_text(s_link, buf);
+    lv_obj_set_style_text_color(s_link, col, 0);
+}
+
 static void refresh(void)
 {
     s_n = model_sorted(s_sorted);
@@ -71,8 +101,7 @@ static void refresh(void)
     snprintf(buf, sizeof buf, "%u done", (unsigned)c.done_unseen);
     lv_label_set_text(s_done, buf);
 
-    bool up = ui_link_connected();
-    lv_label_set_text(s_link, up ? "" : LV_SYMBOL_WARNING " offline");
+    update_link();
     lv_label_set_text(s_hint, s_n ? LV_SYMBOL_UP " swipe up" : "");
 
     s_dot_rgb = hero_rgb;
@@ -117,7 +146,7 @@ static void report(ui_report_t *r)
     ui_report_add(r, "%s", lv_label_get_text(s_caption));
     ui_report_add(r, "%s", lv_label_get_text(s_running));
     ui_report_add(r, "%s", lv_label_get_text(s_done));
-    if (!ui_link_connected()) ui_report_add(r, "offline");
+    ui_report_add(r, "%s", lv_label_get_text(s_link));
 }
 
 ui_screen_t g_glance = {.on_show = on_show, .refresh = refresh, .tick = tick, .gesture = gesture, .report = report};
@@ -135,7 +164,7 @@ void ui_glance_init(void)
     lv_obj_t *scr = g_glance.root = ui_new_screen();
     s_ring = ring_create(scr);
     s_clock = centered(theme_label(scr, 24, COL_MUTED), 62);
-    s_link = centered(theme_label(scr, 16, lv_color_hex(RGB_AMBER)), 96);
+    s_link = centered(theme_label(scr, 20, lv_color_hex(RGB_AMBER)), 94);
 
     s_dot = lv_obj_create(scr);
     lv_obj_remove_style_all(s_dot);

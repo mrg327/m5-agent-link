@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "driver/gpio.h"
+#include "esp_log.h"
 #include "esp_attr.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -13,7 +14,11 @@
 
 #define BTN_DEBOUNCE_MS 12
 #define HAPTIC_MAX_STEPS 32
-#define HAPTIC_DUTY 70 /* % PWM; the motor does not start below ~25 */
+#define HAPTIC_DUTY 85      /* % PWM hold level; the motor does not start below ~25 */
+#define HAPTIC_KICK_DUTY 100 /* overdrive to spin the ERM up quickly */
+#define HAPTIC_KICK_MS 15    /* kick length; only applied to pulses at least twice as long */
+
+static const char *TAG = "haptic";
 
 /* ───────────── buttons ───────────── */
 
@@ -87,17 +92,35 @@ static void haptic_task(void *arg)
     for (;;) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         for (;;) {
+            bool logged_readback = false; /* once per pattern start */
             xSemaphoreTake(s_hap_mtx, portMAX_DELAY);
             size_t n = s_hap_count;
             memcpy(local, s_hap_pattern, n * sizeof(uint16_t));
             xSemaphoreGive(s_hap_mtx);
 
+            ESP_LOGI(TAG, "pattern steps=%u first=%ums duty=%d/%d", (unsigned)n, n ? (unsigned)local[0] : 0u,
+                     HAPTIC_KICK_DUTY, HAPTIC_DUTY);
             bool interrupted = false;
             for (size_t i = 0; i < n && !interrupted; i++) {
                 bool on = (i % 2) == 0;
-                sw_ioe_motor_duty(on ? HAPTIC_DUTY : 0);
-                /* A notification during the wait means a new pattern arrived. */
-                interrupted = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(local[i] ? local[i] : 1)) > 0;
+                uint32_t ms = local[i] ? local[i] : 1;
+                /* A notification during a wait means a new pattern arrived. */
+                if (on && ms >= 2 * HAPTIC_KICK_MS) {
+                    bool ok = sw_ioe_motor_duty(HAPTIC_KICK_DUTY);
+                    if (!logged_readback) {
+                        logged_readback = true;
+                        uint8_t duty = 0;
+                        bool en = false;
+                        bool rb = sw_ioe_motor_readback(&duty, &en);
+                        ESP_LOGI(TAG, "motor set_ok=%d readback_ok=%d duty=%u en=%d", ok, rb, duty, en);
+                    }
+                    interrupted = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(HAPTIC_KICK_MS)) > 0;
+                    ms -= HAPTIC_KICK_MS;
+                    if (!interrupted) sw_ioe_motor_duty(HAPTIC_DUTY);
+                } else {
+                    sw_ioe_motor_duty(on ? HAPTIC_DUTY : 0);
+                }
+                if (!interrupted) interrupted = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(ms)) > 0;
             }
             sw_ioe_motor_duty(0);
             if (!interrupted) {

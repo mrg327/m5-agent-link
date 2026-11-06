@@ -14,7 +14,7 @@ static uint32_t set_hdr(struct hdr_r *h, bool has_re, uint32_t re)
     return id;
 }
 
-static bool send_env(const char *what)
+static bool send_env(hal_link_kind_t to, const char *what)
 {
     size_t len = 0;
     int rc = cbor_encode_envelope(s_txbuf, sizeof s_txbuf, &g_tx_env, &len);
@@ -22,7 +22,7 @@ static bool send_env(const char *what)
         dbg_event_at(DBG_ERR, "link", "tx_encode_failed", "\"msg\":\"%s\",\"rc\":%d", what, rc);
         return false;
     }
-    bool ok = hal_link_send(g_link.kind, s_txbuf, len);
+    bool ok = hal_link_send(to, s_txbuf, len);
     if (strcmp(what, "screenshot_chunk") != 0)
         dbg_event("link", "tx", "\"msg\":\"%s\",\"id\":%u,\"len\":%u,\"sent\":%s", what, (unsigned)g_link.tx_id,
                   (unsigned)len, ok ? "true" : "false");
@@ -71,7 +71,7 @@ static void fill_caps(struct caps *c, const hal_board_info_t *bi)
     c->caps_feature_m_l_feature_m_count = sizeof feats / sizeof *feats;
 }
 
-bool link_tx_hello(void)
+bool link_tx_hello(hal_link_kind_t to)
 {
     const hal_board_info_t *bi = hal_board_info();
     memset(&g_tx_env, 0, sizeof g_tx_env);
@@ -90,7 +90,7 @@ bool link_tx_hello(void)
         h->hello_uint3uint_present = true;
         h->hello_uint3uint.hello_uint3uint = hal_battery_read().percent;
     }
-    return send_env("hello");
+    return send_env(to, "hello");
 }
 
 bool link_tx_pong(uint32_t re)
@@ -98,7 +98,7 @@ bool link_tx_pong(uint32_t re)
     memset(&g_tx_env, 0, sizeof g_tx_env);
     g_tx_env.envelope_choice = envelope_msg_pong_m_c;
     set_hdr(&g_tx_env.envelope_msg_pong_m.msg_pong_hdr_m, true, re);
-    return send_env("pong");
+    return send_env(g_link.kind, "pong");
 }
 
 bool link_tx_ping(void)
@@ -106,12 +106,12 @@ bool link_tx_ping(void)
     memset(&g_tx_env, 0, sizeof g_tx_env);
     g_tx_env.envelope_choice = envelope_msg_ping_m_c;
     set_hdr(&g_tx_env.envelope_msg_ping_m.msg_ping_hdr_m, false, 0);
-    return send_env("ping");
+    return send_env(g_link.kind, "ping");
 }
 
 bool link_send_ui_state(const ui_report_t *r, uint32_t re)
 {
-    if (!g_link.connected) return false;
+    if (!g_link.welcomed) return false;
     memset(&g_tx_env, 0, sizeof g_tx_env);
     g_tx_env.envelope_choice = envelope_msg_dbg_ui_state_m_c;
     struct msg_dbg_ui_state *m = &g_tx_env.envelope_msg_dbg_ui_state_m;
@@ -131,13 +131,13 @@ bool link_send_ui_state(const ui_report_t *r, uint32_t re)
     s->dbg_ui_state_uint4tstr = zstr(r->power);
     s->dbg_ui_state_uint5uint_present = true;
     s->dbg_ui_state_uint5uint.dbg_ui_state_uint5uint = r->fps;
-    return send_env("dbg_ui_state");
+    return send_env(g_link.kind, "dbg_ui_state");
 }
 
 bool link_send_screenshot_chunk(uint16_t w, uint16_t h, uint32_t offset, const uint8_t *data, size_t len,
                                 bool last, uint32_t re)
 {
-    if (!g_link.connected) return false;
+    if (!g_link.welcomed) return false;
     memset(&g_tx_env, 0, sizeof g_tx_env);
     g_tx_env.envelope_choice = envelope_msg_dbg_screenshot_chunk_m_c;
     struct msg_dbg_screenshot_chunk *m = &g_tx_env.envelope_msg_dbg_screenshot_chunk_m;
@@ -148,5 +148,5 @@ bool link_send_screenshot_chunk(uint16_t w, uint16_t h, uint32_t offset, const u
     c->dbg_screenshot_chunk_uint2uint = offset;
     c->dbg_screenshot_chunk_uint3bstr = (struct zcbor_string){.value = data, .len = len};
     c->dbg_screenshot_chunk_uint4bool = last;
-    return send_env("screenshot_chunk");
+    return send_env(g_link.kind, "screenshot_chunk");
 }

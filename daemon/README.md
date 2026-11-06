@@ -3,7 +3,7 @@
 The cross-platform PC side of agentlink (Rust, tokio). It collects agent status, pushes it to devices, and records everything it does.
 
 ```
-agent hooks ─► agentlink-hook ─► ~/.agentlink/hook.sock ─► agentlinkd ─► device (WebSocket now; BLE/USB later)
+agent hooks ─► agentlink-hook ─► ~/.agentlink/hook.sock ─► agentlinkd ─► device (USB / BLE / WebSocket)
                                                               │
                                                      ~/.agentlink/trace/YYYY-MM-DD.jsonl
 ```
@@ -13,7 +13,7 @@ agent hooks ─► agentlink-hook ─► ~/.agentlink/hook.sock ─► agentlink
 | Crate | What |
 |---|---|
 | `crates/agentlink-proto` | Wire types and CBOR codec (`minicbor`, integer keys) mirroring `protocol/agentlink.cddl`; `Envelope::{to_bytes, from_bytes}`; serde JSON (symbolic names) for traces. Tests round-trip every `protocol/vectors/*.json`. |
-| `crates/agentlinkd` | The daemon. `source.rs` (`AgentSource` trait), `hook_source.rs` (hook IPC → events), `registry.rs` (sessions + deltas), `transport.rs` (`Transport`/`Link` traits), `ws.rs` (WebSocket, 127.0.0.1:7878), `ble.rs`/`usb.rs` (TODO stubs), `focus.rs` (`FocusDriver`, logging no-op), `device.rs` (hello→welcome→snapshot, deltas, `cmd` handling), `trace.rs` (JSONL trace + audit log). |
+| `crates/agentlinkd` | The daemon. `source.rs` (`AgentSource` trait), `hook_source.rs` (hook IPC → events), `registry.rs` (sessions + deltas), `transport.rs` (`Transport`/`Link` traits), `ws.rs` (WebSocket, 127.0.0.1:7878), `ble.rs` (+`ble/frag.rs`), `usb.rs` (+`usb/frame.rs`), `focus/` (`FocusDriver`; kitty, Terminal.app, Windows Terminal, tmux, generic), `device.rs` (hello→welcome→snapshot, deltas, `cmd` handling), `trace.rs` (JSONL trace + audit log). |
 | `crates/agentlink-hook` | Tiny shim for agent hooks: `agentlink-hook <agent> <event>` with the hook JSON on stdin. Fail-open, hard 1.5 s deadline, always exits 0, silent on stdout. |
 | `crates/agentlink` | CLI: `status`, `trace [--follow] [--sid N]`, `decode <hex>`, `hooks print`, `device state\|tap\|press\|lift` (stubs). All accept `--json`. |
 
@@ -38,7 +38,7 @@ cargo run -p agentlink -- hooks print        # config snippets (nothing is insta
 echo '{"sessionId":"s1","toolName":"bash"}' | cargo run -p agentlink-hook -- copilot preToolUse
 ```
 
-Environment: `AGENTLINK_HOME` (default `~/.agentlink`), `AGENTLINK_WS_ADDR` (default `127.0.0.1:7878`), `RUST_LOG`.
+Environment: `AGENTLINK_HOME` (default `~/.agentlink`), `AGENTLINK_WS_ADDR` (default `127.0.0.1:7878`), `AGENTLINK_USB=0` / `AGENTLINK_BLE=0` (disable a transport), `AGENTLINK_USB_PORT`, `AGENTLINK_BLE_NAME`, `AGENTLINK_BLE_WRITE_LEN`, `AGENTLINK_PIPE` (Windows hook pipe name; default `\\.\pipe\agentlink-<USERNAME>-<fnv64 of socket path>`), `RUST_LOG`.
 
 ## Files written
 
@@ -47,4 +47,4 @@ Environment: `AGENTLINK_HOME` (default `~/.agentlink`), `AGENTLINK_WS_ADDR` (def
 
 ## Status
 
-Scaffold. Hook IPC is Unix-only (Windows named pipe is a stub). `cmd approve|deny` is acked as `stale` until the approval broker exists; `cmd focus` calls the no-op focus driver.
+Hook IPC is a Unix socket, or a named pipe on Windows. `cmd approve|deny` is acked as `stale` until the approval broker exists. Focus drivers and their verification status: DESIGN §10.

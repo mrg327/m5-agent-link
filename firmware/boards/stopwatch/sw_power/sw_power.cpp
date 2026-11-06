@@ -136,14 +136,27 @@ bool sw_ioe_ok(void)
     return s_ioe != nullptr;
 }
 
-void sw_ioe_motor_duty(uint8_t duty_percent)
+bool sw_ioe_motor_duty(uint8_t duty_percent)
 {
     if (!s_ioe) {
-        return;
+        return false;
     }
     xSemaphoreTake(s_ioe_mtx, portMAX_DELAY);
-    s_ioe->setPwmDuty(SW_IOE_PWM_CH_MOTOR, duty_percent, false, true);
+    bool ok = s_ioe->setPwmDuty(SW_IOE_PWM_CH_MOTOR, duty_percent, false, true) == M5IOE1_OK;
     xSemaphoreGive(s_ioe_mtx);
+    return ok;
+}
+
+bool sw_ioe_motor_readback(uint8_t *duty, bool *enabled)
+{
+    if (!s_ioe) {
+        return false;
+    }
+    bool polarity = false;
+    xSemaphoreTake(s_ioe_mtx, portMAX_DELAY);
+    bool ok = s_ioe->getPwmDuty(SW_IOE_PWM_CH_MOTOR, duty, &polarity, enabled) == M5IOE1_OK;
+    xSemaphoreGive(s_ioe_mtx);
+    return ok;
 }
 
 void sw_power_init(i2c_master_bus_handle_t bus)

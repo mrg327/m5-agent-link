@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "driver/gpio.h"
+#include "driver/usb_serial_jtag.h"
 #include "esp_app_desc.h"
 #include "esp_log.h"
 #include "esp_mac.h"
@@ -112,6 +113,10 @@ uint64_t hal_time_us(void)
 void hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
 {
     (void)wake_after_s;
+    /* Guard: nothing below may take USB Serial/JTAG away while a host is attached. */
+    if (state == HAL_POWER_DEEP && (usb_serial_jtag_is_connected() || hal_battery_read().usb_present)) {
+        state = HAL_POWER_STANDBY;
+    }
     switch (state) {
     case HAL_POWER_ACTIVE:
         hal_display_set_power(true);
@@ -123,7 +128,9 @@ void hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
         hal_display_set_power(false);
         break;
     case HAL_POWER_DEEP:
-        /* TODO(power): L1-only deep state with RTC timer wake via PM1; behaves as STANDBY for now. */
+        /* No esp_deep_sleep/light-sleep is used anywhere (PM is off), so USB Serial/JTAG stays alive.
+         * TODO(power): real L1-only deep state; it needs a wake path (PM1 button / touch INT G13)
+         * and must keep the guard above. Behaves as STANDBY for now. */
         sw_touch_sleep(true);
         hal_display_set_power(false);
         break;

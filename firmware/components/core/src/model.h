@@ -79,6 +79,9 @@ void model_attention_mark_sent(uint32_t rid);
 void model_attention_expire(uint32_t now_unix);
 
 settings_t *model_settings(void);
+/* PC host name from the welcome message (empty when unknown); cleared with model_init(). */
+void model_set_host(const char *host);
+const char *model_host(void);
 
 const char *sess_state_name(sess_state_t s);
 const char *agent_name(agent_t a);

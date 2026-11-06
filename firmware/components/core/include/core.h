@@ -4,6 +4,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/* One ~60 ms buzz after the display is initialised, to confirm the motor works. Set to 0 to disable. */
+#ifndef CORE_BOOT_BUZZ
+#define CORE_BOOT_BUZZ 1
+#endif
+
 /* Brings up LVGL, the HAL display/touch/buttons/motion/link, and the UI. Call after hal_board_init(). */
 void core_init(void);
 /* One iteration: input, link, LVGL timers, debug. Returns ms the caller may sleep (always <= 10). */

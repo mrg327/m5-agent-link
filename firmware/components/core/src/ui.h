@@ -34,9 +34,14 @@ void ui_init(const ui_actions_t *actions);
 void ui_tick(uint32_t now_ms);
 /* Returns true if the gesture was used by the current screen. */
 bool ui_on_gesture(const gesture_evt_t *g);
+/* True if a tap would navigate or act irreversibly, so the app holds it back until the
+ * double-tap window has passed (double-tap means "focus" on list and detail). */
+bool ui_tap_defers(const gesture_evt_t *g);
 
 void ui_report(ui_report_t *out);
-void ui_set_link_state(bool connected);
+void ui_set_link_state(bool connected); /* handshake done (welcomed) */
+/* Transport currently carrying the link: a hal_link_kind_t value, or -1 for none. */
+void ui_set_link_transport(int kind);
 void ui_show_glance(void);
 void ui_show_session(uint32_t sid); /* detail (or attention card) for a session */
 void ui_toast(const char *text, uint32_t rgb);

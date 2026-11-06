@@ -128,3 +128,9 @@ With 450 mAh, STANDBY at 2.5 mA is about 7 days, and 40 lifts × 10 s/day at 100
   - **haptic/sound:** each pattern played
   - **perf:** frame time p50/p95 every 5 s while active, plus free heap and PSRAM
 - **Debug commands** (USB, or BLE when debug mode is enabled): `ui_state`, `screenshot` (the RGB565 framebuffer streamed in chunks and converted to PNG by the daemon), `inject_input {tap|swipe|button|lift}`, `set_log_level`. The simulator implements the same commands, so the agent tooling is identical for both.
+
+## 12. StopWatch board gotchas
+- **Link layout:** `boards/stopwatch/link.cpp` implements the `hal_link_*` dispatcher and fans out to `link_usb.cpp` and `link_ble.cpp`.
+- **`sw_power` component:** the M5PM1/M5IOE1 vendor libraries change their class layout when `<M5GFX.h>` is includable. They therefore live in the separate `sw_power` component, which has no m5gfx dependency, plus an `#error` guard if M5GFX headers become visible. Do not move that code into the board component.
+- **M5IOE1 pin numbering:** the library API is 0-based: label `IOn` = `M5IOE1_PIN_n` = `n-1`. `sw_power.cpp` checks the `SW_IOE_*` constants against the library enum with `static_assert`.
+- **`WHOLE_ARCHIVE`:** the board component is registered with `WHOLE_ARCHIVE` because the `hal_*` implementations are split across objects and are only referenced by `core`; without it the linker drops them.

@@ -75,6 +75,7 @@ static void on_welcome(const struct welcome *w)
     }
     char host[33];
     STR(w->welcome_host_info_m.host_info_uint1tstr, host);
+    model_set_host(host);
     hal_rtc_set_unix(w->welcome_time_sync_m.time_sync_uint0uint);
     model_settings()->tz_off_min = w->welcome_time_sync_m.time_sync_uint1int;
     g_link.welcomed = true;

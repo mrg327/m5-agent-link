@@ -49,6 +49,8 @@ async fn handshake_hook_event_and_focus() {
     let _d = Daemon(
         Command::new(env!("CARGO_BIN_EXE_agentlinkd"))
             .env("AGENTLINK_HOME", &home)
+            .env("AGENTLINK_USB", "0")
+            .env("AGENTLINK_BLE", "0")
             .env("AGENTLINK_WS_ADDR", format!("127.0.0.1:{port}"))
             .stderr(Stdio::null())
             .spawn()
@@ -111,4 +113,52 @@ async fn handshake_hook_event_and_focus() {
             "trace lacks {kind}"
         );
     }
+}
+
+#[tokio::test]
+async fn second_hello_is_a_full_rehandshake() {
+    let home = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("rehello-home");
+    let _ = std::fs::remove_dir_all(&home);
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let _d = Daemon(
+        Command::new(env!("CARGO_BIN_EXE_agentlinkd"))
+            .env("AGENTLINK_HOME", &home)
+            .env("AGENTLINK_USB", "0")
+            .env("AGENTLINK_BLE", "0")
+            .env("AGENTLINK_WS_ADDR", format!("127.0.0.1:{port}"))
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    let url = format!("ws://127.0.0.1:{port}");
+    let mut ws = loop {
+        match tokio_tungstenite::connect_async(&url).await {
+            Ok((ws, _)) => break ws,
+            Err(_) => tokio::time::sleep(Duration::from_millis(50)).await,
+        }
+    };
+    for round in 0..2 {
+        ws.send(Ws::Binary(vector_bytes("hello_sim").into()))
+            .await
+            .unwrap();
+        let welcome = next_env(&mut ws).await;
+        assert!(matches!(welcome.msg, Message::Welcome(_)), "round {round}");
+        assert_eq!((welcome.id, welcome.re), (1, Some(1)), "round {round}");
+        let snap = next_env(&mut ws).await;
+        assert!(matches!(snap.msg, Message::Snapshot(_)), "round {round}");
+        assert_eq!(snap.id, 2, "round {round}");
+    }
+
+    let day = std::fs::read_dir(home.join("trace"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let text = std::fs::read_to_string(day).unwrap();
+    assert!(text.contains("\"kind\":\"rehandshake\""));
 }

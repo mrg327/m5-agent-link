@@ -16,6 +16,10 @@ const MAX_SESSIONS: usize = 32;
 pub struct HostCtx {
     pub cwd: Option<String>,
     pub env: BTreeMap<String, String>,
+    /// Controlling tty of the agent (`/dev/ttysNNN`), as captured by the hook.
+    pub tty: Option<String>,
+    /// Hook's parent pid chain, nearest first (agent process, its shell, the terminal, ...).
+    pub pids: Vec<u32>,
 }
 
 /// Fields an `AgentSource` knows about; `None` = no information.
@@ -169,7 +173,17 @@ impl Registry {
             );
         }
         let rec = st.sessions.get_mut(&sid)?;
-        rec.ctx = ctx;
+        let old = std::mem::replace(&mut rec.ctx, ctx);
+        // A hook that failed to capture identity must not erase what an earlier one found.
+        if rec.ctx.tty.is_none() {
+            rec.ctx.tty = old.tty;
+        }
+        if rec.ctx.pids.is_empty() {
+            rec.ctx.pids = old.pids;
+        }
+        if rec.ctx.env.is_empty() {
+            rec.ctx.env = old.env;
+        }
         let s = &mut rec.session;
         let mut d = Session::delta(sid);
         let mut changed = created;

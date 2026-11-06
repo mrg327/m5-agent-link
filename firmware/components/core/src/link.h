@@ -25,10 +25,18 @@ typedef struct {
 
 void link_init(const link_hooks_t *hooks);
 void link_on_state(hal_link_kind_t kind, bool connected);
+/* Arbitration: until a welcome arrives, hellos go out on every transport that is up and the first
+ * valid welcome picks the active link; afterwards frames from other transports are dropped and
+ * outgoing messages go to the active one. Losing it restarts the cycle on the remaining transports. */
+void link_on_frame_from(hal_link_kind_t kind, const uint8_t *frame, size_t len);
+/* Legacy form without the source transport: attributed to link_active_kind(). */
 void link_on_frame(const uint8_t *frame, size_t len);
 void link_tick(uint32_t now_ms);
-bool link_connected(void); /* transport up */
-bool link_welcomed(void);  /* handshake done */
+bool link_connected(void); /* at least one transport is up (UI: "connecting") */
+bool link_welcomed(void);  /* handshake done on the active transport (UI: "linked") */
+/* Transport carrying the link while welcomed; otherwise the first transport that is up. Gate on
+ * link_welcomed() before showing it as the active link. */
+hal_link_kind_t link_active_kind(void);
 
-/* Returns false if the link is down. */
+/* Returns false unless welcomed. */
 bool link_send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms);

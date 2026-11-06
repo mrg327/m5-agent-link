@@ -29,9 +29,11 @@ void ui_glance_init(void);
 void ui_list_init(void);
 void ui_detail_init(void);
 
+bool ui_list_tap_navigates(int y); /* a tap here would leave the list */
 void ui_goto(screen_id_t id, ui_nav_t nav);
 screen_id_t ui_current(void);
 bool ui_link_connected(void);
+int ui_link_transport(void); /* -1 none, else hal_link_kind_t */
 bool ui_animations_allowed(void);
 void ui_select(uint32_t sid);
 bool ui_selected(uint32_t *sid);

@@ -143,6 +143,14 @@ static int row_at(int y)
     return floor_div(s_pos16 + (y - UI_CY) * 16 / ROW_H + 8, 16);
 }
 
+static int s_tap_row = -1; /* row hit by the last tap: the list scrolls under the finger before a double-tap lands */
+
+bool ui_list_tap_navigates(int y)
+{
+    int j = row_at(y);
+    return j >= 0 && j < s_n && j == s_sel;
+}
+
 static bool gesture(const gesture_evt_t *g)
 {
     switch (g->kind) {
@@ -153,6 +161,7 @@ static bool gesture(const gesture_evt_t *g)
         return true;
     case G_TAP: {
         int j = row_at(g->y);
+        s_tap_row = j;
         if (j < 0 || j >= s_n) return true;
         if (j != s_sel) {
             select_index(j, true);
@@ -163,7 +172,8 @@ static bool gesture(const gesture_evt_t *g)
         return true;
     }
     case G_DOUBLE_TAP: {
-        int j = row_at(g->y);
+        int j = s_tap_row >= 0 ? s_tap_row : row_at(g->y);
+        s_tap_row = -1;
         if (j >= 0 && j < s_n) g_ui_actions->focus(model_at(s_sorted[j])->sid);
         return true;
     }

@@ -1,5 +1,6 @@
 /* App: wires HAL input, link, model, gestures, UI and power together. Single-threaded: HAL
  * callbacks only push into queues; core_step() is the only place that touches LVGL. */
+#include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -16,19 +17,26 @@
 
 #define FRAME_MAX 4096
 
-typedef struct { uint16_t len; uint8_t data[FRAME_MAX]; } frame_t;
+typedef struct { hal_link_kind_t kind; uint16_t len; uint8_t data[FRAME_MAX]; } frame_t;
 typedef struct { hal_link_kind_t kind; bool connected; } link_evt_t;
 typedef struct { uint8_t btn; bool down; uint32_t t_ms; } btn_evt_t;
 
 static gesture_t s_gesture;
 static ring_t s_frames, s_link_evts, s_btn_evts, s_motion_evts, s_gestures;
-static frame_t s_frame_buf[3];
+#define FRAME_SLOTS 8
+static frame_t s_frame_buf[FRAME_SLOTS]; /* 32 KiB .bss */
+static atomic_flag s_rx_lock = ATOMIC_FLAG_INIT; /* transports may deliver from different tasks */
+static atomic_uint s_frames_dropped;
 static link_evt_t s_link_buf[8];
 static btn_evt_t s_btn_buf[16];
 static hal_motion_evt_t s_motion_buf[8];
 static gesture_evt_t s_gesture_buf[32];
 
 static uint32_t s_frames_drawn, s_fps, s_fps_t0;
+static gesture_evt_t s_deferred_tap;
+static bool s_has_deferred;
+static uint32_t s_deferred_at;
+#define DEFER_SLACK_MS 30
 static lv_indev_t *s_touch;
 
 uint32_t app_now_ms(void) { return (uint32_t)(hal_time_us() / 1000); }
@@ -41,12 +49,15 @@ void app_inject_gesture(const gesture_evt_t *g) { ring_push(&s_gestures, g); }
 
 static void on_rx(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 {
-    (void)kind;
     static frame_t f;
     if (len > FRAME_MAX) return;
+    while (atomic_flag_test_and_set_explicit(&s_rx_lock, memory_order_acquire)) {
+    }
+    f.kind = kind;
     f.len = (uint16_t)len;
     memcpy(f.data, frame, len);
-    ring_push(&s_frames, &f);
+    if (!ring_push(&s_frames, &f)) atomic_fetch_add(&s_frames_dropped, 1);
+    atomic_flag_clear_explicit(&s_rx_lock, memory_order_release);
 }
 
 static void on_state(hal_link_kind_t kind, bool connected)
@@ -97,7 +108,10 @@ static void toast_cmd_result(bool sent, const char *ok_text)
 
 static void act_focus(uint32_t sid)
 {
-    toast_cmd_result(link_send_cmd(LINK_OP_FOCUS, sid, 0, 0), "Opening on PC");
+    bool sent = link_send_cmd(LINK_OP_FOCUS, sid, 0, 0);
+    if (sent) feedback_tick();
+    else feedback_reject();
+    toast_cmd_result(sent, "Opening on PC...");
 }
 
 static void act_approve(uint32_t sid, uint32_t rid, uint32_t hold_ms)
@@ -142,27 +156,57 @@ static void on_attention(const attention_t *a)
 
 static void on_result(int op, uint32_t sid, bool ok, int err, const char *msg)
 {
-    (void)op;
     (void)sid;
-    (void)err;
-    if (!ok) ui_toast(msg[0] ? msg : "Failed", 0xf85149);
+    if (ok) {
+        if (op == LINK_OP_FOCUS) ui_toast(LV_SYMBOL_OK " Focused", 0x3fb950);
+        return;
+    }
+    static const char *const errs[] = {"Out of date", "Denied", "Not supported", "No window", "Timed out", "Failed"};
+    const char *text = err >= 0 && err < 6 ? errs[err] : msg[0] ? msg : "Failed";
+    ui_toast(text, err == 3 ? 0xd29922 : 0xf85149);
+    feedback_reject();
 }
 
 static const link_hooks_t s_hooks = {.on_link = on_link, .on_attention = on_attention, .on_result = on_result};
 
 /* ── input dispatch ── */
 
-static void dispatch(const gesture_evt_t *g)
+static void dispatch_now(const gesture_evt_t *g)
 {
-    bool raw = g->kind == G_PRESS || g->kind == G_RELEASE;
-    if (!raw) dbg_event("input", gesture_name(g->kind), "\"x\":%d,\"y\":%d", g->x, g->y);
-    if (power_activity(app_now_ms())) return; /* first touch only wakes the display */
     if (g->kind == G_LIFT) return;
     if (g->kind == G_SHAKE || g->kind == G_BTN_B_LONG) {
         ui_show_glance();
         return;
     }
     ui_on_gesture(g);
+}
+
+static void flush_deferred(void)
+{
+    if (!s_has_deferred) return;
+    s_has_deferred = false;
+    dispatch_now(&s_deferred_tap);
+}
+
+/* A tap that would navigate is held back for the double-tap window, so a double-tap on a row
+ * focuses it instead of first opening it. */
+static void dispatch(const gesture_evt_t *g)
+{
+    bool raw = g->kind == G_PRESS || g->kind == G_RELEASE;
+    if (!raw) dbg_event("input", gesture_name(g->kind), "\"x\":%d,\"y\":%d", g->x, g->y);
+    if (power_activity(app_now_ms())) { /* first touch only wakes the display */
+        s_has_deferred = false;
+        return;
+    }
+    if (g->kind == G_DOUBLE_TAP) s_has_deferred = false;
+    else if (!raw) flush_deferred();
+    if (g->kind == G_TAP && ui_tap_defers(g)) {
+        s_deferred_tap = *g;
+        s_has_deferred = true;
+        s_deferred_at = app_now_ms();
+        return;
+    }
+    dispatch_now(g);
 }
 
 static void drain_input(uint32_t now)
@@ -175,6 +219,8 @@ static void drain_input(uint32_t now)
         if (m.kind == HAL_MOTION_LIFT || m.kind == HAL_MOTION_SHAKE) ring_push(&s_gestures, &g);
     }
     gesture_tick(&s_gesture, now);
+    if (s_has_deferred && !s_gesture.pressed && now - s_deferred_at >= GESTURE_DOUBLE_TAP_MS + DEFER_SLACK_MS)
+        flush_deferred();
 }
 
 static void drain_link(uint32_t now)
@@ -182,8 +228,12 @@ static void drain_link(uint32_t now)
     link_evt_t e;
     while (ring_pop(&s_link_evts, &e)) link_on_state(e.kind, e.connected);
     static frame_t f;
-    while (ring_pop(&s_frames, &f)) link_on_frame(f.data, f.len);
+    while (ring_pop(&s_frames, &f)) link_on_frame_from(f.kind, f.data, f.len);
+    unsigned dropped = atomic_exchange(&s_frames_dropped, 0);
+    if (dropped) dbg_event_at(DBG_DEBUG, "link", "rx_drop", "\"n\":%u", dropped);
     link_tick(now);
+    /* Welcomed transport, else the first up one while connecting; -1 when offline. */
+    ui_set_link_transport(link_connected() ? (int)link_active_kind() : -1);
 }
 
 /* ── public ── */
@@ -209,7 +259,7 @@ bool core_ui_has_label(const char *text)
 
 void core_init(void)
 {
-    ring_init(&s_frames, s_frame_buf, sizeof s_frame_buf[0], 3);
+    ring_init(&s_frames, s_frame_buf, sizeof s_frame_buf[0], FRAME_SLOTS);
     ring_init(&s_link_evts, s_link_buf, sizeof s_link_buf[0], 8);
     ring_init(&s_btn_evts, s_btn_buf, sizeof s_btn_buf[0], 16);
     ring_init(&s_motion_evts, s_motion_buf, sizeof s_motion_buf[0], 8);
@@ -238,6 +288,9 @@ void core_init(void)
     hal_buttons_set_callback(on_button);
     hal_motion_set_callback(on_motion);
     hal_link_start(on_rx, on_state);
+#if CORE_BOOT_BUZZ
+    feedback_hello();
+#endif
     s_fps_t0 = app_now_ms();
 }
 

@@ -8,7 +8,7 @@
 #define GESTURE_LONG_PRESS_MS 600
 #define GESTURE_SWIPE_MIN_PX 60
 #define GESTURE_SWIPE_MAX_MS 400
-#define GESTURE_TAP_SLOP_PX 12
+#define GESTURE_TAP_SLOP_PX 18
 
 typedef enum {
     G_PRESS, G_RELEASE,         /* raw finger down/up, for hold-to-confirm (dur_ms on release) */

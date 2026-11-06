@@ -18,3 +18,4 @@ selftest_*.png
 *.pyc
 __pycache__/
 /.agentlink/
+/firmware/build-*/

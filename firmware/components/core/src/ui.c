@@ -9,7 +9,7 @@
 #include "ui_ring.h"
 #include "ui_theme.h"
 
-#define TOAST_MS 1400
+#define TOAST_MS 1800
 #define SCREEN_ANIM_MS 250
 
 const ui_actions_t *g_ui_actions;
@@ -51,7 +51,10 @@ static void create_overlays(void)
     lv_obj_set_style_pad_ver(s_toast, 8, 0);
     lv_obj_set_size(s_toast, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     s_toast_label = theme_label(s_toast, 20, COL_TEXT);
-    lv_label_set_long_mode(s_toast_label, LV_LABEL_LONG_MODE_CLIP);
+    lv_label_set_long_mode(s_toast_label, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_set_style_max_width(s_toast, 280, 0);
+    lv_obj_set_width(s_toast_label, LV_SIZE_CONTENT);
+    lv_obj_set_style_max_width(s_toast_label, 240, 0);
     lv_obj_add_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
 
     s_glow = lv_obj_create(top);
@@ -87,6 +90,16 @@ void ui_set_link_state(bool connected)
     if (s_link_up == connected) return;
     s_link_up = connected;
     s_seen_rev = 0; /* force a refresh */
+}
+
+static int s_link_kind = -1;
+int ui_link_transport(void) { return s_link_kind; }
+
+void ui_set_link_transport(int kind)
+{
+    if (s_link_kind == kind) return;
+    s_link_kind = kind;
+    s_seen_rev = 0;
 }
 
 void ui_select(uint32_t sid) { s_sel_sid = sid; s_has_sel = true; }
@@ -155,8 +168,9 @@ void ui_toast(const char *text, uint32_t rgb)
 {
     lv_label_set_text(s_toast_label, text);
     lv_obj_set_style_text_color(s_toast_label, lv_color_hex(rgb), 0);
+    lv_obj_set_style_border_color(s_toast, lv_color_hex(rgb), 0);
     lv_obj_update_layout(s_toast);
-    lv_obj_align(s_toast, LV_ALIGN_TOP_MID, 0, 372);
+    lv_obj_align(s_toast, LV_ALIGN_TOP_MID, 0, 366);
     lv_obj_remove_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
     s_toast_until_ms = s_now_ms + TOAST_MS;
     dbg_event("ui", "toast", "\"text\":%s", dbg_q(text));
@@ -189,4 +203,10 @@ void ui_tick(uint32_t now_ms)
 bool ui_on_gesture(const gesture_evt_t *g)
 {
     return s_screens[s_current]->gesture(g);
+}
+
+bool ui_tap_defers(const gesture_evt_t *g)
+{
+    if (s_current == SCR_DETAIL) return true;
+    return s_current == SCR_LIST && ui_list_tap_navigates(g->y);
 }

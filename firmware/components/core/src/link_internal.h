@@ -8,14 +8,18 @@
 
 #define LINK_MAX_MSG 4096 /* advertised as caps.max_msg */
 #define LINK_MAX_PENDING 4
+#define LINK_N_KINDS 3 /* hal_link_kind_t values */
 
 typedef struct { uint32_t id; int op; uint32_t sid; } pending_cmd_t;
 
 typedef struct {
-    hal_link_kind_t kind;
-    bool connected, welcomed;
+    hal_link_kind_t kind; /* active transport; valid while welcomed */
+    bool up[LINK_N_KINDS];
+    bool connected; /* any transport up */
+    bool welcomed;
+    bool hello_cycle; /* hellos are being sent on every up transport */
     uint32_t tx_id, last_rx_id;
-    uint32_t last_activity_ms, hello_sent_ms;
+    uint32_t last_activity_ms, hello_ms[LINK_N_KINDS];
     pending_cmd_t pending[LINK_MAX_PENDING];
     link_hooks_t hooks;
 } link_state_t;
@@ -28,7 +32,7 @@ extern struct envelope_r g_rx_env, g_tx_env;
 void link_rx_dispatch(const struct envelope_r *env, uint32_t now_ms);
 
 /* link_tx.c */
-bool link_tx_hello(void);
+bool link_tx_hello(hal_link_kind_t to);
 bool link_tx_pong(uint32_t re);
 bool link_tx_ping(void);
 bool link_send_ui_state(const ui_report_t *r, uint32_t re);

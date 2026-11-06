@@ -30,7 +30,10 @@ void sw_power_init(i2c_master_bus_handle_t bus);
 /* IO expander helpers (serialised internally, safe from any task). */
 void sw_ioe_write(uint8_t pin, bool level);
 bool sw_ioe_ok(void);
-void sw_ioe_motor_duty(uint8_t duty_percent);
+/* False if the IOE1 is missing or the I2C write failed. */
+bool sw_ioe_motor_duty(uint8_t duty_percent);
+/* Reads the motor PWM channel back from the chip (duty in %). */
+bool sw_ioe_motor_readback(uint8_t *duty, bool *enabled);
 
 /* PM1 green power LED (kept off while the AMOLED is lit). */
 void sw_pm1_led(bool on);
