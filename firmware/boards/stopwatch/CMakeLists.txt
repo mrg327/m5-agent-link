@@ -6,7 +6,7 @@ idf_component_register(
         "rtc.cpp"
         "touch.cpp"
     INCLUDE_DIRS "."
-    REQUIRES agentlink_hal
+    REQUIRES agentlink_hal sw_power
     PRIV_REQUIRES
         driver
         esp_driver_gpio
@@ -15,7 +15,5 @@ idf_component_register(
         nvs_flash
         esp_app_format
         m5stack__m5gfx
-        m5stack__M5IOE1
-        m5stack__M5PM1
         lvgl__lvgl
 )
