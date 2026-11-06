@@ -4,6 +4,7 @@
 use crate::registry::HostCtx;
 use agentlink_proto::Agent;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 pub struct FocusTarget {
     pub sid: u64,
@@ -39,4 +40,9 @@ impl FocusDriver for LoggingFocus {
         );
         Ok(())
     }
+}
+
+/// The driver the daemon uses. Picks per-OS/per-terminal drivers (DESIGN §10).
+pub fn default_driver() -> Arc<dyn FocusDriver> {
+    Arc::new(LoggingFocus)
 }

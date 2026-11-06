@@ -3,7 +3,6 @@
 //! sources (hooks, …) → registry → device links (WebSocket now; BLE/USB later),
 //! with everything traced to `~/.agentlink/trace/`.
 
-#[allow(dead_code)] // TODO stub, not wired up yet
 mod ble;
 mod device;
 mod focus;
@@ -14,7 +13,6 @@ mod registry;
 mod source;
 mod trace;
 mod transport;
-#[allow(dead_code)] // TODO stub, not wired up yet
 mod usb;
 mod ws;
 
@@ -42,7 +40,7 @@ async fn main() -> Result<()> {
     let shared = Arc::new(Shared::new(
         registry.clone(),
         trace.clone(),
-        Arc::new(focus::LoggingFocus),
+        focus::default_driver(),
     ));
     let started = registry::now_unix();
 
@@ -87,13 +85,23 @@ async fn main() -> Result<()> {
     let addr = std::env::var("AGENTLINK_WS_ADDR").unwrap_or_else(|_| DEFAULT_WS_ADDR.into());
     let ws = ws::WsTransport::bind(&addr).await?;
     tracing::info!("websocket transport listening on ws://{}", ws.local_addr()?);
-    // TODO: also run ble::BleTransport and usb::UsbTransport once implemented.
-    tokio::spawn(accept_loop(Box::new(ws), shared));
+    tokio::spawn(accept_loop(Box::new(ws), shared.clone()));
+    if env_enabled("AGENTLINK_USB") {
+        tokio::spawn(accept_loop(Box::new(usb::UsbTransport::new()), shared.clone()));
+    }
+    if env_enabled("AGENTLINK_BLE") {
+        tokio::spawn(accept_loop(Box::new(ble::BleTransport::new()), shared.clone()));
+    }
 
     tokio::signal::ctrl_c().await?;
     tracing::info!("shutting down");
     let _ = std::fs::remove_file(paths::hook_socket());
     Ok(())
+}
+
+/// Transports are on unless the env var is set to `0`/`false`/`off`.
+fn env_enabled(var: &str) -> bool {
+    !matches!(std::env::var(var).as_deref(), Ok("0" | "false" | "off"))
 }
 
 async fn accept_loop(mut transport: Box<dyn Transport>, shared: Arc<Shared>) {

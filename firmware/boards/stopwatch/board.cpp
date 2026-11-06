@@ -1,5 +1,5 @@
 // M5Stack StopWatch (C152) board support: power rails, I2C bus, PM1/IOE1, battery,
-// power states, identity, debug channel and the not-yet-implemented transports.
+// power states and identity. Links + debug channel live in link*.cpp.
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -166,34 +166,6 @@ hal_battery_t hal_battery_read(void)
         last_us = now;
     }
     return cached;
-}
-
-/* ───────────── link transports (TODO) ───────────── */
-
-static hal_link_rx_cb_t s_link_rx;
-static hal_link_state_cb_t s_link_state;
-
-void hal_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state)
-{
-    /* TODO(link): NimBLE peripheral (HAL_LINK_BLE) and USB Serial/JTAG CDC with COBS (HAL_LINK_USB). */
-    s_link_rx = on_rx;
-    s_link_state = on_state;
-}
-
-bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len)
-{
-    (void)kind;
-    (void)frame;
-    (void)len;
-    return false;
-}
-
-/* ───────────── debug channel ───────────── */
-
-void hal_debug_line(const char *json)
-{
-    /* Console is USB Serial/JTAG; a single printf keeps the line atomic. */
-    printf("#%s\n", json);
 }
 
 /* ───────────── sound & motion (TODO) ───────────── */

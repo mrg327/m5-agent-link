@@ -6,6 +6,12 @@ use async_trait::async_trait;
 // TODO: serialport; open without toggling DTR/RTS (ESP32-S3 would reset); COBS + CRC16 framing.
 pub struct UsbTransport;
 
+impl UsbTransport {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 #[async_trait]
 impl Transport for UsbTransport {
     fn name(&self) -> &'static str {

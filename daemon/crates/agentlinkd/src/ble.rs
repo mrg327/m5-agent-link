@@ -6,6 +6,12 @@ use async_trait::async_trait;
 // TODO: btleplug central; reassemble [FIRST|LAST|seq:6] fragments into whole envelopes.
 pub struct BleTransport;
 
+impl BleTransport {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 #[async_trait]
 impl Transport for BleTransport {
     fn name(&self) -> &'static str {
