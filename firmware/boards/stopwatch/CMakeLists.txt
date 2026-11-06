@@ -10,6 +10,7 @@ idf_component_register(
         "touch.cpp"
     INCLUDE_DIRS "."
     REQUIRES agentlink_hal sw_power
+    WHOLE_ARCHIVE # hal_* impls are split across objects; core references them
     PRIV_REQUIRES
         driver
         bt
