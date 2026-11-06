@@ -155,6 +155,12 @@ pub fn env<'a>(ctx: &'a HostCtx, k: &str) -> Option<&'a str> {
     ctx.env.get(k).map(String::as_str).filter(|v| !v.is_empty())
 }
 
+/// kitty's own variables, or its terminfo name (some agents scrub KITTY_* and TERM_PROGRAM
+/// from hook environments but keep TERM).
+fn is_kitty(ctx: &HostCtx) -> bool {
+    env(ctx, "KITTY_WINDOW_ID").is_some() || env(ctx, "TERM") == Some("xterm-kitty")
+}
+
 /// Picks the outer terminal driver from the captured identity. Pure.
 pub fn select_outer(ctx: &HostCtx, os: &str) -> Outer {
     let term = env(ctx, "TERM_PROGRAM");
@@ -168,12 +174,12 @@ pub fn select_outer(ctx: &HostCtx, os: &str) -> Outer {
             Some("ghostty") => Outer::App("Ghostty"),
             Some("Hyper") => Outer::App("Hyper"),
             // tmux and screen overwrite TERM_PROGRAM; fall back to what they left alone.
-            _ if env(ctx, "KITTY_WINDOW_ID").is_some() => Outer::Kitty,
+            _ if is_kitty(ctx) => Outer::Kitty,
             _ => Outer::Unknown,
         },
         "windows" if env(ctx, "WT_SESSION").is_some() => Outer::WindowsTerminal,
         "linux" => {
-            if term == Some("kitty") || env(ctx, "KITTY_WINDOW_ID").is_some() {
+            if term == Some("kitty") || is_kitty(ctx) {
                 Outer::Kitty
             } else {
                 Outer::Linux
@@ -270,6 +276,7 @@ mod tests {
         assert_eq!(sel(&[("WT_SESSION", "x")], "macos"), Outer::Unknown);
         assert_eq!(sel(&[], "linux"), Outer::Linux);
         assert_eq!(sel(&[("KITTY_WINDOW_ID", "")], "macos"), Outer::Unknown);
+        assert_eq!(sel(&[("TERM", "xterm-kitty")], "macos"), Outer::Kitty);
     }
 
     #[test]

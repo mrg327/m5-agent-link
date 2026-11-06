@@ -254,7 +254,7 @@ All easter eggs are rate-limited and are off in quiet mode.
 
 | Terminal | Focus method | Status |
 |---|---|---|
-| kitty (mac/Linux) | `kitty @ --to $KITTY_LISTEN_ON focus-window --match id:$KITTY_WINDOW_ID` + raise the OS window (requires `allow_remote_control` + `listen_on`) | **Verified live on macOS** |
+| kitty (mac/Linux) | `kitty @ --to <socket> focus-window --match id:$KITTY_WINDOW_ID` + raise the OS window (requires `allow_remote_control` + `listen_on`). Socket = `$KITTY_LISTEN_ON`, else `/tmp/kitty-<pid>` for `$KITTY_PID` or an ancestor pid. Without `KITTY_WINDOW_ID` it matches `pid:<p1> or pid:<p2> …` over the pid chain; kitty is detected from `TERM=xterm-kitty` too | **Verified live on macOS** (id and pid-chain paths) |
 | macOS Terminal.app | AppleScript: match `tty` across windows/tabs, then select the tab and bring the window to the front (Automation permission prompt) | **Verified live** |
 | Windows Terminal | Walk the agent's process tree to the owning `WindowsTerminal.exe`, restore the window, `SetForegroundWindow` with the AttachThreadInput workaround. **No tab selection** (no public process→tab API) | Compiles; untested on a device |
 | tmux | Select the pane (`TMUX_PANE`), then focus the outer terminal | Untested |

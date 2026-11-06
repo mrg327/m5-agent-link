@@ -306,6 +306,9 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
                 ctx,
             };
             let res = shared.focus.focus(&target).await;
+            if let Err(e) = &res {
+                tracing::warn!("focus sid={} failed: {e:?}", session.sid);
+            }
             shared.trace.audit(
                 "focus",
                 cmd.sid,
