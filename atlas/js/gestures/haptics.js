@@ -1,14 +1,18 @@
 // Haptic seismograph: each pattern from facts.haptics drawn as the motor-duty waveform the
-// firmware really produces (kick at 100% for 15 ms on pulses ≥ 30 ms, then the 85% hold).
+// firmware really produces (kick at 100% for 15 ms on pulses ≥ 30 ms, then the 85% hold; a pulse
+// no longer than the kick, like the rim detent, is all kick).
 import { h, svg, cssVar } from './dom.js';
 
 const ORDER = [
-  ['tick', 'Tick', null],
+  ['detent', 'Detent', 'accent'],
+  ['hold_ramp', 'Approve ramp', 'amber'],
   ['confirm', 'Confirm', 'success'],
+  ['reject', 'Reject', 'danger'],
+  ['permission', 'Permission', 'amber'],
+  ['question', 'Question', 'amber'],
   ['done', 'Done', 'success'],
   ['error', 'Error', 'danger'],
-  ['needs_input', 'Needs input', 'amber'],
-  ['reject', 'Reject', 'danger'],
+  ['tick', 'Tick', null],
   ['hello', 'Hello', 'accent'],
 ];
 
@@ -18,15 +22,16 @@ function ripple(i) { return Math.sin(i * 12.9898) * 0.5 + Math.sin(i * 4.1414) *
 export function createSeismograph(root, ctx) {
   const f = ctx.facts, motor = f.haptic_motor;
   const total = (steps) => steps.reduce((a, s) => a + s.on_ms + s.off_ms, 0);
-  const longest = Math.max(...Object.values(f.haptics).map(total));
   const VBW = 300, VBH = 64, base = 54, top = 8;
-  const X = (ms) => 6 + (ms / longest) * (VBW - 12);
+  // each card has its own time axis (at least 80 ms wide), so a 15 ms detent is still visible next to a 1.2 s ramp
+  const axis = (steps) => { const span = Math.max(total(steps), 80); return (ms) => 6 + (ms / span) * (VBW - 12); };
   const Y = (duty) => base - (duty / 100) * (base - top);
 
   const cards = [];
   for (const [name, label, tone] of ORDER) {
     const steps = f.haptics[name];
     if (!steps) continue;
+    const X = axis(steps);
     // path of the duty over time, with the kick
     let t = 0, d = `M ${X(0)} ${Y(0)}`;
     const marks = [];
@@ -44,7 +49,7 @@ export function createSeismograph(root, ctx) {
     for (const m of marks) {
       rp += ` M ${X(m.t)} ${Y(0)}`;
       for (let ms = m.t; ms <= m.t + m.on; ms += 3) {
-        const duty = ms - m.t < m.kick ? motor.kick_duty : motor.hold_duty;
+        const duty = ms - m.t < m.kick || m.on <= motor.kick_ms ? motor.kick_duty : motor.hold_duty;
         rp += ` L ${X(ms)} ${Y(duty) + ripple(ms) * 3.2}`;
       }
       rp += ` L ${X(m.t + m.on)} ${Y(0)}`;
@@ -70,7 +75,9 @@ export function createSeismograph(root, ctx) {
   const legend = h('p', { class: 'seis__legend' },
     h('span', { class: 'seis__key mono', text: `${motor.kick_duty}% × ${motor.kick_ms} ms` }), ' kick to spin the motor up, then ',
     h('span', { class: 'seis__key mono', text: `${motor.hold_duty}%` }), ' hold. Only pulses of ',
-    h('span', { class: 'mono', text: `≥ ${motor.kick_min_pulse_ms} ms` }), ' get the kick.');
+    h('span', { class: 'mono', text: `≥ ${motor.kick_min_pulse_ms} ms` }), ' get the kick. The ',
+    h('span', { class: 'mono', text: `${motor.kick_ms} ms` }), ' rim detent is all kick, rate-limited to one per ',
+    h('span', { class: 'mono', text: `${motor.detent_min_gap_ms} ms` }), '.');
   const vib = typeof navigator !== 'undefined' && 'vibrate' in navigator;
   const note = h('p', { class: 'seis__hint', text: vib ? 'Click a pattern. Your phone will buzz it too.' : 'Click a pattern to see it on the watch.' });
   root.append(h('div', { class: 'seisgrid' }, cards), legend, note);

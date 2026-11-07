@@ -3,7 +3,7 @@
 const SIZE = 466;
 const LINK_KINDS = { usb: 0, ble: 1, ws: 2 };
 const GESTURE_KINDS = {
-  tap: 'tap', double_tap: 'double_tap', long_press: 'long_press',
+  tap: 'tap', long_press: 'long_press', scrub: 'scrub', select: 'select', chord: 'chord',
   swipe_up: 'swipe_u', swipe_down: 'swipe_d', swipe_left: 'swipe_l', swipe_right: 'swipe_r',
   btn_a: 'btn_a', btn_b: 'btn_b', btn_a_long: 'btn_a', btn_b_long: 'btn_b',
 };

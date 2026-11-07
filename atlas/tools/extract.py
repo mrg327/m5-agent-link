@@ -63,24 +63,20 @@ def find_all(rel, pattern, flags=0):
 # ───────────────────────── palette ─────────────────────────
 def extract_palette():
     rel = CORE + "ui_theme.h"
-    names = {
-        "bg": r"COL_BG\s+lv_color_hex\(0x([0-9a-fA-F]{6})\)",
-        "surface": r"COL_SURFACE\s+lv_color_hex\(0x([0-9a-fA-F]{6})\)",
-        "surface2": r"COL_SURFACE2\s+lv_color_hex\(0x([0-9a-fA-F]{6})\)",
-        "border": r"COL_BORDER\s+lv_color_hex\(0x([0-9a-fA-F]{6})\)",
-        "text": r"COL_TEXT\s+lv_color_hex\(0x([0-9a-fA-F]{6})\)",
-        "muted": r"COL_MUTED\s+lv_color_hex\(0x([0-9a-fA-F]{6})\)",
-        "amber": r"RGB_AMBER\s+0x([0-9a-fA-F]{6})",
-        "danger": r"RGB_DANGER\s+0x([0-9a-fA-F]{6})",
-        "success": r"RGB_SUCCESS\s+0x([0-9a-fA-F]{6})",
-        "accent": r"RGB_ACCENT\s+0x([0-9a-fA-F]{6})",
-        "idle": r"RGB_IDLE\s+0x([0-9a-fA-F]{6})",
-        "cloud": r"RGB_CLOUD\s+0x([0-9a-fA-F]{6})",
-    }
     pal = {}
-    for k, pat in names.items():
-        m = find(rel, pat, f"palette.{k}")
+    for k in ("bg", "surface", "surface2", "border", "text", "muted"):
+        m = find(rel, rf"COL_{k.upper()}\s+lv_color_hex\(0x([0-9a-fA-F]{{6}})\)", f"palette.{k}")
         pal[k] = "#" + m.group(1).lower()
+    # State colours (Okabe-Ito). The old Primer names are aliases of them, e.g. `RGB_AMBER RGB_PERMISSION`.
+    for k in ("working", "ask", "permission", "done", "error", "idle"):
+        m = find(rel, rf"#define RGB_{k.upper()}\s+0x([0-9a-fA-F]{{6}})", f"palette.{k}")
+        pal[k] = "#" + m.group(1).lower()
+    for k, alias in (("amber", "AMBER"), ("danger", "DANGER"), ("success", "SUCCESS"), ("accent", "ACCENT")):
+        m = find(rel, rf"#define RGB_{alias}\s+RGB_(\w+)", f"palette.{k}")
+        target = m.group(1).lower()
+        if target not in pal:
+            raise Drift(f"RGB_{alias} aliases unknown RGB_{target.upper()} in {rel}")
+        pal[k] = pal[target]
     return pal
 
 
@@ -114,38 +110,33 @@ def extract_states(pal):
                 colour_of[st] = (r.group(1).lower(), base + i)
             default = r.group(1).lower()
             pending = []
-    labels_m = find(src, r"const char \*theme_state_label\(const session_t \*s\)\s*\{(.*?)\n\}", None, re.S)
-    lbase = line_of(src, labels_m.start(1))
-    label_of = {}
-    for i, ln in enumerate(labels_m.group(1).split("\n")):
-        m = re.search(r"case SESS_(\w+): return (.*);", ln)
+    word_m = find(src, r"const char \*theme_state_word\(const session_t \*s\)\s*\{(.*?)\n\}", None, re.S)
+    wbase = line_of(src, word_m.start(1))
+    word_of = {}
+    for i, ln in enumerate(word_m.group(1).split("\n")):
+        m = re.search(r'case SESS_(\w+): return "([^"]+)";', ln)
         if m:
-            label_of[m.group(1).lower()] = (m.group(2), lbase + i)
-        m = re.search(r"default: return \"(\w+)\"", ln)
+            word_of[m.group(1).lower()] = (m.group(2), wbase + i)
+        m = re.search(r'default: return "([^"]+)";', ln)
         if m:
-            label_of["__default"] = (f'"{m.group(1)}"', lbase + i)
-    # the `case X:` before `default` isn't present for ended; it is the default
+            word_of["__default"] = (m.group(1), wbase + i)
+    inp = find(src, r'case SESS_INPUT: return s->sub == 1 \? "([^"]+)" : "([^"]+)";', "states.input_words")
+    sub_c = find(src, r"s->state == SESS_INPUT && s->sub == 0 \? RGB_(\w+) : theme_state_rgb", "states.permission_colour")
     states = {}
     for sid, name in sorted(cddl_states.items()):
         colour_name, cline = colour_of.get(name, (default, None))
-        lab = label_of.get(name) or label_of.get("__default")
-        if not lab:
-            raise Drift(f"no label for state {name} in {src}")
-        raw, lline = lab
-        words = re.findall(r'"([^"]+)"', raw)
-        label = words[-1] if name != "input" else "needs approval"
+        word, wline = word_of.get(name) or word_of["__default"]
         entry = {
             "id": sid,
             "color": pal[colour_name],
             "palette": colour_name,
-            "label": label[:1].upper() + label[1:],
-            "source": f"{src}:{cline or lline}",
+            "label": word,
+            "source": f"{src}:{cline or wline}",
         }
         if name == "input":
-            entry["sub_labels"] = {"0": "Needs approval", "1": "Question"}
-            if words != ["question", "needs approval"] and set(words) != {"question", "needs approval"}:
-                raise Drift(f"unexpected input labels {words} in {src}")
-            entry["label"] = "Needs you"
+            entry["label"] = inp.group(1)
+            entry["sub_labels"] = {"0": inp.group(2), "1": inp.group(1)}
+            entry["sub_colors"] = {"0": pal[sub_c.group(1).lower()], "1": pal[colour_name]}
         states[name] = entry
     # cross-check the C enum matches the wire ids
     for m in find_all(CORE + "model.h", r"SESS_(\w+) = (\d+)"):
@@ -227,92 +218,124 @@ def extract_messages():
 def extract_gesture():
     rel = CORE + "gesture.h"
     g = {}
-    for key, macro in [("double_tap_ms", "GESTURE_DOUBLE_TAP_MS"), ("long_press_ms", "GESTURE_LONG_PRESS_MS"),
-                       ("swipe_min_px", "GESTURE_SWIPE_MIN_PX"), ("swipe_max_ms", "GESTURE_SWIPE_MAX_MS"),
-                       ("tap_slop_px", "GESTURE_TAP_SLOP_PX")]:
+    for key, macro in [("long_press_ms", "GESTURE_LONG_PRESS_MS"), ("swipe_min_px", "GESTURE_SWIPE_MIN_PX"),
+                       ("swipe_max_ms", "GESTURE_SWIPE_MAX_MS"), ("tap_slop_px", "GESTURE_TAP_SLOP_PX"),
+                       ("btn_double_ms", "GESTURE_BTN_DOUBLE_MS"), ("cx_px", "GESTURE_CX"), ("cy_px", "GESTURE_CY"),
+                       ("rim_in_px", "GESTURE_RIM_IN_PX"), ("rim_out_px", "GESTURE_RIM_OUT_PX"),
+                       ("rim_track_in_px", "GESTURE_RIM_TRACK_IN_PX"), ("rim_track_out_px", "GESTURE_RIM_TRACK_OUT_PX"),
+                       ("scrub_start_deg", "GESTURE_SCRUB_START_DEG"), ("scrub_hyst_deg", "GESTURE_SCRUB_HYST_DEG")]:
         g[key] = int(find(rel, rf"#define {macro}\s+(\d+)", f"gesture.{key}").group(1))
-    slack = int(find(CORE + "app.c", r"#define DEFER_SLACK_MS\s+(\d+)", "gesture.defer_slack_ms").group(1))
-    find(CORE + "app.c", r"now - s_deferred_at >= GESTURE_DOUBLE_TAP_MS \+ DEFER_SLACK_MS", "gesture.tap_defer_ms")
-    g["tap_defer_ms"] = g["double_tap_ms"] + slack
-    g["defer_slack_ms"] = slack
-    g["second_tap_radius_px"] = int(find(
-        CORE + "gesture.c", r"abs\(g->x0 - g->x_tap\) <= (\d+)", "gesture.second_tap_radius_px").group(1))
-    g["hold_confirm_ms"] = int(find(CORE + "ui_internal.h", r"#define UI_HOLD_MS\s+(\d+)",
-                                    "gesture.hold_confirm_ms").group(1))
+    # the hysteresis is capped at a third of a sector; fail loudly if that rule changes
+    find(CORE + "gesture.c", r"GESTURE_SCRUB_HYST_DEG < width / 3\.0f", "gesture.scrub_hysteresis_cap")
+    g["hold_confirm_ms"] = int(find(CORE + "ui_internal.h", r"#define UI_HOLD_MS\s+(\d+)", "gesture.hold_confirm_ms").group(1))
+    home = CORE + "ui_home.c"
+    g["centre_r_px"] = int(find(home, r"#define CENTRE_R\s+(\d+)", "gesture.centre_r_px").group(1))
+    g["hold_show_ms"] = int(find(home, r"#define HOLD_SHOW_MS\s+(\d+)", "gesture.hold_show_ms").group(1))
+    find(CORE + "gesture.c", r"if \(btn == 1\) \{\s*emit\(g, G_BTN_B", "gesture.b_immediate", re.S)
     return g
 
 
-# case labels in each screen's gesture() → description (editorial, cross-checked)
-SCREEN_FILES = {"glance": "ui_glance.c", "list": "ui_list.c", "detail": "ui_detail.c"}
+def extract_ring():
+    home, ring = CORE + "ui_home.c", CORE + "ui_ring.c"
+    r = {}
+    for key, macro in [("merge_at", "MERGE_AT"), ("ambient_ms", "AMBIENT_MS"), ("nag_ms", "NAG_MS"), ("nag_max", "NAG_MAX"),
+                       ("hint_a_deg", "HINT_A_DEG"), ("hint_b_deg", "HINT_B_DEG"), ("hint_r_px", "HINT_R"),
+                       ("repo_w_px", "REPO_W"), ("repo_px", "REPO_PX"), ("repo_small_px", "REPO_SMALL_PX")]:
+        r[key] = int(find(home, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
+    for key, macro in [("band_out_px", "BAND_OUT"), ("band_w_px", "BAND_W"), ("sel_out_px", "SEL_OUT"), ("sel_w_px", "SEL_W"),
+                       ("outline_out_px", "OUTLINE_OUT"), ("prog_out_px", "PROG_OUT"), ("prog_w_px", "PROG_W"),
+                       ("work_period_ms", "WORK_PERIOD_MS"), ("ask_period_ms", "ASK_PERIOD_MS"),
+                       ("perm_period_ms", "PERM_PERIOD_MS"), ("done_sweep_ms", "DONE_SWEEP_MS"),
+                       ("error_flicker_ms", "ERROR_FLICKER_MS")]:
+        r[key] = int(find(ring, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
+    r["max_segments"] = int(find(CORE + "ui_ring.h", r"#define RING_MAX_SEGMENTS\s+(\d+)", "ring.max_segments").group(1))
+    # shape + motion per kind, from the comments on ring_kind_t
+    kinds = {}
+    for m in find_all(CORE + "ui_ring.h", r"RING_(\w+),?\s*/\* (.*?) \*/"):
+        kinds[m.group(1).lower()] = m.group(2)
+    SOURCES["ring.kinds"] = f"{CORE}ui_ring.h:{line_of(CORE + 'ui_ring.h', find(CORE + 'ui_ring.h', r'RING_WORK,').start())}"
+    r["kinds"] = kinds
+    find(home, r'"HOLD " LV_SYMBOL_OK " APPROVE"', "ring.pill_approve")
+    find(home, r'"FOCUS \+ ACK"', "ring.pill_done")
+    find(home, r'"swipe down to deny"', "ring.deny_hint")
+    r["pills"] = {"approve": "HOLD ✓ APPROVE", "done": "FOCUS + ACK", "default": "FOCUS"}
+    for key, pat in [("a", r'lv_label_set_text\(s_hint_a, "(\w+)"\)'), ("b", r'lv_label_set_text\(s_hint_b, "(\w+)"\)')]:
+        r.setdefault("edge_hints", {})[key] = find(home, pat, f"ring.edge_hint_{key}").group(1)
+    find(home, r"Nothing else needs you", "ring.nothing_else")
+    return r
+
+
+# Gesture cases handled by ui_home_gesture(), each with a hand-written description (cross-checked both ways).
 ACTION_TEXT = {
-    ("glance", "G_TAP"): "Tap a session segment → open its detail. Tap elsewhere → list",
-    ("glance", "G_SWIPE_UP"): "Open the list",
-    ("glance", "G_BTN_A"): "Open the list",
-    ("list", "G_SWIPE_UP"): "Select the next session",
-    ("list", "G_SWIPE_DOWN"): "Select the previous session (or back to glance from the top)",
-    ("list", "G_TAP"): "Tap a row to select it; tap the selected row to open detail (deferred)",
-    ("list", "G_DOUBLE_TAP"): "Focus that session's terminal on the PC",
-    ("list", "G_BTN_A"): "Open detail for the selected session",
-    ("list", "G_SWIPE_LEFT"): "Back to glance",
-    ("list", "G_BTN_B"): "Back to glance",
-    ("detail", "G_PRESS"): "Finger down on Approve starts the hold-to-confirm",
-    ("detail", "G_RELEASE"): "Lifting early cancels the hold",
-    ("detail", "G_LONG_PRESS"): "Hold Approve long enough to confirm",
-    ("detail", "G_TAP"): "Tap Deny to deny; tap Open to focus the PC (deferred)",
-    ("detail", "G_DOUBLE_TAP"): "Focus that session's terminal on the PC",
-    ("detail", "G_SWIPE_RIGHT"): "Acknowledge the session and go back to the list",
-    ("detail", "G_SWIPE_LEFT"): "Back to the list",
-    ("detail", "G_BTN_B"): "Back to the list",
-    ("detail", "G_BTN_A"): "Focus that session's terminal on the PC",
+    "G_PRESS": "Finger down in the centre of a permission request starts the approve hold",
+    "G_RELEASE": "Lifting cancels a hold in progress",
+    "G_TAP": "Centre: the state's default action (Focus). On the ring: select that segment",
+    "G_DOUBLE_TAP": "Never produced by the recogniser; handled like a tap for injected input",
+    "G_LONG_PRESS": "Focus (Working, Needs input, Idle), acknowledge (Done, Error). On a permission request the hold approves",
+    "G_SWIPE_DOWN": "Deny a permission request (swipe down across the centre)",
+    "G_SCRUB_START": "A drag around the rim starts selecting sessions",
+    "G_SCRUB": "The finger crossed into another sector: select it, with a detent",
+    "G_SCRUB_END": "Finger lifted after a scrub: merged Done groups settle",
+    "G_BTN_A": "Default action: Focus (eyes-free version of tapping the centre)",
+    "G_BTN_A_DOUBLE": "Jump to the next session that needs attention",
+    "G_BTN_B": "Select the next session",
+    "G_BTN_B_LONG": "Select the previous session",
 }
 
 
 def extract_gesture_map():
-    out = {}
-    seen = set()
-    for screen, fn in SCREEN_FILES.items():
-        rel = CORE + fn
-        m = find(rel, r"static bool gesture\(const gesture_evt_t \*g\)\s*\{(.*?)\n\}\n", None, re.S)
-        base = line_of(rel, m.start(1))
-        cases = []
-        for i, ln in enumerate(m.group(1).split("\n")):
-            for c in re.findall(r"case (G_\w+):", ln):
-                cases.append({"gesture": c, "source": f"{rel}:{base + i}"})
-        if not cases:
-            raise Drift(f"no gesture cases in {rel}")
-        for c in cases:
-            key = (screen, c["gesture"])
-            if key not in ACTION_TEXT:
-                raise Drift(f"{rel}: gesture {c['gesture']} on {screen} has no description in extract.py")
-            c["action"] = ACTION_TEXT[key]
-            seen.add(key)
-        out[screen] = cases
+    rel = CORE + "ui_home.c"
+    m = find(rel, r"bool ui_home_gesture\(const gesture_evt_t \*g\)\s*\{(.*?)\n\}\n", None, re.S)
+    base = line_of(rel, m.start(1))
+    cases, seen = [], set()
+    for i, ln in enumerate(m.group(1).split("\n")):
+        for c in re.findall(r"case (G_\w+):", ln):
+            if c not in ACTION_TEXT:
+                raise Drift(f"{rel}: gesture {c} has no description in extract.py")
+            seen.add(c)
+            cases.append({"gesture": c, "action": ACTION_TEXT[c], "source": f"{rel}:{base + i}"})
+    if not cases:
+        raise Drift(f"no gesture cases in {rel}")
     stale = sorted(set(ACTION_TEXT) - seen)
     if stale:
         raise Drift(f"extract.py describes gestures no longer in the source: {stale}")
-    # app.c global routing + deferral rule
-    find(CORE + "app.c", r"g->kind == G_SHAKE \|\| g->kind == G_BTN_B_LONG", "gesture_map.global")
-    find(CORE + "ui.c", r"if \(s_current == SCR_DETAIL\) return true;", "gesture_map.defer_detail")
-    find(CORE + "ui.c", r"return s_current == SCR_LIST && ui_list_tap_navigates", "gesture_map.defer_list")
-    out["global"] = [
-        {"gesture": "G_SHAKE", "action": "Jump to glance, from any screen", "source": SOURCES["gesture_map.global"]},
-        {"gesture": "G_BTN_B_LONG", "action": "Jump to glance, from any screen", "source": SOURCES["gesture_map.global"]},
-    ]
-    out["deferred_taps"] = {"detail": "every tap", "list": "a tap on the already-selected row",
-                            "source": SOURCES["gesture_map.defer_list"]}
-    return out
+    find(CORE + "app.c", r"if \(power_activity\(app_now_ms\(\)\)\) return;", "gesture_map.wake_swallow")
+    find(CORE + "app.c", r'case G_CHORD: dbg_event\("input", "chord"', "gesture_map.chord")
+    # per-state defaults from act_focus_selected / long-press branches, verified by pattern
+    find(rel, r"if \(s->state == SESS_DONE\) g_ui_actions->ack\(s->sid\);", "gesture_map.done_acks")
+    find(rel, r"if \(s->state == SESS_DONE \|\| s->state == SESS_ERROR\) act_ack_selected\(\);", "gesture_map.long_press_ack")
+    return {"cases": cases, "chord": "A + B held together is detected and logged, no action",
+            "first_touch_wakes_only": True}
+
+
+def extract_screens():
+    """Debug `screen` values the UI reports."""
+    vals = {}
+    for rel in (CORE + "ui.c", CORE + "ui_home.c"):
+        for m in re.finditer(r'"screen\\?":\\?"(\w+)\\?"|"%s", a && !a->answer_sent \? "(\w+)" : "(\w+)"', text(rel)):
+            for v in m.groups():
+                if v:
+                    vals.setdefault(v, f"{rel}:{line_of(rel, m.start())}")
+    if set(vals) != {"ring", "attention"}:
+        raise Drift(f"unexpected screen values {sorted(vals)}")
+    SOURCES["screens"] = vals["attention"]
+    return [{"id": "ring", "title": "Ring", "source": vals["ring"]},
+            {"id": "attention", "title": "Ring · a request is waiting", "source": vals["attention"]}]
 
 
 # ───────────────────────── haptics ─────────────────────────
 HAPTIC_MEANING = {
-    # pattern name → (C function/array that defines it, meaning)
-    "tick": ("feedback_tick", "tick", "A light acknowledgement of a touch or selection"),
-    "confirm": ("feedback_confirm", "ok", "An action went through"),
-    "reject": ("feedback_reject", "no", "An action was refused"),
-    "hello": ("feedback_hello", "hello", "Link up: proves the motor path, even in silent mode"),
-    "done": ("feedback_attention", "done", "An agent finished"),
-    "error": ("feedback_attention", "error", "An agent hit an error"),
-    "needs_input": ("feedback_attention", "needs_input", "An agent needs approval or an answer"),
+    # pattern name → (C array that defines it, meaning)
+    "detent": ("detent", "A click each time the rim scrub crosses into another segment"),
+    "hold_ramp": ("ramp", "Pulses grow longer and the gaps shorter while the approve hold fills"),
+    "tick": ("tick", "A light acknowledgement of a button selection"),
+    "confirm": ("ok", "An action went through"),
+    "reject": ("no", "An action was refused"),
+    "hello": ("hello", "Link up: proves the motor path, even in silent mode"),
+    "done": ("done", "An agent finished"),
+    "error": ("error", "An agent hit an error"),
+    "question": ("question", "An agent is asking a question"),
+    "permission": ("permission", "An agent needs approval"),
 }
 
 
@@ -323,8 +346,10 @@ def extract_haptics():
     kick_duty = int(find(inp, r"#define HAPTIC_KICK_DUTY\s+(\d+)", "haptics.kick_duty").group(1))
     kick_ms = int(find(inp, r"#define HAPTIC_KICK_MS\s+(\d+)", "haptics.kick_ms").group(1))
     find(inp, r"ms >= 2 \* HAPTIC_KICK_MS", "haptics.kick_rule")
+    find(inp, r"ms <= HAPTIC_KICK_MS \? HAPTIC_KICK_DUTY : HAPTIC_DUTY", "haptics.kick_only_rule")
+    detent_gap = int(find(rel, r"#define DETENT_MIN_GAP_MS\s+(\d+)", "haptics.detent_min_gap_ms").group(1))
     patterns, meanings = {}, {}
-    for name, (_, arr, meaning) in HAPTIC_MEANING.items():
+    for name, (arr, meaning) in HAPTIC_MEANING.items():
         m = find(rel, rf"static const uint16_t {arr}\[\]\s*=\s*\{{([\d,\s]+)\}};", f"haptics.{name}")
         vals = [int(v) for v in m.group(1).replace(" ", "").strip(",").split(",") if v]
         steps = []
@@ -332,13 +357,16 @@ def extract_haptics():
             on = vals[i]
             off = vals[i + 1] if i + 1 < len(vals) else 0
             has_kick = on >= 2 * kick_ms
-            steps.append({"on_ms": on, "off_ms": off, "duty": duty,
-                          "kick_ms": kick_ms if has_kick else 0, "kick_duty": kick_duty if has_kick else duty})
+            # a pulse no longer than the kick is all kick: a crisp click at kick duty
+            only_kick = on <= kick_ms
+            steps.append({"on_ms": on, "off_ms": off, "duty": kick_duty if only_kick else duty,
+                          "kick_ms": kick_ms if has_kick else 0,
+                          "kick_duty": kick_duty if has_kick or only_kick else duty})
         patterns[name] = steps
         meanings[name] = meaning
     return {"patterns": patterns, "meaning": meanings,
             "motor": {"hold_duty": duty, "kick_duty": kick_duty, "kick_ms": kick_ms,
-                      "kick_min_pulse_ms": 2 * kick_ms}}
+                      "kick_min_pulse_ms": 2 * kick_ms, "detent_min_gap_ms": detent_gap}}
 
 
 # ───────────────────────── link / usb / ble / display ─────────────────────────
@@ -403,7 +431,9 @@ def build():
         "palette": pal,
         "states": extract_states(pal),
         "gesture": extract_gesture(),
+        "ring": extract_ring(),
         "gesture_map": extract_gesture_map(),
+        "screens": extract_screens(),
         "haptics": None,
         "link": extract_link(),
         "usb": extract_usb(),
@@ -426,7 +456,7 @@ def css(facts):
     for k, s in facts["states"].items():
         lines.append(f"  --fw-state-{k}: {s['color']};")
     for k, v in facts["gesture"].items():
-        unit = "px" if k.endswith("_px") else "ms"
+        unit = "px" if k.endswith("_px") else "ms" if k.endswith("_ms") else "deg" if k.endswith("_deg") else ""
         lines.append(f"  --fw-{k.replace('_', '-')}: {v}{unit};")
     m = facts["haptic_motor"]
     lines.append(f"  --fw-haptic-kick-ms: {m['kick_ms']}ms;")

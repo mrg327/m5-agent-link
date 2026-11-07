@@ -11,14 +11,14 @@ if (!document.documentElement.classList.contains('is-file')) boot();
 
 const FALLBACK_FACTS = {
   generated_from: 'fallback',
-  palette: { bg: '#000000', surface: '#0d1117', text: '#e6edf3', muted: '#8b949e', amber: '#d29922', danger: '#f85149', success: '#3fb950', accent: '#58a6ff', idle: '#6e7681', cloud: '#a371f7' },
+  palette: { bg: '#000000', surface: '#0d1117', text: '#e6edf3', muted: '#8b949e', working: '#56b4e9', ask: '#f0e442', permission: '#e69f00', done: '#009e73', error: '#d55e00', idle: '#999999', amber: '#e69f00', danger: '#d55e00', success: '#009e73', accent: '#56b4e9' },
   // TODO(fact): fallback only; the real list is extracted from ui_theme.c
   states: {
-    work: { color: '#58a6ff', label: 'Working' },
-    input: { color: '#d29922', label: 'Needs you' },
-    error: { color: '#f85149', label: 'Error' },
-    done: { color: '#3fb950', label: 'Done' },
-    idle: { color: '#6e7681', label: 'Idle' },
+    work: { color: '#56b4e9', label: 'Working' },
+    input: { color: '#f0e442', label: 'Needs input' },
+    error: { color: '#d55e00', label: 'Error' },
+    done: { color: '#009e73', label: 'Done' },
+    idle: { color: '#999999', label: 'Idle' },
   },
   display: { width: 466, height: 466, shape: 'round' },
   messages: [],

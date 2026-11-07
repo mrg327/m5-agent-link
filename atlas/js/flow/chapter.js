@@ -1,5 +1,5 @@
 // Chapter 02 — "From hook to wrist": how an agent event becomes bytes on a transport and a
-// light on the watch, and how a double-tap travels back as `cmd focus`.
+// light on the watch, and how a tap on the centre travels back as `cmd focus`.
 import { createDiagram, LANE_META } from './diagram.js';
 import { createInspector } from './inspector.js';
 import { encodeMsg, hello, welcome, snapshot, cmd, describe } from '../proto/messages.js';
@@ -53,7 +53,7 @@ export function mount(section, ctx) {
     </div>
 
     <div class="flow__diagram" data-r="diagram"></div>
-    <p class="flow__return" data-r="ret" aria-live="polite">Double-tap the watch to send <code>cmd focus</code> back along the thread.</p>
+    <p class="flow__return" data-r="ret" aria-live="polite">Tap the centre of the watch to send <code>cmd focus</code> back along the thread.</p>
 
     <div class="flow__transport">
       <div class="flow__tswitch" role="radiogroup" aria-label="Transport" data-r="tswitch"></div>

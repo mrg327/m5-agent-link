@@ -122,7 +122,7 @@ test('scenarios: busy has 8 sessions, pause/resume, loop, inject', () => {
   h.daemon.inject({ gone: 20 });
   h.advance(10);
   assert.deepEqual(h.rx.slice(-3).map((m) => m.t), ['session_upd', 'session_upd', 'gone']);
-  assert.deepEqual(h.daemon.scenarios.map((s) => s.name), ['demo', 'single', 'attention', 'busy']);
+  assert.deepEqual(h.daemon.scenarios.map((s) => s.name), ['demo', 'single', 'attention', 'ring', 'busy']);
 });
 
 test('a second hello (device reboot) resends welcome and a current snapshot', () => {

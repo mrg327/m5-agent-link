@@ -26,7 +26,7 @@ order, each a `<section data-chapter="id">`:
 | id | Chapter | Owner module |
 |---|---|---|
 | `intro` | Hero: what it is, the watch in its best light | shell (`js/stage/*`) |
-| `glance` | What the watch shows: states, colours, screens | shell |
+| `glance` | What the watch shows: the ring anatomy, states, colours | shell |
 | `flow` | How data travels: agent → hook → daemon → USB/BLE/WS → watch | flow (`js/flow/*`) |
 | `touch` | How you talk to it: gestures, timing, haptics, focus-on-PC | gestures (`js/gestures/*`) |
 | `replay` | Your own data: drop a trace file and replay real sessions | gestures (`js/replay/*`) |
@@ -54,8 +54,8 @@ ctx = {
 | `watch:tx` | `{bytes: Uint8Array, msg}` frame the watch sent (msg = decoded CBOR) | daemon |
 | `watch:rx` | `{bytes, msg}` frame delivered to the watch | daemon |
 | `watch:haptic` | `{steps: [{on_ms, off_ms, duty}]}` | watch |
-| `watch:gesture` | `{kind: 'tap'|'double_tap'|'long_press'|'swipe_l'|'swipe_r'|'swipe_u'|'swipe_d'|'btn_a'|'btn_b', x, y}` | watch |
-| `watch:screen` | `{screen: 'glance'|'list'|'detail'|..., sel}` | watch |
+| `watch:gesture` | `{kind: 'tap'|'long_press'|'scrub'|'select'|'chord'|'swipe_l'|'swipe_r'|'swipe_u'|'swipe_d'|'btn_a'|'btn_b', x, y}` | watch |
+| `watch:screen` | `{screen: 'ring'|'attention', sel}` | watch |
 | `pc:focus` | `{sid, ok}` the mock PC brought a terminal forward | daemon |
 | `scenario:step` | `{name, step, text}` | daemon |
 | `transport:set` | `{kind: 'usb'|'ble'|'ws'}` which link the story shows | flow |
@@ -122,13 +122,25 @@ site's own art direction on top.
 ```jsonc
 {
   "generated_from": "<git sha or 'worktree'>",
-  "palette": { "bg": "#000000", "surface": "#0d1117", "text": "#e6edf3", "muted": "#8b949e",
-               "amber": "#d29922", "danger": "#f85149", "success": "#3fb950",
-               "accent": "#58a6ff", "idle": "#6e7681", "cloud": "#a371f7" },
-  "states": { "<state id as in the CDDL/model>": { "color": "#hex", "label": "Working", "source": "file:line" } },
-  "gesture": { "double_tap_ms": 300, "long_press_ms": 600, "swipe_min_px": 60,
-               "swipe_max_ms": 400, "tap_slop_px": 18, "tap_defer_ms": 330 },
-  "haptics": { "<pattern name>": [ { "on_ms": 35, "off_ms": 0, "duty": 100 } ] },
+  "palette": { "bg": "#000000", "surface": "#0d1117", "surface2": "#161b22", "border": "#30363d",
+               "text": "#e6edf3", "muted": "#8b949e",
+               "working": "#56b4e9", "ask": "#f0e442", "permission": "#e69f00",
+               "done": "#009e73", "error": "#d55e00", "idle": "#999999",
+               "amber": "#e69f00", "danger": "#d55e00", "success": "#009e73", "accent": "#56b4e9" },
+  "states": { "<state id as in the CDDL/model>": { "color": "#hex", "label": "Working", "palette": "working", "source": "file:line",
+              "sub_labels": { "0": "Permission" }, "sub_colors": { "0": "#e69f00" } } },  // sub_* only on `input`
+  "gesture": { "long_press_ms": 600, "swipe_min_px": 60, "swipe_max_ms": 400, "tap_slop_px": 18,
+               "btn_double_ms": 300, "cx_px": 233, "cy_px": 233, "centre_r_px": 150,
+               "rim_in_px": 160, "rim_out_px": 260, "rim_track_in_px": 110, "rim_track_out_px": 340,
+               "scrub_start_deg": 10, "scrub_hyst_deg": 5, "hold_confirm_ms": 1200, "hold_show_ms": 250 },
+  "ring": { "merge_at": 9, "ambient_ms": 30000, "nag_ms": 15000, "nag_max": 3, "hint_a_deg": 225, "hint_b_deg": 135,
+            "repo_w_px": 250, "repo_px": 32, "repo_small_px": 24,
+            "kinds": { "<work|ask|perm|done|error|idle>": "shape and motion text" },
+            "pills": { "approve": "HOLD ✓ APPROVE", "done": "FOCUS + ACK", "default": "FOCUS" },
+            "edge_hints": { "a": "FOCUS", "b": "NEXT" } /* plus geometry and per-kind periods */ },
+  "gesture_map": { "cases": [ { "gesture": "G_TAP", "source": "file:line", "text": "..." } ], "chord": "...", "first_touch_wakes_only": true },
+  "screens": [ "ring", "attention" ],
+  "haptics": { "<detent|hold_ramp|tick|confirm|reject|hello|done|error|question|permission>": [ { "on_ms": 35, "off_ms": 0, "duty": 100 } ] },
   "link":   { "hello_retry_ms": 3000, "ping_interval_ms": 5000, "silence_timeout_ms": 12000 },
   "usb":    { "vid": "0x303A", "pid": "0x1001", "crc": "CRC-16/CCITT-FALSE", "max_payload": 4096 },
   "ble":    { "service": "uuid", "rx": "uuid", "tx": "uuid", "name_prefix": "AgentLink-", "default_write_len": 20 },

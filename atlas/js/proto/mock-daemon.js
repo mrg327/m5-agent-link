@@ -46,9 +46,25 @@ const SCENARIOS = {
     length: 26000,
     steps: [
       [0, 'Claude Code starts', (d) => d.addSession(S(1, 'claude', 'webapp', 'feat/login', 'work', { tool: 'Edit', sum: 'Editing login form' }))],
+      [600, 'Copilot CLI is busy in api', (d) => d.addSession(S(2, 'copilot', 'api', 'main', 'work', { tool: 'bash', sum: 'Running migrations' }))],
+      [1200, 'docs-site finished earlier', (d) => d.addSession(S(3, 'copilot', 'docs-site', 'main', 'done', { sum: 'Docs updated' }))],
+      [1800, 'infra has a question', (d) => d.addSession(S(4, 'claude', 'infra', 'main', 'input', { sub: 'question', sum: 'Which region?' }))],
       [3000, 'Claude Code asks to run a shell command', (d) => d.requestApproval(1, { rid: 7, title: 'Run shell command', text: 'npm test -- --watch=false', exp: 20 })],
       [20000, 'Nobody answered, so the request expires', (d) => d.expireAttention(7)],
       [22000, 'Claude Code carries on', (d) => d.update(1, { st: 'done', sum: 'Stopped waiting' })],
+    ],
+  },
+  ring: {
+    title: 'One session in every state',
+    length: 3600000,
+    steps: [
+      [0, 'Working', (d) => d.addSession(S(1, 'copilot', 'm5-agent-link', 'main', 'work', { tool: 'bash', sum: 'Running tests' }))],
+      [0, 'Has a question', (d) => d.addSession(S(2, 'claude', 'webapp', 'feat/login', 'input', { sub: 'question', sum: 'Which version to document?' }))],
+      [0, 'Needs permission', (d) => d.addSession(S(3, 'claude', 'api', 'main', 'work', { tool: 'bash' }))],
+      [0, 'Done', (d) => d.addSession(S(4, 'copilot', 'docs-site', 'main', 'done', { sum: 'Docs updated' }))],
+      [0, 'Error', (d) => d.addSession(S(5, 'copilot', 'infra', 'main', 'error', { sum: 'Build failed' }))],
+      [0, 'Idle', (d) => d.addSession(S(6, 'claude', 'blog', 'main', 'idle', { sum: 'Waiting for a prompt' }))],
+      [100, 'Permission request', (d) => d.requestApproval(3, { rid: 7, title: 'Run shell command', text: 'npm test -- --watch=false', exp: 3000 })],
     ],
   },
   busy: {
