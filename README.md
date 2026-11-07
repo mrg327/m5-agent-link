@@ -11,10 +11,19 @@ and a double-tap brings that agent's terminal to the front on your PC.
                    ~/.agentlink/trace (JSONL)                    `#` debug lines over USB
 ```
 
+**New here? Open the Atlas.** It is an interactive, visual guide to how the watch works:
+what it shows, how data travels, how gestures are read and how haptics feel. The watch on
+the page runs the real firmware, compiled to WebAssembly.
+
+```sh
+scripts/atlas --open        # serves index.html at http://localhost:8700/
+```
+
 ## Repository map
 
 | Path | What it is |
 |---|---|
+| `index.html`, `atlas/` | **The Atlas**, the living visual guide (facts generated from source; see `atlas/CONTRACT.md`) |
 | `docs/design/` | **Start here.** `DESIGN.md`, `PROTOCOL.md`, `FIRMWARE.md` |
 | `docs/research/` | Background research: similar products, use cases, host integration, UI |
 | `docs/` (rest) | Vendor documentation for the StopWatch (`uv run scripts/fetch_docs.py`) |

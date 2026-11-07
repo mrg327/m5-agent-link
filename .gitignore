@@ -19,3 +19,5 @@ selftest_*.png
 __pycache__/
 /.agentlink/
 /firmware/build-*/
+.playwright-mcp/
+atlas/wasm/build/

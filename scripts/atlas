@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Serve The Atlas (index.html + atlas/) from the repo root.
+# Usage: scripts/atlas [port] [--open]
+set -euo pipefail
+PORT=8700
+OPEN=0
+for a in "$@"; do
+  case "$a" in
+    --open) OPEN=1 ;;
+    ''|*[!0-9]*) echo "usage: scripts/atlas [port] [--open]" >&2; exit 2 ;;
+    *) PORT="$a" ;;
+  esac
+done
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+URL="http://localhost:${PORT}/"
+echo "The Atlas  →  ${URL}"
+echo "(serving ${ROOT}; Ctrl-C to stop)"
+if [ "$OPEN" = 1 ] && command -v open >/dev/null 2>&1; then
+  (sleep 0.6 && open "$URL") &
+fi
+if command -v node >/dev/null 2>&1; then
+  exec node "$ROOT/atlas/tools/serve.mjs" "$ROOT" "$PORT"
+fi
+exec python3 -m http.server "$PORT" --bind 127.0.0.1 --directory "$ROOT"

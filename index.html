@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AgentLink Atlas — your agents, on your wrist</title>
+<meta name="description" content="A living explainer of AgentLink: a round AMOLED StopWatch that shows what your coding agents are doing, and brings the right terminal back with one tap. The watch on this page runs the real firmware UI.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#05060a">
+<meta property="og:type" content="website">
+<meta property="og:title" content="AgentLink Atlas — your agents, on your wrist">
+<meta property="og:description" content="Agent hooks → daemon → USB/BLE → a round watch. Tap it, and the right terminal comes forward. An interactive tour.">
+<meta property="og:site_name" content="AgentLink Atlas">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3CradialGradient id='g' cx='40%25' cy='35%25' r='70%25'%3E%3Cstop offset='0' stop-color='%2358a6ff'/%3E%3Cstop offset='1' stop-color='%2305060a'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='32' cy='32' r='30' fill='%23181a20'/%3E%3Ccircle cx='32' cy='32' r='24' fill='url(%23g)'/%3E%3Crect x='3' y='40' width='6' height='10' rx='3' fill='%23ff9f1c' transform='rotate(30 6 45)'/%3E%3Crect x='55' y='40' width='6' height='10' rx='3' fill='%23ff5d5d' transform='rotate(-30 58 45)'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="atlas/css/base.css">
+<link rel="stylesheet" href="atlas/css/stage.css">
+<link rel="stylesheet" href="atlas/css/chapters.css">
+<link rel="stylesheet" href="atlas/css/flow.css">
+<link rel="stylesheet" href="atlas/css/touch.css">
+<script>
+  // Browsers block ES modules and WASM on file://; tell people how to run it.
+  if (location.protocol === 'file:') document.documentElement.classList.add('is-file');
+</script>
+</head>
+<body data-stage="hero">
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="file-hint" role="alert">
+  <div>
+    <h1>This page needs a tiny web server.</h1>
+    <p>Browsers won’t run ES modules or WebAssembly from <code>file://</code>. From the repo root, run</p>
+    <pre><code>scripts/atlas --open</code></pre>
+    <p>and the Atlas opens at <code>http://localhost:8700/</code>.</p>
+  </div>
+</div>
+
+<header class="topbar" id="topbar">
+  <a class="topbar__brand" href="#intro" aria-label="AgentLink Atlas, back to top"><i class="topbar__dot" aria-hidden="true"></i>AgentLink<span> Atlas</span></a>
+  <nav class="rail" aria-label="Chapters">
+    <ol>
+      <li><a href="#intro" data-nav="intro"><b>00</b><span>Hello</span></a></li>
+      <li><a href="#glance" data-nav="glance"><b>01</b><span>Glance</span></a></li>
+      <li><a href="#flow" data-nav="flow"><b>02</b><span>Flow</span></a></li>
+      <li><a href="#touch" data-nav="touch"><b>03</b><span>Touch</span></a></li>
+      <li><a href="#replay" data-nav="replay"><b>04</b><span>Replay</span></a></li>
+      <li><a href="#build" data-nav="build"><b>05</b><span>Build</span></a></li>
+    </ol>
+  </nav>
+  <div class="topbar__progress" id="progress" aria-hidden="true"></div>
+</header>
+
+<!-- The persistent watch stage is injected here by atlas/js/main.js -->
+<div class="stage" id="stage" data-mode="hero" aria-label="Interactive StopWatch"></div>
+
+<noscript>
+  <div class="noscript">
+    <h1>AgentLink Atlas</h1>
+    <p>This interactive explainer needs JavaScript. AgentLink shows what your coding agents are doing on a round StopWatch, and a double tap brings the right terminal forward. Read the docs in <a href="docs/design/DESIGN.md">docs/design</a> instead.</p>
+  </div>
+</noscript>
+
+<main id="main">
+
+  <section class="chapter chapter--hero" data-chapter="intro" data-layout="hero" id="intro" aria-labelledby="intro-title">
+    <div class="chapter__inner hero">
+      <div class="hero__copy">
+        <p class="chapter__eyebrow"><span class="mono">M5Stack StopWatch</span> · AgentLink</p>
+        <h1 class="hero__title" id="intro-title">Your agents,<br>on your wrist.</h1>
+        <p class="hero__lede">One glance tells you who is working, who is stuck, who is done. One tap brings the right terminal back.</p>
+        <p class="hero__caption" aria-live="polite"><i class="hero__led" aria-hidden="true"></i><span id="hero-caption">Waiting for the watch…</span></p>
+        <div class="hero__tools">
+          <button class="btn" type="button" id="hero-replay">Replay demo</button>
+          <span class="hero__hint">Tap the watch. Press <kbd class="kbd">A</kbd> <kbd class="kbd">B</kbd> on your keyboard.</span>
+        </div>
+      </div>
+      <a class="hero__scroll" href="#glance" aria-label="Scroll to the next chapter"><span>Scroll</span><i aria-hidden="true"></i></a>
+    </div>
+  </section>
+
+  <section class="chapter" data-chapter="glance" data-layout="side" id="glance" aria-labelledby="glance-title">
+    <div class="chapter__inner" data-mount="glance">
+      <header class="chapter__head">
+        <p class="chapter__eyebrow"><b class="mono">01</b> What it shows</p>
+        <h2 class="chapter__title" id="glance-title">Colour means state.<br>Nothing else is coloured.</h2>
+        <p class="chapter__lede">The screen is true black, so the only light is information. Hover a state to make the watch show it.</p>
+      </header>
+      <div class="glance__chips" data-slot="chips" role="group" aria-label="Agent states"></div>
+      <div class="glance__screens" data-slot="screens"></div>
+      <div class="glance__link" data-slot="link"></div>
+    </div>
+  </section>
+
+  <section class="chapter" data-chapter="flow" data-layout="wide" id="flow" aria-labelledby="flow-title">
+    <div class="chapter__inner" data-mount="flow">
+      <header class="chapter__head">
+        <p class="chapter__eyebrow"><b class="mono">02</b> How data travels</p>
+        <h2 class="chapter__title" id="flow-title">From hook to wrist</h2>
+      </header>
+      <div class="chapter__body" data-slot="body"></div>
+    </div>
+  </section>
+
+  <section class="chapter" data-chapter="touch" data-layout="side" id="touch" aria-labelledby="touch-title">
+    <div class="chapter__inner" data-mount="touch">
+      <header class="chapter__head">
+        <p class="chapter__eyebrow"><b class="mono">03</b> How you talk to it</p>
+        <h2 class="chapter__title" id="touch-title">Touch, press, feel</h2>
+      </header>
+      <div class="chapter__body" data-slot="body"></div>
+    </div>
+  </section>
+
+  <section class="chapter" data-chapter="replay" data-layout="wide" id="replay" aria-labelledby="replay-title">
+    <div class="chapter__inner" data-mount="replay">
+      <header class="chapter__head">
+        <p class="chapter__eyebrow"><b class="mono">04</b> Your own data</p>
+        <h2 class="chapter__title" id="replay-title">Replay a real session</h2>
+      </header>
+      <div class="chapter__body" data-slot="body"></div>
+    </div>
+  </section>
+
+  <section class="chapter" data-chapter="build" data-layout="side" id="build" aria-labelledby="build-title">
+    <div class="chapter__inner" data-mount="build">
+      <header class="chapter__head">
+        <p class="chapter__eyebrow"><b class="mono">05</b> Under the hood</p>
+        <h2 class="chapter__title" id="build-title">Eight layers, four codebases</h2>
+        <p class="chapter__lede">A 15.5 mm puck. Scroll to pull it apart; hover a layer to find it.</p>
+      </header>
+
+      <div class="explode" data-slot="explode" aria-label="Exploded view of the StopWatch">
+        <div class="explode__scene" aria-hidden="true"></div>
+        <ol class="explode__list"></ol>
+      </div>
+
+      <div class="softmap" data-slot="softmap">
+        <h3 class="chapter__sub">Software map</h3>
+        <div class="softmap__grid"></div>
+      </div>
+
+      <div class="truth panel" data-slot="truth">
+        <h3 class="chapter__sub">How this page stays true</h3>
+        <p>Every colour, timing, UUID and message name here is <strong>generated from the source</strong> by <code class="mono">atlas/tools/extract.py</code>. Nothing is retyped by hand, so the page cannot drift from the code.</p>
+        <p>When <code class="mono">watch.kind</code> is <code class="mono">wasm</code>, the screen is the <strong>real firmware UI core and LVGL compiled to WebAssembly</strong>, driven by a JS daemon speaking the real protocol.</p>
+        <p class="truth__badges"><span class="badge" data-badge="runtime">checking…</span><span class="badge" data-badge="facts">checking…</span></p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <p><span class="mono">AgentLink Atlas</span> · static, no build step · <a href="README.md">README</a> · <a href="docs/design/DESIGN.md">Design</a> · <a href="docs/design/PROTOCOL.md">Protocol</a></p>
+</footer>
+
+<div class="grain" aria-hidden="true"></div>
+<script type="module" src="atlas/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,142 @@
+/* stage.css — the persistent watch stage, ambient glow, and effects.
+   The stage is position:fixed. Its anchor moves between three modes by
+   transform only (hero / side / mini), driven by the --sx/--sy/--ss variables below. */
+
+:root {
+  --fit: 1;            /* set by stage.js from the viewport (0.45–1) */
+  --glow-a: .22;       /* ambient intensity, set by stage.js */
+  --usb: #e8ecf4;      /* transport colours; the flow chapter may override */
+  --ble: var(--c-accent);
+
+  /* hero */
+  --sx: 72vw; --sy: calc(50vh + 18px); --ss: calc(.98 * var(--fit));
+}
+body[data-stage="side"] { --sx: calc(100vw - var(--gutter) - 200px); --sy: calc(50vh + 24px); --ss: .64; }
+body[data-stage="mini"] { --sx: calc(100vw - var(--gutter) - 64px); --sy: calc(100vh - 92px); --ss: .21; }
+@media (max-width: 1099px) { body[data-stage="side"] { --sx: calc(100vw - var(--gutter) - 160px); --ss: .52; } }
+/* Wide chapters (flow, replay) span the full content width: keep a clear lane on the right for the mini dock. */
+@media (min-width: 1200px) {
+  body[data-layout="wide"][data-stage="mini"] { --sx: calc(100vw - var(--gutter) - 70px); --sy: calc(100vh - 80px); --ss: .17; }
+}
+@media (max-width: 900px) {
+  body[data-stage] { --ss: calc(.9 * var(--fit)); --sx: 50vw; --sy: calc(var(--topbar-h) + 300px * var(--ss) + 14px); }
+  body[data-stage="side"], body[data-stage="mini"] { --sx: calc(100vw - 14px - 58px); --sy: calc(100vh - 14px - 58px); --ss: .19; }
+}
+
+.stage { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+.stage__halo {
+  position: fixed; left: 0; top: 0; width: 1400px; height: 1400px; margin: -700px 0 0 -700px; z-index: 0; pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--glow) calc(var(--glow-a) * 100%), transparent), color-mix(in srgb, var(--glow) calc(var(--glow-a) * 28%), transparent) 45%, transparent 100%);
+  transform: translate(var(--sx), var(--sy)) scale(calc(var(--ss) * 1.15));
+  transition: transform 900ms var(--ease-out), background 700ms linear;
+  will-change: transform;
+}
+.stage__anchor {
+  position: absolute; left: 0; top: 0; width: 600px; height: 600px; margin: -300px 0 0 -300px;
+  transform: translate(var(--sx), var(--sy)) scale(var(--ss));
+  transition: transform 900ms var(--ease-out);
+  will-change: transform;
+}
+.stage__scene { position: absolute; inset: 0; perspective: 2400px; perspective-origin: 50% 40%; }
+
+.stage__shadow {
+  position: absolute; left: 50%; top: 82%; width: 640px; height: 150px; margin-left: -320px;
+  background: radial-gradient(closest-side, rgba(0,0,0,.9), transparent 100%);
+  filter: blur(8px);
+}
+.stage__shadow::after {
+  content: ""; position: absolute; inset: 20% 12%; border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--glow) 55%, transparent), transparent);
+  opacity: calc(var(--glow-a) * 3.2); transform: translateY(-10%);
+}
+
+/* --- the puck ---------------------------------------------------------- */
+.device {
+  position: absolute; inset: 0; transform-style: preserve-3d; transform-origin: 50% 50% -65px;
+  transform: rotateX(14deg) rotateY(-15deg); will-change: transform;
+}
+.device > * { position: absolute; }
+.slab {
+  inset: 0; border-radius: 50%; pointer-events: none; backface-visibility: hidden;
+  background: conic-gradient(from var(--sheen-rot, 205deg), #0b0c0f 0deg, #2c2f38 14deg, #0b0c0f 44deg, #090a0c 120deg, #1d2027 160deg, #07080a 200deg, #101217 255deg, #34373f 290deg, #0b0c0f 330deg);
+}
+.face { inset: 0; transform: translateZ(0); transform-style: flat; border-radius: 50%; pointer-events: none; }
+.face > * { position: absolute; }
+.face__svg { inset: 0; width: 100%; height: 100%; }
+.face__sheen {
+  inset: 0; border-radius: 50%; mix-blend-mode: screen; opacity: 1;
+  background: conic-gradient(from var(--sheen-rot, 205deg), transparent 0deg, rgba(255,255,255,.32) 16deg, transparent 42deg, transparent 150deg, rgba(160,185,255,.2) 190deg, transparent 230deg, transparent 280deg, rgba(255,255,255,.1) 300deg, transparent 330deg);
+  -webkit-mask: radial-gradient(closest-side, transparent 92.2%, #000 93.4%, #000 98.8%, transparent 100%);
+          mask: radial-gradient(closest-side, transparent 92.2%, #000 93.4%, #000 98.8%, transparent 100%);
+}
+.screen {
+  left: 50%; top: 50%; width: 466px; height: 466px; margin: -233px 0 0 -233px; border-radius: 50%;
+  overflow: hidden; background: #000; pointer-events: none; isolation: isolate; transform: scale(1.09);
+}
+.screen__canvas, .screen__trace { position: absolute; inset: 0; width: 466px; height: 466px; border-radius: 50%; }
+.screen__canvas { pointer-events: auto; touch-action: none; cursor: pointer; background: #000; }
+.screen__trace { pointer-events: none; mix-blend-mode: screen; }
+.screen__annos { position: absolute; inset: 0; pointer-events: none; }
+.glass { inset: 0; transform: translateZ(1px); pointer-events: none; }
+.glass__svg { width: 100%; height: 100%; }
+.glass__sheen { transform: translate(var(--gx, 0px), var(--gy, 0px)); }
+
+/* keys: A orange (lower left), B coral (lower right) */
+.key {
+  left: 0; top: 0; width: 44px; height: 92px; padding: 0; border: 0; background: none; cursor: pointer;
+  transform-style: preserve-3d; -webkit-tap-highlight-color: transparent;
+  transform: translate(var(--kx), var(--ky)) translate(-50%, -50%) rotate(var(--ka)) translateX(var(--press, 0px));
+  transition: transform 90ms ease-out;
+}
+.key--a { --kx: 88px;  --ky: 512px; --ka: 135deg; --k1: #ffb454; --k2: #f07a0b; --k3: #8f4300; }
+.key--b { --kx: 512px; --ky: 512px; --ka: 45deg;  --k1: #ff8b82; --k2: #e5463d; --k3: #7e1d1a; }
+.key i {
+  position: absolute; inset: 0; border-radius: 12px; backface-visibility: hidden;
+  background: linear-gradient(115deg, var(--k3), var(--k2) 55%, var(--k3));
+}
+.key i:last-child { background: radial-gradient(120% 90% at 30% 20%, var(--k1), var(--k2) 55%, var(--k3)); box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -3px 6px rgba(0,0,0,.35); }
+.key i:last-child::after { content: ""; position: absolute; left: 22%; top: 28%; width: 56%; height: 44%; border-radius: 8px; border: 1.5px solid rgba(0,0,0,.28); border-bottom-color: rgba(255,255,255,.25); }
+.key:hover i:last-child { filter: brightness(1.12); }
+.key.is-down { --press: -7px; }
+.key:focus-visible { outline: none; }
+.key:focus-visible i:last-child { box-shadow: 0 0 0 3px var(--ink), 0 0 0 5px var(--c-accent); }
+
+/* USB-C on the right edge */
+.usb { left: 535px; top: 252px; width: 130px; height: 96px; transform: translateZ(-65px) rotateY(90deg) translateZ(-1px); pointer-events: none; display: grid; place-items: center;
+  background: linear-gradient(180deg, #181a20, #0a0b0e 40%, #15171c); border-radius: 18px; }
+.usb__shell { width: 78px; height: 36px; border-radius: 18px; background: linear-gradient(180deg, #dfe3ea, #7d8491 45%, #b8bdc8); padding: 3px; box-shadow: 0 0 0 2px rgba(0,0,0,.5); }
+.usb__slot { position: relative; width: 100%; height: 100%; border-radius: 15px; background: #020203; display: grid; place-items: center; }
+.usb__tongue { width: 76%; height: 7px; border-radius: 2px; background: linear-gradient(90deg, #3a3d45, #6b7080, #3a3d45); }
+
+/* spotlight, ring, labels, effects */
+.spot, .fx { left: -100px; top: -100px; width: 800px; height: 800px; pointer-events: none; transform: translateZ(3px); overflow: visible; }
+.spot__dim { opacity: 0; transition: opacity 420ms var(--ease-out); }
+.spot.is-on .spot__dim { opacity: .74; }
+.spot__ring circle { fill: none; stroke: #fff; stroke-opacity: .8; stroke-width: 1.5; stroke-dasharray: 2 7; transform-box: fill-box; transform-origin: center; animation: spin 14s linear infinite; }
+.spot__label {
+  left: 0; top: 0; transform: translateZ(4px) translate(var(--lx, 300px), var(--ly, 300px)) translate(-50%, 14px);
+  font: 500 15px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: #fff; white-space: nowrap;
+  padding: 7px 11px; border-radius: 999px; background: rgba(5,6,10,.78); border: 1px solid var(--line-2); opacity: 0; transition: opacity 300ms; pointer-events: none;
+}
+.spot__label.is-on { opacity: 1; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.anno { position: absolute; left: 0; top: 0; transform: translate(var(--ax), var(--ay)); animation: anno-in 360ms var(--ease-out) both; }
+.anno i { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; border: 1.5px solid #fff; box-shadow: 0 0 14px 2px rgba(255,255,255,.55); }
+.anno i::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; border: 1px solid rgba(255,255,255,.5); animation: ping 1.8s ease-out infinite; }
+.anno b { position: absolute; top: -34px; left: 14px; font: 500 13px/1.25 var(--font-mono); color: #fff; white-space: nowrap; padding: 5px 9px; border-radius: 8px; background: rgba(5,6,10,.82); border: 1px solid var(--line-2); }
+.anno--left b { left: auto; right: 14px; }
+@keyframes anno-in { from { opacity: 0; } }
+@keyframes ping { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+
+.fx .ripple { fill: none; stroke: var(--ble); stroke-width: 2.5; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.fx .bead { fill: var(--usb); filter: drop-shadow(0 0 8px var(--usb)); }
+.fx .cable { stroke: var(--usb); stroke-width: 1.5; stroke-opacity: .45; fill: none; }
+.fx .seismo { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 6px rgba(255,255,255,.7)); }
+
+body[data-stage="mini"] .screen__canvas { cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stage__anchor, .stage__halo { transition-duration: 1ms; }
+  .spot__ring circle { animation: none; }
+}

@@ -1,0 +1,1171 @@
+{
+  "generated_from": "worktree",
+  "palette": {
+    "bg": "#000000",
+    "surface": "#0d1117",
+    "surface2": "#161b22",
+    "border": "#30363d",
+    "text": "#e6edf3",
+    "muted": "#8b949e",
+    "amber": "#d29922",
+    "danger": "#f85149",
+    "success": "#3fb950",
+    "accent": "#58a6ff",
+    "idle": "#6e7681",
+    "cloud": "#a371f7"
+  },
+  "states": {
+    "start": {
+      "id": 0,
+      "color": "#58a6ff",
+      "palette": "accent",
+      "label": "Starting",
+      "source": "firmware/components/core/src/ui_theme.c:16"
+    },
+    "work": {
+      "id": 1,
+      "color": "#58a6ff",
+      "palette": "accent",
+      "label": "Working",
+      "source": "firmware/components/core/src/ui_theme.c:16"
+    },
+    "input": {
+      "id": 2,
+      "color": "#d29922",
+      "palette": "amber",
+      "label": "Needs you",
+      "source": "firmware/components/core/src/ui_theme.c:12",
+      "sub_labels": {
+        "0": "Needs approval",
+        "1": "Question"
+      }
+    },
+    "error": {
+      "id": 3,
+      "color": "#f85149",
+      "palette": "danger",
+      "label": "Error",
+      "source": "firmware/components/core/src/ui_theme.c:13"
+    },
+    "done": {
+      "id": 4,
+      "color": "#3fb950",
+      "palette": "success",
+      "label": "Done",
+      "source": "firmware/components/core/src/ui_theme.c:14"
+    },
+    "idle": {
+      "id": 5,
+      "color": "#6e7681",
+      "palette": "idle",
+      "label": "Idle",
+      "source": "firmware/components/core/src/ui_theme.c:29"
+    },
+    "ended": {
+      "id": 6,
+      "color": "#6e7681",
+      "palette": "idle",
+      "label": "Ended",
+      "source": "firmware/components/core/src/ui_theme.c:30"
+    }
+  },
+  "gesture": {
+    "double_tap_ms": 300,
+    "long_press_ms": 600,
+    "swipe_min_px": 60,
+    "swipe_max_ms": 400,
+    "tap_slop_px": 18,
+    "tap_defer_ms": 330,
+    "defer_slack_ms": 30,
+    "second_tap_radius_px": 40,
+    "hold_confirm_ms": 1200
+  },
+  "gesture_map": {
+    "glance": [
+      {
+        "gesture": "G_TAP",
+        "source": "firmware/components/core/src/ui_glance.c:124",
+        "action": "Tap a session segment → open its detail. Tap elsewhere → list"
+      },
+      {
+        "gesture": "G_SWIPE_UP",
+        "source": "firmware/components/core/src/ui_glance.c:134",
+        "action": "Open the list"
+      },
+      {
+        "gesture": "G_BTN_A",
+        "source": "firmware/components/core/src/ui_glance.c:135",
+        "action": "Open the list"
+      }
+    ],
+    "list": [
+      {
+        "gesture": "G_SWIPE_UP",
+        "source": "firmware/components/core/src/ui_list.c:157",
+        "action": "Select the next session"
+      },
+      {
+        "gesture": "G_SWIPE_DOWN",
+        "source": "firmware/components/core/src/ui_list.c:158",
+        "action": "Select the previous session (or back to glance from the top)"
+      },
+      {
+        "gesture": "G_TAP",
+        "source": "firmware/components/core/src/ui_list.c:162",
+        "action": "Tap a row to select it; tap the selected row to open detail (deferred)"
+      },
+      {
+        "gesture": "G_DOUBLE_TAP",
+        "source": "firmware/components/core/src/ui_list.c:174",
+        "action": "Focus that session's terminal on the PC"
+      },
+      {
+        "gesture": "G_BTN_A",
+        "source": "firmware/components/core/src/ui_list.c:180",
+        "action": "Open detail for the selected session"
+      },
+      {
+        "gesture": "G_SWIPE_LEFT",
+        "source": "firmware/components/core/src/ui_list.c:186",
+        "action": "Back to glance"
+      },
+      {
+        "gesture": "G_BTN_B",
+        "source": "firmware/components/core/src/ui_list.c:187",
+        "action": "Back to glance"
+      }
+    ],
+    "detail": [
+      {
+        "gesture": "G_PRESS",
+        "source": "firmware/components/core/src/ui_detail.c:121",
+        "action": "Finger down on Approve starts the hold-to-confirm"
+      },
+      {
+        "gesture": "G_RELEASE",
+        "source": "firmware/components/core/src/ui_detail.c:128",
+        "action": "Lifting early cancels the hold"
+      },
+      {
+        "gesture": "G_LONG_PRESS",
+        "source": "firmware/components/core/src/ui_detail.c:134",
+        "action": "Hold Approve long enough to confirm"
+      },
+      {
+        "gesture": "G_TAP",
+        "source": "firmware/components/core/src/ui_detail.c:137",
+        "action": "Tap Deny to deny; tap Open to focus the PC (deferred)"
+      },
+      {
+        "gesture": "G_DOUBLE_TAP",
+        "source": "firmware/components/core/src/ui_detail.c:145",
+        "action": "Focus that session's terminal on the PC"
+      },
+      {
+        "gesture": "G_SWIPE_RIGHT",
+        "source": "firmware/components/core/src/ui_detail.c:146",
+        "action": "Acknowledge the session and go back to the list"
+      },
+      {
+        "gesture": "G_SWIPE_LEFT",
+        "source": "firmware/components/core/src/ui_detail.c:150",
+        "action": "Back to the list"
+      },
+      {
+        "gesture": "G_BTN_B",
+        "source": "firmware/components/core/src/ui_detail.c:151",
+        "action": "Back to the list"
+      },
+      {
+        "gesture": "G_BTN_A",
+        "source": "firmware/components/core/src/ui_detail.c:152",
+        "action": "Focus that session's terminal on the PC"
+      }
+    ],
+    "global": [
+      {
+        "gesture": "G_SHAKE",
+        "action": "Jump to glance, from any screen",
+        "source": "firmware/components/core/src/app.c:177"
+      },
+      {
+        "gesture": "G_BTN_B_LONG",
+        "action": "Jump to glance, from any screen",
+        "source": "firmware/components/core/src/app.c:177"
+      }
+    ],
+    "deferred_taps": {
+      "detail": "every tap",
+      "list": "a tap on the already-selected row",
+      "source": "firmware/components/core/src/ui.c:211"
+    }
+  },
+  "haptics": {
+    "tick": [
+      {
+        "on_ms": 35,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ],
+    "confirm": [
+      {
+        "on_ms": 45,
+        "off_ms": 50,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 45,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ],
+    "reject": [
+      {
+        "on_ms": 35,
+        "off_ms": 60,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 35,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ],
+    "hello": [
+      {
+        "on_ms": 60,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ],
+    "done": [
+      {
+        "on_ms": 80,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ],
+    "error": [
+      {
+        "on_ms": 80,
+        "off_ms": 70,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 80,
+        "off_ms": 70,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 80,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ],
+    "needs_input": [
+      {
+        "on_ms": 250,
+        "off_ms": 120,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 250,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ]
+  },
+  "link": {
+    "hello_retry_ms": 3000,
+    "idle_ping_ms": 60000,
+    "ping_interval_ms": 5000,
+    "silence_timeout_ms": 12000
+  },
+  "usb": {
+    "vid": "0x303A",
+    "pid": "0x1001",
+    "baud": 115200,
+    "crc": "CRC-16/CCITT-FALSE",
+    "max_payload": 4096,
+    "framing": "0x00 ‖ COBS(payload ‖ crc16_be) ‖ 0x00"
+  },
+  "ble": {
+    "service": "a9e1f000-7c3b-4d52-9e18-b06a35c4d2f1",
+    "rx": "a9e1f001-7c3b-4d52-9e18-b06a35c4d2f1",
+    "tx": "a9e1f002-7c3b-4d52-9e18-b06a35c4d2f1",
+    "name_prefix": "AgentLink-",
+    "default_write_len": 20,
+    "max_write_len": 244
+  },
+  "display": {
+    "width": 466,
+    "height": 466,
+    "shape": "round"
+  },
+  "messages": [
+    {
+      "name": "hello",
+      "type": 1,
+      "dir": "dev→pc",
+      "summary": "Device introduces itself: protocol version, board, capabilities",
+      "fields": [
+        {
+          "key": 1,
+          "optional": false,
+          "type": "device_info",
+          "note": "dev",
+          "name": "dev"
+        },
+        {
+          "key": 2,
+          "optional": false,
+          "type": "caps",
+          "note": "caps",
+          "name": "caps"
+        },
+        {
+          "key": 3,
+          "optional": true,
+          "type": "uint",
+          "note": "batt_pct",
+          "name": "batt_pct"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:47"
+    },
+    {
+      "name": "welcome",
+      "type": 2,
+      "dir": "pc→dev",
+      "summary": "Daemon answers with host info, wall-clock time and device settings",
+      "fields": [
+        {
+          "key": 1,
+          "optional": false,
+          "type": "host_info",
+          "note": "host",
+          "name": "host"
+        },
+        {
+          "key": 2,
+          "optional": false,
+          "type": "time_sync",
+          "note": "time",
+          "name": "time"
+        },
+        {
+          "key": 3,
+          "optional": false,
+          "type": "device_cfg",
+          "note": "cfg",
+          "name": "cfg"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:48"
+    },
+    {
+      "name": "snapshot",
+      "type": 3,
+      "dir": "pc→dev",
+      "summary": "Full list of sessions, plus events missed while disconnected",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "[0*32 session]",
+          "note": "sessions",
+          "name": "sessions"
+        },
+        {
+          "key": 1,
+          "optional": true,
+          "type": "[0*16 away_event]",
+          "note": "away   events missed while disconnected",
+          "name": "away"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:49"
+    },
+    {
+      "name": "session_upd",
+      "type": 4,
+      "dir": "pc→dev",
+      "summary": "One session changed: a delta, only the changed keys",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "sid   daemon-assigned, stable for session lifetime",
+          "name": "sid"
+        },
+        {
+          "key": 1,
+          "optional": true,
+          "type": "agent",
+          "note": "ag",
+          "name": "ag"
+        },
+        {
+          "key": 2,
+          "optional": true,
+          "type": "sess_state",
+          "note": "st",
+          "name": "st"
+        },
+        {
+          "key": 3,
+          "optional": true,
+          "type": "input_sub",
+          "note": "sub   when st = input",
+          "name": "sub"
+        },
+        {
+          "key": 4,
+          "optional": true,
+          "type": "tstr",
+          "note": "repo  ≤ 32 chars",
+          "name": "repo"
+        },
+        {
+          "key": 5,
+          "optional": true,
+          "type": "tstr",
+          "note": "br    ≤ 32 chars",
+          "name": "br"
+        },
+        {
+          "key": 6,
+          "optional": true,
+          "type": "tstr",
+          "note": "tool  current tool",
+          "name": "tool"
+        },
+        {
+          "key": 7,
+          "optional": true,
+          "type": "uint",
+          "note": "t0    start (unix)",
+          "name": "t0"
+        },
+        {
+          "key": 8,
+          "optional": true,
+          "type": "uint",
+          "note": "tst   last state change (unix)",
+          "name": "tst"
+        },
+        {
+          "key": 9,
+          "optional": true,
+          "type": "tstr",
+          "note": "sum   preview ≤ 80 chars (privacy-dependent)",
+          "name": "sum"
+        },
+        {
+          "key": 10,
+          "optional": true,
+          "type": "bool",
+          "note": "seen",
+          "name": "seen"
+        },
+        {
+          "key": 11,
+          "optional": true,
+          "type": "uint",
+          "note": "host  host index (0 in v1)",
+          "name": "host"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:50"
+    },
+    {
+      "name": "gone",
+      "type": 5,
+      "dir": "pc→dev",
+      "summary": "A session ended and left the list",
+      "fields": [],
+      "source": "protocol/agentlink.cddl:51"
+    },
+    {
+      "name": "attention",
+      "type": 6,
+      "dir": "pc→dev",
+      "summary": "An agent needs you: approval, question, error or done",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "rid   request id (required for approve/deny/reply)",
+          "name": "rid"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "uint",
+          "note": "sid",
+          "name": "sid"
+        },
+        {
+          "key": 2,
+          "optional": false,
+          "type": "att_kind",
+          "note": "kind",
+          "name": "kind"
+        },
+        {
+          "key": 3,
+          "optional": true,
+          "type": "tstr",
+          "note": "title  e.g. \"Run shell command\"",
+          "name": "title"
+        },
+        {
+          "key": 4,
+          "optional": true,
+          "type": "tstr",
+          "note": "text   preview ≤ 160 chars",
+          "name": "text"
+        },
+        {
+          "key": 5,
+          "optional": true,
+          "type": "[0*4 tstr]",
+          "note": "opts   ≤ 4 choices, each ≤ 24 chars",
+          "name": "opts"
+        },
+        {
+          "key": 6,
+          "optional": false,
+          "type": "[0*5 action]",
+          "note": "acts   actions the device may offer",
+          "name": "acts"
+        },
+        {
+          "key": 7,
+          "optional": true,
+          "type": "uint",
+          "note": "exp    unix time after which to drop",
+          "name": "exp"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:52"
+    },
+    {
+      "name": "clear",
+      "type": 7,
+      "dir": "pc→dev",
+      "summary": "An attention request was answered elsewhere or expired",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "rid",
+          "name": "rid"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "clear_why",
+          "note": "why",
+          "name": "why"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:53"
+    },
+    {
+      "name": "cmd",
+      "type": 8,
+      "dir": "dev→pc",
+      "summary": "A user action: focus, approve, deny, reply, snooze...",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "cmd_op",
+          "note": "op",
+          "name": "op"
+        },
+        {
+          "key": 1,
+          "optional": true,
+          "type": "uint",
+          "note": "sid",
+          "name": "sid"
+        },
+        {
+          "key": 2,
+          "optional": true,
+          "type": "uint",
+          "note": "rid",
+          "name": "rid"
+        },
+        {
+          "key": 3,
+          "optional": true,
+          "type": "any",
+          "note": "arg   snooze minutes, reply option index, quiet secs, {aid}",
+          "name": "arg"
+        },
+        {
+          "key": 4,
+          "optional": true,
+          "type": "uint",
+          "note": "hold_ms  measured hold-to-confirm (approve)",
+          "name": "hold_ms"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:54"
+    },
+    {
+      "name": "result",
+      "type": 9,
+      "dir": "pc→dev",
+      "summary": "Outcome of a command: ok or a reason it failed",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "bool",
+          "note": "ok",
+          "name": "ok"
+        },
+        {
+          "key": 1,
+          "optional": true,
+          "type": "result_err",
+          "note": "err",
+          "name": "err"
+        },
+        {
+          "key": 2,
+          "optional": true,
+          "type": "tstr",
+          "note": "msg",
+          "name": "msg"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:55"
+    },
+    {
+      "name": "detail",
+      "type": 10,
+      "dir": "pc→dev",
+      "summary": "Full text for the detail screen",
+      "fields": [
+        {
+          "key": 0,
+          "optional": true,
+          "type": "uint",
+          "note": "rid",
+          "name": "rid"
+        },
+        {
+          "key": 1,
+          "optional": true,
+          "type": "uint",
+          "note": "sid",
+          "name": "sid"
+        },
+        {
+          "key": 2,
+          "optional": false,
+          "type": "tstr",
+          "note": "text (full)",
+          "name": "text"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:56"
+    },
+    {
+      "name": "cfg",
+      "type": 11,
+      "dir": "pc→dev",
+      "summary": "Device settings: privacy, alert mode, brightness",
+      "fields": [
+        {
+          "key": 0,
+          "optional": true,
+          "type": "privacy",
+          "note": "privacy",
+          "name": "privacy"
+        },
+        {
+          "key": 1,
+          "optional": true,
+          "type": "alert_mode",
+          "note": "alert",
+          "name": "alert"
+        },
+        {
+          "key": 2,
+          "optional": true,
+          "type": "uint",
+          "note": "quiet_until (unix, 0 = none)",
+          "name": "quiet_until"
+        },
+        {
+          "key": 3,
+          "optional": true,
+          "type": "uint",
+          "note": "brightness 0..255",
+          "name": "brightness"
+        },
+        {
+          "key": 4,
+          "optional": true,
+          "type": "tstr",
+          "note": "badge_handle",
+          "name": "badge_handle"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:57"
+    },
+    {
+      "name": "batt",
+      "type": 12,
+      "dir": "dev→pc",
+      "summary": "Battery percentage and charging state",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "pct",
+          "name": "pct"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "bool",
+          "note": "chg",
+          "name": "chg"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:58"
+    },
+    {
+      "name": "ping",
+      "type": 13,
+      "dir": "both",
+      "summary": "Link-liveness probe",
+      "fields": [],
+      "source": "protocol/agentlink.cddl:59"
+    },
+    {
+      "name": "pong",
+      "type": 14,
+      "dir": "both",
+      "summary": "Answer to a ping",
+      "fields": [],
+      "source": "protocol/agentlink.cddl:60"
+    },
+    {
+      "name": "log",
+      "type": 15,
+      "dir": "dev→pc",
+      "summary": "A device log line",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "log_level",
+          "note": "lvl",
+          "name": "lvl"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "tstr",
+          "note": "msg",
+          "name": "msg"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:61"
+    },
+    {
+      "name": "audio_start",
+      "type": 16,
+      "dir": "dev→pc",
+      "summary": "Voice capture begins (reserved)",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "aid",
+          "name": "aid"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "audio_codec",
+          "note": "codec",
+          "name": "codec"
+        },
+        {
+          "key": 2,
+          "optional": true,
+          "type": "uint",
+          "note": "sid",
+          "name": "sid"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:62"
+    },
+    {
+      "name": "audio",
+      "type": 17,
+      "dir": "dev→pc",
+      "summary": "A chunk of encoded audio (reserved)",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "aid",
+          "name": "aid"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "uint",
+          "note": "seq",
+          "name": "seq"
+        },
+        {
+          "key": 2,
+          "optional": false,
+          "type": "bstr .size (0..240)",
+          "note": "data",
+          "name": "data"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:63"
+    },
+    {
+      "name": "audio_end",
+      "type": 18,
+      "dir": "dev→pc",
+      "summary": "Voice capture ends (reserved)",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint }",
+          "note": "aid",
+          "name": "aid"
+        },
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "aid",
+          "name": "aid"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "tstr",
+          "note": "text",
+          "name": "text"
+        },
+        {
+          "key": 2,
+          "optional": false,
+          "type": "uint",
+          "note": "autosend_ms",
+          "name": "autosend_ms"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:64"
+    },
+    {
+      "name": "transcript",
+      "type": 19,
+      "dir": "pc→dev",
+      "summary": "Speech-to-text result (reserved)",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "aid",
+          "name": "aid"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "tstr",
+          "note": "text",
+          "name": "text"
+        },
+        {
+          "key": 2,
+          "optional": false,
+          "type": "uint",
+          "note": "autosend_ms",
+          "name": "autosend_ms"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:65"
+    },
+    {
+      "name": "dbg_ui_state_req",
+      "type": 64,
+      "dir": "pc→dev",
+      "summary": "Debug: ask which screen is showing",
+      "fields": [],
+      "source": "protocol/agentlink.cddl:66"
+    },
+    {
+      "name": "dbg_ui_state",
+      "type": 65,
+      "dir": "dev→pc",
+      "summary": "Debug: the current screen and visible labels",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "tstr",
+          "note": "screen   \"glance\" | \"list\" | \"detail\" | \"attention\" | \"badge\" | \"settings\" | \"pairing\" | \"off\"",
+          "name": "screen"
+        },
+        {
+          "key": 1,
+          "optional": true,
+          "type": "uint",
+          "note": "sel_sid",
+          "name": "sel_sid"
+        },
+        {
+          "key": 2,
+          "optional": true,
+          "type": "uint",
+          "note": "rid      attention card shown",
+          "name": "rid"
+        },
+        {
+          "key": 3,
+          "optional": false,
+          "type": "[0*8 tstr]",
+          "note": "visible  short labels of visible elements, top→bottom",
+          "name": "visible"
+        },
+        {
+          "key": 4,
+          "optional": false,
+          "type": "tstr",
+          "note": "power    \"active\" | \"standby\" | \"badge\" | \"deep\" | \"docked\"",
+          "name": "power"
+        },
+        {
+          "key": 5,
+          "optional": true,
+          "type": "uint",
+          "note": "fps",
+          "name": "fps"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:67"
+    },
+    {
+      "name": "dbg_screenshot_req",
+      "type": 66,
+      "dir": "pc→dev",
+      "summary": "Debug: ask for a screenshot",
+      "fields": [],
+      "source": "protocol/agentlink.cddl:68"
+    },
+    {
+      "name": "dbg_screenshot_chunk",
+      "type": 67,
+      "dir": "dev→pc",
+      "summary": "Debug: a slice of the RGB565 screenshot",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "w",
+          "name": "w"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "uint",
+          "note": "h",
+          "name": "h"
+        },
+        {
+          "key": 2,
+          "optional": false,
+          "type": "uint",
+          "note": "offset (bytes into RGB565 little-endian buffer)",
+          "name": "offset"
+        },
+        {
+          "key": 3,
+          "optional": false,
+          "type": "bstr",
+          "note": "data",
+          "name": "data"
+        },
+        {
+          "key": 4,
+          "optional": false,
+          "type": "bool",
+          "note": "last",
+          "name": "last"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:69"
+    },
+    {
+      "name": "dbg_inject_input",
+      "type": 68,
+      "dir": "pc→dev",
+      "summary": "Debug: inject a tap, swipe or button press",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "input_event",
+          "note": "kind",
+          "name": "kind"
+        },
+        {
+          "key": 1,
+          "optional": true,
+          "type": "int",
+          "note": "x",
+          "name": "x"
+        },
+        {
+          "key": 2,
+          "optional": true,
+          "type": "int",
+          "note": "y",
+          "name": "y"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:70"
+    },
+    {
+      "name": "dbg_set_log_level",
+      "type": 69,
+      "dir": "pc→dev",
+      "summary": "Debug: change the device log verbosity",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "log_level",
+          "note": "",
+          "name": ""
+        }
+      ],
+      "source": "protocol/agentlink.cddl:71"
+    }
+  ],
+  "haptic_meaning": {
+    "tick": "A light acknowledgement of a touch or selection",
+    "confirm": "An action went through",
+    "reject": "An action was refused",
+    "hello": "Link up: proves the motor path, even in silent mode",
+    "done": "An agent finished",
+    "error": "An agent hit an error",
+    "needs_input": "An agent needs approval or an answer"
+  },
+  "haptic_motor": {
+    "hold_duty": 85,
+    "kick_duty": 100,
+    "kick_ms": 15,
+    "kick_min_pulse_ms": 30
+  },
+  "sources": {
+    "ble.default_write_len": "daemon/crates/agentlinkd/src/ble.rs:24",
+    "ble.max_write_len": "daemon/crates/agentlinkd/src/ble.rs:25",
+    "ble.name_prefix": "daemon/crates/agentlinkd/src/ble.rs:103",
+    "ble.rx": "daemon/crates/agentlinkd/src/ble.rs:19",
+    "ble.service": "daemon/crates/agentlinkd/src/ble.rs:18",
+    "ble.tx": "daemon/crates/agentlinkd/src/ble.rs:20",
+    "display.height": "firmware/boards/stopwatch/board_priv.h:19",
+    "display.shape": "firmware/boards/stopwatch/display.cpp:1",
+    "display.width": "firmware/boards/stopwatch/board_priv.h:18",
+    "gesture.defer_slack_ms": "firmware/components/core/src/app.c:39",
+    "gesture.double_tap_ms": "firmware/components/core/src/gesture.h:7",
+    "gesture.hold_confirm_ms": "firmware/components/core/src/ui_internal.h:12",
+    "gesture.long_press_ms": "firmware/components/core/src/gesture.h:8",
+    "gesture.second_tap_radius_px": "firmware/components/core/src/gesture.c:45",
+    "gesture.swipe_max_ms": "firmware/components/core/src/gesture.h:10",
+    "gesture.swipe_min_px": "firmware/components/core/src/gesture.h:9",
+    "gesture.tap_defer_ms": "firmware/components/core/src/app.c:222",
+    "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:11",
+    "gesture_map.defer_detail": "firmware/components/core/src/ui.c:210",
+    "gesture_map.defer_list": "firmware/components/core/src/ui.c:211",
+    "gesture_map.global": "firmware/components/core/src/app.c:177",
+    "haptics.confirm": "firmware/components/core/src/feedback.c:36",
+    "haptics.done": "firmware/components/core/src/feedback.c:19",
+    "haptics.duty": "firmware/boards/stopwatch/input.cpp:17",
+    "haptics.error": "firmware/components/core/src/feedback.c:18",
+    "haptics.hello": "firmware/components/core/src/feedback.c:48",
+    "haptics.kick_duty": "firmware/boards/stopwatch/input.cpp:18",
+    "haptics.kick_ms": "firmware/boards/stopwatch/input.cpp:19",
+    "haptics.kick_rule": "firmware/boards/stopwatch/input.cpp:108",
+    "haptics.needs_input": "firmware/components/core/src/feedback.c:17",
+    "haptics.reject": "firmware/components/core/src/feedback.c:42",
+    "haptics.tick": "firmware/components/core/src/feedback.c:30",
+    "link.hello_retry_ms": "firmware/components/core/src/link.c:8",
+    "link.idle_ping_ms": "firmware/components/core/src/link.c:9",
+    "link.ping_interval_ms": "daemon/crates/agentlinkd/src/usb.rs:26",
+    "link.silence_timeout_ms": "firmware/boards/stopwatch/link_usb.cpp:32",
+    "messages": "protocol/agentlink.cddl:1",
+    "palette.accent": "firmware/components/core/src/ui_theme.h:15",
+    "palette.amber": "firmware/components/core/src/ui_theme.h:12",
+    "palette.bg": "firmware/components/core/src/ui_theme.h:6",
+    "palette.border": "firmware/components/core/src/ui_theme.h:9",
+    "palette.cloud": "firmware/components/core/src/ui_theme.h:17",
+    "palette.danger": "firmware/components/core/src/ui_theme.h:13",
+    "palette.idle": "firmware/components/core/src/ui_theme.h:16",
+    "palette.muted": "firmware/components/core/src/ui_theme.h:11",
+    "palette.success": "firmware/components/core/src/ui_theme.h:14",
+    "palette.surface": "firmware/components/core/src/ui_theme.h:7",
+    "palette.surface2": "firmware/components/core/src/ui_theme.h:8",
+    "palette.text": "firmware/components/core/src/ui_theme.h:10",
+    "states": "firmware/components/core/src/ui_theme.c:10",
+    "usb.baud": "daemon/crates/agentlinkd/src/usb.rs:23",
+    "usb.crc": "daemon/crates/agentlinkd/src/usb/frame.rs:11",
+    "usb.crc_poly": "daemon/crates/agentlinkd/src/usb/frame.rs:16",
+    "usb.max_payload": "daemon/crates/agentlinkd/src/usb/frame.rs:5",
+    "usb.pid": "daemon/crates/agentlinkd/src/usb.rs:22",
+    "usb.vid": "daemon/crates/agentlinkd/src/usb.rs:21"
+  }
+}

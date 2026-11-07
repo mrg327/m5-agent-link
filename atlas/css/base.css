@@ -1,0 +1,121 @@
+/* base.css — site tokens, reset, typography, chrome (topbar, rail, grain).
+   Layered over the firmware palette: tokens.generated.css defines --fw-*.
+   If that file is missing the @import 404s harmlessly and the fallbacks below win. */
+@import url("tokens.generated.css");
+
+:root {
+  /* firmware palette (fallbacks mirror firmware/components/core/src/ui_theme.h) */
+  --c-amber:   var(--fw-amber,   #d29922);
+  --c-danger:  var(--fw-danger,  #f85149);
+  --c-success: var(--fw-success, #3fb950);
+  --c-accent:  var(--fw-accent,  #58a6ff);
+  --c-idle:    var(--fw-idle,    #6e7681);
+  --c-cloud:   var(--fw-cloud,   #a371f7);
+
+  /* site art direction: "Long Exposure" */
+  --ink:    #05060a;
+  --ink-2:  #0a0c12;
+  --paper:  #eef1f6;
+  --paper-2: #b9c0cc;
+  --muted:  #7c8594;
+  --line:   rgba(190, 205, 230, .14);
+  --line-2: rgba(190, 205, 230, .26);
+  --glow:   var(--c-accent);           /* ambient tint, set by the stage */
+
+  --font-display: "New York", "Iowan Old Style", "Charter", "Palatino Linotype", Georgia, serif;
+  --font-sans: ui-sans-serif, -apple-system, "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* type scale (fluid) */
+  --t-xs:  .75rem;
+  --t-sm:  .875rem;
+  --t-md:  1rem;
+  --t-lg:  clamp(1.1rem, 1rem + .4vw, 1.3rem);
+  --t-xl:  clamp(1.4rem, 1.1rem + 1vw, 1.9rem);
+  --t-2xl: clamp(2rem, 1.2rem + 3vw, 3.6rem);
+  --t-3xl: clamp(2.6rem, 1rem + 6vw, 6.4rem);
+  --t-num: clamp(2.4rem, 1.4rem + 3.4vw, 4.6rem);
+
+  /* spacing scale */
+  --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem;
+  --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem; --s-9: 7rem; --s-10: 11rem;
+
+  --radius: 14px;
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-io:  cubic-bezier(.65, 0, .35, 1);
+  --dur-1: 160ms; --dur-2: 320ms; --dur-3: 600ms;
+
+  --topbar-h: 56px;
+  --gutter: clamp(1.1rem, 4vw, 3.5rem);
+  /* width the narrative keeps clear of the stage on wide screens */
+  --side-col: min(46rem, 52vw);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { color-scheme: dark; background: var(--ink); scroll-behavior: smooth; scroll-padding-top: calc(var(--topbar-h) + 12px); -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; min-height: 100vh; background: var(--ink); color: var(--paper);
+  font: 400 var(--t-md)/1.6 var(--font-sans); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+img, svg, canvas { display: block; max-width: 100%; }
+h1, h2, h3, p { margin: 0; }
+a { color: inherit; text-decoration-color: var(--line-2); text-underline-offset: .22em; }
+a:hover { text-decoration-color: currentColor; }
+code, kbd, pre { font-family: var(--font-mono); }
+code { font-size: .9em; }
+button { font: inherit; color: inherit; }
+::selection { background: color-mix(in srgb, var(--glow) 40%, transparent); }
+
+:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; border-radius: 6px; }
+
+.skip { position: fixed; left: 1rem; top: -4rem; z-index: 100; background: var(--paper); color: var(--ink); padding: .6rem 1rem; border-radius: 8px; transition: top var(--dur-1); }
+.skip:focus { top: .75rem; }
+
+/* --- file:// hint ---------------------------------------------------- */
+.file-hint { display: none; }
+.is-file .file-hint { display: grid; place-items: center; position: fixed; inset: 0; z-index: 200; background: var(--ink); padding: 2rem; text-align: center; }
+.file-hint h1 { font: 400 var(--t-2xl)/1.1 var(--font-display); margin-bottom: var(--s-4); }
+.file-hint p { color: var(--paper-2); }
+.file-hint pre { display: inline-block; margin: var(--s-5) 0; padding: .8rem 1.4rem; border: 1px solid var(--line-2); border-radius: 10px; background: var(--ink-2); font-size: var(--t-lg); }
+.noscript { position: relative; z-index: 60; max-width: 40rem; margin: 6rem auto; padding: 0 var(--gutter); }
+.noscript h1 { font: 400 var(--t-2xl)/1.1 var(--font-display); margin-bottom: var(--s-4); }
+
+/* --- top bar + chapter rail ------------------------------------------ */
+.topbar {
+  position: fixed; inset: 0 0 auto 0; z-index: 50; height: var(--topbar-h);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-4);
+  padding: 0 var(--gutter);
+  background: linear-gradient(to bottom, rgba(5,6,10,.86), rgba(5,6,10,.55));
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(190,205,230,.07);
+}
+.topbar__brand { font: 600 var(--t-sm)/1 var(--font-sans); letter-spacing: .02em; text-decoration: none; display: flex; align-items: center; gap: .55rem; white-space: nowrap; }
+.topbar__brand span { color: var(--muted); font-weight: 400; }
+.topbar__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--glow); box-shadow: 0 0 12px 1px var(--glow); transition: background var(--dur-3), box-shadow var(--dur-3); }
+.rail ol { display: flex; gap: .15rem; list-style: none; margin: 0; padding: 0; }
+.rail a { display: flex; align-items: baseline; gap: .45rem; padding: .5rem .6rem; border-radius: 999px; text-decoration: none; color: var(--muted); font-size: var(--t-xs); letter-spacing: .06em; text-transform: uppercase; transition: color var(--dur-2), background var(--dur-2); }
+.rail a b { font: 500 .68rem var(--font-mono); opacity: .7; }
+.rail a:hover { color: var(--paper); }
+.rail a[aria-current="true"] { color: var(--paper); background: rgba(255,255,255,.07); }
+.topbar__progress { position: absolute; left: 0; bottom: 0; height: 1px; width: 100%; background: linear-gradient(90deg, var(--glow), transparent); transform-origin: 0 50%; transform: scaleX(var(--p, 0)); opacity: .8; }
+@media (max-width: 760px) {
+  .rail a span { display: none; }
+  .rail a { padding: .5rem .4rem; }
+  .topbar__brand span { display: none; }
+}
+
+/* --- film grain (cheap: one tiled SVG feTurbulence) ------------------- */
+.grain {
+  position: fixed; inset: 0; z-index: 90; pointer-events: none; opacity: .07; mix-blend-mode: screen;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+.footer { position: relative; z-index: 2; padding: var(--s-8) var(--gutter) var(--s-9); color: var(--muted); font-size: var(--t-sm); border-top: 1px solid var(--line); margin-top: var(--s-9); }
+.footer a { color: var(--paper-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}

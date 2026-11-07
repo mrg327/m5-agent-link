@@ -1,0 +1,47 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>WatchRuntime test</title>
+<style>
+  body { background: #05060a; color: #c9d1d9; font: 13px ui-monospace, Menlo, monospace; margin: 24px; display: flex; gap: 24px; }
+  canvas { width: 466px; height: 466px; border-radius: 50%; background: #000; box-shadow: 0 0 0 2px #1b1f27; touch-action: none; }
+  button { font: inherit; margin: 2px; }
+  #log { white-space: pre-wrap; max-width: 520px; }
+</style>
+<canvas id="c"></canvas>
+<div>
+  <div>
+    <button id="up">link up (ws)</button> <button id="welcome">welcome</button>
+    <button id="snap">snapshot</button> <button id="reset">reset</button>
+    <button id="a">btn A</button> <button id="b">btn B</button>
+  </div>
+  <div id="stat"></div>
+  <pre id="log"></pre>
+</div>
+<script type="module">
+import { createWatch } from '../js/watch-runtime.js';
+const hex = (h) => Uint8Array.from(h.match(/../g), (b) => parseInt(b, 16));
+const vec = async (n) => hex((await (await fetch(`../../protocol/vectors/${n}.json`)).json()).cbor_hex);
+const log = (s) => { const el = document.getElementById('log'); el.textContent = (s + '\n' + el.textContent).slice(0, 4000); };
+const events = [];
+const bus = { emit: (t, d) => { events.push([t, d]); if (t !== 'watch:tx') log(`${t} ${JSON.stringify(d)}`); } };
+const watch = await createWatch(document.getElementById('c'), { bus });
+const txFrames = [];
+watch.onTx((b) => { txFrames.push(b); log(`tx ${b.length}B ${[...b.slice(0, 24)].map((x) => x.toString(16).padStart(2, '0')).join('')}`); });
+const c = document.getElementById('c');
+const pt = (e) => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * 466 / r.width, (e.clientY - r.top) * 466 / r.height]; };
+c.onpointerdown = (e) => { c.setPointerCapture(e.pointerId); watch.pointer('down', ...pt(e)); };
+c.onpointermove = (e) => { if (e.buttons) watch.pointer('move', ...pt(e)); };
+c.onpointerup = (e) => watch.pointer('up', ...pt(e));
+const go = {
+  up: () => watch.setLinkUp('ws', true),
+  welcome: async () => watch.deliver(await vec('welcome')),
+  snap: async () => watch.deliver(await vec('snapshot_two')),
+  reset: () => watch.reset(),
+  a: () => { watch.button('a', true); setTimeout(() => watch.button('a', false), 60); },
+  b: () => { watch.button('b', true); setTimeout(() => watch.button('b', false), 60); },
+};
+for (const k in go) document.getElementById(k).onclick = go[k];
+setInterval(() => { const s = watch.stats(); document.getElementById('stat').textContent =
+  `kind=${watch.kind} screen=${watch.screen?.()} ticks=${s.ticks} avg=${s.avgMs.toFixed(3)}ms max=${s.maxMs.toFixed(2)}ms core-fps=${s.fps}`; }, 250);
+window.__atlas = { watch, go, events, txFrames, vec };
+</script>

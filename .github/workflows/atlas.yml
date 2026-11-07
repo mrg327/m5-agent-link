@@ -1,0 +1,43 @@
+name: atlas
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "atlas/**"
+      - "index.html"
+      - "firmware/components/core/**"
+      - "firmware/boards/stopwatch/**"
+      - "protocol/**"
+      - "daemon/crates/agentlinkd/src/**"
+      - ".github/workflows/atlas.yml"
+  pull_request:
+    paths:
+      - "atlas/**"
+      - "index.html"
+      - "firmware/components/core/**"
+      - "firmware/boards/stopwatch/**"
+      - "protocol/**"
+      - "daemon/crates/agentlinkd/src/**"
+      - ".github/workflows/atlas.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  facts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Atlas facts match the source
+        run: python3 atlas/tools/extract.py --check
+      - name: Atlas unit tests
+        run: node --test atlas/test
