@@ -83,21 +83,21 @@ int main(void)
 
     /* ── rim scrub ── */
     reset(&g, 8);
-    uint32_t t = sweep(&g, 10, 24, 200, 0); /* 14 degrees: below the start arc */
+    uint32_t t = sweep(&g, 10, 18, 200, 0); /* 8 degrees: below the start arc */
     gesture_touch(&g, false, 0, 0, t);
-    EXPECT(count(G_SCRUB_START) == 0 && count(G_SCRUB_END) == 0, "under 15 degrees is not a scrub");
+    EXPECT(count(G_SCRUB_START) == 0 && count(G_SCRUB_END) == 0, "under 10 degrees is not a scrub");
 
     reset(&g, 8);
-    t = sweep(&g, 10, 30, 200, 0);
-    EXPECT(count(G_SCRUB_START) == 1 && seen[0].x == 0, "scrub starts after 15 degrees, in sector 0");
+    t = sweep(&g, 10, 22, 200, 0);
+    EXPECT(count(G_SCRUB_START) == 1 && seen[0].x == 0, "scrub starts after 10 degrees, in sector 0");
     EXPECT(gesture_scrubbing(&g), "scrubbing flag");
-    t = sweep(&g, 30, 50, 200, t);
-    EXPECT(count(G_SCRUB) == 0, "5 degrees past a boundary does not switch sector (hysteresis 15)");
-    t = sweep(&g, 50, 62, 200, t);
-    EXPECT(count(G_SCRUB) == 1 && seen[n_seen - 1].x == 1, "12 more degrees switches to sector 1");
-    t = sweep(&g, 62, 40, 200, t);
+    t = sweep(&g, 22, 48, 200, t);
+    EXPECT(count(G_SCRUB) == 0, "3 degrees past a boundary does not switch sector (hysteresis 5)");
+    t = sweep(&g, 48, 52, 200, t);
+    EXPECT(count(G_SCRUB) == 1 && seen[n_seen - 1].x == 1, "7 degrees past switches to sector 1");
+    t = sweep(&g, 52, 42, 200, t);
     EXPECT(count(G_SCRUB) == 1, "backing off the boundary keeps sector 1");
-    t = sweep(&g, 40, 24, 200, t);
+    t = sweep(&g, 42, 30, 200, t);
     EXPECT(count(G_SCRUB) == 2 && seen[n_seen - 1].x == 0, "well past the boundary returns to sector 0");
     gesture_tick(&g, t + 1000);
     gesture_touch(&g, false, 0, 0, t + 1000);
@@ -116,15 +116,25 @@ int main(void)
     t = sweep(&g, 358, 300, 200, t);
     EXPECT(count(G_SCRUB_START) == 1 && seen[n_seen - 1].x == 3, "counter-clockwise wraps backwards");
 
+    reset(&g, 2);
+    t = sweep(&g, 150, 178, 200, 0);
+    t = sweep(&g, 178, 184, 200, t);
+    EXPECT(count(G_SCRUB) == 0, "two sectors: just past 6 o'clock stays put");
+    sweep(&g, 184, 188, 200, t);
+    EXPECT(count(G_SCRUB) == 1 && seen[n_seen - 1].x == 1, "two sectors: the margin is degrees, not a third of 180");
+
     reset(&g, 8);
     sweep(&g, 10, 80, 150, 0);
-    EXPECT(count(G_SCRUB_START) == 0, "a drag that starts inside r=170 is not a rim scrub");
+    EXPECT(count(G_SCRUB_START) == 0, "a drag that starts inside r=160 is not a rim scrub");
     reset(&g, 8);
     sweep(&g, 10, 80, 100, 0);
     EXPECT(count(G_SCRUB_START) == 0, "a circular drag near the centre is not a rim scrub");
     reset(&g, 8);
     sweep(&g, 10, 80, 232, 0);
-    EXPECT(count(G_SCRUB_START) == 0, "a drag outside r=225 is not a rim scrub");
+    EXPECT(count(G_SCRUB_START) == 1, "a drag along the glass edge (r=232) is a rim scrub");
+    reset(&g, 8);
+    sweep(&g, 10, 80, 270, 0);
+    EXPECT(count(G_SCRUB_START) == 0, "a drag outside r=260 is not a rim scrub");
 
     reset(&g, 8);
     gesture_touch(&g, true, 233, 233 - 195, 0);

@@ -24,6 +24,11 @@
 #define HINT_R 152
 #define HINT_DOT_R 177
 
+#define REPO_Y 116
+#define REPO_W 250
+#define REPO_PX 32
+#define REPO_SMALL_PX 24
+
 typedef struct {
     uint32_t sid;
     uint8_t n_merged; /* > 0: this slot stands for that many Done sessions */
@@ -193,11 +198,26 @@ static void set_txt(lv_obj_t *l, char *cache, size_t cap, const char *t)
     lv_label_set_text(l, t);
 }
 
+/* Fixed single-line height: LONG_MODE_DOTS only truncates when the height is fixed, otherwise a long
+ * name wraps onto the next row and collides with it. */
 static void place(lv_obj_t *l, int y, int w)
 {
-    lv_obj_set_width(l, w);
+    lv_obj_set_size(l, w, lv_font_get_line_height(lv_obj_get_style_text_font(l, 0)));
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_pos(l, UI_CX - w / 2, y);
+}
+
+/* The folder name drops to the smaller font before it is truncated, centred in the same row. */
+static void set_repo(const char *t)
+{
+    if (strcmp(s_repo_txt, t) == 0) return;
+    const lv_font_t *big = theme_font(REPO_PX), *f = big;
+    lv_point_t sz;
+    lv_text_get_size(&sz, t, big, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    if (sz.x > REPO_W) f = theme_font(REPO_SMALL_PX);
+    lv_obj_set_style_text_font(s_repo, f, 0);
+    place(s_repo, REPO_Y + (lv_font_get_line_height(big) - lv_font_get_line_height(f)) / 2, REPO_W);
+    set_txt(s_repo, s_repo_txt, sizeof s_repo_txt, t);
 }
 
 static const char *state_icon(const session_t *s)
@@ -250,7 +270,7 @@ static void update_centre(void)
     const session_t *s = sel_session();
     if (!s || s_n == 0) {
         set_txt(s_agent, s_agent_txt, sizeof s_agent_txt, "");
-        set_txt(s_repo, s_repo_txt, sizeof s_repo_txt, "No sessions");
+        set_repo("No sessions");
         lv_obj_set_style_text_color(s_repo, COL_TEXT, 0);
         set_txt(s_state, s_state_txt, sizeof s_state_txt, "Waiting for an agent");
         lv_obj_set_style_text_color(s_state, COL_MUTED, 0);
@@ -268,11 +288,11 @@ static void update_centre(void)
     if (sl->n_merged) {
         snprintf(buf, sizeof buf, "%d sessions", sl->n_merged);
         set_txt(s_agent, s_agent_txt, sizeof s_agent_txt, buf);
-        set_txt(s_repo, s_repo_txt, sizeof s_repo_txt, "Done");
+        set_repo("Done");
     } else {
         set_txt(s_agent, s_agent_txt, sizeof s_agent_txt, theme_agent_name(s->agent));
         const char *base = theme_basename(s->repo);
-        set_txt(s_repo, s_repo_txt, sizeof s_repo_txt, base[0] ? base : "(no folder)");
+        set_repo(base[0] ? base : "(no folder)");
     }
     lv_obj_set_style_text_color(s_repo, COL_TEXT, 0);
     snprintf(buf, sizeof buf, "%s  %s", state_icon(s), theme_state_word(s));
@@ -552,8 +572,8 @@ lv_obj_t *ui_home_init(void)
 
     s_agent = theme_label(s_centre, 16, COL_MUTED);
     place(s_agent, 94, 200);
-    s_repo = theme_label(s_centre, 32, COL_TEXT);
-    place(s_repo, 116, 250);
+    s_repo = theme_label(s_centre, REPO_PX, COL_TEXT);
+    place(s_repo, REPO_Y, REPO_W);
     s_state = theme_label(s_centre, 24, COL_MUTED);
     place(s_state, 162, 250);
     s_elapsed = theme_label(s_centre, 32, COL_MUTED);

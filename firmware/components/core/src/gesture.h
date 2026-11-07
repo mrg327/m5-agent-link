@@ -14,11 +14,12 @@
 /* Rim scrub: a drag that starts in the annulus around the centre (233,233) and sweeps an arc. */
 #define GESTURE_CX 233
 #define GESTURE_CY 233
-#define GESTURE_RIM_IN_PX 170
-#define GESTURE_RIM_OUT_PX 225
-#define GESTURE_RIM_TRACK_IN_PX 140 /* once started, the finger may drift this far in or out of the annulus */
-#define GESTURE_RIM_TRACK_OUT_PX 240
-#define GESTURE_SCRUB_START_DEG 15  /* continuous arc before it counts as a scrub */
+#define GESTURE_RIM_IN_PX 160
+#define GESTURE_RIM_OUT_PX 260      /* past the glass edge (r 233): a finger riding the bezel reads ~r 225-233 */
+#define GESTURE_RIM_TRACK_IN_PX 110 /* once started, the finger may drift this far in or out of the annulus */
+#define GESTURE_RIM_TRACK_OUT_PX 340
+#define GESTURE_SCRUB_START_DEG 10  /* continuous arc before it counts as a scrub */
+#define GESTURE_SCRUB_HYST_DEG 5    /* how far past a sector boundary before switching (capped at a third of a sector) */
 
 typedef enum {
     G_PRESS, G_RELEASE,         /* raw finger down/up, for hold-to-confirm (dur_ms on release) */

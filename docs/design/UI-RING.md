@@ -65,7 +65,7 @@ The rule: **moving the selection is cheap, acting is one gesture, and anything i
 
 | Input | Effect |
 |---|---|
-| Circular drag in the rim annulus (r 170–225) | Move the selection, with a haptic detent per segment. *Small firmware change: drag stream plus angle recogniser.* |
+| Circular drag around the rim (starts at r 160–260) | Move the selection, with a haptic detent per segment. *Small firmware change: drag stream plus angle recogniser.* |
 | Tap a segment | Select it, no action |
 | **Tap centre** | **Default action for the state** (table below). No deferral: double-tap is retired. |
 | Long-press centre (600 ms, ring fills) | Secondary action |
@@ -112,7 +112,8 @@ AMOLED burn-in: only thin arcs and the centre text are lit. The idle ring dims t
 1. **Prerequisite for performance:** split `ui_ring.c` invalidation into per-segment areas. Today any ring change
    repaints all 466×466 pixels.
 2. Drag stream from `touch_read_cb`, coalesced to the latest point, plus an angle recogniser in `gesture.c`
-   (annulus, sector hysteresis of about a third of a sector).
+   (annulus, sector hysteresis of 5° past the boundary, capped at a third of a sector; a fractional margin
+   lagged 40–60° with 2–4 sessions on the device).
 3. New `ui_ring` screen; remove the glance, list and detail screens and the 330 ms tap deferral.
 4. Button double-press and the A+B chord in `input.cpp`/`gesture.c`.
 5. Haptic detent pattern (≤ 15 ms kick only) and an escalating approve ramp.

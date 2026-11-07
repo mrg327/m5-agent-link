@@ -93,7 +93,7 @@ With 450 mAh, STANDBY at 2.5 mA is about 7 days, and 40 lifts × 10 s/day at 100
   - **tap** (immediate; the 330 ms deferral and double-tap-to-focus are gone)
   - long-press (≥ 600 ms); the approve hold needs ≥ 1.2 s on the centre, with an arc fill
   - swipe (≥ 60 px, ≤ 400 ms); swipe-down on the centre = deny
-  - **rim scrub**: annulus r 170–225 px around (233,233), ≥ 15° continuous arc to start, sector hysteresis of 1/3 sector. Once scrubbing, tap/swipe are suppressed for that touch. Events: `G_SCRUB_START/SCRUB/SCRUB_END`.
+  - **rim scrub**: starts in r 160–260 px around (233,233) (the glass edge is r 233, where a finger riding the bezel lands), tracks within r 110–340, ≥ 10° continuous arc to start, sector hysteresis of 5° past the boundary (capped at 1/3 sector). Once scrubbing, tap/swipe are suppressed for that touch. Events: `G_SCRUB_START/SCRUB/SCRUB_END`.
 - Buttons: KEYA (yellow, G2) and KEYB (blue, G1) with debounce. A short = default action, A double (≤ 300 ms) = next attention, B short/long = next/previous session, A+B chord = detected and logged only. A single press is therefore delayed by ~300 ms to wait for a possible double (B is immediate).
 - Haptics (`feedback.c`): scrub detent = 15 ms kick (the board runs ≤ 15 ms pulses at kick duty), rate-limited to 45 ms; approve-hold ramp = 13 steps (~1 s); per-state entry patterns.
 - UI is a single Ring screen (`ui_home.c` + `ui_ring.c`, per-segment invalidation). `ui_glance/list/detail.c` were removed.

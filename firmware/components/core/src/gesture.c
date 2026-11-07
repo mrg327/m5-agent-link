@@ -60,14 +60,16 @@ void gesture_set_sectors(gesture_t *g, int n)
 
 bool gesture_scrubbing(const gesture_t *g) { return g->scrubbing; }
 
-/* Moves to another sector only once the finger is a third of a sector past the boundary, so a
- * finger resting on an edge does not flutter between two segments. */
+/* Moves to another sector only once the finger is a few degrees past the boundary, so a finger
+ * resting on an edge does not flutter between two segments. The margin is fixed in degrees rather
+ * than a fraction of the sector: with 2-4 sessions a fractional margin is 40-60 degrees of lag. */
 static void update_sector(gesture_t *g, float deg)
 {
     if (g->sectors < 2) return;
     float width = 360.0f / (float)g->sectors;
+    float hyst = (float)GESTURE_SCRUB_HYST_DEG < width / 3.0f ? (float)GESTURE_SCRUB_HYST_DEG : width / 3.0f;
     float centre = ((float)g->sector + 0.5f) * width;
-    if (fabsf(wrap180(deg - centre)) <= width * (0.5f + 1.0f / 3.0f)) return;
+    if (fabsf(wrap180(deg - centre)) <= width * 0.5f + hyst) return;
     int next = sector_of(g, deg);
     if (next == g->sector) return;
     g->sector = next;
