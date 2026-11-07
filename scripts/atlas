@@ -15,8 +15,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 URL="http://localhost:${PORT}/"
 echo "The Atlas  →  ${URL}"
 echo "(serving ${ROOT}; Ctrl-C to stop)"
-if [ "$OPEN" = 1 ] && command -v open >/dev/null 2>&1; then
-  (sleep 0.6 && open "$URL") &
+if [ "$OPEN" = 1 ]; then
+  for opener in open xdg-open; do
+    if command -v "$opener" >/dev/null 2>&1; then
+      (sleep 0.6 && "$opener" "$URL" >/dev/null 2>&1) &
+      break
+    fi
+  done
 fi
 if command -v node >/dev/null 2>&1; then
   exec node "$ROOT/atlas/tools/serve.mjs" "$ROOT" "$PORT"

@@ -19,6 +19,8 @@ agent hooks ─► agentlink-hook ─► ~/.agentlink/hook.sock ─► agentlink
 
 ## Build, test, lint
 
+On Linux, BLE (`btleplug`, via BlueZ/D-Bus) needs `sudo apt-get install -y libdbus-1-dev pkg-config`.
+
 ```sh
 . ~/.cargo/env          # if cargo is not on PATH
 cd daemon

@@ -198,8 +198,8 @@ static void send_hex(const char *hex)
 static void run_session(const char *spec)
 {
     unsigned sid;
-    char st[16], repo[40];
-    if (sscanf(spec, "%u %15s %39s", &sid, st, repo) != 3) {
+    char st[16], repo[33];
+    if (sscanf(spec, "%u %15s %32s", &sid, st, repo) != 3) {
         s_failed = true;
         return;
     }

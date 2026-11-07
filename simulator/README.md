@@ -6,7 +6,8 @@ SDL2 implementation of `firmware/components/agentlink_hal/include/hal.h`; nothin
 ## Build and test
 
 ```sh
-brew install sdl2            # sdl2-compat is fine
+brew install sdl2 ninja                                 # macOS (sdl2-compat is fine)
+sudo apt-get install -y libsdl2-dev ninja-build         # Debian/Ubuntu
 cmake -S simulator -B build/sim -G Ninja
 cmake --build build/sim
 ctest --test-dir build/sim   # 12 protocol vectors, gesture recognizer, scripted headless UI run

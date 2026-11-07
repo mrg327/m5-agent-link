@@ -8,10 +8,11 @@ ESP-IDF release/v5.5 (tested with 5.5.6), LVGL 9.5.
 ```sh
 . ~/esp/esp-idf/export.sh
 cd firmware
-idf.py set-target esp32s3 build flash monitor     # add -p /dev/cu.usbmodem101 if needed
+idf.py set-target esp32s3 build flash monitor     # add -p <port> if needed
 ```
 
-- Device port: `/dev/cu.usbmodem101` (USB Serial/JTAG console).
+- Device port: `/dev/cu.usbmodem101` on macOS, `/dev/ttyACM0` on Linux (USB Serial/JTAG console).
+  On Linux your user needs access to the port (`dialout`/`plugdev` group, or a udev rule).
 - Download mode: hold the power button until the green LED blinks.
 
 ## Options
