@@ -84,7 +84,7 @@ daemon.attach(watch); daemon.play(name); daemon.pause(); daemon.scenarios  // [{
 daemon.inject(sessionPatch)  // used by replay
 ```
 Codecs live in `atlas/js/proto/` (cbor.js, cobs.js, crc16.js, blefrag.js, messages.js).
-They are pure functions with tests in `atlas/test/` (`node --test atlas/test`).
+They are pure functions with tests in `atlas/test/` (`node --test atlas/test/*.test.mjs`).
 
 ## Stage API (owned by **shell**)
 ```js
@@ -101,7 +101,7 @@ and mirrors it on `body[data-layout]`. A chapter may override it in `onEnter`.
 - Serve it with `scripts/atlas` (it uses `atlas/tools/serve.mjs` under node, otherwise python3).
 - Firmware UI change: rebuild the WASM watch with `atlas/wasm/build.sh` and commit `atlas/vendor/watch.*`.
 - Constants changed (palette, gesture timings, haptics, protocol): run `python3 atlas/tools/extract.py`.
-  CI (`.github/workflows/atlas.yml`) runs `--check` and `node --test atlas/test`.
+  CI (`.github/workflows/atlas.yml`) runs `--check` and `node --test atlas/test/*.test.mjs`.
 - Hand-written prose in the chapters (for example the gesture→action matrix) must be updated by hand
   when interaction design changes (see `docs/design/UI-RING.md`).
 
