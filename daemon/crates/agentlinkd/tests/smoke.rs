@@ -3,7 +3,6 @@
 
 use agentlink_proto::{Envelope, Message, SessState};
 use futures_util::{SinkExt, StreamExt};
-use std::io::Write;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message as Ws;
@@ -37,6 +36,41 @@ where
     Envelope::from_bytes(&m.into_data()).unwrap()
 }
 
+/// Named pipe for the hook IPC on Windows (the daemon honours `AGENTLINK_PIPE`); unused on Unix.
+fn pipe_name(port: u16) -> String {
+    format!(r"\\.\pipe\agentlink-smoke-{port}")
+}
+
+/// Writes one hook line over the platform IPC and returns the open connection.
+#[cfg(unix)]
+async fn send_hook(
+    home: &std::path::Path,
+    _port: u16,
+    line: &str,
+) -> std::os::unix::net::UnixStream {
+    use std::io::Write;
+    let mut s = std::os::unix::net::UnixStream::connect(home.join("hook.sock")).unwrap();
+    writeln!(s, "{line}").unwrap();
+    s
+}
+
+#[cfg(windows)]
+async fn send_hook(
+    _home: &std::path::Path,
+    port: u16,
+    line: &str,
+) -> tokio::net::windows::named_pipe::NamedPipeClient {
+    use tokio::io::AsyncWriteExt;
+    let mut c = loop {
+        match tokio::net::windows::named_pipe::ClientOptions::new().open(pipe_name(port)) {
+            Ok(c) => break c,
+            Err(_) => tokio::time::sleep(Duration::from_millis(50)).await,
+        }
+    };
+    c.write_all(format!("{line}\n").as_bytes()).await.unwrap();
+    c
+}
+
 #[tokio::test]
 async fn handshake_hook_event_and_focus() {
     let home = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("smoke-home");
@@ -52,6 +86,7 @@ async fn handshake_hook_event_and_focus() {
             .env("AGENTLINK_USB", "0")
             .env("AGENTLINK_BLE", "0")
             .env("AGENTLINK_WS_ADDR", format!("127.0.0.1:{port}"))
+            .env("AGENTLINK_PIPE", pipe_name(port))
             .stderr(Stdio::null())
             .spawn()
             .unwrap(),
@@ -76,9 +111,12 @@ async fn handshake_hook_event_and_focus() {
     assert!(snap.sessions.is_empty());
 
     // A hook event creates a session, pushed as session_upd.
-    let sock = home.join("hook.sock");
-    let mut s = std::os::unix::net::UnixStream::connect(&sock).unwrap();
-    writeln!(s, r#"{{"agent":"copilot","event":"preToolUse","cwd":"/x/proj","payload":{{"sessionId":"a","toolName":"bash"}}}}"#).unwrap();
+    let _hook = send_hook(
+        &home,
+        port,
+        r#"{"agent":"copilot","event":"preToolUse","cwd":"/x/proj","payload":{"sessionId":"a","toolName":"bash"}}"#,
+    )
+    .await;
     let Message::SessionUpd(sess) = next_env(&mut ws).await.msg else {
         panic!("expected session_upd")
     };
