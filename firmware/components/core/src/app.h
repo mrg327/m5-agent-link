@@ -8,3 +8,5 @@ uint32_t app_now_ms(void);
 uint32_t app_fps(void);
 /* Queue a synthetic gesture; it takes the same path as a real one (wake, log, UI). */
 void app_inject_gesture(const gesture_evt_t *g);
+/* Number of selectable rim segments; the UI calls this whenever the ring is rebuilt. */
+void app_set_sectors(int n);

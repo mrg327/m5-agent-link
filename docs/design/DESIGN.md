@@ -141,7 +141,9 @@ Priority for sorting: `needs_input > error > done(unseen) > working > idle > don
 
 **Physical:** The device hangs face-out. When the user lifts it, it faces the user. The IMU detects the lift and tilt, which drives wake and display rotation. **[D] Q3:** lanyard. At rest the screen faces outward, and the user lifts it to read. The device wakes on lift, and the IMU picks the orientation (0° or 180°).
 
-**Screen map [D]:**
+> **Update:** the glance/list/detail navigation below is superseded by the single Ring screen, implemented per [UI-RING.md](UI-RING.md). The gesture table at the end of this section is updated; items 1–3 are kept for history.
+
+**Screen map [D] (superseded):**
 ```
  (display off) ──lift / button / attention-glow tap──► GLANCE
    GLANCE ──swipe up──► SESSION LIST ──tap──► DETAIL
@@ -157,14 +159,15 @@ Priority for sorting: `needs_input > error > done(unseen) > working > idle > don
 **Gestures/buttons [D/P]:**
 | Input | Action |
 |---|---|
-| Tap | Select / open |
-| **Double-tap on session row or detail** | **Focus that agent on the PC** (haptic tick + "→ PC" toast) |
-| Swipe up / down | Scroll list; from Glance, swipe up opens the list |
-| Swipe right (detail) | Ack / mark seen |
-| Swipe left | Back |
-| Hold on Approve | Hold-to-confirm |
-| Button A (hold) | Push-to-talk (v3); press = wake |
-| Button B | Back / home; long-press = badge mode |
+| Tap centre | Default action for the selected session (Focus; Done also acks), immediate |
+| Tap rim segment / drag along rim | Select session (scrub, with a detent tick per segment) |
+| Hold centre ≥ 1.2 s (permission) | Approve (arc fill + haptic ramp) |
+| Swipe down on centre (permission) | Deny |
+| Button A short | Default action (delayed ~300 ms to detect a double) |
+| Button A double | Jump to next attention |
+| Button B short / long | Next / previous session |
+| A+B chord | Reserved (logged, no action) |
+| (Push-to-talk, badge mode) | Not in the Ring UI; deferred |
 
 **Alerting while at rest [D]:** The screen faces outward on the lanyard, so text is never lit at rest. For `needs_input` and `error`, the device vibrates and shows a **brief dim colored ring glow** (about 2 s, no text, then off). Lifting it shows the attention card.
 

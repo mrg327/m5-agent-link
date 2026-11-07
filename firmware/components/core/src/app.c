@@ -13,7 +13,9 @@
 #include "link.h"
 #include "power.h"
 #include "ring.h"
+#include "model.h"
 #include "ui.h"
+#include "ui_theme.h"
 
 #define FRAME_MAX 4096
 
@@ -33,10 +35,6 @@ static hal_motion_evt_t s_motion_buf[8];
 static gesture_evt_t s_gesture_buf[32];
 
 static uint32_t s_frames_drawn, s_fps, s_fps_t0;
-static gesture_evt_t s_deferred_tap;
-static bool s_has_deferred;
-static uint32_t s_deferred_at;
-#define DEFER_SLACK_MS 30
 static lv_indev_t *s_touch;
 
 uint32_t app_now_ms(void) { return (uint32_t)(hal_time_us() / 1000); }
@@ -44,6 +42,7 @@ uint32_t app_fps(void) { return s_fps; }
 static uint32_t tick_cb(void) { return app_now_ms(); }
 
 void app_inject_gesture(const gesture_evt_t *g) { ring_push(&s_gestures, g); }
+void app_set_sectors(int n) { gesture_set_sectors(&s_gesture, n); }
 
 /* ── HAL callbacks (any context) ── */
 
@@ -102,8 +101,8 @@ static void on_refr_ready(lv_event_t *e)
 
 static void toast_cmd_result(bool sent, const char *ok_text)
 {
-    if (sent) ui_toast(ok_text, 0x58a6ff);
-    else ui_toast("Offline", 0xd29922);
+    if (sent) ui_toast(ok_text, RGB_ACCENT);
+    else ui_toast("Offline", RGB_AMBER);
 }
 
 static void act_focus(uint32_t sid)
@@ -134,9 +133,19 @@ static void act_deny(uint32_t sid, uint32_t rid)
     toast_cmd_result(sent, "Denied");
 }
 
-static void act_ack(uint32_t sid) { link_send_cmd(LINK_OP_ACK, sid, 0, 0); }
+/* The daemon only answers ack; there is no stored state. So the device remembers it: the segment dims. */
+static void act_ack(uint32_t sid)
+{
+    link_send_cmd(LINK_OP_ACK, sid, 0, 0);
+    session_t d = {.sid = sid, .seen = true};
+    model_upsert(&d, SF_SEEN);
+}
 
-static const ui_actions_t s_actions = {act_focus, act_approve, act_deny, act_ack, feedback_tick};
+static void act_nag(void) { feedback_attention(ATT_APPROVAL); }
+
+static const ui_actions_t s_actions = {act_focus,    act_approve,        act_deny,           act_ack,
+                                       feedback_tick, feedback_detent,    feedback_hold_ramp, feedback_hold_stop,
+                                       feedback_reject, act_nag,         app_set_sectors};
 
 /* ── link → app ── */
 
@@ -144,26 +153,28 @@ static void on_link(bool welcomed) { ui_set_link_state(welcomed); }
 
 static void on_attention(const attention_t *a)
 {
-    uint32_t rgb = a->kind == ATT_ERROR ? 0xf85149 : a->kind == ATT_DONE ? 0x3fb950 : 0xd29922;
+    uint32_t rgb = a->kind == ATT_ERROR ? RGB_ERROR : a->kind == ATT_DONE ? RGB_DONE : a->kind == ATT_QUESTION ? RGB_ASK : RGB_PERMISSION;
     feedback_attention(a->kind);
     power_attention(rgb, app_now_ms());
     if (!power_display_on()) return;
+    if (a->kind == ATT_DONE) return;
+    /* Jump to the new request unless the user is already looking at an unanswered one. */
     ui_report_t r;
     ui_report(&r);
     bool busy_elsewhere = r.has_sel_sid && r.sel_sid != a->sid && strcmp(r.screen, "attention") == 0;
-    if (!busy_elsewhere && a->kind != ATT_DONE) ui_show_session(a->sid);
+    if (!busy_elsewhere) ui_show_session(a->sid);
 }
 
 static void on_result(int op, uint32_t sid, bool ok, int err, const char *msg)
 {
     (void)sid;
     if (ok) {
-        if (op == LINK_OP_FOCUS) ui_toast(LV_SYMBOL_OK " Focused", 0x3fb950);
+        if (op == LINK_OP_FOCUS) ui_toast(LV_SYMBOL_OK " Focused", RGB_SUCCESS);
         return;
     }
     static const char *const errs[] = {"Out of date", "Denied", "Not supported", "No window", "Timed out", "Failed"};
     const char *text = err >= 0 && err < 6 ? errs[err] : msg[0] ? msg : "Failed";
-    ui_toast(text, err == 3 ? 0xd29922 : 0xf85149);
+    ui_toast(text, err == 3 ? RGB_AMBER : RGB_DANGER);
     feedback_reject();
 }
 
@@ -171,42 +182,29 @@ static const link_hooks_t s_hooks = {.on_link = on_link, .on_attention = on_atte
 
 /* ── input dispatch ── */
 
-static void dispatch_now(const gesture_evt_t *g)
+static void log_gesture(const gesture_evt_t *g)
 {
-    if (g->kind == G_LIFT) return;
-    if (g->kind == G_SHAKE || g->kind == G_BTN_B_LONG) {
-        ui_show_glance();
+    switch (g->kind) {
+    case G_PRESS:
+    case G_RELEASE: return; /* raw edges are too chatty */
+    case G_SCRUB_START:
+    case G_SCRUB:
+    case G_SCRUB_END:
+        dbg_event("input", "scrub", "\"phase\":\"%s\",\"sector\":%d,\"angle\":%d,\"arc\":%u",
+                  g->kind == G_SCRUB_START ? "start" : g->kind == G_SCRUB ? "move" : "end", g->x, g->y,
+                  (unsigned)g->dur_ms);
         return;
+    case G_CHORD: dbg_event("input", "chord", "\"note\":\"reserved, no action\""); return;
+    default: dbg_event("input", gesture_name(g->kind), "\"x\":%d,\"y\":%d", g->x, g->y);
     }
-    ui_on_gesture(g);
 }
 
-static void flush_deferred(void)
-{
-    if (!s_has_deferred) return;
-    s_has_deferred = false;
-    dispatch_now(&s_deferred_tap);
-}
-
-/* A tap that would navigate is held back for the double-tap window, so a double-tap on a row
- * focuses it instead of first opening it. */
 static void dispatch(const gesture_evt_t *g)
 {
-    bool raw = g->kind == G_PRESS || g->kind == G_RELEASE;
-    if (!raw) dbg_event("input", gesture_name(g->kind), "\"x\":%d,\"y\":%d", g->x, g->y);
-    if (power_activity(app_now_ms())) { /* first touch only wakes the display */
-        s_has_deferred = false;
-        return;
-    }
-    if (g->kind == G_DOUBLE_TAP) s_has_deferred = false;
-    else if (!raw) flush_deferred();
-    if (g->kind == G_TAP && ui_tap_defers(g)) {
-        s_deferred_tap = *g;
-        s_has_deferred = true;
-        s_deferred_at = app_now_ms();
-        return;
-    }
-    dispatch_now(g);
+    log_gesture(g);
+    if (g->kind == G_LIFT) return;
+    if (power_activity(app_now_ms())) return; /* first touch only wakes the display */
+    ui_on_gesture(g);
 }
 
 static void drain_input(uint32_t now)
@@ -219,8 +217,6 @@ static void drain_input(uint32_t now)
         if (m.kind == HAL_MOTION_LIFT || m.kind == HAL_MOTION_SHAKE) ring_push(&s_gestures, &g);
     }
     gesture_tick(&s_gesture, now);
-    if (s_has_deferred && !s_gesture.pressed && now - s_deferred_at >= GESTURE_DOUBLE_TAP_MS + DEFER_SLACK_MS)
-        flush_deferred();
 }
 
 static void drain_link(uint32_t now)

@@ -1,0 +1,23 @@
+# One of each state, selected in turn with B (pinned order), for screenshots.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 error prairie
+session 2 ask grove
+session 3 work ember
+session 4 done fjord
+session 5 idle juniper
+wait 1000
+expect_label Error
+shot ring_error.png
+btn B
+expect_label Needs input
+shot ring_ask.png
+btn B
+expect_label Working
+shot ring_work.png
+btn B
+expect_label Done
+shot ring_done2.png
+btn B
+expect_label Idle
+shot ring_idle.png

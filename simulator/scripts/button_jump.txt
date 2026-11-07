@@ -1,0 +1,30 @@
+# A double-press jumps to the next session that needs you; B steps, A+B is reserved.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work ember
+session 2 work fjord
+session 3 ask grove
+session 4 work harbor
+session 5 error island
+wait 300
+expect_label ember
+btn A double
+wait 200
+expect_label grove
+btn A double
+wait 200
+expect_label island
+btn A double
+wait 200
+expect_label grove
+btn B
+wait 200
+expect_label harbor
+btn B long
+wait 200
+expect_label grove
+chord
+wait 200
+expect_label grove
+btn A
+wait 200

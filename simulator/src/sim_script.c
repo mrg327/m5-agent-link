@@ -1,18 +1,23 @@
 /* Scripted input. A script is expanded up front into a timeline of primitive events (mouse, keys,
  * IMU, frames, checks) that are replayed in real time through the same paths as real input.
  *
- *   wait MS | tap X Y | dtap X Y | hold X Y MS | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long]
- *   lift | shake | connect | disconnect | rx HEX | ui | shot FILE.png
- *   expect_screen NAME | expect_label TEXT | quit
+ *   wait MS | tap X Y | hold X Y MS | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double] | chord
+ *   scrub DEG0 DEG1 [MS [RADIUS]]   drag along the rim, degrees clockwise from 12 o'clock
+ *   session SID work|input|ask|error|done|idle|doneseen REPO   add or update a session (input = permission, ask = question)
+ *   drop SID | lift | shake | connect | disconnect | rx HEX | ui | shot FILE.png
+ *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
  */
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "core.h"
+#include "model.h"
+#include "ui_theme.h"
 #include "sim.h"
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_DROP, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -53,6 +58,25 @@ static void tap(uint32_t *t, int x, int y)
     *t += 100;
 }
 
+/* A finger dragging along an arc, one sample every 8 ms. */
+static void scrub(uint32_t *t, int d0, int d1, int ms, int radius)
+{
+    int steps = ms / 8 > 2 ? ms / 8 : 2;
+    for (int i = 0; i <= steps; i++) {
+        float rad = (float)(d0 + (d1 - d0) * i / steps) * 3.14159265f / 180.0f;
+        int x = 233 + (int)lroundf((float)radius * sinf(rad)), y = 233 - (int)lroundf((float)radius * cosf(rad));
+        add(*t + (uint32_t)(ms * i / steps), E_PTR, 1, x, y, NULL);
+        if (i == steps) add(*t + (uint32_t)ms + 8, E_PTR, 0, x, y, NULL);
+    }
+    *t += (uint32_t)ms + 150;
+}
+
+static void btn(uint32_t *t, int b, uint32_t down_at, uint32_t up_at)
+{
+    add(*t + down_at, E_BTN, b, 1, 0, NULL);
+    add(*t + up_at, E_BTN, b, 0, 0, NULL);
+}
+
 static bool parse_line(char *line, uint32_t *t)
 {
     char cmd[24] = "", arg[512] = "";
@@ -65,12 +89,7 @@ static bool parse_line(char *line, uint32_t *t)
 
     if (!strcmp(cmd, "wait") && sscanf(rest, "%d", &a) == 1) *t += (uint32_t)a;
     else if (!strcmp(cmd, "tap") && sscanf(rest, "%d %d", &a, &b) == 2) tap(t, a, b);
-    else if (!strcmp(cmd, "dtap") && sscanf(rest, "%d %d", &a, &b) == 2) {
-        tap(t, a, b);
-        *t += 0;
-        tap(t, a, b);
-        *t += 150;
-    } else if (!strcmp(cmd, "hold") && sscanf(rest, "%d %d %d", &a, &b, &c) == 3) {
+    else if (!strcmp(cmd, "hold") && sscanf(rest, "%d %d %d", &a, &b, &c) == 3) {
         add(*t, E_PTR, 1, a, b, NULL);
         add(*t + (uint32_t)c, E_PTR, 0, a, b, NULL);
         *t += (uint32_t)c + 150;
@@ -79,10 +98,32 @@ static bool parse_line(char *line, uint32_t *t)
         if (n < 4) return false;
         swipe(t, a, b, c, d, n == 5 ? e : 160);
     } else if (!strcmp(cmd, "btn") && (rest[0] == 'A' || rest[0] == 'B')) {
-        bool lng = strstr(rest, "long") != NULL;
-        add(*t, E_BTN, rest[0] == 'B', 1, 0, NULL);
-        add(*t + (lng ? 900u : 60u), E_BTN, rest[0] == 'B', 0, 0, NULL);
-        *t += (lng ? 900u : 60u) + 120;
+        bool lng = strstr(rest, "long") != NULL, dbl = strstr(rest, "double") != NULL;
+        int bi = rest[0] == 'B';
+        if (dbl) {
+            btn(t, bi, 0, 60);
+            btn(t, bi, 160, 220);
+            *t += 220 + 600; /* a double press settles at once; leave room for a stray single */
+        } else {
+            btn(t, bi, 0, lng ? 900u : 60u);
+            *t += (lng ? 900u : 60u) + 450; /* a single A is delayed by the double-press window */
+        }
+    } else if (!strcmp(cmd, "chord")) {
+        btn(t, 0, 0, 200);
+        btn(t, 1, 40, 220);
+        *t += 220 + 450;
+    } else if (!strcmp(cmd, "scrub") && sscanf(rest, "%d %d %d %d", &a, &b, &c, &d) >= 2) {
+        int n = sscanf(rest, "%d %d %d %d", &a, &b, &c, &d);
+        scrub(t, a, b, n >= 3 ? c : 400, n >= 4 ? d : 200);
+    } else if (!strcmp(cmd, "session") && arg[0]) {
+        add(*t, E_SESSION, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "drop") && sscanf(rest, "%d", &a) == 1) {
+        add(*t, E_DROP, a, 0, 0, NULL);
+        *t += 50;
+    } else if (!strcmp(cmd, "expect_no_label") && arg[0]) {
+        add(*t, E_EXPECT_NO_LABEL, 0, 0, 0, arg);
+        *t += 50;
     } else if (!strcmp(cmd, "lift")) {
         add(*t, E_MOTION, HAL_MOTION_LIFT, 0, 0, NULL);
         *t += 100;
@@ -133,6 +174,12 @@ bool sim_script_load(const char *path)
     }
     fclose(f);
     add(t + 200, E_QUIT, 0, 0, 0, NULL);
+    for (size_t i = 1; i < s_n; i++) { /* stable: overlapping primitives (a chord) are added out of order */
+        ev_t k = s_ev[i];
+        size_t j = i;
+        for (; j > 0 && s_ev[j - 1].at_ms > k.at_ms; j--) s_ev[j] = s_ev[j - 1];
+        s_ev[j] = k;
+    }
     return true;
 }
 
@@ -146,6 +193,28 @@ static void send_hex(const char *hex)
         buf[n++] = (uint8_t)v;
     }
     sim_link_inject_rx(buf, n);
+}
+
+static void run_session(const char *spec)
+{
+    unsigned sid;
+    char st[16], repo[40];
+    if (sscanf(spec, "%u %15s %39s", &sid, st, repo) != 3) {
+        s_failed = true;
+        return;
+    }
+    uint32_t now = theme_now_unix();
+    session_t d = {.sid = sid, .agent = (agent_t)(sid % 3), .state = SESS_WORK, .t0 = now - 3600 + sid, .tst = now - 40 - 53 * sid};
+    if (!strcmp(st, "input") || !strcmp(st, "ask")) {
+        d.state = SESS_INPUT;
+        d.sub = st[0] == 'a';
+    } else if (!strcmp(st, "error")) d.state = SESS_ERROR;
+    else if (!strcmp(st, "done") || !strcmp(st, "doneseen")) {
+        d.state = SESS_DONE;
+        d.seen = st[4] == 's';
+    } else if (!strcmp(st, "idle")) d.state = SESS_IDLE;
+    snprintf(d.repo, sizeof d.repo, "%s", repo);
+    model_upsert(&d, SF_AGENT | SF_STATE | SF_SUB | SF_REPO | SF_T0 | SF_TST | SF_SEEN);
 }
 
 static void fail(const char *what, const char *want)
@@ -174,6 +243,11 @@ static void run(const ev_t *e)
     case E_EXPECT_LABEL:
         if (!core_ui_has_label(e->text)) fail("expected label", e->text);
         break;
+    case E_EXPECT_NO_LABEL:
+        if (core_ui_has_label(e->text)) fail("unexpected label", e->text);
+        break;
+    case E_SESSION: run_session(e->text); break;
+    case E_DROP: model_remove((uint32_t)e->a); break;
     case E_QUIT: s_next = s_n; break;
     }
 }

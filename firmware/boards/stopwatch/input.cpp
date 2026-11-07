@@ -16,7 +16,7 @@
 #define HAPTIC_MAX_STEPS 32
 #define HAPTIC_DUTY 85      /* % PWM hold level; the motor does not start below ~25 */
 #define HAPTIC_KICK_DUTY 100 /* overdrive to spin the ERM up quickly */
-#define HAPTIC_KICK_MS 15    /* kick length; only applied to pulses at least twice as long */
+#define HAPTIC_KICK_MS 15    /* kick length; pulses at least twice as long get it first, shorter ones run at kick duty */
 
 static const char *TAG = "haptic";
 
@@ -118,7 +118,8 @@ static void haptic_task(void *arg)
                     ms -= HAPTIC_KICK_MS;
                     if (!interrupted) sw_ioe_motor_duty(HAPTIC_DUTY);
                 } else {
-                    sw_ioe_motor_duty(on ? HAPTIC_DUTY : 0);
+                    /* A pulse no longer than the kick (the rim detent) is all kick: a crisp click. */
+                    sw_ioe_motor_duty(on ? (ms <= HAPTIC_KICK_MS ? HAPTIC_KICK_DUTY : HAPTIC_DUTY) : 0);
                 }
                 if (!interrupted) interrupted = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(ms)) > 0;
             }

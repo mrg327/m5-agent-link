@@ -1,4 +1,4 @@
-/* LVGL user interface: glance, session list, session detail / attention card.
+/* LVGL user interface: one Ring screen (docs/design/UI-RING.md).
  * Everything here runs on the LVGL thread (core_step). */
 #pragma once
 #include <stdbool.h>
@@ -9,7 +9,7 @@
 #include "lvgl.h"
 
 typedef struct {
-    char screen[12];            /* "glance" | "list" | "detail" | "attention" | "off" */
+    char screen[12];            /* "ring" | "attention" (selected session has a pending request) | "off" */
     bool has_sel_sid;
     uint32_t sel_sid;
     bool has_rid;
@@ -26,7 +26,13 @@ typedef struct {
     void (*approve)(uint32_t sid, uint32_t rid, uint32_t hold_ms);
     void (*deny)(uint32_t sid, uint32_t rid);
     void (*ack)(uint32_t sid);
-    void (*tick)(void); /* light haptic tick for selection changes */
+    void (*tick)(void);   /* light haptic tick: selection by tap or button */
+    void (*detent)(void); /* rim-scrub segment crossed */
+    void (*hold_start)(void); /* approve hold passed the grace period: start the haptic ramp */
+    void (*hold_stop)(void);
+    void (*reject)(void); /* nothing to do: buzz */
+    void (*nag)(void);    /* unanswered permission request: remind */
+    void (*sectors)(int n); /* the rim now has n selectable segments */
 } ui_actions_t;
 
 void ui_init(const ui_actions_t *actions);
@@ -34,16 +40,12 @@ void ui_init(const ui_actions_t *actions);
 void ui_tick(uint32_t now_ms);
 /* Returns true if the gesture was used by the current screen. */
 bool ui_on_gesture(const gesture_evt_t *g);
-/* True if a tap would navigate or act irreversibly, so the app holds it back until the
- * double-tap window has passed (double-tap means "focus" on list and detail). */
-bool ui_tap_defers(const gesture_evt_t *g);
-
 void ui_report(ui_report_t *out);
 void ui_set_link_state(bool connected); /* handshake done (welcomed) */
 /* Transport currently carrying the link: a hal_link_kind_t value, or -1 for none. */
 void ui_set_link_transport(int kind);
-void ui_show_glance(void);
-void ui_show_session(uint32_t sid); /* detail (or attention card) for a session */
+/* Moves the selection to a session (attention wake); counts as user attention. */
+void ui_show_session(uint32_t sid);
 void ui_toast(const char *text, uint32_t rgb);
 /* Brief dim ring for alerts while the display is otherwise idle; text-free by design. */
 void ui_glow(uint32_t rgb);

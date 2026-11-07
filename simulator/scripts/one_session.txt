@@ -1,0 +1,6 @@
+# A single session closes the ring.
+session 1 work ember
+wait 300
+expect_label ember
+expect_label 1 segments
+shot ring_one.png

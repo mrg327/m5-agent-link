@@ -9,13 +9,39 @@
 uint32_t theme_state_rgb(sess_state_t s)
 {
     switch (s) {
-    case SESS_INPUT: return RGB_AMBER;
-    case SESS_ERROR: return RGB_DANGER;
-    case SESS_DONE: return RGB_SUCCESS;
+    case SESS_INPUT: return RGB_ASK;
+    case SESS_ERROR: return RGB_ERROR;
+    case SESS_DONE: return RGB_DONE;
     case SESS_WORK:
-    case SESS_START: return RGB_ACCENT;
+    case SESS_START: return RGB_WORKING;
     default: return RGB_IDLE;
     }
+}
+
+uint32_t theme_session_rgb(const session_t *s)
+{
+    return s->state == SESS_INPUT && s->sub == 0 ? RGB_PERMISSION : theme_state_rgb(s->state);
+}
+
+const char *theme_state_word(const session_t *s)
+{
+    switch (s->state) {
+    case SESS_START: return "Starting";
+    case SESS_WORK: return "Working";
+    case SESS_INPUT: return s->sub == 1 ? "Needs input" : "Permission";
+    case SESS_ERROR: return "Error";
+    case SESS_DONE: return "Done";
+    case SESS_IDLE: return "Idle";
+    default: return "Ended";
+    }
+}
+
+const char *theme_basename(const char *path)
+{
+    const char *base = path;
+    for (const char *p = path; *p; p++)
+        if ((*p == '/' || *p == '\\') && p[1]) base = p + 1;
+    return base;
 }
 
 const char *theme_state_label(const session_t *s)
@@ -125,3 +151,10 @@ void theme_elapsed(char *dst, size_t cap, uint32_t secs)
 }
 
 uint32_t theme_now_unix(void) { return hal_rtc_get_unix(); }
+
+void theme_elapsed_long(char *dst, size_t cap, uint32_t secs)
+{
+    if (secs < 60) snprintf(dst, cap, "%us", (unsigned)secs);
+    else if (secs < 3600) snprintf(dst, cap, "%um %02us", (unsigned)(secs / 60), (unsigned)(secs % 60));
+    else snprintf(dst, cap, "%uh %02um", (unsigned)(secs / 3600), (unsigned)(secs / 60 % 60));
+}

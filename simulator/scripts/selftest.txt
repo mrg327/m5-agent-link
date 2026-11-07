@@ -1,32 +1,19 @@
-# End-to-end self test without a daemon: feed protocol vectors, drive the UI, check the screens.
+# End-to-end self test without a daemon: feed protocol vectors, drive the Ring screen.
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 rx a30003010203a10082ab000101000201046d6d352d6167656e742d6c696e6b05646d61696e066462617368071a6aee2d10081a6aee315c096d52756e6e696e672074657374730af40b00aa00020101020203000466776562617070056a666561742f6c6f67696e071a6aee2928081a6aee318e0af40b00
 wait 300
-expect_screen glance
-shot selftest_glance.png
-swipe 233 380 233 120
-wait 400
-expect_screen list
-expect_label m5-agent-link · main
-shot selftest_list.png
-tap 233 233
-wait 400
-expect_screen detail
-shot selftest_detail.png
-swipe 100 233 380 233
-wait 400
-expect_screen list
+expect_screen ring
+expect_label segments
+shot selftest_ring.png
 btn B
-wait 400
-expect_screen glance
+wait 100
 rx a30006010403a7000701020200037152756e207368656c6c20636f6d6d616e640478196e706d2074657374202d2d202d2d77617463683d66616c73650683000102071a6aee32ba
 wait 400
 expect_screen attention
-expect_label Approve
-expect_label Deny
+expect_label APPROVE
 shot selftest_attention.png
 rx a30007010603a200070100
 wait 300
-expect_screen detail
+expect_screen ring
 ui

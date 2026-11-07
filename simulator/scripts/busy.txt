@@ -1,0 +1,21 @@
+# 12 sessions: the four finished ones merge into a single dim segment, so nine segments remain.
+session 1 work ember
+session 2 work fjord
+session 3 doneseen grove
+session 4 work harbor
+session 5 doneseen island
+session 6 idle juniper
+session 7 doneseen kestrel
+session 8 work lagoon
+session 9 doneseen meadow
+session 10 idle nectar
+session 11 work orchard
+session 12 error prairie
+wait 300
+expect_label 9 segments
+shot ring_busy.png
+# Selecting the merged slot expands it.
+scrub 5 190 700
+expect_screen ring
+wait 300
+shot ring_busy_scrubbed.png
