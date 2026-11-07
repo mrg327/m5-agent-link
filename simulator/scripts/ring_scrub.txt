@@ -1,0 +1,16 @@
+# Dragging along the rim moves the selection and sends nothing.
+session 1 work ember
+session 2 work fjord
+session 3 work grove
+session 4 ask harbor
+session 5 work island
+session 6 idle juniper
+wait 300
+expect_label ember
+scrub 10 100 400
+wait 100
+expect_label fjord
+shot ring_scrub.png
+scrub 100 215 500
+wait 100
+expect_label harbor

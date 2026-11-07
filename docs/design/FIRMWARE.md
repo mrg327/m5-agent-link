@@ -17,7 +17,7 @@ firmware/
     core/              portable: app model, controllers, UI (LVGL), power policy, haptic/sound patterns
       model/           session store (fixed pool, ~32 sessions), attention queue, settings (NVS)
       link/            link manager: transport-agnostic, pairing, session keys, resync
-      ui/              screens: glance, list, detail, attention, badge, settings, pairing; layout profiles
+      ui/              screens: ring (single screen, UI-RING.md), badge, settings, pairing; layout profiles
       fx/              creature sprites + animation engine, easter eggs (IMU)
       power/           power state machine (policy only; calls HAL)
     hal/               C interface headers only (display, touch, buttons, haptic, audio, imu, rtc, power, batt, link_ble, link_usb)
@@ -89,12 +89,14 @@ With 450 mAh, STANDBY at 2.5 mA is about 7 days, and 40 lifts × 10 s/day at 100
 - Burn-in: no static bright elements in ambient/badge; a ±2 px orbit shift every 60 s.
 
 ## 6. Input & gestures
-- Touch: CST820B on I2C (G47/G48) with INT on G13. The raw points are fed to LVGL. A small recognizer in `core/` handles the following:
-  - tap, **double-tap (≤ 300 ms)**
-  - long-press (≥ 600 ms)
-  - swipe (≥ 60 px, ≤ 400 ms)
-  - hold-to-confirm (progress events)
-- Buttons: KEYA (yellow, G2) and KEYB (blue, G1) with debounce. Short, long and the sequence detector (easter egg).
+- Touch: CST820B on I2C (G47/G48) with INT on G13. The raw points are fed to LVGL, which polls every 10 ms on the LVGL thread, so the drag stream is already coalesced to the latest point. The recogniser in `core/gesture.c` handles the following (see [UI-RING.md](UI-RING.md)):
+  - **tap** (immediate; the 330 ms deferral and double-tap-to-focus are gone)
+  - long-press (≥ 600 ms); the approve hold needs ≥ 1.2 s on the centre, with an arc fill
+  - swipe (≥ 60 px, ≤ 400 ms); swipe-down on the centre = deny
+  - **rim scrub**: annulus r 170–225 px around (233,233), ≥ 15° continuous arc to start, sector hysteresis of 1/3 sector. Once scrubbing, tap/swipe are suppressed for that touch. Events: `G_SCRUB_START/SCRUB/SCRUB_END`.
+- Buttons: KEYA (yellow, G2) and KEYB (blue, G1) with debounce. A short = default action, A double (≤ 300 ms) = next attention, B short/long = next/previous session, A+B chord = detected and logged only. A single press is therefore delayed by ~300 ms to wait for a possible double (B is immediate).
+- Haptics (`feedback.c`): scrub detent = 15 ms kick (the board runs ≤ 15 ms pulses at kick duty), rate-limited to 45 ms; approve-hold ramp = 13 steps (~1 s); per-state entry patterns.
+- UI is a single Ring screen (`ui_home.c` + `ui_ring.c`, per-segment invalidation). `ui_glance/list/detail.c` were removed.
 - Touch-panel wake is optional (off in STANDBY to save power; lift or a button wakes the device).
 
 ## 7. Link manager

@@ -1,6 +1,21 @@
 # UI proposal: "Ring": select a session, act with one gesture
 
-Status: **proposal**, not implemented. It replaces today's glance → list → detail screens.
+Status: **implemented** (branch `ui-ring`; simulator-verified, firmware builds, not yet validated on the device). It replaces the old glance → list → detail screens.
+
+**Implementation notes and deviations**
+- Code: `ui_home.c` (screen), `ui_ring.c` (segments, per-segment invalidation in ≤ 30° chunks), `gesture.c` (rim recogniser, buttons), `feedback.c`, `ui_theme.c` (Okabe-Ito).
+- Drag stream: no extra HAL queue. LVGL polls touch every 10 ms on the single UI thread, so the stream is naturally the latest point; the simulator uses the same path.
+- Ack: the protocol has an `ack` op (1), but the daemon stores nothing, so the device also dims the segment locally (`seen`).
+- Long-press on Working/Needs input/Idle = Focus; on Done/Error = ack only; ignored on Permission (the hold is the approve).
+- Tap on a Permission centre = Focus (never approve).
+- A double-press costs ~300 ms on A's single press (B is immediate). Accepted trade-off.
+- A+B chord: detected and logged (`chord` event) with no action.
+- Edge hints sit just inside the ring beside the confirmed buttons: A (KEYA, orange) at lower-left 7:30 (225° clockwise from 12), B (KEYB, red) at lower-right 4:30 (135°). A small dot points at each button.
+- Approve arc and haptic ramp start after 250 ms of hold; early release cancels.
+- Debug events: `scrub` (`phase` start|move|end, `sector`, `angle`, `arc`), `select`, `chord`; `screen` is `ring` or `attention`.
+- Permission nag: up to 3 re-buzzes every 15 s. Ambient dim after 30 s idle when nothing needs input.
+- Moved the host recogniser test to `simulator/tests/test_gesture.c`.
+- Still needs on-device validation: rim accuracy, fps, haptic feel, hint placement against the real bezel.
 Sources: [`wearable-glance-gestures.md`](../research/wearable-glance-gestures.md),
 [`minimal-peripherals.md`](../research/minimal-peripherals.md),
 [`stopwatch-interaction-capabilities.md`](../research/stopwatch-interaction-capabilities.md).

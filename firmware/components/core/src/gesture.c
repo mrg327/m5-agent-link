@@ -1,7 +1,12 @@
 #include "gesture.h"
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 static void emit(gesture_t *g, gesture_kind_t kind, int x, int y, uint32_t dur)
 {
@@ -20,8 +25,72 @@ const char *gesture_name(gesture_kind_t k)
 {
     static const char *const names[] = {
         "press", "release", "tap", "double_tap", "long_press", "swipe_up", "swipe_down",
-        "swipe_left", "swipe_right", "btn_a", "btn_b", "btn_a_long", "btn_b_long", "lift", "shake"};
+        "swipe_left", "swipe_right", "btn_a", "btn_b", "btn_a_long", "btn_b_long", "lift", "shake",
+        "scrub_start", "scrub", "scrub_end", "btn_a_double", "chord"};
     return (unsigned)k < sizeof names / sizeof *names ? names[k] : "?";
+}
+
+float gesture_angle_deg(int x, int y, float *radius)
+{
+    float dx = (float)(x - GESTURE_CX), dy = (float)(y - GESTURE_CY);
+    if (radius) *radius = sqrtf(dx * dx + dy * dy);
+    float deg = atan2f(dy, dx) * 180.0f / (float)M_PI + 90.0f;
+    return deg < 0 ? deg + 360.0f : deg >= 360.0f ? deg - 360.0f : deg;
+}
+
+static float wrap180(float d)
+{
+    while (d > 180.0f) d -= 360.0f;
+    while (d <= -180.0f) d += 360.0f;
+    return d;
+}
+
+static int sector_of(const gesture_t *g, float deg)
+{
+    if (g->sectors < 2) return 0;
+    int s = (int)(deg * (float)g->sectors / 360.0f);
+    return s >= g->sectors ? g->sectors - 1 : s;
+}
+
+void gesture_set_sectors(gesture_t *g, int n)
+{
+    g->sectors = n;
+    if (g->scrubbing) g->sector = sector_of(g, g->last_deg);
+}
+
+bool gesture_scrubbing(const gesture_t *g) { return g->scrubbing; }
+
+/* Moves to another sector only once the finger is a third of a sector past the boundary, so a
+ * finger resting on an edge does not flutter between two segments. */
+static void update_sector(gesture_t *g, float deg)
+{
+    if (g->sectors < 2) return;
+    float width = 360.0f / (float)g->sectors;
+    float centre = ((float)g->sector + 0.5f) * width;
+    if (fabsf(wrap180(deg - centre)) <= width * (0.5f + 1.0f / 3.0f)) return;
+    int next = sector_of(g, deg);
+    if (next == g->sector) return;
+    g->sector = next;
+    emit(g, G_SCRUB, next, (int)deg, (uint32_t)fabsf(g->arc_deg));
+}
+
+static void rim_track(gesture_t *g, int x, int y)
+{
+    float r;
+    float deg = gesture_angle_deg(x, y, &r);
+    if (r < GESTURE_RIM_TRACK_IN_PX || r > GESTURE_RIM_TRACK_OUT_PX) {
+        if (!g->scrubbing) g->rim_candidate = false;
+        return;
+    }
+    g->arc_deg += wrap180(deg - g->last_deg);
+    g->last_deg = deg;
+    if (g->scrubbing) {
+        update_sector(g, deg);
+    } else if (fabsf(g->arc_deg) >= GESTURE_SCRUB_START_DEG) {
+        g->scrubbing = true;
+        g->sector = sector_of(g, deg);
+        emit(g, G_SCRUB_START, g->sector, (int)deg, (uint32_t)fabsf(g->arc_deg));
+    }
 }
 
 static void finish_touch(gesture_t *g, uint32_t t_ms)
@@ -29,6 +98,11 @@ static void finish_touch(gesture_t *g, uint32_t t_ms)
     uint32_t dur = t_ms - g->t_down;
     g->pressed = false;
     emit(g, G_RELEASE, g->x, g->y, dur);
+    if (g->scrubbing) {
+        g->scrubbing = g->rim_candidate = false;
+        emit(g, G_SCRUB_END, g->sector, (int)g->last_deg, (uint32_t)fabsf(g->arc_deg));
+        return;
+    }
     if (g->long_fired) return;
 
     if (g->moved) {
@@ -37,37 +111,29 @@ static void finish_touch(gesture_t *g, uint32_t t_ms)
         gesture_kind_t k = abs(dx) > abs(dy) ? (dx > 0 ? G_SWIPE_RIGHT : G_SWIPE_LEFT)
                                              : (dy > 0 ? G_SWIPE_DOWN : G_SWIPE_UP);
         emit(g, k, g->x0, g->y0, dur);
-        g->have_tap = false;
         return;
     }
-
-    bool second = g->have_tap && (g->t_down - g->t_tap_up) <= GESTURE_DOUBLE_TAP_MS &&
-                  abs(g->x0 - g->x_tap) <= 40 && abs(g->y0 - g->y_tap) <= 40;
-    if (second) {
-        g->have_tap = false;
-        emit(g, G_DOUBLE_TAP, g->x0, g->y0, dur);
-    } else {
-        g->have_tap = true;
-        g->t_tap_up = t_ms;
-        g->x_tap = g->x0;
-        g->y_tap = g->y0;
-        emit(g, G_TAP, g->x0, g->y0, dur);
-    }
+    emit(g, G_TAP, g->x0, g->y0, dur);
 }
 
 void gesture_touch(gesture_t *g, bool down, int x, int y, uint32_t t_ms)
 {
     if (down && !g->pressed) {
         g->pressed = true;
-        g->moved = g->long_fired = false;
+        g->moved = g->long_fired = g->scrubbing = false;
         g->t_down = t_ms;
         g->x0 = g->x = (int16_t)x;
         g->y0 = g->y = (int16_t)y;
+        float r;
+        g->last_deg = gesture_angle_deg(x, y, &r);
+        g->arc_deg = 0;
+        g->rim_candidate = r >= GESTURE_RIM_IN_PX && r <= GESTURE_RIM_OUT_PX;
         emit(g, G_PRESS, x, y, 0);
     } else if (down) {
         g->x = (int16_t)x;
         g->y = (int16_t)y;
         if (abs(x - g->x0) > GESTURE_TAP_SLOP_PX || abs(y - g->y0) > GESTURE_TAP_SLOP_PX) g->moved = true;
+        if (g->rim_candidate) rim_track(g, x, y);
     } else if (g->pressed) {
         finish_touch(g, t_ms);
     }
@@ -76,14 +142,34 @@ void gesture_touch(gesture_t *g, bool down, int x, int y, uint32_t t_ms)
 void gesture_button(gesture_t *g, int btn, bool down, uint32_t t_ms)
 {
     if (btn < 0 || btn > 1) return;
+    gesture_btn_t *b = &g->btn[btn], *o = &g->btn[1 - btn];
     if (down) {
-        g->btn[btn].down = true;
-        g->btn[btn].long_fired = false;
-        g->btn[btn].t_down = t_ms;
-    } else if (g->btn[btn].down) {
-        g->btn[btn].down = false;
-        if (!g->btn[btn].long_fired)
-            emit(g, btn ? G_BTN_B : G_BTN_A, 0, 0, t_ms - g->btn[btn].t_down);
+        if (b->down) return;
+        b->down = true;
+        b->long_fired = b->consumed = b->second = false;
+        b->t_down = t_ms;
+        if (o->down && !o->long_fired && !o->consumed) {
+            b->consumed = o->consumed = true;
+            g->a_pending = false;
+            emit(g, G_CHORD, 0, 0, 0);
+            return;
+        }
+        if (btn == 0 && g->a_pending) {
+            g->a_pending = false;
+            b->second = t_ms - g->a_release_ms <= GESTURE_BTN_DOUBLE_MS;
+        }
+    } else if (b->down) {
+        b->down = false;
+        if (b->consumed || b->long_fired) return;
+        uint32_t dur = t_ms - b->t_down;
+        if (btn == 1) {
+            emit(g, G_BTN_B, 0, 0, dur);
+        } else if (b->second) {
+            emit(g, G_BTN_A_DOUBLE, 0, 0, dur);
+        } else {
+            g->a_pending = true;
+            g->a_release_ms = t_ms;
+        }
     }
 }
 
@@ -91,11 +177,15 @@ void gesture_tick(gesture_t *g, uint32_t t_ms)
 {
     if (g->pressed && !g->moved && !g->long_fired && t_ms - g->t_down >= GESTURE_LONG_PRESS_MS) {
         g->long_fired = true;
-        g->have_tap = false;
         emit(g, G_LONG_PRESS, g->x0, g->y0, GESTURE_LONG_PRESS_MS);
     }
+    if (g->a_pending && t_ms - g->a_release_ms >= GESTURE_BTN_DOUBLE_MS) {
+        g->a_pending = false;
+        emit(g, G_BTN_A, 0, 0, 0);
+    }
     for (int b = 0; b < 2; b++) {
-        if (g->btn[b].down && !g->btn[b].long_fired && t_ms - g->btn[b].t_down >= GESTURE_LONG_PRESS_MS) {
+        if (g->btn[b].down && !g->btn[b].long_fired && !g->btn[b].consumed &&
+            t_ms - g->btn[b].t_down >= GESTURE_LONG_PRESS_MS) {
             g->btn[b].long_fired = true;
             emit(g, b ? G_BTN_B_LONG : G_BTN_A_LONG, 0, 0, GESTURE_LONG_PRESS_MS);
         }

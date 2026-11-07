@@ -1,0 +1,6 @@
+# Nothing to show: a dim ring and a calm message.
+wait 200
+expect_screen ring
+expect_label No sessions
+expect_label Offline
+shot ring_empty.png

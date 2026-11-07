@@ -31,6 +31,7 @@ add_subdirectory(${FW}/agentlink_proto agentlink_proto)
 add_subdirectory(${FW}/core core)
 
 add_executable(agentlink_sim src/main.c src/sim_script.c)
+target_include_directories(agentlink_sim PRIVATE ${FW}/core/src)
 target_link_libraries(agentlink_sim PRIVATE core agentlink_hal)
 target_compile_options(agentlink_sim PRIVATE -Wall -Wextra)
 
@@ -40,8 +41,9 @@ target_link_libraries(test_vectors PRIVATE agentlink_proto)
 add_test(NAME protocol_vectors
          COMMAND test_vectors ${CMAKE_CURRENT_SOURCE_DIR}/../protocol/vectors)
 
-add_executable(test_gesture ${FW}/core/test/test_gesture.c ${FW}/core/src/gesture.c)
+add_executable(test_gesture tests/test_gesture.c ${FW}/core/src/gesture.c)
 target_include_directories(test_gesture PRIVATE ${FW}/core/src)
+target_link_libraries(test_gesture PRIVATE m)
 add_test(NAME gesture_recognizer COMMAND test_gesture)
 
 add_test(NAME sim_headless_selftest
@@ -54,13 +56,25 @@ function(sim_script_test name script)
     set_tests_properties(${name} PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30 ${ARGN})
 endfunction()
 
-# Double-tap on a row sends exactly the focus command and never opens the detail screen first.
-sim_script_test(sim_double_tap_focus dtap_focus.txt
-                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_cmd\",\"id\":[0-9]+,\"op\":0,\"sid\":[0-9]+"
-                FAIL_REGULAR_EXPRESSION "\"screen\":\"detail\"")
-sim_script_test(sim_tap_deferred tap_deferred.txt
-                FAIL_REGULAR_EXPRESSION "\"ev\":\"tx_cmd\"")
 sim_script_test(sim_link_indicator link_indicator.txt)
+sim_script_test(sim_ring_empty ring_empty.txt)
+sim_script_test(sim_ring_one one_session.txt)
+sim_script_test(sim_ring_busy busy.txt)
+sim_script_test(sim_ring_states ring_states.txt)
+sim_script_test(sim_ring_scrub ring_scrub.txt
+                PASS_REGULAR_EXPRESSION "\"ev\":\"scrub\".*\"phase\":\"start\""
+                FAIL_REGULAR_EXPRESSION "\"ev\":\"tx_cmd\"|SCRIPT FAIL")
+# A tap on the centre is the default action at once (no deferral); Done also acknowledges.
+sim_script_test(sim_center_tap_focus center_tap_focus.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_cmd\",\"id\":[0-9]+,\"op\":0")
+sim_script_test(sim_approve_hold approve_hold.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"op\":3")
+sim_script_test(sim_deny_swipe deny_swipe.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"op\":4")
+sim_script_test(sim_button_jump button_jump.txt)
 
 # Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
 add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c
