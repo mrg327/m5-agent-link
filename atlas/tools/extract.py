@@ -257,7 +257,7 @@ def extract_ring():
     r["kinds"] = kinds
     find(home, r'"HOLD " LV_SYMBOL_OK " APPROVE"', "ring.pill_approve")
     find(home, r'"FOCUS \+ ACK"', "ring.pill_done")
-    find(home, r'"swipe down to deny"', "ring.deny_hint")
+    find(home, r'"long swipe down to deny"', "ring.deny_hint")
     r["pills"] = {"approve": "HOLD ✓ APPROVE", "done": "FOCUS + ACK", "default": "FOCUS"}
     for key, pat in [("a", r'lv_label_set_text\(s_hint_a, "(\w+)"\)'), ("b", r'lv_label_set_text\(s_hint_b, "(\w+)"\)')]:
         r.setdefault("edge_hints", {})[key] = find(home, pat, f"ring.edge_hint_{key}").group(1)
@@ -329,8 +329,9 @@ HAPTIC_MEANING = {
     "detent": ("detent", "A click each time the rim scrub crosses into another segment"),
     "hold_ramp": ("ramp", "Pulses grow longer and the gaps shorter while the approve hold fills"),
     "tick": ("tick", "A light acknowledgement of a button selection"),
-    "confirm": ("ok", "An action went through"),
-    "reject": ("no", "An action was refused"),
+    "approved": ("approved", "Approve was sent: one long pulse"),
+    "denied": ("denied", "Deny was sent: two medium pulses"),
+    "reject": ("no", "A command could not be sent: three short pulses"),
     "hello": ("hello", "Link up: proves the motor path, even in silent mode"),
     "done": ("done", "An agent finished"),
     "error": ("error", "An agent hit an error"),

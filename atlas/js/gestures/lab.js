@@ -110,7 +110,7 @@ export function createLab(root, ctx) {
       }
       case 'swipe_d':
         log('swipe', 'swipe ↓', t);
-        if (S.pressCentre && r.id === 'perm') { cancelHold(t, true); verdict('Swipe down', 'danger', r.cells.swipe_d.text); buzz('reject'); }
+        if (S.pressCentre && r.id === 'perm') { cancelHold(t, true); verdict('Swipe down', 'danger', r.cells.swipe_d.text); buzz('denied'); }
         else verdict('Swipe down', 'no', r.cells.swipe_d.text);
         break;
       case 'swipe_u': case 'swipe_l': case 'swipe_r':
@@ -147,7 +147,7 @@ export function createLab(root, ctx) {
       S.holdFired = true; S.holding = false; S.rampOn = false; S.flashAt = now;
       log('fire', 'approve', now);
       verdict('Approved', 'ok', `held ${Math.round(el)} ms. ${row().cells.hold.text}`);
-      buzz('confirm');
+      buzz('approved');
     }
   }
 
@@ -374,7 +374,7 @@ export function createLab(root, ctx) {
     c.strokeStyle = col; c.lineWidth = 2 * kk; c.fillStyle = hexA(col, 0.12);
     c.beginPath(); c.roundRect(cx - pwid / 2, py - ph2 / 2, pwid, ph2, ph2 / 2); c.fill(); c.stroke();
     c.fillStyle = col; c.fillText(pill, cx, py + 1);
-    if (r.id === 'perm') { c.font = font(16); c.fillStyle = C.muted; c.fillText('swipe down to deny', cx, cy + 96 * kk); }
+    if (r.id === 'perm') { c.font = font(16); c.fillStyle = C.muted; c.fillText('long swipe down to deny', cx, cy + 96 * kk); }
     // edge hints beside the buttons
     const hint = (deg, text, colr) => {
       const x = cx + ring.hint_r_px * kk * Math.sin((deg * Math.PI) / 180), y = cy - ring.hint_r_px * kk * Math.cos((deg * Math.PI) / 180);

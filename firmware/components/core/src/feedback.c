@@ -58,16 +58,24 @@ void feedback_hold_stop(void)
     if (model_settings()->alert != ALERT_SILENT) hal_haptic_play(NULL, 0);
 }
 
-void feedback_confirm(void)
+/* Approve, deny and reject differ in count and length, so they can be told apart without looking:
+ * one long pulse, two medium, three short. */
+void feedback_approved(void)
 {
-    static const uint16_t ok[] = {45, 50, 45};
-    haptic(ok, 3);
+    static const uint16_t approved[] = {150};
+    haptic(approved, 1);
+}
+
+void feedback_denied(void)
+{
+    static const uint16_t denied[] = {60, 90, 60};
+    haptic(denied, 3);
 }
 
 void feedback_reject(void)
 {
-    static const uint16_t no[] = {35, 60, 35};
-    haptic(no, 3);
+    static const uint16_t no[] = {35, 70, 35, 70, 35};
+    haptic(no, 5);
 }
 
 void feedback_hello(void)

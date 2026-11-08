@@ -118,7 +118,9 @@ static void act_approve(uint32_t sid, uint32_t rid, uint32_t hold_ms)
     bool sent = link_send_cmd(LINK_OP_APPROVE, sid, rid, hold_ms);
     if (sent) {
         model_attention_mark_sent(rid);
-        feedback_confirm();
+        feedback_approved();
+    } else {
+        feedback_reject();
     }
     toast_cmd_result(sent, "Approved");
 }
@@ -128,7 +130,9 @@ static void act_deny(uint32_t sid, uint32_t rid)
     bool sent = link_send_cmd(LINK_OP_DENY, sid, rid, 0);
     if (sent) {
         model_attention_mark_sent(rid);
-        feedback_confirm();
+        feedback_denied();
+    } else {
+        feedback_reject();
     }
     toast_cmd_result(sent, "Denied");
 }

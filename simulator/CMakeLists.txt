@@ -75,6 +75,15 @@ sim_script_test(sim_deny_swipe deny_swipe.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"op\":4")
 sim_script_test(sim_button_jump button_jump.txt)
+# Approval safety: the card shows the request; a short or low swipe never denies; a hold before
+# the card has been visible never approves.
+sim_script_test(sim_approve_card approve_card.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_deny_short_swipe deny_short_swipe.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4")
+add_test(NAME sim_approve_after_glow
+         COMMAND agentlink_sim --headless --no-ws --idle-off 1 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/approve_after_glow.txt)
+set_tests_properties(sim_approve_after_glow PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL" PASS_REGULAR_EXPRESSION "\"op\":3")
+sim_script_test(sim_approve_too_soon approve_too_soon.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
 
 # Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
 add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c

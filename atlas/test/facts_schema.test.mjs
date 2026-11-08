@@ -44,7 +44,7 @@ test('ring facts: screens, per-kind shapes, pills and the gesture cases', () => 
 
 test('haptics have steps with duty, the rim detent and the approve ramp', () => {
   assert.deepEqual(Object.keys(facts.haptics).sort(),
-    ['confirm', 'detent', 'done', 'error', 'hello', 'hold_ramp', 'permission', 'question', 'reject', 'tick']);
+    ['approved', 'denied', 'detent', 'done', 'error', 'hello', 'hold_ramp', 'permission', 'question', 'reject', 'tick']);
   for (const steps of Object.values(facts.haptics)) {
     assert.ok(steps.length > 0);
     for (const s of steps) assert.ok(s.on_ms > 0 && s.off_ms >= 0 && s.duty > 0 && s.duty <= 100);

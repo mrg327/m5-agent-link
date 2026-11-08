@@ -6,7 +6,8 @@ import { h, svg, cssVar } from './dom.js';
 const ORDER = [
   ['detent', 'Detent', 'accent'],
   ['hold_ramp', 'Approve ramp', 'amber'],
-  ['confirm', 'Confirm', 'success'],
+  ['approved', 'Approved', 'success'],
+  ['denied', 'Denied', 'danger'],
   ['reject', 'Reject', 'danger'],
   ['permission', 'Permission', 'amber'],
   ['question', 'Question', 'amber'],

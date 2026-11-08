@@ -41,8 +41,11 @@ bool power_activity(uint32_t now_ms)
 {
     s_last_activity = now_ms;
     if (s_glowing) {
+        /* The display is already on for the alert glow, but nothing has been read yet: this touch
+         * only reveals the card, so a thumb grabbing the watch cannot start an approval. */
         s_glowing = false;
         ui_glow_hide();
+        return true;
     }
     if (s_on) return false;
     set_display(true);

@@ -12,6 +12,8 @@
 
 #define CENTRE_R 150 /* a touch inside this radius is a centre touch; outside it is the rim */
 #define HOLD_SHOW_MS 250 /* the arc and the haptic ramp only start after this, so a tap never flashes them */
+#define CARD_ARM_MS 300  /* a hold only starts once the request has been on screen this long */
+#define DENY_MIN_PX 120  /* deny is a deliberate swipe: this long, starting above the centre line */
 #define AMBIENT_MS 30000
 #define MERGE_AT 9
 #define NAG_MS 15000
@@ -37,6 +39,7 @@ typedef struct {
 static lv_obj_t *s_root, *s_ring, *s_centre;
 static lv_obj_t *s_agent, *s_repo, *s_state, *s_elapsed, *s_pill, *s_pill_lbl, *s_hint, *s_link;
 static lv_obj_t *s_hint_a, *s_hint_b, *s_dot[2];
+static lv_obj_t *s_req_title, *s_req_text; /* approval card: what is being approved */
 
 static slot_t s_slots[RING_MAX_SEGMENTS];
 static int s_n, s_sel;
@@ -48,11 +51,14 @@ static bool s_ambient;
 
 static bool s_press_centre, s_holding, s_hold_fired, s_ramp_started;
 static uint32_t s_hold_t0, s_hold_rid;
+static uint32_t s_card_rid, s_card_t0; /* request on screen, and since when */
+static int s_rel_y;                    /* where the last touch lifted, for the deny swipe length */
 
 static uint32_t s_nag_rid, s_nag_next;
 static int s_nag_n;
 
 static char s_agent_txt[24], s_repo_txt[40], s_state_txt[40], s_elapsed_txt[16], s_pill_txt[32], s_link_txt[48];
+static char s_req_title_txt[48], s_req_text_txt[168];
 
 static const session_t *sel_session(void)
 {
@@ -275,6 +281,9 @@ static void update_centre(void)
         set_txt(s_state, s_state_txt, sizeof s_state_txt, "Waiting for an agent");
         lv_obj_set_style_text_color(s_state, COL_MUTED, 0);
         set_txt(s_elapsed, s_elapsed_txt, sizeof s_elapsed_txt, "");
+        lv_obj_add_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
+        s_card_rid = 0;
         lv_obj_add_flag(s_pill, LV_OBJ_FLAG_HIDDEN);
         lv_label_set_text(s_hint, "");
         lv_obj_add_flag(s_hint_a, LV_OBJ_FLAG_HIDDEN);
@@ -300,14 +309,35 @@ static void update_centre(void)
     lv_obj_set_style_text_color(s_state, lv_color_hex(rgb), 0);
     update_elapsed(s);
 
-    bool perm = approvable(s) != NULL;
+    const attention_t *req = approvable(s);
+    bool perm = req != NULL;
+    if (perm) {
+        /* Show what is being approved in place of the elapsed time. Fall back to the tool name
+         * when the daemon sent no title (privacy: meta). */
+        if (req->rid != s_card_rid) {
+            s_card_rid = req->rid;
+            s_card_t0 = s_now;
+        }
+        set_txt(s_req_title, s_req_title_txt, sizeof s_req_title_txt,
+                req->title[0] ? req->title : s->tool[0] ? s->tool : "Permission request");
+        set_txt(s_req_text, s_req_text_txt, sizeof s_req_text_txt, req->text);
+        lv_obj_add_flag(s_elapsed, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
+        if (req->text[0]) lv_obj_remove_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        s_card_rid = 0;
+        lv_obj_remove_flag(s_elapsed, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
+    }
     const char *pill = perm ? "HOLD " LV_SYMBOL_OK " APPROVE" : s->state == SESS_DONE ? "FOCUS + ACK" : "FOCUS";
     set_txt(s_pill_lbl, s_pill_txt, sizeof s_pill_txt, pill);
     lv_obj_set_style_text_color(s_pill_lbl, lv_color_hex(rgb), 0);
     lv_obj_set_style_border_color(s_pill, lv_color_hex(rgb), 0);
     lv_obj_remove_flag(s_pill, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_align(s_pill, LV_ALIGN_TOP_MID, 0, 262);
-    lv_label_set_text(s_hint, perm ? "swipe down to deny" : "");
+    lv_obj_align(s_pill, LV_ALIGN_TOP_MID, 0, perm ? 272 : 262);
+    lv_label_set_text(s_hint, perm ? "long swipe down to deny" : "");
     lv_obj_set_style_text_color(s_hint_a, lv_color_hex(rgb), 0);
     lv_obj_remove_flag(s_hint_a, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(s_dot[0], LV_OBJ_FLAG_HIDDEN);
@@ -390,7 +420,8 @@ bool ui_home_gesture(const gesture_evt_t *g)
     case G_PRESS:
         s_press_centre = centre_hit(g->x, g->y);
         s_hold_fired = false;
-        if (s_press_centre && approvable(s)) {
+        if (s_press_centre && approvable(s) && s_card_rid == model_attention_for_sid(s->sid)->rid &&
+            s_now - s_card_t0 >= CARD_ARM_MS) {
             s_holding = true;
             s_ramp_started = false;
             s_hold_t0 = s_now;
@@ -398,6 +429,7 @@ bool ui_home_gesture(const gesture_evt_t *g)
         }
         return true;
     case G_RELEASE:
+        s_rel_y = g->y;
         hold_cancel();
         return true;
     case G_DOUBLE_TAP:
@@ -412,7 +444,7 @@ bool ui_home_gesture(const gesture_evt_t *g)
         if (!s_press_centre || s_hold_fired || !s) return false;
         const attention_t *a = approvable(s);
         if (a) { /* an injected long press that already covers the hold time approves directly */
-            if (g->dur_ms >= UI_HOLD_MS) {
+            if (g->dur_ms >= UI_HOLD_MS && s_card_rid == a->rid && s_now - s_card_t0 >= CARD_ARM_MS) {
                 hold_cancel();
                 s_hold_fired = true;
                 g_ui_actions->approve(s->sid, a->rid, g->dur_ms);
@@ -426,6 +458,8 @@ bool ui_home_gesture(const gesture_evt_t *g)
     case G_SWIPE_DOWN: {
         const attention_t *a = approvable(s);
         if (!s_press_centre || !a || !(a->acts & (1u << ACT_DENY))) return false;
+        /* g->y is where the swipe started; G_RELEASE (sent just before) recorded where it ended. */
+        if (g->y >= UI_CY || s_rel_y - g->y < DENY_MIN_PX) return true; /* too short: ignore, but consume */
         hold_cancel();
         g_ui_actions->deny(s->sid, a->rid);
         return true;
@@ -554,6 +588,8 @@ void ui_home_report(ui_report_t *r)
     }
     if (s_repo_txt[0]) ui_report_add(r, "%s", s_repo_txt);
     if (s_state_txt[0] && s) ui_report_add(r, "%s", theme_state_word(s));
+    if (!lv_obj_has_flag(s_req_title, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_req_title_txt);
+    if (!lv_obj_has_flag(s_req_text, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_req_text_txt);
     if (s && !lv_obj_has_flag(s_pill, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_pill_txt);
     if (s_link_txt[0]) ui_report_add(r, "%s", s_link_txt);
     ui_report_add(r, "%d segments", s_n);
@@ -578,6 +614,15 @@ lv_obj_t *ui_home_init(void)
     place(s_state, 162, 250);
     s_elapsed = theme_label(s_centre, 32, COL_MUTED);
     place(s_elapsed, 196, 250);
+    s_req_title = theme_label(s_centre, 20, COL_TEXT);
+    place(s_req_title, 196, 280);
+    s_req_text = theme_label(s_centre, 16, COL_MUTED);
+    lv_obj_set_size(s_req_text, 300, 2 * lv_font_get_line_height(theme_font(16)));
+    lv_obj_set_style_text_align(s_req_text, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(s_req_text, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_set_pos(s_req_text, UI_CX - 150, 224);
+    lv_obj_add_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
 
     s_pill = lv_obj_create(s_centre);
     lv_obj_remove_style_all(s_pill);
@@ -592,7 +637,7 @@ lv_obj_t *ui_home_init(void)
     lv_obj_set_width(s_pill_lbl, LV_SIZE_CONTENT);
 
     s_hint = theme_label(s_centre, 16, COL_MUTED);
-    place(s_hint, 306, 230);
+    place(s_hint, 316, 300);
     s_link = theme_label(s_centre, 16, COL_MUTED);
     place(s_link, 392, 170);
 
@@ -618,7 +663,7 @@ lv_obj_t *ui_home_init(void)
         lv_obj_set_pos(d, UI_CX + (int)((float)HINT_DOT_R * sinf(rad)) - 3,
                        UI_CY - (int)((float)HINT_DOT_R * cosf(rad)) - 3);
     }
-    lv_obj_t *all[] = {s_agent, s_repo, s_state, s_elapsed, s_pill_lbl, s_hint, s_link};
+    lv_obj_t *all[] = {s_agent, s_repo, s_state, s_elapsed, s_req_title, s_req_text, s_pill_lbl, s_hint, s_link};
     for (size_t i = 0; i < sizeof all / sizeof all[0]; i++) lv_label_set_text(all[i], "");
     ui_home_animations_changed();
     return s_root;

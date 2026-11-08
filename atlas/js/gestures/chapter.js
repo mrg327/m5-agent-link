@@ -19,7 +19,7 @@ export function mount(section, ctx) {
 
   const intro = h('p', { class: 'tc__intro' },
     'One screen, one ring. Scrub the rim to pick a session, tap the centre to act, hold it for ',
-    h('b', { class: 'mono', text: `${g.hold_confirm_ms} ms` }), ' to approve, swipe down to deny. The classifier below is the firmware’s own rule set: ',
+    h('b', { class: 'mono', text: `${g.hold_confirm_ms} ms` }), ' to approve, a long swipe down (from above the centre) to deny. The classifier below is the firmware’s own rule set: ',
     h('b', { class: 'mono', text: `${g.tap_slop_px} px` }), ' slop, ',
     h('b', { class: 'mono', text: `${g.swipe_min_px} px` }), ' in ',
     h('b', { class: 'mono', text: `${g.swipe_max_ms} ms` }), ' for a swipe, ',
