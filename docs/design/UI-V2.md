@@ -187,6 +187,7 @@ User decision §9.1: tapping the centre opens a screen where gestures act on tha
 - **Approve-class options (anything that grants permission, including "don't ask again" variants) commit only by hold.** The hold starts after 250 ms, and only once the card has been on screen 300 ms (`CARD_ARM_MS`); it fills a 10 px arc in the item's colour from 12 o'clock over the index ring, with the escalating haptic ramp; early release cancels; the hold is bound to `rid` and cancels if the attention changes or is cleared.
 - Deny commits by hold (0.8 s, falling haptic) **or** by the strict swipe down (≥ 120 px, starting above the centre line). Both answer with `cmd_op_deny`.
 - Question options (`attention.opts`, ≤ 4 × 24 chars) commit by tap or A; they are not destructive. The reply is `cmd_op_reply` with `arg = option index`.
+- Toasts on ASK (`Hold to confirm`, `Out of date`, `Offline`) take the hint line under the key badges (`UI_TOAST_LOW_Y`; the hint hides meanwhile), not the action-pill slot the deck uses, which would sit on the wheel's selected row. STATUS does the same.
 - After an answer: the wheel collapses to one line `Approved · waiting for PC` (or `Denied`, `Sent "Yes" · waiting for PC`) in the answer's colour (green, vermillion, yellow); the index ring shows one dim capsule; the card stays until `clear`, then HOME returns. A `result.ok = false` shows the error as a toast, restores the options and buzzes the reject pattern.
 - Nag: up to 3 re-buzzes every 15 s while a permission is unanswered and the display is off; any input stops it.
 
@@ -431,6 +432,7 @@ Phase 5 decisions (2026-11-08, implementation):
 23. **The empty deck is not STATUS.** It keeps `No sessions` / `Waiting for an agent` plus the hint `swipe down for status`; embedding STATUS would loop its 8 s timeout against an always-empty deck.
 24. **No toast on STATUS, and no "Sleep now" row.** The row's new text and the haptic are the confirmation; the display-off path stays with `power.c`'s idle timer (§4.5 lists no sleep row).
 25. **"Watch…" opens STATUS** (it toasted "coming soon" before); `actions_wheel.txt` expects the `status` screen there now.
+26. **Toasts on the wheel screens use the hint line** (ASK, STATUS; `ui.c place_toast()`): the deck's slot over the action pill lands on the selected row of a wheel laid out in the bottom half. A toast that outlives a mode change moves to the new mode's slot.
 
 ## 10. Decisions that reconcile DESIGN.md and UI-RING.md
 

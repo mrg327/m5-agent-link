@@ -11,6 +11,7 @@
 #define UI_CY 233
 #define UI_R 233
 #define UI_ACTION_Y 292 /* top of the action pill row; toasts replace the pill at the same height */
+#define UI_TOAST_LOW_Y 358 /* toast slot on the wheel screens (ASK, STATUS): over the hint line, below the key badges */
 
 extern const ui_actions_t *g_ui_actions;
 
@@ -28,6 +29,7 @@ void ui_go_home(void);          /* leave AGENT (commit, back, chord, timeout) */
 void ui_go_scroll(void);        /* AGENT's "Scroll terminal": open SCROLL on the selected session */
 void ui_go_status(void);        /* AGENT's "Watch...": open STATUS */
 int ui_last_release_y(void);    /* where the last touch lifted, for the long-swipe rules */
+bool ui_toast_active(void);     /* a toast is showing: ASK and STATUS hide their hint line under it */
 
 /* The HOME deck (ui_home.c). */
 lv_obj_t *ui_home_init(void);

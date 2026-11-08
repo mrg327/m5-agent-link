@@ -110,6 +110,18 @@ void ui_set_link_transport(int kind)
 nav_mode_t ui_mode(void) { return s_mode; }
 int ui_last_release_y(void) { return s_rel_y; }
 
+/* Where the toast sits: over the action pill on the deck, but on the wheel screens whose rows reach
+ * that height (ASK, STATUS) it takes the hint line below the key badges, so the selected row stays
+ * readable while it shows. */
+static void place_toast(void)
+{
+    bool low = s_mode == MODE_ASK || s_mode == MODE_STATUS;
+    lv_obj_update_layout(s_toast);
+    lv_obj_align(s_toast, LV_ALIGN_TOP_MID, 0, low ? UI_TOAST_LOW_Y : UI_ACTION_Y - 4);
+}
+
+bool ui_toast_active(void) { return !lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN); }
+
 static void enter_mode(nav_mode_t m)
 {
     if (m == s_mode) return;
@@ -124,6 +136,7 @@ static void enter_mode(nav_mode_t m)
     else if (m == MODE_SCROLL) ui_scroll_open(ui_home_sel_sid(), s_now_ms);
     else if (m == MODE_STATUS) ui_status_open(s_now_ms);
     else ui_home_refresh(s_now_ms); /* the ring shows sessions again */
+    if (ui_toast_active()) place_toast(); /* a toast that outlives the mode moves to the new slot */
     dbg_event("ui", "mode", "\"mode\":\"%s\"", nav_mode_name(m));
 }
 
@@ -184,8 +197,7 @@ void ui_toast(const char *text, uint32_t rgb)
     lv_label_set_text(s_toast_label, text);
     lv_obj_set_style_text_color(s_toast_label, COL_TEXT, 0);
     lv_obj_set_style_bg_color(s_toast, lv_color_mix(lv_color_hex(rgb), COL_BG, UI_TOAST_TINT_MIX), 0);
-    lv_obj_update_layout(s_toast);
-    lv_obj_align(s_toast, LV_ALIGN_TOP_MID, 0, UI_ACTION_Y - 4); /* over the action pill, clear of the key badges */
+    place_toast();
     lv_obj_remove_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
     s_toast_until_ms = s_now_ms + TOAST_MS;
     dbg_event("ui", "toast", "\"text\":%s", dbg_q(text));

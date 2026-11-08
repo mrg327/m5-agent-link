@@ -273,6 +273,7 @@ bool ui_ask_tick(uint32_t now)
     s_now = now;
     const attention_t *a = req();
     if (!a || !model_find(s_sid)) return true;
+    show(s_hint, !ui_toast_active()); /* the toast takes the hint's line (UI_TOAST_LOW_Y) */
     if (s_holding && !s_hold_fired) {
         uint32_t el = now - s_hold_t0;
         const ask_item_t *it = s_hold_idx < s_n ? &s_items[s_hold_idx] : NULL;

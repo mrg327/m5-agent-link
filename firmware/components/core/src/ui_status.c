@@ -211,6 +211,7 @@ bool ui_status_act(nav_action_t a, const gesture_evt_t *g)
 bool ui_status_tick(uint32_t now)
 {
     s_now = now;
+    show(s_hint, !ui_toast_active()); /* the toast takes the hint's line (UI_TOAST_LOW_Y) */
     if (now - s_last_render >= RENDER_MS) render();
     return now - s_last_input > NAV_STATUS_TIMEOUT_MS;
 }

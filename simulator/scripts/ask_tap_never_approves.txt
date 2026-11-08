@@ -12,6 +12,7 @@ tap 233 233
 wait 300
 expect_screen ask
 expect_label Hold to confirm
+shot ask_toast_hold.png
 tap 233 233
 tap 233 233
 wait 300
