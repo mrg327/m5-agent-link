@@ -1,0 +1,2 @@
+# Boot then idle; the command line decides the power scenario.
+wait 3500

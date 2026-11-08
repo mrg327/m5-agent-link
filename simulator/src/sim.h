@@ -9,6 +9,9 @@
 /* sim_board.c: input injection (same path as real keys / IMU) and logging helper. */
 void sim_log(const char *ev, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 void sim_input_button(int btn, bool down);
+/* Power tests: run on battery (no USB), and pretend this boot ended a DEEP. */
+void sim_set_battery(bool on_battery);
+void sim_set_wake(hal_wake_t why, uint32_t retained);
 void sim_input_motion(hal_motion_kind_t kind);
 
 /* sim_display.c */

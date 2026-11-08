@@ -85,6 +85,28 @@ set_tests_properties(sim_approve_after_glow PROPERTIES WORKING_DIRECTORY ${CMAKE
                      FAIL_REGULAR_EXPRESSION "SCRIPT FAIL" PASS_REGULAR_EXPRESSION "\"op\":3")
 sim_script_test(sim_approve_too_soon approve_too_soon.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
 
+# Power: DEEP only on battery with no link, counted from display-off; timer wakes stay dark and
+# silent and walk the retry ladder (5, 10, 20 ... min, then buttons only).
+function(sim_power_test name script)
+    cmake_parse_arguments(P "" "" "ARGS;PROPS" ${ARGN})
+    add_test(NAME ${name} COMMAND agentlink_sim --headless --no-ws ${P_ARGS}
+             --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/${script})
+    set_tests_properties(${name} PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30 ${P_PROPS})
+endfunction()
+sim_power_test(sim_deep_battery deep_sleep.txt ARGS --battery --idle-off 1 --deep-after 2
+               PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"display_on\".*\"ev\":\"deep\",\"wake_after_s\":300,\"tries\":0")
+sim_power_test(sim_deep_not_on_usb deep_wait.txt ARGS --idle-off 1 --deep-after 1
+               PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"deep\"")
+sim_power_test(sim_deep_not_linked deep_linked.txt ARGS --battery --idle-off 1 --deep-after 1
+               PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"deep\"")
+sim_power_test(sim_deep_timer_wake deep_wait.txt ARGS --battery --deep-after 2 --wake timer --tries 2
+               PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"haptic\"|\"ev\":\"display_on\""
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"deep\",\"wake_after_s\":1200,\"tries\":2")
+sim_power_test(sim_deep_ladder_end deep_wait.txt ARGS --battery --deep-after 2 --wake timer --tries 7
+               PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"deep\",\"wake_after_s\":0,\"tries\":7")
+
 # UI-V2 Phase 1: the HOME deck (summary row, stale/offline treatment, two-line folder names).
 sim_script_test(sim_deck_summary deck_summary.txt)
 sim_script_test(sim_deck_stale deck_stale.txt)

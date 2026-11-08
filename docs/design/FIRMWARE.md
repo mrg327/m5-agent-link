@@ -68,6 +68,7 @@ Measured rails (from vendor docs): **L0** = M5PM1 only. **L1** = + IMU + RTC. **
   - The same IMU data picks a 0° or 180° rotation.
 - **DEEP [D]:** when the host is lost, the device keeps advertising and reconnecting with **adaptive backoff** (5 → 10 → 20 → 40 → 60 min windows, via RTC timer wake). After about 4 h without success it stays in DEEP until the user **lifts the device or presses a button**, which triggers a manual reconnect.
 - **Touch-to-wake [D]:** off in STANDBY. Only lifting or a button wakes the device.
+- **As built (2026-11-08):** `core/power.c` owns the policy and `boards/stopwatch/board.cpp` the mechanism. Display off after 60 s without input. DEEP = ESP32-S3 deep sleep (PM1, IOE1 and the RTC domain stay up), entered only on battery with no link, 10 min after display-off; never with USB present (checked twice: `may_deep()` and the board guard). Wake: either button (G1/G2 via EXT1, any low) or the retry timer (5, 10, 20, 40, 60, 60, 60 min, the count kept in RTC memory, then buttons only); a wake is a reboot. A timer wake boots dark and silent, tries to reconnect for 90 s, then sleeps again; a link or any input resets the ladder. A held button aborts the sleep. Recovery: one click of the PM1 power button resets. Lift-to-wake waits for the IMU driver. Simulator: `--battery`, `--deep-after S`, `--wake timer|button --tries N`; tests `sim_deep_*`.
 
 **Budget estimate (to be measured in spike S4):**
 

@@ -180,6 +180,9 @@ void web_motion(int kind)
 void hal_haptic_play(const uint16_t *on_off_ms, size_t count) { js_haptic(on_off_ms, (int)count); }
 void hal_sound_play(hal_sound_t sound) { (void)sound; }
 void hal_power_enter(hal_power_state_t state, uint32_t wake_after_s) { (void)state; (void)wake_after_s; }
+hal_wake_t hal_wake_reason(void) { return HAL_WAKE_POWER_ON; }
+uint32_t hal_retained_get(void) { return 0; }
+void hal_retained_set(uint32_t v) { (void)v; }
 hal_battery_t hal_battery_read(void) { return (hal_battery_t){.percent = 80, .charging = false, .usb_present = true}; }
 void hal_debug_line(const char *json) { js_debug(json); }
 

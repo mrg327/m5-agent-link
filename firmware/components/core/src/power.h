@@ -4,6 +4,11 @@
 #include <stdint.h>
 
 void power_init(void);
+/* Call once the display and UI exist: a timer wake (reconnect attempt) turns the display off. */
+void power_start(uint32_t now_ms);
+bool power_woke_by_timer(void);
+/* Display-off time before DEEP (battery, no link). Default 10 min; tests shorten it. */
+void power_set_deep_after_ms(uint32_t ms);
 void power_set_idle_timeout_ms(uint32_t ms);
 /* Any user input. Returns true if the display was off (the input only woke it and is consumed). */
 bool power_activity(uint32_t now_ms);

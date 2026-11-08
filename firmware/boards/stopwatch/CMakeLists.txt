@@ -18,6 +18,7 @@ idf_component_register(
         esp_driver_gpio
         esp_driver_i2c
         esp_timer
+        esp_hw_support
         nvs_flash
         esp_app_format
         m5stack__m5gfx

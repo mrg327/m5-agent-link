@@ -1,0 +1,6 @@
+# On battery with no link: display off after the idle timeout, DEEP after the display-off time
+# (run with --battery --idle-off 1 --deep-after 2). A button press in between restarts both.
+wait 1500
+btn B
+wait 2200
+wait 2000

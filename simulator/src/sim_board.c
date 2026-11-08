@@ -71,7 +71,19 @@ void hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
     sim_log("power_enter", "\"state\":%d,\"wake_after_s\":%u", (int)state, (unsigned)wake_after_s);
 }
 
-hal_battery_t hal_battery_read(void) { return (hal_battery_t){.percent = 80, .charging = false, .usb_present = true}; }
+static bool s_on_battery;
+static hal_wake_t s_wake = HAL_WAKE_POWER_ON;
+static uint32_t s_retained;
+void sim_set_battery(bool on_battery) { s_on_battery = on_battery; }
+void sim_set_wake(hal_wake_t why, uint32_t retained) { s_wake = why, s_retained = retained; }
+hal_wake_t hal_wake_reason(void) { return s_wake; }
+uint32_t hal_retained_get(void) { return s_retained; }
+void hal_retained_set(uint32_t v) { s_retained = v; }
+
+hal_battery_t hal_battery_read(void)
+{
+    return (hal_battery_t){.percent = 80, .charging = false, .usb_present = !s_on_battery};
+}
 
 void hal_debug_line(const char *json)
 {

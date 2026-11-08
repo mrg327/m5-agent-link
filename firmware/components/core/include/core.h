@@ -15,6 +15,8 @@ void core_init(void);
 uint32_t core_step(void);
 /* 0 disables the idle display-off timeout. */
 void core_set_idle_timeout_ms(uint32_t ms);
+/* Display-off time before DEEP on battery with no link (default 10 min). */
+void core_set_deep_after_ms(uint32_t ms);
 /* Emits the current ui_state as a debug line. */
 void core_dump_ui_state(void);
 /* Test hooks for scripted runs: current screen name, and whether a visible label contains `text`. */

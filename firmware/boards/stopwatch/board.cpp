@@ -5,6 +5,8 @@
 #include <string.h>
 
 #include "driver/gpio.h"
+#include "driver/rtc_io.h"
+#include "esp_sleep.h"
 #include "driver/usb_serial_jtag.h"
 #include "esp_app_desc.h"
 #include "esp_log.h"
@@ -27,6 +29,56 @@ static hal_board_info_t s_info;
 static char s_fw_version[32];
 
 static hal_power_state_t s_power_state = HAL_POWER_ACTIVE;
+
+/* Kept in RTC slow memory across deep sleep; the bootloader zeroes it on a power-on or reset. */
+static RTC_DATA_ATTR uint32_t s_retained;
+uint32_t hal_retained_get(void) { return s_retained; }
+void hal_retained_set(uint32_t v) { s_retained = v; }
+
+hal_wake_t hal_wake_reason(void)
+{
+    switch (esp_sleep_get_wakeup_cause()) {
+    case ESP_SLEEP_WAKEUP_EXT1: return HAL_WAKE_BUTTON;
+    case ESP_SLEEP_WAKEUP_TIMER: return HAL_WAKE_TIMER;
+    default: return HAL_WAKE_POWER_ON;
+    }
+}
+
+/* ESP32-S3 deep sleep: only the RTC domain, PM1 and IOE1 stay up. Either button (G1/G2, active low,
+ * both RTC IOs) wakes it through EXT1, as does the optional timer; a wake is a reboot. The PM1 power
+ * button (single click = reset) is the recovery path if anything here goes wrong. */
+static bool deep_sleep(uint32_t wake_after_s)
+{
+    const gpio_num_t pins[2] = {(gpio_num_t)SW_PIN_BTN_A, (gpio_num_t)SW_PIN_BTN_B};
+    for (gpio_num_t p : pins) {
+        if (gpio_get_level(p) == 0) {
+            return false; /* a held button would wake us at once and its release would be lost */
+        }
+    }
+    hal_haptic_play(NULL, 0);
+    vTaskDelay(pdMS_TO_TICKS(20));
+    sw_ioe_motor_duty(0); /* IOE1 stays powered: a motor left on would run all night */
+    sw_pm1_led(false);
+    for (gpio_num_t p : pins) {
+        rtc_gpio_pullup_en(p);
+        rtc_gpio_pulldown_dis(p);
+    }
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON); /* keeps the pull-ups */
+    if (esp_sleep_enable_ext1_wakeup_io((1ULL << SW_PIN_BTN_A) | (1ULL << SW_PIN_BTN_B), ESP_EXT1_WAKEUP_ANY_LOW) !=
+        ESP_OK) {
+        return false;
+    }
+    if (wake_after_s) {
+        esp_sleep_enable_timer_wakeup((uint64_t)wake_after_s * 1000000ULL);
+    }
+    char line[80];
+    snprintf(line, sizeof(line), "{\"cat\":\"power\",\"ev\":\"deep_sleep\",\"wake_after_s\":%u}",
+             (unsigned)wake_after_s);
+    hal_debug_line(line);
+    vTaskDelay(pdMS_TO_TICKS(50)); /* let the line drain */
+    esp_deep_sleep_start();
+    return true; /* not reached */
+}
 
 i2c_master_bus_handle_t sw_i2c_bus(void)
 {
@@ -128,11 +180,12 @@ void hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
         hal_display_set_power(false);
         break;
     case HAL_POWER_DEEP:
-        /* No esp_deep_sleep/light-sleep is used anywhere (PM is off), so USB Serial/JTAG stays alive.
-         * TODO(power): real L1-only deep state; it needs a wake path (PM1 button / touch INT G13)
-         * and must keep the guard above. Behaves as STANDBY for now. */
+        /* Only reached on battery with no host (guard above), so losing USB Serial/JTAG is fine. */
         sw_touch_sleep(true);
         hal_display_set_power(false);
+        if (!deep_sleep(wake_after_s)) {
+            state = HAL_POWER_STANDBY; /* a button is held: its release is input and wakes the display */
+        }
         break;
     }
     s_power_state = state;

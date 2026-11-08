@@ -292,6 +292,7 @@ static void drain_link(uint32_t now)
 /* ── public ── */
 
 void core_set_idle_timeout_ms(uint32_t ms) { power_set_idle_timeout_ms(ms); }
+void core_set_deep_after_ms(uint32_t ms) { power_set_deep_after_ms(ms); }
 void core_dump_ui_state(void) { dbg_dump_ui_state(); }
 
 const char *core_screen_name(void)
@@ -342,8 +343,9 @@ void core_init(void)
     hal_motion_set_callback(on_motion);
     hal_link_start(on_rx, on_state);
 #if CORE_BOOT_BUZZ
-    feedback_hello();
+    if (!power_woke_by_timer()) feedback_hello(); /* a reconnect attempt stays silent and dark */
 #endif
+    power_start(app_now_ms());
     s_fps_t0 = app_now_ms();
 }
 
