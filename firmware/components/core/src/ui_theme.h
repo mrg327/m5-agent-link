@@ -21,6 +21,12 @@
 #define RGB_SUCCESS RGB_DONE
 #define RGB_ACCENT RGB_WORKING
 
+/* Round language (UI-V2 §4.1, capsules): key caps are circles, the action pill and the toast are
+ * filled with a tint of their state colour instead of a border. */
+#define UI_KEYCAP_PX 24
+#define UI_PILL_TINT_OPA LV_OPA_20 /* pill background: state colour at this opacity over black */
+#define UI_TOAST_TINT_MIX 60       /* toast background: lv_color_mix(state colour, black, this) */
+
 uint32_t theme_state_rgb(sess_state_t s);
 /* Colour of a session: like theme_state_rgb, but approval requests (orange) differ from questions (yellow). */
 uint32_t theme_session_rgb(const session_t *s);

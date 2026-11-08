@@ -382,7 +382,7 @@ static void update_centre(void)
     set_txt(s_pill_lbl, s_pill_txt, sizeof s_pill_txt, pill);
     lv_color_t pill_col = offline() ? COL_MUTED : lv_color_hex(rgb);
     lv_obj_set_style_text_color(s_pill_lbl, pill_col, 0);
-    lv_obj_set_style_border_color(s_pill, pill_col, 0);
+    lv_obj_set_style_bg_color(s_pill, pill_col, 0);
     lv_obj_remove_flag(s_pill, LV_OBJ_FLAG_HIDDEN);
     lv_obj_align(s_pill, LV_ALIGN_TOP_MID, 0, UI_ACTION_Y);
     lv_label_set_text(s_hint, perm ? "long swipe down to deny" : "");
@@ -672,10 +672,10 @@ lv_obj_t *ui_home_init(void)
     s_pill = lv_obj_create(s_centre);
     lv_obj_remove_style_all(s_pill);
     lv_obj_set_size(s_pill, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_style_border_width(s_pill, 2, 0);
+    lv_obj_set_style_bg_opa(s_pill, UI_PILL_TINT_OPA, 0); /* a filled tint, no border */
     lv_obj_set_style_radius(s_pill, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_pad_hor(s_pill, 14, 0);
-    lv_obj_set_style_pad_ver(s_pill, 6, 0);
+    lv_obj_set_style_pad_hor(s_pill, 18, 0);
+    lv_obj_set_style_pad_ver(s_pill, 8, 0);
     lv_obj_remove_flag(s_pill, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     s_pill_lbl = theme_label(s_pill, 20, COL_TEXT);
     lv_label_set_long_mode(s_pill_lbl, LV_LABEL_LONG_MODE_CLIP);
@@ -700,8 +700,8 @@ lv_obj_t *ui_home_init(void)
         lv_obj_remove_flag(b, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
         lv_obj_t *cap = lv_obj_create(b);
         lv_obj_remove_style_all(cap);
-        lv_obj_set_size(cap, 22, 22);
-        lv_obj_set_style_radius(cap, 5, 0);
+        lv_obj_set_size(cap, UI_KEYCAP_PX, UI_KEYCAP_PX);
+        lv_obj_set_style_radius(cap, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_bg_opa(cap, LV_OPA_COVER, 0);
         lv_obj_set_style_bg_color(cap, COL_SURFACE2, 0);
         lv_obj_set_style_border_width(cap, 1, 0);

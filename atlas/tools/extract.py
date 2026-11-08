@@ -245,7 +245,8 @@ def extract_ring():
                        ("summary_w_px", "SUMMARY_W")]:
         r[key] = int(find(home, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
     for key, macro in [("band_out_px", "BAND_OUT"), ("band_w_px", "BAND_W"), ("sel_out_px", "SEL_OUT"), ("sel_w_px", "SEL_W"),
-                       ("sel_tick_len_px", "SEL_TICK_LEN"), ("error_inset_px", "ERROR_INSET"),
+                       ("seg_gap_deg", "SEG_GAP_DEG"), ("others_pct", "OTHERS_PCT"), ("underline_w_px", "UNDERLINE_W"),
+                       ("underline_gap_px", "UNDERLINE_GAP"), ("dot_step_deg", "DOT_STEP_DEG"), ("track_w_px", "TRACK_W"),
                        ("prog_out_px", "PROG_OUT"), ("prog_w_px", "PROG_W"),
                        ("work_period_ms", "WORK_PERIOD_MS"), ("ask_period_ms", "ASK_PERIOD_MS"),
                        ("perm_period_ms", "PERM_PERIOD_MS"), ("done_sweep_ms", "DONE_SWEEP_MS"),

@@ -311,8 +311,8 @@ export function createLab(root, ctx) {
   // ── the ring, as the firmware draws it (ui_ring.c shapes) ──
   function drawRing(c, w, now, kk, C) {
     const cx = w / 2, cy = w / 2;
-    const gap = 2;
-    c.lineCap = 'butt';
+    const gap = ring.seg_gap_deg / 2;
+    c.lineCap = 'round'; // capsules
     STATE_ROWS.forEach((r, i) => {
       const col = rowColor(r, f);
       const a0 = (i * 360) / N + gap, a1 = ((i + 1) * 360) / N - gap, span = a1 - a0;
@@ -346,10 +346,9 @@ export function createLab(root, ctx) {
         default: arc(a0, a1, rr, wd, 1);
       }
       c.shadowBlur = 0; c.setLineDash([]);
-      if (on) { // radial white tick at the midpoint of the selected segment (UI-V2 §4.1)
-        const mid = rad((a0 + a1) / 2), r1 = (ring.sel_out_px - ring.sel_w_px - 2) * kk, r0 = r1 - ring.sel_tick_len_px * kk;
-        c.strokeStyle = hexA('#ffffff', 1); c.lineWidth = 3 * kk; c.lineCap = 'round';
-        c.beginPath(); c.moveTo(cx + r1 * Math.cos(mid), cy + r1 * Math.sin(mid)); c.lineTo(cx + r0 * Math.cos(mid), cy + r0 * Math.sin(mid)); c.stroke();
+      if (on) { // thin white underline just inside the selected capsule (UI-V2 §4.1)
+        c.strokeStyle = hexA('#ffffff', 1); c.lineWidth = ring.underline_w_px * kk;
+        c.beginPath(); c.arc(cx, cy, (ring.sel_out_px - ring.sel_w_px - ring.underline_gap_px) * kk, rad(a0), rad(a1)); c.stroke();
       }
     });
   }

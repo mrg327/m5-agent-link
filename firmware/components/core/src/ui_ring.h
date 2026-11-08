@@ -12,11 +12,11 @@
 
 /* The kind decides shape and motion as well as colour, so state never depends on colour alone. */
 typedef enum {
-    RING_WORK,  /* dim arc + a comet sweeping along it */
-    RING_ASK,   /* full arc, gentle pulse */
-    RING_PERM,  /* double line, faster pulse */
+    RING_WORK,  /* dim capsule + a comet sweeping along it */
+    RING_ASK,   /* full capsule, gentle pulse */
+    RING_PERM,  /* two thin round tracks, faster pulse */
     RING_DONE,  /* one sweep, then solid; dim once acknowledged */
-    RING_ERROR, /* dashed; one fast flicker, then solid */
+    RING_ERROR, /* a row of round dots; one fast flicker, then solid */
     RING_IDLE   /* thin, dim, still */
 } ring_kind_t;
 

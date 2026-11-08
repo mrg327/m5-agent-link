@@ -1,0 +1,14 @@
+# Nothing needs you for 30 s: the ring drops to 20 % and the card to 30 %; the selection underline stays.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work ember
+session 2 work fjord feat/x Running tests
+session 3 doneseen grove
+session 4 idle juniper
+session 5 work harbor
+wait 300
+btn B
+wait 31500
+expect_label fjord
+shot deck_ambient.png
+quit

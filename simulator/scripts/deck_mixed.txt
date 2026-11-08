@@ -1,0 +1,16 @@
+# A selected Working capsule between an error (round dots) and a permission (two thin tracks).
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 error prairie main npm install failed
+session 2 work ember feat/x Running tests
+session 3 input keel
+session 4 ask grove
+session 5 done fjord
+session 6 idle juniper
+wait 600
+btn B
+wait 300
+expect_label ember
+expect_label 6 segments
+shot deck_mixed.png
+quit

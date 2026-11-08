@@ -80,9 +80,9 @@ Display 466 × 466, centre (233, 233). Fonts: Montserrat 16/20/24/32 (existing).
 |---|---|---|---|---|
 | Working | sky `#56B4E9` | `LV_SYMBOL_REFRESH` | slow comet | Working |
 | Needs input | yellow `#F0E442` | `?` | pulse 1 Hz | Question |
-| Permission | orange `#E69F00` | `LV_SYMBOL_BELL` until a custom `!`-in-circle glyph exists | pulse 1 Hz, double line | Approve? |
+| Permission | orange `#E69F00` | `LV_SYMBOL_BELL` until a custom `!`-in-circle glyph exists | pulse 1 Hz, **two thin round tracks** | Approve? |
 | Done | green `#009E73` | `LV_SYMBOL_OK` | one sweep, then dim after ack | Done |
-| Error | vermillion `#D55E00` | `LV_SYMBOL_WARNING` | dashed, drawn **inset** from the band | Error |
+| Error | vermillion `#D55E00` | `LV_SYMBOL_WARNING` | **a row of round dots**; one fast flicker, then solid | Error |
 | Idle | grey `#999999` | `LV_SYMBOL_PAUSE` | none | Idle |
 
 ### 4.1 HOME: the deck
@@ -92,7 +92,7 @@ Glanceable: *which* session, *what state*, *what it just did*. One gesture deepe
 ```
                      ╭──────────────────────────────────────╮
                   ╭──╯  ▬▬  ▬▬▬▬  ▬▬  ▬▬▬▬▬  ▬▬  ▬▬▬  ▬▬  ╰──╮    index ring, 6 px, pinned order,
-                ╭─╯                                          ╰─╮  selected = 12 px + white tick
+                ╭─╯                                          ╰─╮  selected = 14 px + underline
                ╭╯            Claude Code · feat/login          ╰╮  16 px muted: agent · branch
               ╭╯                                                ╰╮
               │                  webapp                          │ 32 px white: cwd basename (2 lines max)
@@ -110,7 +110,9 @@ Glanceable: *which* session, *what state*, *what it just did*. One gesture deepe
                      ╰──────────────────────────────────────╯
 ```
 
-- The index ring replaces the Ring UI's 10–18 px band. It is a 6 px arc per session, pinned by creation order from 12 o'clock, 4° gaps; the selected one is 12 px with a 2 px white radial tick at its midpoint (the tick, not an inner outline, marks selection). At ≥ 9 sessions, acknowledged Done sessions merge into one dim arc, as today.
+- **The index ring is a ring of capsules.** Each session is an 8 px round-capped arc at the rim (outer radius 226), pinned by creation order from 12 o'clock, with 9° gaps so the capsules read as separate beads. **Selection** is a 14 px capsule grown both ways around the same centre line plus a 2 px white underline just inside it; the other capsules recede to 70 % brightness but keep their hue, so error and permission stay urgent. The underline is what survives ambient dim. At ≥ 9 sessions, acknowledged Done sessions merge into one dim capsule.
+- **Round everywhere else:** the key caps are circles, the action pill is a filled 20 % tint of the state colour with no border, the toast is a tinted pill with white text, and the hold-to-approve arc has round caps.
+- *Decision note (2026-11-07):* the capsule language was chosen from a round-direction review (capsules vs. orbit beads vs. soft track, with the `7c70ca4` look as baseline); the filled pill and tinted toast were taken from the soft-track direction. It replaced the earlier radial white tick, which was visible on the glass but weak.
 - The state row is the largest coloured element; elapsed time is demoted to 20 px and always means "time in this state" (`tst`).
 - The summary row shows `session.summary` for Working/Done/Error and `attention.title` + `text` for Question/Permission, so the approval text is already on the glanceable screen (carried from `2702775`).
 - Key badges `[A] WORD` / `WORD [B]` sit at 7:30 and 4:30 beside the physical buttons. They are legends, not touch targets; a tap there is a rim tap.
@@ -325,7 +327,7 @@ Daemon side: `handle_cmd` needs `CmdOp::Reply` wired to the approval broker that
 
 - `model.{c,h}`: sessions, attention queue (already parses `opts`), settings, counts. Add `grant_mask` to `attention_t`.
 - `gesture.{c,h}`: rim scrub, buttons, chord, double-A, strict deny geometry. Add a vertical drag stream (`G_DRAG` with dy, emitted every 24 px in the centre) for SCROLL and a release-velocity flag on swipes for the page flick.
-- `ui_ring.c`: becomes the index ring. Keep the segment model, per-segment invalidation and `ring_set_progress()`; shrink `BAND_W` to 6/12, replace the inner outline with a radial tick, inset the error dash, and add a "track" mode (one grey ring plus one coloured arc) for SCROLL.
+- `ui_ring.c`: becomes the index ring (done in Phase 1: capsules, selection underline, dotted error, double-track permission). Still to add: a "track" mode (one grey ring plus one coloured arc) for SCROLL.
 - `ui_theme.{c,h}`: palette and fonts unchanged; add `theme_state_glyph()` per §4 and the new state words.
 - `power.c`: keep, with the glow first-touch fix.
 - `link_*`, `debug.c`, `app.c` action table: extend rather than replace.

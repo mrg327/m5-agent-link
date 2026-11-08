@@ -39,9 +39,7 @@ static void create_overlays(void)
     lv_obj_remove_style_all(s_toast);
     lv_obj_set_style_bg_color(s_toast, COL_SURFACE2, 0);
     lv_obj_set_style_bg_opa(s_toast, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(s_toast, COL_BORDER, 0);
-    lv_obj_set_style_border_width(s_toast, 2, 0);
-    lv_obj_set_style_radius(s_toast, 24, 0);
+    lv_obj_set_style_radius(s_toast, LV_RADIUS_CIRCLE, 0); /* a tinted pill, no border */
     lv_obj_set_style_pad_hor(s_toast, 18, 0);
     lv_obj_set_style_pad_ver(s_toast, 8, 0);
     lv_obj_set_size(s_toast, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -126,8 +124,8 @@ void ui_report(ui_report_t *r)
 void ui_toast(const char *text, uint32_t rgb)
 {
     lv_label_set_text(s_toast_label, text);
-    lv_obj_set_style_text_color(s_toast_label, lv_color_hex(rgb), 0);
-    lv_obj_set_style_border_color(s_toast, lv_color_hex(rgb), 0);
+    lv_obj_set_style_text_color(s_toast_label, COL_TEXT, 0);
+    lv_obj_set_style_bg_color(s_toast, lv_color_mix(lv_color_hex(rgb), COL_BG, UI_TOAST_TINT_MIX), 0);
     lv_obj_update_layout(s_toast);
     lv_obj_align(s_toast, LV_ALIGN_TOP_MID, 0, UI_ACTION_Y - 4); /* over the action pill, clear of the key badges */
     lv_obj_remove_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
