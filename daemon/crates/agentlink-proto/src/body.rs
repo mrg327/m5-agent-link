@@ -169,6 +169,8 @@ body!(Attention {
     #[n(5)] #[serde(skip_serializing_if = "Option::is_none")] opts: Option<Vec<String>>,
     #[n(6)] acts: Vec<Action>,
     #[n(7)] #[serde(skip_serializing_if = "Option::is_none")] exp: Option<u64>,
+    /// Bit `i` set: `opts[i]` grants permission (approve-class; the device commits it only by a hold).
+    #[n(8)] #[serde(skip_serializing_if = "Option::is_none")] grant_mask: Option<u64>,
 });
 body!(Clear {
     #[n(0)]

@@ -381,6 +381,10 @@ struct attention_uint7uint {
 	uint32_t attention_uint7uint;
 };
 
+struct attention_uint8uint {
+	uint32_t attention_uint8uint;
+};
+
 struct attention {
 	uint32_t attention_uint0uint;
 	uint32_t attention_uint1uint;
@@ -395,6 +399,8 @@ struct attention {
 	size_t attention_action_m_l_action_m_count;
 	struct attention_uint7uint attention_uint7uint;
 	bool attention_uint7uint_present;
+	struct attention_uint8uint attention_uint8uint;
+	bool attention_uint8uint_present;
 };
 
 struct msg_attention {
@@ -444,6 +450,21 @@ struct cmd_uint2uint {
 	uint32_t cmd_uint2uint;
 };
 
+struct cmd_arg_r {
+	union {
+		uint32_t cmd_arg_uint;
+		struct zcbor_string cmd_arg_tstr;
+	};
+	enum {
+		cmd_arg_uint_c,
+		cmd_arg_tstr_c,
+	} cmd_arg_choice;
+};
+
+struct cmd_arg_m {
+	struct cmd_arg_r cmd_arg_m;
+};
+
 struct cmd_uint4uint {
 	uint32_t cmd_uint4uint;
 };
@@ -454,7 +475,8 @@ struct cmd {
 	bool cmd_uint1uint_present;
 	struct cmd_uint2uint cmd_uint2uint;
 	bool cmd_uint2uint_present;
-	bool cmd_uint3any_present;
+	struct cmd_arg_m cmd_arg_m;
+	bool cmd_arg_m_present;
 	struct cmd_uint4uint cmd_uint4uint;
 	bool cmd_uint4uint_present;
 };

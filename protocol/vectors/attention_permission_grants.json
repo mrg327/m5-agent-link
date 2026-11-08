@@ -1,0 +1,28 @@
+{
+  "desc": "Permission for session 2 with the agent's own choices; bits 0 and 1 grant (hold to commit)",
+  "symbolic": {
+    "t": "attention",
+    "id": 13,
+    "b": {
+      "rid": 9,
+      "sid": 2,
+      "kind": "approval",
+      "title": "Run shell command",
+      "text": "npm test -- --watch=false",
+      "opts": [
+        "Yes",
+        "Yes, don't ask again",
+        "No"
+      ],
+      "acts": [
+        "approve",
+        "deny",
+        "focus",
+        "reply"
+      ],
+      "exp": 1793995450,
+      "grant_mask": 3
+    }
+  },
+  "cbor_hex": "a30006010d03a9000901020200037152756e207368656c6c20636f6d6d616e640478196e706d2074657374202d2d202d2d77617463683d66616c7365058363596573745965732c20646f6e27742061736b20616761696e624e6f068400010203071a6aee32ba0803"
+}

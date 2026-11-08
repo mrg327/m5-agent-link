@@ -216,7 +216,8 @@ attention = {
   ? 4 => tstr,            ; text   preview ≤ 160 chars
   ? 5 => [0*4 tstr],        ; opts   ≤ 4 choices, each ≤ 24 chars
   6 => [0*5 action],        ; acts   actions the device may offer
-  ? 7 => uint            ; exp    unix time after which to drop
+  ? 7 => uint,            ; exp    unix time after which to drop
+  ? 8 => uint            ; grant_mask  bit i set = opts[i] grants permission (approve-class: hold to commit)
 }
 att_kind = att_kind_approval / att_kind_question / att_kind_error / att_kind_done
 att_kind_approval = 0
@@ -241,9 +242,11 @@ cmd = {
   0 => cmd_op,     ; op
   ? 1 => uint,     ; sid
   ? 2 => uint,     ; rid
-  ? 3 => any,      ; arg   snooze minutes, reply option index, quiet secs, {aid}
+  ? 3 => cmd_arg,  ; arg   snooze minutes, reply option index, quiet secs
   ? 4 => uint     ; hold_ms  measured hold-to-confirm (approve)
 }
+; v0.1 arguments are scalars; structured arguments (scroll_arg, {aid}) join this union when they land.
+cmd_arg = uint / tstr
 cmd_op = cmd_op_focus / cmd_op_ack / cmd_op_snooze / cmd_op_approve / cmd_op_deny /
   cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet
 cmd_op_focus = 0

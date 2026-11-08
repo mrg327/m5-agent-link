@@ -1,0 +1,14 @@
+{
+  "desc": "Device answers rid 9 with option 1 (\"Yes, don't ask again\")",
+  "symbolic": {
+    "t": "cmd",
+    "id": 7,
+    "b": {
+      "op": "reply",
+      "sid": 2,
+      "rid": 9,
+      "arg": 1
+    }
+  },
+  "cbor_hex": "a30008010703a40005010202090301"
+}

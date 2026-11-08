@@ -1,0 +1,26 @@
+{
+  "desc": "Question for session 1 with three choices (AskUserQuestion); none of them grants anything",
+  "symbolic": {
+    "t": "attention",
+    "id": 12,
+    "b": {
+      "rid": 8,
+      "sid": 1,
+      "kind": "question",
+      "title": "Which framework?",
+      "text": "Pick the UI library for the new dashboard",
+      "opts": [
+        "React",
+        "Vue",
+        "Keep vanilla"
+      ],
+      "acts": [
+        "reply",
+        "focus"
+      ],
+      "exp": 1793995500,
+      "grant_mask": 0
+    }
+  },
+  "cbor_hex": "a30006010c03a900080101020103705768696368206672616d65776f726b3f0478295069636b20746865205549206c69627261727920666f7220746865206e65772064617368626f6172640583655265616374635675656c4b6565702076616e696c6c6106820302071a6aee32ec0800"
+}
