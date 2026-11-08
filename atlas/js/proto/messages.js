@@ -57,7 +57,7 @@ const SPECS = {
   gone: { sid: [0, 'uint'] },
   attention: {
     rid: [0, 'uint'], sid: [1, 'uint'], kind: [2, 'enum:att_kind'], title: [3, 'tstr'], text: [4, 'tstr'],
-    opts: [5, 'tstrs'], acts: [6, 'enums:action'], exp: [7, 'uint'],
+    opts: [5, 'tstrs'], acts: [6, 'enums:action'], exp: [7, 'uint'], grant_mask: [8, 'uint'],
   },
   clear: { rid: [0, 'uint'], why: [1, 'enum:clear_why'] },
   cmd: { op: [0, 'enum:cmd_op'], sid: [1, 'uint'], rid: [2, 'uint'], arg: [3, 'any'], hold_ms: [4, 'uint'] },

@@ -34,17 +34,17 @@ test('gesture thresholds describe the ring recogniser, with no tap deferral', ()
 });
 
 test('ring facts: screens, per-kind shapes, pills and the gesture cases', () => {
-  assert.deepEqual(facts.screens.map((s) => s.id), ['ring', 'attention', 'agent']);
+  assert.deepEqual(facts.screens.map((s) => s.id), ['ring', 'attention', 'agent', 'ask']);
   assert.deepEqual(Object.keys(facts.ring.kinds), ['work', 'ask', 'perm', 'done', 'error', 'idle']);
   assert.ok(facts.ring.merge_at >= 2 && facts.ring.max_segments >= facts.ring.merge_at);
-  assert.equal(facts.ring.pills.approve, 'HOLD ✓ APPROVE');
+  assert.equal(facts.ring.pills.approve, 'TAP › ANSWER'); // a request's tap opens ASK; approving is a hold there
   const cases = facts.gesture_map.cases.map((c) => c.gesture);
   for (const c of ['G_TAP', 'G_LONG_PRESS', 'G_SWIPE_DOWN', 'G_SCRUB', 'G_BTN_A', 'G_BTN_A_DOUBLE', 'G_BTN_B']) assert.ok(cases.includes(c), c);
 });
 
 test('haptics have steps with duty, the rim detent and the approve ramp', () => {
   assert.deepEqual(Object.keys(facts.haptics).sort(),
-    ['approved', 'denied', 'detent', 'done', 'error', 'hello', 'hold_ramp', 'permission', 'question', 'reject', 'tick']);
+    ['approved', 'denied', 'deny_ramp', 'detent', 'done', 'error', 'hello', 'hold_ramp', 'permission', 'question', 'reject', 'reply_sent', 'tick']);
   for (const steps of Object.values(facts.haptics)) {
     assert.ok(steps.length > 0);
     for (const s of steps) assert.ok(s.on_ms > 0 && s.off_ms >= 0 && s.duty > 0 && s.duty <= 100);
@@ -54,6 +54,8 @@ test('haptics have steps with duty, the rim detent and the approve ramp', () => 
   assert.deepEqual(facts.haptics.detent.map((s) => [s.on_ms, s.duty]), [[facts.haptic_motor.kick_ms, 100]]);
   const ramp = facts.haptics.hold_ramp;
   assert.ok(ramp.at(-1).on_ms > ramp[0].on_ms && ramp.at(-2).off_ms < ramp[0].off_ms);
+  const deny = facts.haptics.deny_ramp; // the opposite shape: pulses shrink, gaps grow
+  assert.ok(deny.at(-1).on_ms < deny[0].on_ms && deny.at(-1).off_ms === 0 && deny.at(-2).off_ms > deny[0].off_ms);
 });
 
 test('link, usb, ble and display facts', () => {

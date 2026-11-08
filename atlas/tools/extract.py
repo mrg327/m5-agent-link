@@ -234,6 +234,7 @@ def extract_gesture():
     g["hold_show_ms"] = int(find(nav, r"#define NAV_HOLD_SHOW_MS\s+(\d+)", "gesture.hold_show_ms").group(1))
     g["card_arm_ms"] = int(find(nav, r"#define NAV_CARD_ARM_MS\s+(\d+)", "gesture.card_arm_ms").group(1))
     g["long_swipe_px"] = int(find(nav, r"#define NAV_LONG_SWIPE_PX\s+(\d+)", "gesture.long_swipe_px").group(1))
+    g["deny_hold_ms"] = int(find(nav, r"#define NAV_DENY_HOLD_MS\s+(\d+)", "gesture.deny_hold_ms").group(1))
     g["agent_timeout_ms"] = int(find(nav, r"#define NAV_AGENT_TIMEOUT_MS\s+(\d+)", "gesture.agent_timeout_ms").group(1))
     find(CORE + "gesture.c", r"if \(btn == 1\) \{\s*emit\(g, G_BTN_B", "gesture.b_immediate", re.S)
     return g
@@ -264,10 +265,11 @@ def extract_ring():
         kinds[m.group(1).lower()] = m.group(2)
     SOURCES["ring.kinds"] = f"{CORE}ui_ring.h:{line_of(CORE + 'ui_ring.h', find(CORE + 'ui_ring.h', r'RING_WORK,').start())}"
     r["kinds"] = kinds
-    find(home, r'"HOLD " LV_SYMBOL_OK " APPROVE"', "ring.pill_approve")
+    find(home, r'"TAP " LV_SYMBOL_RIGHT " ANSWER"', "ring.pill_approve")
     find(home, r'"FOCUS \+ ACK"', "ring.pill_done")
     find(home, r'"long swipe down to deny"', "ring.deny_hint")
-    r["pills"] = {"approve": "HOLD ✓ APPROVE", "done": "FOCUS + ACK", "default": "FOCUS"}
+    # a request's pill opens ASK (UI-V2 §4.3); approving is a hold on that screen, never on the deck
+    r["pills"] = {"approve": "TAP › ANSWER", "done": "FOCUS + ACK", "default": "FOCUS"}
     words = find(home, r'static const char \*const words\[2\] = \{"(\w+)", "(\w+)"\};', "ring.edge_hint_a")
     SOURCES["ring.edge_hint_b"] = SOURCES["ring.edge_hint_a"]
     r["edge_hints"] = {"a": words.group(1), "b": words.group(2)}
@@ -278,22 +280,24 @@ def extract_ring():
 # The gesture map is one table in nav.c (interaction layer). Each nav action has a hand-written
 # description here; a new action in the source without one, or a stale one here, fails the check.
 ACTION_TEXT = {
-    "NAV_HOLD_PRESS": "Finger down in the centre: arms a hold if a request is on screen and armed",
+    "NAV_HOLD_PRESS": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
     "NAV_HOLD_RELEASE": "Lifting cancels a hold in progress",
-    "NAV_FOCUS": "Focus the terminal (Done also acknowledges). On a request it is the review path: a tap never approves",
+    "NAV_FOCUS": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
     "NAV_OPEN_AGENT": "Open the per-agent wheel for the selected session",
-    "NAV_PICK_RIM": "Select the segment (HOME) or item (AGENT) under the finger",
-    "NAV_HOLD_LONG": "An injected long press that already covers the hold time approves directly",
+    "NAV_OPEN_ASK": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
+    "NAV_PICK_RIM": "Select the segment (HOME) or item (AGENT, ASK) under the finger",
+    "NAV_HOLD_LONG": "An injected long press that already covers the selected hold item's time commits it directly",
     "NAV_DENY": "Deny a permission request: a long swipe down that started above the centre",
     "NAV_SCRUB": "A drag around the rim moves the selection with a detent per step",
     "NAV_NEXT_ATTENTION": "Jump to the next session that needs attention",
-    "NAV_NEXT": "Next session (HOME) or next item (AGENT)",
+    "NAV_NEXT": "Next session (HOME) or next item (AGENT, ASK)",
     "NAV_PREV": "Previous session",
-    "NAV_COMMIT": "Commit the selected item; a destructive item answers 'hold to confirm' instead",
-    "NAV_BACK": "Back to the deck (a long swipe down, or B held)",
+    "NAV_COMMIT": "Commit the selected item; an approve-class or deny item answers 'hold to confirm' instead",
+    "NAV_BACK": "Back to the deck (a long swipe down, or B held); a request stays pending",
     "NAV_HOME": "A+B chord: straight back to the deck",
 }
-WHEN_TEXT = {"WHEN_ALWAYS": "", "WHEN_REQUEST": "with a request on screen", "WHEN_NO_REQUEST": "without a request"}
+WHEN_TEXT = {"WHEN_ALWAYS": "", "WHEN_REQUEST": "with an approvable request on screen", "WHEN_NO_REQUEST": "without an approvable request",
+             "WHEN_ASKABLE": "with a permission or question pending", "WHEN_NOT_ASKABLE": "with nothing to answer"}
 
 
 def extract_gesture_map():
@@ -316,11 +320,16 @@ def extract_gesture_map():
     stale = sorted(set(ACTION_TEXT) - seen)
     if stale:
         raise Drift(f"extract.py describes nav actions no longer in the source: {stale}")
-    find(CORE + "app.c", r"if \(power_activity\(app_now_ms\(\)\)\) return;", "gesture_map.wake_swallow")
+    find(CORE + "app.c", r"if \(power_activity\(app_now_ms\(\)\)\) \{", "gesture_map.wake_swallow")
     find(CORE + "app.c", r'case G_CHORD: dbg_event\("input", "chord"', "gesture_map.chord")
     find(CORE + "ui_home.c", r"if \(s->state == SESS_DONE\) g_ui_actions->ack\(s->sid\);", "gesture_map.done_acks")
-    find(rel, r"\{MODE_HOME, G_TAP, ZONE_CENTRE, WHEN_REQUEST, NAV_FOCUS\}", "gesture_map.tap_never_approves")
+    # the deck has no hold binding at all, and a tap on a request only opens its options
+    find(rel, r"\{MODE_HOME, G_TAP, ZONE_CENTRE, WHEN_ASKABLE, NAV_OPEN_ASK\}", "gesture_map.tap_never_approves")
+    if re.search(r"\{MODE_HOME, G_PRESS,", text(rel)):
+        raise Drift(f"{rel}: the deck must not arm holds (UI-V2 §3)")
     find(CORE + "nav.c", r"bool nav_hold_may_start\(", "gesture_map.hold_bound_to_rid")
+    find(CORE + "ui_ask.c", r"if \(it->hold_ms\) \{ /\* a tap never commits an approve-class or deny item \*/", "gesture_map.ask_tap_never_commits_hold")
+    find(CORE + "ui_ask.c", r"if \(a->rid != s_hold_rid \|\| a->answer_sent", "gesture_map.ask_hold_cancels_on_change")
     return {"cases": cases, "chord": "A + B held together: Home from any mode (logged on the deck, no action there)",
             "first_touch_wakes_only": True}
 
@@ -335,12 +344,15 @@ def extract_screens():
                     vals.setdefault(v, f"{rel}:{line_of(rel, m.start())}")
     ag = find(CORE + "ui_agent.c", r'snprintf\(r->screen, sizeof r->screen, "agent"\)', "screens.agent")
     vals["agent"] = f"{CORE}ui_agent.c:{line_of(CORE + 'ui_agent.c', ag.start())}"
-    if set(vals) != {"ring", "attention", "agent"}:
+    ask = find(CORE + "ui_ask.c", r'snprintf\(r->screen, sizeof r->screen, "ask"\)', "screens.ask")
+    vals["ask"] = f"{CORE}ui_ask.c:{line_of(CORE + 'ui_ask.c', ask.start())}"
+    if set(vals) != {"ring", "attention", "agent", "ask"}:
         raise Drift(f"unexpected screen values {sorted(vals)}")
     SOURCES["screens"] = vals["attention"]
     return [{"id": "ring", "title": "Deck", "source": vals["ring"]},
             {"id": "attention", "title": "Deck · a request is waiting", "source": vals["attention"]},
-            {"id": "agent", "title": "Agent wheel", "source": vals["agent"]}]
+            {"id": "agent", "title": "Agent wheel", "source": vals["agent"]},
+            {"id": "ask", "title": "Ask · the request and its options", "source": vals["ask"]}]
 
 
 # ───────────────────────── haptics ─────────────────────────
@@ -348,6 +360,8 @@ HAPTIC_MEANING = {
     # pattern name → (C array that defines it, meaning)
     "detent": ("detent", "A click each time the rim scrub crosses into another segment"),
     "hold_ramp": ("ramp", "Pulses grow longer and the gaps shorter while the approve hold fills"),
+    "deny_ramp": ("deny_ramp", "Pulses shrink and the gaps grow while the deny hold fills"),
+    "reply_sent": ("reply", "A question option went out: three ticks"),
     "tick": ("tick", "A light acknowledgement of a button selection"),
     "approved": ("approved", "Approve was sent: one long pulse"),
     "denied": ("denied", "Deny was sent: two medium pulses"),

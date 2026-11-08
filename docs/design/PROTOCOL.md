@@ -132,13 +132,16 @@ attention = {
   kind: "approval"/"question"/"error"/"done",
   ? title: tstr,             ; e.g. "Run shell command"
   ? text: tstr,              ; preview (≤ 160) — full text only via `detail` request
-  ? opts: [* tstr],          ; for questions with choices (≤ 4, each ≤ 24 chars)
+  ? opts: [* tstr],          ; the agent's own choices (≤ 4, each ≤ 24 chars): a question's options, or a
+                             ; permission's "Yes" / "Yes, don't ask again" / "No"
   acts: [* "approve"/"deny"/"focus"/"reply"/"ack"],
-  exp?: uint                 ; unix time after which device must drop it
+  exp?: uint,                ; unix time after which device must drop it
+  grant_mask?: uint          ; bit i set = opts[i] grants permission (approve-class: the device commits
+                             ; it only by a hold); sent whenever opts is (0 for a plain question)
 }
 clear = { rid: uint, why: "answered_pc"/"answered_dev"/"expired"/"cancelled" }
 ```
-The device must show approve/deny **only if** they are in `acts`. The daemon includes them only for prompts the agent itself raised (DESIGN Q6).
+The device must show approve/deny **only if** they are in `acts`. The daemon includes them only for prompts the agent itself raised (DESIGN Q6). An option is answered with `cmd { op: "reply", rid, arg: index }`; the daemon maps the index back to the agent's choice (UI-V2 §7).
 
 ## 5. Commands (device → daemon)
 
@@ -147,14 +150,15 @@ cmd = {
   op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet",
   ? sid: uint,
   ? rid: uint,               ; required for approve/deny/reply
-  ? arg: any,                ; snooze minutes, reply option index, quiet duration...
+  ? arg: uint / tstr,        ; snooze minutes (the watch sends 30), reply option index, quiet duration...
+                             ; (structured arguments join this union when they land; the CDDL names it cmd_arg)
   hold_ms?: uint             ; for approve: measured hold-to-confirm duration (daemon enforces ≥ 1000)
 }
 result = { ok: bool, ? err: "stale"/"denied"/"unsupported"/"no_window"/"timeout", ? msg: tstr }
 ```
 - `focus`: the daemon runs the FocusDriver for that session. On `no_window`, the device shows "Open terminal not found".
 - `detail`: the daemon replies with `detail { rid|sid, text }`, which holds the full text. This is sent only when privacy ≠ `meta`.
-- `approve`/`deny` on a `rid` that has already been cleared returns `err: "stale"`, so a race against the terminal answer is safe.
+- `approve`/`deny`/`reply` on a `rid` that has already been cleared returns `err: "stale"`, so a race against the terminal answer is safe. The daemon's approval broker holds the agent's blocking hook for that `rid` (DESIGN §6a); the first of {device answer, terminal answer, timeout} settles it, and only a device answer ever becomes a decision for the agent.
 
 ## 6. Audio (v3)
 ```

@@ -1,6 +1,6 @@
 # UI v2: "Deck": switch context, pick from a list, answer from the watch
 
-Status: **decided; Phases 1–2 (HOME deck, AGENT wheel) implemented in the simulator** (branch `ui-v2`, not yet validated on the device). Supersedes the Ring UI ([UI-RING.md](UI-RING.md)) and DESIGN.md §6, §6a (device side) and §8 (palette). Inputs: the Ring UX review (simulator pass, 2026-11-07), the user's v2 brief and answers (§9), and `docs/research/{stopwatch-interaction-capabilities,wearable-glance-gestures,minimal-peripherals}.md`.
+Status: **decided; Phases 1–3 (HOME deck, AGENT wheel, ASK with the approval broker) implemented in the simulator** (branch `ui-v2`, not yet validated on the device). Supersedes the Ring UI ([UI-RING.md](UI-RING.md)) and DESIGN.md §6, §6a (device side) and §8 (palette). Inputs: the Ring UX review (simulator pass, 2026-11-07), the user's v2 brief and answers (§9), and `docs/research/{stopwatch-interaction-capabilities,wearable-glance-gestures,minimal-peripherals}.md`.
 
 Where this document and DESIGN.md or UI-RING.md disagree, this document wins. §10 lists each decision.
 
@@ -47,16 +47,16 @@ One table, every input × mode. "—" means ignored (and logged). Thresholds: lo
 | Input | OFF / glow | HOME (deck) | AGENT (wheel) | ASK (card + wheel) | SCROLL | STATUS |
 |---|---|---|---|---|---|---|
 | First touch after off/glow | wake only (glow: reveal ASK) | | | | | |
-| Tap centre | wake | open AGENT | commit selected item (safe items; a destructive item shows "hold") | commit selected item if safe (Open on PC, a question option); else shows "hold" | exit, keep terminal position | back to HOME |
+| Tap centre | wake | open AGENT (open ASK when a permission or question is pending) | commit selected item (safe items; a destructive item shows "hold") | commit selected item if safe (Open on PC, a question option); else shows "hold" | exit, keep terminal position | back to HOME |
 | Long-press centre (600 ms) | wake | — (reserved) | — | — | — | — |
 | Hold centre ≥ 1.2 s (arc + ramp) | — | — | commit a destructive item | **Approve**-class item (bound to `rid`), or Deny (0.8 s); arc colour = item colour | — | — |
 | Rim scrub CW / CCW | wake | next / previous session (detent) | next / previous item (detent) | next / previous option (detent) | — | next / previous row |
 | Tap rim | wake | select the session under the finger | select the item at that angle (items are laid out on the ring) | same | — | — |
 | Vertical drag in centre | wake | — | — | — | scroll lines: 1 detent per 24 px = 3 lines | — |
-| Swipe up (centre) | wake | open AGENT | — | — | flick: page up (older) | back to HOME |
+| Swipe up (centre) | wake | open AGENT (ASK when a request is pending) | — | — | flick: page up (older) | back to HOME |
 | Swipe down (centre) | wake | open STATUS | back to HOME | **Deny** (permission only, strict) | flick: page down (newer) | — |
 | Swipe left / right | wake | next / previous session | — | — | — | — |
-| Button A short | wake | default action (Focus; Done also acks) | commit selected item (safe only) | commit selected item (safe only) | to bottom (live) and exit | commit row (quiet 30 min, …) |
+| Button A short | wake | default action (Focus; Done also acks) | commit selected item (safe only) | **Open on PC** (focus), whatever is selected: A never approves | to bottom (live) and exit | commit row (quiet 30 min, …) |
 | Button A double | wake | jump to next attention (Input › Error › Done-unseen) | — | — | — | — |
 | Button A long | wake | — | — | — | — | — |
 | Button B short | wake | next session | next item | next option | page down (newer) | next row |
@@ -180,11 +180,14 @@ User decision §9.1: tapping the centre opens a screen where gestures act on tha
               ╰──────────────────────────────────────╯
 ```
 
-- The prompt text is the top half of the screen; the options are the wheel in the bottom half. Nothing is hidden behind a gesture.
+- The prompt text is the top half of the screen; the options are the wheel in the bottom half (three rows, the selected one at y 272). Nothing is hidden behind a gesture. The `HOLD` tag has a fixed slot at the right end of the selected row, in place of the right chevron, so every hold item reads the same whatever its label length.
+- Order: `attention.opts` verbatim with the first option selected (the agent's own default); a bare permission shows Approve · Deny; "Open on PC" is always the last item. In a permission, an option that does not grant (the agent's "No") is a deny-class hold (0.8 s), never a tap.
+- Colour says what an item does, never alone: orange grants, vermillion denies, yellow answers a question, sky blue goes to the PC; the arc and the haptic ramp follow the item.
+- Opening ASK: a permission or question that arrives while the display is on opens it directly; during a glow the first touch reveals it; on the deck a tap, double tap or swipe up on a request's card opens it (the pill reads `TAP › ANSWER`). The deck itself has no hold: nothing on HOME can approve.
 - **Approve-class options (anything that grants permission, including "don't ask again" variants) commit only by hold.** The hold starts after 250 ms, and only once the card has been on screen 300 ms (`CARD_ARM_MS`); it fills a 10 px arc in the item's colour from 12 o'clock over the index ring, with the escalating haptic ramp; early release cancels; the hold is bound to `rid` and cancels if the attention changes or is cleared.
 - Deny commits by hold (0.8 s, falling haptic) **or** by the strict swipe down (≥ 120 px, starting above the centre line). Both answer with `cmd_op_deny`.
 - Question options (`attention.opts`, ≤ 4 × 24 chars) commit by tap or A; they are not destructive. The reply is `cmd_op_reply` with `arg = option index`.
-- After an answer: the wheel collapses to one line `Approved · waiting for PC` (or `Denied`, `Sent "Yes"`) in the state colour; the index-ring arc stops pulsing and dims; the card stays until `clear`, then HOME returns. A `result.ok = false` shows the error and restores the options.
+- After an answer: the wheel collapses to one line `Approved · waiting for PC` (or `Denied`, `Sent "Yes" · waiting for PC`) in the answer's colour (green, vermillion, yellow); the index ring shows one dim capsule; the card stays until `clear`, then HOME returns. A `result.ok = false` shows the error as a toast, restores the options and buzzes the reject pattern.
 - Nag: up to 3 re-buzzes every 15 s while a permission is unanswered and the display is off; any input stops it.
 
 ### 4.4 SCROLL: the terminal's scrollback
@@ -245,7 +248,7 @@ ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a deten
 | Error arrived | 500 | one long | glow |
 | Done arrived | 60, 80, 60 | two short | glow |
 | Approve ramp (during hold) | 35,170, 40,140, 45,110, 55,85, 65,65, 80,50, 100 | rising, gaps shrink | ASK |
-| Deny ramp (during hold) | 100,50, 80,65, 65,85, 55,110 | falling | ASK |
+| Deny ramp (during hold) | 100,50, 80,65, 65,85, 55,110, 45 | falling, ends on a pulse | ASK |
 | **Approved** (commit) | 150 | one firm long | ASK |
 | **Denied** (commit) | 60, 90, 60 | two medium | ASK |
 | Reply sent | 35, 60, 35, 60, 35 | three ticks | ASK |
@@ -319,13 +322,13 @@ daemon ─► result ok ─► card line: Sent "Yes, and run tests" · waiting  
 
 Free-text replies are out of scope for v2 (voice in v3). "Open on PC" is always present so the user can escape to the terminal for anything the watch cannot express.
 
-Daemon side: `handle_cmd` needs `CmdOp::Reply` wired to the approval broker that `Approve`/`Deny` are waiting on (today both return `Stale`). The broker maps `rid` → the pending hook response (Claude Code `PreToolUse`/`Notification`, Copilot `permissionRequest`/`elicitation_dialog`) and returns the option text or the permission decision through the hook's stdout, "first answer wins" per DESIGN §6a.
+Daemon side (Phase 3, `daemon/crates/agentlinkd/src/broker.rs`): the approval broker maps `rid` → the hook that is blocking for a decision. `agentlink-hook` blocks on Claude Code's `PermissionRequest` (the event that fires when the permission prompt is about to appear; output `hookSpecificOutput.decision.behavior`, with `updatedPermissions = permission_suggestions` for "Yes, don't ask again") and on `PreToolUse` for `AskUserQuestion` (output `permissionDecision: allow` + `updatedInput.answers`), for `AGENTLINK_WAIT_MS` (15 s). `handle_cmd` routes `Approve`/`Deny`/`Reply` to `Broker::answer`; an unknown or settled `rid` is `stale`, a bad option index `denied`. "First answer wins" (DESIGN §6a): a device answer releases the hook and clears the device (`answered_dev`); the daemon's timeout clears it (`expired`) and the hook exits with **no output**, which Claude Code treats as "no decision" so its terminal prompt appears; any later hook event from the same session (the terminal answered) cancels what was pending (`answered_pc`). The hook never prints a decision it did not receive. Limits: one question with single-select options (multi-question or multi-select prompts are not offered to the watch: the hook returns no decision at once); Copilot has no decision path yet.
 
 ## 8. Migration from the Ring UI
 
 ### 8.1 Reuse as is (`firmware/components/core/src/`)
 
-- `model.{c,h}`: sessions, attention queue (already parses `opts`), settings, counts. Add `grant_mask` to `attention_t`.
+- `model.{c,h}`: sessions, attention queue (parses `opts` and `grant_mask`), settings, counts; `answer`/`answer_opt` record what went out so ASK can show the pending line and restore the options on a rejected command.
 - `gesture.{c,h}`: rim scrub, buttons, chord, double-A, strict deny geometry. Add a vertical drag stream (`G_DRAG` with dy, emitted every 24 px in the centre) for SCROLL and a release-velocity flag on swipes for the page flick.
 - `ui_ring.c`: becomes the index ring (done in Phase 1: capsules, selection underline, dotted error, double-track permission). Still to add: a "track" mode (one grey ring plus one coloured arc) for SCROLL.
 - `ui_theme.{c,h}`: palette and fonts unchanged; add `theme_state_glyph()` per §4 and the new state words.
@@ -335,7 +338,7 @@ Daemon side: `handle_cmd` needs `CmdOp::Reply` wired to the approval broker that
 
 ### 8.2 Replace
 
-- `ui_home.c` splits into: `ui_home.c` (deck: card + badges + link row), `ui_wheel.c` (the list widget: items, detents, hold tags, rim layout, used by AGENT, ASK and STATUS), `ui_ask.c` (prompt text + wheel + answer-pending line), `ui_scroll.c` (counter, preview, chevrons, coalescer). Each under 400 lines.
+- `ui_home.c` splits into: `ui_home.c` (deck: card + badges + link row; no hold), `ui_wheel.c` (the list widget: items, detents, hold tags, a `wheel_layout_t` for where the rows sit; used by AGENT, ASK and STATUS), `ui_ask.c` (prompt text + wheel + answer-pending line + the rid-bound hold; done in Phase 3), `ui_scroll.c` (counter, preview, chevrons, coalescer). Each under 400 lines.
 - `ui.c`: mode stack (HOME + one overlay mode), timeouts, toast placement moved above the key badges, `ui_report` gains `mode` and `item`.
 - Edge hints become key badges `[A] WORD` / `WORD [B]` drawn at 7:30 and 4:30; they are not touch targets.
 
@@ -346,7 +349,7 @@ Daemon side: `handle_cmd` needs `CmdOp::Reply` wired to the approval broker that
 | 0 | Review fixes #1–#4 (`2702775`): prompt text on the card, glow first-touch, haptic triple, strict deny | `approve_card`, `approve_after_glow`, `approve_too_soon`, `deny_short_swipe` |
 | 1 | HOME deck: new hierarchy, summary row, time-in-state, index ring with tick and inset error dash, stale/offline, key badges, toast placement. Tap centre stays Focus until Phase 2 | screenshots of every state; `expect_label` on summary and stale |
 | 2 | `ui_wheel.c` + AGENT for Working/Done/Error/Idle (Focus, Ack, Dismiss, Snooze, Notify, Watch…); tap centre and swipe up open it; chord = Home. **Done** (`nav.c` interaction layer, §8a) | `actions_wheel.txt`, `agent_timeout.txt` |
-| 3 | ASK on the wheel: options from `opts`, `grant_mask`, `cmd_op_reply`, approve/grants/deny as hold items, answer-pending line | `ask_reply.txt`; protocol vector with `opts` |
+| 3 | ASK on the wheel: options from `opts`, `grant_mask`, `cmd_op_reply`, approve/grants/deny as hold items, answer-pending line; daemon approval broker + blocking Claude Code hooks. **Done** | `ask_reply`, `ask_grant_hold`, `ask_deny_hold`, `ask_tap_never_approves`, `ask_result_error`, `ask_hold_bound_to_rid`; vectors `attention_question_opts`, `attention_permission_grants`, `cmd_reply`; broker and hook unit tests |
 | 4 | SCROLL by drag/flick + `cmd_op_scroll` + `scroll_pos` + kitty and tmux drivers + privacy-gated preview | `scroll_mode.txt`; daemon unit tests for argument building |
 | 5 | STATUS wheel (swipe down from HOME, quiet mode); Atlas update (gesture map is generated from `ui_*.c`) | `status.txt` |
 | 6 | IMU raise-to-wake and lift-during-glow (needs the BMI270 driver) | on-device only |
@@ -359,9 +362,9 @@ Three layers, so the look and the interaction model can change independently (us
 
 | Layer | Lives in | Knows about | Does not know about |
 |---|---|---|---|
-| **Interaction model** | `nav.h`, `nav.c` | modes (`MODE_HOME`, `MODE_AGENT`, …), the gesture map (`nav_bindings[]`: mode × gesture × zone × condition → action), the safety rules (`NAV_HOLD_MS`, `NAV_CARD_ARM_MS`, `NAV_LONG_SWIPE_PX`, `nav_hold_may_start()`, `nav_long_swipe_down()`), the per-state action lists (`nav_agent_items()`) | LVGL, colours, geometry, labels |
-| **Mode plumbing** | `ui.c` | which screen owns the current mode, mode transitions (`NAV_OPEN_AGENT`, `NAV_BACK`, `NAV_HOME`, timeouts, an attention always lands on HOME), the debug report | drawing |
-| **Presentation** | `ui_theme.h/.c` (tokens: palette, fonts, pill tint, key caps, badge angles), `ui_ring.c` (index ring), `ui_wheel.c` (the list component), `ui_home.c` (deck card), `ui_agent.c` (wheel screen: labels for action ids, header, badges) | how things look and where they sit | which gesture triggered an action |
+| **Interaction model** | `nav.h`, `nav.c` | modes (`MODE_HOME`, `MODE_AGENT`, `MODE_ASK`, …), the gesture map (`nav_bindings[]`: mode × gesture × zone × condition → action; conditions `WHEN_REQUEST` = an approvable permission, `WHEN_ASKABLE` = any permission or question), the safety rules (`NAV_HOLD_MS`, `NAV_DENY_HOLD_MS`, `NAV_CARD_ARM_MS`, `NAV_LONG_SWIPE_PX`, `nav_hold_may_start()`, `nav_long_swipe_down()`), the per-state action lists (`nav_agent_items()`) and the answer options with their commit rules (`nav_ask_items()`: which option is a hold, and how long) | LVGL, colours, geometry, labels |
+| **Mode plumbing** | `ui.c` | which screen owns the current mode, mode transitions (`NAV_OPEN_AGENT`, `NAV_OPEN_ASK`, `NAV_BACK`, `NAV_HOME`, timeouts; a permission or question opens ASK on its session, done/error land on HOME), the debug report | drawing |
+| **Presentation** | `ui_theme.h/.c` (tokens: palette, fonts, pill tint, key caps, badge angles), `ui_ring.c` (index ring), `ui_wheel.c` (the list component), `ui_home.c` (deck card), `ui_agent.c` (wheel screen: labels for action ids, header, badges), `ui_ask.c` (request text, option labels and colours, answer line; runs the hold the model allows) | how things look and where they sit | which gesture triggered an action |
 
 What a change touches:
 - **Reskin** (Capsules → something else): `ui_theme.h` tokens and the draw code in `ui_ring.c` / `ui_wheel.c` / `ui_home.c` / `ui_agent.c`. No gesture logic, no safety rule, no test script changes.
@@ -369,7 +372,7 @@ What a change touches:
 - **New mode** (ASK, SCROLL, STATUS): a `MODE_*` value, its rows in the table, a screen file with `open/close/act/tick/report`, and one case each in `enter_mode()` and `ui_on_gesture()` in `ui.c`.
 - **New action for a state**: `nav_agent_items()` plus a label in `ui_agent.c` and a handler in `commit()`.
 
-Safety is in the interaction layer, so every skin keeps it for free: a tap is never bound to approve (`{MODE_HOME, G_TAP, ZONE_CENTRE, WHEN_REQUEST, NAV_FOCUS}`), holds start only through `nav_hold_may_start()` (request on screen ≥ 300 ms, bound to its `rid`), deny and back-from-AGENT use the same `nav_long_swipe_down()` rule, the first touch after a glow is swallowed in `power.c`, and approve/deny/reject haptics are distinct patterns in `feedback.c`. The Atlas extractor reads the gesture map from `nav.c`, so a remap is documented automatically.
+Safety is in the interaction layer, so every skin keeps it for free: a tap is never bound to approve (`{MODE_HOME, G_TAP, ZONE_CENTRE, WHEN_ASKABLE, NAV_OPEN_ASK}` only opens the options; on ASK `NAV_COMMIT` refuses any item with `hold_ms`), the deck has no `G_PRESS` binding at all, holds start only through `nav_hold_may_start()` (request on screen ≥ 300 ms, bound to its `rid`; `ui_ask.c` cancels the hold when the request changes, clears or is answered, or the selection moves), which options are holds and for how long is decided by `nav_ask_items()` (grant bit or Approve → 1.2 s, a permission's deny-class option → 0.8 s), button A on ASK is `NAV_FOCUS` (Open on PC), deny and back use the same `nav_long_swipe_down()` rule, the first touch after a glow is swallowed in `power.c`, and approve/deny/reject haptics are distinct patterns in `feedback.c`. The Atlas extractor reads the gesture map from `nav.c` and fails on a `MODE_HOME` press binding, so a remap is documented automatically and a reskin cannot reintroduce a deck hold.
 
 ## 9. Decided (user answers, 2026-11-07)
 
@@ -382,6 +385,13 @@ Safety is in the interaction layer, so every skin keeps it for free: a tap is ne
 7. **A+B chord = Home.** Quiet mode lives only in STATUS (swipe down from HOME, or "Watch…").
 8. **Scroll preview: yes**, one line ≤ 48 chars, only when privacy ≥ preview.
 9. **Pebble-style `[A] WORD` key badges.**
+
+Phase 3 decisions (2026-11-08, implementation):
+
+10. **`grant_mask` is an optional key** (`attention` key 8), sent whenever `opts` is: an older daemon without it still works (no grants offered), and the existing vectors stay valid. `cmd.arg` becomes `uint / tstr` in the CDDL (zcbor encodes `any` as `nil`); the watch sends Snooze with `arg = 30` explicitly.
+11. **The deck no longer holds.** Approving is: open ASK (tap, swipe up, or automatically on arrival), then hold. One hold path to audit instead of two; §3's "HOME hold = —" now matches the code.
+12. **Claude Code hooks: `PermissionRequest` + `PreToolUse`(`AskUserQuestion`), 15 s window, silence = no decision** (DESIGN §6a fallback 2). Multi-question / multi-select prompts and Copilot are not offered to the watch yet.
+13. **Question defaults**: the first option is preselected (the agent's own default); ASK has no idle timeout, it waits for the answer or the daemon's `clear`.
 
 ## 10. Decisions that reconcile DESIGN.md and UI-RING.md
 
