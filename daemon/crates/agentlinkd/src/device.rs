@@ -1,6 +1,7 @@
 //! One connected device: handshake (hello → welcome → snapshot), then deltas out and
 //! commands in.
 
+use crate::broker::{Broker, Decision};
 use crate::focus::{FocusDriver, FocusError, FocusTarget};
 use crate::registry::{now_unix, Registry, Update};
 use crate::trace::{Dir, Trace};
@@ -19,6 +20,7 @@ const MIN_APPROVE_HOLD_MS: u64 = 1000;
 /// State shared by every link task.
 pub struct Shared {
     pub registry: Arc<Registry>,
+    pub broker: Arc<Broker>,
     pub trace: Trace,
     pub focus: Arc<dyn FocusDriver>,
     pub host: HostInfo,
@@ -28,9 +30,15 @@ pub struct Shared {
 }
 
 impl Shared {
-    pub fn new(registry: Arc<Registry>, trace: Trace, focus: Arc<dyn FocusDriver>) -> Self {
+    pub fn new(
+        registry: Arc<Registry>,
+        broker: Arc<Broker>,
+        trace: Trace,
+        focus: Arc<dyn FocusDriver>,
+    ) -> Self {
         Shared {
             registry,
+            broker,
             trace,
             focus,
             host: host_info(),
@@ -223,6 +231,10 @@ async fn handshake(
         }),
     )
     .await?;
+    // Requests still waiting for an answer: a device that connects now can still give it.
+    for att in shared.broker.pending() {
+        c.send(None, Message::Attention(att)).await?;
+    }
 
     // One entry per device id, so a re-handshake or a reconnect on a new link replaces it.
     let key = hex::encode(hello.1.dev.uid);
@@ -262,6 +274,8 @@ async fn serve(
             u = updates.recv() => match u {
                 Ok(Update::Upsert(s)) => c.send(None, Message::SessionUpd(s)).await?,
                 Ok(Update::Gone(sid)) => c.send(None, Message::Gone(Gone { sid })).await?,
+                Ok(Update::Attention(a)) => c.send(None, Message::Attention(a)).await?,
+                Ok(Update::Clear(cl)) => c.send(None, Message::Clear(cl)).await?,
                 // Missed updates: the device has drifted, so send a full replacement.
                 Err(RecvError::Lagged(_)) => {
                     let sessions = shared.registry.snapshot();
@@ -328,13 +342,36 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
                 Err(FocusError::Internal(m)) => fail(ResultErr::Internal, &m),
             }
         }
-        CmdOp::Approve | CmdOp::Deny => {
-            // No approval broker yet, so no rid is ever live: always stale (PROTOCOL §5).
-            let hold_ok = cmd.op == CmdOp::Deny || cmd.hold_ms.unwrap_or(0) >= MIN_APPROVE_HOLD_MS;
-            let res = if !hold_ok {
-                fail(ResultErr::Denied, "hold-to-confirm too short")
-            } else {
-                fail(ResultErr::Stale, "no pending request for rid")
+        CmdOp::Approve | CmdOp::Deny | CmdOp::Reply => {
+            // The broker holds the hook that is waiting for this rid; an unknown or settled rid
+            // is stale, so a race against the terminal answer is safe (PROTOCOL §5).
+            let decision = match cmd.op {
+                CmdOp::Approve => Some(Decision::Approve),
+                CmdOp::Deny => Some(Decision::Deny),
+                _ => match cmd.arg {
+                    Some(Arg::Uint(i)) => usize::try_from(i).ok().map(Decision::Reply),
+                    _ => None,
+                },
+            };
+            let res = match (cmd.rid, decision) {
+                (None, _) => fail(ResultErr::Denied, "rid required"),
+                (_, None) => fail(ResultErr::Denied, "reply needs an option index"),
+                (Some(_), Some(Decision::Approve))
+                    if cmd.hold_ms.unwrap_or(0) < MIN_APPROVE_HOLD_MS =>
+                {
+                    fail(ResultErr::Denied, "hold-to-confirm too short")
+                }
+                (Some(rid), Some(d)) => match shared.broker.answer(rid, d) {
+                    Ok(outcome) => {
+                        tracing::info!("rid {rid} answered from device: {:?}", outcome);
+                        CmdResult {
+                            ok: true,
+                            err: None,
+                            msg: None,
+                        }
+                    }
+                    Err((err, msg)) => fail(err, msg),
+                },
             };
             shared.trace.audit(
                 "approval",
@@ -416,11 +453,120 @@ mod tests {
 
     fn shared() -> Arc<Shared> {
         let trace = Trace::null();
+        let registry = Arc::new(Registry::new(trace.clone()));
         Arc::new(Shared::new(
-            Arc::new(Registry::new(trace.clone())),
+            registry.clone(),
+            Arc::new(Broker::new(registry)),
             trace,
             Arc::new(NoFocus),
         ))
+    }
+
+    fn cmd_bytes(id: u64, cmd: Cmd) -> Vec<u8> {
+        Envelope::new(id, Message::Cmd(cmd)).to_bytes().unwrap()
+    }
+
+    fn cmd(op: CmdOp, rid: Option<u64>, arg: Option<Arg>, hold_ms: Option<u64>) -> Cmd {
+        Cmd {
+            op,
+            sid: Some(1),
+            rid,
+            arg,
+            hold_ms,
+        }
+    }
+
+    async fn result_of(d: &mut Dev) -> CmdResult {
+        match d.next().await.msg {
+            Message::Result(r) => r,
+            m => panic!("expected result, got {m:?}"),
+        }
+    }
+
+    /// Approve, deny and reply reach the broker and release the hook; stale rids are refused;
+    /// a device that connects late is told about the open request.
+    #[tokio::test]
+    async fn commands_answer_the_broker() {
+        use crate::broker::{Meaning, Request};
+        use std::time::Duration;
+        let shared = shared();
+        let req = |opts: Vec<(String, Meaning)>| Request {
+            sid: 1,
+            key: "claude:s".into(),
+            tool: Some("Bash".into()),
+            kind: AttKind::Approval,
+            title: Some("Run shell command".into()),
+            text: Some("npm test".into()),
+            opts,
+            ttl: Duration::from_secs(15),
+        };
+        let (rid, wait) = shared.broker.open(req(vec![]));
+        let mut d = spawn_link(&shared);
+        d.to_daemon.send(hello_bytes("1.0.0")).unwrap();
+        d.next().await; // welcome
+        d.next().await; // snapshot
+        let Message::Attention(att) = d.next().await.msg else {
+            panic!("pending attention after snapshot")
+        };
+        assert_eq!(att.rid, rid);
+
+        // too short a hold is refused and the request stays open
+        d.to_daemon
+            .send(cmd_bytes(
+                1,
+                cmd(CmdOp::Approve, Some(rid), None, Some(400)),
+            ))
+            .unwrap();
+        let r = result_of(&mut d).await;
+        assert_eq!((r.ok, r.err), (false, Some(ResultErr::Denied)));
+        // a proper hold approves: result ok, hook released, clear broadcast
+        d.to_daemon
+            .send(cmd_bytes(
+                2,
+                cmd(CmdOp::Approve, Some(rid), None, Some(1250)),
+            ))
+            .unwrap();
+        assert!(result_of(&mut d).await.ok);
+        assert_eq!(wait.await.unwrap().decision, "allow");
+        let Message::Clear(c) = d.next().await.msg else {
+            panic!()
+        };
+        assert_eq!((c.rid, c.why), (rid, ClearWhy::AnsweredDev));
+        // the same rid again is stale
+        d.to_daemon
+            .send(cmd_bytes(3, cmd(CmdOp::Deny, Some(rid), None, None)))
+            .unwrap();
+        assert_eq!(result_of(&mut d).await.err, Some(ResultErr::Stale));
+
+        // reply with an option index, delivered as an attention while connected
+        let (rid, wait) = shared.broker.open(req(vec![
+            ("Yes".into(), Meaning::Allow),
+            ("Yes, don't ask again".into(), Meaning::AllowGrant),
+            ("No".into(), Meaning::Deny),
+        ]));
+        let Message::Attention(att) = d.next().await.msg else {
+            panic!()
+        };
+        assert_eq!((att.rid, att.grant_mask), (rid, Some(3)));
+        d.to_daemon
+            .send(cmd_bytes(
+                4,
+                cmd(CmdOp::Reply, Some(rid), Some(Arg::Uint(1)), None),
+            ))
+            .unwrap();
+        assert!(result_of(&mut d).await.ok);
+        let out = wait.await.unwrap();
+        assert_eq!((out.decision, out.grant), ("allow", true));
+        let _clear = d.next().await;
+        // reply without an index, and deny of an unknown rid
+        d.to_daemon
+            .send(cmd_bytes(5, cmd(CmdOp::Reply, Some(rid), None, None)))
+            .unwrap();
+        assert_eq!(result_of(&mut d).await.err, Some(ResultErr::Denied));
+        d.to_daemon
+            .send(cmd_bytes(6, cmd(CmdOp::Deny, Some(4242), None, None)))
+            .unwrap();
+        assert_eq!(result_of(&mut d).await.err, Some(ResultErr::Stale));
     }
 
     fn spawn_link(shared: &Arc<Shared>) -> Dev {

@@ -2,7 +2,7 @@
 //! session list and broadcasts deltas.
 
 use crate::trace::{Dir, Trace};
-use agentlink_proto::{Agent, InputSub, SessState, Session};
+use agentlink_proto::{Agent, Attention, Clear, InputSub, SessState, Session};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Mutex;
@@ -67,6 +67,10 @@ pub enum Update {
     /// Full object for a new session, otherwise only the changed keys.
     Upsert(Session),
     Gone(u64),
+    /// A request the devices may answer (from the approval broker).
+    Attention(Attention),
+    /// That request is over: answered (on either side), expired or cancelled.
+    Clear(Clear),
 }
 
 struct Record {
@@ -94,7 +98,7 @@ pub fn now_unix() -> u64 {
         .unwrap_or(0)
 }
 
-fn clip(s: &str, max: usize) -> String {
+pub fn clip(s: &str, max: usize) -> String {
     if s.chars().count() <= max {
         return s.to_owned();
     }
@@ -128,27 +132,59 @@ impl Registry {
     }
 
     pub fn apply(&self, ev: SessionEvent) {
-        let mut st = self.state.lock().unwrap();
-        let update = match ev {
-            SessionEvent::Update { key, patch, ctx } => Self::upsert(&mut st, key, patch, ctx),
-            SessionEvent::End { key } => st
-                .by_key
-                .remove(&key)
-                .and_then(|sid| st.sessions.remove(&sid).map(|_| Update::Gone(sid))),
+        let update = {
+            let mut st = self.state.lock().unwrap();
+            match ev {
+                SessionEvent::Update { key, patch, ctx } => Self::upsert(&mut st, key, patch, ctx),
+                SessionEvent::End { key } => st
+                    .by_key
+                    .remove(&key)
+                    .and_then(|sid| st.sessions.remove(&sid).map(|_| Update::Gone(sid))),
+            }
         };
         if let Some(u) = update {
-            let (kind, sid, msg) = match &u {
-                Update::Upsert(s) => (
-                    "session_upd",
-                    s.sid,
-                    serde_json::to_value(s).unwrap_or_default(),
-                ),
-                Update::Gone(sid) => ("gone", *sid, serde_json::json!({"sid": sid})),
-            };
-            self.trace
-                .record("registry", Dir::Internal, kind, Some(sid), None, msg, None);
-            let _ = self.tx.send(u); // no receivers is fine
+            self.publish(u);
         }
+    }
+
+    /// Traces and broadcasts one update to every device link.
+    pub fn publish(&self, u: Update) {
+        let (kind, sid, rid, msg) = match &u {
+            Update::Upsert(s) => (
+                "session_upd",
+                s.sid,
+                None,
+                serde_json::to_value(s).unwrap_or_default(),
+            ),
+            Update::Gone(sid) => ("gone", *sid, None, serde_json::json!({"sid": sid})),
+            Update::Attention(a) => (
+                "attention",
+                a.sid,
+                Some(a.rid),
+                serde_json::to_value(a).unwrap_or_default(),
+            ),
+            Update::Clear(c) => (
+                "clear",
+                0,
+                Some(c.rid),
+                serde_json::to_value(c).unwrap_or_default(),
+            ),
+        };
+        self.trace.record(
+            "registry",
+            Dir::Internal,
+            kind,
+            (sid != 0).then_some(sid),
+            rid,
+            msg,
+            None,
+        );
+        let _ = self.tx.send(u); // no receivers is fine
+    }
+
+    /// The device-visible id of a source session key, once it has been seen.
+    pub fn sid_of(&self, key: &str) -> Option<u64> {
+        self.state.lock().unwrap().by_key.get(key).copied()
     }
 
     fn upsert(st: &mut State, key: String, p: SessionPatch, ctx: HostCtx) -> Option<Update> {

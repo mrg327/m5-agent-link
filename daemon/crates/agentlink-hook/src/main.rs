@@ -3,7 +3,16 @@
 //! Reads the hook JSON from stdin, adds agent kind and terminal-identifying env, and sends
 //! one line to the daemon socket. It must never hold up the agent: everything runs under a
 //! hard deadline, every failure is swallowed, the exit code is always 0, and stdout stays
-//! empty except for a permission hook's reply (none yet: the daemon sends no decisions).
+//! empty unless the daemon returns a decision.
+//!
+//! Two Claude Code hooks block for the watch (UI-V2 §7, DESIGN §6a "first answer wins"):
+//! `PermissionRequest` (fires when Claude Code is about to show its permission prompt) and
+//! `PreToolUse` for `AskUserQuestion`. The hook holds the prompt back for `AGENTLINK_WAIT_MS`
+//! (15 s) while the daemon shows the request on the watch. A device answer becomes the
+//! event's own hook output; no answer (timeout, terminal, daemon down) prints nothing and
+//! exits 0, which Claude Code documents as "no decision": its normal prompt appears. Silence
+//! never approves. Format: https://code.claude.com/docs/en/hooks (PermissionRequest
+//! `hookSpecificOutput.decision.behavior`; PreToolUse `permissionDecision` + `updatedInput`).
 
 use serde_json::{json, Map, Value};
 use std::io::Read;
@@ -12,7 +21,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const DEADLINE: Duration = Duration::from_millis(1500);
 const STDIN_TIMEOUT: Duration = Duration::from_millis(500);
-const REPLY_TIMEOUT: Duration = Duration::from_millis(300);
+/// How long a blocking hook waits for the watch before letting the terminal prompt appear.
+const DEFAULT_WAIT_MS: u64 = 15_000;
+const MAX_WAIT_MS: u64 = 120_000;
+/// Slack between the daemon's own timeout and ours, so the daemon's `none` arrives first.
+const WAIT_SLACK: Duration = Duration::from_millis(2000);
 
 /// Env that identifies the terminal/window the agent runs in (used by focus drivers).
 const ENV_KEYS: &[&str] = &[
@@ -47,8 +60,64 @@ fn socket_path() -> std::path::PathBuf {
         .join("hook.sock")
 }
 
-fn is_permission_hook(event: &str) -> bool {
-    event.eq_ignore_ascii_case("permissionrequest")
+/// Which Claude Code hooks wait for a decision: the permission prompt, and a question.
+fn blocks_for_watch(agent: &str, event: &str, payload: &Value) -> bool {
+    agent == "claude"
+        && (event.eq_ignore_ascii_case("permissionrequest")
+            || (event.eq_ignore_ascii_case("pretooluse")
+                && payload["tool_name"].as_str() == Some("AskUserQuestion")))
+}
+
+fn wait_ms() -> u64 {
+    std::env::var("AGENTLINK_WAIT_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_WAIT_MS)
+        .min(MAX_WAIT_MS)
+}
+
+/// Turns the daemon's `{"decision": "allow"|"deny"|"none", "grant"?, "answer"?}` into the
+/// hook output Claude Code expects for `event`. `None` = print nothing (no decision).
+fn hook_output(event: &str, payload: &Value, reply: &Value) -> Option<Value> {
+    let decision = reply["decision"].as_str()?;
+    if decision == "none" {
+        return None;
+    }
+    if event.eq_ignore_ascii_case("permissionrequest") {
+        let mut d = json!({"behavior": decision});
+        if decision == "allow" {
+            // "Yes, don't ask again": apply the rules Claude Code itself proposed for this call
+            if reply["grant"].as_bool() == Some(true) {
+                if let Some(s) = payload["permission_suggestions"]
+                    .as_array()
+                    .filter(|a| !a.is_empty())
+                {
+                    d["updatedPermissions"] = Value::Array(s.clone());
+                }
+            }
+        } else if decision == "deny" {
+            d["message"] = json!("Denied from the watch");
+        } else {
+            return None;
+        }
+        return Some(
+            json!({"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": d}}),
+        );
+    }
+    if event.eq_ignore_ascii_case("pretooluse") {
+        // AskUserQuestion: "allow" alone is not an answer; the chosen label goes in updatedInput.answers
+        let answer = reply["answer"].as_str()?;
+        let mut input = payload["tool_input"].clone();
+        let question = input["questions"][0]["question"].as_str()?.to_owned();
+        input["answers"] = json!({ question: answer });
+        return Some(json!({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow",
+            "permissionDecisionReason": "answered on the watch",
+            "updatedInput": input,
+        }}));
+    }
+    None
 }
 
 fn read_stdin() -> String {
@@ -168,7 +237,9 @@ fn process_identity(_ppid: u32) -> (Vec<u32>, Option<String>) {
     (Vec::new(), None)
 }
 
-fn build_line(agent: &str, event: &str, stdin: &str) -> String {
+/// The line for the daemon, plus the hook's event name and payload (for formatting a reply)
+/// and how long it waits for one (0: no wait).
+fn build_line(agent: &str, event: &str, stdin: &str) -> (String, String, Value, u64) {
     let payload: Value = serde_json::from_str(stdin).unwrap_or(Value::Null);
     let env: Map<String, Value> = ENV_KEYS
         .iter()
@@ -198,13 +269,21 @@ fn build_line(agent: &str, event: &str, stdin: &str) -> String {
     } else {
         event
     };
-    json!({"agent": agent, "event": event, "ts": ts, "cwd": cwd, "ppid": ppid, "tty": tty, "pids": pids, "env": env, "payload": payload})
-        .to_string()
+    let wait = if blocks_for_watch(agent, event, &payload) {
+        wait_ms()
+    } else {
+        0
+    };
+    let mut line = json!({"agent": agent, "event": event, "ts": ts, "cwd": cwd, "ppid": ppid, "tty": tty, "pids": pids, "env": env, "payload": payload});
+    if wait > 0 {
+        line["await"] = json!({"wait_ms": wait});
+    }
+    (line.to_string(), event.to_owned(), payload, wait)
 }
 
-/// Sends `line`; for permission hooks also waits briefly for a one-line reply.
+/// Sends `line`; for blocking hooks also waits up to `reply_wait` for a one-line reply.
 #[cfg(unix)]
-fn send(line: &str, want_reply: bool) -> Option<String> {
+fn send(line: &str, reply_wait: Option<Duration>) -> Option<String> {
     use std::io::{BufRead, BufReader, Write};
     use std::net::Shutdown;
     use std::os::unix::net::UnixStream;
@@ -214,10 +293,8 @@ fn send(line: &str, want_reply: bool) -> Option<String> {
     s.write_all(line.as_bytes()).ok()?;
     s.write_all(b"\n").ok()?;
     s.shutdown(Shutdown::Write).ok()?;
-    if !want_reply {
-        return None;
-    }
-    s.set_read_timeout(Some(REPLY_TIMEOUT)).ok()?;
+    let wait = reply_wait?;
+    s.set_read_timeout(Some(wait)).ok()?;
     let mut reply = String::new();
     BufReader::new(s).read_line(&mut reply).ok()?;
     Some(reply.trim().to_owned()).filter(|r| !r.is_empty())
@@ -243,9 +320,9 @@ fn pipe_name(socket: &std::path::Path) -> String {
 }
 
 /// Windows twin of the unix `send`: one line over the named pipe, then an optional reply
-/// read on a helper thread so a silent daemon cannot hold us past `REPLY_TIMEOUT`.
+/// read on a helper thread so a silent daemon cannot hold us past the wait.
 #[cfg(windows)]
-fn send(line: &str, want_reply: bool) -> Option<String> {
+fn send(line: &str, reply_wait: Option<Duration>) -> Option<String> {
     use std::io::{BufRead, BufReader, Write};
 
     const ERROR_PIPE_BUSY: i32 = 231;
@@ -268,21 +345,19 @@ fn send(line: &str, want_reply: bool) -> Option<String> {
     pipe.write_all(line.as_bytes()).ok()?;
     pipe.write_all(b"\n").ok()?;
     pipe.flush().ok()?;
-    if !want_reply {
-        return None;
-    }
+    let wait = reply_wait?;
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let mut reply = String::new();
         let _ = BufReader::new(pipe).read_line(&mut reply);
         let _ = tx.send(reply);
     });
-    let reply = rx.recv_timeout(REPLY_TIMEOUT).ok()?;
+    let reply = rx.recv_timeout(wait).ok()?;
     Some(reply.trim().to_owned()).filter(|r| !r.is_empty())
 }
 
 #[cfg(not(any(unix, windows)))]
-fn send(_line: &str, _want_reply: bool) -> Option<String> {
+fn send(_line: &str, _reply_wait: Option<Duration>) -> Option<String> {
     None
 }
 
@@ -291,17 +366,31 @@ fn main() {
     let agent = args.next().unwrap_or_else(|| "other".into());
     let event = args.next().unwrap_or_default();
 
-    let (tx, rx) = mpsc::channel();
+    // The worker reads stdin and talks to the socket, so neither can hold the agent past the
+    // deadline. It first reports what kind of hook this is, then the daemon's reply.
+    let (kind_tx, kind_rx) = mpsc::channel();
+    let (reply_tx, reply_rx) = mpsc::channel();
     std::thread::spawn(move || {
-        let line = build_line(&agent, &event, &read_stdin());
-        let ev = serde_json::from_str::<Value>(&line)
-            .ok()
-            .and_then(|v| v["event"].as_str().map(str::to_owned));
-        let want_reply = ev.as_deref().is_some_and(is_permission_hook);
-        let _ = tx.send((want_reply, send(&line, want_reply)));
+        let (line, event, payload, wait) = build_line(&agent, &event, &read_stdin());
+        let _ = kind_tx.send((event, payload, wait));
+        let reply_wait = (wait > 0).then(|| Duration::from_millis(wait) + WAIT_SLACK);
+        let _ = reply_tx.send(send(&line, reply_wait));
     });
-    if let Ok((true, Some(reply))) = rx.recv_timeout(DEADLINE) {
-        println!("{reply}");
+    let Ok((event, payload, wait)) = kind_rx.recv_timeout(DEADLINE) else {
+        std::process::exit(0);
+    };
+    let budget = if wait > 0 {
+        Duration::from_millis(wait) + 2 * WAIT_SLACK
+    } else {
+        DEADLINE
+    };
+    if let Ok(Some(reply)) = reply_rx.recv_timeout(budget) {
+        if let Some(out) = serde_json::from_str::<Value>(&reply)
+            .ok()
+            .and_then(|r| hook_output(&event, &payload, &r))
+        {
+            println!("{out}");
+        }
     }
     std::process::exit(0);
 }
@@ -318,6 +407,90 @@ mod tests {
         assert_eq!(tty.as_deref(), Some("/dev/ttys003"));
         assert_eq!(walk_chain(ps, 800, 2).0, vec![800, 700]);
         assert_eq!(walk_chain("", 42, 8), (vec![42], None));
+    }
+
+    #[test]
+    fn permission_outputs_follow_claude_codes_format() {
+        let payload = json!({"tool_name": "Bash", "tool_input": {"command": "npm test"},
+                             "permission_suggestions": [{"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "npm test:*"}]}]});
+        let allow =
+            hook_output("PermissionRequest", &payload, &json!({"decision": "allow"})).unwrap();
+        assert_eq!(
+            allow["hookSpecificOutput"]["hookEventName"],
+            "PermissionRequest"
+        );
+        assert_eq!(allow["hookSpecificOutput"]["decision"]["behavior"], "allow");
+        assert!(allow["hookSpecificOutput"]["decision"]
+            .get("updatedPermissions")
+            .is_none());
+
+        let grant = hook_output(
+            "PermissionRequest",
+            &payload,
+            &json!({"decision": "allow", "grant": true}),
+        )
+        .unwrap();
+        assert_eq!(
+            grant["hookSpecificOutput"]["decision"]["updatedPermissions"],
+            payload["permission_suggestions"]
+        );
+
+        let deny =
+            hook_output("PermissionRequest", &payload, &json!({"decision": "deny"})).unwrap();
+        assert_eq!(deny["hookSpecificOutput"]["decision"]["behavior"], "deny");
+        assert!(deny["hookSpecificOutput"]["decision"]["message"].is_string());
+
+        // no decision, garbage, or an unknown decision word: print nothing, so the terminal prompts
+        assert!(hook_output("PermissionRequest", &payload, &json!({"decision": "none"})).is_none());
+        assert!(hook_output("PermissionRequest", &payload, &json!({})).is_none());
+        assert!(
+            hook_output("PermissionRequest", &payload, &json!({"decision": "maybe"})).is_none()
+        );
+    }
+
+    #[test]
+    fn question_answer_goes_into_updated_input() {
+        let payload = json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
+            {"question": "Which framework?", "header": "Framework", "options": [{"label": "React"}, {"label": "Vue"}]}]}});
+        let out = hook_output(
+            "PreToolUse",
+            &payload,
+            &json!({"decision": "allow", "answer": "Vue"}),
+        )
+        .unwrap();
+        let h = &out["hookSpecificOutput"];
+        assert_eq!(h["hookEventName"], "PreToolUse");
+        assert_eq!(h["permissionDecision"], "allow");
+        assert_eq!(h["updatedInput"]["answers"]["Which framework?"], "Vue");
+        assert_eq!(
+            h["updatedInput"]["questions"],
+            payload["tool_input"]["questions"]
+        );
+        // "allow" without an answer is not an answer to a question
+        assert!(hook_output("PreToolUse", &payload, &json!({"decision": "allow"})).is_none());
+        assert!(hook_output("PreToolUse", &payload, &json!({"decision": "none"})).is_none());
+    }
+
+    #[test]
+    fn only_claude_permission_and_question_hooks_block() {
+        let ask = json!({"tool_name": "AskUserQuestion"});
+        let bash = json!({"tool_name": "Bash"});
+        assert!(blocks_for_watch("claude", "PermissionRequest", &bash));
+        assert!(blocks_for_watch("claude", "PreToolUse", &ask));
+        assert!(!blocks_for_watch("claude", "PreToolUse", &bash));
+        assert!(!blocks_for_watch("claude", "Notification", &bash));
+        assert!(!blocks_for_watch("copilot", "permissionRequest", &bash));
+        let (line, event, _, wait) = build_line("claude", "PermissionRequest", &bash.to_string());
+        assert_eq!(event, "PermissionRequest");
+        assert!(wait > 0);
+        let v: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(v["await"]["wait_ms"].as_u64(), Some(wait));
+        let (line, _, _, wait) = build_line("claude", "Stop", "{}");
+        assert_eq!(wait, 0);
+        assert!(serde_json::from_str::<Value>(&line)
+            .unwrap()
+            .get("await")
+            .is_none());
     }
 
     #[test]

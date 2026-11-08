@@ -4,6 +4,7 @@
 //! with everything traced to `~/.agentlink/trace/`.
 
 mod ble;
+mod broker;
 mod device;
 mod focus;
 mod hook_source;
@@ -21,7 +22,6 @@ use device::Shared;
 use serde_json::json;
 use source::AgentSource;
 use std::sync::Arc;
-use tokio::sync::mpsc;
 use transport::Transport;
 
 const DEFAULT_WS_ADDR: &str = "127.0.0.1:7878";
@@ -37,8 +37,10 @@ async fn main() -> Result<()> {
 
     let trace = trace::Trace::new(paths::trace_dir(), paths::audit_log());
     let registry = Arc::new(registry::Registry::new(trace.clone()));
+    let broker = Arc::new(broker::Broker::new(registry.clone()));
     let shared = Arc::new(Shared::new(
         registry.clone(),
+        broker.clone(),
         trace.clone(),
         focus::default_driver(),
     ));
@@ -59,28 +61,21 @@ async fn main() -> Result<()> {
         })
     };
 
-    let (tx, mut rx) = mpsc::channel(256);
     let sources: Vec<Box<dyn AgentSource>> = vec![Box::new(hook_source::HookSource {
         socket: paths::hook_socket(),
         trace: trace.clone(),
         status,
+        broker,
     })];
     for s in sources {
-        let tx = tx.clone();
+        let reg = registry.clone();
         tokio::spawn(async move {
             let name = s.name();
-            if let Err(e) = s.run(tx).await {
+            if let Err(e) = s.run(reg).await {
                 tracing::error!("source {name} stopped: {e:#}");
             }
         });
     }
-    drop(tx);
-    let reg = registry.clone();
-    tokio::spawn(async move {
-        while let Some(ev) = rx.recv().await {
-            reg.apply(ev);
-        }
-    });
 
     let addr = std::env::var("AGENTLINK_WS_ADDR").unwrap_or_else(|_| DEFAULT_WS_ADDR.into());
     let ws = ws::WsTransport::bind(&addr).await?;
