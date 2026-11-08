@@ -1,0 +1,30 @@
+# A question with three options opens ASK; B moves, a tap on the centre sends cmd_op_reply with the
+# option index (op 5, arg 1), the card shows "Sent", and the daemon's clear returns to the deck.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite
+session 2 ask dashboard main
+wait 300
+attention 8 2 question reply,focus 0 Which framework?|Pick the UI library for the new dashboard|React|Vue|Keep vanilla
+wait 400
+expect_screen ask
+expect_label Which framework?
+expect_label Pick the UI library
+expect_label > React
+expect_label 4 options
+shot ask_question.png
+btn B
+wait 150
+expect_label > Vue
+tap 233 233
+wait 300
+expect_screen ask
+expect_label Sent "Vue"
+shot ask_sent.png
+result ok
+wait 200
+expect_label Sent "Vue"
+clear 8 answered_dev
+wait 300
+expect_screen ring
+quit

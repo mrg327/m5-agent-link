@@ -43,14 +43,19 @@ One command per line, `#` comments. Input is replayed in real time through the s
 input, so gesture recognition is exercised.
 
 ```
-wait MS | tap X Y | dtap X Y | hold X Y MS | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long]
+wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double] | chord
+scrub DEG0 DEG1 [MS [RADIUS]] | session SID STATE REPO [BRANCH [SUMMARY]] | drop SID
 lift | shake | connect | disconnect | rx HEX | ui | shot FILE.png
-expect_screen NAME | expect_label TEXT | quit
+attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OPT...
+result ok | result err stale|denied|... | clear RID [WHY]
+expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
 ```
 
 `rx` feeds a CBOR envelope (e.g. `cbor_hex` from `protocol/vectors`) as if the daemon sent it;
-`connect` fakes the transport being up for `--no-ws` runs. A failed `expect_*` exits with code 1.
-`shot` writes a PNG of the framebuffer (round mask applied).
+`attention`, `result` (answers the device's last command) and `clear` build such envelopes with the
+firmware's own codec. `connect` fakes the transport being up for `--no-ws` runs. A failed `expect_*`
+exits with code 1. `shot` writes a PNG of the framebuffer (round mask applied); `press` without a
+`release` keeps the finger down, so a hold can be photographed mid-way.
 
 ## Notes
 

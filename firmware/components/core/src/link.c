@@ -118,7 +118,7 @@ void link_tick(uint32_t now_ms)
     }
 }
 
-bool link_send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms)
+static bool send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms, bool has_arg, uint32_t arg)
 {
     if (!g_link.welcomed) return false;
     memset(&g_tx_env, 0, sizeof g_tx_env);
@@ -133,6 +133,11 @@ bool link_send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms)
         m->msg_cmd_cmd_m.cmd_uint2uint_present = true;
         m->msg_cmd_cmd_m.cmd_uint2uint.cmd_uint2uint = rid;
     }
+    if (has_arg) {
+        m->msg_cmd_cmd_m.cmd_arg_m_present = true;
+        m->msg_cmd_cmd_m.cmd_arg_m.cmd_arg_m.cmd_arg_choice = cmd_arg_uint_c;
+        m->msg_cmd_cmd_m.cmd_arg_m.cmd_arg_m.cmd_arg_uint = arg;
+    }
     if (hold_ms) {
         m->msg_cmd_cmd_m.cmd_uint4uint_present = true;
         m->msg_cmd_cmd_m.cmd_uint4uint.cmd_uint4uint = hold_ms;
@@ -140,11 +145,21 @@ bool link_send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms)
     uint32_t id = ++g_link.tx_id;
     m->msg_cmd_hdr_m.hdr_uint1uint = id;
     /* Unanswered commands are simply overwritten by newer ones. */
-    g_link.pending[id % LINK_MAX_PENDING] = (pending_cmd_t){.id = id, .op = (int)op, .sid = sid};
+    g_link.pending[id % LINK_MAX_PENDING] = (pending_cmd_t){.id = id, .op = (int)op, .sid = sid, .rid = rid};
     uint8_t buf[64];
     size_t len = 0;
     if (cbor_encode_envelope(buf, sizeof buf, &g_tx_env, &len) != ZCBOR_SUCCESS) return false;
-    dbg_event("link", "tx_cmd", "\"id\":%u,\"op\":%d,\"sid\":%u,\"rid\":%u,\"hold_ms\":%u", (unsigned)id,
-              (int)op, (unsigned)sid, (unsigned)rid, (unsigned)hold_ms);
+    dbg_event("link", "tx_cmd", "\"id\":%u,\"op\":%d,\"sid\":%u,\"rid\":%u,\"hold_ms\":%u,\"arg\":%d", (unsigned)id,
+              (int)op, (unsigned)sid, (unsigned)rid, (unsigned)hold_ms, has_arg ? (int)arg : -1);
     return hal_link_send(g_link.kind, buf, len);
+}
+
+bool link_send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms)
+{
+    return send_cmd(op, sid, rid, hold_ms, false, 0);
+}
+
+bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg)
+{
+    return send_cmd(op, sid, rid, 0, true, arg);
 }

@@ -1,10 +1,15 @@
 /* Scripted input. A script is expanded up front into a timeline of primitive events (mouse, keys,
  * IMU, frames, checks) that are replayed in real time through the same paths as real input.
  *
- *   wait MS | tap X Y | hold X Y MS | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double] | chord
+ *   wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double] | chord
  *   scrub DEG0 DEG1 [MS [RADIUS]]   drag along the rim, degrees clockwise from 12 o'clock
  *   session SID work|input|ask|error|done|idle|doneseen REPO   add or update a session (input = permission, ask = question)
  *   drop SID | lift | shake | connect | disconnect | rx HEX | ui | shot FILE.png
+ *   attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OPT...
+ *                                   a daemon `attention`; ACTS = comma list of approve,deny,focus,reply,ack
+ *   result ok | result err stale|denied|unsupported|no_window|timeout|internal
+ *                                   a daemon `result` answering the last command the device sent
+ *   clear RID [answered_pc|answered_dev|expired|cancelled]
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
  */
 #include <stdio.h>
@@ -12,12 +17,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "agentlink_codec_encode.h"
 #include "core.h"
+#include "link_internal.h"
 #include "model.h"
 #include "ui_theme.h"
 #include "sim.h"
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_DROP, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -77,6 +84,8 @@ static void btn(uint32_t *t, int b, uint32_t down_at, uint32_t up_at)
     add(*t + up_at, E_BTN, b, 0, 0, NULL);
 }
 
+static int s_last_x, s_last_y; /* where `press` put the finger, for `release` */
+
 static bool parse_line(char *line, uint32_t *t)
 {
     char cmd[24] = "", arg[512] = "";
@@ -93,6 +102,14 @@ static bool parse_line(char *line, uint32_t *t)
         add(*t, E_PTR, 1, a, b, NULL);
         add(*t + (uint32_t)c, E_PTR, 0, a, b, NULL);
         *t += (uint32_t)c + 150;
+    } else if (!strcmp(cmd, "press") && sscanf(rest, "%d %d", &a, &b) == 2) {
+        add(*t, E_PTR, 1, a, b, NULL); /* finger down; stays down until `release` */
+        s_last_x = a;
+        s_last_y = b;
+        *t += 20;
+    } else if (!strcmp(cmd, "release")) {
+        add(*t, E_PTR, 0, s_last_x, s_last_y, NULL);
+        *t += 150;
     } else if (!strcmp(cmd, "swipe")) {
         int n = sscanf(rest, "%d %d %d %d %d", &a, &b, &c, &d, &e);
         if (n < 4) return false;
@@ -120,6 +137,15 @@ static bool parse_line(char *line, uint32_t *t)
         *t += 50;
     } else if (!strcmp(cmd, "drop") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_DROP, a, 0, 0, NULL);
+        *t += 50;
+    } else if (!strcmp(cmd, "attention") && arg[0]) {
+        add(*t, E_ATTENTION, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "result") && arg[0]) {
+        add(*t, E_RESULT, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "clear") && sscanf(rest, "%d", &a) == 1) {
+        add(*t, E_CLEAR, a, 0, 0, arg);
         *t += 50;
     } else if (!strcmp(cmd, "expect_no_label") && arg[0]) {
         add(*t, E_EXPECT_NO_LABEL, 0, 0, 0, arg);
@@ -230,6 +256,117 @@ static void run_session(const char *spec)
     model_upsert(&d, present);
 }
 
+static void fail(const char *what, const char *want);
+
+/* ── daemon messages built with the firmware's own codec, so scripts need no hand-made hex ── */
+
+static uint32_t s_rx_id = 100; /* ids of scripted daemon messages; the device does not check them */
+
+static struct zcbor_string zs(const char *str) { return (struct zcbor_string){.value = (const uint8_t *)str, .len = strlen(str)}; }
+
+static void inject_env(struct envelope_r *env, const char *what)
+{
+    static uint8_t buf[1024];
+    size_t len = 0;
+    if (cbor_encode_envelope(buf, sizeof buf, env, &len) != ZCBOR_SUCCESS) {
+        fail("cannot encode", what);
+        return;
+    }
+    sim_link_inject_rx(buf, len);
+}
+
+static int enum_of(const char *s, const char *const *names, int n)
+{
+    for (int i = 0; i < n; i++)
+        if (!strcmp(s, names[i])) return i;
+    return -1;
+}
+
+/* attention RID SID KIND ACTS GRANT_MASK TITLE|TEXT|OPT... */
+static void run_attention(char *spec)
+{
+    static const char *const kinds[] = {"approval", "question", "error", "done"};
+    static const char *const acts[] = {"approve", "deny", "focus", "reply", "ack"};
+    unsigned rid, sid, grant;
+    char kind[12], actl[48];
+    int n = 0;
+    if (sscanf(spec, "%u %u %11s %47s %u %n", &rid, &sid, kind, actl, &grant, &n) != 5 || enum_of(kind, kinds, 4) < 0) {
+        fail("bad attention", spec);
+        return;
+    }
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_attention_m_c;
+    env.envelope_msg_attention_m.msg_attention_hdr_m.hdr_uint1uint = ++s_rx_id;
+    struct attention *a = &env.envelope_msg_attention_m.msg_attention_attention_m;
+    a->attention_uint0uint = rid;
+    a->attention_uint1uint = sid;
+    a->attention_att_kind_m.att_kind_choice = enum_of(kind, kinds, 4);
+    for (char *tok = strtok(actl, ","); tok; tok = strtok(NULL, ",")) {
+        int k = enum_of(tok, acts, 5);
+        if (k >= 0 && a->attention_action_m_l_action_m_count < 5)
+            a->attention_action_m_l_action_m[a->attention_action_m_l_action_m_count++].action_choice = k;
+    }
+    a->attention_uint8uint_present = true;
+    a->attention_uint8uint.attention_uint8uint = grant;
+    /* the text block is kept in the event, so the zcbor_strings may point into it */
+    char *fields = spec + n, *save = NULL;
+    int i = 0;
+    for (char *f = strtok_r(fields, "|", &save); f; f = strtok_r(NULL, "|", &save), i++) {
+        if (i == 0) {
+            a->attention_uint3tstr_present = f[0] != 0;
+            a->attention_uint3tstr.attention_uint3tstr = zs(f);
+        } else if (i == 1) {
+            a->attention_uint4tstr_present = f[0] != 0;
+            a->attention_uint4tstr.attention_uint4tstr = zs(f);
+        } else if (i < 6) {
+            a->attention_tstr_l_present = true;
+            a->attention_tstr_l.attention_tstr_l_tstr[a->attention_tstr_l.attention_tstr_l_tstr_count++] = zs(f);
+        }
+    }
+    inject_env(&env, "attention");
+}
+
+/* result ok | result err CODE: answers the device's most recent command. */
+static void run_result(const char *spec)
+{
+    static const char *const errs[] = {"stale", "denied", "unsupported", "no_window", "timeout", "internal"};
+    char word[12], code[16] = "";
+    if (sscanf(spec, "%11s %15s", word, code) < 1) {
+        fail("bad result", spec);
+        return;
+    }
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_result_m_c;
+    struct msg_result *m = &env.envelope_msg_result_m;
+    m->msg_result_hdr_m.hdr_uint1uint = ++s_rx_id;
+    m->msg_result_hdr_m.hdr_uint2uint_present = true;
+    m->msg_result_hdr_m.hdr_uint2uint.hdr_uint2uint = g_link.tx_id; /* the last command sent */
+    m->msg_result_result_m.result_uint0bool = !strcmp(word, "ok");
+    if (!m->msg_result_result_m.result_uint0bool) {
+        int e = enum_of(code, errs, 6);
+        m->msg_result_result_m.result_err_m_present = e >= 0;
+        m->msg_result_result_m.result_err_m.result_err_m.result_err_choice = e < 0 ? 0 : e;
+    }
+    inject_env(&env, "result");
+}
+
+static void run_clear(int rid, const char *spec)
+{
+    static const char *const whys[] = {"answered_pc", "answered_dev", "expired", "cancelled"};
+    char why[16] = "answered_pc";
+    sscanf(spec, "%*d %15s", why);
+    int w = enum_of(why, whys, 4);
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_clear_m_c;
+    env.envelope_msg_clear_m.msg_clear_hdr_m.hdr_uint1uint = ++s_rx_id;
+    env.envelope_msg_clear_m.msg_clear_clear_m.clear_uint0uint = (uint32_t)rid;
+    env.envelope_msg_clear_m.msg_clear_clear_m.clear_why_m.clear_why_choice = w < 0 ? 0 : w;
+    inject_env(&env, "clear");
+}
+
 static void fail(const char *what, const char *want)
 {
     fprintf(stderr, "SCRIPT FAIL: %s '%s' (screen=%s)\n", what, want, core_screen_name());
@@ -261,6 +398,9 @@ static void run(const ev_t *e)
         break;
     case E_SESSION: run_session(e->text); break;
     case E_DROP: model_remove((uint32_t)e->a); break;
+    case E_ATTENTION: run_attention(e->text); break;
+    case E_RESULT: run_result(e->text); break;
+    case E_CLEAR: run_clear(e->a, e->text); break;
     case E_QUIT: s_next = s_n; break;
     }
 }

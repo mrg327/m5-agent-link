@@ -16,8 +16,17 @@ typedef struct {
     int id;       /* owner's action id */
 } wheel_item_t;
 
+/* Where the rows sit: the selected row at cy, its neighbours dy1 above and below, the outer pair
+ * dy2 further out (dy2 == 0: three rows only). The default wheel fills the centre of the screen. */
+typedef struct {
+    int cy, dy1, dy2;
+} wheel_layout_t;
+#define WHEEL_LAYOUT_CENTRE ((wheel_layout_t){233, 46, 84})
+
 lv_obj_t *wheel_create(lv_obj_t *parent);
+lv_obj_t *wheel_create_at(lv_obj_t *parent, wheel_layout_t layout);
 void wheel_set(lv_obj_t *w, const wheel_item_t *items, int n, int sel);
+void wheel_set_shown(lv_obj_t *w, bool shown);
 void wheel_select(lv_obj_t *w, int sel);
 int wheel_sel(const lv_obj_t *w);
 int wheel_count(const lv_obj_t *w);

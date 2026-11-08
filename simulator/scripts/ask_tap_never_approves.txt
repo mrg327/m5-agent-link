@@ -1,0 +1,32 @@
+# Safety: on ASK a tap, a double tap, button A and a short press never approve. A only opens the
+# terminal (op 0); the request stays unanswered.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+expect_label > Approve HOLD
+tap 233 233
+wait 300
+expect_screen ask
+expect_label Hold to confirm
+tap 233 233
+tap 233 233
+wait 300
+expect_screen ask
+hold 233 233 400
+wait 300
+expect_screen ask
+expect_label > Approve HOLD
+btn A
+wait 300
+expect_screen attention
+expect_label Opening on PC
+# back into ASK: the request is still there, still unanswered
+tap 233 233
+wait 300
+expect_screen ask
+expect_label > Approve HOLD
+quit

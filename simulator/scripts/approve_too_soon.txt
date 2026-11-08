@@ -6,6 +6,6 @@ rx a30006010403a7000701020200037152756e207368656c6c20636f6d6d616e640478196e706d2
 wait 50
 hold 233 233 1500
 wait 400
-expect_screen attention
+expect_screen ask
 expect_label HOLD
 quit

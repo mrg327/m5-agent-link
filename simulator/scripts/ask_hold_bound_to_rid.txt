@@ -1,0 +1,19 @@
+# A hold in progress is bound to its request: when that request is cleared mid-hold (answered on
+# the PC) nothing is sent, and a new request that replaces it is not approved by the same hold.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+clear 7 answered_pc
+wait 100
+attention 11 2 approval approve,deny,focus 0 Delete branch|git branch -D feat/login
+wait 100
+hold 233 233 1500
+wait 400
+expect_screen ask
+expect_label Delete branch
+expect_label > Approve HOLD
+quit

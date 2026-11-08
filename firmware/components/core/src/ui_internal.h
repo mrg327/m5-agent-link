@@ -34,6 +34,7 @@ void ui_home_tick(uint32_t now_ms);
 bool ui_home_act(nav_action_t a, const gesture_evt_t *g);
 void ui_home_note_input(void);  /* any input anywhere resets the ambient timer and the nag */
 bool ui_home_request_pending(void); /* the selected session has an unanswered approvable request on screen */
+bool ui_home_askable(void);         /* the selected session has an unanswered permission or question */
 uint32_t ui_home_sel_sid(void);
 lv_obj_t *ui_home_ring(void);
 void ui_home_set_card_shown(bool shown);
@@ -49,3 +50,12 @@ bool ui_agent_refresh(uint32_t now_ms); /* false: the session is gone */
 bool ui_agent_act(nav_action_t a, const gesture_evt_t *g);
 bool ui_agent_tick(uint32_t now_ms);    /* true: wants to close */
 void ui_agent_report(ui_report_t *r);
+
+/* The ASK screen (ui_ask.c). */
+lv_obj_t *ui_ask_init(lv_obj_t *screen);
+void ui_ask_open(uint32_t sid, uint32_t now_ms);
+void ui_ask_close(void);
+bool ui_ask_refresh(uint32_t now_ms); /* false: nothing left to ask */
+bool ui_ask_act(nav_action_t a, const gesture_evt_t *g);
+bool ui_ask_tick(uint32_t now_ms);    /* true: wants to close */
+void ui_ask_report(ui_report_t *r);

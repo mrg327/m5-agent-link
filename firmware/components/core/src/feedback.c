@@ -53,6 +53,13 @@ void feedback_hold_ramp(void)
     haptic(ramp, sizeof ramp / sizeof ramp[0]);
 }
 
+/* Pulses shrink and the gaps grow: the opposite shape, so a deny hold feels different in the hand. */
+void feedback_deny_ramp(void)
+{
+    static const uint16_t deny_ramp[] = {100, 50, 80, 65, 65, 85, 55, 110, 45};
+    haptic(deny_ramp, sizeof deny_ramp / sizeof deny_ramp[0]);
+}
+
 void feedback_hold_stop(void)
 {
     if (model_settings()->alert != ALERT_SILENT) hal_haptic_play(NULL, 0);
@@ -70,6 +77,13 @@ void feedback_denied(void)
 {
     static const uint16_t denied[] = {60, 90, 60};
     haptic(denied, 3);
+}
+
+/* Three ticks: an answer went out that neither grants nor denies. */
+void feedback_reply_sent(void)
+{
+    static const uint16_t reply[] = {35, 60, 35, 60, 35};
+    haptic(reply, 5);
 }
 
 void feedback_reject(void)

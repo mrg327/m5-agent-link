@@ -12,7 +12,7 @@
 #define TOAST_MS 1800
 
 const ui_actions_t *g_ui_actions;
-static lv_obj_t *s_home, *s_agent;
+static lv_obj_t *s_home, *s_agent, *s_ask;
 static nav_mode_t s_mode = MODE_HOME;
 static int s_rel_y;
 static bool s_link_up, s_animate = true;
@@ -66,6 +66,7 @@ void ui_init(const ui_actions_t *actions)
     g_ui_actions = actions;
     s_home = ui_home_init();
     s_agent = ui_agent_init(s_home);
+    s_ask = ui_ask_init(s_home);
     create_overlays();
     lv_screen_load(s_home);
     ui_home_refresh(0);
@@ -111,9 +112,11 @@ static void enter_mode(nav_mode_t m)
 {
     if (m == s_mode) return;
     if (s_mode == MODE_AGENT) ui_agent_close();
+    if (s_mode == MODE_ASK) ui_ask_close();
     s_mode = m;
     ui_home_set_card_shown(m == MODE_HOME);
     if (m == MODE_AGENT) ui_agent_open(ui_home_sel_sid(), s_now_ms);
+    else if (m == MODE_ASK) ui_ask_open(ui_home_sel_sid(), s_now_ms);
     else ui_home_refresh(s_now_ms); /* the ring shows sessions again */
     dbg_event("ui", "mode", "\"mode\":\"%s\"", nav_mode_name(m));
 }
@@ -125,6 +128,19 @@ void ui_show_session(uint32_t sid)
 {
     enter_mode(MODE_HOME);
     ui_home_select_sid(sid, "attention");
+}
+
+/* A permission or question opens ASK on its session (UI-V2 §2); done/error only update the card. */
+void ui_show_attention(uint32_t sid)
+{
+    ui_show_session(sid);
+    if (ui_home_sel_sid() == sid && ui_home_askable()) enter_mode(MODE_ASK);
+}
+
+uint32_t ui_pending_attention_sid(void)
+{
+    const attention_t *a = model_attention_first();
+    return a && !a->answer_sent && (a->kind == ATT_APPROVAL || a->kind == ATT_QUESTION) ? a->sid : 0;
 }
 
 void ui_report_add(ui_report_t *r, const char *fmt, ...)
@@ -142,6 +158,7 @@ void ui_report(ui_report_t *r)
     r->power = "active";
     if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", lv_label_get_text(s_toast_label));
     if (s_mode == MODE_AGENT) ui_agent_report(r);
+    else if (s_mode == MODE_ASK) ui_ask_report(r);
     else ui_home_report(r);
 }
 
@@ -180,9 +197,11 @@ void ui_tick(uint32_t now_ms)
         s_seen_rev = model_rev();
         ui_home_refresh(now_ms);
         if (s_mode == MODE_AGENT && !ui_agent_refresh(now_ms)) enter_mode(MODE_HOME);
+        if (s_mode == MODE_ASK && !ui_ask_refresh(now_ms)) enter_mode(MODE_HOME);
     }
     ui_home_tick(now_ms);
     if (s_mode == MODE_AGENT && ui_agent_tick(now_ms)) enter_mode(MODE_HOME);
+    if (s_mode == MODE_ASK && ui_ask_tick(now_ms)) enter_mode(MODE_HOME);
 }
 
 /* The interaction layer maps the gesture to an action; mode changes are handled here, everything
@@ -191,7 +210,7 @@ bool ui_on_gesture(const gesture_evt_t *g)
 {
     if (g->kind == G_RELEASE) s_rel_y = g->y;
     nav_zone_t zone = nav_centre(g->x, g->y) ? ZONE_CENTRE : ZONE_RIM;
-    nav_action_t a = nav_lookup(s_mode, g->kind, zone, ui_home_request_pending());
+    nav_action_t a = nav_lookup(s_mode, g->kind, zone, ui_home_request_pending(), ui_home_askable());
     if (a != NAV_NONE && g->kind != G_PRESS && g->kind != G_RELEASE)
         dbg_event("ui", "nav", "\"mode\":\"%s\",\"gesture\":\"%s\",\"action\":\"%s\"", nav_mode_name(s_mode),
                   gesture_name(g->kind), nav_action_name(a));
@@ -203,6 +222,15 @@ bool ui_on_gesture(const gesture_evt_t *g)
             return true;
         }
         enter_mode(MODE_AGENT);
+        g_ui_actions->tick();
+        return true;
+    case NAV_OPEN_ASK: /* shows the options; answering takes a further tap or hold */
+        ui_home_note_input();
+        if (!ui_home_askable()) {
+            g_ui_actions->reject();
+            return true;
+        }
+        enter_mode(MODE_ASK);
         g_ui_actions->tick();
         return true;
     case NAV_BACK:
@@ -218,6 +246,10 @@ bool ui_on_gesture(const gesture_evt_t *g)
     if (s_mode == MODE_AGENT) {
         ui_home_note_input();
         return ui_agent_act(a, g);
+    }
+    if (s_mode == MODE_ASK) {
+        ui_home_note_input();
+        return ui_ask_act(a, g);
     }
     return ui_home_act(a, g);
 }

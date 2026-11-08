@@ -1,0 +1,17 @@
+# Screenshot of a grant hold in progress (the arc fills in the item's colour); the hold is released early.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention 9 2 approval approve,deny,focus,reply 3 Run shell command|npm test -- --watch=false|Yes|Yes, don't ask again|No
+wait 400
+btn B
+wait 150
+press 233 233
+wait 800
+shot ask_hold_progress.png
+release
+wait 300
+expect_screen ask
+expect_label > Yes, don't ask again HOLD
+quit

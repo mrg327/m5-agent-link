@@ -10,7 +10,7 @@
 
 typedef enum {
     LINK_OP_FOCUS = 0, LINK_OP_ACK = 1, LINK_OP_SNOOZE = 2, LINK_OP_APPROVE = 3, LINK_OP_DENY = 4,
-    LINK_OP_NOTIFY_DONE = 8
+    LINK_OP_REPLY = 5, LINK_OP_NOTIFY_DONE = 8
 } link_op_t;
 #define LINK_OP_UNKNOWN (-1)
 
@@ -20,7 +20,7 @@ typedef struct {
     void (*on_attention)(const attention_t *att);
     void (*on_cleared)(uint32_t rid, int why);
     /* op is LINK_OP_UNKNOWN when the result does not match a command we sent. */
-    void (*on_result)(int op, uint32_t sid, bool ok, int err, const char *msg);
+    void (*on_result)(int op, uint32_t sid, uint32_t rid, bool ok, int err, const char *msg);
     void (*on_cfg)(void);
 } link_hooks_t;
 
@@ -41,3 +41,5 @@ hal_link_kind_t link_active_kind(void);
 
 /* Returns false unless welcomed. */
 bool link_send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms);
+/* Same, with a uint `arg` (snooze minutes, reply option index). */
+bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg);

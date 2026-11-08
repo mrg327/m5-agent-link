@@ -10,7 +10,7 @@
 #define LINK_MAX_PENDING 4
 #define LINK_N_KINDS 3 /* hal_link_kind_t values */
 
-typedef struct { uint32_t id; int op; uint32_t sid; } pending_cmd_t;
+typedef struct { uint32_t id; int op; uint32_t sid, rid; } pending_cmd_t;
 
 typedef struct {
     hal_link_kind_t kind; /* active transport; valid while welcomed */

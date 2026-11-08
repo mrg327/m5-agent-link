@@ -117,7 +117,7 @@ static void act_approve(uint32_t sid, uint32_t rid, uint32_t hold_ms)
 {
     bool sent = link_send_cmd(LINK_OP_APPROVE, sid, rid, hold_ms);
     if (sent) {
-        model_attention_mark_sent(rid);
+        model_attention_set_answer(rid, ATT_ANSWER_APPROVE, 0);
         feedback_approved();
     } else {
         feedback_reject();
@@ -129,12 +129,25 @@ static void act_deny(uint32_t sid, uint32_t rid)
 {
     bool sent = link_send_cmd(LINK_OP_DENY, sid, rid, 0);
     if (sent) {
-        model_attention_mark_sent(rid);
+        model_attention_set_answer(rid, ATT_ANSWER_DENY, 0);
         feedback_denied();
     } else {
         feedback_reject();
     }
     toast_cmd_result(sent, "Denied");
+}
+
+/* cmd_op_reply {rid, arg: option index}: a question's answer, or one of a permission's own choices. */
+static void act_reply(uint32_t sid, uint32_t rid, uint8_t opt)
+{
+    bool sent = link_send_cmd_arg(LINK_OP_REPLY, sid, rid, opt);
+    if (sent) {
+        model_attention_set_answer(rid, ATT_ANSWER_REPLY, opt);
+        feedback_reply_sent();
+    } else {
+        feedback_reject();
+    }
+    toast_cmd_result(sent, "Sent");
 }
 
 /* The daemon only answers ack; there is no stored state. So the device remembers it: the segment dims. */
@@ -147,7 +160,7 @@ static void act_ack(uint32_t sid)
 
 static void act_snooze(uint32_t sid)
 {
-    bool sent = link_send_cmd(LINK_OP_SNOOZE, sid, 0, 0); /* 30 min is the daemon's default */
+    bool sent = link_send_cmd_arg(LINK_OP_SNOOZE, sid, 0, 30); /* minutes, stated rather than defaulted */
     if (sent) feedback_tick();
     else feedback_reject();
     toast_cmd_result(sent, "Snoozed 30 min");
@@ -163,10 +176,21 @@ static void act_notify_done(uint32_t sid)
 
 static void act_nag(void) { feedback_attention(ATT_APPROVAL); }
 
-static const ui_actions_t s_actions = {act_focus,       act_approve,    act_deny,          act_ack,
-                                       act_snooze,      act_notify_done, feedback_tick,     feedback_detent,
-                                       feedback_hold_ramp, feedback_hold_stop, feedback_reject, act_nag,
-                                       app_set_sectors};
+static const ui_actions_t s_actions = {.focus = act_focus,
+                                       .approve = act_approve,
+                                       .deny = act_deny,
+                                       .reply = act_reply,
+                                       .ack = act_ack,
+                                       .snooze = act_snooze,
+                                       .notify_done = act_notify_done,
+                                       .tick = feedback_tick,
+                                       .detent = feedback_detent,
+                                       .hold_start = feedback_hold_ramp,
+                                       .deny_hold_start = feedback_deny_ramp,
+                                       .hold_stop = feedback_hold_stop,
+                                       .reject = feedback_reject,
+                                       .nag = act_nag,
+                                       .sectors = app_set_sectors};
 
 /* ── link → app ── */
 
@@ -177,22 +201,28 @@ static void on_attention(const attention_t *a)
     uint32_t rgb = a->kind == ATT_ERROR ? RGB_ERROR : a->kind == ATT_DONE ? RGB_DONE : a->kind == ATT_QUESTION ? RGB_ASK : RGB_PERMISSION;
     feedback_attention(a->kind);
     power_attention(rgb, app_now_ms());
-    if (!power_display_on()) return;
+    if (!power_display_on() || ui_glow_active()) return; /* a glow: the first touch reveals it */
     if (a->kind == ATT_DONE) return;
     /* Jump to the new request unless the user is already looking at an unanswered one. */
     ui_report_t r;
     ui_report(&r);
-    bool busy_elsewhere = r.has_sel_sid && r.sel_sid != a->sid && strcmp(r.screen, "attention") == 0;
-    if (!busy_elsewhere) ui_show_session(a->sid);
+    bool busy_elsewhere = r.has_sel_sid && r.sel_sid != a->sid &&
+                          (strcmp(r.screen, "attention") == 0 || strcmp(r.screen, "ask") == 0);
+    if (busy_elsewhere) return;
+    if (a->kind == ATT_ERROR) ui_show_session(a->sid);
+    else ui_show_attention(a->sid); /* a permission or question opens ASK (UI-V2 §2) */
 }
 
-static void on_result(int op, uint32_t sid, bool ok, int err, const char *msg)
+static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, const char *msg)
 {
     (void)sid;
     if (ok) {
         if (op == LINK_OP_FOCUS) ui_toast(LV_SYMBOL_OK " Focused", RGB_SUCCESS);
         return;
     }
+    /* The daemon refused an answer: the request is unanswered again, so ASK restores its options. */
+    if (rid && (op == LINK_OP_APPROVE || op == LINK_OP_DENY || op == LINK_OP_REPLY))
+        model_attention_set_answer(rid, ATT_ANSWER_NONE, 0);
     static const char *const errs[] = {"Out of date", "Denied", "Not supported", "No window", "Timed out", "Failed"};
     const char *text = err >= 0 && err < 6 ? errs[err] : msg[0] ? msg : "Failed";
     ui_toast(text, err == 3 ? RGB_AMBER : RGB_DANGER);
@@ -224,7 +254,12 @@ static void dispatch(const gesture_evt_t *g)
 {
     log_gesture(g);
     if (g->kind == G_LIFT) return;
-    if (power_activity(app_now_ms())) return; /* first touch only wakes the display */
+    bool glow = ui_glow_active();
+    if (power_activity(app_now_ms())) { /* first touch only wakes the display (a glow: reveals the request) */
+        uint32_t sid = glow ? ui_pending_attention_sid() : 0;
+        if (sid) ui_show_attention(sid);
+        return;
+    }
     ui_on_gesture(g);
 }
 

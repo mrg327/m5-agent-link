@@ -9,7 +9,7 @@
 #include "lvgl.h"
 
 typedef struct {
-    char screen[12];            /* "ring" | "attention" (selected session has a pending request) | "agent" | "off" */
+    char screen[12];            /* "ring" | "attention" (selected session has a pending request) | "agent" | "ask" | "off" */
     bool has_sel_sid;
     uint32_t sel_sid;
     bool has_rid;
@@ -25,12 +25,14 @@ typedef struct {
     void (*focus)(uint32_t sid);
     void (*approve)(uint32_t sid, uint32_t rid, uint32_t hold_ms);
     void (*deny)(uint32_t sid, uint32_t rid);
+    void (*reply)(uint32_t sid, uint32_t rid, uint8_t opt); /* ASK: answer a question / pick a grant option */
     void (*ack)(uint32_t sid);
     void (*snooze)(uint32_t sid);      /* AGENT: snooze this session for 30 min */
     void (*notify_done)(uint32_t sid); /* AGENT: buzz when this session finishes */
     void (*tick)(void);   /* light haptic tick: selection by tap or button */
     void (*detent)(void); /* rim-scrub segment crossed */
-    void (*hold_start)(void); /* approve hold passed the grace period: start the haptic ramp */
+    void (*hold_start)(void); /* approve hold passed the grace period: start the rising haptic ramp */
+    void (*deny_hold_start)(void); /* deny hold: the falling ramp */
     void (*hold_stop)(void);
     void (*reject)(void); /* nothing to do: buzz */
     void (*nag)(void);    /* unanswered permission request: remind */
@@ -48,6 +50,10 @@ void ui_set_link_state(bool connected); /* handshake done (welcomed) */
 void ui_set_link_transport(int kind);
 /* Moves the selection to a session (attention wake); counts as user attention. */
 void ui_show_session(uint32_t sid);
+/* A request arrived (or a glow was touched): select its session and open ASK on it. */
+void ui_show_attention(uint32_t sid);
+/* The first unanswered request, if any, else 0. */
+uint32_t ui_pending_attention_sid(void);
 void ui_toast(const char *text, uint32_t rgb);
 /* Brief dim ring for alerts while the display is otherwise idle; text-free by design. */
 void ui_glow(uint32_t rgb);

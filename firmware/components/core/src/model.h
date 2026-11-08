@@ -41,9 +41,13 @@ typedef struct {
     char opts[4][25];
     uint8_t n_opts;
     uint8_t acts; /* bitmask of 1 << att_action_t */
+    uint8_t grant_mask; /* bit i set: opts[i] grants permission (approve-class, hold to commit) */
     uint32_t exp; /* unix, 0 = none */
-    bool answer_sent; /* approve/deny already sent; waiting for clear */
+    bool answer_sent; /* an answer (approve/deny/reply) is out; waiting for clear */
+    uint8_t answer;   /* what was sent: ATT_ANSWER_* */
+    uint8_t answer_opt; /* option index for ATT_ANSWER_REPLY */
 } attention_t;
+enum { ATT_ANSWER_NONE = 0, ATT_ANSWER_APPROVE, ATT_ANSWER_DENY, ATT_ANSWER_REPLY };
 
 typedef struct { uint32_t waiting, error, running, done_unseen; } model_counts_t;
 
@@ -75,7 +79,9 @@ bool model_attention_clear(uint32_t rid);
 const attention_t *model_attention_for_sid(uint32_t sid);
 const attention_t *model_attention_find(uint32_t rid);
 const attention_t *model_attention_first(void);
-void model_attention_mark_sent(uint32_t rid);
+/* Records the answer that went out (ATT_ANSWER_*); ATT_ANSWER_NONE restores the unanswered state
+ * (the daemon rejected the command). */
+void model_attention_set_answer(uint32_t rid, uint8_t answer, uint8_t opt);
 void model_attention_expire(uint32_t now_unix);
 
 settings_t *model_settings(void);

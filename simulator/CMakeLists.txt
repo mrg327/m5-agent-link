@@ -95,6 +95,23 @@ set_tests_properties(sim_deck_ambient PROPERTIES TIMEOUT 60)
 # UI-V2 Phase 2: the AGENT wheel.
 sim_script_test(sim_actions_wheel actions_wheel.txt)
 sim_script_test(sim_agent_timeout agent_timeout.txt)
+# UI-V2 Phase 3: ASK. Question options reply by tap; grants and Deny are holds; a tap never approves;
+# a rejected answer restores the options; a hold is bound to its request id.
+sim_script_test(sim_ask_reply ask_reply.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4"
+                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":8,\"hold_ms\":0,\"arg\":1")
+sim_script_test(sim_ask_grant_hold ask_grant_hold.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4"
+                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":9,\"hold_ms\":0,\"arg\":1")
+sim_script_test(sim_ask_grant_hold_progress ask_grant_hold_progress.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"tx_cmd\"")
+sim_script_test(sim_ask_deny_hold ask_deny_hold.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":5"
+                PASS_REGULAR_EXPRESSION "\"op\":4,\"sid\":2,\"rid\":7")
+sim_script_test(sim_ask_tap_never_approves ask_tap_never_approves.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"op\":5"
+                PASS_REGULAR_EXPRESSION "\"op\":0,\"sid\":2")
+sim_script_test(sim_ask_result_error ask_result_error.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_ask_hold_bound_to_rid ask_hold_bound_to_rid.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"tx_cmd\"")
 
 # Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
 add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c

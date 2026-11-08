@@ -1,6 +1,6 @@
 /* The HOME deck (docs/design/UI-V2.md §4.1): one session card in the centre, a thin pinned index ring
- * at the rim. Gestures and buttons are mapped in ui_home_gesture(). Until Phase 2 (the per-agent
- * wheel) a tap on the centre is still the default action. */
+ * at the rim. The interaction layer (nav.c) maps gestures to actions; ui_home_act() runs them. Nothing
+ * on the deck is destructive: a request shows its text here and is answered on the ASK screen. */
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -51,10 +51,6 @@ static bool s_scrubbing, s_freeze_expand;
 static uint32_t s_now, s_last_input, s_last_elapsed;
 static bool s_ambient;
 
-static bool s_holding, s_hold_fired, s_ramp_started;
-static uint32_t s_hold_t0, s_hold_rid;
-static uint32_t s_card_rid, s_card_t0; /* request on screen, and since when */
-
 static uint32_t s_nag_rid, s_nag_next;
 static int s_nag_n;
 
@@ -69,11 +65,19 @@ static const session_t *sel_session(void)
     return s_has_sel ? model_find(s_sel_sid) : NULL;
 }
 
-static const attention_t *approvable(const session_t *s)
+/* An unanswered permission or question for the session: what ASK would show. */
+static const attention_t *askable(const session_t *s)
 {
     if (!s || s->state != SESS_INPUT) return NULL;
     const attention_t *a = model_attention_for_sid(s->sid);
-    return a && a->kind == ATT_APPROVAL && (a->acts & (1u << ACT_APPROVE)) && !a->answer_sent ? a : NULL;
+    return a && (a->kind == ATT_APPROVAL || a->kind == ATT_QUESTION) && !a->answer_sent ? a : NULL;
+}
+
+/* The subset that can be approved, and so denied: the only state in which the deny swipe exists. */
+static const attention_t *approvable(const session_t *s)
+{
+    const attention_t *a = askable(s);
+    return a && a->kind == ATT_APPROVAL && (a->acts & (1u << ACT_APPROVE)) ? a : NULL;
 }
 
 static ring_kind_t kind_of(const session_t *s)
@@ -317,7 +321,6 @@ static void update_centre(void)
         set_txt(s_elapsed, s_elapsed_txt, sizeof s_elapsed_txt, "");
         lv_obj_add_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
-        s_card_rid = 0;
         lv_obj_add_flag(s_pill, LV_OBJ_FLAG_HIDDEN);
         lv_label_set_text(s_hint, "");
         set_badges(false, false, 0);
@@ -343,17 +346,13 @@ static void update_centre(void)
     lv_obj_set_style_text_color(s_state, lv_color_hex(rgb), 0);
     update_elapsed(s);
 
-    const attention_t *req = approvable(s);
-    bool perm = req != NULL;
-    if (perm) {
-        /* Show what is being approved in place of the summary and the time. Fall back to the tool
+    const attention_t *req = askable(s);
+    bool ask = req != NULL, perm = approvable(s) != NULL;
+    if (ask) {
+        /* Show what is being asked in place of the summary and the time. Fall back to the tool
          * name when the daemon sent no title (privacy: meta). */
-        if (req->rid != s_card_rid) {
-            s_card_rid = req->rid;
-            s_card_t0 = s_now;
-        }
         set_txt(s_req_title, s_req_title_txt, sizeof s_req_title_txt,
-                req->title[0] ? req->title : s->tool[0] ? s->tool : "Permission request");
+                req->title[0] ? req->title : s->tool[0] ? s->tool : req->kind == ATT_APPROVAL ? "Permission request" : "Question");
         set_txt(s_req_text, s_req_text_txt, sizeof s_req_text_txt, req->text);
         set_txt(s_summary, s_summary_txt, sizeof s_summary_txt, "");
         lv_obj_add_flag(s_elapsed, LV_OBJ_FLAG_HIDDEN);
@@ -361,20 +360,20 @@ static void update_centre(void)
         if (req->text[0]) lv_obj_remove_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
         else lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
     } else {
-        s_card_rid = 0;
         set_txt(s_summary, s_summary_txt, sizeof s_summary_txt, sl->n_merged ? "" : s->summary);
         lv_obj_remove_flag(s_elapsed, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
     }
-    const char *pill = perm ? "HOLD " LV_SYMBOL_OK " APPROVE" : s->state == SESS_DONE ? "FOCUS + ACK" : "FOCUS";
+    /* The pill names the centre tap: on a request it opens the options (answering needs a hold there). */
+    const char *pill = ask ? "TAP " LV_SYMBOL_RIGHT " ANSWER" : s->state == SESS_DONE ? "FOCUS + ACK" : "FOCUS";
     set_txt(s_pill_lbl, s_pill_txt, sizeof s_pill_txt, pill);
     lv_color_t pill_col = offline() ? COL_MUTED : lv_color_hex(rgb);
     lv_obj_set_style_text_color(s_pill_lbl, pill_col, 0);
     lv_obj_set_style_bg_color(s_pill, pill_col, 0);
     lv_obj_remove_flag(s_pill, LV_OBJ_FLAG_HIDDEN);
     lv_obj_align(s_pill, LV_ALIGN_TOP_MID, 0, UI_ACTION_Y);
-    lv_label_set_text(s_hint, perm ? "long swipe down to deny" : "");
+    lv_label_set_text(s_hint, perm && (req->acts & (1u << ACT_DENY)) ? "long swipe down to deny" : "");
     set_badges(true, s_n > 1, rgb);
 }
 
@@ -419,17 +418,9 @@ static void step_selection(int dir, const char *via)
     select_idx((s_sel + dir + s_n) % s_n, via, g_ui_actions->tick);
 }
 
-static void hold_cancel(void)
-{
-    if (!s_holding) return;
-    s_holding = false;
-    if (s_ramp_started) g_ui_actions->hold_stop();
-    s_ramp_started = false;
-    ring_set_progress(s_ring, 0, 0xffffff);
-}
-
-/* Accessors for the mode plumbing in ui.c and the AGENT screen. */
+/* Accessors for the mode plumbing in ui.c and the AGENT/ASK screens. */
 bool ui_home_request_pending(void) { return approvable(sel_session()) != NULL; }
+bool ui_home_askable(void) { return askable(sel_session()) != NULL; }
 uint32_t ui_home_sel_sid(void) { return sel_session() ? s_sel_sid : 0; }
 lv_obj_t *ui_home_ring(void) { return s_ring; }
 void ui_home_note_input(void) { noted_input(); }
@@ -439,28 +430,14 @@ void ui_home_set_card_shown(bool shown)
     else lv_obj_add_flag(s_centre, LV_OBJ_FLAG_HIDDEN);
 }
 
-/* Acts on what the interaction layer decided (nav.c). The approve hold is the one safety-critical
- * path: it starts only via NAV_HOLD_PRESS on an armed request (nav_hold_may_start) and is bound to
- * that request id until it fires or the finger lifts. */
+/* Acts on what the interaction layer decided (nav.c). No hold exists on the deck: approving means
+ * opening ASK (NAV_OPEN_ASK, handled in ui.c) and holding there. The strict deny swipe is the one
+ * answer the deck can give. */
 bool ui_home_act(nav_action_t a, const gesture_evt_t *g)
 {
     if (g->kind != G_LIFT && g->kind != G_SHAKE) noted_input();
     const session_t *s = sel_session();
     switch (a) {
-    case NAV_HOLD_PRESS: {
-        s_hold_fired = false;
-        const attention_t *req = approvable(s);
-        if (req && nav_hold_may_start(s_card_rid, s_card_t0, req->rid, s_now)) {
-            s_holding = true;
-            s_ramp_started = false;
-            s_hold_t0 = s_now;
-            s_hold_rid = req->rid;
-        }
-        return true;
-    }
-    case NAV_HOLD_RELEASE:
-        hold_cancel();
-        return true;
     case NAV_FOCUS:
         act_focus_selected();
         return true;
@@ -469,22 +446,11 @@ bool ui_home_act(nav_action_t a, const gesture_evt_t *g)
         if (i >= 0) select_idx(i, "tap", g_ui_actions->tick);
         return true;
     }
-    case NAV_HOLD_LONG: { /* an injected long press that already covers the hold time approves directly */
-        if (s_hold_fired || !s) return false;
-        const attention_t *req = approvable(s);
-        if (req && g->dur_ms >= NAV_HOLD_MS && nav_hold_may_start(s_card_rid, s_card_t0, req->rid, s_now)) {
-            hold_cancel();
-            s_hold_fired = true;
-            g_ui_actions->approve(s->sid, req->rid, g->dur_ms);
-        }
-        return true;
-    }
     case NAV_DENY: {
         const attention_t *req = approvable(s);
         if (!req || !(req->acts & (1u << ACT_DENY))) return false;
         /* g->y is where the swipe started; the release recorded where it ended. */
         if (!nav_long_swipe_down(g->y, ui_last_release_y())) return true; /* too short: ignore, but consume */
-        hold_cancel();
         g_ui_actions->deny(s->sid, req->rid);
         return true;
     }
@@ -533,30 +499,6 @@ void ui_home_tick(uint32_t now)
     if (!s_last_input) s_last_input = now;
     if (ui_animations_allowed()) ring_tick(s_ring, now);
 
-    if (s_holding && !s_hold_fired) {
-        const session_t *s = sel_session();
-        const attention_t *a = approvable(s);
-        if (!a || a->rid != s_hold_rid) {
-            hold_cancel();
-        } else {
-            uint32_t el = now - s_hold_t0;
-            if (el >= NAV_HOLD_SHOW_MS) {
-                if (!s_ramp_started) {
-                    s_ramp_started = true;
-                    g_ui_actions->hold_start();
-                }
-                ring_set_progress(s_ring, (int)(el * 1000 / NAV_HOLD_MS), theme_session_rgb(s)); /* the item's colour */
-            }
-            if (el >= NAV_HOLD_MS) {
-                s_hold_fired = true;
-                s_holding = false;
-                s_ramp_started = false;
-                ring_set_progress(s_ring, 0, theme_session_rgb(s));
-                g_ui_actions->approve(s->sid, a->rid, el);
-            }
-        }
-    }
-
     /* Unanswered permission requests nag a few times, until the user touches anything. */
     const attention_t *first = model_attention_first();
     if (first && first->kind == ATT_APPROVAL && !first->answer_sent) {
@@ -571,7 +513,7 @@ void ui_home_tick(uint32_t now)
         }
     }
 
-    bool amb = now - s_last_input > AMBIENT_MS && !needs_you() && !s_holding;
+    bool amb = now - s_last_input > AMBIENT_MS && !needs_you();
     if (amb != s_ambient) {
         s_ambient = amb;
         ring_set_ambient(s_ring, amb);

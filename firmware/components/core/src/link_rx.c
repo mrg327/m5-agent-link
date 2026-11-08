@@ -110,6 +110,7 @@ static void on_attention(const struct attention *in)
     for (size_t i = 0; i < in->attention_action_m_l_action_m_count; i++)
         a.acts |= (uint8_t)(1u << in->attention_action_m_l_action_m[i].action_choice);
     if (in->attention_uint7uint_present) a.exp = in->attention_uint7uint.attention_uint7uint;
+    if (in->attention_uint8uint_present) a.grant_mask = (uint8_t)in->attention_uint8uint.attention_uint8uint;
     model_attention_add(&a);
     if (g_link.hooks.on_attention) g_link.hooks.on_attention(model_attention_find(a.rid));
 }
@@ -118,12 +119,13 @@ static void on_result(const struct msg_result *m, uint32_t re_id, bool has_re)
 {
     const struct result *r = &m->msg_result_result_m;
     int op = LINK_OP_UNKNOWN;
-    uint32_t sid = 0;
+    uint32_t sid = 0, rid = 0;
     if (has_re) {
         pending_cmd_t *p = &g_link.pending[re_id % LINK_MAX_PENDING];
         if (p->id == re_id) {
             op = p->op;
             sid = p->sid;
+            rid = p->rid;
             p->id = 0;
         }
     }
@@ -132,7 +134,7 @@ static void on_result(const struct msg_result *m, uint32_t re_id, bool has_re)
     if (r->result_uint2tstr_present) STR(r->result_uint2tstr.result_uint2tstr, msg);
     dbg_event("link", "result", "\"ok\":%s,\"err\":%d,\"op\":%d,\"msg\":%s", r->result_uint0bool ? "true" : "false",
               err, op, dbg_q(msg));
-    if (g_link.hooks.on_result) g_link.hooks.on_result(op, sid, r->result_uint0bool, err, msg);
+    if (g_link.hooks.on_result) g_link.hooks.on_result(op, sid, rid, r->result_uint0bool, err, msg);
 }
 
 void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)

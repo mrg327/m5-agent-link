@@ -8,18 +8,21 @@
 #include "gesture.h"
 #include "model.h"
 
-typedef enum { MODE_HOME, MODE_AGENT, MODE_COUNT } nav_mode_t;
+typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_COUNT } nav_mode_t;
 
 /* Where a touch gesture happened, by its press (or swipe start) point. */
 typedef enum { ZONE_ANY, ZONE_CENTRE, ZONE_RIM } nav_zone_t;
 
-/* Condition on the selected session: does it have an unanswered approvable request on screen? */
-typedef enum { WHEN_ALWAYS, WHEN_REQUEST, WHEN_NO_REQUEST } nav_when_t;
+/* Condition on the selected session. REQUEST: an unanswered *approvable* permission (approve in
+ * acts) is on screen, the only state in which deny exists. ASKABLE: any unanswered permission or
+ * question, i.e. there is something ASK can show. REQUEST implies ASKABLE. */
+typedef enum { WHEN_ALWAYS, WHEN_REQUEST, WHEN_NO_REQUEST, WHEN_ASKABLE, WHEN_NOT_ASKABLE } nav_when_t;
 
 typedef enum {
     NAV_NONE,
     NAV_FOCUS,          /* default action: focus the terminal (Done also acknowledges) */
     NAV_OPEN_AGENT,     /* HOME → AGENT for the selected session */
+    NAV_OPEN_ASK,       /* HOME → ASK: the pending request with its options; opening never answers */
     NAV_BACK,           /* leave the current mode for HOME; from a swipe it must be a long one */
     NAV_HOME,           /* A+B chord: straight back to HOME */
     NAV_NEXT,           /* next session (HOME) or next item (AGENT) */
@@ -47,13 +50,14 @@ typedef struct {
 extern const nav_binding_t nav_bindings[];
 extern const int nav_n_bindings;
 
-nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool request_pending);
+nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool request_pending, bool askable);
 const char *nav_mode_name(nav_mode_t m);
 const char *nav_action_name(nav_action_t a);
 
 /* ── safety rules (UI-V2 §1): structural, so every skin keeps them ── */
 #define NAV_CENTRE_R 150     /* a touch inside this radius is a centre touch; outside it is the rim */
 #define NAV_HOLD_MS 1200     /* hold-to-approve duration; the daemon's floor is 1000 ms */
+#define NAV_DENY_HOLD_MS 800 /* hold-to-deny: shorter, since a deny only sends the agent back to the prompt */
 #define NAV_HOLD_SHOW_MS 250 /* the arc and the haptic ramp only start after this, so a tap never flashes them */
 #define NAV_CARD_ARM_MS 300  /* a hold only starts once the request has been on screen this long */
 #define NAV_LONG_SWIPE_PX 120 /* deny, and back-from-AGENT: a deliberate swipe, at least this long */
@@ -76,3 +80,20 @@ typedef struct {
 } agent_item_t;
 
 int nav_agent_items(sess_state_t state, agent_item_t *out, int cap);
+
+/* ── ASK: the answer options of a request, in wheel order, default first (UI-V2 §4.3, §7) ──
+ * Options come from attention.opts verbatim; a bare permission synthesises Approve / Deny; "Open on
+ * PC" is always last. Anything that grants permission (grant_mask bit, or Approve) commits only by
+ * the NAV_HOLD_MS hold; a deny-class option by the NAV_DENY_HOLD_MS hold (or the strict swipe); a
+ * question option by a tap. */
+typedef enum { ASK_OPT, ASK_APPROVE, ASK_DENY, ASK_OPEN_PC } ask_action_t;
+
+typedef struct {
+    ask_action_t id;
+    int opt;          /* ASK_OPT: index into attention.opts (the cmd_op_reply argument) */
+    uint32_t hold_ms; /* 0: commits by tap or button A; else only by a hold of this length */
+    bool grants;      /* approve-class: hold arc and haptic ramp use the approve pattern */
+} ask_item_t;
+
+#define ASK_MAX_ITEMS 7 /* 4 options + Approve + Deny + Open on PC never all coexist, but keep room */
+int nav_ask_items(const attention_t *a, ask_item_t *out, int cap);

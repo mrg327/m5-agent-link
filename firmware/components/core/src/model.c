@@ -247,11 +247,13 @@ const attention_t *model_attention_first(void)
     return NULL;
 }
 
-void model_attention_mark_sent(uint32_t rid)
+void model_attention_set_answer(uint32_t rid, uint8_t answer, uint8_t opt)
 {
     for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
         if (s_att_used[i] && s_att[i].rid == rid) {
-            s_att[i].answer_sent = true;
+            s_att[i].answer_sent = answer != ATT_ANSWER_NONE;
+            s_att[i].answer = answer;
+            s_att[i].answer_opt = opt;
             s_rev++;
         }
     }
