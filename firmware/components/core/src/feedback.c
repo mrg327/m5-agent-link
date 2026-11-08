@@ -92,6 +92,14 @@ void feedback_reject(void)
     haptic(no, 5);
 }
 
+/* SCROLL hit an end of the scrollback: one thud, firmer than a detent, shorter than a tick pair. */
+void feedback_scroll_stop(void)
+{
+    static const uint16_t stop[] = {40};
+    if (model_settings()->alert == ALERT_SILENT) return;
+    haptic(stop, 1);
+}
+
 void feedback_hello(void)
 {
     static const uint16_t hello[] = {60};

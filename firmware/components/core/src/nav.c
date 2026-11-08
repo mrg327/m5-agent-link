@@ -52,6 +52,16 @@ const nav_binding_t nav_bindings[] = {
     {MODE_ASK, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_NEXT},
     {MODE_ASK, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_ASK, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
+    /* SCROLL: the centre's vertical motion drives the terminal (UI-V2 §4.4). The rim is unused, so
+     * nothing here is a scrub, and swipe down means a page, never deny or back. */
+    {MODE_SCROLL, G_DRAG, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_DRAG},
+    {MODE_SCROLL, G_SWIPE_UP, ZONE_CENTRE, WHEN_ALWAYS, NAV_PAGE_OLDER},   /* only a flick counts */
+    {MODE_SCROLL, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_ALWAYS, NAV_PAGE_NEWER}, /* only a flick counts */
+    {MODE_SCROLL, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* leaves the terminal where it is */
+    {MODE_SCROLL, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_TO_BOTTOM},
+    {MODE_SCROLL, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_PAGE_NEWER},
+    {MODE_SCROLL, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
+    {MODE_SCROLL, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
 };
 const int nav_n_bindings = (int)(sizeof nav_bindings / sizeof nav_bindings[0]);
 
@@ -73,7 +83,7 @@ nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool
 
 const char *nav_mode_name(nav_mode_t m)
 {
-    static const char *const names[MODE_COUNT] = {"home", "agent", "ask"};
+    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll"};
     return (unsigned)m < MODE_COUNT ? names[m] : "?";
 }
 
@@ -81,7 +91,8 @@ const char *nav_action_name(nav_action_t a)
 {
     static const char *const names[NAV_COUNT] = {
         "none", "focus", "open_agent", "open_ask", "back", "home", "next", "prev", "next_attention", "pick_rim",
-        "scrub", "commit", "deny", "hold_press", "hold_release", "hold_long"};
+        "scrub", "commit", "deny", "hold_press", "hold_release", "hold_long", "scroll_drag", "page_older",
+        "page_newer", "to_bottom"};
     return (unsigned)a < NAV_COUNT ? names[a] : "?";
 }
 
@@ -101,7 +112,12 @@ bool nav_long_swipe_down(int y_start, int y_end)
     return y_start < GESTURE_CY && y_end - y_start >= NAV_LONG_SWIPE_PX;
 }
 
-int nav_agent_items(sess_state_t state, agent_item_t *out, int cap)
+int nav_scroll_lines(int dy_px)
+{
+    return dy_px / GESTURE_DRAG_STEP_PX * NAV_SCROLL_LINES_PER_STEP;
+}
+
+int nav_agent_items(sess_state_t state, bool scroll_ok, agent_item_t *out, int cap)
 {
     static const agent_item_t work[] = {{AG_FOCUS, false}, {AG_SCROLL, false}, {AG_SNOOZE, false}, {AG_NOTIFY, false}, {AG_WATCH, false}};
     static const agent_item_t done[] = {{AG_FOCUS_ACK, false}, {AG_ACK, false}, {AG_SCROLL, false}, {AG_WATCH, false}};
@@ -117,9 +133,12 @@ int nav_agent_items(sess_state_t state, agent_item_t *out, int cap)
     case SESS_INPUT: src = input; n = 3; break;
     default: src = work; n = 5; break;
     }
-    if (n > cap) n = cap;
-    for (int i = 0; i < n; i++) out[i] = src[i];
-    return n;
+    int k = 0;
+    for (int i = 0; i < n && k < cap; i++) {
+        if (src[i].id == AG_SCROLL && !scroll_ok) continue;
+        out[k++] = src[i];
+    }
+    return k;
 }
 
 int nav_ask_items(const attention_t *a, ask_item_t *out, int cap)

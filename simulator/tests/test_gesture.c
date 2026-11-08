@@ -73,7 +73,8 @@ int main(void)
     gesture_touch(&g, true, 233, 190, 50);
     gesture_touch(&g, true, 233, 240, 100);
     gesture_touch(&g, false, 233, 240, 120);
-    EXPECT(n_seen == 1 && seen[0].kind == G_SWIPE_DOWN, "swipe down on the centre");
+    EXPECT(count(G_SWIPE_DOWN) == 1 && count(G_TAP) == 0 && seen[n_seen - 1].kind == G_SWIPE_DOWN,
+           "swipe down on the centre (after its drag steps)");
 
     reset(&g, 0);
     gesture_touch(&g, true, 300, 233, 0);
@@ -152,6 +153,49 @@ int main(void)
     gesture_set_sectors(&g, 4); /* a Done group expanded or merged mid-scrub */
     sweep(&g, 40, 130, 200, t);
     EXPECT(seen[n_seen - 1].x == 1 && count(G_SCRUB) == 1, "changing the sector count mid-scrub re-syncs without a jump");
+
+    /* ── drag stream and flick (SCROLL) ── */
+    reset(&g, 0);
+    gesture_touch(&g, true, 233, 260, 0);
+    for (int i = 1; i <= 12; i++) gesture_touch(&g, true, 233, 260 - i * 8, (uint32_t)(i * 50)); /* 96 px up over 600 ms */
+    EXPECT(count(G_DRAG) == 4, "a slow drag emits one G_DRAG per 24 px");
+    EXPECT(seen[0].kind == G_DRAG && seen[0].dy == -24 && seen[0].x == 233 && seen[0].y == 260,
+           "G_DRAG carries the step as dy (up < 0) and the press point as x,y");
+    gesture_touch(&g, false, 233, 164, 650);
+    EXPECT(n_seen == 4 && count(G_TAP) == 0 && count(G_SWIPE_UP) == 0, "a slow drag ends without a tap or a swipe");
+
+    reset(&g, 0);
+    gesture_touch(&g, true, 233, 200, 0);
+    gesture_touch(&g, true, 233, 250, 30); /* 50 px at once: two whole steps, the 2 px remainder carries */
+    EXPECT(count(G_DRAG) == 1 && seen[0].dy == 48, "a jump of 50 px is one G_DRAG of two steps");
+    gesture_touch(&g, true, 233, 300, 60);
+    EXPECT(count(G_DRAG) == 2 && seen[1].dy == 48, "the carried remainder plus 50 px is again 48 px");
+    gesture_touch(&g, true, 233, 320, 90);
+    EXPECT(count(G_DRAG) == 3 && seen[2].dy == 24, "the remainders add up to one more step");
+
+    reset(&g, 0);
+    gesture_touch(&g, true, 233, 300, 0);
+    for (int i = 1; i <= 6; i++) gesture_touch(&g, true, 233, 300 - i * 25, (uint32_t)(i * 20)); /* 150 px in 120 ms */
+    gesture_touch(&g, false, 233, 150, 125);
+    EXPECT(count(G_DRAG) == 6 && count(G_SWIPE_UP) == 1, "a fast swipe streams drag steps and then swipes");
+    EXPECT(seen[n_seen - 1].kind == G_SWIPE_UP && seen[n_seen - 1].flick && seen[n_seen - 1].dy == -150,
+           "the swipe is a flick and carries its travel");
+
+    reset(&g, 0);
+    gesture_touch(&g, true, 233, 300, 0);
+    for (int i = 1; i <= 8; i++) gesture_touch(&g, true, 233, 300 - i * 10, (uint32_t)(i * 45)); /* 80 px in 360 ms */
+    gesture_touch(&g, false, 233, 220, 365);
+    EXPECT(count(G_SWIPE_UP) == 1 && !seen[n_seen - 1].flick, "a slow swipe is a swipe without the flick flag");
+
+    reset(&g, 8);
+    t = sweep(&g, 10, 80, 200, 0); /* a scrub on the rim: never a drag */
+    gesture_touch(&g, false, 0, 0, t);
+    EXPECT(count(G_DRAG) == 0, "a rim scrub emits no drag steps");
+    reset(&g, 0);
+    gesture_touch(&g, true, 233, 233 - 200, 0);
+    gesture_touch(&g, true, 233, 233 - 150, 20);
+    gesture_touch(&g, true, 233, 233 - 100, 40);
+    EXPECT(count(G_DRAG) == 0, "a press that started on the rim is not a drag stream");
 
     /* ── buttons ── */
     reset(&g, 0);

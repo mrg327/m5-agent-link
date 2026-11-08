@@ -22,6 +22,7 @@
 #define SEL_TRACK_W 4
 #define IDLE_W 4
 #define GLOW_W 14     /* ring_set_solid: the display-off alert glow is wider than the index band */
+#define TRACK_RING_W 6 /* ring_set_track: the grey track and the position arc share this width */
 #define PROG_OUT 212  /* hold-to-confirm fill, just inside the band */
 #define PROG_W 8
 #define INV_R_IN 190 /* every invalidated chunk covers this radius band */
@@ -49,6 +50,9 @@ typedef struct {
     int n;
     bool ambient, still, solid; /* still: show the settled look, no motion */
     lv_color_t solid_color;
+    bool track; /* SCROLL position track instead of segments */
+    int track_permille;
+    uint32_t track_rgb;
     int prog;
     uint32_t prog_rgb;
     uint32_t last_tick;
@@ -270,6 +274,12 @@ static void on_draw(lv_event_t *e)
         arc(l, BAND_OUT, GLOW_W, 0, 360, d->solid_color);
         return;
     }
+    if (d->track) {
+        arc(l, BAND_OUT, TRACK_RING_W, 0, 360, mix(0x8b949e, 45)); /* muted grey: visible against the bezel */
+        int span = d->track_permille * 360 / 1000;
+        if (span > 0) arc(l, BAND_OUT, TRACK_RING_W, 0, span < 360 ? span : 360, lv_color_hex(d->track_rgb));
+        return;
+    }
     if (d->n == 0) {
         arc(l, BAND_OUT, 3, 0, 360, mix(0x30363d, d->ambient ? 40 : 100));
     }
@@ -298,8 +308,8 @@ void ring_set(lv_obj_t *ring, const ring_seg_t *segs, int n, uint32_t now_ms)
 {
     ring_data_t *d = lv_obj_get_user_data(ring);
     if (n > RING_MAX_SEGMENTS) n = RING_MAX_SEGMENTS;
-    bool restore = d->solid;
-    d->solid = false;
+    bool restore = d->solid || d->track;
+    d->solid = d->track = false;
     if (restore || n != d->n) {
         for (int i = 0; i < n; i++) {
             bool keep = i < d->n && d->seg[i].s.id == segs[i].id && d->seg[i].s.kind == segs[i].kind;
@@ -336,6 +346,21 @@ void ring_set_solid(lv_obj_t *ring, lv_color_t color)
     d->solid = true;
     d->solid_color = color;
     inval_all(ring);
+}
+
+void ring_set_track(lv_obj_t *ring, int permille, uint32_t rgb)
+{
+    ring_data_t *d = lv_obj_get_user_data(ring);
+    permille = permille < 0 ? 0 : permille > 1000 ? 1000 : permille / 8 * 8; /* ~3° steps */
+    if (d->track && d->track_permille == permille && d->track_rgb == rgb) return;
+    int lo = d->track ? (d->track_permille < permille ? d->track_permille : permille) : 0;
+    int hi = d->track ? (d->track_permille < permille ? permille : d->track_permille) : 1000;
+    if (d->track && rgb != d->track_rgb) lo = 0, hi = 1000;
+    d->track = true;
+    d->solid = false;
+    d->track_permille = permille;
+    d->track_rgb = rgb;
+    inval_arc(ring, lo * 360 / 1000 - 1, hi * 360 / 1000 + 2);
 }
 
 void ring_set_progress(lv_obj_t *ring, int permille, uint32_t rgb)
@@ -381,7 +406,7 @@ void ring_set_ambient(lv_obj_t *ring, bool ambient)
 void ring_tick(lv_obj_t *ring, uint32_t now_ms)
 {
     ring_data_t *d = lv_obj_get_user_data(ring);
-    if (d->solid || d->ambient || d->still || d->n == 0) return;
+    if (d->solid || d->track || d->ambient || d->still || d->n == 0) return;
     if (d->have_tick && now_ms - d->last_tick < TICK_MS) return;
     d->have_tick = true;
     d->last_tick = now_ms;

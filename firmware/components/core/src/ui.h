@@ -7,9 +7,10 @@
 
 #include "gesture.h"
 #include "lvgl.h"
+#include "nav.h"
 
 typedef struct {
-    char screen[12];            /* "ring" | "attention" (selected session has a pending request) | "agent" | "ask" | "off" */
+    char screen[12];            /* "ring" | "attention" (selected session has a pending request) | "agent" | "ask" | "scroll" | "off" */
     bool has_sel_sid;
     uint32_t sel_sid;
     bool has_rid;
@@ -29,6 +30,9 @@ typedef struct {
     void (*ack)(uint32_t sid);
     void (*snooze)(uint32_t sid);      /* AGENT: snooze this session for 30 min */
     void (*notify_done)(uint32_t sid); /* AGENT: buzz when this session finishes */
+    void (*scroll_open)(uint32_t sid); /* entering SCROLL: bring the terminal to the front, quietly */
+    void (*scroll)(uint32_t sid, nav_scroll_unit_t unit, int delta); /* SCROLL: one coalesced cmd_op_scroll */
+    void (*scroll_stop)(void); /* SCROLL reached the bottom or the top */
     void (*tick)(void);   /* light haptic tick: selection by tap or button */
     void (*detent)(void); /* rim-scrub segment crossed */
     void (*hold_start)(void); /* approve hold passed the grace period: start the rising haptic ramp */
@@ -55,6 +59,8 @@ void ui_show_attention(uint32_t sid);
 /* The first unanswered request, if any, else 0. */
 uint32_t ui_pending_attention_sid(void);
 void ui_toast(const char *text, uint32_t rgb);
+/* A scroll result arrived (sid 0 = unknown): SCROLL updates its counter, track and preview. */
+void ui_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total, uint32_t total, const char *preview);
 /* Brief dim ring for alerts while the display is otherwise idle; text-free by design. */
 void ui_glow(uint32_t rgb);
 void ui_glow_hide(void);

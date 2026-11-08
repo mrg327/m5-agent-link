@@ -134,6 +134,16 @@ sim_script_test(sim_ask_tap_never_approves ask_tap_never_approves.txt
                 PASS_REGULAR_EXPRESSION "\"op\":0,\"sid\":2")
 sim_script_test(sim_ask_result_error ask_result_error.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_ask_hold_bound_to_rid ask_hold_bound_to_rid.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"tx_cmd\"")
+# UI-V2 Phase 4: SCROLL. A drag is lines (op 10, unit 0), a flick a page (unit 1), A to_end (unit 2) and
+# out; leaving by tap, B long, chord or timeout never sends to_end; privacy meta hides the preview;
+# `unsupported` drops the item for the session.
+sim_script_test(sim_scroll_mode scroll_mode.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_scroll\",\"unit\":0,\"delta\":-3,.*\"ev\":\"tx_scroll\",\"unit\":1,\"delta\":-1,.*\"ev\":\"tx_scroll\",\"unit\":1,\"delta\":1,.*\"ev\":\"tx_scroll\",\"unit\":2,\"delta\":1,")
+sim_script_test(sim_scroll_exit scroll_exit.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"unit\":2")
+set_tests_properties(sim_scroll_exit PROPERTIES TIMEOUT 60)
+sim_script_test(sim_scroll_privacy scroll_privacy.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_scroll_unsupported scroll_unsupported.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 
 # Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
 add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c

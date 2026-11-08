@@ -71,7 +71,7 @@ bool ui_agent_refresh(uint32_t now)
         lv_label_set_text(s_header, buf);
     }
     agent_item_t items[WHEEL_MAX_ITEMS];
-    int n = nav_agent_items(s->state, items, WHEEL_MAX_ITEMS);
+    int n = nav_agent_items(s->state, !s->no_scroll, items, WHEEL_MAX_ITEMS);
     uint32_t rgb = theme_session_rgb(s);
     wheel_item_t w[WHEEL_MAX_ITEMS];
     for (int i = 0; i < n; i++) w[i] = (wheel_item_t){s_labels[items[i].id], rgb, items[i].hold, (int)items[i].id};
@@ -127,7 +127,10 @@ static void commit(const wheel_item_t *it)
     case AG_DISMISS: g_ui_actions->ack(s->sid); g_ui_actions->tick(); break;
     case AG_SNOOZE: g_ui_actions->snooze(s->sid); break;
     case AG_NOTIFY: g_ui_actions->notify_done(s->sid); break;
-    case AG_SCROLL: ui_toast("Scroll: coming soon", RGB_ACCENT); g_ui_actions->tick(); break;
+    case AG_SCROLL: /* the terminal comes to the front first, then the drag stream drives it (UI-V2 §4.4) */
+        g_ui_actions->scroll_open(s->sid);
+        ui_go_scroll();
+        return;
     case AG_WATCH: ui_toast("Watch: coming soon", RGB_ACCENT); g_ui_actions->tick(); break;
     default: break;
     }

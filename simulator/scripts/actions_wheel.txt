@@ -42,7 +42,7 @@ expect_screen agent
 chord
 wait 300
 expect_screen ring
-# commit a placeholder: toast and back to the deck
+# "Scroll terminal" opens SCROLL (Phase 4); a long B goes back
 tap 233 233
 wait 300
 btn B
@@ -50,6 +50,24 @@ wait 150
 expect_label > Scroll terminal
 btn A
 wait 200
+expect_screen scroll
+btn B long
+wait 300
 expect_screen ring
-expect_label Scroll: coming soon
+# commit a placeholder: toast and back to the deck
+tap 233 233
+wait 300
+btn B
+wait 150
+btn B
+wait 150
+btn B
+wait 150
+btn B
+wait 150
+expect_label > Watch...
+btn A
+wait 200
+expect_screen ring
+expect_label Watch: coming soon
 quit

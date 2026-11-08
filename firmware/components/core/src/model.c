@@ -77,6 +77,7 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
     if (present & SF_TST) dst->tst = src->tst;
     if (present & SF_SUMMARY) memcpy(dst->summary, src->summary, sizeof dst->summary);
     if (present & SF_SEEN) dst->seen = src->seen;
+    if (present & SF_NO_SCROLL) dst->no_scroll = src->no_scroll;
 }
 
 void model_upsert(const session_t *delta, uint32_t present)

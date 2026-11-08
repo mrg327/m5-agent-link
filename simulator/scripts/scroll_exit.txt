@@ -1,0 +1,57 @@
+# Leaving SCROLL keeps the terminal where it is: tap, B long, chord and the 8 s timeout never send
+# to_end (unit 2); the rim does nothing here; a drag on the deck does nothing either.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite
+wait 300
+drag 233 260 -96
+wait 200
+expect_screen ring
+tap 233 233
+wait 300
+btn B
+wait 150
+btn A
+wait 300
+expect_screen scroll
+drag 233 260 -72
+wait 200
+result pos 9 0 1200
+wait 200
+expect_label -9 lines
+scrub 300 250 400
+wait 200
+expect_screen scroll
+tap 233 233
+wait 300
+expect_screen ring
+tap 233 233
+wait 300
+btn B
+wait 150
+btn A
+wait 300
+expect_screen scroll
+btn B long
+wait 300
+expect_screen ring
+tap 233 233
+wait 300
+btn B
+wait 150
+btn A
+wait 300
+expect_screen scroll
+chord
+wait 300
+expect_screen ring
+tap 233 233
+wait 300
+btn B
+wait 150
+btn A
+wait 300
+expect_screen scroll
+wait 8600
+expect_screen ring
+quit

@@ -3,12 +3,15 @@
  *
  *   wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double] | chord
  *   scrub DEG0 DEG1 [MS [RADIUS]]   drag along the rim, degrees clockwise from 12 o'clock
+ *   drag X Y DY [MS]                a slow vertical drag in the centre (default 500 ms: steps, no swipe); a flick is a fast `swipe`
  *   session SID work|input|ask|error|done|idle|doneseen REPO   add or update a session (input = permission, ask = question)
  *   drop SID | lift | shake | connect | disconnect | rx HEX | ui | shot FILE.png
  *   attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OPT...
  *                                   a daemon `attention`; ACTS = comma list of approve,deny,focus,reply,ack
  *   result ok | result err stale|denied|unsupported|no_window|timeout|internal
  *                                   a daemon `result` answering the last command the device sent
+ *   result pos LINES AT_BOTTOM [TOTAL|- [PREVIEW TEXT...]]   a scroll result with scroll_pos
+ *   cfg privacy meta|preview|full   a daemon `cfg` changing the device's privacy setting
  *   clear RID [answered_pc|answered_dev|expired|cancelled]
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
  */
@@ -24,7 +27,7 @@
 #include "ui_theme.h"
 #include "sim.h"
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -56,6 +59,15 @@ static void swipe(uint32_t *t, int x1, int y1, int x2, int y2, int ms)
     for (int i = 1; i <= steps; i++) add(*t + (uint32_t)(ms * i / steps), E_PTR, 1, x1 + (x2 - x1) * i / steps, y1 + (y2 - y1) * i / steps, NULL);
     add(*t + (uint32_t)ms + 5, E_PTR, 0, x2, y2, NULL);
     *t += (uint32_t)ms + 120;
+}
+
+/* A finger moving straight down (dy > 0) or up, one sample every 16 ms, then lifted where it stopped. */
+static void drag(uint32_t *t, int x, int y, int dy, int ms)
+{
+    int steps = ms / 16 > 2 ? ms / 16 : 2;
+    for (int i = 0; i <= steps; i++) add(*t + (uint32_t)(ms * i / steps), E_PTR, 1, x, y + dy * i / steps, NULL);
+    add(*t + (uint32_t)ms + 16, E_PTR, 0, x, y + dy, NULL);
+    *t += (uint32_t)ms + 150;
 }
 
 static void tap(uint32_t *t, int x, int y)
@@ -129,6 +141,11 @@ static bool parse_line(char *line, uint32_t *t)
         btn(t, 0, 0, 200);
         btn(t, 1, 40, 220);
         *t += 220 + 450;
+    } else if (!strcmp(cmd, "drag") && sscanf(rest, "%d %d %d %d", &a, &b, &c, &d) >= 3) {
+        drag(t, a, b, c, sscanf(rest, "%d %d %d %d", &a, &b, &c, &d) == 4 ? d : 500);
+    } else if (!strcmp(cmd, "cfg") && arg[0]) {
+        add(*t, E_CFG, 0, 0, 0, arg);
+        *t += 50;
     } else if (!strcmp(cmd, "scrub") && sscanf(rest, "%d %d %d %d", &a, &b, &c, &d) >= 2) {
         int n = sscanf(rest, "%d %d %d %d", &a, &b, &c, &d);
         scrub(t, a, b, n >= 3 ? c : 400, n >= 4 ? d : 200);
@@ -327,8 +344,9 @@ static void run_attention(char *spec)
     inject_env(&env, "attention");
 }
 
-/* result ok | result err CODE: answers the device's most recent command. */
-static void run_result(const char *spec)
+/* result ok | result err CODE | result pos LINES AT_BOTTOM [TOTAL|- [PREVIEW...]]: answers the device's
+ * most recent command. */
+static void run_result(char *spec)
 {
     static const char *const errs[] = {"stale", "denied", "unsupported", "no_window", "timeout", "internal"};
     char word[12], code[16] = "";
@@ -343,13 +361,53 @@ static void run_result(const char *spec)
     m->msg_result_hdr_m.hdr_uint1uint = ++s_rx_id;
     m->msg_result_hdr_m.hdr_uint2uint_present = true;
     m->msg_result_hdr_m.hdr_uint2uint.hdr_uint2uint = g_link.tx_id; /* the last command sent */
-    m->msg_result_result_m.result_uint0bool = !strcmp(word, "ok");
-    if (!m->msg_result_result_m.result_uint0bool) {
+    m->msg_result_result_m.result_uint0bool = !strcmp(word, "ok") || !strcmp(word, "pos");
+    if (!strcmp(word, "pos")) {
+        unsigned lines, bottom;
+        char total[16] = "-";
+        int n = 0;
+        if (sscanf(spec, "%*s %u %u %15s %n", &lines, &bottom, total, &n) < 2) {
+            fail("bad result pos", spec);
+            return;
+        }
+        m->msg_result_result_m.result_scroll_pos_m_present = true;
+        struct scroll_pos *p = &m->msg_result_result_m.result_scroll_pos_m.result_scroll_pos_m;
+        p->scroll_pos_uint0uint = lines;
+        p->scroll_pos_uint1bool = bottom != 0;
+        if (total[0] && strcmp(total, "-")) {
+            p->scroll_pos_uint2uint_present = true;
+            p->scroll_pos_uint2uint.scroll_pos_uint2uint = (uint32_t)atoi(total);
+        }
+        if (n > 0 && spec[n]) {
+            p->scroll_pos_uint3tstr_present = true;
+            p->scroll_pos_uint3tstr.scroll_pos_uint3tstr = zs(spec + n); /* points into the event's text */
+        }
+    } else if (!m->msg_result_result_m.result_uint0bool) {
         int e = enum_of(code, errs, 6);
         m->msg_result_result_m.result_err_m_present = e >= 0;
         m->msg_result_result_m.result_err_m.result_err_m.result_err_choice = e < 0 ? 0 : e;
     }
     inject_env(&env, "result");
+}
+
+/* cfg privacy meta|preview|full */
+static void run_cfg(const char *spec)
+{
+    static const char *const privacy[] = {"meta", "preview", "full"};
+    char key[12], val[12];
+    int v;
+    if (sscanf(spec, "%11s %11s", key, val) != 2 || strcmp(key, "privacy") || (v = enum_of(val, privacy, 3)) < 0) {
+        fail("bad cfg", spec);
+        return;
+    }
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_cfg_m_c;
+    env.envelope_msg_cfg_m.msg_cfg_hdr_m.hdr_uint1uint = ++s_rx_id;
+    struct device_cfg *c = &env.envelope_msg_cfg_m.msg_cfg_device_cfg_m;
+    c->device_cfg_privacy_m_present = true;
+    c->device_cfg_privacy_m.device_cfg_privacy_m.privacy_choice = v;
+    inject_env(&env, "cfg");
 }
 
 static void run_clear(int rid, const char *spec)
@@ -401,6 +459,7 @@ static void run(const ev_t *e)
     case E_ATTENTION: run_attention(e->text); break;
     case E_RESULT: run_result(e->text); break;
     case E_CLEAR: run_clear(e->a, e->text); break;
+    case E_CFG: run_cfg(e->text); break;
     case E_QUIT: s_next = s_n; break;
     }
 }

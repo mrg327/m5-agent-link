@@ -8,7 +8,7 @@
 #include "gesture.h"
 #include "model.h"
 
-typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_COUNT } nav_mode_t;
+typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_COUNT } nav_mode_t;
 
 /* Where a touch gesture happened, by its press (or swipe start) point. */
 typedef enum { ZONE_ANY, ZONE_CENTRE, ZONE_RIM } nav_zone_t;
@@ -35,6 +35,10 @@ typedef enum {
     NAV_HOLD_PRESS,     /* raw finger down in the centre: may arm a hold */
     NAV_HOLD_RELEASE,   /* raw finger up: cancels a hold in progress */
     NAV_HOLD_LONG,      /* a long press whose duration already covers the hold (injected input) */
+    NAV_SCROLL_DRAG,    /* SCROLL: a vertical drag step; dy → lines (up = older) */
+    NAV_PAGE_OLDER,     /* SCROLL: a page toward older output (a flick up) */
+    NAV_PAGE_NEWER,     /* SCROLL: a page toward newer output (a flick down, or button B) */
+    NAV_TO_BOTTOM,      /* SCROLL: button A: back to the live bottom, then leave */
     NAV_COUNT
 } nav_action_t;
 
@@ -62,6 +66,16 @@ const char *nav_action_name(nav_action_t a);
 #define NAV_CARD_ARM_MS 300  /* a hold only starts once the request has been on screen this long */
 #define NAV_LONG_SWIPE_PX 120 /* deny, and back-from-AGENT: a deliberate swipe, at least this long */
 #define NAV_AGENT_TIMEOUT_MS 8000
+#define NAV_SCROLL_TIMEOUT_MS 8000 /* SCROLL closes this long after the last input */
+
+/* ── SCROLL (UI-V2 §4.4, §6): the device side of cmd_op_scroll ── */
+typedef enum { SCROLL_LINES = 0, SCROLL_PAGES = 1, SCROLL_TO_END = 2 } nav_scroll_unit_t; /* wire values */
+#define NAV_SCROLL_LINES_PER_STEP 3 /* one drag step (GESTURE_DRAG_STEP_PX) moves this many lines */
+#define NAV_SCROLL_COALESCE_MS 50   /* steps are summed into one command per this window (≤ 20 cmds/s) */
+#define NAV_SCROLL_MAX_LINES 500    /* per command, as the daemon clamps */
+#define NAV_SCROLL_MAX_PAGES 20
+/* Lines for a drag step: negative = up = older, like the wire delta. */
+int nav_scroll_lines(int dy_px);
 
 bool nav_centre(int x, int y);
 /* A hold may start only for the request that is on screen, and only once it has been there NAV_CARD_ARM_MS. */
@@ -79,7 +93,8 @@ typedef struct {
     bool hold; /* destructive: commits only by a hold, never by a tap or button A */
 } agent_item_t;
 
-int nav_agent_items(sess_state_t state, agent_item_t *out, int cap);
+/* scroll_ok: false once the daemon answered a scroll with `unsupported` for this session (the item is hidden). */
+int nav_agent_items(sess_state_t state, bool scroll_ok, agent_item_t *out, int cap);
 
 /* ── ASK: the answer options of a request, in wheel order, default first (UI-V2 §4.3, §7) ──
  * Options come from attention.opts verbatim; a bare permission synthesises Approve / Deny; "Open on

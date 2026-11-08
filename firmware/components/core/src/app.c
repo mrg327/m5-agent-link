@@ -175,6 +175,19 @@ static void act_notify_done(uint32_t sid)
     toast_cmd_result(sent, "Will buzz when done");
 }
 
+/* Entering SCROLL: focus without the "Opening on PC..." toast; the mode-change tick is the feedback. */
+static void act_scroll_open(uint32_t sid)
+{
+    if (link_send_cmd(LINK_OP_FOCUS, sid, 0, 0)) feedback_tick();
+    else ui_toast("Offline", RGB_AMBER);
+}
+
+static void act_scroll(uint32_t sid, nav_scroll_unit_t unit, int delta)
+{
+    static uint32_t seq;
+    if (!link_send_scroll(sid, (int)unit, delta, ++seq)) ui_toast("Offline", RGB_AMBER);
+}
+
 static void act_nag(void) { feedback_attention(ATT_APPROVAL); }
 
 static const ui_actions_t s_actions = {.focus = act_focus,
@@ -184,6 +197,9 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .ack = act_ack,
                                        .snooze = act_snooze,
                                        .notify_done = act_notify_done,
+                                       .scroll_open = act_scroll_open,
+                                       .scroll = act_scroll,
+                                       .scroll_stop = feedback_scroll_stop,
                                        .tick = feedback_tick,
                                        .detent = feedback_detent,
                                        .hold_start = feedback_hold_ramp,
@@ -216,21 +232,35 @@ static void on_attention(const attention_t *a)
 
 static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, const char *msg)
 {
-    (void)sid;
     if (ok) {
-        if (op == LINK_OP_FOCUS) ui_toast(LV_SYMBOL_OK " Focused", RGB_SUCCESS);
+        /* the focus that opens SCROLL stays quiet: the screen itself is the confirmation */
+        if (op == LINK_OP_FOCUS && strcmp(core_screen_name(), "scroll") != 0) ui_toast(LV_SYMBOL_OK " Focused", RGB_SUCCESS);
         return;
     }
     /* The daemon refused an answer: the request is unanswered again, so ASK restores its options. */
     if (rid && (op == LINK_OP_APPROVE || op == LINK_OP_DENY || op == LINK_OP_REPLY))
         model_attention_set_answer(rid, ATT_ANSWER_NONE, 0);
+    if (op == LINK_OP_SCROLL && sid) {
+        if (err == 2) { /* unsupported: this terminal has no scroll API; the item disappears for the session */
+            session_t d = {.sid = sid, .no_scroll = true};
+            model_upsert(&d, SF_NO_SCROLL);
+        }
+        ui_show_session(sid); /* back to the deck, where the toast explains */
+    }
     static const char *const errs[] = {"Out of date", "Denied", "Not supported", "No window", "Timed out", "Failed"};
     const char *text = err >= 0 && err < 6 ? errs[err] : msg[0] ? msg : "Failed";
     ui_toast(text, err == 3 ? RGB_AMBER : RGB_DANGER);
     feedback_reject();
 }
 
-static const link_hooks_t s_hooks = {.on_link = on_link, .on_attention = on_attention, .on_result = on_result};
+static void on_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total, uint32_t total,
+                          const char *preview)
+{
+    ui_scroll_pos(sid, lines_above, at_bottom, has_total, total, preview);
+}
+
+static const link_hooks_t s_hooks = {
+    .on_link = on_link, .on_attention = on_attention, .on_result = on_result, .on_scroll_pos = on_scroll_pos};
 
 /* ── input dispatch ── */
 

@@ -1,0 +1,42 @@
+# SCROLL (UI-V2 §4.4): entered from the AGENT wheel; a slow drag is lines, a flick a page, B a page
+# down, A back to the bottom and out. The counter predicts, the daemon's scroll_pos corrects and
+# brings the preview line.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite
+wait 300
+tap 233 233
+wait 300
+expect_screen agent
+btn B
+wait 150
+expect_label > Scroll terminal
+btn A
+wait 300
+expect_screen scroll
+expect_label Claude Code
+expect_label Live
+shot scroll_live.png
+# four steps up = 12 lines, one command after the coalescing window
+drag 233 260 -96
+wait 200
+expect_label -12 lines
+result pos 12 0 1200 $ npm test -- --watch=false
+wait 200
+expect_label -12 lines
+expect_label npm test
+shot scroll_preview.png
+result pos 142 0 1200 $ npm test -- --watch=false
+wait 200
+expect_label -142 lines
+shot scroll_scrolled.png
+# a flick up is a page toward older output; B is a page toward newer
+swipe 233 300 233 150 120
+wait 200
+btn B
+wait 200
+# A: to the live bottom and back to the deck
+btn A
+wait 300
+expect_screen ring
+quit

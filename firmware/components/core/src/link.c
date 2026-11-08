@@ -118,9 +118,10 @@ void link_tick(uint32_t now_ms)
     }
 }
 
-static bool send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms, bool has_arg, uint32_t arg)
+/* Fills g_tx_env with a cmd envelope (no arg yet); NULL unless welcomed. */
+static struct cmd *begin_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms)
 {
-    if (!g_link.welcomed) return false;
+    if (!g_link.welcomed) return NULL;
     memset(&g_tx_env, 0, sizeof g_tx_env);
     struct msg_cmd *m = &g_tx_env.envelope_msg_cmd_m;
     g_tx_env.envelope_choice = envelope_msg_cmd_m_c;
@@ -133,15 +134,17 @@ static bool send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms,
         m->msg_cmd_cmd_m.cmd_uint2uint_present = true;
         m->msg_cmd_cmd_m.cmd_uint2uint.cmd_uint2uint = rid;
     }
-    if (has_arg) {
-        m->msg_cmd_cmd_m.cmd_arg_m_present = true;
-        m->msg_cmd_cmd_m.cmd_arg_m.cmd_arg_m.cmd_arg_choice = cmd_arg_uint_c;
-        m->msg_cmd_cmd_m.cmd_arg_m.cmd_arg_m.cmd_arg_uint = arg;
-    }
     if (hold_ms) {
         m->msg_cmd_cmd_m.cmd_uint4uint_present = true;
         m->msg_cmd_cmd_m.cmd_uint4uint.cmd_uint4uint = hold_ms;
     }
+    return &m->msg_cmd_cmd_m;
+}
+
+/* Numbers, registers and sends the cmd begun with begin_cmd(). `arg_log` is -1 for no scalar arg. */
+static bool finish_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms, int arg_log)
+{
+    struct msg_cmd *m = &g_tx_env.envelope_msg_cmd_m;
     uint32_t id = ++g_link.tx_id;
     m->msg_cmd_hdr_m.hdr_uint1uint = id;
     /* Unanswered commands are simply overwritten by newer ones. */
@@ -150,16 +153,37 @@ static bool send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms,
     size_t len = 0;
     if (cbor_encode_envelope(buf, sizeof buf, &g_tx_env, &len) != ZCBOR_SUCCESS) return false;
     dbg_event("link", "tx_cmd", "\"id\":%u,\"op\":%d,\"sid\":%u,\"rid\":%u,\"hold_ms\":%u,\"arg\":%d", (unsigned)id,
-              (int)op, (unsigned)sid, (unsigned)rid, (unsigned)hold_ms, has_arg ? (int)arg : -1);
+              (int)op, (unsigned)sid, (unsigned)rid, (unsigned)hold_ms, arg_log);
     return hal_link_send(g_link.kind, buf, len);
 }
 
 bool link_send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms)
 {
-    return send_cmd(op, sid, rid, hold_ms, false, 0);
+    if (!begin_cmd(op, sid, rid, hold_ms)) return false;
+    return finish_cmd(op, sid, rid, hold_ms, -1);
 }
 
 bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg, uint32_t hold_ms)
 {
-    return send_cmd(op, sid, rid, hold_ms, true, arg);
+    struct cmd *c = begin_cmd(op, sid, rid, hold_ms);
+    if (!c) return false;
+    c->cmd_arg_m_present = true;
+    c->cmd_arg_m.cmd_arg_m.cmd_arg_choice = cmd_arg_uint_c;
+    c->cmd_arg_m.cmd_arg_m.cmd_arg_uint = arg;
+    return finish_cmd(op, sid, rid, hold_ms, (int)arg);
+}
+
+bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq)
+{
+    struct cmd *c = begin_cmd(LINK_OP_SCROLL, sid, 0, 0);
+    if (!c) return false;
+    c->cmd_arg_m_present = true;
+    struct cmd_arg_r *a = &c->cmd_arg_m.cmd_arg_m;
+    a->cmd_arg_choice = cmd_arg_scroll_arg_m_c;
+    a->cmd_arg_scroll_arg_m.scroll_arg_scroll_unit_m.scroll_unit_choice = unit;
+    a->cmd_arg_scroll_arg_m.scroll_arg_uint1int = delta;
+    a->cmd_arg_scroll_arg_m.scroll_arg_uint2uint_present = true;
+    a->cmd_arg_scroll_arg_m.scroll_arg_uint2uint.scroll_arg_uint2uint = seq;
+    dbg_event("link", "tx_scroll", "\"unit\":%d,\"delta\":%d,\"seq\":%u", unit, delta, (unsigned)seq);
+    return finish_cmd(LINK_OP_SCROLL, sid, 0, 0, -1);
 }
