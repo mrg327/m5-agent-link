@@ -39,6 +39,9 @@
   --fw-hold-confirm-ms: 1200ms;
   --fw-centre-r-px: 150px;
   --fw-hold-show-ms: 250ms;
+  --fw-card-arm-ms: 300ms;
+  --fw-long-swipe-px: 120px;
+  --fw-agent-timeout-ms: 8000ms;
   --fw-haptic-kick-ms: 15ms;
   --fw-display-size: 466px;
 }

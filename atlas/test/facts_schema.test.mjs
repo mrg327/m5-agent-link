@@ -34,7 +34,7 @@ test('gesture thresholds describe the ring recogniser, with no tap deferral', ()
 });
 
 test('ring facts: screens, per-kind shapes, pills and the gesture cases', () => {
-  assert.deepEqual(facts.screens.map((s) => s.id), ['ring', 'attention']);
+  assert.deepEqual(facts.screens.map((s) => s.id), ['ring', 'attention', 'agent']);
   assert.deepEqual(Object.keys(facts.ring.kinds), ['work', 'ask', 'perm', 'done', 'error', 'idle']);
   assert.ok(facts.ring.merge_at >= 2 && facts.ring.max_segments >= facts.ring.merge_at);
   assert.equal(facts.ring.pills.approve, 'HOLD ✓ APPROVE');

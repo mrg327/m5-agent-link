@@ -9,7 +9,7 @@
 #include "lvgl.h"
 
 typedef struct {
-    char screen[12];            /* "ring" | "attention" (selected session has a pending request) | "off" */
+    char screen[12];            /* "ring" | "attention" (selected session has a pending request) | "agent" | "off" */
     bool has_sel_sid;
     uint32_t sel_sid;
     bool has_rid;
@@ -26,6 +26,8 @@ typedef struct {
     void (*approve)(uint32_t sid, uint32_t rid, uint32_t hold_ms);
     void (*deny)(uint32_t sid, uint32_t rid);
     void (*ack)(uint32_t sid);
+    void (*snooze)(uint32_t sid);      /* AGENT: snooze this session for 30 min */
+    void (*notify_done)(uint32_t sid); /* AGENT: buzz when this session finishes */
     void (*tick)(void);   /* light haptic tick: selection by tap or button */
     void (*detent)(void); /* rim-scrub segment crossed */
     void (*hold_start)(void); /* approve hold passed the grace period: start the haptic ramp */

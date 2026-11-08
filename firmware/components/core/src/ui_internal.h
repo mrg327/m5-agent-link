@@ -3,13 +3,13 @@
 #include <stdarg.h>
 
 #include "model.h"
+#include "nav.h"
 #include "ui.h"
 
 #define UI_SIZE 466
 #define UI_CX 233
 #define UI_CY 233
 #define UI_R 233
-#define UI_HOLD_MS 1200 /* hold-to-approve duration; the daemon's floor is 1000 ms */
 #define UI_ACTION_Y 292 /* top of the action pill row; toasts replace the pill at the same height */
 
 extern const ui_actions_t *g_ui_actions;
@@ -22,11 +22,30 @@ bool ui_animations_allowed(void);
 void ui_report_add(ui_report_t *r, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 lv_obj_t *ui_new_screen(void);
 
-/* The Ring screen (ui_home.c). */
+/* Mode plumbing (ui.c): the interaction layer decides, the screens draw. */
+nav_mode_t ui_mode(void);
+void ui_go_home(void);          /* leave AGENT (commit, back, chord, timeout) */
+int ui_last_release_y(void);    /* where the last touch lifted, for the long-swipe rules */
+
+/* The HOME deck (ui_home.c). */
 lv_obj_t *ui_home_init(void);
 void ui_home_refresh(uint32_t now_ms);
 void ui_home_tick(uint32_t now_ms);
-bool ui_home_gesture(const gesture_evt_t *g);
+bool ui_home_act(nav_action_t a, const gesture_evt_t *g);
+void ui_home_note_input(void);  /* any input anywhere resets the ambient timer and the nag */
+bool ui_home_request_pending(void); /* the selected session has an unanswered approvable request on screen */
+uint32_t ui_home_sel_sid(void);
+lv_obj_t *ui_home_ring(void);
+void ui_home_set_card_shown(bool shown);
 void ui_home_select_sid(uint32_t sid, const char *via);
 void ui_home_report(ui_report_t *r);
 void ui_home_animations_changed(void);
+
+/* The AGENT screen (ui_agent.c). */
+lv_obj_t *ui_agent_init(lv_obj_t *screen);
+void ui_agent_open(uint32_t sid, uint32_t now_ms);
+void ui_agent_close(void);
+bool ui_agent_refresh(uint32_t now_ms); /* false: the session is gone */
+bool ui_agent_act(nav_action_t a, const gesture_evt_t *g);
+bool ui_agent_tick(uint32_t now_ms);    /* true: wants to close */
+void ui_agent_report(ui_report_t *r);

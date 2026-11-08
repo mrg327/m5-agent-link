@@ -9,7 +9,8 @@
 #include "model.h"
 
 typedef enum {
-    LINK_OP_FOCUS = 0, LINK_OP_ACK = 1, LINK_OP_APPROVE = 3, LINK_OP_DENY = 4
+    LINK_OP_FOCUS = 0, LINK_OP_ACK = 1, LINK_OP_SNOOZE = 2, LINK_OP_APPROVE = 3, LINK_OP_DENY = 4,
+    LINK_OP_NOTIFY_DONE = 8
 } link_op_t;
 #define LINK_OP_UNKNOWN (-1)
 

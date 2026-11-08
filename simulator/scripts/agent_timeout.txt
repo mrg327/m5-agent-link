@@ -1,0 +1,11 @@
+# The wheel closes by itself after 8 s without input, and an attention always lands on the deck.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite
+wait 300
+tap 233 233
+wait 300
+expect_screen agent
+wait 8500
+expect_screen ring
+quit

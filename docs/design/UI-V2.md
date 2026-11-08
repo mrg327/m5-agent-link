@@ -1,6 +1,6 @@
 # UI v2: "Deck": switch context, pick from a list, answer from the watch
 
-Status: **decided; Phase 1 (HOME deck) implemented in the simulator** (branch `ui-v2`, not yet validated on the device). Supersedes the Ring UI ([UI-RING.md](UI-RING.md)) and DESIGN.md §6, §6a (device side) and §8 (palette). Inputs: the Ring UX review (simulator pass, 2026-11-07), the user's v2 brief and answers (§9), and `docs/research/{stopwatch-interaction-capabilities,wearable-glance-gestures,minimal-peripherals}.md`.
+Status: **decided; Phases 1–2 (HOME deck, AGENT wheel) implemented in the simulator** (branch `ui-v2`, not yet validated on the device). Supersedes the Ring UI ([UI-RING.md](UI-RING.md)) and DESIGN.md §6, §6a (device side) and §8 (palette). Inputs: the Ring UX review (simulator pass, 2026-11-07), the user's v2 brief and answers (§9), and `docs/research/{stopwatch-interaction-capabilities,wearable-glance-gestures,minimal-peripherals}.md`.
 
 Where this document and DESIGN.md or UI-RING.md disagree, this document wins. §10 lists each decision.
 
@@ -345,13 +345,31 @@ Daemon side: `handle_cmd` needs `CmdOp::Reply` wired to the approval broker that
 |---|---|---|
 | 0 | Review fixes #1–#4 (`2702775`): prompt text on the card, glow first-touch, haptic triple, strict deny | `approve_card`, `approve_after_glow`, `approve_too_soon`, `deny_short_swipe` |
 | 1 | HOME deck: new hierarchy, summary row, time-in-state, index ring with tick and inset error dash, stale/offline, key badges, toast placement. Tap centre stays Focus until Phase 2 | screenshots of every state; `expect_label` on summary and stale |
-| 2 | `ui_wheel.c` + AGENT for Working/Done/Error/Idle (Focus, Ack, Dismiss, Snooze, Notify, Watch…); tap centre and swipe up open it; chord = Home | `agent_wheel.txt` |
+| 2 | `ui_wheel.c` + AGENT for Working/Done/Error/Idle (Focus, Ack, Dismiss, Snooze, Notify, Watch…); tap centre and swipe up open it; chord = Home. **Done** (`nav.c` interaction layer, §8a) | `actions_wheel.txt`, `agent_timeout.txt` |
 | 3 | ASK on the wheel: options from `opts`, `grant_mask`, `cmd_op_reply`, approve/grants/deny as hold items, answer-pending line | `ask_reply.txt`; protocol vector with `opts` |
 | 4 | SCROLL by drag/flick + `cmd_op_scroll` + `scroll_pos` + kitty and tmux drivers + privacy-gated preview | `scroll_mode.txt`; daemon unit tests for argument building |
 | 5 | STATUS wheel (swipe down from HOME, quiet mode); Atlas update (gesture map is generated from `ui_*.c`) | `status.txt` |
 | 6 | IMU raise-to-wake and lift-during-glow (needs the BMI270 driver) | on-device only |
 
 The simulator is the acceptance tool at each phase: scripts under `simulator/scripts/`, screenshots compared by eye, `expect_screen` extended with the mode name.
+
+## 8a. Architecture: what is swappable
+
+Three layers, so the look and the interaction model can change independently (user request, Phase 2):
+
+| Layer | Lives in | Knows about | Does not know about |
+|---|---|---|---|
+| **Interaction model** | `nav.h`, `nav.c` | modes (`MODE_HOME`, `MODE_AGENT`, …), the gesture map (`nav_bindings[]`: mode × gesture × zone × condition → action), the safety rules (`NAV_HOLD_MS`, `NAV_CARD_ARM_MS`, `NAV_LONG_SWIPE_PX`, `nav_hold_may_start()`, `nav_long_swipe_down()`), the per-state action lists (`nav_agent_items()`) | LVGL, colours, geometry, labels |
+| **Mode plumbing** | `ui.c` | which screen owns the current mode, mode transitions (`NAV_OPEN_AGENT`, `NAV_BACK`, `NAV_HOME`, timeouts, an attention always lands on HOME), the debug report | drawing |
+| **Presentation** | `ui_theme.h/.c` (tokens: palette, fonts, pill tint, key caps, badge angles), `ui_ring.c` (index ring), `ui_wheel.c` (the list component), `ui_home.c` (deck card), `ui_agent.c` (wheel screen: labels for action ids, header, badges) | how things look and where they sit | which gesture triggered an action |
+
+What a change touches:
+- **Reskin** (Capsules → something else): `ui_theme.h` tokens and the draw code in `ui_ring.c` / `ui_wheel.c` / `ui_home.c` / `ui_agent.c`. No gesture logic, no safety rule, no test script changes.
+- **Gesture remap** (say, swipe left opens the wheel): one row in `nav_bindings[]`, plus its description in `atlas/tools/extract.py`. No drawing code.
+- **New mode** (ASK, SCROLL, STATUS): a `MODE_*` value, its rows in the table, a screen file with `open/close/act/tick/report`, and one case each in `enter_mode()` and `ui_on_gesture()` in `ui.c`.
+- **New action for a state**: `nav_agent_items()` plus a label in `ui_agent.c` and a handler in `commit()`.
+
+Safety is in the interaction layer, so every skin keeps it for free: a tap is never bound to approve (`{MODE_HOME, G_TAP, ZONE_CENTRE, WHEN_REQUEST, NAV_FOCUS}`), holds start only through `nav_hold_may_start()` (request on screen ≥ 300 ms, bound to its `rid`), deny and back-from-AGENT use the same `nav_long_swipe_down()` rule, the first touch after a glow is swallowed in `power.c`, and approve/deny/reject haptics are distinct patterns in `feedback.c`. The Atlas extractor reads the gesture map from `nav.c`, so a remap is documented automatically.
 
 ## 9. Decided (user answers, 2026-11-07)
 

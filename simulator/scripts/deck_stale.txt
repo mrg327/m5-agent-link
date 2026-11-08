@@ -10,7 +10,7 @@ wait 1200
 expect_label Offline
 expect_label stale 1s
 shot deck_stale.png
-tap 233 233
+btn A
 wait 200
 expect_label Offline
 quit

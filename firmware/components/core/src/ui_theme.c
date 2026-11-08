@@ -171,3 +171,37 @@ void theme_elapsed_long(char *dst, size_t cap, uint32_t secs)
     else if (secs < 3600) snprintf(dst, cap, "%um %02us", (unsigned)(secs / 60), (unsigned)(secs % 60));
     else snprintf(dst, cap, "%uh %02um", (unsigned)(secs / 3600), (unsigned)(secs / 60 % 60));
 }
+
+lv_obj_t *theme_key_badge(lv_obj_t *parent, const char *key, const char *word, bool key_left, int deg, int r,
+                          lv_obj_t **key_out, lv_obj_t **word_out)
+{
+    lv_obj_t *b = lv_obj_create(parent);
+    lv_obj_remove_style_all(b);
+    lv_obj_set_size(b, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(b, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(b, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(b, 6, 0);
+    lv_obj_remove_flag(b, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_t *cap = lv_obj_create(b);
+    lv_obj_remove_style_all(cap);
+    lv_obj_set_size(cap, UI_KEYCAP_PX, UI_KEYCAP_PX);
+    lv_obj_set_style_radius(cap, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(cap, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(cap, COL_SURFACE2, 0);
+    lv_obj_set_style_border_width(cap, 1, 0);
+    lv_obj_set_style_border_color(cap, COL_BORDER, 0);
+    lv_obj_remove_flag(cap, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_t *k = theme_label(cap, 16, COL_TEXT);
+    lv_label_set_text(k, key);
+    lv_obj_center(k);
+    lv_obj_t *w = theme_label(b, 16, key_left ? COL_TEXT : COL_MUTED);
+    lv_label_set_text(w, word);
+    if (!key_left) lv_obj_move_to_index(cap, 1); /* word first, cap on the button side */
+    float rad = (float)deg * 3.14159265f / 180.0f;
+    lv_obj_update_layout(b);
+    int bw = lv_obj_get_width(b), bh = lv_obj_get_height(b);
+    lv_obj_set_pos(b, 233 + (int)((float)r * sinf(rad)) - bw / 2, 233 - (int)((float)r * cosf(rad)) - bh / 2);
+    if (key_out) *key_out = k;
+    if (word_out) *word_out = w;
+    return b;
+}

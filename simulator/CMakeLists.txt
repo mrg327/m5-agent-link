@@ -92,6 +92,9 @@ sim_script_test(sim_deck_long_names deck_long_names.txt)
 sim_script_test(sim_deck_mixed deck_mixed.txt)
 sim_script_test(sim_deck_ambient deck_ambient.txt)
 set_tests_properties(sim_deck_ambient PROPERTIES TIMEOUT 60)
+# UI-V2 Phase 2: the AGENT wheel.
+sim_script_test(sim_actions_wheel actions_wheel.txt)
+sim_script_test(sim_agent_timeout agent_timeout.txt)
 
 # Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
 add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c

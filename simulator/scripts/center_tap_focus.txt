@@ -1,4 +1,5 @@
-# Tap on the centre = the default action, immediately: focus, and for a finished session also ack.
+# Tap on the centre opens the per-agent wheel (UI-V2 §4.2); button A is still the immediate default
+# action: focus, and for a finished session also ack.
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 session 2 done fjord
@@ -8,4 +9,12 @@ expect_label fjord
 expect_label FOCUS + ACK
 shot ring_done.png
 tap 233 233
+wait 200
+expect_screen agent
+expect_label Focus + acknowledge
+btn B long
+wait 200
+expect_screen ring
+btn A
 wait 100
+quit

@@ -145,11 +145,28 @@ static void act_ack(uint32_t sid)
     model_upsert(&d, SF_SEEN);
 }
 
+static void act_snooze(uint32_t sid)
+{
+    bool sent = link_send_cmd(LINK_OP_SNOOZE, sid, 0, 0); /* 30 min is the daemon's default */
+    if (sent) feedback_tick();
+    else feedback_reject();
+    toast_cmd_result(sent, "Snoozed 30 min");
+}
+
+static void act_notify_done(uint32_t sid)
+{
+    bool sent = link_send_cmd(LINK_OP_NOTIFY_DONE, sid, 0, 0);
+    if (sent) feedback_tick();
+    else feedback_reject();
+    toast_cmd_result(sent, "Will buzz when done");
+}
+
 static void act_nag(void) { feedback_attention(ATT_APPROVAL); }
 
-static const ui_actions_t s_actions = {act_focus,    act_approve,        act_deny,           act_ack,
-                                       feedback_tick, feedback_detent,    feedback_hold_ramp, feedback_hold_stop,
-                                       feedback_reject, act_nag,         app_set_sectors};
+static const ui_actions_t s_actions = {act_focus,       act_approve,    act_deny,          act_ack,
+                                       act_snooze,      act_notify_done, feedback_tick,     feedback_detent,
+                                       feedback_hold_ramp, feedback_hold_stop, feedback_reject, act_nag,
+                                       app_set_sectors};
 
 /* ── link → app ── */
 

@@ -93,20 +93,23 @@
     "scrub_hyst_deg": 5,
     "hold_confirm_ms": 1200,
     "centre_r_px": 150,
-    "hold_show_ms": 250
+    "hold_show_ms": 250,
+    "card_arm_ms": 300,
+    "long_swipe_px": 120,
+    "agent_timeout_ms": 8000
   },
   "ring": {
     "merge_at": 9,
     "ambient_ms": 30000,
     "nag_ms": 15000,
     "nag_max": 3,
-    "hint_a_deg": 225,
-    "hint_b_deg": 135,
-    "hint_r_px": 158,
     "repo_w_px": 280,
     "repo_px": 32,
     "repo_small_px": 24,
     "summary_w_px": 300,
+    "hint_a_deg": 225,
+    "hint_b_deg": 135,
+    "hint_r_px": 158,
     "band_out_px": 226,
     "band_w_px": 8,
     "sel_out_px": 229,
@@ -147,83 +150,302 @@
     "cases": [
       {
         "gesture": "G_PRESS",
-        "action": "Finger down in the centre of a permission request starts the approve hold",
-        "source": "firmware/components/core/src/ui_home.c:459"
+        "mode": "home",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_HOLD_PRESS",
+        "action": "Finger down in the centre: arms a hold if a request is on screen and armed",
+        "source": "firmware/components/core/src/nav.c:8"
       },
       {
         "gesture": "G_RELEASE",
+        "mode": "home",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_HOLD_RELEASE",
         "action": "Lifting cancels a hold in progress",
-        "source": "firmware/components/core/src/ui_home.c:470"
-      },
-      {
-        "gesture": "G_DOUBLE_TAP",
-        "action": "Never produced by the recogniser; handled like a tap for injected input",
-        "source": "firmware/components/core/src/ui_home.c:474"
+        "source": "firmware/components/core/src/nav.c:9"
       },
       {
         "gesture": "G_TAP",
-        "action": "Centre: the state's default action (Focus). On the ring: select that segment",
-        "source": "firmware/components/core/src/ui_home.c:475"
+        "mode": "home",
+        "zone": "centre",
+        "when": "with a request on screen",
+        "nav": "NAV_FOCUS",
+        "action": "Focus the terminal (Done also acknowledges). On a request it is the review path: a tap never approves",
+        "source": "firmware/components/core/src/nav.c:10"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "home",
+        "zone": "centre",
+        "when": "without a request",
+        "nav": "NAV_OPEN_AGENT",
+        "action": "Open the per-agent wheel for the selected session",
+        "source": "firmware/components/core/src/nav.c:11"
+      },
+      {
+        "gesture": "G_DOUBLE_TAP",
+        "mode": "home",
+        "zone": "centre",
+        "when": "with a request on screen",
+        "nav": "NAV_FOCUS",
+        "action": "Focus the terminal (Done also acknowledges). On a request it is the review path: a tap never approves",
+        "source": "firmware/components/core/src/nav.c:12"
+      },
+      {
+        "gesture": "G_DOUBLE_TAP",
+        "mode": "home",
+        "zone": "centre",
+        "when": "without a request",
+        "nav": "NAV_OPEN_AGENT",
+        "action": "Open the per-agent wheel for the selected session",
+        "source": "firmware/components/core/src/nav.c:13"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "home",
+        "zone": "rim",
+        "when": "",
+        "nav": "NAV_PICK_RIM",
+        "action": "Select the segment (HOME) or item (AGENT) under the finger",
+        "source": "firmware/components/core/src/nav.c:14"
+      },
+      {
+        "gesture": "G_DOUBLE_TAP",
+        "mode": "home",
+        "zone": "rim",
+        "when": "",
+        "nav": "NAV_PICK_RIM",
+        "action": "Select the segment (HOME) or item (AGENT) under the finger",
+        "source": "firmware/components/core/src/nav.c:15"
       },
       {
         "gesture": "G_LONG_PRESS",
-        "action": "Focus (Working, Question, Idle), acknowledge (Done, Error). On a permission request the hold approves",
-        "source": "firmware/components/core/src/ui_home.c:482"
+        "mode": "home",
+        "zone": "centre",
+        "when": "with a request on screen",
+        "nav": "NAV_HOLD_LONG",
+        "action": "An injected long press that already covers the hold time approves directly",
+        "source": "firmware/components/core/src/nav.c:16"
+      },
+      {
+        "gesture": "G_SWIPE_UP",
+        "mode": "home",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_OPEN_AGENT",
+        "action": "Open the per-agent wheel for the selected session",
+        "source": "firmware/components/core/src/nav.c:17"
       },
       {
         "gesture": "G_SWIPE_DOWN",
-        "action": "Deny a permission request (swipe down across the centre)",
-        "source": "firmware/components/core/src/ui_home.c:497"
+        "mode": "home",
+        "zone": "centre",
+        "when": "with a request on screen",
+        "nav": "NAV_DENY",
+        "action": "Deny a permission request: a long swipe down that started above the centre",
+        "source": "firmware/components/core/src/nav.c:18"
       },
       {
         "gesture": "G_SCRUB_START",
-        "action": "A drag around the rim starts selecting sessions",
-        "source": "firmware/components/core/src/ui_home.c:506"
+        "mode": "home",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:19"
       },
       {
         "gesture": "G_SCRUB",
-        "action": "The finger crossed into another sector: select it, with a detent",
-        "source": "firmware/components/core/src/ui_home.c:510"
+        "mode": "home",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:20"
       },
       {
         "gesture": "G_SCRUB_END",
-        "action": "Finger lifted after a scrub: merged Done groups settle",
-        "source": "firmware/components/core/src/ui_home.c:516"
+        "mode": "home",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:21"
       },
       {
         "gesture": "G_BTN_A",
-        "action": "Default action: Focus (eyes-free version of tapping the centre)",
-        "source": "firmware/components/core/src/ui_home.c:522"
+        "mode": "home",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_FOCUS",
+        "action": "Focus the terminal (Done also acknowledges). On a request it is the review path: a tap never approves",
+        "source": "firmware/components/core/src/nav.c:22"
       },
       {
         "gesture": "G_BTN_A_DOUBLE",
+        "mode": "home",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_NEXT_ATTENTION",
         "action": "Jump to the next session that needs attention",
-        "source": "firmware/components/core/src/ui_home.c:525"
+        "source": "firmware/components/core/src/nav.c:23"
       },
       {
         "gesture": "G_BTN_B",
-        "action": "Select the next session",
-        "source": "firmware/components/core/src/ui_home.c:528"
+        "mode": "home",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_NEXT",
+        "action": "Next session (HOME) or next item (AGENT)",
+        "source": "firmware/components/core/src/nav.c:24"
       },
       {
         "gesture": "G_BTN_B_LONG",
-        "action": "Select the previous session",
-        "source": "firmware/components/core/src/ui_home.c:531"
+        "mode": "home",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_PREV",
+        "action": "Previous session",
+        "source": "firmware/components/core/src/nav.c:25"
+      },
+      {
+        "gesture": "G_PRESS",
+        "mode": "agent",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_HOLD_PRESS",
+        "action": "Finger down in the centre: arms a hold if a request is on screen and armed",
+        "source": "firmware/components/core/src/nav.c:27"
+      },
+      {
+        "gesture": "G_RELEASE",
+        "mode": "agent",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_HOLD_RELEASE",
+        "action": "Lifting cancels a hold in progress",
+        "source": "firmware/components/core/src/nav.c:28"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "agent",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_COMMIT",
+        "action": "Commit the selected item; a destructive item answers 'hold to confirm' instead",
+        "source": "firmware/components/core/src/nav.c:29"
+      },
+      {
+        "gesture": "G_DOUBLE_TAP",
+        "mode": "agent",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_COMMIT",
+        "action": "Commit the selected item; a destructive item answers 'hold to confirm' instead",
+        "source": "firmware/components/core/src/nav.c:30"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "agent",
+        "zone": "rim",
+        "when": "",
+        "nav": "NAV_PICK_RIM",
+        "action": "Select the segment (HOME) or item (AGENT) under the finger",
+        "source": "firmware/components/core/src/nav.c:31"
+      },
+      {
+        "gesture": "G_SWIPE_DOWN",
+        "mode": "agent",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back to the deck (a long swipe down, or B held)",
+        "source": "firmware/components/core/src/nav.c:32"
+      },
+      {
+        "gesture": "G_SCRUB_START",
+        "mode": "agent",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:33"
+      },
+      {
+        "gesture": "G_SCRUB",
+        "mode": "agent",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:34"
+      },
+      {
+        "gesture": "G_SCRUB_END",
+        "mode": "agent",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:35"
+      },
+      {
+        "gesture": "G_BTN_A",
+        "mode": "agent",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_COMMIT",
+        "action": "Commit the selected item; a destructive item answers 'hold to confirm' instead",
+        "source": "firmware/components/core/src/nav.c:36"
+      },
+      {
+        "gesture": "G_BTN_B",
+        "mode": "agent",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_NEXT",
+        "action": "Next session (HOME) or next item (AGENT)",
+        "source": "firmware/components/core/src/nav.c:37"
+      },
+      {
+        "gesture": "G_BTN_B_LONG",
+        "mode": "agent",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back to the deck (a long swipe down, or B held)",
+        "source": "firmware/components/core/src/nav.c:38"
+      },
+      {
+        "gesture": "G_CHORD",
+        "mode": "agent",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_HOME",
+        "action": "A+B chord: straight back to the deck",
+        "source": "firmware/components/core/src/nav.c:39"
       }
     ],
-    "chord": "A + B held together is detected and logged, no action",
+    "chord": "A + B held together: Home from any mode (logged on the deck, no action there)",
     "first_touch_wakes_only": true
   },
   "screens": [
     {
       "id": "ring",
-      "title": "Ring",
-      "source": "firmware/components/core/src/ui.c:69"
+      "title": "Deck",
+      "source": "firmware/components/core/src/ui.c:72"
     },
     {
       "id": "attention",
-      "title": "Ring · a request is waiting",
-      "source": "firmware/components/core/src/ui_home.c:627"
+      "title": "Deck · a request is waiting",
+      "source": "firmware/components/core/src/ui_home.c:610"
+    },
+    {
+      "id": "agent",
+      "title": "Agent wheel",
+      "source": "firmware/components/core/src/ui_agent.c:209"
     }
   ],
   "haptics": {
@@ -1229,14 +1451,17 @@
     "display.height": "firmware/boards/stopwatch/board_priv.h:19",
     "display.shape": "firmware/boards/stopwatch/display.cpp:1",
     "display.width": "firmware/boards/stopwatch/board_priv.h:18",
+    "gesture.agent_timeout_ms": "firmware/components/core/src/nav.h:60",
     "gesture.b_immediate": "firmware/components/core/src/gesture.c:167",
     "gesture.btn_double_ms": "firmware/components/core/src/gesture.h:12",
-    "gesture.centre_r_px": "firmware/components/core/src/ui_home.c:14",
+    "gesture.card_arm_ms": "firmware/components/core/src/nav.h:58",
+    "gesture.centre_r_px": "firmware/components/core/src/nav.h:55",
     "gesture.cx_px": "firmware/components/core/src/gesture.h:15",
     "gesture.cy_px": "firmware/components/core/src/gesture.h:16",
-    "gesture.hold_confirm_ms": "firmware/components/core/src/ui_internal.h:12",
-    "gesture.hold_show_ms": "firmware/components/core/src/ui_home.c:15",
+    "gesture.hold_confirm_ms": "firmware/components/core/src/nav.h:56",
+    "gesture.hold_show_ms": "firmware/components/core/src/nav.h:57",
     "gesture.long_press_ms": "firmware/components/core/src/gesture.h:7",
+    "gesture.long_swipe_px": "firmware/components/core/src/nav.h:59",
     "gesture.rim_in_px": "firmware/components/core/src/gesture.h:17",
     "gesture.rim_out_px": "firmware/components/core/src/gesture.h:18",
     "gesture.rim_track_in_px": "firmware/components/core/src/gesture.h:19",
@@ -1247,10 +1472,11 @@
     "gesture.swipe_max_ms": "firmware/components/core/src/gesture.h:9",
     "gesture.swipe_min_px": "firmware/components/core/src/gesture.h:8",
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
-    "gesture_map.chord": "firmware/components/core/src/app.c:201",
-    "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:402",
-    "gesture_map.long_press_ack": "firmware/components/core/src/ui_home.c:493",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:210",
+    "gesture_map.chord": "firmware/components/core/src/app.c:218",
+    "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:391",
+    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:76",
+    "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:10",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:227",
     "haptics.approved": "firmware/components/core/src/feedback.c:65",
     "haptics.denied": "firmware/components/core/src/feedback.c:71",
     "haptics.detent": "firmware/components/core/src/feedback.c:41",
@@ -1289,43 +1515,44 @@
     "palette.surface2": "firmware/components/core/src/ui_theme.h:8",
     "palette.text": "firmware/components/core/src/ui_theme.h:10",
     "palette.working": "firmware/components/core/src/ui_theme.h:13",
-    "ring.ambient_ms": "firmware/components/core/src/ui_home.c:18",
+    "ring.ambient_ms": "firmware/components/core/src/ui_home.c:14",
     "ring.ask_period_ms": "firmware/components/core/src/ui_ring.c:32",
     "ring.band_out_px": "firmware/components/core/src/ui_ring.c:12",
     "ring.band_w_px": "firmware/components/core/src/ui_ring.c:13",
-    "ring.deny_hint": "firmware/components/core/src/ui_home.c:37",
+    "ring.deny_hint": "firmware/components/core/src/ui_home.c:33",
     "ring.done_sweep_ms": "firmware/components/core/src/ui_ring.c:34",
     "ring.dot_step_deg": "firmware/components/core/src/ui_ring.c:20",
-    "ring.edge_hint_a": "firmware/components/core/src/ui_home.c:692",
-    "ring.edge_hint_b": "firmware/components/core/src/ui_home.c:692",
+    "ring.edge_hint_a": "firmware/components/core/src/ui_home.c:672",
+    "ring.edge_hint_b": "firmware/components/core/src/ui_home.c:672",
     "ring.error_flicker_ms": "firmware/components/core/src/ui_ring.c:35",
-    "ring.hint_a_deg": "firmware/components/core/src/ui_home.c:42",
-    "ring.hint_b_deg": "firmware/components/core/src/ui_home.c:43",
-    "ring.hint_r_px": "firmware/components/core/src/ui_home.c:44",
+    "ring.hint_a_deg": "firmware/components/core/src/ui_theme.h:29",
+    "ring.hint_b_deg": "firmware/components/core/src/ui_theme.h:30",
+    "ring.hint_r_px": "firmware/components/core/src/ui_theme.h:31",
     "ring.kinds": "firmware/components/core/src/ui_ring.h:15",
     "ring.max_segments": "firmware/components/core/src/ui_ring.h:11",
-    "ring.merge_at": "firmware/components/core/src/ui_home.c:19",
-    "ring.nag_max": "firmware/components/core/src/ui_home.c:21",
-    "ring.nag_ms": "firmware/components/core/src/ui_home.c:20",
-    "ring.nothing_else": "firmware/components/core/src/ui_home.c:426",
+    "ring.merge_at": "firmware/components/core/src/ui_home.c:15",
+    "ring.nag_max": "firmware/components/core/src/ui_home.c:17",
+    "ring.nag_ms": "firmware/components/core/src/ui_home.c:16",
+    "ring.nothing_else": "firmware/components/core/src/ui_home.c:409",
     "ring.others_pct": "firmware/components/core/src/ui_ring.c:17",
     "ring.perm_period_ms": "firmware/components/core/src/ui_ring.c:33",
-    "ring.pill_approve": "firmware/components/core/src/ui_home.c:381",
-    "ring.pill_done": "firmware/components/core/src/ui_home.c:381",
+    "ring.pill_approve": "firmware/components/core/src/ui_home.c:370",
+    "ring.pill_done": "firmware/components/core/src/ui_home.c:370",
     "ring.prog_out_px": "firmware/components/core/src/ui_ring.c:25",
     "ring.prog_w_px": "firmware/components/core/src/ui_ring.c:26",
-    "ring.repo_px": "firmware/components/core/src/ui_home.c:29",
-    "ring.repo_small_px": "firmware/components/core/src/ui_home.c:30",
-    "ring.repo_w_px": "firmware/components/core/src/ui_home.c:28",
+    "ring.repo_px": "firmware/components/core/src/ui_home.c:25",
+    "ring.repo_small_px": "firmware/components/core/src/ui_home.c:26",
+    "ring.repo_w_px": "firmware/components/core/src/ui_home.c:24",
     "ring.seg_gap_deg": "firmware/components/core/src/ui_ring.c:16",
     "ring.sel_out_px": "firmware/components/core/src/ui_ring.c:14",
     "ring.sel_w_px": "firmware/components/core/src/ui_ring.c:15",
-    "ring.summary_w_px": "firmware/components/core/src/ui_home.c:33",
+    "ring.summary_w_px": "firmware/components/core/src/ui_home.c:29",
     "ring.track_w_px": "firmware/components/core/src/ui_ring.c:21",
     "ring.underline_gap_px": "firmware/components/core/src/ui_ring.c:19",
     "ring.underline_w_px": "firmware/components/core/src/ui_ring.c:18",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring.c:31",
-    "screens": "firmware/components/core/src/ui_home.c:627",
+    "screens": "firmware/components/core/src/ui_home.c:610",
+    "screens.agent": "firmware/components/core/src/ui_agent.c:209",
     "states": "firmware/components/core/src/ui_theme.c:10",
     "states.input_words": "firmware/components/core/src/ui_theme.c:31",
     "states.permission_colour": "firmware/components/core/src/ui_theme.c:23",

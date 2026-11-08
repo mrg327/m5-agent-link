@@ -227,10 +227,14 @@ def extract_gesture():
         g[key] = int(find(rel, rf"#define {macro}\s+(\d+)", f"gesture.{key}").group(1))
     # the hysteresis is capped at a third of a sector; fail loudly if that rule changes
     find(CORE + "gesture.c", r"GESTURE_SCRUB_HYST_DEG < width / 3\.0f", "gesture.scrub_hysteresis_cap")
-    g["hold_confirm_ms"] = int(find(CORE + "ui_internal.h", r"#define UI_HOLD_MS\s+(\d+)", "gesture.hold_confirm_ms").group(1))
-    home = CORE + "ui_home.c"
-    g["centre_r_px"] = int(find(home, r"#define CENTRE_R\s+(\d+)", "gesture.centre_r_px").group(1))
-    g["hold_show_ms"] = int(find(home, r"#define HOLD_SHOW_MS\s+(\d+)", "gesture.hold_show_ms").group(1))
+    # the safety rules live in the interaction layer (nav.h), not in any drawing file
+    nav = CORE + "nav.h"
+    g["hold_confirm_ms"] = int(find(nav, r"#define NAV_HOLD_MS\s+(\d+)", "gesture.hold_confirm_ms").group(1))
+    g["centre_r_px"] = int(find(nav, r"#define NAV_CENTRE_R\s+(\d+)", "gesture.centre_r_px").group(1))
+    g["hold_show_ms"] = int(find(nav, r"#define NAV_HOLD_SHOW_MS\s+(\d+)", "gesture.hold_show_ms").group(1))
+    g["card_arm_ms"] = int(find(nav, r"#define NAV_CARD_ARM_MS\s+(\d+)", "gesture.card_arm_ms").group(1))
+    g["long_swipe_px"] = int(find(nav, r"#define NAV_LONG_SWIPE_PX\s+(\d+)", "gesture.long_swipe_px").group(1))
+    g["agent_timeout_ms"] = int(find(nav, r"#define NAV_AGENT_TIMEOUT_MS\s+(\d+)", "gesture.agent_timeout_ms").group(1))
     find(CORE + "gesture.c", r"if \(btn == 1\) \{\s*emit\(g, G_BTN_B", "gesture.b_immediate", re.S)
     return g
 
@@ -240,10 +244,11 @@ def extract_ring():
     r = {}
     for key, macro in [("merge_at", "MERGE_AT"), ("ambient_ms", "AMBIENT_MS"), ("nag_ms", "NAG_MS"), ("nag_max", "NAG_MAX"),
                        # key badges beside the buttons (UI-V2 §4.1); the fact keys keep their old names for the Atlas
-                       ("hint_a_deg", "BADGE_A_DEG"), ("hint_b_deg", "BADGE_B_DEG"), ("hint_r_px", "BADGE_R"),
                        ("repo_w_px", "REPO_W"), ("repo_px", "REPO_PX"), ("repo_small_px", "REPO_SMALL_PX"),
                        ("summary_w_px", "SUMMARY_W")]:
         r[key] = int(find(home, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
+    for key, macro in [("hint_a_deg", "UI_BADGE_A_DEG"), ("hint_b_deg", "UI_BADGE_B_DEG"), ("hint_r_px", "UI_BADGE_R")]:
+        r[key] = int(find(CORE + "ui_theme.h", rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
     for key, macro in [("band_out_px", "BAND_OUT"), ("band_w_px", "BAND_W"), ("sel_out_px", "SEL_OUT"), ("sel_w_px", "SEL_W"),
                        ("seg_gap_deg", "SEG_GAP_DEG"), ("others_pct", "OTHERS_PCT"), ("underline_w_px", "UNDERLINE_W"),
                        ("underline_gap_px", "UNDERLINE_GAP"), ("dot_step_deg", "DOT_STEP_DEG"), ("track_w_px", "TRACK_W"),
@@ -270,46 +275,53 @@ def extract_ring():
     return r
 
 
-# Gesture cases handled by ui_home_gesture(), each with a hand-written description (cross-checked both ways).
+# The gesture map is one table in nav.c (interaction layer). Each nav action has a hand-written
+# description here; a new action in the source without one, or a stale one here, fails the check.
 ACTION_TEXT = {
-    "G_PRESS": "Finger down in the centre of a permission request starts the approve hold",
-    "G_RELEASE": "Lifting cancels a hold in progress",
-    "G_TAP": "Centre: the state's default action (Focus). On the ring: select that segment",
-    "G_DOUBLE_TAP": "Never produced by the recogniser; handled like a tap for injected input",
-    "G_LONG_PRESS": "Focus (Working, Question, Idle), acknowledge (Done, Error). On a permission request the hold approves",
-    "G_SWIPE_DOWN": "Deny a permission request (swipe down across the centre)",
-    "G_SCRUB_START": "A drag around the rim starts selecting sessions",
-    "G_SCRUB": "The finger crossed into another sector: select it, with a detent",
-    "G_SCRUB_END": "Finger lifted after a scrub: merged Done groups settle",
-    "G_BTN_A": "Default action: Focus (eyes-free version of tapping the centre)",
-    "G_BTN_A_DOUBLE": "Jump to the next session that needs attention",
-    "G_BTN_B": "Select the next session",
-    "G_BTN_B_LONG": "Select the previous session",
+    "NAV_HOLD_PRESS": "Finger down in the centre: arms a hold if a request is on screen and armed",
+    "NAV_HOLD_RELEASE": "Lifting cancels a hold in progress",
+    "NAV_FOCUS": "Focus the terminal (Done also acknowledges). On a request it is the review path: a tap never approves",
+    "NAV_OPEN_AGENT": "Open the per-agent wheel for the selected session",
+    "NAV_PICK_RIM": "Select the segment (HOME) or item (AGENT) under the finger",
+    "NAV_HOLD_LONG": "An injected long press that already covers the hold time approves directly",
+    "NAV_DENY": "Deny a permission request: a long swipe down that started above the centre",
+    "NAV_SCRUB": "A drag around the rim moves the selection with a detent per step",
+    "NAV_NEXT_ATTENTION": "Jump to the next session that needs attention",
+    "NAV_NEXT": "Next session (HOME) or next item (AGENT)",
+    "NAV_PREV": "Previous session",
+    "NAV_COMMIT": "Commit the selected item; a destructive item answers 'hold to confirm' instead",
+    "NAV_BACK": "Back to the deck (a long swipe down, or B held)",
+    "NAV_HOME": "A+B chord: straight back to the deck",
 }
+WHEN_TEXT = {"WHEN_ALWAYS": "", "WHEN_REQUEST": "with a request on screen", "WHEN_NO_REQUEST": "without a request"}
 
 
 def extract_gesture_map():
-    rel = CORE + "ui_home.c"
-    m = find(rel, r"bool ui_home_gesture\(const gesture_evt_t \*g\)\s*\{(.*?)\n\}\n", None, re.S)
+    rel = CORE + "nav.c"
+    m = find(rel, r"const nav_binding_t nav_bindings\[\] = \{(.*?)\n\};", None, re.S)
     base = line_of(rel, m.start(1))
     cases, seen = [], set()
     for i, ln in enumerate(m.group(1).split("\n")):
-        for c in re.findall(r"case (G_\w+):", ln):
-            if c not in ACTION_TEXT:
-                raise Drift(f"{rel}: gesture {c} has no description in extract.py")
-            seen.add(c)
-            cases.append({"gesture": c, "action": ACTION_TEXT[c], "source": f"{rel}:{base + i}"})
+        row = re.search(r"\{MODE_(\w+), (G_\w+), ZONE_(\w+), (WHEN_\w+), (NAV_\w+)\}", ln)
+        if not row:
+            continue
+        mode, g, zone, when, act = row.groups()
+        if act not in ACTION_TEXT:
+            raise Drift(f"{rel}: action {act} has no description in extract.py")
+        seen.add(act)
+        cases.append({"gesture": g, "mode": mode.lower(), "zone": zone.lower(), "when": WHEN_TEXT[when],
+                      "nav": act, "action": ACTION_TEXT[act], "source": f"{rel}:{base + i}"})
     if not cases:
-        raise Drift(f"no gesture cases in {rel}")
+        raise Drift(f"no gesture bindings in {rel}")
     stale = sorted(set(ACTION_TEXT) - seen)
     if stale:
-        raise Drift(f"extract.py describes gestures no longer in the source: {stale}")
+        raise Drift(f"extract.py describes nav actions no longer in the source: {stale}")
     find(CORE + "app.c", r"if \(power_activity\(app_now_ms\(\)\)\) return;", "gesture_map.wake_swallow")
     find(CORE + "app.c", r'case G_CHORD: dbg_event\("input", "chord"', "gesture_map.chord")
-    # per-state defaults from act_focus_selected / long-press branches, verified by pattern
-    find(rel, r"if \(s->state == SESS_DONE\) g_ui_actions->ack\(s->sid\);", "gesture_map.done_acks")
-    find(rel, r"if \(s->state == SESS_DONE \|\| s->state == SESS_ERROR\) act_ack_selected\(\);", "gesture_map.long_press_ack")
-    return {"cases": cases, "chord": "A + B held together is detected and logged, no action",
+    find(CORE + "ui_home.c", r"if \(s->state == SESS_DONE\) g_ui_actions->ack\(s->sid\);", "gesture_map.done_acks")
+    find(rel, r"\{MODE_HOME, G_TAP, ZONE_CENTRE, WHEN_REQUEST, NAV_FOCUS\}", "gesture_map.tap_never_approves")
+    find(CORE + "nav.c", r"bool nav_hold_may_start\(", "gesture_map.hold_bound_to_rid")
+    return {"cases": cases, "chord": "A + B held together: Home from any mode (logged on the deck, no action there)",
             "first_touch_wakes_only": True}
 
 
@@ -321,11 +333,14 @@ def extract_screens():
             for v in m.groups():
                 if v:
                     vals.setdefault(v, f"{rel}:{line_of(rel, m.start())}")
-    if set(vals) != {"ring", "attention"}:
+    ag = find(CORE + "ui_agent.c", r'snprintf\(r->screen, sizeof r->screen, "agent"\)', "screens.agent")
+    vals["agent"] = f"{CORE}ui_agent.c:{line_of(CORE + 'ui_agent.c', ag.start())}"
+    if set(vals) != {"ring", "attention", "agent"}:
         raise Drift(f"unexpected screen values {sorted(vals)}")
     SOURCES["screens"] = vals["attention"]
-    return [{"id": "ring", "title": "Ring", "source": vals["ring"]},
-            {"id": "attention", "title": "Ring · a request is waiting", "source": vals["attention"]}]
+    return [{"id": "ring", "title": "Deck", "source": vals["ring"]},
+            {"id": "attention", "title": "Deck · a request is waiting", "source": vals["attention"]},
+            {"id": "agent", "title": "Agent wheel", "source": vals["agent"]}]
 
 
 # ───────────────────────── haptics ─────────────────────────

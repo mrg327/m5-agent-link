@@ -1,0 +1,55 @@
+# The AGENT wheel: open with a tap, move with B and the rim, commit with A, placeholders toast.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite
+session 2 done api main Fixed the flaky retry test
+wait 300
+tap 233 233
+wait 300
+expect_screen agent
+expect_label Claude Code
+expect_label > Focus terminal
+expect_label 5 items
+shot agent_wheel.png
+btn B
+wait 150
+expect_label > Scroll terminal
+shot agent_wheel_scroll.png
+btn B
+wait 150
+expect_label > Snooze 30 min
+scrub 300 250 400
+wait 150
+expect_screen agent
+tap 233 233
+wait 200
+expect_screen ring
+shot agent_commit_toast.png
+# swipe up opens it too; a short swipe down is ignored, a long one goes back
+swipe 233 300 233 180 160
+wait 300
+expect_screen agent
+swipe 233 200 233 260 160
+wait 300
+expect_screen agent
+swipe 233 150 233 330 200
+wait 300
+expect_screen ring
+# chord = Home
+tap 233 233
+wait 300
+expect_screen agent
+chord
+wait 300
+expect_screen ring
+# commit a placeholder: toast and back to the deck
+tap 233 233
+wait 300
+btn B
+wait 150
+expect_label > Scroll terminal
+btn A
+wait 200
+expect_screen ring
+expect_label Scroll: coming soon
+quit

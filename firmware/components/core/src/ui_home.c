@@ -11,10 +11,6 @@
 #include "ui_ring.h"
 #include "ui_theme.h"
 
-#define CENTRE_R 150 /* a touch inside this radius is a centre touch; outside it is the rim */
-#define HOLD_SHOW_MS 250 /* the arc and the haptic ramp only start after this, so a tap never flashes them */
-#define CARD_ARM_MS 300  /* a hold only starts once the request has been on screen this long */
-#define DENY_MIN_PX 120  /* deny is a deliberate swipe: this long, starting above the centre line */
 #define AMBIENT_MS 30000
 #define MERGE_AT 9
 #define NAG_MS 15000
@@ -37,12 +33,6 @@
 #define HINT_Y 364    /* 16 px: "long swipe down to deny", between the badges and the link row */
 #define LINK_Y 392    /* 16 px: link · host · battery, or Offline · stale */
 
-/* Pebble-style key badges beside the physical buttons (angles clockwise from 12 o'clock):
- * KEYA lower-left at 7:30 (225 deg), KEYB lower-right at 4:30 (135 deg). Legends, not touch targets. */
-#define BADGE_A_DEG 225
-#define BADGE_B_DEG 135
-#define BADGE_R 158
-
 typedef struct {
     uint32_t sid;
     uint8_t n_merged; /* > 0: this slot stands for that many Done sessions */
@@ -61,10 +51,9 @@ static bool s_scrubbing, s_freeze_expand;
 static uint32_t s_now, s_last_input, s_last_elapsed;
 static bool s_ambient;
 
-static bool s_press_centre, s_holding, s_hold_fired, s_ramp_started;
+static bool s_holding, s_hold_fired, s_ramp_started;
 static uint32_t s_hold_t0, s_hold_rid;
 static uint32_t s_card_rid, s_card_t0; /* request on screen, and since when */
-static int s_rel_y;                    /* where the last touch lifted, for the deny swipe length */
 
 static uint32_t s_nag_rid, s_nag_next;
 static int s_nag_n;
@@ -402,12 +391,6 @@ static void act_focus_selected(void)
     if (s->state == SESS_DONE) g_ui_actions->ack(s->sid); /* focusing a finished session also acknowledges it */
 }
 
-static void act_ack_selected(void)
-{
-    const session_t *s = sel_session();
-    if (s) g_ui_actions->ack(s->sid);
-}
-
 static void next_attention(void)
 {
     const session_t *sel = sel_session();
@@ -445,94 +428,94 @@ static void hold_cancel(void)
     ring_set_progress(s_ring, 0, 0xffffff);
 }
 
-static bool centre_hit(int x, int y)
+/* Accessors for the mode plumbing in ui.c and the AGENT screen. */
+bool ui_home_request_pending(void) { return approvable(sel_session()) != NULL; }
+uint32_t ui_home_sel_sid(void) { return sel_session() ? s_sel_sid : 0; }
+lv_obj_t *ui_home_ring(void) { return s_ring; }
+void ui_home_note_input(void) { noted_input(); }
+void ui_home_set_card_shown(bool shown)
 {
-    int dx = x - UI_CX, dy = y - UI_CY;
-    return dx * dx + dy * dy < CENTRE_R * CENTRE_R;
+    if (shown) lv_obj_remove_flag(s_centre, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(s_centre, LV_OBJ_FLAG_HIDDEN);
 }
 
-bool ui_home_gesture(const gesture_evt_t *g)
+/* Acts on what the interaction layer decided (nav.c). The approve hold is the one safety-critical
+ * path: it starts only via NAV_HOLD_PRESS on an armed request (nav_hold_may_start) and is bound to
+ * that request id until it fires or the finger lifts. */
+bool ui_home_act(nav_action_t a, const gesture_evt_t *g)
 {
     if (g->kind != G_LIFT && g->kind != G_SHAKE) noted_input();
     const session_t *s = sel_session();
-    switch (g->kind) {
-    case G_PRESS:
-        s_press_centre = centre_hit(g->x, g->y);
+    switch (a) {
+    case NAV_HOLD_PRESS: {
         s_hold_fired = false;
-        if (s_press_centre && approvable(s) && s_card_rid == model_attention_for_sid(s->sid)->rid &&
-            s_now - s_card_t0 >= CARD_ARM_MS) {
+        const attention_t *req = approvable(s);
+        if (req && nav_hold_may_start(s_card_rid, s_card_t0, req->rid, s_now)) {
             s_holding = true;
             s_ramp_started = false;
             s_hold_t0 = s_now;
-            s_hold_rid = model_attention_for_sid(s->sid)->rid;
+            s_hold_rid = req->rid;
         }
         return true;
-    case G_RELEASE:
-        s_rel_y = g->y;
+    }
+    case NAV_HOLD_RELEASE:
         hold_cancel();
         return true;
-    case G_DOUBLE_TAP:
-    case G_TAP:
-        if (centre_hit(g->x, g->y)) act_focus_selected();
-        else {
-            int i = ring_hit(s_ring, g->x, g->y);
-            if (i >= 0) select_idx(i, "tap", g_ui_actions->tick);
+    case NAV_FOCUS:
+        act_focus_selected();
+        return true;
+    case NAV_PICK_RIM: {
+        int i = ring_hit(s_ring, g->x, g->y);
+        if (i >= 0) select_idx(i, "tap", g_ui_actions->tick);
+        return true;
+    }
+    case NAV_HOLD_LONG: { /* an injected long press that already covers the hold time approves directly */
+        if (s_hold_fired || !s) return false;
+        const attention_t *req = approvable(s);
+        if (req && g->dur_ms >= NAV_HOLD_MS && nav_hold_may_start(s_card_rid, s_card_t0, req->rid, s_now)) {
+            hold_cancel();
+            s_hold_fired = true;
+            g_ui_actions->approve(s->sid, req->rid, g->dur_ms);
         }
         return true;
-    case G_LONG_PRESS: {
-        if (!s_press_centre || s_hold_fired || !s) return false;
-        const attention_t *a = approvable(s);
-        if (a) { /* an injected long press that already covers the hold time approves directly */
-            if (g->dur_ms >= UI_HOLD_MS && s_card_rid == a->rid && s_now - s_card_t0 >= CARD_ARM_MS) {
-                hold_cancel();
-                s_hold_fired = true;
-                g_ui_actions->approve(s->sid, a->rid, g->dur_ms);
-            }
+    }
+    case NAV_DENY: {
+        const attention_t *req = approvable(s);
+        if (!req || !(req->acts & (1u << ACT_DENY))) return false;
+        /* g->y is where the swipe started; the release recorded where it ended. */
+        if (!nav_long_swipe_down(g->y, ui_last_release_y())) return true; /* too short: ignore, but consume */
+        hold_cancel();
+        g_ui_actions->deny(s->sid, req->rid);
+        return true;
+    }
+    case NAV_SCRUB:
+        if (g->kind == G_SCRUB_START) {
+            s_scrubbing = true;
+            s_freeze_expand = false;
+        }
+        if (g->kind == G_SCRUB_END) {
+            s_scrubbing = false;
+            s_freeze_expand = false;
+            rebuild();
+            update_centre();
             return true;
         }
-        if (s->state == SESS_DONE || s->state == SESS_ERROR) act_ack_selected();
-        else act_focus_selected(); /* Working, Needs input, Idle: long press = Focus */
-        return true;
-    }
-    case G_SWIPE_DOWN: {
-        const attention_t *a = approvable(s);
-        if (!s_press_centre || !a || !(a->acts & (1u << ACT_DENY))) return false;
-        /* g->y is where the swipe started; G_RELEASE (sent just before) recorded where it ended. */
-        if (g->y >= UI_CY || s_rel_y - g->y < DENY_MIN_PX) return true; /* too short: ignore, but consume */
-        hold_cancel();
-        g_ui_actions->deny(s->sid, a->rid);
-        return true;
-    }
-    case G_SCRUB_START:
-        s_scrubbing = true;
-        s_freeze_expand = false;
-        /* fall through */
-    case G_SCRUB:
         if (select_idx(g->x, "scrub", g_ui_actions->detent) && s_n > 0) {
             int i = g->y * s_n / 360;
             select_idx(i < s_n ? i : s_n - 1, "scrub", NULL);
         }
         return true;
-    case G_SCRUB_END:
-        s_scrubbing = false;
-        s_freeze_expand = false;
-        rebuild();
-        update_centre();
-        return true;
-    case G_BTN_A:
-        act_focus_selected();
-        return true;
-    case G_BTN_A_DOUBLE:
+    case NAV_NEXT_ATTENTION:
         next_attention();
         return true;
-    case G_BTN_B:
+    case NAV_NEXT:
         step_selection(1, "btn");
         return true;
-    case G_BTN_B_LONG:
+    case NAV_PREV:
         step_selection(-1, "btn");
         return true;
     default:
-        return false; /* A long, chord, swipes, lift, shake: no action */
+        return false; /* reserved or not for this screen */
     }
 }
 
@@ -557,14 +540,14 @@ void ui_home_tick(uint32_t now)
             hold_cancel();
         } else {
             uint32_t el = now - s_hold_t0;
-            if (el >= HOLD_SHOW_MS) {
+            if (el >= NAV_HOLD_SHOW_MS) {
                 if (!s_ramp_started) {
                     s_ramp_started = true;
                     g_ui_actions->hold_start();
                 }
-                ring_set_progress(s_ring, (int)(el * 1000 / UI_HOLD_MS), theme_session_rgb(s)); /* the item's colour */
+                ring_set_progress(s_ring, (int)(el * 1000 / NAV_HOLD_MS), theme_session_rgb(s)); /* the item's colour */
             }
-            if (el >= UI_HOLD_MS) {
+            if (el >= NAV_HOLD_MS) {
                 s_hold_fired = true;
                 s_holding = false;
                 s_ramp_started = false;
@@ -686,39 +669,10 @@ lv_obj_t *ui_home_init(void)
     s_link = theme_label(s_centre, 16, COL_MUTED);
     place(s_link, LINK_Y, 240);
 
-    /* Key badges: a key cap with the button's letter, and the word for what it does. A reads
-     * "[A] FOCUS" with the cap on the button side; B reads "NEXT [B]". */
-    static const int deg[2] = {BADGE_A_DEG, BADGE_B_DEG};
     static const char *const words[2] = {"FOCUS", "NEXT"};
-    for (int i = 0; i < 2; i++) {
-        lv_obj_t *b = s_badge[i] = lv_obj_create(s_centre);
-        lv_obj_remove_style_all(b);
-        lv_obj_set_size(b, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-        lv_obj_set_flex_flow(b, LV_FLEX_FLOW_ROW);
-        lv_obj_set_flex_align(b, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_column(b, 6, 0);
-        lv_obj_remove_flag(b, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_t *cap = lv_obj_create(b);
-        lv_obj_remove_style_all(cap);
-        lv_obj_set_size(cap, UI_KEYCAP_PX, UI_KEYCAP_PX);
-        lv_obj_set_style_radius(cap, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_opa(cap, LV_OPA_COVER, 0);
-        lv_obj_set_style_bg_color(cap, COL_SURFACE2, 0);
-        lv_obj_set_style_border_width(cap, 1, 0);
-        lv_obj_set_style_border_color(cap, COL_BORDER, 0);
-        lv_obj_remove_flag(cap, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-        s_key[i] = theme_label(cap, 16, COL_TEXT);
-        lv_label_set_text(s_key[i], i == 0 ? "A" : "B");
-        lv_obj_center(s_key[i]);
-        s_word[i] = theme_label(b, 16, i == 0 ? COL_TEXT : COL_MUTED);
-        lv_label_set_text(s_word[i], words[i]);
-        if (i == 1) lv_obj_move_to_index(cap, 1); /* word first, cap on the button side */
-        float rad = (float)deg[i] * 3.14159265f / 180.0f;
-        lv_obj_update_layout(b);
-        int w = lv_obj_get_width(b), h = lv_obj_get_height(b);
-        lv_obj_set_pos(b, UI_CX + (int)((float)BADGE_R * sinf(rad)) - w / 2,
-                       UI_CY - (int)((float)BADGE_R * cosf(rad)) - h / 2);
-    }
+    for (int i = 0; i < 2; i++)
+        s_badge[i] = theme_key_badge(s_centre, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,
+                                     UI_BADGE_R, &s_key[i], &s_word[i]);
     lv_obj_t *all[] = {s_agent, s_repo, s_state, s_summary, s_elapsed, s_req_title, s_req_text, s_pill_lbl, s_hint, s_link};
     for (size_t i = 0; i < sizeof all / sizeof all[0]; i++) lv_label_set_text(all[i], "");
     ui_home_animations_changed();

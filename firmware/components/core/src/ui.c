@@ -12,7 +12,9 @@
 #define TOAST_MS 1800
 
 const ui_actions_t *g_ui_actions;
-static lv_obj_t *s_home;
+static lv_obj_t *s_home, *s_agent;
+static nav_mode_t s_mode = MODE_HOME;
+static int s_rel_y;
 static bool s_link_up, s_animate = true;
 static uint32_t s_seen_rev;
 static uint32_t s_now_ms;
@@ -63,6 +65,7 @@ void ui_init(const ui_actions_t *actions)
 {
     g_ui_actions = actions;
     s_home = ui_home_init();
+    s_agent = ui_agent_init(s_home);
     create_overlays();
     lv_screen_load(s_home);
     ui_home_refresh(0);
@@ -101,7 +104,28 @@ void ui_set_link_transport(int kind)
     s_seen_rev = 0;
 }
 
-void ui_show_session(uint32_t sid) { ui_home_select_sid(sid, "attention"); }
+nav_mode_t ui_mode(void) { return s_mode; }
+int ui_last_release_y(void) { return s_rel_y; }
+
+static void enter_mode(nav_mode_t m)
+{
+    if (m == s_mode) return;
+    if (s_mode == MODE_AGENT) ui_agent_close();
+    s_mode = m;
+    ui_home_set_card_shown(m == MODE_HOME);
+    if (m == MODE_AGENT) ui_agent_open(ui_home_sel_sid(), s_now_ms);
+    else ui_home_refresh(s_now_ms); /* the ring shows sessions again */
+    dbg_event("ui", "mode", "\"mode\":\"%s\"", nav_mode_name(m));
+}
+
+void ui_go_home(void) { enter_mode(MODE_HOME); }
+
+/* An attention always lands on the deck, whatever was open. */
+void ui_show_session(uint32_t sid)
+{
+    enter_mode(MODE_HOME);
+    ui_home_select_sid(sid, "attention");
+}
 
 void ui_report_add(ui_report_t *r, const char *fmt, ...)
 {
@@ -116,7 +140,9 @@ void ui_report(ui_report_t *r)
 {
     memset(r, 0, sizeof *r);
     r->power = "active";
-    ui_home_report(r);
+    if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", lv_label_get_text(s_toast_label));
+    if (s_mode == MODE_AGENT) ui_agent_report(r);
+    else ui_home_report(r);
 }
 
 /* ───────── toast & glow ───────── */
@@ -153,11 +179,45 @@ void ui_tick(uint32_t now_ms)
     if (model_rev() != s_seen_rev) {
         s_seen_rev = model_rev();
         ui_home_refresh(now_ms);
+        if (s_mode == MODE_AGENT && !ui_agent_refresh(now_ms)) enter_mode(MODE_HOME);
     }
     ui_home_tick(now_ms);
+    if (s_mode == MODE_AGENT && ui_agent_tick(now_ms)) enter_mode(MODE_HOME);
 }
 
+/* The interaction layer maps the gesture to an action; mode changes are handled here, everything
+ * else goes to the screen that owns the mode. */
 bool ui_on_gesture(const gesture_evt_t *g)
 {
-    return ui_home_gesture(g);
+    if (g->kind == G_RELEASE) s_rel_y = g->y;
+    nav_zone_t zone = nav_centre(g->x, g->y) ? ZONE_CENTRE : ZONE_RIM;
+    nav_action_t a = nav_lookup(s_mode, g->kind, zone, ui_home_request_pending());
+    if (a != NAV_NONE && g->kind != G_PRESS && g->kind != G_RELEASE)
+        dbg_event("ui", "nav", "\"mode\":\"%s\",\"gesture\":\"%s\",\"action\":\"%s\"", nav_mode_name(s_mode),
+                  gesture_name(g->kind), nav_action_name(a));
+    switch (a) {
+    case NAV_OPEN_AGENT:
+        ui_home_note_input();
+        if (!ui_home_sel_sid()) {
+            g_ui_actions->reject();
+            return true;
+        }
+        enter_mode(MODE_AGENT);
+        g_ui_actions->tick();
+        return true;
+    case NAV_BACK:
+        if (g->kind == G_SWIPE_DOWN && !nav_long_swipe_down(g->y, s_rel_y)) return true; /* too short: ignored */
+        enter_mode(MODE_HOME);
+        g_ui_actions->tick();
+        return true;
+    case NAV_HOME:
+        enter_mode(MODE_HOME);
+        return true;
+    default: break;
+    }
+    if (s_mode == MODE_AGENT) {
+        ui_home_note_input();
+        return ui_agent_act(a, g);
+    }
+    return ui_home_act(a, g);
 }

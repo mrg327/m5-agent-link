@@ -24,6 +24,11 @@
 /* Round language (UI-V2 §4.1, capsules): key caps are circles, the action pill and the toast are
  * filled with a tint of their state colour instead of a border. */
 #define UI_KEYCAP_PX 24
+/* Key badges sit beside the physical buttons (clockwise from 12 o'clock): KEYA lower-left at 7:30,
+ * KEYB lower-right at 4:30. Legends, not touch targets. */
+#define UI_BADGE_A_DEG 225
+#define UI_BADGE_B_DEG 135
+#define UI_BADGE_R 158
 #define UI_PILL_TINT_OPA LV_OPA_20 /* pill background: state colour at this opacity over black */
 #define UI_TOAST_TINT_MIX 60       /* toast background: lv_color_mix(state colour, black, this) */
 
@@ -53,3 +58,6 @@ void theme_elapsed(char *dst, size_t cap, uint32_t secs);
 /* "42s", "4m 12s", "1h 05m". */
 void theme_elapsed_long(char *dst, size_t cap, uint32_t secs);
 uint32_t theme_now_unix(void);
+/* "[A] WORD" (key_left) or "WORD [B]": a circular key cap and a word, centred at polar (deg, r). */
+lv_obj_t *theme_key_badge(lv_obj_t *parent, const char *key, const char *word, bool key_left, int deg, int r,
+                          lv_obj_t **key_out, lv_obj_t **word_out);
