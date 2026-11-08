@@ -356,8 +356,9 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
             let res = match (cmd.rid, decision) {
                 (None, _) => fail(ResultErr::Denied, "rid required"),
                 (_, None) => fail(ResultErr::Denied, "reply needs an option index"),
-                (Some(_), Some(Decision::Approve))
-                    if cmd.hold_ms.unwrap_or(0) < MIN_APPROVE_HOLD_MS =>
+                (Some(rid), Some(ref d))
+                    if shared.broker.grants(rid, d)
+                        && cmd.hold_ms.unwrap_or(0) < MIN_APPROVE_HOLD_MS =>
                 {
                     fail(ResultErr::Denied, "hold-to-confirm too short")
                 }
@@ -548,10 +549,21 @@ mod tests {
             panic!()
         };
         assert_eq!((att.rid, att.grant_mask), (rid, Some(3)));
+        // a granting option needs the full hold too, even though it travels as a reply
+        for short in [None, Some(400)] {
+            d.to_daemon
+                .send(cmd_bytes(
+                    4,
+                    cmd(CmdOp::Reply, Some(rid), Some(Arg::Uint(1)), short),
+                ))
+                .unwrap();
+            let r = result_of(&mut d).await;
+            assert_eq!((r.ok, r.err), (false, Some(ResultErr::Denied)));
+        }
         d.to_daemon
             .send(cmd_bytes(
                 4,
-                cmd(CmdOp::Reply, Some(rid), Some(Arg::Uint(1)), None),
+                cmd(CmdOp::Reply, Some(rid), Some(Arg::Uint(1)), Some(1250)),
             ))
             .unwrap();
         assert!(result_of(&mut d).await.ok);

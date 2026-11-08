@@ -159,7 +159,7 @@ bool link_send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms)
     return send_cmd(op, sid, rid, hold_ms, false, 0);
 }
 
-bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg)
+bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg, uint32_t hold_ms)
 {
-    return send_cmd(op, sid, rid, 0, true, arg);
+    return send_cmd(op, sid, rid, hold_ms, true, arg);
 }

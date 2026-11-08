@@ -229,6 +229,23 @@ impl Broker {
     }
 
     /// Ends a request without a device decision (timeout, terminal answer, hook gone).
+    /// True when `decision` on `rid` would grant permission (Approve, or a reply whose option
+    /// means allow): the caller must then insist on a full hold, whichever op carried it.
+    pub fn grants(&self, rid: u64, decision: &Decision) -> bool {
+        let g = self.inner.lock().unwrap();
+        let Some(p) = g.pending.get(&rid) else {
+            return false;
+        };
+        match decision {
+            Decision::Approve => p.att.kind == AttKind::Approval,
+            Decision::Deny => false,
+            Decision::Reply(i) => matches!(
+                p.meanings.get(*i),
+                Some(Meaning::Allow) | Some(Meaning::AllowGrant)
+            ),
+        }
+    }
+
     pub fn cancel(&self, rid: u64, why: ClearWhy) -> bool {
         let removed = self.inner.lock().unwrap().pending.remove(&rid);
         if removed.is_some() {

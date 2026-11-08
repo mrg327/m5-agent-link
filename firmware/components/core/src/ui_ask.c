@@ -193,7 +193,7 @@ static void commit(const attention_t *a, int idx, uint32_t hold_ms)
     dbg_event("ui", "commit", "\"sid\":%u,\"rid\":%u,\"item\":%d,\"opt\":%d,\"hold_ms\":%u", (unsigned)s_sid,
               (unsigned)a->rid, (int)it->id, it->opt, (unsigned)hold_ms);
     switch (it->id) {
-    case ASK_OPT: g_ui_actions->reply(s_sid, a->rid, (uint8_t)it->opt); break;
+    case ASK_OPT: g_ui_actions->reply(s_sid, a->rid, (uint8_t)it->opt, hold_ms); break;
     case ASK_APPROVE: g_ui_actions->approve(s_sid, a->rid, hold_ms); break;
     case ASK_DENY: g_ui_actions->deny(s_sid, a->rid); break;
     case ASK_OPEN_PC:

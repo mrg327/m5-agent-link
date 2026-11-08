@@ -138,9 +138,10 @@ static void act_deny(uint32_t sid, uint32_t rid)
 }
 
 /* cmd_op_reply {rid, arg: option index}: a question's answer, or one of a permission's own choices. */
-static void act_reply(uint32_t sid, uint32_t rid, uint8_t opt)
+static void act_reply(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms)
 {
-    bool sent = link_send_cmd_arg(LINK_OP_REPLY, sid, rid, opt);
+    /* hold_ms rides along so the daemon can re-check a grant option's hold, as it does for approve */
+    bool sent = link_send_cmd_arg(LINK_OP_REPLY, sid, rid, opt, hold_ms);
     if (sent) {
         model_attention_set_answer(rid, ATT_ANSWER_REPLY, opt);
         feedback_reply_sent();
@@ -160,7 +161,7 @@ static void act_ack(uint32_t sid)
 
 static void act_snooze(uint32_t sid)
 {
-    bool sent = link_send_cmd_arg(LINK_OP_SNOOZE, sid, 0, 30); /* minutes, stated rather than defaulted */
+    bool sent = link_send_cmd_arg(LINK_OP_SNOOZE, sid, 0, 30, 0); /* minutes, stated rather than defaulted */
     if (sent) feedback_tick();
     else feedback_reject();
     toast_cmd_result(sent, "Snoozed 30 min");

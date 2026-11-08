@@ -25,7 +25,7 @@ typedef struct {
     void (*focus)(uint32_t sid);
     void (*approve)(uint32_t sid, uint32_t rid, uint32_t hold_ms);
     void (*deny)(uint32_t sid, uint32_t rid);
-    void (*reply)(uint32_t sid, uint32_t rid, uint8_t opt); /* ASK: answer a question / pick a grant option */
+    void (*reply)(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms); /* ASK: answer a question / pick a grant option */
     void (*ack)(uint32_t sid);
     void (*snooze)(uint32_t sid);      /* AGENT: snooze this session for 30 min */
     void (*notify_done)(uint32_t sid); /* AGENT: buzz when this session finishes */

@@ -42,4 +42,4 @@ hal_link_kind_t link_active_kind(void);
 /* Returns false unless welcomed. */
 bool link_send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms);
 /* Same, with a uint `arg` (snooze minutes, reply option index). */
-bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg);
+bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg, uint32_t hold_ms);
