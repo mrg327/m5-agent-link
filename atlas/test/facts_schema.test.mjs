@@ -49,6 +49,7 @@ test('ring facts: screens, per-kind shapes, pills and the gesture cases', () => 
   assert.ok(facts.gesture_map.cases.some((c) => c.mode === 'status'));
   assert.ok(facts.gesture.status_timeout_ms > 0 && facts.gesture.quiet_step1_s < facts.gesture.quiet_step2_s);
   assert.ok(facts.gesture.drag_step_px > facts.gesture.tap_slop_px && facts.gesture.scroll_lines_per_step > 0);
+  assert.ok(facts.gesture.flick_px_per_s > 0 && facts.gesture.flick_window_ms > 0 && facts.gesture.flick_window_ms < facts.gesture.swipe_max_ms);
 });
 
 test('haptics have steps with duty, the rim detent and the approve ramp', () => {

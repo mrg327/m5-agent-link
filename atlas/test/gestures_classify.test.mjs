@@ -39,14 +39,14 @@ test('slop is strict: exactly tap_slop_px still counts as a tap', () => {
   assert.equal(kinds().at(-1), 'tap');
 });
 
-test('a slow or short drag emits no gesture, and keeps a pending tap', () => {
+test('a slow or short drag emits no swipe or tap (only the centre drag steps), and keeps a pending tap', () => {
   const { c, kinds } = rig();
   c.touch(true, 100, 100, 0);
   c.touch(false, 100, 100, 50); // tap
-  c.touch(true, 100, 200, 100);
+  c.touch(true, 100, 200, 100); // inside the rim: a vertical move streams drag steps (SCROLL binds them)
   c.touch(true, 100, 230, 150); // moved, but under swipe_min_px
   c.touch(false, 100, 230, 200);
-  assert.deepEqual(kinds(), ['press', 'release', 'tap', 'press', 'release']);
+  assert.deepEqual(kinds(), ['press', 'release', 'tap', 'press', 'drag', 'release']);
   c.touch(true, 300, 100, 1000);
   c.touch(true, 300, 200, 1100);
   c.touch(false, 300, 300, 1000 + th.swipe_max_ms + 1);
@@ -232,3 +232,83 @@ test('a hold in the centre fires long_press from tick; a centre tap is immediate
   assert.equal(kinds().at(-1), 'tap');
 });
 
+// ── drag stream and flick (SCROLL): the same cases as simulator/tests/test_gesture.c ──
+
+test('a slow drag in the centre emits one drag per drag_step_px, carrying the press point and the step', () => {
+  const { c, ev, kinds } = rig();
+  c.touch(true, 233, 260, 0);
+  for (let i = 1; i <= 12; i++) c.touch(true, 233, 260 - i * 8, i * 50); // 96 px up over 600 ms
+  const drags = ev.filter((e) => e.kind === 'drag');
+  assert.equal(drags.length, 96 / th.drag_step_px);
+  assert.deepEqual([drags[0].dy, drags[0].x, drags[0].y, drags[0].dx], [-th.drag_step_px, 233, 260, 0]);
+  assert.ok(c.dragging);
+  c.touch(false, 233, 164, 650);
+  assert.ok(!kinds().includes('tap') && !kinds().some((k) => k.startsWith('swipe')), 'a slow drag ends without a tap or a swipe');
+});
+
+test('a jump of more than one step is one drag of several steps, and the remainder carries', () => {
+  const { c, ev } = rig();
+  const step = th.drag_step_px; // 24
+  c.touch(true, 233, 200, 0);
+  c.touch(true, 233, 250, 30); // 50 px at once: two whole steps, 2 px carry
+  let drags = ev.filter((e) => e.kind === 'drag');
+  assert.deepEqual(drags.map((d) => d.dy), [2 * step]);
+  c.touch(true, 233, 300, 60);
+  drags = ev.filter((e) => e.kind === 'drag');
+  assert.deepEqual(drags.map((d) => d.dy), [2 * step, 2 * step]);
+  c.touch(true, 233, 320, 90);
+  drags = ev.filter((e) => e.kind === 'drag');
+  assert.deepEqual(drags.map((d) => d.dy), [2 * step, 2 * step, step], 'the remainders add up to one more step');
+});
+
+test('a fast swipe streams its drag steps and then ends in a flick that carries its travel', () => {
+  const { c, ev } = rig();
+  c.touch(true, 233, 300, 0);
+  for (let i = 1; i <= 6; i++) c.touch(true, 233, 300 - i * 25, i * 20); // 150 px in 120 ms
+  c.touch(false, 233, 150, 125);
+  assert.equal(ev.filter((e) => e.kind === 'drag').length, 6);
+  const last = ev.at(-1);
+  assert.equal(last.kind, 'swipe_u');
+  assert.equal(last.flick, true);
+  assert.deepEqual([last.dx, last.dy], [0, -150]);
+});
+
+test('a slow swipe is a swipe without the flick flag', () => {
+  const { c, ev } = rig();
+  c.touch(true, 233, 300, 0);
+  for (let i = 1; i <= 8; i++) c.touch(true, 233, 300 - i * 10, i * 45); // 80 px in 360 ms
+  c.touch(false, 233, 220, 365);
+  const last = ev.at(-1);
+  assert.equal(last.kind, 'swipe_u');
+  assert.equal(last.flick, false);
+  assert.equal(last.dy, -80);
+});
+
+test('the flick speed is measured over the last flick_window_ms only', () => {
+  const { c, ev } = rig();
+  c.touch(true, 233, 300, 0);
+  for (let i = 1; i <= 6; i++) c.touch(true, 233, 300 - i * 25, i * 20); // fast start: 150 px in 120 ms
+  for (let i = 1; i <= 4; i++) c.touch(true, 233, 150 - i * 2, 120 + i * 50); // then a crawl for 200 ms
+  c.touch(false, 233, 142, 325);
+  assert.equal(ev.at(-1).kind, 'swipe_u');
+  assert.equal(ev.at(-1).flick, false, 'a swipe that slows before the lift is not a flick');
+});
+
+test('a rim scrub and a press that started on the rim never emit drag steps', () => {
+  let r = rig();
+  r.c.setSectors(8);
+  dragRim(r.c, 10, 80, 2, 200);
+  assert.ok(!r.kinds().includes('drag'));
+  r = rig();
+  r.c.touch(true, 233, 233 - 200, 0); // on the rim band
+  r.c.touch(true, 233, 233 - 150, 20);
+  r.c.touch(true, 233, 233 - 100, 40);
+  assert.ok(!r.kinds().includes('drag') && !r.c.dragging);
+});
+
+test('a drag or swipe carries no flick fields on other events (tap stays as it was)', () => {
+  const { c, ev } = rig();
+  c.touch(true, 100, 100, 0);
+  c.touch(false, 100, 100, 50);
+  assert.deepEqual(ev.at(-1), { kind: 'tap', x: 100, y: 100, dur_ms: 50 });
+});

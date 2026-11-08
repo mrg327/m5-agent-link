@@ -1,13 +1,15 @@
 // JS mirror of firmware/components/core/src/gesture.c: the touch recogniser, the rim-scrub
-// recogniser and the button logic (A double-press, A+B chord). Keep it honest: when that C file
-// changes, change this too. Thresholds come from facts.json, never hard-coded. There is no tap
-// deferral any more: a tap fires on release.
+// recogniser, the centre drag stream with the release-speed flick (SCROLL, UI-V2 §4.4) and the
+// button logic (A double-press, A+B chord). Keep it honest: when that C file changes, change this
+// too. Thresholds come from facts.json, never hard-coded. There is no tap deferral any more: a tap
+// fires on release.
 //
 // Time is explicit (milliseconds), as in the C code, so it is deterministic and testable.
 
 const SWIPE = { right: 'swipe_r', left: 'swipe_l', down: 'swipe_d', up: 'swipe_u' };
 
 const wrap180 = (d) => { while (d > 180) d -= 360; while (d <= -180) d += 360; return d; };
+const HIST = 8; // GESTURE_HIST: recent samples kept for the release speed
 
 /** Angle of a point around the screen centre, 0..360 from 12 o'clock, clockwise (gesture_angle_deg). */
 export function angleDeg(th, x, y) {
@@ -20,18 +22,21 @@ export function angleDeg(th, x, y) {
 /**
  * @param {(evt:{kind:string,x:number,y:number,dur_ms:number})=>void} cb
  * @param {object} th facts.gesture
- * Kinds: press, release, tap, long_press, swipe_u/d/l/r, scrub_start, scrub, scrub_end (x = sector,
- * y = angle, dur_ms = arc swept), btn_a, btn_b, btn_a_long, btn_b_long, btn_a_double, chord
+ * Kinds: press, release, tap, long_press, swipe_u/d/l/r (with dx, dy = whole travel and flick =
+ * released at flick speed), drag (x, y = press point, dy = the step, up < 0; one per drag_step_px of
+ * vertical travel from a press inside the rim), scrub_start, scrub, scrub_end (x = sector, y = angle,
+ * dur_ms = arc swept), btn_a, btn_b, btn_a_long, btn_b_long, btn_a_double, chord
  */
 export function createClassifier(cb, th) {
   const g = {
     pressed: false, moved: false, longFired: false, tDown: 0,
     x0: 0, y0: 0, x: 0, y: 0,
     sectors: 0, rimCandidate: false, scrubbing: false, lastDeg: 0, arcDeg: 0, sector: 0,
+    centreStart: false, dragging: false, dragY: 0, hist: [],
     aPending: false, aReleaseMs: 0,
     btn: [0, 1].map(() => ({ down: false, longFired: false, consumed: false, second: false, tDown: 0 })),
   };
-  const emit = (kind, x, y, dur) => cb({ kind, x: Math.trunc(x), y: Math.trunc(y), dur_ms: Math.trunc(dur) });
+  const emit = (kind, x, y, dur, extra) => cb({ kind, x: Math.trunc(x), y: Math.trunc(y), dur_ms: Math.trunc(dur), ...(extra || {}) });
   const sectorOf = (deg) => {
     if (g.sectors < 2) return 0;
     const s = Math.trunc(deg * g.sectors / 360);
@@ -67,6 +72,31 @@ export function createClassifier(cb, th) {
     }
   }
 
+  const histPush = (x, y, t) => { g.hist.push({ x: Math.trunc(x), y: Math.trunc(y), t }); if (g.hist.length > HIST) g.hist.shift(); };
+
+  // Speed over the oldest sample still inside the flick window, in px/s (release_speed).
+  function releaseSpeed(t) {
+    let best = null;
+    for (let k = g.hist.length - 1; k >= 0; k--) {
+      if (t - g.hist[k].t > th.flick_window_ms) break;
+      best = g.hist[k];
+    }
+    if (!best) return 0;
+    const dt = t - best.t;
+    if (dt === 0) return 0;
+    return Math.trunc(Math.hypot(g.x - best.x, g.y - best.y) * 1000 / dt);
+  }
+
+  // Drag stream (SCROLL): every drag_step_px of vertical travel from a press inside the rim (drag_track).
+  function dragTrack(y, t) {
+    const d = y - g.dragY;
+    if (Math.abs(d) < th.drag_step_px) return;
+    const step = Math.trunc(d / th.drag_step_px) * th.drag_step_px;
+    g.dragY += step;
+    g.dragging = true;
+    emit('drag', g.x0, g.y0, t - g.tDown, { dx: 0, dy: step });
+  }
+
   function finishTouch(t) {
     const dur = t - g.tDown;
     g.pressed = false;
@@ -82,7 +112,7 @@ export function createClassifier(cb, th) {
       const dx = g.x - g.x0, dy = g.y - g.y0;
       if (dur > th.swipe_max_ms || (Math.abs(dx) < th.swipe_min_px && Math.abs(dy) < th.swipe_min_px)) return;
       const k = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? SWIPE.right : SWIPE.left) : (dy > 0 ? SWIPE.down : SWIPE.up);
-      emit(k, g.x0, g.y0, dur);
+      emit(k, g.x0, g.y0, dur, { dx, dy, flick: releaseSpeed(t) >= th.flick_px_per_s });
       return;
     }
     emit('tap', g.x0, g.y0, dur);
@@ -100,12 +130,19 @@ export function createClassifier(cb, th) {
         g.lastDeg = deg;
         g.arcDeg = 0;
         g.rimCandidate = r >= th.rim_in_px && r <= th.rim_out_px;
+        g.centreStart = r < th.rim_in_px;
+        g.dragging = false;
+        g.dragY = g.y0;
+        g.hist = [];
+        histPush(x, y, t);
         emit('press', x, y, 0);
       } else if (down) {
         g.x = Math.trunc(x);
         g.y = Math.trunc(y);
+        histPush(x, y, t);
         if (Math.abs(x - g.x0) > th.tap_slop_px || Math.abs(y - g.y0) > th.tap_slop_px) g.moved = true;
         if (g.rimCandidate) rimTrack(x, y);
+        else if (g.centreStart) dragTrack(g.y, t);
       } else if (g.pressed) {
         finishTouch(t);
       }
@@ -160,6 +197,7 @@ export function createClassifier(cb, th) {
       if (g.scrubbing) g.sector = sectorOf(g.lastDeg);
     },
     get scrubbing() { return g.scrubbing; },
-    get state() { return { ...g, btn: g.btn.map((b) => ({ ...b })) }; },
+    get dragging() { return g.dragging; },
+    get state() { return { ...g, hist: g.hist.map((s) => ({ ...s })), btn: g.btn.map((b) => ({ ...b })) }; },
   };
 }

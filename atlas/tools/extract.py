@@ -239,6 +239,7 @@ def extract_gesture():
     # SCROLL (UI-V2 §4.4): the drag stream and the flick come from the recogniser, the rate from nav.h
     g["drag_step_px"] = int(find(rel, r"#define GESTURE_DRAG_STEP_PX\s+(\d+)", "gesture.drag_step_px").group(1))
     g["flick_px_per_s"] = int(find(rel, r"#define GESTURE_FLICK_PX_PER_S\s+(\d+)", "gesture.flick_px_per_s").group(1))
+    g["flick_window_ms"] = int(find(rel, r"#define GESTURE_FLICK_WINDOW_MS\s+(\d+)", "gesture.flick_window_ms").group(1))
     g["scroll_lines_per_step"] = int(find(nav, r"#define NAV_SCROLL_LINES_PER_STEP\s+(\d+)", "gesture.scroll_lines_per_step").group(1))
     g["scroll_coalesce_ms"] = int(find(nav, r"#define NAV_SCROLL_COALESCE_MS\s+(\d+)", "gesture.scroll_coalesce_ms").group(1))
     g["scroll_timeout_ms"] = int(find(nav, r"#define NAV_SCROLL_TIMEOUT_MS\s+(\d+)", "gesture.scroll_timeout_ms").group(1))
