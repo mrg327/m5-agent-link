@@ -92,6 +92,7 @@ struct feature_r {
 		feature_voice_m_c = 4,
 		feature_badge_m_c = 5,
 		feature_debug_m_c = 6,
+		feature_scroll_m_c = 7,
 	} feature_choice;
 };
 
@@ -439,6 +440,7 @@ struct cmd_op_r {
 		cmd_op_detail_m_c = 7,
 		cmd_op_notify_done_m_c = 8,
 		cmd_op_quiet_m_c = 9,
+		cmd_op_scroll_m_c = 10,
 	} cmd_op_choice;
 };
 
@@ -450,14 +452,35 @@ struct cmd_uint2uint {
 	uint32_t cmd_uint2uint;
 };
 
+struct scroll_unit_r {
+	enum {
+		scroll_unit_scroll_lines_m_c = 0,
+		scroll_unit_scroll_pages_m_c = 1,
+		scroll_unit_scroll_to_end_m_c = 2,
+	} scroll_unit_choice;
+};
+
+struct scroll_arg_uint2uint {
+	uint32_t scroll_arg_uint2uint;
+};
+
+struct scroll_arg {
+	struct scroll_unit_r scroll_arg_scroll_unit_m;
+	int32_t scroll_arg_uint1int;
+	struct scroll_arg_uint2uint scroll_arg_uint2uint;
+	bool scroll_arg_uint2uint_present;
+};
+
 struct cmd_arg_r {
 	union {
 		uint32_t cmd_arg_uint;
 		struct zcbor_string cmd_arg_tstr;
+		struct scroll_arg cmd_arg_scroll_arg_m;
 	};
 	enum {
 		cmd_arg_uint_c,
 		cmd_arg_tstr_c,
+		cmd_arg_scroll_arg_m_c,
 	} cmd_arg_choice;
 };
 
@@ -505,12 +528,35 @@ struct result_uint2tstr {
 	struct zcbor_string result_uint2tstr;
 };
 
+struct scroll_pos_uint2uint {
+	uint32_t scroll_pos_uint2uint;
+};
+
+struct scroll_pos_uint3tstr {
+	struct zcbor_string scroll_pos_uint3tstr;
+};
+
+struct scroll_pos {
+	uint32_t scroll_pos_uint0uint;
+	bool scroll_pos_uint1bool;
+	struct scroll_pos_uint2uint scroll_pos_uint2uint;
+	bool scroll_pos_uint2uint_present;
+	struct scroll_pos_uint3tstr scroll_pos_uint3tstr;
+	bool scroll_pos_uint3tstr_present;
+};
+
+struct result_scroll_pos_m {
+	struct scroll_pos result_scroll_pos_m;
+};
+
 struct result {
 	bool result_uint0bool;
 	struct result_err_m result_err_m;
 	bool result_err_m_present;
 	struct result_uint2tstr result_uint2tstr;
 	bool result_uint2tstr_present;
+	struct result_scroll_pos_m result_scroll_pos_m;
+	bool result_scroll_pos_m_present;
 };
 
 struct msg_result {

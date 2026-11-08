@@ -11,6 +11,7 @@ mod hook_source;
 mod ipc;
 mod paths;
 mod registry;
+mod scroll;
 mod source;
 mod trace;
 mod transport;
@@ -43,6 +44,7 @@ async fn main() -> Result<()> {
         broker.clone(),
         trace.clone(),
         focus::default_driver(),
+        focus::default_scroll_driver(),
     ));
     let started = registry::now_unix();
 

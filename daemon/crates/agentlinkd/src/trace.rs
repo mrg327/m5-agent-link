@@ -135,6 +135,18 @@ impl Trace {
         self.record(src, dir, &kind, sid, rid, msg, Some(bytes));
     }
 
+    /// Like `proto`, for a message that carries terminal content (a scroll result's preview):
+    /// the content is replaced before the line is written and the raw bytes are left out.
+    pub fn proto_private(&self, src: &str, dir: Dir, env: &Envelope) {
+        let mut msg = serde_json::to_value(env).unwrap_or(Value::Null);
+        if let Some(p) = msg.pointer_mut("/b/pos/preview") {
+            *p = Value::String("<private>".into());
+        }
+        let kind = msg["t"].as_str().unwrap_or("?").to_owned();
+        let sid = msg["b"]["sid"].as_u64();
+        self.record(src, dir, &kind, sid, None, msg, None);
+    }
+
     /// Appends to the audit log (and the trace) for approvals and focus actions.
     pub fn audit(&self, kind: &str, sid: Option<u64>, rid: Option<u64>, msg: Value) {
         let line = json!({"ts": chrono::Local::now().to_rfc3339(), "kind": kind, "sid": sid, "rid": rid, "msg": msg});

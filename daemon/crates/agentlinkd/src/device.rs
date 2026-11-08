@@ -2,8 +2,9 @@
 //! commands in.
 
 use crate::broker::{Broker, Decision};
-use crate::focus::{FocusDriver, FocusError, FocusTarget};
+use crate::focus::{FocusDriver, FocusError, FocusTarget, ScrollDriver};
 use crate::registry::{now_unix, Registry, Update};
+use crate::scroll::{Batch, Coalescer, RESULT_MIN_GAP};
 use crate::trace::{Dir, Trace};
 use crate::transport::Link;
 use agentlink_proto::*;
@@ -13,6 +14,8 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast::error::RecvError;
+use tokio::task::JoinHandle;
+use tokio::time::Instant;
 
 /// Minimum hold-to-confirm for approvals (PROTOCOL §5).
 const MIN_APPROVE_HOLD_MS: u64 = 1000;
@@ -23,6 +26,7 @@ pub struct Shared {
     pub broker: Arc<Broker>,
     pub trace: Trace,
     pub focus: Arc<dyn FocusDriver>,
+    pub scroll: Arc<dyn ScrollDriver>,
     pub host: HostInfo,
     /// Connected, handshaken devices keyed by device uid, for `agentlink status`.
     pub devices: Mutex<BTreeMap<String, Value>>,
@@ -35,12 +39,14 @@ impl Shared {
         broker: Arc<Broker>,
         trace: Trace,
         focus: Arc<dyn FocusDriver>,
+        scroll: Arc<dyn ScrollDriver>,
     ) -> Self {
         Shared {
             registry,
             broker,
             trace,
             focus,
+            scroll,
             host: host_info(),
             devices: Mutex::default(),
             next_link: AtomicU64::new(1),
@@ -79,6 +85,44 @@ struct Conn {
     trace: Trace,
     src: String,
     next_id: u64,
+    /// The privacy setting this link's welcome gave the device: gates the scroll preview.
+    privacy: Privacy,
+}
+
+/// Terminal content leaves the daemon only when the device may show it (UI-V2 §4.4).
+fn preview_allowed(privacy: Privacy) -> bool {
+    privacy != Privacy::Meta
+}
+
+/// A scroll batch running against the terminal, and the result throttle (UI-V2 §6.1: at most
+/// one `result` per 250 ms per device, only when the position changed or the command failed).
+type Inflight = JoinHandle<(Batch, std::result::Result<ScrollPos, FocusError>)>;
+
+#[derive(Default)]
+struct ScrollState {
+    co: Coalescer,
+    last_pos: Option<ScrollPos>,
+    last_sent: Option<Instant>,
+    /// A changed position waiting for the throttle window: (re, result, due).
+    deferred: Option<(u64, CmdResult, Instant)>,
+}
+
+impl ScrollState {
+    fn start(shared: &Shared, privacy: Privacy, target: FocusTarget, b: Batch) -> Inflight {
+        let driver = shared.scroll.clone();
+        let preview = preview_allowed(privacy);
+        tokio::spawn(async move {
+            let r = driver.scroll(&target, b.unit, b.delta, preview).await;
+            (b, r)
+        })
+    }
+
+    fn deferred_due(&self) -> Instant {
+        self.deferred
+            .as_ref()
+            .map(|d| d.2)
+            .unwrap_or_else(Instant::now)
+    }
 }
 
 impl Conn {
@@ -90,7 +134,12 @@ impl Conn {
         };
         self.next_id += 1;
         let bytes = env.to_bytes()?;
-        self.trace.proto(&self.src, Dir::Out, &env, &bytes);
+        let private = matches!(&env.msg, Message::Result(r) if r.pos.as_ref().is_some_and(|p| p.preview.is_some()));
+        if private {
+            self.trace.proto_private(&self.src, Dir::Out, &env);
+        } else {
+            self.trace.proto(&self.src, Dir::Out, &env, &bytes);
+        }
         self.link.send(bytes).await
     }
 
@@ -150,6 +199,7 @@ pub async fn run_link(
         trace: shared.trace.clone(),
         src: transport.to_owned(),
         next_id: 1,
+        privacy: Privacy::Meta,
     };
 
     let hello = loop {
@@ -221,8 +271,9 @@ async fn handshake(
 
     // Subscribe before taking the snapshot so no update is lost in between.
     let (sessions, updates) = shared.registry.subscribe();
-    c.send(Some(hello.0), Message::Welcome(welcome(&shared.host)))
-        .await?;
+    let w = welcome(&shared.host);
+    c.privacy = w.cfg.privacy.unwrap_or(Privacy::Meta);
+    c.send(Some(hello.0), Message::Welcome(w)).await?;
     c.send(
         None,
         Message::Snapshot(Snapshot {
@@ -260,7 +311,11 @@ async fn serve(
     peer: &str,
     dev_key: &mut Option<String>,
 ) -> Result<()> {
+    let mut sc = ScrollState::default();
+    // The running scroll batch lives outside `sc` so the select! branches borrow separate things.
+    let mut inflight: Option<Inflight> = None;
     loop {
+        let deferred_due = sc.deferred_due();
         tokio::select! {
             env = c.recv() => match env? {
                 None => return Ok(()),
@@ -269,7 +324,18 @@ async fn serve(
                     *updates = handshake(shared, c, (id, h), link_id, transport, peer, dev_key).await?;
                     tracing::info!("device re-handshake: {peer} ({transport})");
                 }
-                Some(env) => handle(shared, c, env).await?,
+                Some(env) => handle(shared, c, env, &mut sc, &mut inflight).await?,
+            },
+            done = async { inflight.as_mut().expect("guarded by the branch condition").await }, if inflight.is_some() => {
+                inflight = None;
+                let (b, res) = done?;
+                scroll_done(shared, c, &mut sc, &mut inflight, b, res).await?;
+            },
+            _ = tokio::time::sleep_until(deferred_due), if sc.deferred.is_some() => {
+                if let Some((re, r, _)) = sc.deferred.take() {
+                    sc.last_sent = Some(Instant::now());
+                    c.send(Some(re), Message::Result(r)).await?;
+                }
             },
             u = updates.recv() => match u {
                 Ok(Update::Upsert(s)) => c.send(None, Message::SessionUpd(s)).await?,
@@ -287,8 +353,17 @@ async fn serve(
     }
 }
 
-async fn handle(shared: &Shared, c: &mut Conn, env: Envelope) -> Result<()> {
+async fn handle(
+    shared: &Shared,
+    c: &mut Conn,
+    env: Envelope,
+    sc: &mut ScrollState,
+    inflight: &mut Option<Inflight>,
+) -> Result<()> {
     match env.msg {
+        Message::Cmd(cmd) if cmd.op == CmdOp::Scroll => {
+            scroll_cmd(shared, c, sc, inflight, env.id, &cmd).await
+        }
         Message::Cmd(cmd) => {
             let res = handle_cmd(shared, &cmd).await;
             c.send(Some(env.id), Message::Result(res)).await
@@ -304,7 +379,136 @@ fn fail(err: ResultErr, msg: &str) -> CmdResult {
         ok: false,
         err: Some(err),
         msg: Some(msg.into()),
+        pos: None,
     }
+}
+
+/// The batch a scroll command asks for, or the result that refuses it.
+fn scroll_batch(id: u64, cmd: &Cmd) -> std::result::Result<Batch, CmdResult> {
+    let Some(sid) = cmd.sid else {
+        return Err(fail(ResultErr::Denied, "sid required"));
+    };
+    let Some(Arg::Scroll(a)) = &cmd.arg else {
+        return Err(fail(ResultErr::Denied, "scroll needs a scroll_arg"));
+    };
+    Ok(Batch {
+        sid,
+        unit: a.unit,
+        delta: a.delta,
+        re: id,
+        n: 1,
+    })
+}
+
+/// `cmd_op_scroll`: read-only on the PC, so no audit line; one trace line per batch, never
+/// per command, and never the preview (UI-V2 §6.2).
+async fn scroll_cmd(
+    shared: &Shared,
+    c: &mut Conn,
+    sc: &mut ScrollState,
+    inflight: &mut Option<Inflight>,
+    id: u64,
+    cmd: &Cmd,
+) -> Result<()> {
+    let b = match scroll_batch(id, cmd) {
+        Ok(b) => b,
+        Err(r) => return c.send(Some(id), Message::Result(r)).await,
+    };
+    let Some((session, ctx)) = shared.registry.get(b.sid) else {
+        return c
+            .send(
+                Some(id),
+                Message::Result(fail(ResultErr::Stale, "unknown session")),
+            )
+            .await;
+    };
+    if let Some(b) = sc.co.push(b) {
+        let target = FocusTarget {
+            sid: session.sid,
+            agent: session.ag,
+            ctx,
+        };
+        *inflight = Some(ScrollState::start(shared, c.privacy, target, b));
+    }
+    Ok(())
+}
+
+async fn scroll_done(
+    shared: &Shared,
+    c: &mut Conn,
+    sc: &mut ScrollState,
+    inflight: &mut Option<Inflight>,
+    b: Batch,
+    res: std::result::Result<ScrollPos, FocusError>,
+) -> Result<()> {
+    let now = Instant::now();
+    let mut line = json!({"unit": b.unit, "delta": b.delta, "cmds": b.n, "ok": res.is_ok()});
+    let out = match res {
+        Ok(pos) => {
+            line["lines_above"] = pos.lines_above.into();
+            line["at_bottom"] = pos.at_bottom.into();
+            let changed = sc.last_pos.as_ref() != Some(&pos);
+            sc.last_pos = Some(pos.clone());
+            changed.then(|| CmdResult {
+                pos: Some(pos),
+                ..CmdResult::ok()
+            })
+        }
+        Err(e) => {
+            tracing::warn!("scroll sid={} failed: {e:?}", b.sid);
+            line["err"] = format!("{e:?}").into();
+            sc.deferred = None; // a stale position after a failure would mislead
+            Some(match e {
+                FocusError::NoWindow => fail(ResultErr::NoWindow, "no window found"),
+                FocusError::Unsupported => fail(ResultErr::Unsupported, "scroll unsupported here"),
+                FocusError::Internal(m) => fail(ResultErr::Internal, &m),
+            })
+        }
+    };
+    shared.trace.record(
+        &c.src,
+        Dir::Internal,
+        "scroll",
+        Some(b.sid),
+        None,
+        line,
+        None,
+    );
+    if let Some(r) = out {
+        let due = sc
+            .last_sent
+            .map(|t| t + RESULT_MIN_GAP)
+            .filter(|d| *d > now);
+        match due {
+            Some(d) if r.ok => sc.deferred = Some((b.re, r, d)), // the newest position wins
+            _ => {
+                sc.deferred = None;
+                sc.last_sent = Some(now);
+                c.send(Some(b.re), Message::Result(r)).await?;
+            }
+        }
+    }
+    if let Some(next) = sc.co.done() {
+        match shared.registry.get(next.sid) {
+            Some((session, ctx)) => {
+                *inflight = Some(ScrollState::start(
+                    shared,
+                    c.privacy,
+                    FocusTarget {
+                        sid: session.sid,
+                        agent: session.ag,
+                        ctx,
+                    },
+                    next,
+                ))
+            }
+            None => {
+                // the session ended mid-burst: drop what was queued for it
+                while sc.co.done().is_some() {}
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
@@ -330,11 +534,7 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
                 json!({"cmd": detail, "ok": res.is_ok()}),
             );
             match res {
-                Ok(()) => CmdResult {
-                    ok: true,
-                    err: None,
-                    msg: None,
-                },
+                Ok(()) => CmdResult::ok(),
                 Err(FocusError::NoWindow) => fail(ResultErr::NoWindow, "no window found"),
                 Err(FocusError::Unsupported) => {
                     fail(ResultErr::Unsupported, "focus unsupported here")
@@ -365,11 +565,7 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
                 (Some(rid), Some(d)) => match shared.broker.answer(rid, d) {
                     Ok(outcome) => {
                         tracing::info!("rid {rid} answered from device: {:?}", outcome);
-                        CmdResult {
-                            ok: true,
-                            err: None,
-                            msg: None,
-                        }
+                        CmdResult::ok()
                     }
                     Err((err, msg)) => fail(err, msg),
                 },
@@ -382,11 +578,7 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
             );
             res
         }
-        CmdOp::Ack => CmdResult {
-            ok: true,
-            err: None,
-            msg: None,
-        },
+        CmdOp::Ack => CmdResult::ok(),
         _ => fail(ResultErr::Unsupported, "command not implemented"),
     }
 }
@@ -402,6 +594,46 @@ mod tests {
     impl FocusDriver for NoFocus {
         async fn focus(&self, _: &FocusTarget) -> Result<(), FocusError> {
             Err(FocusError::Unsupported)
+        }
+    }
+
+    /// Records every scroll call, takes 60 ms each (so a burst piles up behind it) and keeps a
+    /// position of its own: `lines_above` grows by the lines scrolled up.
+    #[derive(Default)]
+    struct FakeScroll {
+        calls: Mutex<Vec<(u64, ScrollUnit, i64, bool)>>,
+        lines_above: Mutex<i64>,
+        unsupported: bool,
+    }
+    #[async_trait]
+    impl ScrollDriver for FakeScroll {
+        async fn scroll(
+            &self,
+            t: &FocusTarget,
+            unit: ScrollUnit,
+            delta: i64,
+            preview: bool,
+        ) -> Result<ScrollPos, FocusError> {
+            self.calls
+                .lock()
+                .unwrap()
+                .push((t.sid, unit, delta, preview));
+            tokio::time::sleep(std::time::Duration::from_millis(60)).await;
+            if self.unsupported {
+                return Err(FocusError::Unsupported);
+            }
+            let mut la = self.lines_above.lock().unwrap();
+            *la = match unit {
+                ScrollUnit::Lines => (*la - delta).max(0),
+                ScrollUnit::Pages => (*la - delta * 40).max(0),
+                ScrollUnit::ToEnd => 0,
+            };
+            Ok(ScrollPos {
+                lines_above: *la as u64,
+                at_bottom: *la == 0,
+                total: Some(1200),
+                preview: preview.then(|| "$ npm test".into()),
+            })
         }
     }
 
@@ -453,6 +685,10 @@ mod tests {
     }
 
     fn shared() -> Arc<Shared> {
+        shared_with(Arc::new(FakeScroll::default()))
+    }
+
+    fn shared_with(scroll: Arc<dyn ScrollDriver>) -> Arc<Shared> {
         let trace = Trace::null();
         let registry = Arc::new(Registry::new(trace.clone()));
         Arc::new(Shared::new(
@@ -460,7 +696,141 @@ mod tests {
             Arc::new(Broker::new(registry)),
             trace,
             Arc::new(NoFocus),
+            scroll,
         ))
+    }
+
+    fn scroll_cmd(sid: u64, unit: ScrollUnit, delta: i64, seq: u64) -> Cmd {
+        Cmd {
+            op: CmdOp::Scroll,
+            sid: Some(sid),
+            rid: None,
+            arg: Some(Arg::Scroll(ScrollArg {
+                unit,
+                delta,
+                seq: Some(seq),
+            })),
+            hold_ms: None,
+        }
+    }
+
+    fn add_session(shared: &Shared) -> u64 {
+        use crate::registry::{SessionEvent, SessionPatch};
+        let mut p = SessionPatch::new(Agent::Claude);
+        p.state = Some(SessState::Work);
+        shared.registry.apply(SessionEvent::Update {
+            key: "claude:s".into(),
+            patch: p,
+            ctx: crate::registry::HostCtx::default(),
+        });
+        shared.registry.sid_of("claude:s").unwrap()
+    }
+
+    /// A burst of scroll commands is summed behind the running one, each batch answers with the
+    /// position (only when it changed), the preview rides along under the welcome's privacy, and
+    /// a terminal without a scroll API answers `unsupported`.
+    #[tokio::test]
+    async fn scroll_bursts_are_coalesced_and_answered_with_positions() {
+        let drv = Arc::new(FakeScroll::default());
+        let shared = shared_with(drv.clone());
+        let sid = add_session(&shared);
+        let mut d = spawn_link(&shared);
+        d.to_daemon.send(hello_bytes("1.0.0")).unwrap();
+        d.next().await; // welcome
+        d.next().await; // snapshot (the session is in it)
+
+        for i in 0..5u64 {
+            d.to_daemon
+                .send(cmd_bytes(10 + i, scroll_cmd(sid, ScrollUnit::Lines, -3, i)))
+                .unwrap();
+        }
+        // first batch: the first command alone; second batch: the other four summed
+        let r1 = d.next().await;
+        assert_eq!(r1.re, Some(10));
+        let Message::Result(r) = r1.msg else { panic!() };
+        assert_eq!(
+            (r.ok, r.pos.as_ref().map(|p| p.lines_above)),
+            (true, Some(3))
+        );
+        let r2 = d.next().await;
+        assert_eq!(
+            r2.re,
+            Some(14),
+            "the result answers the newest command folded in"
+        );
+        let Message::Result(r) = r2.msg else { panic!() };
+        let pos = r.pos.unwrap();
+        assert_eq!(
+            (pos.lines_above, pos.at_bottom, pos.total),
+            (15, false, Some(1200))
+        );
+        assert_eq!(
+            pos.preview.as_deref(),
+            Some("$ npm test"),
+            "welcome privacy is preview"
+        );
+        {
+            let calls = drv.calls.lock().unwrap();
+            assert_eq!(calls.len(), 2, "{calls:?}");
+            assert_eq!(calls[0], (sid, ScrollUnit::Lines, -3, true));
+            assert_eq!(calls[1], (sid, ScrollUnit::Lines, -12, true));
+        }
+        // back to the bottom: a position change, answered
+        d.to_daemon
+            .send(cmd_bytes(20, scroll_cmd(sid, ScrollUnit::ToEnd, 1, 9)))
+            .unwrap();
+        let Message::Result(r) = d.next().await.msg else {
+            panic!()
+        };
+        assert!(r.pos.unwrap().at_bottom);
+        // scrolling down while live changes nothing: no result at all
+        d.to_daemon
+            .send(cmd_bytes(21, scroll_cmd(sid, ScrollUnit::Lines, 3, 10)))
+            .unwrap();
+        let quiet =
+            tokio::time::timeout(std::time::Duration::from_millis(400), d.from_daemon.recv()).await;
+        assert!(quiet.is_err(), "unchanged position must not be answered");
+        // unknown session and a malformed argument are refused at once
+        d.to_daemon
+            .send(cmd_bytes(22, scroll_cmd(4242, ScrollUnit::Lines, -3, 11)))
+            .unwrap();
+        assert_eq!(result_of(&mut d).await.err, Some(ResultErr::Stale));
+        d.to_daemon
+            .send(cmd_bytes(
+                23,
+                cmd(CmdOp::Scroll, None, Some(Arg::Uint(3)), None),
+            ))
+            .unwrap();
+        assert_eq!(result_of(&mut d).await.err, Some(ResultErr::Denied));
+    }
+
+    #[tokio::test]
+    async fn scroll_on_an_unsupported_terminal_fails_fast() {
+        let drv = Arc::new(FakeScroll {
+            unsupported: true,
+            ..Default::default()
+        });
+        let shared = shared_with(drv);
+        let sid = add_session(&shared);
+        let mut d = spawn_link(&shared);
+        d.to_daemon.send(hello_bytes("1.0.0")).unwrap();
+        d.next().await;
+        d.next().await;
+        d.to_daemon
+            .send(cmd_bytes(10, scroll_cmd(sid, ScrollUnit::Pages, -1, 0)))
+            .unwrap();
+        let r = result_of(&mut d).await;
+        assert_eq!(
+            (r.ok, r.err, r.pos),
+            (false, Some(ResultErr::Unsupported), None)
+        );
+    }
+
+    #[test]
+    fn preview_needs_privacy_above_meta() {
+        assert!(!preview_allowed(Privacy::Meta));
+        assert!(preview_allowed(Privacy::Preview));
+        assert!(preview_allowed(Privacy::Full));
     }
 
     fn cmd_bytes(id: u64, cmd: Cmd) -> Vec<u8> {

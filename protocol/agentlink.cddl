@@ -118,7 +118,7 @@ input_kind_rotary = 2
 input_kind_imu = 3
 
 feature = feature_focus / feature_ack / feature_approve / feature_reply /
-  feature_voice / feature_badge / feature_debug
+  feature_voice / feature_badge / feature_debug / feature_scroll
 feature_focus = 0
 feature_ack = 1
 feature_approve = 2
@@ -126,6 +126,7 @@ feature_reply = 3
 feature_voice = 4
 feature_badge = 5
 feature_debug = 6
+feature_scroll = 7   ; the device drives the terminal's scrollback (cmd_op_scroll, UI-V2 §6)
 
 welcome = {
   0 => [major: uint, minor: uint],   ; proto
@@ -245,10 +246,10 @@ cmd = {
   ? 3 => cmd_arg,  ; arg   snooze minutes, reply option index, quiet secs
   ? 4 => uint     ; hold_ms  measured hold-to-confirm (approve)
 }
-; v0.1 arguments are scalars; structured arguments (scroll_arg, {aid}) join this union when they land.
-cmd_arg = uint / tstr
+; Scalars for snooze / reply / quiet; a map for scroll. Further structured arguments ({aid}) join this union when they land.
+cmd_arg = uint / tstr / scroll_arg
 cmd_op = cmd_op_focus / cmd_op_ack / cmd_op_snooze / cmd_op_approve / cmd_op_deny /
-  cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet
+  cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet / cmd_op_scroll
 cmd_op_focus = 0
 cmd_op_ack = 1
 cmd_op_snooze = 2
@@ -259,11 +260,32 @@ cmd_op_cancel = 6
 cmd_op_detail = 7
 cmd_op_notify_done = 8
 cmd_op_quiet = 9
+cmd_op_scroll = 10
+
+; cmd_op_scroll argument (UI-V2 §6.1): move the session's terminal scrollback.
+scroll_arg = {
+  0 => scroll_unit,   ; unit
+  1 => int,           ; delta   negative = up (older), positive = down (newer); for scroll_to_end < 0 = top, > 0 = bottom (live)
+  ? 2 => uint        ; seq     device-side counter, so the daemon can drop stale bursts
+}
+scroll_unit = scroll_lines / scroll_pages / scroll_to_end
+scroll_lines = 0
+scroll_pages = 1
+scroll_to_end = 2
 
 result = {
   0 => bool,         ; ok
   ? 1 => result_err,   ; err
-  ? 2 => tstr       ; msg
+  ? 2 => tstr,       ; msg
+  ? 3 => scroll_pos   ; pos   only in answers to cmd_op_scroll
+}
+; Where the terminal's view is after a scroll (UI-V2 §6.1). `preview` is terminal content: sent only when
+; the device's privacy is preview or full, cut at 48 chars, never logged.
+scroll_pos = {
+  0 => uint,     ; lines_above   lines between the view and the live bottom; 0 = live
+  1 => bool,     ; at_bottom
+  ? 2 => uint,   ; total         scrollback size when known (for the position track)
+  ? 3 => tstr   ; preview       top visible line, ≤ 48 chars
 }
 
 detail = {

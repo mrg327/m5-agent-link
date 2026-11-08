@@ -180,13 +180,25 @@ body!(Clear {
 });
 
 // ── commands ──
-/// The CDDL `any` in `cmd.arg`: common scalars are typed, anything else is kept as raw CBOR.
+body!(
+    /// `cmd_op_scroll` argument (UI-V2 §6.1). `delta` < 0 is up (older), > 0 down (newer); with
+    /// `ToEnd` its sign picks top or bottom.
+    ScrollArg {
+        #[n(0)] unit: ScrollUnit,
+        #[n(1)] delta: i64,
+        #[n(2)] #[serde(skip_serializing_if = "Option::is_none")] seq: Option<u64>,
+    }
+);
+
+/// The CDDL `cmd_arg` union (`uint / tstr / scroll_arg`): the typed members, plus `Int`, `Bool`
+/// and raw CBOR so an unknown argument from a newer peer survives a round trip.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Arg {
     Uint(u64),
     Int(i64),
     Text(String),
     Bool(bool),
+    Scroll(ScrollArg),
     Raw(Vec<u8>),
 }
 
@@ -197,6 +209,7 @@ impl Serialize for Arg {
             Arg::Int(v) => s.serialize_i64(*v),
             Arg::Text(v) => s.serialize_str(v),
             Arg::Bool(v) => s.serialize_bool(*v),
+            Arg::Scroll(v) => v.serialize(s),
             Arg::Raw(v) => s.serialize_str(&format!("cbor:{}", hex::encode(v))),
         }
     }
@@ -213,6 +226,10 @@ impl<C> Encode<C> for Arg {
             Arg::Int(v) => e.i64(*v)?,
             Arg::Text(v) => e.str(v)?,
             Arg::Bool(v) => e.bool(*v)?,
+            Arg::Scroll(v) => {
+                v.encode(e, &mut ())?;
+                e
+            }
             Arg::Raw(v) => {
                 e.writer_mut()
                     .write_all(v)
@@ -232,6 +249,18 @@ impl<'b, C> Decode<'b, C> for Arg {
             Type::I8 | Type::I16 | Type::I32 | Type::I64 => Arg::Int(d.i64()?),
             Type::String => Arg::Text(d.str()?.to_owned()),
             Type::Bool => Arg::Bool(d.bool()?),
+            Type::Map => {
+                // scroll_arg is the only map member today; anything else stays raw
+                let start = d.position();
+                match ScrollArg::decode(d, &mut ()) {
+                    Ok(a) => Arg::Scroll(a),
+                    Err(_) => {
+                        d.set_position(start);
+                        d.skip()?;
+                        Arg::Raw(d.input()[start..d.position()].to_vec())
+                    }
+                }
+            }
             _ => {
                 let start = d.position();
                 d.skip()?;
@@ -252,7 +281,29 @@ body!(CmdResult {
     #[n(0)] ok: bool,
     #[n(1)] #[serde(skip_serializing_if = "Option::is_none")] err: Option<ResultErr>,
     #[n(2)] #[serde(skip_serializing_if = "Option::is_none")] msg: Option<String>,
+    /// Only in answers to `cmd_op_scroll`.
+    #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] pos: Option<ScrollPos>,
 });
+impl CmdResult {
+    pub fn ok() -> Self {
+        CmdResult {
+            ok: true,
+            err: None,
+            msg: None,
+            pos: None,
+        }
+    }
+}
+body!(
+    /// Where the terminal's view is after a scroll. `preview` is terminal content: only sent when
+    /// the device's privacy allows it, clipped to 48 chars, never logged.
+    ScrollPos {
+        #[n(0)] lines_above: u64,
+        #[n(1)] at_bottom: bool,
+        #[n(2)] #[serde(skip_serializing_if = "Option::is_none")] total: Option<u64>,
+        #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] preview: Option<String>,
+    }
+);
 body!(Detail {
     #[n(0)] #[serde(skip_serializing_if = "Option::is_none")] rid: Option<u64>,
     #[n(1)] #[serde(skip_serializing_if = "Option::is_none")] sid: Option<u64>,

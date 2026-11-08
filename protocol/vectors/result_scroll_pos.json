@@ -1,0 +1,18 @@
+{
+  "desc": "Daemon answers a scroll: 142 lines above the live bottom of 1200, with the top visible line (privacy >= preview)",
+  "symbolic": {
+    "t": "result",
+    "id": 7,
+    "re": 8,
+    "b": {
+      "ok": true,
+      "pos": {
+        "lines_above": 142,
+        "at_bottom": false,
+        "total": 1200,
+        "preview": "$ npm test -- --watch=false"
+      }
+    }
+  },
+  "cbor_hex": "a400090107020803a200f503a400188e01f4021904b003781b24206e706d2074657374202d2d202d2d77617463683d66616c7365"
+}

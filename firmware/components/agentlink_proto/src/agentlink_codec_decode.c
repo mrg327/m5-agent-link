@@ -89,6 +89,9 @@ static bool decode_msg_clear(zcbor_state_t *state, struct msg_clear *result);
 static bool decode_cmd_op(zcbor_state_t *state, struct cmd_op_r *result);
 static bool decode_repeated_cmd_uint1uint(zcbor_state_t *state, struct cmd_uint1uint *result);
 static bool decode_repeated_cmd_uint2uint(zcbor_state_t *state, struct cmd_uint2uint *result);
+static bool decode_scroll_unit(zcbor_state_t *state, struct scroll_unit_r *result);
+static bool decode_repeated_scroll_arg_uint2uint(zcbor_state_t *state, struct scroll_arg_uint2uint *result);
+static bool decode_scroll_arg(zcbor_state_t *state, struct scroll_arg *result);
 static bool decode_cmd_arg(zcbor_state_t *state, struct cmd_arg_r *result);
 static bool decode_repeated_cmd_arg_m(zcbor_state_t *state, struct cmd_arg_m *result);
 static bool decode_repeated_cmd_uint4uint(zcbor_state_t *state, struct cmd_uint4uint *result);
@@ -97,6 +100,10 @@ static bool decode_msg_cmd(zcbor_state_t *state, struct msg_cmd *result);
 static bool decode_result_err(zcbor_state_t *state, struct result_err_r *result);
 static bool decode_repeated_result_err_m(zcbor_state_t *state, struct result_err_m *result);
 static bool decode_repeated_result_uint2tstr(zcbor_state_t *state, struct result_uint2tstr *result);
+static bool decode_repeated_scroll_pos_uint2uint(zcbor_state_t *state, struct scroll_pos_uint2uint *result);
+static bool decode_repeated_scroll_pos_uint3tstr(zcbor_state_t *state, struct scroll_pos_uint3tstr *result);
+static bool decode_scroll_pos(zcbor_state_t *state, struct scroll_pos *result);
+static bool decode_repeated_result_scroll_pos_m(zcbor_state_t *state, struct result_scroll_pos_m *result);
 static bool decode_result(zcbor_state_t *state, struct result *result);
 static bool decode_msg_result(zcbor_state_t *state, struct msg_result *result);
 static bool decode_repeated_detail_uint0uint(zcbor_state_t *state, struct detail_uint0uint *result);
@@ -286,7 +293,8 @@ static bool decode_feature(
 	|| (((*result).feature_choice == feature_reply_m_c) && ((1)))
 	|| (((*result).feature_choice == feature_voice_m_c) && ((1)))
 	|| (((*result).feature_choice == feature_badge_m_c) && ((1)))
-	|| (((*result).feature_choice == feature_debug_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
+	|| (((*result).feature_choice == feature_debug_m_c) && ((1)))
+	|| (((*result).feature_choice == feature_scroll_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1101,7 +1109,8 @@ static bool decode_cmd_op(
 	|| (((*result).cmd_op_choice == cmd_op_cancel_m_c) && ((1)))
 	|| (((*result).cmd_op_choice == cmd_op_detail_m_c) && ((1)))
 	|| (((*result).cmd_op_choice == cmd_op_notify_done_m_c) && ((1)))
-	|| (((*result).cmd_op_choice == cmd_op_quiet_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
+	|| (((*result).cmd_op_choice == cmd_op_quiet_m_c) && ((1)))
+	|| (((*result).cmd_op_choice == cmd_op_scroll_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1131,6 +1140,53 @@ static bool decode_repeated_cmd_uint2uint(
 	return res;
 }
 
+static bool decode_scroll_unit(
+		zcbor_state_t *state, struct scroll_unit_r *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((((zcbor_uint_decode(state, &(*result).scroll_unit_choice, sizeof((*result).scroll_unit_choice)))) && ((((((*result).scroll_unit_choice == scroll_unit_scroll_lines_m_c) && ((1)))
+	|| (((*result).scroll_unit_choice == scroll_unit_scroll_pages_m_c) && ((1)))
+	|| (((*result).scroll_unit_choice == scroll_unit_scroll_to_end_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_scroll_arg_uint2uint(
+		zcbor_state_t *state, struct scroll_arg_uint2uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (2))))
+	&& (zcbor_uint32_decode(state, (&(*result).scroll_arg_uint2uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_scroll_arg(
+		zcbor_state_t *state, struct scroll_arg *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (decode_scroll_unit(state, (&(*result).scroll_arg_scroll_unit_m))))
+	&& (((zcbor_uint32_expect(state, (1))))
+	&& (zcbor_int32_decode(state, (&(*result).scroll_arg_uint1int))))
+	&& zcbor_present_decode(&((*result).scroll_arg_uint2uint_present), (zcbor_decoder_t *)decode_repeated_scroll_arg_uint2uint, state, (&(*result).scroll_arg_uint2uint))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	if (false) {
+		/* For testing that the types of the arguments are correct.
+		 * A compiler error here means a bug in zcbor.
+		 */
+		decode_repeated_scroll_arg_uint2uint(state, (&(*result).scroll_arg_uint2uint));
+	}
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_cmd_arg(
 		zcbor_state_t *state, struct cmd_arg_r *result)
 {
@@ -1138,7 +1194,8 @@ static bool decode_cmd_arg(
 	bool int_res;
 
 	bool res = (((zcbor_union_start_code(state) && (int_res = ((((zcbor_uint32_decode(state, (&(*result).cmd_arg_uint)))) && (((*result).cmd_arg_choice = cmd_arg_uint_c), true))
-	|| (((zcbor_tstr_decode(state, (&(*result).cmd_arg_tstr)))) && (((*result).cmd_arg_choice = cmd_arg_tstr_c), true))), zcbor_union_end_code(state), int_res))));
+	|| (((zcbor_tstr_decode(state, (&(*result).cmd_arg_tstr)))) && (((*result).cmd_arg_choice = cmd_arg_tstr_c), true))
+	|| (((decode_scroll_arg(state, (&(*result).cmd_arg_scroll_arg_m)))) && (((*result).cmd_arg_choice = cmd_arg_scroll_arg_m_c), true))), zcbor_union_end_code(state), int_res))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1249,6 +1306,66 @@ static bool decode_repeated_result_uint2tstr(
 	return res;
 }
 
+static bool decode_repeated_scroll_pos_uint2uint(
+		zcbor_state_t *state, struct scroll_pos_uint2uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (2))))
+	&& (zcbor_uint32_decode(state, (&(*result).scroll_pos_uint2uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_scroll_pos_uint3tstr(
+		zcbor_state_t *state, struct scroll_pos_uint3tstr *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (3))))
+	&& (zcbor_tstr_decode(state, (&(*result).scroll_pos_uint3tstr)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_scroll_pos(
+		zcbor_state_t *state, struct scroll_pos *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_decode(state, (&(*result).scroll_pos_uint0uint))))
+	&& (((zcbor_uint32_expect(state, (1))))
+	&& (zcbor_bool_decode(state, (&(*result).scroll_pos_uint1bool))))
+	&& zcbor_present_decode(&((*result).scroll_pos_uint2uint_present), (zcbor_decoder_t *)decode_repeated_scroll_pos_uint2uint, state, (&(*result).scroll_pos_uint2uint))
+	&& zcbor_present_decode(&((*result).scroll_pos_uint3tstr_present), (zcbor_decoder_t *)decode_repeated_scroll_pos_uint3tstr, state, (&(*result).scroll_pos_uint3tstr))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	if (false) {
+		/* For testing that the types of the arguments are correct.
+		 * A compiler error here means a bug in zcbor.
+		 */
+		decode_repeated_scroll_pos_uint2uint(state, (&(*result).scroll_pos_uint2uint));
+		decode_repeated_scroll_pos_uint3tstr(state, (&(*result).scroll_pos_uint3tstr));
+	}
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_result_scroll_pos_m(
+		zcbor_state_t *state, struct result_scroll_pos_m *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (3))))
+	&& (decode_scroll_pos(state, (&(*result).result_scroll_pos_m)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_result(
 		zcbor_state_t *state, struct result *result)
 {
@@ -1257,7 +1374,8 @@ static bool decode_result(
 	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
 	&& (zcbor_bool_decode(state, (&(*result).result_uint0bool))))
 	&& zcbor_present_decode(&((*result).result_err_m_present), (zcbor_decoder_t *)decode_repeated_result_err_m, state, (&(*result).result_err_m))
-	&& zcbor_present_decode(&((*result).result_uint2tstr_present), (zcbor_decoder_t *)decode_repeated_result_uint2tstr, state, (&(*result).result_uint2tstr))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+	&& zcbor_present_decode(&((*result).result_uint2tstr_present), (zcbor_decoder_t *)decode_repeated_result_uint2tstr, state, (&(*result).result_uint2tstr))
+	&& zcbor_present_decode(&((*result).result_scroll_pos_m_present), (zcbor_decoder_t *)decode_repeated_result_scroll_pos_m, state, (&(*result).result_scroll_pos_m))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
 
 	if (false) {
 		/* For testing that the types of the arguments are correct.
@@ -1265,6 +1383,7 @@ static bool decode_result(
 		 */
 		decode_repeated_result_err_m(state, (&(*result).result_err_m));
 		decode_repeated_result_uint2tstr(state, (&(*result).result_uint2tstr));
+		decode_repeated_result_scroll_pos_m(state, (&(*result).result_scroll_pos_m));
 	}
 
 	log_result(state, res, __func__);

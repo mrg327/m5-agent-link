@@ -8,6 +8,7 @@
 mod generic;
 mod kitty;
 mod macos_terminal;
+pub mod scroll;
 mod tmux;
 #[cfg(windows)]
 mod windows_terminal;
@@ -233,6 +234,8 @@ fn focus_blocking(ctx: &HostCtx, os: &str) -> Result<(), FocusError> {
 pub fn default_driver() -> Arc<dyn FocusDriver> {
     Arc::new(SystemFocus)
 }
+
+pub use scroll::{default_driver as default_scroll_driver, ScrollDriver};
 
 #[cfg(test)]
 mod tests {

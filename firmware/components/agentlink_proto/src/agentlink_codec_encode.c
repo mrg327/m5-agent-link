@@ -89,6 +89,9 @@ static bool encode_msg_clear(zcbor_state_t *state, const struct msg_clear *input
 static bool encode_cmd_op(zcbor_state_t *state, const struct cmd_op_r *input);
 static bool encode_repeated_cmd_uint1uint(zcbor_state_t *state, const struct cmd_uint1uint *input);
 static bool encode_repeated_cmd_uint2uint(zcbor_state_t *state, const struct cmd_uint2uint *input);
+static bool encode_scroll_unit(zcbor_state_t *state, const struct scroll_unit_r *input);
+static bool encode_repeated_scroll_arg_uint2uint(zcbor_state_t *state, const struct scroll_arg_uint2uint *input);
+static bool encode_scroll_arg(zcbor_state_t *state, const struct scroll_arg *input);
 static bool encode_cmd_arg(zcbor_state_t *state, const struct cmd_arg_r *input);
 static bool encode_repeated_cmd_arg_m(zcbor_state_t *state, const struct cmd_arg_m *input);
 static bool encode_repeated_cmd_uint4uint(zcbor_state_t *state, const struct cmd_uint4uint *input);
@@ -97,6 +100,10 @@ static bool encode_msg_cmd(zcbor_state_t *state, const struct msg_cmd *input);
 static bool encode_result_err(zcbor_state_t *state, const struct result_err_r *input);
 static bool encode_repeated_result_err_m(zcbor_state_t *state, const struct result_err_m *input);
 static bool encode_repeated_result_uint2tstr(zcbor_state_t *state, const struct result_uint2tstr *input);
+static bool encode_repeated_scroll_pos_uint2uint(zcbor_state_t *state, const struct scroll_pos_uint2uint *input);
+static bool encode_repeated_scroll_pos_uint3tstr(zcbor_state_t *state, const struct scroll_pos_uint3tstr *input);
+static bool encode_scroll_pos(zcbor_state_t *state, const struct scroll_pos *input);
+static bool encode_repeated_result_scroll_pos_m(zcbor_state_t *state, const struct result_scroll_pos_m *input);
 static bool encode_result(zcbor_state_t *state, const struct result *input);
 static bool encode_msg_result(zcbor_state_t *state, const struct msg_result *input);
 static bool encode_repeated_detail_uint0uint(zcbor_state_t *state, const struct detail_uint0uint *input);
@@ -283,7 +290,8 @@ static bool encode_feature(
 	: (((*input).feature_choice == feature_voice_m_c) ? ((zcbor_uint32_put(state, (4))))
 	: (((*input).feature_choice == feature_badge_m_c) ? ((zcbor_uint32_put(state, (5))))
 	: (((*input).feature_choice == feature_debug_m_c) ? ((zcbor_uint32_put(state, (6))))
-	: false)))))))));
+	: (((*input).feature_choice == feature_scroll_m_c) ? ((zcbor_uint32_put(state, (7))))
+	: false))))))))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1029,7 +1037,8 @@ static bool encode_cmd_op(
 	: (((*input).cmd_op_choice == cmd_op_detail_m_c) ? ((zcbor_uint32_put(state, (7))))
 	: (((*input).cmd_op_choice == cmd_op_notify_done_m_c) ? ((zcbor_uint32_put(state, (8))))
 	: (((*input).cmd_op_choice == cmd_op_quiet_m_c) ? ((zcbor_uint32_put(state, (9))))
-	: false))))))))))));
+	: (((*input).cmd_op_choice == cmd_op_scroll_m_c) ? ((zcbor_uint32_put(state, (10))))
+	: false)))))))))))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1059,6 +1068,47 @@ static bool encode_repeated_cmd_uint2uint(
 	return res;
 }
 
+static bool encode_scroll_unit(
+		zcbor_state_t *state, const struct scroll_unit_r *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((((*input).scroll_unit_choice == scroll_unit_scroll_lines_m_c) ? ((zcbor_uint32_put(state, (0))))
+	: (((*input).scroll_unit_choice == scroll_unit_scroll_pages_m_c) ? ((zcbor_uint32_put(state, (1))))
+	: (((*input).scroll_unit_choice == scroll_unit_scroll_to_end_m_c) ? ((zcbor_uint32_put(state, (2))))
+	: false)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_scroll_arg_uint2uint(
+		zcbor_state_t *state, const struct scroll_arg_uint2uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (2))))
+	&& (zcbor_uint32_encode(state, (&(*input).scroll_arg_uint2uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_scroll_arg(
+		zcbor_state_t *state, const struct scroll_arg *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_encode(state, 3) && (((((zcbor_uint32_put(state, (0))))
+	&& (encode_scroll_unit(state, (&(*input).scroll_arg_scroll_unit_m))))
+	&& (((zcbor_uint32_put(state, (1))))
+	&& (zcbor_int32_encode(state, (&(*input).scroll_arg_uint1int))))
+	&& (!(*input).scroll_arg_uint2uint_present || encode_repeated_scroll_arg_uint2uint(state, (&(*input).scroll_arg_uint2uint)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 3))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_cmd_arg(
 		zcbor_state_t *state, const struct cmd_arg_r *input)
 {
@@ -1066,7 +1116,8 @@ static bool encode_cmd_arg(
 
 	bool res = (((((*input).cmd_arg_choice == cmd_arg_uint_c) ? ((zcbor_uint32_encode(state, (&(*input).cmd_arg_uint))))
 	: (((*input).cmd_arg_choice == cmd_arg_tstr_c) ? ((zcbor_tstr_encode(state, (&(*input).cmd_arg_tstr))))
-	: false))));
+	: (((*input).cmd_arg_choice == cmd_arg_scroll_arg_m_c) ? ((encode_scroll_arg(state, (&(*input).cmd_arg_scroll_arg_m))))
+	: false)))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1168,15 +1219,68 @@ static bool encode_repeated_result_uint2tstr(
 	return res;
 }
 
+static bool encode_repeated_scroll_pos_uint2uint(
+		zcbor_state_t *state, const struct scroll_pos_uint2uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (2))))
+	&& (zcbor_uint32_encode(state, (&(*input).scroll_pos_uint2uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_scroll_pos_uint3tstr(
+		zcbor_state_t *state, const struct scroll_pos_uint3tstr *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (3))))
+	&& (zcbor_tstr_encode(state, (&(*input).scroll_pos_uint3tstr)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_scroll_pos(
+		zcbor_state_t *state, const struct scroll_pos *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_encode(state, 4) && (((((zcbor_uint32_put(state, (0))))
+	&& (zcbor_uint32_encode(state, (&(*input).scroll_pos_uint0uint))))
+	&& (((zcbor_uint32_put(state, (1))))
+	&& (zcbor_bool_encode(state, (&(*input).scroll_pos_uint1bool))))
+	&& (!(*input).scroll_pos_uint2uint_present || encode_repeated_scroll_pos_uint2uint(state, (&(*input).scroll_pos_uint2uint)))
+	&& (!(*input).scroll_pos_uint3tstr_present || encode_repeated_scroll_pos_uint3tstr(state, (&(*input).scroll_pos_uint3tstr)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 4))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_result_scroll_pos_m(
+		zcbor_state_t *state, const struct result_scroll_pos_m *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (3))))
+	&& (encode_scroll_pos(state, (&(*input).result_scroll_pos_m)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_result(
 		zcbor_state_t *state, const struct result *input)
 {
 	zcbor_log("%s\r\n", __func__);
 
-	bool res = (((zcbor_map_start_encode(state, 3) && (((((zcbor_uint32_put(state, (0))))
+	bool res = (((zcbor_map_start_encode(state, 4) && (((((zcbor_uint32_put(state, (0))))
 	&& (zcbor_bool_encode(state, (&(*input).result_uint0bool))))
 	&& (!(*input).result_err_m_present || encode_repeated_result_err_m(state, (&(*input).result_err_m)))
-	&& (!(*input).result_uint2tstr_present || encode_repeated_result_uint2tstr(state, (&(*input).result_uint2tstr)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 3))));
+	&& (!(*input).result_uint2tstr_present || encode_repeated_result_uint2tstr(state, (&(*input).result_uint2tstr)))
+	&& (!(*input).result_scroll_pos_m_present || encode_repeated_result_scroll_pos_m(state, (&(*input).result_scroll_pos_m)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 4))));
 
 	log_result(state, res, __func__);
 	return res;

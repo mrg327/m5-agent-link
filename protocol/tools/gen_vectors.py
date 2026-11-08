@@ -118,6 +118,17 @@ VECTORS = {
         {"t": "cmd", "id": 6, "b": {"op": "approve", "sid": 2, "rid": 7, "hold_ms": 1250}},
         env("cmd", 6, {0: 3, 1: 2, 2: 7, 4: 1250}),
     ),
+    "cmd_scroll": (
+        "Device scrolls session 2's terminal three lines up (older); seq 1 of the burst",
+        {"t": "cmd", "id": 8, "b": {"op": "scroll", "sid": 2, "arg": {"unit": "lines", "delta": -3, "seq": 1}}},
+        env("cmd", 8, {0: 10, 1: 2, 3: {0: 0, 1: -3, 2: 1}}),
+    ),
+    "result_scroll_pos": (
+        "Daemon answers a scroll: 142 lines above the live bottom of 1200, with the top visible line (privacy >= preview)",
+        {"t": "result", "id": 7, "re": 8, "b": {"ok": True, "pos": {"lines_above": 142, "at_bottom": False, "total": 1200,
+         "preview": "$ npm test -- --watch=false"}}},
+        env("result", 7, {0: True, 3: {0: 142, 1: False, 2: 1200, 3: "$ npm test -- --watch=false"}}, re_=8),
+    ),
     "result_stale": (
         "Daemon rejects approve because the prompt was already answered on PC",
         {"t": "result", "id": 5, "re": 6, "b": {"ok": False, "err": "stale"}},
