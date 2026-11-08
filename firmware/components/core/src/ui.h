@@ -10,7 +10,7 @@
 #include "nav.h"
 
 typedef struct {
-    char screen[12];            /* "ring" | "attention" (selected session has a pending request) | "agent" | "ask" | "scroll" | "off" */
+    char screen[12];            /* "ring" | "attention" (selected session has a pending request) | "agent" | "ask" | "scroll" | "status" | "off" */
     bool has_sel_sid;
     uint32_t sel_sid;
     bool has_rid;
@@ -33,6 +33,7 @@ typedef struct {
     void (*scroll_open)(uint32_t sid); /* entering SCROLL: bring the terminal to the front, quietly */
     void (*scroll)(uint32_t sid, nav_scroll_unit_t unit, int delta); /* SCROLL: one coalesced cmd_op_scroll */
     void (*scroll_stop)(void); /* SCROLL reached the bottom or the top */
+    void (*quiet_toggled)(void); /* STATUS: quiet mode turned on, extended or off */
     void (*tick)(void);   /* light haptic tick: selection by tap or button */
     void (*detent)(void); /* rim-scrub segment crossed */
     void (*hold_start)(void); /* approve hold passed the grace period: start the rising haptic ramp */

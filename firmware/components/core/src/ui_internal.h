@@ -26,6 +26,7 @@ lv_obj_t *ui_new_screen(void);
 nav_mode_t ui_mode(void);
 void ui_go_home(void);          /* leave AGENT (commit, back, chord, timeout) */
 void ui_go_scroll(void);        /* AGENT's "Scroll terminal": open SCROLL on the selected session */
+void ui_go_status(void);        /* AGENT's "Watch...": open STATUS */
 int ui_last_release_y(void);    /* where the last touch lifted, for the long-swipe rules */
 
 /* The HOME deck (ui_home.c). */
@@ -38,6 +39,9 @@ bool ui_home_request_pending(void); /* the selected session has an unanswered ap
 bool ui_home_askable(void);         /* the selected session has an unanswered permission or question */
 uint32_t ui_home_sel_sid(void);
 lv_obj_t *ui_home_ring(void);
+/* "USB · dev-mac · 82%" while linked (battery only if asked), else how stale the snapshot is;
+ * rgb = the row's colour. */
+void ui_home_link_text(char *dst, size_t cap, bool with_battery, uint32_t *rgb);
 void ui_home_set_card_shown(bool shown);
 void ui_home_select_sid(uint32_t sid, const char *via);
 void ui_home_report(ui_report_t *r);
@@ -71,3 +75,12 @@ bool ui_ask_refresh(uint32_t now_ms); /* false: nothing left to ask */
 bool ui_ask_act(nav_action_t a, const gesture_evt_t *g);
 bool ui_ask_tick(uint32_t now_ms);    /* true: wants to close */
 void ui_ask_report(ui_report_t *r);
+
+/* The STATUS screen (ui_status.c). */
+lv_obj_t *ui_status_init(lv_obj_t *screen);
+void ui_status_open(uint32_t now_ms);
+void ui_status_close(void);
+void ui_status_refresh(uint32_t now_ms);
+bool ui_status_act(nav_action_t a, const gesture_evt_t *g);
+bool ui_status_tick(uint32_t now_ms);    /* true: wants to close */
+void ui_status_report(ui_report_t *r);

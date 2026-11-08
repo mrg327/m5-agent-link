@@ -8,7 +8,7 @@
 #include "gesture.h"
 #include "model.h"
 
-typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_COUNT } nav_mode_t;
+typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_STATUS, MODE_COUNT } nav_mode_t;
 
 /* Where a touch gesture happened, by its press (or swipe start) point. */
 typedef enum { ZONE_ANY, ZONE_CENTRE, ZONE_RIM } nav_zone_t;
@@ -23,6 +23,7 @@ typedef enum {
     NAV_FOCUS,          /* default action: focus the terminal (Done also acknowledges) */
     NAV_OPEN_AGENT,     /* HOME → AGENT for the selected session */
     NAV_OPEN_ASK,       /* HOME → ASK: the pending request with its options; opening never answers */
+    NAV_OPEN_STATUS,    /* HOME → STATUS (swipe down): link, battery, quiet mode */
     NAV_BACK,           /* leave the current mode for HOME; from a swipe it must be a long one */
     NAV_HOME,           /* A+B chord: straight back to HOME */
     NAV_NEXT,           /* next session (HOME) or next item (AGENT) */
@@ -31,7 +32,7 @@ typedef enum {
     NAV_PICK_RIM,       /* tap on the rim: select the segment or item under the finger */
     NAV_SCRUB,          /* rim drag; the gesture kind says start / move / end */
     NAV_COMMIT,         /* AGENT: commit the selected item (safe items only; hold items need a hold) */
-    NAV_DENY,           /* HOME with a request: the strict deny swipe */
+    NAV_DENY,           /* ASK with a request: the strict deny swipe */
     NAV_HOLD_PRESS,     /* raw finger down in the centre: may arm a hold */
     NAV_HOLD_RELEASE,   /* raw finger up: cancels a hold in progress */
     NAV_HOLD_LONG,      /* a long press whose duration already covers the hold (injected input) */
@@ -67,6 +68,7 @@ const char *nav_action_name(nav_action_t a);
 #define NAV_LONG_SWIPE_PX 120 /* deny, and back-from-AGENT: a deliberate swipe, at least this long */
 #define NAV_AGENT_TIMEOUT_MS 8000
 #define NAV_SCROLL_TIMEOUT_MS 8000 /* SCROLL closes this long after the last input */
+#define NAV_STATUS_TIMEOUT_MS 8000 /* STATUS closes this long after the last input */
 
 /* ── SCROLL (UI-V2 §4.4, §6): the device side of cmd_op_scroll ── */
 typedef enum { SCROLL_LINES = 0, SCROLL_PAGES = 1, SCROLL_TO_END = 2 } nav_scroll_unit_t; /* wire values */
@@ -112,3 +114,23 @@ typedef struct {
 
 #define ASK_MAX_ITEMS 7 /* 4 options + Approve + Deny + Open on PC never all coexist, but keep room */
 int nav_ask_items(const attention_t *a, ask_item_t *out, int cap);
+
+/* ── STATUS: the watch's own rows, in wheel order (UI-V2 §4.5) ──
+ * Quiet first: it is what the screen is for. Rows that are not actionable only inform; committing
+ * them does nothing. Quiet mode is device-side and timed: Off → 30 min → 1 h → Off. While it runs,
+ * attention arrivals neither buzz, glow nor nag; the card still updates and ASK still opens when the
+ * display is already on. The alert mode (Sounds) toggles between full and quiet (sound off). */
+typedef enum { ST_QUIET, ST_SOUNDS, ST_PRIVACY, ST_SESSIONS, ST_FIRMWARE, ST_COUNT } status_row_t;
+
+typedef struct {
+    status_row_t id;
+    bool actionable;
+} status_item_t;
+
+int nav_status_items(status_item_t *out, int cap);
+#define NAV_QUIET_STEP1_S (30u * 60u)
+#define NAV_QUIET_STEP2_S (60u * 60u)
+/* The next quiet_until after a commit on the Quiet row: 0 (off) → now + 30 min → now + 1 h → 0. */
+uint32_t nav_quiet_next(uint32_t quiet_until, uint32_t now_unix);
+/* Which step nav_quiet_next() would take: 1 = 30 min, 2 = 1 h, 0 = off. */
+int nav_quiet_step(uint32_t quiet_until, uint32_t now_unix);

@@ -54,7 +54,7 @@ expect_screen scroll
 btn B long
 wait 300
 expect_screen ring
-# commit a placeholder: toast and back to the deck
+# "Watch..." opens STATUS (Phase 5); swipe up goes back to the deck
 tap 233 233
 wait 300
 btn B
@@ -68,6 +68,8 @@ wait 150
 expect_label > Watch...
 btn A
 wait 200
+expect_screen status
+swipe 233 300 233 180 160
+wait 300
 expect_screen ring
-expect_label Watch: coming soon
 quit

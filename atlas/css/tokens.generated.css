@@ -48,6 +48,9 @@
   --fw-scroll-lines-per-step: 3;
   --fw-scroll-coalesce-ms: 50ms;
   --fw-scroll-timeout-ms: 8000ms;
+  --fw-status-timeout-ms: 8000ms;
+  --fw-quiet-step1-s: 1800;
+  --fw-quiet-step2-s: 3600;
   --fw-haptic-kick-ms: 15ms;
   --fw-display-size: 466px;
 }

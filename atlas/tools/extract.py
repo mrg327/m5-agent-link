@@ -242,6 +242,10 @@ def extract_gesture():
     g["scroll_lines_per_step"] = int(find(nav, r"#define NAV_SCROLL_LINES_PER_STEP\s+(\d+)", "gesture.scroll_lines_per_step").group(1))
     g["scroll_coalesce_ms"] = int(find(nav, r"#define NAV_SCROLL_COALESCE_MS\s+(\d+)", "gesture.scroll_coalesce_ms").group(1))
     g["scroll_timeout_ms"] = int(find(nav, r"#define NAV_SCROLL_TIMEOUT_MS\s+(\d+)", "gesture.scroll_timeout_ms").group(1))
+    # STATUS (UI-V2 §4.5): its idle timeout and the quiet cycle's two steps
+    g["status_timeout_ms"] = int(find(nav, r"#define NAV_STATUS_TIMEOUT_MS\s+(\d+)", "gesture.status_timeout_ms").group(1))
+    g["quiet_step1_s"] = 60 * int(find(nav, r"#define NAV_QUIET_STEP1_S \((\d+)u \* 60u\)", "gesture.quiet_step1_s").group(1))
+    g["quiet_step2_s"] = 60 * int(find(nav, r"#define NAV_QUIET_STEP2_S \((\d+)u \* 60u\)", "gesture.quiet_step2_s").group(1))
     find(CORE + "gesture.c", r"if \(btn == 1\) \{\s*emit\(g, G_BTN_B", "gesture.b_immediate", re.S)
     return g
 
@@ -273,7 +277,8 @@ def extract_ring():
     r["kinds"] = kinds
     find(home, r'"TAP " LV_SYMBOL_RIGHT " ANSWER"', "ring.pill_approve")
     find(home, r'"FOCUS \+ ACK"', "ring.pill_done")
-    find(home, r'"long swipe down to deny"', "ring.deny_hint")
+    find(CORE + "ui_ask.c", r'"long swipe down to deny"', "ring.deny_hint") # deny lives only in ASK (UI-V2 §3)
+    find(home, r'"swipe down for status"', "ring.status_hint")
     # a request's pill opens ASK (UI-V2 §4.3); approving is a hold on that screen, never on the deck
     r["pills"] = {"approve": "TAP › ANSWER", "done": "FOCUS + ACK", "default": "FOCUS"}
     words = find(home, r'static const char \*const words\[2\] = \{"(\w+)", "(\w+)"\};', "ring.edge_hint_a")
@@ -291,15 +296,16 @@ ACTION_TEXT = {
     "NAV_FOCUS": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
     "NAV_OPEN_AGENT": "Open the per-agent wheel for the selected session",
     "NAV_OPEN_ASK": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
+    "NAV_OPEN_STATUS": "Open STATUS (swipe down on the deck): link, battery, quiet mode, sounds",
     "NAV_PICK_RIM": "Select the segment (HOME) or item (AGENT, ASK) under the finger",
     "NAV_HOLD_LONG": "An injected long press that already covers the selected hold item's time commits it directly",
     "NAV_DENY": "Deny a permission request: a long swipe down that started above the centre",
     "NAV_SCRUB": "A drag around the rim moves the selection with a detent per step",
     "NAV_NEXT_ATTENTION": "Jump to the next session that needs attention",
-    "NAV_NEXT": "Next session (HOME) or next item (AGENT, ASK)",
+    "NAV_NEXT": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
     "NAV_PREV": "Previous session",
-    "NAV_COMMIT": "Commit the selected item; an approve-class or deny item answers 'hold to confirm' instead",
-    "NAV_BACK": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is); a request stays pending",
+    "NAV_COMMIT": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item answers 'hold to confirm' instead",
+    "NAV_BACK": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is; on STATUS a swipe up); a request stays pending",
     "NAV_HOME": "A+B chord: straight back to the deck",
     "NAV_SCROLL_DRAG": "SCROLL: each 24 px of vertical drag moves the terminal 3 lines (up = older), summed into one command per 50 ms",
     "NAV_PAGE_OLDER": "SCROLL: a flick up moves one page toward older output (a slow swipe only counts by its drag steps)",
@@ -337,6 +343,11 @@ def extract_gesture_map():
     find(rel, r"\{MODE_HOME, G_TAP, ZONE_CENTRE, WHEN_ASKABLE, NAV_OPEN_ASK\}", "gesture_map.tap_never_approves")
     if re.search(r"\{MODE_HOME, G_PRESS,", text(rel)):
         raise Drift(f"{rel}: the deck must not arm holds (UI-V2 §3)")
+    if re.search(r"\{MODE_HOME, \w+, \w+, \w+, NAV_DENY\}", text(rel)):
+        raise Drift(f"{rel}: deny lives only in ASK (UI-V2 §3)")
+    find(rel, r"\{MODE_HOME, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_ALWAYS, NAV_OPEN_STATUS\}", "gesture_map.swipe_down_status")
+    # quiet mode holds the arrival buzz and glow, and the nag, in app.c
+    find(CORE + "app.c", r"if \(model_quiet_active\(hal_rtc_get_unix\(\)\)\) \{", "gesture_map.quiet_holds_alerts")
     find(CORE + "nav.c", r"bool nav_hold_may_start\(", "gesture_map.hold_bound_to_rid")
     find(CORE + "ui_ask.c", r"if \(it->hold_ms\) \{ /\* a tap never commits an approve-class or deny item \*/", "gesture_map.ask_tap_never_commits_hold")
     find(CORE + "ui_ask.c", r"if \(a->rid != s_hold_rid \|\| a->answer_sent", "gesture_map.ask_hold_cancels_on_change")
@@ -358,7 +369,9 @@ def extract_screens():
     vals["ask"] = f"{CORE}ui_ask.c:{line_of(CORE + 'ui_ask.c', ask.start())}"
     sc = find(CORE + "ui_scroll.c", r'snprintf\(r->screen, sizeof r->screen, "scroll"\)', "screens.scroll")
     vals["scroll"] = f"{CORE}ui_scroll.c:{line_of(CORE + 'ui_scroll.c', sc.start())}"
-    if set(vals) != {"ring", "attention", "agent", "ask", "scroll"}:
+    stt = find(CORE + "ui_status.c", r'snprintf\(r->screen, sizeof r->screen, "status"\)', "screens.status")
+    vals["status"] = f"{CORE}ui_status.c:{line_of(CORE + 'ui_status.c', stt.start())}"
+    if set(vals) != {"ring", "attention", "agent", "ask", "scroll", "status"}:
         raise Drift(f"unexpected screen values {sorted(vals)}")
     # the preview line is terminal content: it is only drawn when the privacy setting allows it
     find(CORE + "ui_scroll.c", r"static bool preview_allowed\(void\) \{ return model_settings\(\)->privacy != PRIVACY_META; \}",
@@ -368,7 +381,8 @@ def extract_screens():
             {"id": "attention", "title": "Deck · a request is waiting", "source": vals["attention"]},
             {"id": "agent", "title": "Agent wheel", "source": vals["agent"]},
             {"id": "ask", "title": "Ask · the request and its options", "source": vals["ask"]},
-            {"id": "scroll", "title": "Scroll · the terminal's scrollback", "source": vals["scroll"]}]
+            {"id": "scroll", "title": "Scroll · the terminal's scrollback", "source": vals["scroll"]},
+            {"id": "status", "title": "Status · link, battery, quiet mode", "source": vals["status"]}]
 
 
 # ───────────────────────── haptics ─────────────────────────
@@ -388,6 +402,7 @@ HAPTIC_MEANING = {
     "question": ("question", "An agent is asking a question"),
     "permission": ("permission", "An agent needs approval"),
     "scroll_stop": ("stop", "SCROLL reached the bottom or the top of the scrollback: one thud"),
+    "quiet_toggled": ("quiet", "Quiet mode turned on, extended or off: two spaced pulses"),
 }
 
 

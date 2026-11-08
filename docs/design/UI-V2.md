@@ -1,6 +1,6 @@
 # UI v2: "Deck": switch context, pick from a list, answer from the watch
 
-Status: **decided; Phases 1–4 (HOME deck, AGENT wheel, ASK with the approval broker, SCROLL with the kitty and tmux drivers) implemented in the simulator** (branch `ui-v2`, not yet validated on the device). Supersedes the Ring UI ([UI-RING.md](UI-RING.md)) and DESIGN.md §6, §6a (device side) and §8 (palette). Inputs: the Ring UX review (simulator pass, 2026-11-07), the user's v2 brief and answers (§9), and `docs/research/{stopwatch-interaction-capabilities,wearable-glance-gestures,minimal-peripherals}.md`.
+Status: **decided; Phases 1–5 (HOME deck, AGENT wheel, ASK with the approval broker, SCROLL with the kitty and tmux drivers, STATUS with quiet mode) implemented in the simulator** (branch `ui-v2`, not yet validated on the device). Supersedes the Ring UI ([UI-RING.md](UI-RING.md)) and DESIGN.md §6, §6a (device side) and §8 (palette). Inputs: the Ring UX review (simulator pass, 2026-11-07), the user's v2 brief and answers (§9), and `docs/research/{stopwatch-interaction-capabilities,wearable-glance-gestures,minimal-peripherals}.md`.
 
 Where this document and DESIGN.md or UI-RING.md disagree, this document wins. §10 lists each decision.
 
@@ -36,7 +36,7 @@ Five modes, one screen each. HOME is the only place you can stay; every other mo
 - **AGENT.** The per-agent screen (user decision §9.1): a curved list ("wheel") of that session's actions, default item preselected, with gesture shortcuts layered on it. Scrub moves, tap commits a safe item, hold commits a destructive one.
 - **ASK.** Opened automatically when an attention (question, permission) arrives while the display is on, or on the first touch during a glow. It is AGENT with the agent's prompt text above the wheel and the agent's options as items. Done/error attentions do not open ASK; they update the card and buzz.
 - **SCROLL.** Vertical swipes drive the focused terminal's scrollback. Entered only from the AGENT wheel.
-- **STATUS.** Link, host, battery, quiet mode. Swipe down from HOME, the "Watch…" item, and HOME's empty state.
+- **STATUS.** Link, host, battery, quiet mode, sounds. Swipe down from HOME or the "Watch…" item; the empty deck points at it (§4.5).
 
 Timeouts: AGENT 8 s, ASK none (it waits for the answer or a `clear`), SCROLL 8 s after the last swipe, STATUS 8 s. The display turns off 10 s after the last input on HOME unless an unanswered attention is showing.
 
@@ -47,7 +47,7 @@ One table, every input × mode. "—" means ignored (and logged). Thresholds: lo
 | Input | OFF / glow | HOME (deck) | AGENT (wheel) | ASK (card + wheel) | SCROLL | STATUS |
 |---|---|---|---|---|---|---|
 | First touch after off/glow | wake only (glow: reveal ASK) | | | | | |
-| Tap centre | wake | open AGENT (open ASK when a permission or question is pending) | commit selected item (safe items; a destructive item shows "hold") | commit selected item if safe (Open on PC, a question option); else shows "hold" | exit, keep terminal position | back to HOME |
+| Tap centre | wake | open AGENT (open ASK when a permission or question is pending) | commit selected item (safe items; a destructive item shows "hold") | commit selected item if safe (Open on PC, a question option); else shows "hold" | exit, keep terminal position | commit selected row (nothing here is destructive) |
 | Long-press centre (600 ms) | wake | — (reserved) | — | — | — | — |
 | Hold centre ≥ 1.2 s (arc + ramp) | — | — | commit a destructive item | **Approve**-class item (bound to `rid`), or Deny (0.8 s); arc colour = item colour | — | — |
 | Rim scrub CW / CCW | wake | next / previous session (detent) | next / previous item (detent) | next / previous option (detent) | — | next / previous row |
@@ -56,7 +56,7 @@ One table, every input × mode. "—" means ignored (and logged). Thresholds: lo
 | Swipe up (centre) | wake | open AGENT (ASK when a request is pending) | — | — | flick: page up (older) | back to HOME |
 | Swipe down (centre) | wake | open STATUS | back to HOME | **Deny** (permission only, strict) | flick: page down (newer) | — |
 | Swipe left / right | wake | next / previous session | — | — | — | — |
-| Button A short | wake | default action (Focus; Done also acks) | commit selected item (safe only) | **Open on PC** (focus), whatever is selected: A never approves | to bottom (live) and exit | commit row (quiet 30 min, …) |
+| Button A short | wake | default action (Focus; Done also acks) | commit selected item (safe only) | **Open on PC** (focus), whatever is selected: A never approves | to bottom (live) and exit | commit row (Quiet: off → 30 min → 1 h → off; Sounds: on/off; information rows: nothing) |
 | Button A double | wake | jump to next attention (Input › Error › Done-unseen) | — | — | — | — |
 | Button A long | wake | — | — | — | — | — |
 | Button B short | wake | next session | next item | next option | page down (newer) | next row |
@@ -67,7 +67,7 @@ One table, every input × mode. "—" means ignored (and logged). Thresholds: lo
 
 Why this is conflict-free:
 - The centre and the rim are disjoint hit regions (r < 150 vs r ≥ 160); a press between them is a rim press. A scrub that starts in the annulus never becomes a swipe; a swipe or drag that starts in the centre never becomes a scrub.
-- **The centre's vertical motion has one meaning per mode:** HOME opens things (up = AGENT, down = STATUS), AGENT/ASK go back or deny (down only), SCROLL scrolls. Session switching is horizontal (left/right) or on the rim, so it can never be mistaken for a deny or a page flick. Deny exists only in ASK, and only as the strict swipe or the hold item.
+- **The centre's vertical motion has one meaning per mode:** HOME opens things (up = AGENT, down = STATUS), AGENT/ASK go back or deny (down only), SCROLL scrolls, STATUS goes back (up only, the reverse of the swipe that opened it; down is ignored there). Session switching is horizontal (left/right) or on the rim, so it can never be mistaken for a deny or a page flick. Deny exists only in ASK, and only as the strict swipe or the hold item.
 - The wheel is moved by the rim and B, never by a vertical drag, so the wheel and the deny swipe cannot overlap.
 - Holds only start in modes where the selected item is destructive. On HOME nothing is destructive, so no centre press can approve anything.
 - IMU is never a commit input (research: no trusted false-positive data). Shake is reserved.
@@ -118,7 +118,7 @@ Glanceable: *which* session, *what state*, *what it just did*. One gesture deepe
 - Key badges `[A] WORD` / `WORD [B]` sit at 7:30 and 4:30 beside the physical buttons. They are legends, not touch targets; a tap there is a rim tap.
 - Offline: the centre drops to 50 % opacity, the badges grey out, elapsed freezes, and the link row reads `Offline · stale 4m`.
 - Ambient (30 s idle, nothing needs you): ring 20 %, centre 30 %, pixel shift 1 px per minute. Carried over.
-- Empty: the centre shows STATUS (§4.5).
+- Empty: the centre reads `No sessions` / `Waiting for an agent` with the hint `swipe down for status` (decision 23: STATUS is not embedded, since its idle timeout would fight an always-empty deck).
 
 Before/after reference: the Ring screenshots `20_mixed_error.png`, `30_perm_card.png` and `50_long_repo_work.png` (UX review scratch directory) show the hierarchy this fixes: elapsed as large as the repo, no prompt text, one-line truncation.
 
@@ -223,15 +223,32 @@ User decision §9.3: scrolling is by vertical swipe, not by rim scrub. A drag in
 ### 4.5 STATUS
 
 ```
-        ◦ BLE · dev-mac            16 px: transport · host      (amber "Offline · stale 4m" when down)
-          82 %  ▮▮▮▮▯              battery, charging glyph
-     ▶    Quiet until 14:30   [A]  rows are a wheel: scrub/B moves, A or tap commits
-          Sounds: on
-          3 sessions · 1 waiting   counts
-          [A] QUIET 30 MIN         NEXT [B]
+              ╭──────────────────────────────────────╮
+           ╭──╯        ◦ BLE · dev-mac                ╰──╮  16 px: transport · host (amber "Offline · stale 4m" when down)
+         ╭─╯            82 %  ▬▬▬▬▬▬▬▬▬▬▭▭             ╰─╮  24 px percent beside a round-capped gauge; ⚡ while charging
+        ╭╯            ───────────────────               ╰╮  capsule divider
+        │               3 sessions · 1 waiting            │  rows are a wheel: scrub/B moves, A or tap commits
+        │               Firmware 0.4.2                    │
+        │          ▶    Quiet: off                 ◀      │  the default row; "Quiet until 14:30" while it runs
+        │               Sounds: on                        │
+        │               Privacy: preview                  │
+        ╰╮                                                ╭╯
+         ╰─╮  [A] QUIET 30 MIN                 NEXT [B] ╭─╯  the A word names what the commit will do
+           ╰──╮        swipe up to go back           ╭──╯
+              ╰──────────────────────────────────────╯
 ```
 
-Reached by swipe down from HOME, the "Watch…" item, and shown as HOME when there are no sessions ("No sessions · waiting for an agent" replaces the counts). **Quiet mode lives only here** (user decision §9.7).
+Reached by swipe down from HOME and by the "Watch…" item on the AGENT wheel; the empty deck says `swipe down for status`. The index ring keeps showing the sessions, so the deck's glance survives the visit. **Quiet mode lives only here** (user decision §9.7). Rows, in wheel order (`nav_status_items()`):
+
+| Row | Text | Commit (A or tap) |
+|---|---|---|
+| Quiet | `Quiet: off` · `Quiet until 14:30` (local time; `Quiet: on` before the clock is set) | cycles `settings.quiet_until`: off → now + 30 min → now + 1 h → off (`nav_quiet_next()`); haptic "quiet toggled" (§5); the A badge reads `QUIET 30 MIN` / `QUIET 1 H` / `QUIET OFF` |
+| Sounds | `Sounds: on` · `Sounds: off` · `Silent` | toggles the alert mode full ↔ quiet (sound off); silent is only set by the daemon's `cfg` |
+| Privacy | `Privacy: meta` / `preview` / `full` | nothing (set on the PC); the A badge hides |
+| Sessions | `3 sessions · 1 waiting` (or `· 1 error`, `No sessions`) | nothing |
+| Firmware | `Firmware 0.4.2` (`hal_board_info()->fw_version`) | nothing |
+
+While quiet runs (`model_quiet_active()`), an attention that arrives neither buzzes, glows nor nags (`app.c`); the card and the ring still change, and a permission or question still opens ASK when the display is already on. Ticks and detents (feedback for the user's own input) are unaffected. The deck shows quiet subtly: a mute glyph leads the link row. There is no toast on STATUS: the row's new text and the haptic are the confirmation, so the rows stay readable. Leaving: swipe up, B long, chord, or 8 s idle. Quiet is device-side only for now (decision 19); a `cfg` from the daemon still overrides `quiet_until` and the alert mode.
 
 ### 4.6 OFF and glow
 
@@ -259,7 +276,7 @@ ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a deten
 | Mode change (enter AGENT/SCROLL/STATUS) | 35 | one short | all |
 | Quiet toggled | 35, 100, 35 | two spaced | STATUS |
 
-Silent mode suppresses all but `hello`; quiet mode suppresses sound only (sound is still a stub).
+Three controls (§4.5): the alert mode `silent` suppresses every haptic but `hello`; the alert mode `quiet` ("Sounds: off") suppresses sound only (sound is still a stub); the timed **Quiet** (`quiet_until`) suppresses the *alerts* (attention arrival, glow, nag) while leaving the detents, ticks and commit haptics, which answer the user's own input.
 
 ## 6. Terminal scroll mode: protocol and daemon
 
@@ -342,7 +359,7 @@ Daemon side (Phase 3, `daemon/crates/agentlinkd/src/broker.rs`): the approval br
 
 ### 8.2 Replace
 
-- `ui_home.c` splits into: `ui_home.c` (deck: card + badges + link row; no hold), `ui_wheel.c` (the list widget: items, detents, hold tags, a `wheel_layout_t` for where the rows sit; used by AGENT, ASK and STATUS), `ui_ask.c` (prompt text + wheel + answer-pending line + the rid-bound hold; done in Phase 3), `ui_scroll.c` (counter, preview, chevrons, coalescer). Each under 400 lines.
+- `ui_home.c` splits into: `ui_home.c` (deck: card + badges + link row; no hold), `ui_wheel.c` (the list widget: items, detents, hold tags, a `wheel_layout_t` for where the rows sit; used by AGENT, ASK and STATUS), `ui_ask.c` (prompt text + wheel + answer-pending line + the rid-bound hold; done in Phase 3), `ui_scroll.c` (counter, preview, chevrons, coalescer), `ui_status.c` (link and battery header, the rows, the quiet cycle; done in Phase 5). Each under 400 lines.
 - `ui.c`: mode stack (HOME + one overlay mode), timeouts, toast placement moved above the key badges, `ui_report` gains `mode` and `item`.
 - Edge hints become key badges `[A] WORD` / `WORD [B]` drawn at 7:30 and 4:30; they are not touch targets.
 
@@ -355,7 +372,7 @@ Daemon side (Phase 3, `daemon/crates/agentlinkd/src/broker.rs`): the approval br
 | 2 | `ui_wheel.c` + AGENT for Working/Done/Error/Idle (Focus, Ack, Dismiss, Snooze, Notify, Watch…); tap centre and swipe up open it; chord = Home. **Done** (`nav.c` interaction layer, §8a) | `actions_wheel.txt`, `agent_timeout.txt` |
 | 3 | ASK on the wheel: options from `opts`, `grant_mask`, `cmd_op_reply`, approve/grants/deny as hold items, answer-pending line; daemon approval broker + blocking Claude Code hooks. **Done** | `ask_reply`, `ask_grant_hold`, `ask_deny_hold`, `ask_tap_never_approves`, `ask_result_error`, `ask_hold_bound_to_rid`; vectors `attention_question_opts`, `attention_permission_grants`, `cmd_reply`; broker and hook unit tests |
 | 4 | SCROLL by drag/flick + `cmd_op_scroll` + `scroll_pos` + kitty and tmux drivers + privacy-gated preview. **Done** (simulator and daemon unit tests; not yet run against a real kitty or tmux, and the BLE interactive interval is still untouched) | `scroll_mode.txt`, `scroll_exit.txt`, `scroll_privacy.txt`, `scroll_unsupported.txt`; `test_gesture` drag/flick cases; vectors `cmd_scroll`, `result_scroll_pos`; daemon tests for kitty/tmux argument building, position parsing, preview tidying, the coalescer and the link-level burst test |
-| 5 | STATUS wheel (swipe down from HOME, quiet mode); Atlas update (gesture map is generated from `ui_*.c`) | `status.txt` |
+| 5 | STATUS wheel (swipe down from HOME, "Watch…"; quiet cycle, sounds toggle, privacy / counts / firmware rows; quiet holds the alert buzz, glow and nag; the deck's mute glyph); deny removed from the deck; Atlas facts (gesture map from `nav.c`, `status` screen, `quiet_toggled` haptic). **Done** (simulator) | `status.txt` (rows, cycle, every exit path), `quiet_buzz.txt` (no permission buzz while quiet, buzz again after) |
 | 6 | IMU raise-to-wake and lift-during-glow (needs the BMI270 driver) | on-device only |
 
 The simulator is the acceptance tool at each phase: scripts under `simulator/scripts/`, screenshots compared by eye, `expect_screen` extended with the mode name.
@@ -366,17 +383,17 @@ Three layers, so the look and the interaction model can change independently (us
 
 | Layer | Lives in | Knows about | Does not know about |
 |---|---|---|---|
-| **Interaction model** | `nav.h`, `nav.c` | modes (`MODE_HOME`, `MODE_AGENT`, `MODE_ASK`, `MODE_SCROLL`), the gesture map (`nav_bindings[]`: mode × gesture × zone × condition → action; conditions `WHEN_REQUEST` = an approvable permission, `WHEN_ASKABLE` = any permission or question), the safety rules (`NAV_HOLD_MS`, `NAV_DENY_HOLD_MS`, `NAV_CARD_ARM_MS`, `NAV_LONG_SWIPE_PX`, `nav_hold_may_start()`, `nav_long_swipe_down()`), the per-state action lists (`nav_agent_items()`, minus Scroll once a session is `no_scroll`), the answer options with their commit rules (`nav_ask_items()`: which option is a hold, and how long) and the scroll rate (`nav_scroll_lines()`, `NAV_SCROLL_*`: lines per step, coalescing window, clamps, timeout) | LVGL, colours, geometry, labels |
-| **Mode plumbing** | `ui.c` | which screen owns the current mode, mode transitions (`NAV_OPEN_AGENT`, `NAV_OPEN_ASK`, `NAV_BACK`, `NAV_HOME`, timeouts; a permission or question opens ASK on its session, done/error land on HOME), the debug report | drawing |
-| **Presentation** | `ui_theme.h/.c` (tokens: palette, fonts, pill tint, key caps, badge angles), `ui_ring.c` (index ring, plus the SCROLL position track: `ring_set_track()`), `ui_wheel.c` (the list component), `ui_home.c` (deck card), `ui_agent.c` (wheel screen: labels for action ids, header, badges), `ui_ask.c` (request text, option labels and colours, answer line; runs the hold the model allows), `ui_scroll.c` (counter, chevrons, privacy-gated preview line, the 50 ms coalescer and the predicted position) | how things look and where they sit | which gesture triggered an action |
+| **Interaction model** | `nav.h`, `nav.c` | modes (`MODE_HOME`, `MODE_AGENT`, `MODE_ASK`, `MODE_SCROLL`, `MODE_STATUS`), the gesture map (`nav_bindings[]`: mode × gesture × zone × condition → action; conditions `WHEN_REQUEST` = an approvable permission, `WHEN_ASKABLE` = any permission or question), the safety rules (`NAV_HOLD_MS`, `NAV_DENY_HOLD_MS`, `NAV_CARD_ARM_MS`, `NAV_LONG_SWIPE_PX`, `nav_hold_may_start()`, `nav_long_swipe_down()`), the per-state action lists (`nav_agent_items()`, minus Scroll once a session is `no_scroll`), the answer options with their commit rules (`nav_ask_items()`: which option is a hold, and how long) the scroll rate (`nav_scroll_lines()`, `NAV_SCROLL_*`: lines per step, coalescing window, clamps, timeout), and the watch's own rows with the quiet cycle (`nav_status_items()`, `nav_quiet_step()` / `nav_quiet_next()`, `NAV_QUIET_STEP*_S`, `NAV_STATUS_TIMEOUT_MS`) | LVGL, colours, geometry, labels |
+| **Mode plumbing** | `ui.c` | which screen owns the current mode, mode transitions (`NAV_OPEN_AGENT`, `NAV_OPEN_ASK`, `NAV_OPEN_STATUS`, `NAV_BACK`, `NAV_HOME`, timeouts; a permission or question opens ASK on its session, done/error land on HOME), the debug report | drawing |
+| **Presentation** | `ui_theme.h/.c` (tokens: palette, fonts, pill tint, key caps, badge angles), `ui_ring.c` (index ring, plus the SCROLL position track: `ring_set_track()`), `ui_wheel.c` (the list component), `ui_home.c` (deck card), `ui_agent.c` (wheel screen: labels for action ids, header, badges), `ui_ask.c` (request text, option labels and colours, answer line; runs the hold the model allows), `ui_scroll.c` (counter, chevrons, privacy-gated preview line, the 50 ms coalescer and the predicted position), `ui_status.c` (link and battery header with the capsule gauge, row labels, the A badge's word per row) | how things look and where they sit | which gesture triggered an action |
 
 What a change touches:
 - **Reskin** (Capsules → something else): `ui_theme.h` tokens and the draw code in `ui_ring.c` / `ui_wheel.c` / `ui_home.c` / `ui_agent.c`. No gesture logic, no safety rule, no test script changes.
 - **Gesture remap** (say, swipe left opens the wheel): one row in `nav_bindings[]`, plus its description in `atlas/tools/extract.py`. No drawing code.
-- **New mode** (ASK, SCROLL, STATUS): a `MODE_*` value, its rows in the table, a screen file with `open/close/act/tick/report`, and one case each in `enter_mode()`, `ui_tick()`, `ui_report()` and `ui_on_gesture()` in `ui.c`. SCROLL followed this recipe exactly (Phase 4); it also added one gesture kind (`G_DRAG`, with `dx/dy/flick` on every event) in `gesture.c`, which no other mode binds.
+- **New mode** (ASK, SCROLL, STATUS): a `MODE_*` value, its rows in the table, a screen file with `open/close/act/tick/report`, and one case each in `enter_mode()`, `ui_tick()`, `ui_report()` and `ui_on_gesture()` in `ui.c`. SCROLL followed this recipe exactly (Phase 4); it also added one gesture kind (`G_DRAG`, with `dx/dy/flick` on every event) in `gesture.c`, which no other mode binds. STATUS followed it too (Phase 5) with no new gesture kind: ten rows in the table, `ui_status.c`, and the four cases in `ui.c`. Quiet's effect on alerts is one `model_quiet_active()` check in `app.c` (`on_attention`, `act_nag`), not in any screen.
 - **New action for a state**: `nav_agent_items()` plus a label in `ui_agent.c` and a handler in `commit()`.
 
-Safety is in the interaction layer, so every skin keeps it for free: a tap is never bound to approve (`{MODE_HOME, G_TAP, ZONE_CENTRE, WHEN_ASKABLE, NAV_OPEN_ASK}` only opens the options; on ASK `NAV_COMMIT` refuses any item with `hold_ms`), the deck has no `G_PRESS` binding at all, holds start only through `nav_hold_may_start()` (request on screen ≥ 300 ms, bound to its `rid`; `ui_ask.c` cancels the hold when the request changes, clears or is answered, or the selection moves), which options are holds and for how long is decided by `nav_ask_items()` (grant bit or Approve → 1.2 s, a permission's deny-class option → 0.8 s), button A on ASK is `NAV_FOCUS` (Open on PC), deny and back use the same `nav_long_swipe_down()` rule, the first touch after a glow is swallowed in `power.c`, and approve/deny/reject haptics are distinct patterns in `feedback.c`. The Atlas extractor reads the gesture map from `nav.c` and fails on a `MODE_HOME` press binding, so a remap is documented automatically and a reskin cannot reintroduce a deck hold.
+Safety is in the interaction layer, so every skin keeps it for free: a tap is never bound to approve (`{MODE_HOME, G_TAP, ZONE_CENTRE, WHEN_ASKABLE, NAV_OPEN_ASK}` only opens the options; on ASK `NAV_COMMIT` refuses any item with `hold_ms`), the deck has no `G_PRESS` binding at all, holds start only through `nav_hold_may_start()` (request on screen ≥ 300 ms, bound to its `rid`; `ui_ask.c` cancels the hold when the request changes, clears or is answered, or the selection moves), which options are holds and for how long is decided by `nav_ask_items()` (grant bit or Approve → 1.2 s, a permission's deny-class option → 0.8 s), button A on ASK is `NAV_FOCUS` (Open on PC), deny and back use the same `nav_long_swipe_down()` rule, the first touch after a glow is swallowed in `power.c`, and approve/deny/reject haptics are distinct patterns in `feedback.c`. The Atlas extractor reads the gesture map from `nav.c` and fails on a `MODE_HOME` press binding or any `MODE_HOME` deny binding, so a remap is documented automatically and a reskin cannot reintroduce a deck hold or a deck deny.
 
 ## 9. Decided (user answers, 2026-11-07)
 
@@ -404,6 +421,16 @@ Phase 4 decisions (2026-11-08, implementation):
 16. **kitty's position is tracked by the daemon**, corrected from `ls` when kitty reports `scrolled_by` and exact (with the top line) when the privacy setting lets the daemon read the text. `get-text --extent screen` would not give the scrolled view.
 17. **No `welcome.feats` yet.** The device advertises `feature_scroll`; a daemon without scroll answers `unsupported` and the item disappears for that session. Adding daemon features to `welcome` is a protocol change for a later phase.
 18. **Scroll is never audited** (read-only on the PC) and the preview never reaches the trace or the audit log; one trace line per coalesced batch.
+
+Phase 5 decisions (2026-11-08, implementation):
+
+19. **Quiet is device-side and timed.** The Quiet row cycles `settings.quiet_until` off → 30 min → 1 h → off; while it runs the device holds the attention buzz, the glow and the nag, and nothing else. The daemon is not told (`cmd_op_quiet` answers `unsupported` today); a daemon `cfg` still overrides `quiet_until` and the alert mode. Telling the daemon is a later phase, with `welcome.feats`.
+20. **Sounds toggles the alert mode full ↔ quiet** on the watch; silent (no haptics) is only ever set from the PC, so a thumb cannot mute the watch by accident.
+21. **On STATUS a tap commits, like A; swipe up goes back.** §3's earlier "tap = back" cell was replaced: lists keep one thumb motion everywhere (§1), and nothing on STATUS is destructive. Swipe down is ignored there, the rim tap too; the index ring keeps showing the sessions.
+22. **Deny no longer exists on the deck.** `nav.c` still had `{MODE_HOME, G_SWIPE_DOWN, …, WHEN_REQUEST, NAV_DENY}`; it is now `NAV_OPEN_STATUS` unconditionally, as §3 said, and the extractor fails on any deck deny binding. The simulator's deny tests already ran in ASK.
+23. **The empty deck is not STATUS.** It keeps `No sessions` / `Waiting for an agent` plus the hint `swipe down for status`; embedding STATUS would loop its 8 s timeout against an always-empty deck.
+24. **No toast on STATUS, and no "Sleep now" row.** The row's new text and the haptic are the confirmation; the display-off path stays with `power.c`'s idle timer (§4.5 lists no sleep row).
+25. **"Watch…" opens STATUS** (it toasted "coming soon" before); `actions_wheel.txt` expects the `status` screen there now.
 
 ## 10. Decisions that reconcile DESIGN.md and UI-RING.md
 

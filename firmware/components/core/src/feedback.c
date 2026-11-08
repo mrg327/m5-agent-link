@@ -100,6 +100,13 @@ void feedback_scroll_stop(void)
     haptic(stop, 1);
 }
 
+/* Quiet mode toggled (UI-V2 §5): two spaced pulses, unlike the tick (one) and the reject (three). */
+void feedback_quiet_toggled(void)
+{
+    static const uint16_t quiet[] = {35, 100, 35};
+    haptic(quiet, 3);
+}
+
 void feedback_hello(void)
 {
     static const uint16_t hello[] = {60};

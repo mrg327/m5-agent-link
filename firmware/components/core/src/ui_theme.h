@@ -61,3 +61,5 @@ uint32_t theme_now_unix(void);
 /* "[A] WORD" (key_left) or "WORD [B]": a circular key cap and a word, centred at polar (deg, r). */
 lv_obj_t *theme_key_badge(lv_obj_t *parent, const char *key, const char *word, bool key_left, int deg, int r,
                           lv_obj_t **key_out, lv_obj_t **word_out);
+/* Change a badge's word and re-centre it on the same polar spot (the width changed). */
+void theme_key_badge_set_word(lv_obj_t *badge, lv_obj_t *word_lbl, const char *word, int deg, int r);

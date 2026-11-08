@@ -1,0 +1,41 @@
+# Quiet mode holds the alert: while quiet runs, a permission that arrives neither buzzes (no
+# [250,120,250] pattern before quiet is turned off) nor glows, but the card and ASK still show it.
+# Once quiet is cycled off, the next permission buzzes again.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+btn A
+wait 200
+expect_label > Quiet until
+swipe 233 300 233 180 160
+wait 300
+expect_screen ring
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+expect_label Run shell command
+expect_label > Approve HOLD
+# back to the deck (the request stays), into STATUS, cycle quiet: 1 h, then off
+btn B long
+wait 300
+expect_screen attention
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+btn A
+wait 200
+expect_label > Quiet until
+btn A
+wait 200
+expect_label > Quiet: off
+swipe 233 300 233 180 160
+wait 300
+expect_screen attention
+attention 8 2 approval approve,deny,focus 0 Write file|src/index.ts
+wait 400
+expect_screen ask
+quit

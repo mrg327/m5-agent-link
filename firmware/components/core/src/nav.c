@@ -13,7 +13,7 @@ const nav_binding_t nav_bindings[] = {
     {MODE_HOME, G_DOUBLE_TAP, ZONE_RIM, WHEN_ALWAYS, NAV_PICK_RIM},
     {MODE_HOME, G_SWIPE_UP, ZONE_CENTRE, WHEN_ASKABLE, NAV_OPEN_ASK},
     {MODE_HOME, G_SWIPE_UP, ZONE_CENTRE, WHEN_NOT_ASKABLE, NAV_OPEN_AGENT},
-    {MODE_HOME, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_REQUEST, NAV_DENY}, /* STATUS later, when no request */
+    {MODE_HOME, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_ALWAYS, NAV_OPEN_STATUS}, /* deny lives only in ASK */
     {MODE_HOME, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_HOME, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_HOME, G_SCRUB_END, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
@@ -62,6 +62,19 @@ const nav_binding_t nav_bindings[] = {
     {MODE_SCROLL, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_PAGE_NEWER},
     {MODE_SCROLL, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_SCROLL, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
+    /* STATUS: the watch's own rows on the wheel (UI-V2 §4.5). Nothing here is destructive, so a tap
+     * commits like A does; swipe up (the opposite of the swipe that opened it) goes back; swipe down
+     * is ignored, so it can never read as deny. */
+    {MODE_STATUS, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
+    {MODE_STATUS, G_DOUBLE_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
+    {MODE_STATUS, G_SWIPE_UP, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK},
+    {MODE_STATUS, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_STATUS, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_STATUS, G_SCRUB_END, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_STATUS, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_COMMIT},
+    {MODE_STATUS, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_NEXT},
+    {MODE_STATUS, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
+    {MODE_STATUS, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
 };
 const int nav_n_bindings = (int)(sizeof nav_bindings / sizeof nav_bindings[0]);
 
@@ -83,14 +96,14 @@ nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool
 
 const char *nav_mode_name(nav_mode_t m)
 {
-    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll"};
+    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll", "status"};
     return (unsigned)m < MODE_COUNT ? names[m] : "?";
 }
 
 const char *nav_action_name(nav_action_t a)
 {
     static const char *const names[NAV_COUNT] = {
-        "none", "focus", "open_agent", "open_ask", "back", "home", "next", "prev", "next_attention", "pick_rim",
+        "none", "focus", "open_agent", "open_ask", "open_status", "back", "home", "next", "prev", "next_attention", "pick_rim",
         "scrub", "commit", "deny", "hold_press", "hold_release", "hold_long", "scroll_drag", "page_older",
         "page_newer", "to_bottom"};
     return (unsigned)a < NAV_COUNT ? names[a] : "?";
@@ -159,4 +172,28 @@ int nav_ask_items(const attention_t *a, ask_item_t *out, int cap)
     }
     out[n++] = (ask_item_t){ASK_OPEN_PC, -1, 0, false}; /* always: the escape to the terminal */
     return n;
+}
+
+int nav_status_items(status_item_t *out, int cap)
+{
+    static const status_item_t rows[ST_COUNT] = {
+        {ST_QUIET, true}, {ST_SOUNDS, true}, {ST_PRIVACY, false}, {ST_SESSIONS, false}, {ST_FIRMWARE, false}};
+    int n = 0;
+    for (int i = 0; i < ST_COUNT && n < cap; i++) out[n++] = rows[i];
+    return n;
+}
+
+int nav_quiet_step(uint32_t quiet_until, uint32_t now_unix)
+{
+    if (!quiet_until || quiet_until <= now_unix) return 1;             /* off → 30 min */
+    return quiet_until - now_unix <= NAV_QUIET_STEP1_S ? 2 : 0;         /* 30 min → 1 h → off */
+}
+
+uint32_t nav_quiet_next(uint32_t quiet_until, uint32_t now_unix)
+{
+    switch (nav_quiet_step(quiet_until, now_unix)) {
+    case 1: return now_unix + NAV_QUIET_STEP1_S;
+    case 2: return now_unix + NAV_QUIET_STEP2_S;
+    default: return 0;
+    }
 }

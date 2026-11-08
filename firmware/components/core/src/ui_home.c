@@ -30,7 +30,7 @@
 #define REQ_TITLE_Y 208 /* approval: 20 px title, then 16 px text on two lines, in place of summary + time */
 #define REQ_TEXT_Y 234
 #define ELAPSED_Y 262 /* 20 px muted: time in this state */
-#define HINT_Y 364    /* 16 px: "long swipe down to deny", between the badges and the link row */
+#define HINT_Y 364    /* 16 px: a one-line hint on the empty deck, between the badges and the link row */
 #define LINK_Y 392    /* 16 px: link · host · battery, or Offline · stale */
 
 typedef struct {
@@ -54,7 +54,7 @@ static bool s_ambient;
 static uint32_t s_nag_rid, s_nag_next;
 static int s_nag_n;
 
-static bool s_offline_dim;
+static bool s_offline_dim, s_quiet_shown;
 
 static char s_agent_txt[64], s_repo_txt[40], s_state_txt[40], s_summary_txt[88], s_elapsed_txt[16], s_pill_txt[32],
     s_link_txt[64];
@@ -243,9 +243,13 @@ static void set_repo(const char *t)
 
 static bool offline(void) { return !ui_link_connected(); }
 
-/* Link row: transport · host · battery while connected; otherwise how stale the snapshot is. */
-static void link_text(char *dst, size_t cap, uint32_t *rgb)
+/* Link row: transport · host · battery while connected; otherwise how stale the snapshot is. A
+ * leading mute glyph says quiet mode is on (STATUS has the details). */
+void ui_home_link_text(char *dst, size_t cap, bool with_battery, uint32_t *rgb)
 {
+    bool quiet = model_quiet_active(theme_now_unix());
+    const char *q = quiet ? LV_SYMBOL_MUTE "  " : "";
+    s_quiet_shown = quiet;
     int k = ui_link_transport();
     const char *sym = k == HAL_LINK_USB ? LV_SYMBOL_USB : k == HAL_LINK_BLE ? LV_SYMBOL_BLUETOOTH : LV_SYMBOL_WIFI;
     const char *name = k == HAL_LINK_USB ? "USB" : k == HAL_LINK_BLE ? "BLE" : "PC";
@@ -253,21 +257,22 @@ static void link_text(char *dst, size_t cap, uint32_t *rgb)
     if (!ui_link_connected() && down && model_count() > 0) {
         char age[16];
         theme_elapsed(age, sizeof age, down / 1000);
-        snprintf(dst, cap, "%s Offline %s stale %s", LV_SYMBOL_WARNING, theme_sep(), age);
+        snprintf(dst, cap, "%s%s Offline %s stale %s", q, LV_SYMBOL_WARNING, theme_sep(), age);
         *rgb = RGB_AMBER;
     } else if (k < 0) {
-        snprintf(dst, cap, "%s Offline", LV_SYMBOL_WARNING);
+        snprintf(dst, cap, "%s%s Offline", q, LV_SYMBOL_WARNING);
         *rgb = RGB_AMBER;
     } else if (!ui_link_connected()) {
-        snprintf(dst, cap, "%s %s...", sym, name);
+        snprintf(dst, cap, "%s%s %s...", q, sym, name);
         *rgb = RGB_AMBER;
     } else {
         const char *host = model_host();
         hal_battery_t b = hal_battery_read();
         char batt[16] = "";
-        if (b.percent <= 100) snprintf(batt, sizeof batt, "%s%s%u%%", theme_sep(), b.charging ? LV_SYMBOL_CHARGE " " : "", b.percent);
-        if (host[0]) snprintf(dst, cap, "%s %s%s%.12s%s", sym, name, theme_sep(), host, batt);
-        else snprintf(dst, cap, "%s %s%s", sym, name, batt);
+        if (with_battery && b.percent <= 100)
+            snprintf(batt, sizeof batt, "%s%s%u%%", theme_sep(), b.charging ? LV_SYMBOL_CHARGE " " : "", b.percent);
+        if (host[0]) snprintf(dst, cap, "%s%s %s%s%.12s%s", q, sym, name, theme_sep(), host, batt);
+        else snprintf(dst, cap, "%s%s %s%s", q, sym, name, batt);
         *rgb = RGB_SUCCESS;
     }
 }
@@ -304,7 +309,7 @@ static void update_centre(void)
 {
     char buf[64];
     uint32_t link_rgb;
-    link_text(buf, sizeof buf, &link_rgb);
+    ui_home_link_text(buf, sizeof buf, true, &link_rgb);
     set_txt(s_link, s_link_txt, sizeof s_link_txt, buf);
     lv_obj_set_style_text_color(s_link, lv_color_hex(link_rgb), 0);
 
@@ -322,7 +327,7 @@ static void update_centre(void)
         lv_obj_add_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_pill, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(s_hint, "");
+        lv_label_set_text(s_hint, "swipe down for status"); /* the empty deck's one way onward (UI-V2 §4.5) */
         set_badges(false, false, 0);
         return;
     }
@@ -347,7 +352,7 @@ static void update_centre(void)
     update_elapsed(s);
 
     const attention_t *req = askable(s);
-    bool ask = req != NULL, perm = approvable(s) != NULL;
+    bool ask = req != NULL;
     if (ask) {
         /* Show what is being asked in place of the summary and the time. Fall back to the tool
          * name when the daemon sent no title (privacy: meta). */
@@ -373,7 +378,7 @@ static void update_centre(void)
     lv_obj_set_style_bg_color(s_pill, pill_col, 0);
     lv_obj_remove_flag(s_pill, LV_OBJ_FLAG_HIDDEN);
     lv_obj_align(s_pill, LV_ALIGN_TOP_MID, 0, UI_ACTION_Y);
-    lv_label_set_text(s_hint, perm && (req->acts & (1u << ACT_DENY)) ? "long swipe down to deny" : "");
+    lv_label_set_text(s_hint, ""); /* deny lives only in ASK (UI-V2 §3); the deck answers nothing */
     set_badges(true, s_n > 1, rgb);
 }
 
@@ -426,17 +431,20 @@ lv_obj_t *ui_home_ring(void) { return s_ring; }
 void ui_home_note_input(void) { noted_input(); }
 void ui_home_set_card_shown(bool shown)
 {
-    if (shown) lv_obj_remove_flag(s_centre, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_add_flag(s_centre, LV_OBJ_FLAG_HIDDEN);
+    if (shown) {
+        lv_obj_remove_flag(s_centre, LV_OBJ_FLAG_HIDDEN);
+        if (g_ui_actions->sectors) g_ui_actions->sectors(s_n); /* the rim counts sessions again */
+    } else {
+        lv_obj_add_flag(s_centre, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 /* Acts on what the interaction layer decided (nav.c). No hold exists on the deck: approving means
- * opening ASK (NAV_OPEN_ASK, handled in ui.c) and holding there. The strict deny swipe is the one
- * answer the deck can give. */
+ * opening ASK (NAV_OPEN_ASK, handled in ui.c) and holding there; deny lives there too (UI-V2 §3), so
+ * the deck answers nothing. */
 bool ui_home_act(nav_action_t a, const gesture_evt_t *g)
 {
     if (g->kind != G_LIFT && g->kind != G_SHAKE) noted_input();
-    const session_t *s = sel_session();
     switch (a) {
     case NAV_FOCUS:
         act_focus_selected();
@@ -444,14 +452,6 @@ bool ui_home_act(nav_action_t a, const gesture_evt_t *g)
     case NAV_PICK_RIM: {
         int i = ring_hit(s_ring, g->x, g->y);
         if (i >= 0) select_idx(i, "tap", g_ui_actions->tick);
-        return true;
-    }
-    case NAV_DENY: {
-        const attention_t *req = approvable(s);
-        if (!req || !(req->acts & (1u << ACT_DENY))) return false;
-        /* g->y is where the swipe started; the release recorded where it ended. */
-        if (!nav_long_swipe_down(g->y, ui_last_release_y())) return true; /* too short: ignore, but consume */
-        g_ui_actions->deny(s->sid, req->rid);
         return true;
     }
     case NAV_SCRUB:
@@ -524,11 +524,13 @@ void ui_home_tick(uint32_t now)
         s_last_elapsed = now;
         const session_t *s = sel_session();
         if (s && s_n > 0 && !s_slots[s_sel].n_merged) update_elapsed(s);
-        if (ui_link_down_ms()) { /* the stale age ticks while offline */
+        if (ui_link_down_ms() || s_quiet_shown != model_quiet_active(theme_now_unix())) {
+            /* the stale age ticks while offline; the mute glyph goes when quiet runs out */
             char buf[64];
             uint32_t link_rgb;
-            link_text(buf, sizeof buf, &link_rgb);
+            ui_home_link_text(buf, sizeof buf, true, &link_rgb);
             set_txt(s_link, s_link_txt, sizeof s_link_txt, buf);
+            lv_obj_set_style_text_color(s_link, lv_color_hex(link_rgb), 0);
         }
     }
 }
@@ -563,6 +565,7 @@ void ui_home_report(ui_report_t *r)
     if (!lv_obj_has_flag(s_req_text, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_req_text_txt);
     if (s && !lv_obj_has_flag(s_pill, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_pill_txt);
     if (s_link_txt[0]) ui_report_add(r, "%s", s_link_txt);
+    if (s_quiet_shown) ui_report_add(r, "quiet");
     ui_report_add(r, "%d segments", s_n);
 }
 

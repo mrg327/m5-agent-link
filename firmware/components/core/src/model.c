@@ -273,3 +273,12 @@ void model_attention_expire(uint32_t now_unix)
 }
 
 settings_t *model_settings(void) { return &s_settings; }
+
+void model_settings_changed(void)
+{
+    s_rev++;
+    dbg_event("model", "settings", "\"privacy\":%d,\"alert\":%d,\"quiet_until\":%u", (int)s_settings.privacy,
+              (int)s_settings.alert, (unsigned)s_settings.quiet_until);
+}
+
+bool model_quiet_active(uint32_t now_unix) { return s_settings.quiet_until != 0 && now_unix < s_settings.quiet_until; }

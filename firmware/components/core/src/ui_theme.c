@@ -197,11 +197,17 @@ lv_obj_t *theme_key_badge(lv_obj_t *parent, const char *key, const char *word, b
     lv_obj_t *w = theme_label(b, 16, key_left ? COL_TEXT : COL_MUTED);
     lv_label_set_text(w, word);
     if (!key_left) lv_obj_move_to_index(cap, 1); /* word first, cap on the button side */
+    theme_key_badge_set_word(b, w, word, deg, r);
+    if (key_out) *key_out = k;
+    if (word_out) *word_out = w;
+    return b;
+}
+
+void theme_key_badge_set_word(lv_obj_t *b, lv_obj_t *word_lbl, const char *word, int deg, int r)
+{
+    lv_label_set_text(word_lbl, word);
     float rad = (float)deg * 3.14159265f / 180.0f;
     lv_obj_update_layout(b);
     int bw = lv_obj_get_width(b), bh = lv_obj_get_height(b);
     lv_obj_set_pos(b, 233 + (int)((float)r * sinf(rad)) - bw / 2, 233 - (int)((float)r * cosf(rad)) - bh / 2);
-    if (key_out) *key_out = k;
-    if (word_out) *word_out = w;
-    return b;
 }

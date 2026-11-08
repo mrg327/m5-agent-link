@@ -1,0 +1,97 @@
+# STATUS (UI-V2 §4.5): swipe down from HOME opens it; link, battery and the rows are shown; A or a tap
+# commits the selected row (Quiet cycles off → 30 min → 1 h → off, Sounds toggles); information rows
+# do nothing; every exit path (swipe up, B long, chord, timeout, "Watch..." round trip) returns to HOME.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite
+session 2 input api main
+wait 300
+expect_screen ring
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+expect_label dev-mac
+expect_label 80 %
+expect_label > Quiet: off
+expect_label Sounds: on
+expect_label Privacy: preview
+expect_label 2 sessions
+expect_label 1 waiting
+expect_label Firmware 0.1.0-sim
+shot status.png
+# A on the Quiet row: 30 min, then 1 h, then off; a tap commits too
+btn A
+wait 200
+expect_label > Quiet until
+shot status_quiet.png
+tap 233 233
+wait 200
+expect_label > Quiet until
+tap 233 233
+wait 200
+expect_label > Quiet: off
+btn A
+wait 200
+expect_label > Quiet until
+# Sounds toggles; the rim scrubs the rows; information rows commit to nothing
+btn B
+wait 150
+expect_label > Sounds: on
+btn A
+wait 200
+expect_label > Sounds: off
+btn A
+wait 200
+expect_label > Sounds: on
+btn B
+wait 150
+expect_label > Privacy: preview
+btn A
+wait 200
+expect_screen status
+expect_label > Privacy: preview
+scrub 300 250 400
+wait 150
+expect_screen status
+# swipe up goes back; the deck shows quiet mode subtly
+swipe 233 300 233 180 160
+wait 300
+expect_screen ring
+expect_label quiet
+shot deck_quiet.png
+# "Watch..." on the AGENT wheel opens STATUS too; B long goes back
+tap 233 233
+wait 300
+expect_screen agent
+btn B
+wait 150
+btn B
+wait 150
+btn B
+wait 150
+btn B
+wait 150
+expect_label > Watch...
+btn A
+wait 200
+expect_screen status
+btn B long
+wait 300
+expect_screen ring
+# chord = Home
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+chord
+wait 300
+expect_screen ring
+# swipe down on STATUS is nothing; 8 s idle closes it
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+wait 8600
+expect_screen ring
+quit

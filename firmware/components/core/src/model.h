@@ -87,6 +87,11 @@ void model_attention_set_answer(uint32_t rid, uint8_t answer, uint8_t opt);
 void model_attention_expire(uint32_t now_unix);
 
 settings_t *model_settings(void);
+/* The device changed a setting itself (STATUS): bumps the revision so the screens redraw. */
+void model_settings_changed(void);
+/* Timed quiet mode (UI-V2 §4.5): true while quiet_until lies in the future. Attention arrivals then
+ * neither buzz, glow nor nag; interaction feedback (ticks, detents) is unaffected. */
+bool model_quiet_active(uint32_t now_unix);
 /* PC host name from the welcome message (empty when unknown); cleared with model_init(). */
 void model_set_host(const char *host);
 const char *model_host(void);

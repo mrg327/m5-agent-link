@@ -188,7 +188,11 @@ static void act_scroll(uint32_t sid, nav_scroll_unit_t unit, int delta)
     if (!link_send_scroll(sid, (int)unit, delta, ++seq)) ui_toast("Offline", RGB_AMBER);
 }
 
-static void act_nag(void) { feedback_attention(ATT_APPROVAL); }
+/* The nag is an alert too: quiet mode holds it as it holds the arrival buzz. */
+static void act_nag(void)
+{
+    if (!model_quiet_active(hal_rtc_get_unix())) feedback_attention(ATT_APPROVAL);
+}
 
 static const ui_actions_t s_actions = {.focus = act_focus,
                                        .approve = act_approve,
@@ -200,6 +204,7 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .scroll_open = act_scroll_open,
                                        .scroll = act_scroll,
                                        .scroll_stop = feedback_scroll_stop,
+                                       .quiet_toggled = feedback_quiet_toggled,
                                        .tick = feedback_tick,
                                        .detent = feedback_detent,
                                        .hold_start = feedback_hold_ramp,
@@ -216,8 +221,14 @@ static void on_link(bool welcomed) { ui_set_link_state(welcomed); }
 static void on_attention(const attention_t *a)
 {
     uint32_t rgb = a->kind == ATT_ERROR ? RGB_ERROR : a->kind == ATT_DONE ? RGB_DONE : a->kind == ATT_QUESTION ? RGB_ASK : RGB_PERMISSION;
-    feedback_attention(a->kind);
-    power_attention(rgb, app_now_ms());
+    if (model_quiet_active(hal_rtc_get_unix())) {
+        /* Quiet (UI-V2 §4.5): no buzz, no glow, no nag. The card and the ring still change, and a
+         * request still opens ASK when the display is already on. */
+        dbg_event("ui", "quiet", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
+    } else {
+        feedback_attention(a->kind);
+        power_attention(rgb, app_now_ms());
+    }
     if (!power_display_on() || ui_glow_active()) return; /* a glow: the first touch reveals it */
     if (a->kind == ATT_DONE) return;
     /* Jump to the new request unless the user is already looking at an unanswered one. */

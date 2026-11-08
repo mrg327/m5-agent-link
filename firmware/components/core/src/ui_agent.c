@@ -131,7 +131,10 @@ static void commit(const wheel_item_t *it)
         g_ui_actions->scroll_open(s->sid);
         ui_go_scroll();
         return;
-    case AG_WATCH: ui_toast("Watch: coming soon", RGB_ACCENT); g_ui_actions->tick(); break;
+    case AG_WATCH: /* the watch's own screen (UI-V2 §4.5) */
+        g_ui_actions->tick();
+        ui_go_status();
+        return;
     default: break;
     }
     ui_go_home();

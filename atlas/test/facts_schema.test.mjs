@@ -34,7 +34,7 @@ test('gesture thresholds describe the ring recogniser, with no tap deferral', ()
 });
 
 test('ring facts: screens, per-kind shapes, pills and the gesture cases', () => {
-  assert.deepEqual(facts.screens.map((s) => s.id), ['ring', 'attention', 'agent', 'ask', 'scroll']);
+  assert.deepEqual(facts.screens.map((s) => s.id), ['ring', 'attention', 'agent', 'ask', 'scroll', 'status']);
   assert.deepEqual(Object.keys(facts.ring.kinds), ['work', 'ask', 'perm', 'done', 'error', 'idle']);
   assert.ok(facts.ring.merge_at >= 2 && facts.ring.max_segments >= facts.ring.merge_at);
   assert.equal(facts.ring.pills.approve, 'TAP › ANSWER'); // a request's tap opens ASK; approving is a hold there
@@ -43,12 +43,17 @@ test('ring facts: screens, per-kind shapes, pills and the gesture cases', () => 
   // SCROLL: the drag stream is the only binding of G_DRAG, and the deck still has no press binding
   assert.deepEqual(facts.gesture_map.cases.filter((c) => c.gesture === 'G_DRAG').map((c) => c.mode), ['scroll']);
   assert.ok(!facts.gesture_map.cases.some((c) => c.mode === 'home' && c.gesture === 'G_PRESS'));
+  // deny lives only in ASK; the deck's swipe down opens STATUS, which has its own timeout and the quiet steps
+  assert.deepEqual(facts.gesture_map.cases.filter((c) => c.nav === 'NAV_DENY').map((c) => c.mode), ['ask']);
+  assert.ok(facts.gesture_map.cases.some((c) => c.mode === 'home' && c.gesture === 'G_SWIPE_DOWN' && c.nav === 'NAV_OPEN_STATUS'));
+  assert.ok(facts.gesture_map.cases.some((c) => c.mode === 'status'));
+  assert.ok(facts.gesture.status_timeout_ms > 0 && facts.gesture.quiet_step1_s < facts.gesture.quiet_step2_s);
   assert.ok(facts.gesture.drag_step_px > facts.gesture.tap_slop_px && facts.gesture.scroll_lines_per_step > 0);
 });
 
 test('haptics have steps with duty, the rim detent and the approve ramp', () => {
   assert.deepEqual(Object.keys(facts.haptics).sort(),
-    ['approved', 'denied', 'deny_ramp', 'detent', 'done', 'error', 'hello', 'hold_ramp', 'permission', 'question', 'reject', 'reply_sent', 'scroll_stop', 'tick']);
+    ['approved', 'denied', 'deny_ramp', 'detent', 'done', 'error', 'hello', 'hold_ramp', 'permission', 'question', 'quiet_toggled', 'reject', 'reply_sent', 'scroll_stop', 'tick']);
   for (const steps of Object.values(facts.haptics)) {
     assert.ok(steps.length > 0);
     for (const s of steps) assert.ok(s.on_ms > 0 && s.off_ms >= 0 && s.duty > 0 && s.duty <= 100);
