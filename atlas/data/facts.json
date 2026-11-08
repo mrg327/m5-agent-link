@@ -97,7 +97,12 @@
     "card_arm_ms": 300,
     "long_swipe_px": 120,
     "deny_hold_ms": 800,
-    "agent_timeout_ms": 8000
+    "agent_timeout_ms": 8000,
+    "drag_step_px": 24,
+    "flick_px_per_s": 700,
+    "scroll_lines_per_step": 3,
+    "scroll_coalesce_ms": 50,
+    "scroll_timeout_ms": 8000
   },
   "ring": {
     "merge_at": 9,
@@ -344,7 +349,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back to the deck (a long swipe down, or B held); a request stays pending",
+        "action": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is); a request stays pending",
         "source": "firmware/components/core/src/nav.c:30"
       },
       {
@@ -398,7 +403,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back to the deck (a long swipe down, or B held); a request stays pending",
+        "action": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is); a request stays pending",
         "source": "firmware/components/core/src/nav.c:36"
       },
       {
@@ -479,7 +484,7 @@
         "zone": "centre",
         "when": "without an approvable request",
         "nav": "NAV_BACK",
-        "action": "Back to the deck (a long swipe down, or B held); a request stays pending",
+        "action": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is); a request stays pending",
         "source": "firmware/components/core/src/nav.c:47"
       },
       {
@@ -533,7 +538,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back to the deck (a long swipe down, or B held); a request stays pending",
+        "action": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is); a request stays pending",
         "source": "firmware/components/core/src/nav.c:53"
       },
       {
@@ -544,6 +549,78 @@
         "nav": "NAV_HOME",
         "action": "A+B chord: straight back to the deck",
         "source": "firmware/components/core/src/nav.c:54"
+      },
+      {
+        "gesture": "G_DRAG",
+        "mode": "scroll",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_SCROLL_DRAG",
+        "action": "SCROLL: each 24 px of vertical drag moves the terminal 3 lines (up = older), summed into one command per 50 ms",
+        "source": "firmware/components/core/src/nav.c:57"
+      },
+      {
+        "gesture": "G_SWIPE_UP",
+        "mode": "scroll",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_PAGE_OLDER",
+        "action": "SCROLL: a flick up moves one page toward older output (a slow swipe only counts by its drag steps)",
+        "source": "firmware/components/core/src/nav.c:58"
+      },
+      {
+        "gesture": "G_SWIPE_DOWN",
+        "mode": "scroll",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_PAGE_NEWER",
+        "action": "SCROLL: a flick down or button B moves one page toward newer output",
+        "source": "firmware/components/core/src/nav.c:59"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "scroll",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is); a request stays pending",
+        "source": "firmware/components/core/src/nav.c:60"
+      },
+      {
+        "gesture": "G_BTN_A",
+        "mode": "scroll",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_TO_BOTTOM",
+        "action": "SCROLL: button A jumps back to the live bottom and leaves the mode",
+        "source": "firmware/components/core/src/nav.c:61"
+      },
+      {
+        "gesture": "G_BTN_B",
+        "mode": "scroll",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_PAGE_NEWER",
+        "action": "SCROLL: a flick down or button B moves one page toward newer output",
+        "source": "firmware/components/core/src/nav.c:62"
+      },
+      {
+        "gesture": "G_BTN_B_LONG",
+        "mode": "scroll",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is); a request stays pending",
+        "source": "firmware/components/core/src/nav.c:63"
+      },
+      {
+        "gesture": "G_CHORD",
+        "mode": "scroll",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_HOME",
+        "action": "A+B chord: straight back to the deck",
+        "source": "firmware/components/core/src/nav.c:64"
       }
     ],
     "chord": "A + B held together: Home from any mode (logged on the deck, no action there)",
@@ -553,7 +630,7 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:73"
+      "source": "firmware/components/core/src/ui.c:74"
     },
     {
       "id": "attention",
@@ -563,12 +640,17 @@
     {
       "id": "agent",
       "title": "Agent wheel",
-      "source": "firmware/components/core/src/ui_agent.c:209"
+      "source": "firmware/components/core/src/ui_agent.c:212"
     },
     {
       "id": "ask",
       "title": "Ask · the request and its options",
       "source": "firmware/components/core/src/ui_ask.c:306"
+    },
+    {
+      "id": "scroll",
+      "title": "Scroll · the terminal's scrollback",
+      "source": "firmware/components/core/src/ui_scroll.c:243"
     }
   ],
   "haptics": {
@@ -802,6 +884,15 @@
       },
       {
         "on_ms": 250,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ],
+    "scroll_stop": [
+      {
+        "on_ms": 40,
         "off_ms": 0,
         "duty": 85,
         "kick_ms": 15,
@@ -1186,6 +1277,13 @@
           "type": "tstr",
           "note": "msg",
           "name": "msg"
+        },
+        {
+          "key": 3,
+          "optional": true,
+          "type": "scroll_pos",
+          "note": "pos   only in answers to cmd_op_scroll",
+          "name": "pos"
         }
       ],
       "source": "protocol/agentlink.cddl:55"
@@ -1624,7 +1722,8 @@
     "done": "An agent finished",
     "error": "An agent hit an error",
     "question": "An agent is asking a question",
-    "permission": "An agent needs approval"
+    "permission": "An agent needs approval",
+    "scroll_stop": "SCROLL reached the bottom or the top of the scrollback: one thud"
   },
   "haptic_motor": {
     "hold_duty": 85,
@@ -1643,35 +1742,40 @@
     "display.height": "firmware/boards/stopwatch/board_priv.h:19",
     "display.shape": "firmware/boards/stopwatch/display.cpp:1",
     "display.width": "firmware/boards/stopwatch/board_priv.h:18",
-    "gesture.agent_timeout_ms": "firmware/components/core/src/nav.h:64",
-    "gesture.b_immediate": "firmware/components/core/src/gesture.c:167",
+    "gesture.agent_timeout_ms": "firmware/components/core/src/nav.h:68",
+    "gesture.b_immediate": "firmware/components/core/src/gesture.c:212",
     "gesture.btn_double_ms": "firmware/components/core/src/gesture.h:12",
-    "gesture.card_arm_ms": "firmware/components/core/src/nav.h:62",
-    "gesture.centre_r_px": "firmware/components/core/src/nav.h:58",
-    "gesture.cx_px": "firmware/components/core/src/gesture.h:15",
-    "gesture.cy_px": "firmware/components/core/src/gesture.h:16",
-    "gesture.deny_hold_ms": "firmware/components/core/src/nav.h:60",
-    "gesture.hold_confirm_ms": "firmware/components/core/src/nav.h:59",
-    "gesture.hold_show_ms": "firmware/components/core/src/nav.h:61",
+    "gesture.card_arm_ms": "firmware/components/core/src/nav.h:66",
+    "gesture.centre_r_px": "firmware/components/core/src/nav.h:62",
+    "gesture.cx_px": "firmware/components/core/src/gesture.h:21",
+    "gesture.cy_px": "firmware/components/core/src/gesture.h:22",
+    "gesture.deny_hold_ms": "firmware/components/core/src/nav.h:64",
+    "gesture.drag_step_px": "firmware/components/core/src/gesture.h:14",
+    "gesture.flick_px_per_s": "firmware/components/core/src/gesture.h:16",
+    "gesture.hold_confirm_ms": "firmware/components/core/src/nav.h:63",
+    "gesture.hold_show_ms": "firmware/components/core/src/nav.h:65",
     "gesture.long_press_ms": "firmware/components/core/src/gesture.h:7",
-    "gesture.long_swipe_px": "firmware/components/core/src/nav.h:63",
-    "gesture.rim_in_px": "firmware/components/core/src/gesture.h:17",
-    "gesture.rim_out_px": "firmware/components/core/src/gesture.h:18",
-    "gesture.rim_track_in_px": "firmware/components/core/src/gesture.h:19",
-    "gesture.rim_track_out_px": "firmware/components/core/src/gesture.h:20",
-    "gesture.scrub_hyst_deg": "firmware/components/core/src/gesture.h:22",
+    "gesture.long_swipe_px": "firmware/components/core/src/nav.h:67",
+    "gesture.rim_in_px": "firmware/components/core/src/gesture.h:23",
+    "gesture.rim_out_px": "firmware/components/core/src/gesture.h:24",
+    "gesture.rim_track_in_px": "firmware/components/core/src/gesture.h:25",
+    "gesture.rim_track_out_px": "firmware/components/core/src/gesture.h:26",
+    "gesture.scroll_coalesce_ms": "firmware/components/core/src/nav.h:74",
+    "gesture.scroll_lines_per_step": "firmware/components/core/src/nav.h:73",
+    "gesture.scroll_timeout_ms": "firmware/components/core/src/nav.h:69",
+    "gesture.scrub_hyst_deg": "firmware/components/core/src/gesture.h:28",
     "gesture.scrub_hysteresis_cap": "firmware/components/core/src/gesture.c:70",
-    "gesture.scrub_start_deg": "firmware/components/core/src/gesture.h:21",
+    "gesture.scrub_start_deg": "firmware/components/core/src/gesture.h:27",
     "gesture.swipe_max_ms": "firmware/components/core/src/gesture.h:9",
     "gesture.swipe_min_px": "firmware/components/core/src/gesture.h:8",
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:279",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:229",
-    "gesture_map.chord": "firmware/components/core/src/app.c:249",
+    "gesture_map.chord": "firmware/components/core/src/app.c:279",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:390",
-    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:94",
+    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:105",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:259",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:289",
     "haptics.approved": "firmware/components/core/src/feedback.c:72",
     "haptics.denied": "firmware/components/core/src/feedback.c:78",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:59",
@@ -1680,7 +1784,7 @@
     "haptics.done": "firmware/components/core/src/feedback.c:23",
     "haptics.duty": "firmware/boards/stopwatch/input.cpp:17",
     "haptics.error": "firmware/components/core/src/feedback.c:22",
-    "haptics.hello": "firmware/components/core/src/feedback.c:97",
+    "haptics.hello": "firmware/components/core/src/feedback.c:105",
     "haptics.hold_ramp": "firmware/components/core/src/feedback.c:52",
     "haptics.kick_duty": "firmware/boards/stopwatch/input.cpp:18",
     "haptics.kick_ms": "firmware/boards/stopwatch/input.cpp:19",
@@ -1690,6 +1794,7 @@
     "haptics.question": "firmware/components/core/src/feedback.c:21",
     "haptics.reject": "firmware/components/core/src/feedback.c:91",
     "haptics.reply_sent": "firmware/components/core/src/feedback.c:85",
+    "haptics.scroll_stop": "firmware/components/core/src/feedback.c:98",
     "haptics.tick": "firmware/components/core/src/feedback.c:34",
     "link.hello_retry_ms": "firmware/components/core/src/link.c:8",
     "link.idle_ping_ms": "firmware/components/core/src/link.c:9",
@@ -1713,15 +1818,15 @@
     "palette.text": "firmware/components/core/src/ui_theme.h:10",
     "palette.working": "firmware/components/core/src/ui_theme.h:13",
     "ring.ambient_ms": "firmware/components/core/src/ui_home.c:14",
-    "ring.ask_period_ms": "firmware/components/core/src/ui_ring.c:32",
+    "ring.ask_period_ms": "firmware/components/core/src/ui_ring.c:33",
     "ring.band_out_px": "firmware/components/core/src/ui_ring.c:12",
     "ring.band_w_px": "firmware/components/core/src/ui_ring.c:13",
     "ring.deny_hint": "firmware/components/core/src/ui_home.c:33",
-    "ring.done_sweep_ms": "firmware/components/core/src/ui_ring.c:34",
+    "ring.done_sweep_ms": "firmware/components/core/src/ui_ring.c:35",
     "ring.dot_step_deg": "firmware/components/core/src/ui_ring.c:20",
     "ring.edge_hint_a": "firmware/components/core/src/ui_home.c:614",
     "ring.edge_hint_b": "firmware/components/core/src/ui_home.c:614",
-    "ring.error_flicker_ms": "firmware/components/core/src/ui_ring.c:35",
+    "ring.error_flicker_ms": "firmware/components/core/src/ui_ring.c:36",
     "ring.hint_a_deg": "firmware/components/core/src/ui_theme.h:29",
     "ring.hint_b_deg": "firmware/components/core/src/ui_theme.h:30",
     "ring.hint_r_px": "firmware/components/core/src/ui_theme.h:31",
@@ -1732,11 +1837,11 @@
     "ring.nag_ms": "firmware/components/core/src/ui_home.c:16",
     "ring.nothing_else": "firmware/components/core/src/ui_home.c:408",
     "ring.others_pct": "firmware/components/core/src/ui_ring.c:17",
-    "ring.perm_period_ms": "firmware/components/core/src/ui_ring.c:33",
+    "ring.perm_period_ms": "firmware/components/core/src/ui_ring.c:34",
     "ring.pill_approve": "firmware/components/core/src/ui_home.c:369",
     "ring.pill_done": "firmware/components/core/src/ui_home.c:369",
-    "ring.prog_out_px": "firmware/components/core/src/ui_ring.c:25",
-    "ring.prog_w_px": "firmware/components/core/src/ui_ring.c:26",
+    "ring.prog_out_px": "firmware/components/core/src/ui_ring.c:26",
+    "ring.prog_w_px": "firmware/components/core/src/ui_ring.c:27",
     "ring.repo_px": "firmware/components/core/src/ui_home.c:25",
     "ring.repo_small_px": "firmware/components/core/src/ui_home.c:26",
     "ring.repo_w_px": "firmware/components/core/src/ui_home.c:24",
@@ -1747,10 +1852,12 @@
     "ring.track_w_px": "firmware/components/core/src/ui_ring.c:21",
     "ring.underline_gap_px": "firmware/components/core/src/ui_ring.c:19",
     "ring.underline_w_px": "firmware/components/core/src/ui_ring.c:18",
-    "ring.work_period_ms": "firmware/components/core/src/ui_ring.c:31",
+    "ring.work_period_ms": "firmware/components/core/src/ui_ring.c:32",
     "screens": "firmware/components/core/src/ui_home.c:552",
-    "screens.agent": "firmware/components/core/src/ui_agent.c:209",
+    "screens.agent": "firmware/components/core/src/ui_agent.c:212",
     "screens.ask": "firmware/components/core/src/ui_ask.c:306",
+    "screens.scroll": "firmware/components/core/src/ui_scroll.c:243",
+    "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:55",
     "states": "firmware/components/core/src/ui_theme.c:10",
     "states.input_words": "firmware/components/core/src/ui_theme.c:31",
     "states.permission_colour": "firmware/components/core/src/ui_theme.c:23",

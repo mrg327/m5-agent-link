@@ -147,16 +147,19 @@ The device must show approve/deny **only if** they are in `acts`. The daemon inc
 
 ```cddl
 cmd = {
-  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet",
+  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll",
   ? sid: uint,
   ? rid: uint,               ; required for approve/deny/reply
-  ? arg: uint / tstr,        ; snooze minutes (the watch sends 30), reply option index, quiet duration...
-                             ; (structured arguments join this union when they land; the CDDL names it cmd_arg)
+  ? arg: uint / tstr / scroll_arg,  ; snooze minutes (the watch sends 30), reply option index, quiet duration,
+                             ; or the scroll argument (the CDDL names the union cmd_arg)
   hold_ms?: uint             ; for approve: measured hold-to-confirm duration (daemon enforces ≥ 1000)
 }
-result = { ok: bool, ? err: "stale"/"denied"/"unsupported"/"no_window"/"timeout", ? msg: tstr }
+scroll_arg = { unit: "lines"/"pages"/"to_end", delta: int, ? seq: uint }   ; delta < 0 = up (older); to_end: sign = top / bottom
+result = { ok: bool, ? err: "stale"/"denied"/"unsupported"/"no_window"/"timeout", ? msg: tstr, ? pos: scroll_pos }
+scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tstr }   ; only in answers to scroll
 ```
 - `focus`: the daemon runs the FocusDriver for that session. On `no_window`, the device shows "Open terminal not found".
+- `scroll` (UI-V2 §6): the daemon moves the session's terminal scrollback (tmux copy mode first, else kitty remote control; other terminals answer `unsupported` and the device hides the item for that session). The daemon sums a burst into one move while the previous one runs, answers at most one `result` per 250 ms and only when the position changed or the move failed, and clamps `delta` to ±500 lines / ±20 pages. `pos.preview` is the terminal's top visible line, ≤ 48 chars, sent only when the device's privacy is `preview` or `full`; it is never written to the audit log or the trace. Scroll is read-only on the PC and is not audited.
 - `detail`: the daemon replies with `detail { rid|sid, text }`, which holds the full text. This is sent only when privacy ≠ `meta`.
 - `approve`/`deny`/`reply` on a `rid` that has already been cleared returns `err: "stale"`, so a race against the terminal answer is safe. The daemon's approval broker holds the agent's blocking hook for that `rid` (DESIGN §6a); the first of {device answer, terminal answer, timeout} settles it, and only a device answer ever becomes a decision for the agent.
 

@@ -6,7 +6,7 @@ import { encode, decode } from './cbor.js';
 const ENUMS = {
   device_class: { watch: 0, desk: 1, pad: 2, sim: 3, other: 15 },
   input_kind: { touch: 0, btn: 1, rotary: 2, imu: 3 },
-  feature: { focus: 0, ack: 1, approve: 2, reply: 3, voice: 4, badge: 5, debug: 6 },
+  feature: { focus: 0, ack: 1, approve: 2, reply: 3, voice: 4, badge: 5, debug: 6, scroll: 7 },
   privacy: { meta: 0, preview: 1, full: 2 },
   alert_mode: { full: 0, quiet: 1, silent: 2 },
   agent: { copilot: 0, claude: 1, cloud: 2, other: 15 },
@@ -14,7 +14,8 @@ const ENUMS = {
   input_sub: { approval: 0, question: 1 },
   att_kind: { approval: 0, question: 1, error: 2, done: 3 },
   action: { approve: 0, deny: 1, focus: 2, reply: 3, ack: 4 },
-  cmd_op: { focus: 0, ack: 1, snooze: 2, approve: 3, deny: 4, reply: 5, cancel: 6, detail: 7, notify_done: 8, quiet: 9 },
+  cmd_op: { focus: 0, ack: 1, snooze: 2, approve: 3, deny: 4, reply: 5, cancel: 6, detail: 7, notify_done: 8, quiet: 9, scroll: 10 },
+  scroll_unit: { lines: 0, pages: 1, to_end: 2 },
   disp_shape: { round: 0, rect: 1 },
   host_os: { mac: 0, win: 1, linux: 2 },
   clear_why: { answered_pc: 0, answered_dev: 1, expired: 2, cancelled: 3 },
@@ -60,8 +61,11 @@ const SPECS = {
     opts: [5, 'tstrs'], acts: [6, 'enums:action'], exp: [7, 'uint'], grant_mask: [8, 'uint'],
   },
   clear: { rid: [0, 'uint'], why: [1, 'enum:clear_why'] },
-  cmd: { op: [0, 'enum:cmd_op'], sid: [1, 'uint'], rid: [2, 'uint'], arg: [3, 'any'], hold_ms: [4, 'uint'] },
-  result: { ok: [0, 'bool'], err: [1, 'enum:result_err'], msg: [2, 'tstr'] },
+  // cmd_arg = uint / tstr / scroll_arg: a map argument is the scroll one
+  scroll_arg: { unit: [0, 'enum:scroll_unit'], delta: [1, 'int'], seq: [2, 'uint'] },
+  cmd: { op: [0, 'enum:cmd_op'], sid: [1, 'uint'], rid: [2, 'uint'], arg: [3, 'cmd_arg'], hold_ms: [4, 'uint'] },
+  scroll_pos: { lines_above: [0, 'uint'], at_bottom: [1, 'bool'], total: [2, 'uint'], preview: [3, 'tstr'] },
+  result: { ok: [0, 'bool'], err: [1, 'enum:result_err'], msg: [2, 'tstr'], pos: [3, 'obj:scroll_pos'] },
   detail: { rid: [0, 'uint'], sid: [1, 'uint'], text: [2, 'tstr'] },
   batt: { pct: [0, 'uint'], chg: [1, 'bool'] },
   log: { lvl: [0, 'enum:log_level'], msg: [1, 'tstr'] },
@@ -92,6 +96,7 @@ function toWire(type, v) {
     case 'enums': return v.map((x) => ENUMS[arg][x] ?? x);
     case 'obj': return objToWire(arg, v);
     case 'objs': return v.map((x) => objToWire(arg, x));
+    case 'cmd_arg': return v !== null && typeof v === 'object' ? objToWire('scroll_arg', v) : v;
     default: return v;
   }
 }
@@ -104,6 +109,7 @@ function fromWire(type, v) {
     case 'obj': return objFromWire(arg, v);
     case 'objs': return v.map((x) => objFromWire(arg, x));
     case 'any': return v instanceof Map ? Object.fromEntries(v) : v;
+    case 'cmd_arg': return v instanceof Map ? objFromWire('scroll_arg', v) : v;
     default: return v;
   }
 }
@@ -202,8 +208,18 @@ export function describe(msg, dir) {
     case 'gone': what = `session ${b.sid} ended`; break;
     case 'attention': what = `${b.kind ?? 'attention'} request for session ${b.sid}${b.title ? `: ${b.title}` : ''}`; break;
     case 'clear': what = `request ${b.rid} cleared (${String(b.why).replace('_', ' ')})`; break;
-    case 'cmd': what = `command ${b.op}${b.sid !== undefined ? ` on session ${b.sid}` : ''}${b.hold_ms ? ` after a ${b.hold_ms} ms hold` : ''}`; break;
-    case 'result': what = b.ok ? `result: OK${b.msg ? ` (${b.msg})` : ''}` : `result: ${b.err ?? 'failed'}${b.msg ? ` (${b.msg})` : ''}`; break;
+    case 'cmd': {
+      const scroll = b.op === 'scroll' && b.arg && typeof b.arg === 'object'
+        ? ` ${b.arg.unit === 'to_end' ? (b.arg.delta < 0 ? 'to the top' : 'to the bottom') : `${Math.abs(b.arg.delta)} ${b.arg.unit} ${b.arg.delta < 0 ? 'up' : 'down'}`}`
+        : '';
+      what = `command ${b.op}${scroll}${b.sid !== undefined ? ` on session ${b.sid}` : ''}${b.hold_ms ? ` after a ${b.hold_ms} ms hold` : ''}`;
+      break;
+    }
+    case 'result': {
+      const pos = b.pos ? (b.pos.at_bottom ? ', live at the bottom' : `, ${b.pos.lines_above} lines above the bottom`) : '';
+      what = b.ok ? `result: OK${pos}${b.msg ? ` (${b.msg})` : ''}` : `result: ${b.err ?? 'failed'}${b.msg ? ` (${b.msg})` : ''}`;
+      break;
+    }
     case 'ping': what = 'ping (keepalive)'; break;
     case 'pong': what = 'pong (link is alive)'; break;
     case 'batt': what = `battery ${b.pct}%${b.chg ? ' charging' : ''}`; break;

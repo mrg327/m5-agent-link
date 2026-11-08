@@ -236,6 +236,12 @@ def extract_gesture():
     g["long_swipe_px"] = int(find(nav, r"#define NAV_LONG_SWIPE_PX\s+(\d+)", "gesture.long_swipe_px").group(1))
     g["deny_hold_ms"] = int(find(nav, r"#define NAV_DENY_HOLD_MS\s+(\d+)", "gesture.deny_hold_ms").group(1))
     g["agent_timeout_ms"] = int(find(nav, r"#define NAV_AGENT_TIMEOUT_MS\s+(\d+)", "gesture.agent_timeout_ms").group(1))
+    # SCROLL (UI-V2 §4.4): the drag stream and the flick come from the recogniser, the rate from nav.h
+    g["drag_step_px"] = int(find(rel, r"#define GESTURE_DRAG_STEP_PX\s+(\d+)", "gesture.drag_step_px").group(1))
+    g["flick_px_per_s"] = int(find(rel, r"#define GESTURE_FLICK_PX_PER_S\s+(\d+)", "gesture.flick_px_per_s").group(1))
+    g["scroll_lines_per_step"] = int(find(nav, r"#define NAV_SCROLL_LINES_PER_STEP\s+(\d+)", "gesture.scroll_lines_per_step").group(1))
+    g["scroll_coalesce_ms"] = int(find(nav, r"#define NAV_SCROLL_COALESCE_MS\s+(\d+)", "gesture.scroll_coalesce_ms").group(1))
+    g["scroll_timeout_ms"] = int(find(nav, r"#define NAV_SCROLL_TIMEOUT_MS\s+(\d+)", "gesture.scroll_timeout_ms").group(1))
     find(CORE + "gesture.c", r"if \(btn == 1\) \{\s*emit\(g, G_BTN_B", "gesture.b_immediate", re.S)
     return g
 
@@ -293,8 +299,12 @@ ACTION_TEXT = {
     "NAV_NEXT": "Next session (HOME) or next item (AGENT, ASK)",
     "NAV_PREV": "Previous session",
     "NAV_COMMIT": "Commit the selected item; an approve-class or deny item answers 'hold to confirm' instead",
-    "NAV_BACK": "Back to the deck (a long swipe down, or B held); a request stays pending",
+    "NAV_BACK": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is); a request stays pending",
     "NAV_HOME": "A+B chord: straight back to the deck",
+    "NAV_SCROLL_DRAG": "SCROLL: each 24 px of vertical drag moves the terminal 3 lines (up = older), summed into one command per 50 ms",
+    "NAV_PAGE_OLDER": "SCROLL: a flick up moves one page toward older output (a slow swipe only counts by its drag steps)",
+    "NAV_PAGE_NEWER": "SCROLL: a flick down or button B moves one page toward newer output",
+    "NAV_TO_BOTTOM": "SCROLL: button A jumps back to the live bottom and leaves the mode",
 }
 WHEN_TEXT = {"WHEN_ALWAYS": "", "WHEN_REQUEST": "with an approvable request on screen", "WHEN_NO_REQUEST": "without an approvable request",
              "WHEN_ASKABLE": "with a permission or question pending", "WHEN_NOT_ASKABLE": "with nothing to answer"}
@@ -346,13 +356,19 @@ def extract_screens():
     vals["agent"] = f"{CORE}ui_agent.c:{line_of(CORE + 'ui_agent.c', ag.start())}"
     ask = find(CORE + "ui_ask.c", r'snprintf\(r->screen, sizeof r->screen, "ask"\)', "screens.ask")
     vals["ask"] = f"{CORE}ui_ask.c:{line_of(CORE + 'ui_ask.c', ask.start())}"
-    if set(vals) != {"ring", "attention", "agent", "ask"}:
+    sc = find(CORE + "ui_scroll.c", r'snprintf\(r->screen, sizeof r->screen, "scroll"\)', "screens.scroll")
+    vals["scroll"] = f"{CORE}ui_scroll.c:{line_of(CORE + 'ui_scroll.c', sc.start())}"
+    if set(vals) != {"ring", "attention", "agent", "ask", "scroll"}:
         raise Drift(f"unexpected screen values {sorted(vals)}")
+    # the preview line is terminal content: it is only drawn when the privacy setting allows it
+    find(CORE + "ui_scroll.c", r"static bool preview_allowed\(void\) \{ return model_settings\(\)->privacy != PRIVACY_META; \}",
+         "screens.scroll_preview_privacy")
     SOURCES["screens"] = vals["attention"]
     return [{"id": "ring", "title": "Deck", "source": vals["ring"]},
             {"id": "attention", "title": "Deck · a request is waiting", "source": vals["attention"]},
             {"id": "agent", "title": "Agent wheel", "source": vals["agent"]},
-            {"id": "ask", "title": "Ask · the request and its options", "source": vals["ask"]}]
+            {"id": "ask", "title": "Ask · the request and its options", "source": vals["ask"]},
+            {"id": "scroll", "title": "Scroll · the terminal's scrollback", "source": vals["scroll"]}]
 
 
 # ───────────────────────── haptics ─────────────────────────
@@ -371,6 +387,7 @@ HAPTIC_MEANING = {
     "error": ("error", "An agent hit an error"),
     "question": ("question", "An agent is asking a question"),
     "permission": ("permission", "An agent needs approval"),
+    "scroll_stop": ("stop", "SCROLL reached the bottom or the top of the scrollback: one thud"),
 }
 
 

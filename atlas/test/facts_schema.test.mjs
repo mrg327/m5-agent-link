@@ -34,17 +34,21 @@ test('gesture thresholds describe the ring recogniser, with no tap deferral', ()
 });
 
 test('ring facts: screens, per-kind shapes, pills and the gesture cases', () => {
-  assert.deepEqual(facts.screens.map((s) => s.id), ['ring', 'attention', 'agent', 'ask']);
+  assert.deepEqual(facts.screens.map((s) => s.id), ['ring', 'attention', 'agent', 'ask', 'scroll']);
   assert.deepEqual(Object.keys(facts.ring.kinds), ['work', 'ask', 'perm', 'done', 'error', 'idle']);
   assert.ok(facts.ring.merge_at >= 2 && facts.ring.max_segments >= facts.ring.merge_at);
   assert.equal(facts.ring.pills.approve, 'TAP › ANSWER'); // a request's tap opens ASK; approving is a hold there
   const cases = facts.gesture_map.cases.map((c) => c.gesture);
-  for (const c of ['G_TAP', 'G_LONG_PRESS', 'G_SWIPE_DOWN', 'G_SCRUB', 'G_BTN_A', 'G_BTN_A_DOUBLE', 'G_BTN_B']) assert.ok(cases.includes(c), c);
+  for (const c of ['G_TAP', 'G_LONG_PRESS', 'G_SWIPE_DOWN', 'G_SCRUB', 'G_BTN_A', 'G_BTN_A_DOUBLE', 'G_BTN_B', 'G_DRAG']) assert.ok(cases.includes(c), c);
+  // SCROLL: the drag stream is the only binding of G_DRAG, and the deck still has no press binding
+  assert.deepEqual(facts.gesture_map.cases.filter((c) => c.gesture === 'G_DRAG').map((c) => c.mode), ['scroll']);
+  assert.ok(!facts.gesture_map.cases.some((c) => c.mode === 'home' && c.gesture === 'G_PRESS'));
+  assert.ok(facts.gesture.drag_step_px > facts.gesture.tap_slop_px && facts.gesture.scroll_lines_per_step > 0);
 });
 
 test('haptics have steps with duty, the rim detent and the approve ramp', () => {
   assert.deepEqual(Object.keys(facts.haptics).sort(),
-    ['approved', 'denied', 'deny_ramp', 'detent', 'done', 'error', 'hello', 'hold_ramp', 'permission', 'question', 'reject', 'reply_sent', 'tick']);
+    ['approved', 'denied', 'deny_ramp', 'detent', 'done', 'error', 'hello', 'hold_ramp', 'permission', 'question', 'reject', 'reply_sent', 'scroll_stop', 'tick']);
   for (const steps of Object.values(facts.haptics)) {
     assert.ok(steps.length > 0);
     for (const s of steps) assert.ok(s.on_ms > 0 && s.off_ms >= 0 && s.duty > 0 && s.duty <= 100);

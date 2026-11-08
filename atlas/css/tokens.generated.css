@@ -43,6 +43,11 @@
   --fw-long-swipe-px: 120px;
   --fw-deny-hold-ms: 800ms;
   --fw-agent-timeout-ms: 8000ms;
+  --fw-drag-step-px: 24px;
+  --fw-flick-px-per-s: 700;
+  --fw-scroll-lines-per-step: 3;
+  --fw-scroll-coalesce-ms: 50ms;
+  --fw-scroll-timeout-ms: 8000ms;
   --fw-haptic-kick-ms: 15ms;
   --fw-display-size: 466px;
 }
