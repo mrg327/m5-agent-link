@@ -6,6 +6,10 @@
 #include "ui.h"
 
 #define GLOW_MS 2000
+/* Display-off timeout with no input. 0 would mean "never", so the device default must be set here:
+ * the AMOLED and the battery both suffer from a panel left lit (the ring dims to ambient at 30 s).
+ * The simulator overrides it (`--idle-off`, default never) so scripts see a stable screen. */
+#define IDLE_OFF_DEFAULT_MS (60u * 1000u)
 /* Display-off time after which an unattended, battery-powered, unlinked device goes DEEP. */
 #define DEEP_AFTER_MS (10u * 60u * 1000u)
 
@@ -32,7 +36,11 @@ static bool may_deep(void)
     return !b.usb_present && !link_connected();
 }
 
-void power_init(void) { s_on = true; }
+void power_init(void)
+{
+    s_on = true;
+    s_idle_ms = IDLE_OFF_DEFAULT_MS;
+}
 void power_set_idle_timeout_ms(uint32_t ms) { s_idle_ms = ms; }
 bool power_display_on(void) { return s_on; }
 const char *power_name(void) { return s_on ? "active" : s_deep ? "deep" : "standby"; }

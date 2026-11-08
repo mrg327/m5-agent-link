@@ -366,5 +366,8 @@ uint32_t core_step(void)
         s_frames_drawn = 0;
         s_fps_t0 = now;
     }
+    /* Display off: nothing to animate and input is queued by interrupts, so poll slowly; the first
+     * button or link frame still lands within 50 ms. */
+    if (!power_display_on()) return 50;
     return wait > 10 ? 10 : wait;
 }
