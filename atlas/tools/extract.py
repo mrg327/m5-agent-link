@@ -252,13 +252,16 @@ def extract_gesture():
 
 
 def extract_ring():
-    home, ring = CORE + "ui_home.c", CORE + "ui_ring.c"
+    # the deck is two files: ui_home.c (slots, selection, timers) and ui_home_card.c (the centre card);
+    # the ring's constants live in its private header, shared by ui_ring.c and ui_ring_draw.c
+    home, card, ring = CORE + "ui_home.c", CORE + "ui_home_card.c", CORE + "ui_ring_internal.h"
     r = {}
-    for key, macro in [("merge_at", "MERGE_AT"), ("ambient_ms", "AMBIENT_MS"), ("nag_ms", "NAG_MS"), ("nag_max", "NAG_MAX"),
-                       # key badges beside the buttons (UI-V2 §4.1); the fact keys keep their old names for the Atlas
-                       ("repo_w_px", "REPO_W"), ("repo_px", "REPO_PX"), ("repo_small_px", "REPO_SMALL_PX"),
-                       ("summary_w_px", "SUMMARY_W")]:
+    for key, macro in [("merge_at", "MERGE_AT"), ("ambient_ms", "AMBIENT_MS"), ("nag_ms", "NAG_MS"), ("nag_max", "NAG_MAX")]:
         r[key] = int(find(home, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
+    # key badges beside the buttons (UI-V2 §4.1); the fact keys keep their old names for the Atlas
+    for key, macro in [("repo_w_px", "REPO_W"), ("repo_px", "REPO_PX"), ("repo_small_px", "REPO_SMALL_PX"),
+                       ("summary_w_px", "SUMMARY_W")]:
+        r[key] = int(find(card, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
     for key, macro in [("hint_a_deg", "UI_BADGE_A_DEG"), ("hint_b_deg", "UI_BADGE_B_DEG"), ("hint_r_px", "UI_BADGE_R")]:
         r[key] = int(find(CORE + "ui_theme.h", rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
     for key, macro in [("band_out_px", "BAND_OUT"), ("band_w_px", "BAND_W"), ("sel_out_px", "SEL_OUT"), ("sel_w_px", "SEL_W"),
@@ -276,13 +279,13 @@ def extract_ring():
         kinds[m.group(1).lower()] = m.group(2)
     SOURCES["ring.kinds"] = f"{CORE}ui_ring.h:{line_of(CORE + 'ui_ring.h', find(CORE + 'ui_ring.h', r'RING_WORK,').start())}"
     r["kinds"] = kinds
-    find(home, r'"TAP " LV_SYMBOL_RIGHT " ANSWER"', "ring.pill_approve")
-    find(home, r'"FOCUS \+ ACK"', "ring.pill_done")
+    find(card, r'"TAP " LV_SYMBOL_RIGHT " ANSWER"', "ring.pill_approve")
+    find(card, r'"FOCUS \+ ACK"', "ring.pill_done")
     find(CORE + "ui_ask.c", r'"long swipe down to deny"', "ring.deny_hint") # deny lives only in ASK (UI-V2 §3)
-    find(home, r'"swipe down for status"', "ring.status_hint")
+    find(card, r'"swipe down for status"', "ring.status_hint")
     # a request's pill opens ASK (UI-V2 §4.3); approving is a hold on that screen, never on the deck
     r["pills"] = {"approve": "TAP › ANSWER", "done": "FOCUS + ACK", "default": "FOCUS"}
-    words = find(home, r'static const char \*const words\[2\] = \{"(\w+)", "(\w+)"\};', "ring.edge_hint_a")
+    words = find(card, r'static const char \*const words\[2\] = \{"(\w+)", "(\w+)"\};', "ring.edge_hint_a")
     SOURCES["ring.edge_hint_b"] = SOURCES["ring.edge_hint_a"]
     r["edge_hints"] = {"a": words.group(1), "b": words.group(2)}
     find(home, r"Nothing else needs you", "ring.nothing_else")

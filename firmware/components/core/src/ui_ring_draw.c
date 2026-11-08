@@ -1,0 +1,141 @@
+/* How the index ring paints (UI-V2 §4.1, "capsules"): one arc primitive with round caps, a round dot,
+ * and one segment per kind: a dim capsule with a comet (working), a pulsing capsule (question), two
+ * thin tracks (permission), a sweep then solid (done), a row of dots (error), a thin still line
+ * (idle). The object, its segments and the animation clock live in ui_ring.c. */
+#include "ui_ring_internal.h"
+
+#include <math.h>
+
+lv_color_t ring_mix(uint32_t rgb, int pct)
+{
+    return lv_color_mix(lv_color_hex(rgb), lv_color_black(), (uint8_t)(255 * pct / 100));
+}
+
+/* ring_mix() scaled by k percent: the non-selected capsules recede without losing their hue. */
+static lv_color_t mixk(int k, uint32_t rgb, int pct) { return ring_mix(rgb, pct * k / 100); }
+
+void ring_arc(lv_layer_t *l, int r_out, int w, int a0, int a1, lv_color_t c)
+{
+    if (a1 <= a0 || w <= 0) return;
+    lv_draw_arc_dsc_t d;
+    lv_draw_arc_dsc_init(&d);
+    d.center.x = CX;
+    d.center.y = CY;
+    d.radius = (uint16_t)r_out;
+    d.width = (uint16_t)w;
+    d.color = c;
+    d.rounded = a1 - a0 < 360; /* capsule ends; a full ring has none */
+    if (a1 - a0 >= 360) { /* two overlapping halves: a single 0..359 arc leaves a visible seam */
+        d.start_angle = 0;
+        d.end_angle = 181;
+        lv_draw_arc(l, &d);
+        d.start_angle = 180;
+        d.end_angle = 1;
+    } else {
+        d.start_angle = (lv_value_precise_t)((a0 + 270) % 360);
+        d.end_angle = (lv_value_precise_t)((a1 + 270) % 360);
+    }
+    lv_draw_arc(l, &d);
+}
+
+static int tri_level(uint32_t t, uint32_t period, int levels)
+{
+    uint32_t p = t % period * 2;
+    if (p > period) p = 2 * period - p; /* 0..period..0 */
+    return (int)(p * (uint32_t)levels / period);
+}
+
+int ring_anim_level(const ring_data_t *d, const ring_slot_t *s, int span, uint32_t now)
+{
+    if (d->ambient || d->still) {
+        switch (s->s.kind) {
+        case RING_WORK: return span / 2 / COMET_STEP_DEG;
+        case RING_ASK:
+        case RING_PERM: return PULSE_LEVELS - 1;
+        case RING_DONE: return DONE_STEPS;
+        case RING_ERROR: return 2;
+        default: return 0;
+        }
+    }
+    uint32_t t = now - s->entry_ms;
+    switch (s->s.kind) {
+    case RING_WORK: return (int)(now % WORK_PERIOD_MS * (uint32_t)span / WORK_PERIOD_MS / COMET_STEP_DEG);
+    case RING_ASK: return tri_level(now, ASK_PERIOD_MS, PULSE_LEVELS);
+    case RING_PERM: return tri_level(now, PERM_PERIOD_MS, PULSE_LEVELS);
+    case RING_DONE: return t >= DONE_SWEEP_MS ? DONE_STEPS : (int)(t * DONE_STEPS / DONE_SWEEP_MS);
+    case RING_ERROR: return t >= ERROR_FLICKER_MS ? 2 : (int)(t / 100 % 2);
+    default: return 0;
+    }
+}
+
+/* A filled circle of diameter `diam` centred at polar (r_mid, deg clockwise from 12 o'clock). */
+static void dot(lv_layer_t *l, int r_mid, int diam, int deg, lv_color_t c)
+{
+    float rad = (float)deg * (float)M_PI / 180.0f;
+    int x = CX + (int)lroundf((float)r_mid * sinf(rad)), y = CY - (int)lroundf((float)r_mid * cosf(rad));
+    lv_draw_rect_dsc_t d;
+    lv_draw_rect_dsc_init(&d);
+    d.bg_color = c;
+    d.bg_opa = LV_OPA_COVER;
+    d.radius = LV_RADIUS_CIRCLE;
+    lv_area_t a = {x - diam / 2, y - diam / 2, x - diam / 2 + diam - 1, y - diam / 2 + diam - 1};
+    lv_draw_rect(l, &d, &a);
+}
+
+static void draw_dotted(lv_layer_t *l, int r_mid, int diam, int a0, int a1, lv_color_t c)
+{
+    for (int a = a0 + 3; a <= a1 - 3; a += DOT_STEP_DEG) dot(l, r_mid, diam, a, c);
+}
+
+void ring_draw_slot(lv_layer_t *l, const ring_data_t *d, int i)
+{
+    const ring_slot_t *s = &d->seg[i];
+    int a0, a1;
+    ring_seg_span(d->n, i, &a0, &a1);
+    int span = a1 - a0;
+    bool sel = s->s.selected && d->n > 1;
+    int out = sel ? SEL_OUT : BAND_OUT, w = sel ? SEL_W : BAND_W;
+    int k = d->n > 1 && !s->s.selected ? OTHERS_PCT : 100;
+    int lvl = s->lvl;
+    int base = s->s.dim ? 30 : 100;
+    if (d->ambient) base = 20;
+    uint32_t rgb = s->s.rgb;
+
+    switch (s->s.kind) {
+    case RING_WORK: {
+        ring_arc(l, out, w, a0, a1, mixk(k, rgb, d->ambient ? 20 : 38));
+        if (!d->ambient) {
+            int p = lvl * COMET_STEP_DEG, len = span / 2 < COMET_DEG ? span / 2 : COMET_DEG;
+            int c0 = a0 + p, c1 = c0 + len;
+            if (c1 > a1) c1 = a1;
+            ring_arc(l, out, w, c0, c1, mixk(k, rgb, 100));
+        }
+        break;
+    }
+    case RING_ASK:
+        ring_arc(l, out, w, a0, a1, mixk(k, rgb, d->ambient ? 20 : 55 + lvl * 45 / PULSE_LEVELS));
+        break;
+    case RING_PERM: { /* two thin round tracks on the outer and inner edge of the capsule */
+        int tw = sel ? SEL_TRACK_W : TRACK_W;
+        lv_color_t c = mixk(k, rgb, d->ambient ? 20 : 55 + lvl * 45 / PULSE_LEVELS);
+        ring_arc(l, out, tw, a0, a1, c);
+        ring_arc(l, out - w + tw, tw, a0, a1, c);
+        break;
+    }
+    case RING_DONE:
+        if (lvl < DONE_STEPS) {
+            ring_arc(l, out, w, a0, a1, mixk(k, rgb, 25));
+            ring_arc(l, out, w, a0, a0 + span * lvl / DONE_STEPS, mixk(k, rgb, 100));
+        } else {
+            ring_arc(l, out, w, a0, a1, mixk(k, rgb, base));
+        }
+        break;
+    case RING_ERROR: /* a row of round dots along the capsule's centre line */
+        draw_dotted(l, out - w / 2, w, a0, a1, mixk(k, rgb, d->ambient ? 20 : (lvl == 0 ? 35 : 100)));
+        break;
+    default:
+        ring_arc(l, out - w / 2 + IDLE_W / 2, IDLE_W, a0, a1, mixk(k, rgb, d->ambient ? 15 : 60));
+        break;
+    }
+    if (sel) ring_arc(l, out - w - UNDERLINE_GAP, UNDERLINE_W, a0, a1, ring_mix(0xe6edf3, d->ambient ? 25 : 100));
+}
