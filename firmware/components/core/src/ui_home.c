@@ -1,5 +1,6 @@
-/* The Ring screen: one arc segment per session around the bezel, the selected session in the
- * centre. Gestures and buttons are mapped in ui_home_gesture(); see docs/design/UI-RING.md. */
+/* The HOME deck (docs/design/UI-V2.md §4.1): one session card in the centre, a thin pinned index ring
+ * at the rim. Gestures and buttons are mapped in ui_home_gesture(). Until Phase 2 (the per-agent
+ * wheel) a tap on the centre is still the default action. */
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -19,17 +20,28 @@
 #define NAG_MS 15000
 #define NAG_MAX 3
 
-/* Edge hints sit just inside the ring next to the physical buttons (angles clockwise from 12 o'clock):
- * KEYA lower-left at 7:30 (225 deg), KEYB lower-right at 4:30 (135 deg). A small dot points at each button. */
-#define HINT_A_DEG 225
-#define HINT_B_DEG 135
-#define HINT_R 152
-#define HINT_DOT_R 177
-
-#define REPO_Y 116
-#define REPO_W 250
+/* Card rows, top to bottom. Glanceable first: the state word is the largest coloured element and the
+ * time in state is demoted below the summary. */
+#define AGENT_Y 80    /* 16 px muted: agent · branch */
+#define REPO_Y 102    /* 32 px white on one line, or 24 px on two; centred in a row REPO_H tall */
+#define REPO_H 64
+#define REPO_W 280
 #define REPO_PX 32
 #define REPO_SMALL_PX 24
+#define STATE_Y 168   /* 32 px state colour: glyph + word */
+#define SUMMARY_Y 210 /* 20 px muted, two lines: the agent's last summary */
+#define SUMMARY_W 300
+#define REQ_TITLE_Y 208 /* approval: 20 px title, then 16 px text on two lines, in place of summary + time */
+#define REQ_TEXT_Y 234
+#define ELAPSED_Y 262 /* 20 px muted: time in this state */
+#define HINT_Y 364    /* 16 px: "long swipe down to deny", between the badges and the link row */
+#define LINK_Y 392    /* 16 px: link · host · battery, or Offline · stale */
+
+/* Pebble-style key badges beside the physical buttons (angles clockwise from 12 o'clock):
+ * KEYA lower-left at 7:30 (225 deg), KEYB lower-right at 4:30 (135 deg). Legends, not touch targets. */
+#define BADGE_A_DEG 225
+#define BADGE_B_DEG 135
+#define BADGE_R 158
 
 typedef struct {
     uint32_t sid;
@@ -37,8 +49,8 @@ typedef struct {
 } slot_t;
 
 static lv_obj_t *s_root, *s_ring, *s_centre;
-static lv_obj_t *s_agent, *s_repo, *s_state, *s_elapsed, *s_pill, *s_pill_lbl, *s_hint, *s_link;
-static lv_obj_t *s_hint_a, *s_hint_b, *s_dot[2];
+static lv_obj_t *s_agent, *s_repo, *s_state, *s_summary, *s_elapsed, *s_pill, *s_pill_lbl, *s_hint, *s_link;
+static lv_obj_t *s_badge[2], *s_key[2], *s_word[2]; /* [0] = A, [1] = B */
 static lv_obj_t *s_req_title, *s_req_text; /* approval card: what is being approved */
 
 static slot_t s_slots[RING_MAX_SEGMENTS];
@@ -57,7 +69,10 @@ static int s_rel_y;                    /* where the last touch lifted, for the d
 static uint32_t s_nag_rid, s_nag_next;
 static int s_nag_n;
 
-static char s_agent_txt[24], s_repo_txt[40], s_state_txt[40], s_elapsed_txt[16], s_pill_txt[32], s_link_txt[48];
+static bool s_offline_dim;
+
+static char s_agent_txt[64], s_repo_txt[40], s_state_txt[40], s_summary_txt[88], s_elapsed_txt[16], s_pill_txt[32],
+    s_link_txt[64];
 static char s_req_title_txt[48], s_req_text_txt[168];
 
 static const session_t *sel_session(void)
@@ -204,45 +219,50 @@ static void set_txt(lv_obj_t *l, char *cache, size_t cap, const char *t)
     lv_label_set_text(l, t);
 }
 
-/* Fixed single-line height: LONG_MODE_DOTS only truncates when the height is fixed, otherwise a long
- * name wraps onto the next row and collides with it. */
-static void place(lv_obj_t *l, int y, int w)
+/* Fixed height of `lines` rows: LONG_MODE_DOTS only truncates when the height is fixed, otherwise a
+ * long text wraps onto the next row and collides with it. */
+static void place_lines(lv_obj_t *l, int y, int w, int lines)
 {
-    lv_obj_set_size(l, w, lv_font_get_line_height(lv_obj_get_style_text_font(l, 0)));
+    lv_obj_set_size(l, w, lines * lv_font_get_line_height(lv_obj_get_style_text_font(l, 0)));
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_pos(l, UI_CX - w / 2, y);
 }
 
-/* The folder name drops to the smaller font before it is truncated, centred in the same row. */
+static void place(lv_obj_t *l, int y, int w) { place_lines(l, y, w, 1); }
+
+/* The folder name is one 32 px line when it fits, otherwise two 24 px lines, centred in the same row. */
 static void set_repo(const char *t)
 {
     if (strcmp(s_repo_txt, t) == 0) return;
     const lv_font_t *big = theme_font(REPO_PX), *f = big;
+    int lines = 1;
     lv_point_t sz;
     lv_text_get_size(&sz, t, big, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-    if (sz.x > REPO_W) f = theme_font(REPO_SMALL_PX);
+    if (sz.x > REPO_W) {
+        f = theme_font(REPO_SMALL_PX);
+        lines = 2;
+    }
     lv_obj_set_style_text_font(s_repo, f, 0);
-    place(s_repo, REPO_Y + (lv_font_get_line_height(big) - lv_font_get_line_height(f)) / 2, REPO_W);
+    int h = lines * lv_font_get_line_height(f);
+    place_lines(s_repo, REPO_Y + (REPO_H - h) / 2, REPO_W, lines);
     set_txt(s_repo, s_repo_txt, sizeof s_repo_txt, t);
 }
 
-static const char *state_icon(const session_t *s)
-{
-    switch (s->state) {
-    case SESS_INPUT: return s->sub == 0 ? LV_SYMBOL_STOP : "?";
-    case SESS_ERROR: return LV_SYMBOL_WARNING;
-    case SESS_DONE: return LV_SYMBOL_OK;
-    case SESS_IDLE: return LV_SYMBOL_PAUSE;
-    default: return LV_SYMBOL_REFRESH;
-    }
-}
+static bool offline(void) { return !ui_link_connected(); }
 
+/* Link row: transport · host · battery while connected; otherwise how stale the snapshot is. */
 static void link_text(char *dst, size_t cap, uint32_t *rgb)
 {
     int k = ui_link_transport();
     const char *sym = k == HAL_LINK_USB ? LV_SYMBOL_USB : k == HAL_LINK_BLE ? LV_SYMBOL_BLUETOOTH : LV_SYMBOL_WIFI;
     const char *name = k == HAL_LINK_USB ? "USB" : k == HAL_LINK_BLE ? "BLE" : "PC";
-    if (k < 0) {
+    uint32_t down = ui_link_down_ms();
+    if (!ui_link_connected() && down && model_count() > 0) {
+        char age[16];
+        theme_elapsed(age, sizeof age, down / 1000);
+        snprintf(dst, cap, "%s Offline %s stale %s", LV_SYMBOL_WARNING, theme_sep(), age);
+        *rgb = RGB_AMBER;
+    } else if (k < 0) {
         snprintf(dst, cap, "%s Offline", LV_SYMBOL_WARNING);
         *rgb = RGB_AMBER;
     } else if (!ui_link_connected()) {
@@ -250,19 +270,41 @@ static void link_text(char *dst, size_t cap, uint32_t *rgb)
         *rgb = RGB_AMBER;
     } else {
         const char *host = model_host();
-        if (host[0]) snprintf(dst, cap, "%s %s %s %.12s", sym, name, theme_sep(), host);
-        else snprintf(dst, cap, "%s %s", sym, name);
+        hal_battery_t b = hal_battery_read();
+        char batt[16] = "";
+        if (b.percent <= 100) snprintf(batt, sizeof batt, "%s%s%u%%", theme_sep(), b.charging ? LV_SYMBOL_CHARGE " " : "", b.percent);
+        if (host[0]) snprintf(dst, cap, "%s %s%s%.12s%s", sym, name, theme_sep(), host, batt);
+        else snprintf(dst, cap, "%s %s%s", sym, name, batt);
         *rgb = RGB_SUCCESS;
     }
 }
 
+/* Time in the current state (UI-V2 §10). While offline the clock is frozen at the moment the link
+ * dropped, so a stale card does not keep counting as if it were live. */
 static void update_elapsed(const session_t *s)
 {
-    uint32_t now = theme_now_unix(), from = s->state == SESS_WORK || s->state == SESS_START ? s->t0 : s->tst;
-    if (!from) from = s->t0;
+    uint32_t now = theme_now_unix() - ui_link_down_ms() / 1000, from = s->tst ? s->tst : s->t0;
     char buf[16] = "";
     if (from && now >= from) theme_elapsed_long(buf, sizeof buf, now - from);
     set_txt(s_elapsed, s_elapsed_txt, sizeof s_elapsed_txt, buf);
+}
+
+/* One opacity for the card: ambient wins, then offline, else full. */
+static void apply_dim(void)
+{
+    lv_obj_set_style_opa(s_centre, s_ambient ? LV_OPA_30 : s_offline_dim ? LV_OPA_50 : LV_OPA_COVER, 0);
+}
+
+static void set_badges(bool show_a, bool show_b, uint32_t rgb_a)
+{
+    bool off = offline();
+    lv_obj_set_style_text_color(s_word[0], off ? COL_MUTED : lv_color_hex(rgb_a), 0);
+    lv_obj_set_style_text_color(s_word[1], COL_MUTED, 0);
+    for (int i = 0; i < 2; i++) {
+        lv_obj_set_style_text_color(s_key[i], off ? COL_MUTED : COL_TEXT, 0);
+        if (i == 0 ? show_a : show_b) lv_obj_remove_flag(s_badge[i], LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(s_badge[i], LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 static void update_centre(void)
@@ -273,23 +315,23 @@ static void update_centre(void)
     set_txt(s_link, s_link_txt, sizeof s_link_txt, buf);
     lv_obj_set_style_text_color(s_link, lv_color_hex(link_rgb), 0);
 
+    s_offline_dim = offline() && model_count() > 0;
+    apply_dim();
+
     const session_t *s = sel_session();
     if (!s || s_n == 0) {
         set_txt(s_agent, s_agent_txt, sizeof s_agent_txt, "");
         set_repo("No sessions");
         lv_obj_set_style_text_color(s_repo, COL_TEXT, 0);
-        set_txt(s_state, s_state_txt, sizeof s_state_txt, "Waiting for an agent");
-        lv_obj_set_style_text_color(s_state, COL_MUTED, 0);
+        set_txt(s_state, s_state_txt, sizeof s_state_txt, "");
+        set_txt(s_summary, s_summary_txt, sizeof s_summary_txt, "Waiting for an agent");
         set_txt(s_elapsed, s_elapsed_txt, sizeof s_elapsed_txt, "");
         lv_obj_add_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
         s_card_rid = 0;
         lv_obj_add_flag(s_pill, LV_OBJ_FLAG_HIDDEN);
         lv_label_set_text(s_hint, "");
-        lv_obj_add_flag(s_hint_a, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(s_hint_b, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(s_dot[0], LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(s_dot[1], LV_OBJ_FLAG_HIDDEN);
+        set_badges(false, false, 0);
         return;
     }
     uint32_t rgb = theme_session_rgb(s);
@@ -299,12 +341,15 @@ static void update_centre(void)
         set_txt(s_agent, s_agent_txt, sizeof s_agent_txt, buf);
         set_repo("Done");
     } else {
-        set_txt(s_agent, s_agent_txt, sizeof s_agent_txt, theme_agent_name(s->agent));
+        /* agent · branch: two sessions on the same folder stay distinguishable */
+        if (s->branch[0]) snprintf(buf, sizeof buf, "%s%s%s", theme_agent_name(s->agent), theme_sep(), s->branch);
+        else snprintf(buf, sizeof buf, "%s", theme_agent_name(s->agent));
+        set_txt(s_agent, s_agent_txt, sizeof s_agent_txt, buf);
         const char *base = theme_basename(s->repo);
         set_repo(base[0] ? base : "(no folder)");
     }
     lv_obj_set_style_text_color(s_repo, COL_TEXT, 0);
-    snprintf(buf, sizeof buf, "%s  %s", state_icon(s), theme_state_word(s));
+    snprintf(buf, sizeof buf, "%s  %s", theme_state_glyph(s), theme_state_word(s));
     set_txt(s_state, s_state_txt, sizeof s_state_txt, buf);
     lv_obj_set_style_text_color(s_state, lv_color_hex(rgb), 0);
     update_elapsed(s);
@@ -312,8 +357,8 @@ static void update_centre(void)
     const attention_t *req = approvable(s);
     bool perm = req != NULL;
     if (perm) {
-        /* Show what is being approved in place of the elapsed time. Fall back to the tool name
-         * when the daemon sent no title (privacy: meta). */
+        /* Show what is being approved in place of the summary and the time. Fall back to the tool
+         * name when the daemon sent no title (privacy: meta). */
         if (req->rid != s_card_rid) {
             s_card_rid = req->rid;
             s_card_t0 = s_now;
@@ -321,33 +366,27 @@ static void update_centre(void)
         set_txt(s_req_title, s_req_title_txt, sizeof s_req_title_txt,
                 req->title[0] ? req->title : s->tool[0] ? s->tool : "Permission request");
         set_txt(s_req_text, s_req_text_txt, sizeof s_req_text_txt, req->text);
+        set_txt(s_summary, s_summary_txt, sizeof s_summary_txt, "");
         lv_obj_add_flag(s_elapsed, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
         if (req->text[0]) lv_obj_remove_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
         else lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
     } else {
         s_card_rid = 0;
+        set_txt(s_summary, s_summary_txt, sizeof s_summary_txt, sl->n_merged ? "" : s->summary);
         lv_obj_remove_flag(s_elapsed, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
     }
     const char *pill = perm ? "HOLD " LV_SYMBOL_OK " APPROVE" : s->state == SESS_DONE ? "FOCUS + ACK" : "FOCUS";
     set_txt(s_pill_lbl, s_pill_txt, sizeof s_pill_txt, pill);
-    lv_obj_set_style_text_color(s_pill_lbl, lv_color_hex(rgb), 0);
-    lv_obj_set_style_border_color(s_pill, lv_color_hex(rgb), 0);
+    lv_color_t pill_col = offline() ? COL_MUTED : lv_color_hex(rgb);
+    lv_obj_set_style_text_color(s_pill_lbl, pill_col, 0);
+    lv_obj_set_style_border_color(s_pill, pill_col, 0);
     lv_obj_remove_flag(s_pill, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_align(s_pill, LV_ALIGN_TOP_MID, 0, perm ? 272 : 262);
+    lv_obj_align(s_pill, LV_ALIGN_TOP_MID, 0, UI_ACTION_Y);
     lv_label_set_text(s_hint, perm ? "long swipe down to deny" : "");
-    lv_obj_set_style_text_color(s_hint_a, lv_color_hex(rgb), 0);
-    lv_obj_remove_flag(s_hint_a, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(s_dot[0], LV_OBJ_FLAG_HIDDEN);
-    if (s_n > 1) {
-        lv_obj_remove_flag(s_hint_b, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_remove_flag(s_dot[1], LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_add_flag(s_hint_b, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(s_dot[1], LV_OBJ_FLAG_HIDDEN);
-    }
+    set_badges(true, s_n > 1, rgb);
 }
 
 /* ───────── actions ───────── */
@@ -523,13 +562,13 @@ void ui_home_tick(uint32_t now)
                     s_ramp_started = true;
                     g_ui_actions->hold_start();
                 }
-                ring_set_progress(s_ring, (int)(el * 1000 / UI_HOLD_MS), 0xffffff);
+                ring_set_progress(s_ring, (int)(el * 1000 / UI_HOLD_MS), theme_session_rgb(s)); /* the item's colour */
             }
             if (el >= UI_HOLD_MS) {
                 s_hold_fired = true;
                 s_holding = false;
                 s_ramp_started = false;
-                ring_set_progress(s_ring, 0, 0xffffff);
+                ring_set_progress(s_ring, 0, theme_session_rgb(s));
                 g_ui_actions->approve(s->sid, a->rid, el);
             }
         }
@@ -553,13 +592,19 @@ void ui_home_tick(uint32_t now)
     if (amb != s_ambient) {
         s_ambient = amb;
         ring_set_ambient(s_ring, amb);
-        lv_obj_set_style_opa(s_centre, amb ? LV_OPA_30 : LV_OPA_COVER, 0);
+        apply_dim();
     }
 
     if (now - s_last_elapsed >= 500) {
         s_last_elapsed = now;
         const session_t *s = sel_session();
         if (s && s_n > 0 && !s_slots[s_sel].n_merged) update_elapsed(s);
+        if (ui_link_down_ms()) { /* the stale age ticks while offline */
+            char buf[64];
+            uint32_t link_rgb;
+            link_text(buf, sizeof buf, &link_rgb);
+            set_txt(s_link, s_link_txt, sizeof s_link_txt, buf);
+        }
     }
 }
 
@@ -588,6 +633,7 @@ void ui_home_report(ui_report_t *r)
     }
     if (s_repo_txt[0]) ui_report_add(r, "%s", s_repo_txt);
     if (s_state_txt[0] && s) ui_report_add(r, "%s", theme_state_word(s));
+    if (s_summary_txt[0]) ui_report_add(r, "%s", s_summary_txt);
     if (!lv_obj_has_flag(s_req_title, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_req_title_txt);
     if (!lv_obj_has_flag(s_req_text, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_req_text_txt);
     if (s && !lv_obj_has_flag(s_pill, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_pill_txt);
@@ -607,20 +653,19 @@ lv_obj_t *ui_home_init(void)
     lv_obj_remove_flag(s_centre, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
 
     s_agent = theme_label(s_centre, 16, COL_MUTED);
-    place(s_agent, 94, 200);
+    place(s_agent, AGENT_Y, 280);
     s_repo = theme_label(s_centre, REPO_PX, COL_TEXT);
-    place(s_repo, REPO_Y, REPO_W);
-    s_state = theme_label(s_centre, 24, COL_MUTED);
-    place(s_state, 162, 250);
-    s_elapsed = theme_label(s_centre, 32, COL_MUTED);
-    place(s_elapsed, 196, 250);
+    place(s_repo, REPO_Y + (REPO_H - lv_font_get_line_height(theme_font(REPO_PX))) / 2, REPO_W);
+    s_state = theme_label(s_centre, 32, COL_MUTED);
+    place(s_state, STATE_Y, 300);
+    s_summary = theme_label(s_centre, 20, COL_MUTED);
+    place_lines(s_summary, SUMMARY_Y, SUMMARY_W, 2);
+    s_elapsed = theme_label(s_centre, 20, COL_MUTED);
+    place(s_elapsed, ELAPSED_Y, 250);
     s_req_title = theme_label(s_centre, 20, COL_TEXT);
-    place(s_req_title, 196, 280);
+    place(s_req_title, REQ_TITLE_Y, 300);
     s_req_text = theme_label(s_centre, 16, COL_MUTED);
-    lv_obj_set_size(s_req_text, 300, 2 * lv_font_get_line_height(theme_font(16)));
-    lv_obj_set_style_text_align(s_req_text, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_long_mode(s_req_text, LV_LABEL_LONG_MODE_DOTS);
-    lv_obj_set_pos(s_req_text, UI_CX - 150, 224);
+    place_lines(s_req_text, REQ_TEXT_Y, 300, 2);
     lv_obj_add_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
 
@@ -637,33 +682,44 @@ lv_obj_t *ui_home_init(void)
     lv_obj_set_width(s_pill_lbl, LV_SIZE_CONTENT);
 
     s_hint = theme_label(s_centre, 16, COL_MUTED);
-    place(s_hint, 316, 300);
+    place(s_hint, HINT_Y, 300);
     s_link = theme_label(s_centre, 16, COL_MUTED);
-    place(s_link, 392, 170);
+    place(s_link, LINK_Y, 240);
 
-    s_hint_a = theme_label(s_centre, 16, COL_TEXT);
-    lv_label_set_text(s_hint_a, "FOCUS");
-    s_hint_b = theme_label(s_centre, 16, COL_MUTED);
-    lv_label_set_text(s_hint_b, "NEXT");
-    static const int deg[2] = {HINT_A_DEG, HINT_B_DEG};
-    lv_obj_t *h[2] = {s_hint_a, s_hint_b};
+    /* Key badges: a key cap with the button's letter, and the word for what it does. A reads
+     * "[A] FOCUS" with the cap on the button side; B reads "NEXT [B]". */
+    static const int deg[2] = {BADGE_A_DEG, BADGE_B_DEG};
+    static const char *const words[2] = {"FOCUS", "NEXT"};
     for (int i = 0; i < 2; i++) {
+        lv_obj_t *b = s_badge[i] = lv_obj_create(s_centre);
+        lv_obj_remove_style_all(b);
+        lv_obj_set_size(b, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_flex_flow(b, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(b, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_column(b, 6, 0);
+        lv_obj_remove_flag(b, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_t *cap = lv_obj_create(b);
+        lv_obj_remove_style_all(cap);
+        lv_obj_set_size(cap, 22, 22);
+        lv_obj_set_style_radius(cap, 5, 0);
+        lv_obj_set_style_bg_opa(cap, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(cap, COL_SURFACE2, 0);
+        lv_obj_set_style_border_width(cap, 1, 0);
+        lv_obj_set_style_border_color(cap, COL_BORDER, 0);
+        lv_obj_remove_flag(cap, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+        s_key[i] = theme_label(cap, 16, COL_TEXT);
+        lv_label_set_text(s_key[i], i == 0 ? "A" : "B");
+        lv_obj_center(s_key[i]);
+        s_word[i] = theme_label(b, 16, i == 0 ? COL_TEXT : COL_MUTED);
+        lv_label_set_text(s_word[i], words[i]);
+        if (i == 1) lv_obj_move_to_index(cap, 1); /* word first, cap on the button side */
         float rad = (float)deg[i] * 3.14159265f / 180.0f;
-        lv_obj_set_width(h[i], 60);
-        lv_obj_set_style_text_align(h[i], LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_set_pos(h[i], UI_CX + (int)((float)HINT_R * sinf(rad)) - 30,
-                       UI_CY - (int)((float)HINT_R * cosf(rad)) - 9);
-        lv_obj_t *d = s_dot[i] = lv_obj_create(s_centre);
-        lv_obj_remove_style_all(d);
-        lv_obj_set_size(d, 6, 6);
-        lv_obj_set_style_radius(d, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_opa(d, LV_OPA_COVER, 0);
-        lv_obj_set_style_bg_color(d, i == 0 ? COL_TEXT : COL_MUTED, 0);
-        lv_obj_remove_flag(d, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_pos(d, UI_CX + (int)((float)HINT_DOT_R * sinf(rad)) - 3,
-                       UI_CY - (int)((float)HINT_DOT_R * cosf(rad)) - 3);
+        lv_obj_update_layout(b);
+        int w = lv_obj_get_width(b), h = lv_obj_get_height(b);
+        lv_obj_set_pos(b, UI_CX + (int)((float)BADGE_R * sinf(rad)) - w / 2,
+                       UI_CY - (int)((float)BADGE_R * cosf(rad)) - h / 2);
     }
-    lv_obj_t *all[] = {s_agent, s_repo, s_state, s_elapsed, s_req_title, s_req_text, s_pill_lbl, s_hint, s_link};
+    lv_obj_t *all[] = {s_agent, s_repo, s_state, s_summary, s_elapsed, s_req_title, s_req_text, s_pill_lbl, s_hint, s_link};
     for (size_t i = 0; i < sizeof all / sizeof all[0]; i++) lv_label_set_text(all[i], "");
     ui_home_animations_changed();
     return s_root;

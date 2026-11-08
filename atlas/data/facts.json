@@ -37,11 +37,11 @@
       "id": 2,
       "color": "#f0e442",
       "palette": "ask",
-      "label": "Needs input",
+      "label": "Question",
       "source": "firmware/components/core/src/ui_theme.c:12",
       "sub_labels": {
-        "0": "Permission",
-        "1": "Needs input"
+        "0": "Approve?",
+        "1": "Question"
       },
       "sub_colors": {
         "0": "#e69f00",
@@ -102,17 +102,19 @@
     "nag_max": 3,
     "hint_a_deg": 225,
     "hint_b_deg": 135,
-    "hint_r_px": 152,
-    "repo_w_px": 250,
+    "hint_r_px": 158,
+    "repo_w_px": 280,
     "repo_px": 32,
     "repo_small_px": 24,
-    "band_out_px": 216,
-    "band_w_px": 10,
-    "sel_out_px": 222,
-    "sel_w_px": 18,
-    "outline_out_px": 197,
-    "prog_out_px": 190,
-    "prog_w_px": 5,
+    "summary_w_px": 300,
+    "band_out_px": 226,
+    "band_w_px": 6,
+    "sel_out_px": 228,
+    "sel_w_px": 12,
+    "sel_tick_len_px": 10,
+    "error_inset_px": 5,
+    "prog_out_px": 212,
+    "prog_w_px": 8,
     "work_period_ms": 1400,
     "ask_period_ms": 1400,
     "perm_period_ms": 900,
@@ -142,67 +144,67 @@
       {
         "gesture": "G_PRESS",
         "action": "Finger down in the centre of a permission request starts the approve hold",
-        "source": "firmware/components/core/src/ui_home.c:420"
+        "source": "firmware/components/core/src/ui_home.c:459"
       },
       {
         "gesture": "G_RELEASE",
         "action": "Lifting cancels a hold in progress",
-        "source": "firmware/components/core/src/ui_home.c:431"
+        "source": "firmware/components/core/src/ui_home.c:470"
       },
       {
         "gesture": "G_DOUBLE_TAP",
         "action": "Never produced by the recogniser; handled like a tap for injected input",
-        "source": "firmware/components/core/src/ui_home.c:435"
+        "source": "firmware/components/core/src/ui_home.c:474"
       },
       {
         "gesture": "G_TAP",
         "action": "Centre: the state's default action (Focus). On the ring: select that segment",
-        "source": "firmware/components/core/src/ui_home.c:436"
+        "source": "firmware/components/core/src/ui_home.c:475"
       },
       {
         "gesture": "G_LONG_PRESS",
-        "action": "Focus (Working, Needs input, Idle), acknowledge (Done, Error). On a permission request the hold approves",
-        "source": "firmware/components/core/src/ui_home.c:443"
+        "action": "Focus (Working, Question, Idle), acknowledge (Done, Error). On a permission request the hold approves",
+        "source": "firmware/components/core/src/ui_home.c:482"
       },
       {
         "gesture": "G_SWIPE_DOWN",
         "action": "Deny a permission request (swipe down across the centre)",
-        "source": "firmware/components/core/src/ui_home.c:458"
+        "source": "firmware/components/core/src/ui_home.c:497"
       },
       {
         "gesture": "G_SCRUB_START",
         "action": "A drag around the rim starts selecting sessions",
-        "source": "firmware/components/core/src/ui_home.c:467"
+        "source": "firmware/components/core/src/ui_home.c:506"
       },
       {
         "gesture": "G_SCRUB",
         "action": "The finger crossed into another sector: select it, with a detent",
-        "source": "firmware/components/core/src/ui_home.c:471"
+        "source": "firmware/components/core/src/ui_home.c:510"
       },
       {
         "gesture": "G_SCRUB_END",
         "action": "Finger lifted after a scrub: merged Done groups settle",
-        "source": "firmware/components/core/src/ui_home.c:477"
+        "source": "firmware/components/core/src/ui_home.c:516"
       },
       {
         "gesture": "G_BTN_A",
         "action": "Default action: Focus (eyes-free version of tapping the centre)",
-        "source": "firmware/components/core/src/ui_home.c:483"
+        "source": "firmware/components/core/src/ui_home.c:522"
       },
       {
         "gesture": "G_BTN_A_DOUBLE",
         "action": "Jump to the next session that needs attention",
-        "source": "firmware/components/core/src/ui_home.c:486"
+        "source": "firmware/components/core/src/ui_home.c:525"
       },
       {
         "gesture": "G_BTN_B",
         "action": "Select the next session",
-        "source": "firmware/components/core/src/ui_home.c:489"
+        "source": "firmware/components/core/src/ui_home.c:528"
       },
       {
         "gesture": "G_BTN_B_LONG",
         "action": "Select the previous session",
-        "source": "firmware/components/core/src/ui_home.c:492"
+        "source": "firmware/components/core/src/ui_home.c:531"
       }
     ],
     "chord": "A + B held together is detected and logged, no action",
@@ -217,7 +219,7 @@
     {
       "id": "attention",
       "title": "Ring · a request is waiting",
-      "source": "firmware/components/core/src/ui_home.c:582"
+      "source": "firmware/components/core/src/ui_home.c:627"
     }
   ],
   "haptics": {
@@ -1225,11 +1227,11 @@
     "display.width": "firmware/boards/stopwatch/board_priv.h:18",
     "gesture.b_immediate": "firmware/components/core/src/gesture.c:167",
     "gesture.btn_double_ms": "firmware/components/core/src/gesture.h:12",
-    "gesture.centre_r_px": "firmware/components/core/src/ui_home.c:13",
+    "gesture.centre_r_px": "firmware/components/core/src/ui_home.c:14",
     "gesture.cx_px": "firmware/components/core/src/gesture.h:15",
     "gesture.cy_px": "firmware/components/core/src/gesture.h:16",
     "gesture.hold_confirm_ms": "firmware/components/core/src/ui_internal.h:12",
-    "gesture.hold_show_ms": "firmware/components/core/src/ui_home.c:14",
+    "gesture.hold_show_ms": "firmware/components/core/src/ui_home.c:15",
     "gesture.long_press_ms": "firmware/components/core/src/gesture.h:7",
     "gesture.rim_in_px": "firmware/components/core/src/gesture.h:17",
     "gesture.rim_out_px": "firmware/components/core/src/gesture.h:18",
@@ -1242,8 +1244,8 @@
     "gesture.swipe_min_px": "firmware/components/core/src/gesture.h:8",
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.chord": "firmware/components/core/src/app.c:201",
-    "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:363",
-    "gesture_map.long_press_ack": "firmware/components/core/src/ui_home.c:454",
+    "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:402",
+    "gesture_map.long_press_ack": "firmware/components/core/src/ui_home.c:493",
     "gesture_map.wake_swallow": "firmware/components/core/src/app.c:210",
     "haptics.approved": "firmware/components/core/src/feedback.c:65",
     "haptics.denied": "firmware/components/core/src/feedback.c:71",
@@ -1283,37 +1285,39 @@
     "palette.surface2": "firmware/components/core/src/ui_theme.h:8",
     "palette.text": "firmware/components/core/src/ui_theme.h:10",
     "palette.working": "firmware/components/core/src/ui_theme.h:13",
-    "ring.ambient_ms": "firmware/components/core/src/ui_home.c:17",
-    "ring.ask_period_ms": "firmware/components/core/src/ui_ring.c:21",
-    "ring.band_out_px": "firmware/components/core/src/ui_ring.c:8",
-    "ring.band_w_px": "firmware/components/core/src/ui_ring.c:9",
-    "ring.deny_hint": "firmware/components/core/src/ui_home.c:340",
-    "ring.done_sweep_ms": "firmware/components/core/src/ui_ring.c:23",
-    "ring.edge_hint_a": "firmware/components/core/src/ui_home.c:645",
-    "ring.edge_hint_b": "firmware/components/core/src/ui_home.c:647",
-    "ring.error_flicker_ms": "firmware/components/core/src/ui_ring.c:24",
-    "ring.hint_a_deg": "firmware/components/core/src/ui_home.c:24",
-    "ring.hint_b_deg": "firmware/components/core/src/ui_home.c:25",
-    "ring.hint_r_px": "firmware/components/core/src/ui_home.c:26",
+    "ring.ambient_ms": "firmware/components/core/src/ui_home.c:18",
+    "ring.ask_period_ms": "firmware/components/core/src/ui_ring.c:26",
+    "ring.band_out_px": "firmware/components/core/src/ui_ring.c:11",
+    "ring.band_w_px": "firmware/components/core/src/ui_ring.c:12",
+    "ring.deny_hint": "firmware/components/core/src/ui_home.c:37",
+    "ring.done_sweep_ms": "firmware/components/core/src/ui_ring.c:28",
+    "ring.edge_hint_a": "firmware/components/core/src/ui_home.c:692",
+    "ring.edge_hint_b": "firmware/components/core/src/ui_home.c:692",
+    "ring.error_flicker_ms": "firmware/components/core/src/ui_ring.c:29",
+    "ring.error_inset_px": "firmware/components/core/src/ui_ring.c:17",
+    "ring.hint_a_deg": "firmware/components/core/src/ui_home.c:42",
+    "ring.hint_b_deg": "firmware/components/core/src/ui_home.c:43",
+    "ring.hint_r_px": "firmware/components/core/src/ui_home.c:44",
     "ring.kinds": "firmware/components/core/src/ui_ring.h:15",
     "ring.max_segments": "firmware/components/core/src/ui_ring.h:11",
-    "ring.merge_at": "firmware/components/core/src/ui_home.c:18",
-    "ring.nag_max": "firmware/components/core/src/ui_home.c:20",
-    "ring.nag_ms": "firmware/components/core/src/ui_home.c:19",
-    "ring.nothing_else": "firmware/components/core/src/ui_home.c:387",
-    "ring.outline_out_px": "firmware/components/core/src/ui_ring.c:12",
-    "ring.perm_period_ms": "firmware/components/core/src/ui_ring.c:22",
-    "ring.pill_approve": "firmware/components/core/src/ui_home.c:334",
-    "ring.pill_done": "firmware/components/core/src/ui_home.c:334",
-    "ring.prog_out_px": "firmware/components/core/src/ui_ring.c:14",
-    "ring.prog_w_px": "firmware/components/core/src/ui_ring.c:15",
-    "ring.repo_px": "firmware/components/core/src/ui_home.c:31",
-    "ring.repo_small_px": "firmware/components/core/src/ui_home.c:32",
-    "ring.repo_w_px": "firmware/components/core/src/ui_home.c:30",
-    "ring.sel_out_px": "firmware/components/core/src/ui_ring.c:10",
-    "ring.sel_w_px": "firmware/components/core/src/ui_ring.c:11",
-    "ring.work_period_ms": "firmware/components/core/src/ui_ring.c:20",
-    "screens": "firmware/components/core/src/ui_home.c:582",
+    "ring.merge_at": "firmware/components/core/src/ui_home.c:19",
+    "ring.nag_max": "firmware/components/core/src/ui_home.c:21",
+    "ring.nag_ms": "firmware/components/core/src/ui_home.c:20",
+    "ring.nothing_else": "firmware/components/core/src/ui_home.c:426",
+    "ring.perm_period_ms": "firmware/components/core/src/ui_ring.c:27",
+    "ring.pill_approve": "firmware/components/core/src/ui_home.c:381",
+    "ring.pill_done": "firmware/components/core/src/ui_home.c:381",
+    "ring.prog_out_px": "firmware/components/core/src/ui_ring.c:19",
+    "ring.prog_w_px": "firmware/components/core/src/ui_ring.c:20",
+    "ring.repo_px": "firmware/components/core/src/ui_home.c:29",
+    "ring.repo_small_px": "firmware/components/core/src/ui_home.c:30",
+    "ring.repo_w_px": "firmware/components/core/src/ui_home.c:28",
+    "ring.sel_out_px": "firmware/components/core/src/ui_ring.c:13",
+    "ring.sel_tick_len_px": "firmware/components/core/src/ui_ring.c:15",
+    "ring.sel_w_px": "firmware/components/core/src/ui_ring.c:14",
+    "ring.summary_w_px": "firmware/components/core/src/ui_home.c:33",
+    "ring.work_period_ms": "firmware/components/core/src/ui_ring.c:25",
+    "screens": "firmware/components/core/src/ui_home.c:627",
     "states": "firmware/components/core/src/ui_theme.c:10",
     "states.input_words": "firmware/components/core/src/ui_theme.c:31",
     "states.permission_colour": "firmware/components/core/src/ui_theme.c:23",

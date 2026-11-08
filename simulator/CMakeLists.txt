@@ -85,6 +85,11 @@ set_tests_properties(sim_approve_after_glow PROPERTIES WORKING_DIRECTORY ${CMAKE
                      FAIL_REGULAR_EXPRESSION "SCRIPT FAIL" PASS_REGULAR_EXPRESSION "\"op\":3")
 sim_script_test(sim_approve_too_soon approve_too_soon.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
 
+# UI-V2 Phase 1: the HOME deck (summary row, stale/offline treatment, two-line folder names).
+sim_script_test(sim_deck_summary deck_summary.txt)
+sim_script_test(sim_deck_stale deck_stale.txt)
+sim_script_test(sim_deck_long_names deck_long_names.txt)
+
 # Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
 add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c
                ${FW}/core/src/link_tx.c ${FW}/core/src/model.c)

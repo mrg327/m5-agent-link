@@ -30,7 +30,7 @@ export const STATE_ROWS = [
     },
   },
   {
-    id: 'ask', kind: 'ask', palette: 'ask', label: 'Needs input', icon: '?',
+    id: 'ask', kind: 'ask', palette: 'ask', label: 'Question', icon: '?',
     cells: {
       tap: FOCUS, long_press: { ...FOCUS, text: 'Focus (a quick reply is planned)' },
       hold: NOTHING('Nothing more: the long-press already focused at 0.6 s'),
@@ -38,7 +38,7 @@ export const STATE_ROWS = [
     },
   },
   {
-    id: 'perm', kind: 'perm', palette: 'permission', label: 'Permission', icon: '✋',
+    id: 'perm', kind: 'perm', palette: 'permission', label: 'Approve?', icon: '🔔',
     cells: {
       tap: { fx: 'focus', text: 'Focus, to review the request first. A tap never approves' },
       long_press: NOTHING('Ignored: the approve hold must run the full time'),

@@ -239,11 +239,14 @@ def extract_ring():
     home, ring = CORE + "ui_home.c", CORE + "ui_ring.c"
     r = {}
     for key, macro in [("merge_at", "MERGE_AT"), ("ambient_ms", "AMBIENT_MS"), ("nag_ms", "NAG_MS"), ("nag_max", "NAG_MAX"),
-                       ("hint_a_deg", "HINT_A_DEG"), ("hint_b_deg", "HINT_B_DEG"), ("hint_r_px", "HINT_R"),
-                       ("repo_w_px", "REPO_W"), ("repo_px", "REPO_PX"), ("repo_small_px", "REPO_SMALL_PX")]:
+                       # key badges beside the buttons (UI-V2 §4.1); the fact keys keep their old names for the Atlas
+                       ("hint_a_deg", "BADGE_A_DEG"), ("hint_b_deg", "BADGE_B_DEG"), ("hint_r_px", "BADGE_R"),
+                       ("repo_w_px", "REPO_W"), ("repo_px", "REPO_PX"), ("repo_small_px", "REPO_SMALL_PX"),
+                       ("summary_w_px", "SUMMARY_W")]:
         r[key] = int(find(home, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
     for key, macro in [("band_out_px", "BAND_OUT"), ("band_w_px", "BAND_W"), ("sel_out_px", "SEL_OUT"), ("sel_w_px", "SEL_W"),
-                       ("outline_out_px", "OUTLINE_OUT"), ("prog_out_px", "PROG_OUT"), ("prog_w_px", "PROG_W"),
+                       ("sel_tick_len_px", "SEL_TICK_LEN"), ("error_inset_px", "ERROR_INSET"),
+                       ("prog_out_px", "PROG_OUT"), ("prog_w_px", "PROG_W"),
                        ("work_period_ms", "WORK_PERIOD_MS"), ("ask_period_ms", "ASK_PERIOD_MS"),
                        ("perm_period_ms", "PERM_PERIOD_MS"), ("done_sweep_ms", "DONE_SWEEP_MS"),
                        ("error_flicker_ms", "ERROR_FLICKER_MS")]:
@@ -259,8 +262,9 @@ def extract_ring():
     find(home, r'"FOCUS \+ ACK"', "ring.pill_done")
     find(home, r'"long swipe down to deny"', "ring.deny_hint")
     r["pills"] = {"approve": "HOLD ✓ APPROVE", "done": "FOCUS + ACK", "default": "FOCUS"}
-    for key, pat in [("a", r'lv_label_set_text\(s_hint_a, "(\w+)"\)'), ("b", r'lv_label_set_text\(s_hint_b, "(\w+)"\)')]:
-        r.setdefault("edge_hints", {})[key] = find(home, pat, f"ring.edge_hint_{key}").group(1)
+    words = find(home, r'static const char \*const words\[2\] = \{"(\w+)", "(\w+)"\};', "ring.edge_hint_a")
+    SOURCES["ring.edge_hint_b"] = SOURCES["ring.edge_hint_a"]
+    r["edge_hints"] = {"a": words.group(1), "b": words.group(2)}
     find(home, r"Nothing else needs you", "ring.nothing_else")
     return r
 
@@ -271,7 +275,7 @@ ACTION_TEXT = {
     "G_RELEASE": "Lifting cancels a hold in progress",
     "G_TAP": "Centre: the state's default action (Focus). On the ring: select that segment",
     "G_DOUBLE_TAP": "Never produced by the recogniser; handled like a tap for injected input",
-    "G_LONG_PRESS": "Focus (Working, Needs input, Idle), acknowledge (Done, Error). On a permission request the hold approves",
+    "G_LONG_PRESS": "Focus (Working, Question, Idle), acknowledge (Done, Error). On a permission request the hold approves",
     "G_SWIPE_DOWN": "Deny a permission request (swipe down across the centre)",
     "G_SCRUB_START": "A drag around the rim starts selecting sessions",
     "G_SCRUB": "The finger crossed into another sector: select it, with a detent",

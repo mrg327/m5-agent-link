@@ -5,16 +5,21 @@
 
 #define CX 233
 #define CY 233
-#define BAND_OUT 216 /* outer radius of a normal segment */
-#define BAND_W 10
-#define SEL_OUT 222 /* the selected segment is thicker, and outlined on its inner edge */
-#define SEL_W 18
-#define OUTLINE_OUT 197
-#define OUTLINE_W 2
-#define PROG_OUT 190
-#define PROG_W 5
-#define INV_R_IN 182 /* every invalidated chunk covers this radius band */
-#define INV_R_OUT 228
+/* Index ring (UI-V2 §4.1): a thin band at the rim. The selected segment is thicker and carries a
+ * radial white tick at its midpoint; the error dash sits inset so it never reads as the permission
+ * double line next to it. */
+#define BAND_OUT 226 /* outer radius of a normal segment */
+#define BAND_W 6
+#define SEL_OUT 228 /* the selected segment is thicker */
+#define SEL_W 12
+#define SEL_TICK_LEN 10 /* radial tick from the selected band's inner edge inward */
+#define SEL_TICK_W 3
+#define ERROR_INSET 5 /* the dashed error arc sits this far inside the band */
+#define GLOW_W 14     /* ring_set_solid: the display-off alert glow is wider than the index band */
+#define PROG_OUT 212  /* hold-to-confirm fill, just inside the band */
+#define PROG_W 8
+#define INV_R_IN 196 /* every invalidated chunk covers this radius band */
+#define INV_R_OUT 232
 #define TICK_MS 30
 
 #define WORK_PERIOD_MS 1400
@@ -221,13 +226,27 @@ static void draw_slot(lv_layer_t *l, const ring_data_t *d, int i, uint32_t now)
         }
         break;
     case RING_ERROR:
-        draw_dashed(l, out, w, a0, a1, mix(rgb, d->ambient ? 20 : (lvl == 0 ? 35 : 100)));
+        draw_dashed(l, out - ERROR_INSET, w, a0, a1, mix(rgb, d->ambient ? 20 : (lvl == 0 ? 35 : 100)));
         break;
     default:
-        arc(l, s->s.selected ? out - 2 : BAND_OUT - 2, s->s.selected ? 8 : 4, a0, a1, mix(rgb, d->ambient ? 15 : 60));
+        arc(l, s->s.selected ? out - 2 : BAND_OUT - 1, s->s.selected ? 6 : 3, a0, a1, mix(rgb, d->ambient ? 15 : 60));
         break;
     }
-    if (s->s.selected && d->n > 1) arc(l, OUTLINE_OUT, OUTLINE_W, a0, a1, mix(0xe6edf3, d->ambient ? 25 : 90));
+    if (s->s.selected && d->n > 1) { /* radial tick at the segment's midpoint, pointing at the centre */
+        float rad = (float)(a0 + a1) / 2.0f * (float)M_PI / 180.0f;
+        float sn = sinf(rad), cs = cosf(rad);
+        lv_draw_line_dsc_t ln;
+        lv_draw_line_dsc_init(&ln);
+        int r1 = out - w - 2, r0 = r1 - SEL_TICK_LEN;
+        ln.p1.x = CX + (lv_value_precise_t)r1 * sn;
+        ln.p1.y = CY - (lv_value_precise_t)r1 * cs;
+        ln.p2.x = CX + (lv_value_precise_t)r0 * sn;
+        ln.p2.y = CY - (lv_value_precise_t)r0 * cs;
+        ln.width = SEL_TICK_W;
+        ln.round_start = ln.round_end = 1;
+        ln.color = mix(0xe6edf3, d->ambient ? 25 : 100);
+        lv_draw_line(l, &ln);
+    }
     (void)now;
 }
 
@@ -237,11 +256,11 @@ static void on_draw(lv_event_t *e)
     lv_layer_t *l = lv_event_get_layer(e);
 
     if (d->solid) {
-        arc(l, BAND_OUT, BAND_W, 0, 360, d->solid_color);
+        arc(l, BAND_OUT, GLOW_W, 0, 360, d->solid_color);
         return;
     }
     if (d->n == 0) {
-        arc(l, BAND_OUT, 6, 0, 360, mix(0x30363d, d->ambient ? 40 : 100));
+        arc(l, BAND_OUT, 3, 0, 360, mix(0x30363d, d->ambient ? 40 : 100));
     }
     for (int i = 0; i < d->n; i++) {
         int a0, a1;

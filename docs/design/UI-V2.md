@@ -1,6 +1,6 @@
 # UI v2: "Deck": switch context, pick from a list, answer from the watch
 
-Status: **decided, Phase 1 in progress** (branch `ui-v2`). Supersedes the Ring UI ([UI-RING.md](UI-RING.md)) and DESIGN.md §6, §6a (device side) and §8 (palette). Inputs: the Ring UX review (simulator pass, 2026-11-07), the user's v2 brief and answers (§9), and `docs/research/{stopwatch-interaction-capabilities,wearable-glance-gestures,minimal-peripherals}.md`.
+Status: **decided; Phase 1 (HOME deck) implemented in the simulator** (branch `ui-v2`, not yet validated on the device). Supersedes the Ring UI ([UI-RING.md](UI-RING.md)) and DESIGN.md §6, §6a (device side) and §8 (palette). Inputs: the Ring UX review (simulator pass, 2026-11-07), the user's v2 brief and answers (§9), and `docs/research/{stopwatch-interaction-capabilities,wearable-glance-gestures,minimal-peripherals}.md`.
 
 Where this document and DESIGN.md or UI-RING.md disagree, this document wins. §10 lists each decision.
 

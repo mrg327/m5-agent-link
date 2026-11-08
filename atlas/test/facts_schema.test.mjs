@@ -19,7 +19,7 @@ test('states cover the seven CDDL states with palette colours', () => {
     assert.match(s.source, /:\d+$/);
   }
   assert.equal(facts.states.input.sub_colors['0'], facts.palette.permission);
-  assert.equal(facts.states.input.sub_labels['0'], 'Permission');
+  assert.equal(facts.states.input.sub_labels['0'], 'Approve?');
 });
 
 test('gesture thresholds describe the ring recogniser, with no tap deferral', () => {

@@ -1,0 +1,14 @@
+# Long folder names wrap onto two smaller lines instead of being cut to one; long summaries truncate.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work customer-portal-frontend-web release/2026.11 A very long summary line that goes on and on about what the agent did and then some more
+session 2 ask aVeryLongRepositoryNameWithoutDash - Which database should the migration target first?
+wait 400
+expect_label customer-portal-frontend
+shot deck_long_work.png
+btn B
+wait 100
+expect_label Question
+expect_label Which database
+shot deck_long_ask.png
+quit

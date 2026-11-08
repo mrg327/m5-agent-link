@@ -1,0 +1,26 @@
+# The deck card: agent · branch, folder, state word, the agent's last summary, time in state.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite after the login refactor
+session 2 done api main Fixed the flaky retry test; 42 passed
+session 3 error worker - npm install failed: ENOTFOUND registry.npmjs.org
+wait 400
+expect_label webapp
+expect_label Working
+expect_label Running the test suite
+expect_label 80%
+shot deck_work.png
+btn B
+wait 100
+expect_label api
+expect_label Done
+expect_label Fixed the flaky retry test
+expect_label FOCUS + ACK
+shot deck_done.png
+btn B
+wait 100
+expect_label worker
+expect_label Error
+expect_label npm install failed
+shot deck_error.png
+quit

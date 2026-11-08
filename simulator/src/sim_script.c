@@ -197,14 +197,27 @@ static void send_hex(const char *hex)
 
 static void run_session(const char *spec)
 {
+    /* session SID STATE REPO [BRANCH|- [summary text...]] */
     unsigned sid;
-    char st[16], repo[33];
+    char st[16], repo[33], branch[33] = "";
+    int n = 0;
     if (sscanf(spec, "%u %15s %32s", &sid, st, repo) != 3) {
         s_failed = true;
         return;
     }
+    sscanf(spec, "%*u %*15s %*32s %32s %n", branch, &n);
+    if (!strcmp(branch, "-")) branch[0] = 0;
     uint32_t now = theme_now_unix();
     session_t d = {.sid = sid, .agent = (agent_t)(sid % 3), .state = SESS_WORK, .t0 = now - 3600 + sid, .tst = now - 40 - 53 * sid};
+    uint32_t present = SF_AGENT | SF_STATE | SF_SUB | SF_REPO | SF_T0 | SF_TST | SF_SEEN;
+    if (branch[0]) {
+        snprintf(d.branch, sizeof d.branch, "%s", branch);
+        present |= SF_BRANCH;
+    }
+    if (n > 0 && spec[n]) {
+        snprintf(d.summary, sizeof d.summary, "%s", spec + n);
+        present |= SF_SUMMARY;
+    }
     if (!strcmp(st, "input") || !strcmp(st, "ask")) {
         d.state = SESS_INPUT;
         d.sub = st[0] == 'a';
@@ -214,7 +227,7 @@ static void run_session(const char *spec)
         d.seen = st[4] == 's';
     } else if (!strcmp(st, "idle")) d.state = SESS_IDLE;
     snprintf(d.repo, sizeof d.repo, "%s", repo);
-    model_upsert(&d, SF_AGENT | SF_STATE | SF_SUB | SF_REPO | SF_T0 | SF_TST | SF_SEEN);
+    model_upsert(&d, present);
 }
 
 static void fail(const char *what, const char *want)

@@ -1,0 +1,16 @@
+# Losing the link: the card dims, the time in state freezes, and the link row says how stale it is.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite
+session 2 ask api main
+wait 300
+expect_label dev-mac
+disconnect
+wait 1200
+expect_label Offline
+expect_label stale 1s
+shot deck_stale.png
+tap 233 233
+wait 200
+expect_label Offline
+quit

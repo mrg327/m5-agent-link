@@ -28,11 +28,24 @@ const char *theme_state_word(const session_t *s)
     switch (s->state) {
     case SESS_START: return "Starting";
     case SESS_WORK: return "Working";
-    case SESS_INPUT: return s->sub == 1 ? "Needs input" : "Permission";
+    case SESS_INPUT: return s->sub == 1 ? "Question" : "Approve?";
     case SESS_ERROR: return "Error";
     case SESS_DONE: return "Done";
     case SESS_IDLE: return "Idle";
     default: return "Ended";
+    }
+}
+
+/* Centre glyph per state (UI-V2 §4): a shape beside the word, so state never depends on colour alone.
+ * The permission glyph is a bell until a custom "!" in a circle exists; never a square. */
+const char *theme_state_glyph(const session_t *s)
+{
+    switch (s->state) {
+    case SESS_INPUT: return s->sub == 0 ? LV_SYMBOL_BELL : "?";
+    case SESS_ERROR: return LV_SYMBOL_WARNING;
+    case SESS_DONE: return LV_SYMBOL_OK;
+    case SESS_IDLE: return LV_SYMBOL_PAUSE;
+    default: return LV_SYMBOL_REFRESH;
     }
 }
 

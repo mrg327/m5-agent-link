@@ -80,9 +80,15 @@ bool ui_animations_allowed(void) { return s_animate; }
 
 bool ui_link_connected(void) { return s_link_up; }
 
+static bool s_was_up;
+static uint32_t s_link_down_at;
+uint32_t ui_link_down_ms(void) { return s_link_up || !s_was_up ? 0 : s_now_ms - s_link_down_at; }
+
 void ui_set_link_state(bool connected)
 {
     if (s_link_up == connected) return;
+    if (connected) s_was_up = true;
+    else s_link_down_at = s_now_ms;
     s_link_up = connected;
     s_seen_rev = 0; /* force a refresh */
 }
@@ -123,7 +129,7 @@ void ui_toast(const char *text, uint32_t rgb)
     lv_obj_set_style_text_color(s_toast_label, lv_color_hex(rgb), 0);
     lv_obj_set_style_border_color(s_toast, lv_color_hex(rgb), 0);
     lv_obj_update_layout(s_toast);
-    lv_obj_align(s_toast, LV_ALIGN_TOP_MID, 0, 338);
+    lv_obj_align(s_toast, LV_ALIGN_TOP_MID, 0, UI_ACTION_Y - 4); /* over the action pill, clear of the key badges */
     lv_obj_remove_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
     s_toast_until_ms = s_now_ms + TOAST_MS;
     dbg_event("ui", "toast", "\"text\":%s", dbg_q(text));
