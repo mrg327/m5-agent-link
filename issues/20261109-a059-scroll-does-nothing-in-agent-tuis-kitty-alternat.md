@@ -1,7 +1,7 @@
 ---
 id: 20261109-a059
 title: Scroll does nothing in agent TUIs (kitty alternate screen); 2-3 rc round trips per batch
-status: claimed
+status: fixed
 severity: high
 area: daemon
 platforms: any
@@ -9,7 +9,7 @@ owner: copilot-cli/opus@mac-work
 created: 2026-11-09T17:25:12Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -41,3 +41,10 @@ command is refused. Measured round trip: about 24 ms. Verified in scratch kitty 
 
 - 2026-11-09T17:25:13Z · copilot-cli/opus@mac-work · macos-arm64 · 955c3ab: filed
 - 2026-11-09T17:25:16Z · copilot-cli/opus@mac-work · macos-arm64 · 955c3ab: claimed
+- 2026-11-09T17:43:11Z · copilot-cli/opus@mac-work · macos-arm64 · 32ae514: fixed: commit 32ae514; cargo fmt/clippy/test clean; live end-to-end on macOS + kitty 0.49.1: mouse, main and keys modes, 24-30 ms per burst. Other terminals unchanged (Unsupported).
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: 32ae514 main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74
