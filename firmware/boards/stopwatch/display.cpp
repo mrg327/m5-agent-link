@@ -137,7 +137,7 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
     uint32_t pixels = w * h;
 
     xSemaphoreTake(s_gfx_mtx, portMAX_DELAY);
-    if (s_powered) {
+    { /* always draw, even while dark: the panel never sleeps, so it never falls behind */
         s_gfx->startWrite();
         s_gfx->setAddrWindow(area->x1, area->y1, w, h);
         const lgfx::rgb565_t *src = (const lgfx::rgb565_t *)px_map;
@@ -250,36 +250,21 @@ void hal_display_set_brightness(uint8_t level)
     xSemaphoreGive(s_gfx_mtx);
 }
 
-/* Display off = CO5300 sleep-in (0x10) with brightness 0; the L3B rail stays up. Cutting L3B and
- * re-running the init list after re-applying it left the panel dark on hardware (the vendor demo
- * never drops L3B, and even re-checks that its enable took). Sleep-in draws microamps, so the rail
- * buys little. Called from the core loop, so the LVGL invalidate below is safe. */
+/* Display off = brightness 0, nothing else. The panel keeps running and LVGL keeps drawing into it,
+ * so on wake only the brightness changes. Two attempts to sleep the CO5300 (rail cut + re-init, then
+ * sleep-in/out) both woke with a scrambled picture (mixed frames, shifted copy), so the panel's own
+ * sleep stays unused until it can be debugged on the bench. An AMOLED at brightness 0 emits nothing;
+ * the driver IC still draws a few mA, and deep sleep covers long idle on battery. */
 void hal_display_set_power(bool on)
 {
     if (!s_gfx || on == s_powered) {
         return;
     }
     xSemaphoreTake(s_gfx_mtx, portMAX_DELAY);
-    if (on) {
-        sw_ioe_write(SW_IOE_L3B_AMOLED, true); /* idempotent; covers a rail dropped elsewhere */
-        s_gfx->panel.setSleep(false);          /* 0x11 sleep-out, then 150 ms */
-        s_gfx->panel.reinitAfterRail();        /* display-on, TE, brightness mode: cheap, and safe */
-        s_powered = true;
-        s_gfx->display(0, 0, SW_PANEL_W, SW_PANEL_H); /* repaint from the PSRAM framebuffer */
-        s_gfx->waitDisplay();
-        s_gfx->panel.setBrightness(s_brightness);
-        sw_pm1_led(false);
-    } else {
-        s_powered = false;
-        s_gfx->panel.setBrightness(0);
-        s_gfx->panel.setSleep(true); /* 0x10 sleep-in */
-        sw_pm1_led(true);
-    }
+    s_powered = on;
+    s_gfx->panel.setBrightness(on ? s_brightness : 0);
+    sw_pm1_led(!on);
     xSemaphoreGive(s_gfx_mtx);
-    /* Frames LVGL rendered while dark were dropped by flush_cb: redraw the whole screen now. */
-    if (on && s_disp) {
-        lv_obj_invalidate(lv_display_get_screen_active(s_disp));
-    }
 }
 
 void hal_display_set_rotation_180(bool flipped)
