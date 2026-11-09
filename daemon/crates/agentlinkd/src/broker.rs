@@ -113,11 +113,23 @@ pub fn tidy(s: &str) -> String {
     out.trim_end().to_owned()
 }
 
+/// First request id of this daemon run. Random, not 1: a watch can still show a card from an
+/// earlier run, and its answer names only the rid, so a reused rid could approve a different
+/// request (issue 20261109-1173). Kept below 2^31 so a run has room before the device's
+/// 32-bit rid limit.
+fn first_rid() -> u64 {
+    use std::hash::{BuildHasher, Hasher};
+    let r = std::collections::hash_map::RandomState::new()
+        .build_hasher()
+        .finish();
+    1 + (r % (1 << 31))
+}
+
 impl Broker {
     pub fn new(registry: Arc<Registry>) -> Self {
         Broker {
             inner: Mutex::new(Inner {
-                next_rid: 1,
+                next_rid: first_rid(),
                 ..Default::default()
             }),
             registry,
@@ -143,7 +155,11 @@ impl Broker {
             .fold(0u64, |mask, (i, _)| mask | (1 << i));
         let mut g = self.inner.lock().unwrap();
         let rid = g.next_rid;
-        g.next_rid += 1;
+        g.next_rid = if rid >= u64::from(u32::MAX) {
+            1
+        } else {
+            rid + 1
+        };
         let att = Attention {
             rid,
             sid: req.sid,
@@ -415,6 +431,26 @@ mod tests {
 
     fn next_update(rx: &mut tokio::sync::broadcast::Receiver<Update>) -> Update {
         rx.try_recv().expect("an update")
+    }
+
+    #[tokio::test]
+    async fn a_new_daemon_run_does_not_reuse_old_rids() {
+        // Issue 20261109-1173: the watch may still hold a card from the previous run, and its
+        // answer names only the rid.
+        let (old, _rx1) = broker();
+        let (old_rid, _w1) = old.open(perm(false));
+        let (new, _rx2) = broker();
+        let (new_rid, _w2) = new.open(perm(false));
+        assert_ne!(old_rid, new_rid);
+        assert!(
+            new_rid > 0 && new_rid <= u64::from(u32::MAX),
+            "fits the device's u32 rid"
+        );
+        assert!(matches!(
+            new.answer(old_rid, Decision::Approve),
+            Err((ResultErr::Stale, _))
+        ));
+        assert_eq!(new.pending().len(), 1, "the new request is untouched");
     }
 
     #[tokio::test]

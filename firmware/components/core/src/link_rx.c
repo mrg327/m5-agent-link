@@ -82,6 +82,10 @@ static void on_welcome(const struct welcome *w)
     dbg_event("link", "welcome", "\"host\":%s,\"unix\":%u,\"tz_off\":%d", dbg_q(host),
               (unsigned)w->welcome_time_sync_m.time_sync_uint0uint, (int)w->welcome_time_sync_m.time_sync_uint1int);
     apply_cfg(&w->welcome_device_cfg_m);
+    /* A welcome starts a new link, possibly with a restarted daemon whose request ids and
+       session ids begin again. A card kept from before could then name a different request
+       (issue 20261109-1173), so drop them all; the daemon re-sends the open ones next. */
+    model_attention_clear_all();
     if (g_link.hooks.on_link) g_link.hooks.on_link(true);
 }
 

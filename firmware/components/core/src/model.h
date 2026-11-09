@@ -78,6 +78,8 @@ model_counts_t model_counts(void);
 
 void model_attention_add(const attention_t *a);
 bool model_attention_clear(uint32_t rid);
+/* Drops every request (a new link: the daemon re-sends the open ones after its welcome). */
+void model_attention_clear_all(void);
 const attention_t *model_attention_for_sid(uint32_t sid);
 const attention_t *model_attention_find(uint32_t rid);
 const attention_t *model_attention_first(void);

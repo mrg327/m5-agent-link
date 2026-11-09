@@ -234,6 +234,18 @@ bool model_attention_clear(uint32_t rid)
     return false;
 }
 
+void model_attention_clear_all(void)
+{
+    int n = 0;
+    for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
+        n += s_att_used[i];
+        s_att_used[i] = false;
+    }
+    if (!n) return;
+    s_rev++;
+    dbg_event("model", "attention_clear_all", "\"n\":%d", n);
+}
+
 const attention_t *model_attention_find(uint32_t rid)
 {
     for (int i = 0; i < MODEL_MAX_ATTENTION; i++)

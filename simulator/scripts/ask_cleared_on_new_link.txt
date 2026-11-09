@@ -1,0 +1,20 @@
+# Issue 20261109-1173: a welcome starts a new link, possibly with a restarted daemon whose rids
+# begin again, so cards from before are dropped (the daemon re-sends the open ones). Otherwise
+# an old "rid 7" card could approve the new daemon's rid 7, or lend it the answer already given.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+expect_label Run shell command
+disconnect
+wait 200
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 400
+expect_no_label Run shell command
+expect_screen ring
+quit

@@ -145,6 +145,9 @@ sim_script_test(sim_ask_tap_never_approves ask_tap_never_approves.txt
                 PASS_REGULAR_EXPRESSION "\"op\":0,\"sid\":2")
 sim_script_test(sim_ask_result_error ask_result_error.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_ask_hold_bound_to_rid ask_hold_bound_to_rid.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"tx_cmd\"")
+# A welcome (a new link, maybe a restarted daemon) drops every card: rids may begin again (issue 1173).
+sim_script_test(sim_ask_cleared_on_new_link ask_cleared_on_new_link.txt
+  PASS_REGULAR_EXPRESSION "attention_clear_all" FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 # UI-V2 Phase 4: SCROLL. A drag is lines (op 10, unit 0), the first sent with its step (leading edge);
 # a flick is never a page (unit 1 only from B); A to_end (unit 2) and out; leaving by tap, B long,
 # chord or timeout never sends to_end; privacy meta hides the preview; `unsupported` drops the item.
