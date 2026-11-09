@@ -29,3 +29,4 @@ Copilot hooks cannot return an answer, so its permission prompt and ask_user for
 ## Log
 
 - 2026-11-09T21:01:02Z · copilot-cli/opus@mac-work · macos-arm64 · 95e1db1: filed
+- 2026-11-09T21:03:06Z · copilot-cli/opus@mac-work · macos-arm64 · 0aa3bf4: Driven with the headless simulator as a second device on ws://127.0.0.1:7878 against a live Copilot 1.0.106 session in kitty: permission card held Yes (hold_ms 1208), the daemon typed 1, and the command ran; ask_user card, B then tap on green, typed and Copilot reported green; a two-field form got a Focus-only card, and Esc in the terminal cleared it (answered_pc).
