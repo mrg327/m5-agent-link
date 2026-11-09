@@ -1,11 +1,11 @@
 ---
 id: 20261109-1173
 title: Request ids restart at 1 on daemon restart (old rid could approve a new request)
-status: open
+status: claimed
 severity: med
 area: daemon
 platforms: any
-owner:
+owner: claude-code@linux-dev
 created: 2026-11-09T17:14:24Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
@@ -29,3 +29,4 @@ Unconfirmed, from the review of 7d28268..48dafed. Broker::answer looks up by rid
 ## Log
 
 - 2026-11-09T17:14:24Z · copilot-cli/opus@mac-work · macos-arm64 · aa1a69e: filed
+- 2026-11-09T18:56:53Z · claude-code@linux-dev · linux-x86_64 · 609966f: claimed
