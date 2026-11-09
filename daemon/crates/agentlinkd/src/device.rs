@@ -2,6 +2,7 @@
 //! commands in.
 
 use crate::broker::{Broker, Decision};
+use crate::deltas::DeltaQueue;
 use crate::focus::{FocusDriver, FocusError, FocusTarget, ScrollDriver};
 use crate::registry::{now_unix, Registry, Route, Update};
 use crate::scroll::{Batch, Coalescer, RESULT_MIN_GAP};
@@ -89,6 +90,8 @@ struct Conn {
     privacy: Privacy,
     /// Protocol minor the device announced in its hello.
     peer_minor: u64,
+    /// `session_upd` deltas waiting for the coalescing window.
+    deltas: DeltaQueue,
 }
 
 /// Terminal content leaves the daemon only when the device may show it (UI-V2 §4.4).
@@ -147,7 +150,36 @@ impl Conn {
         v.into_iter().map(|s| self.for_peer(s)).collect()
     }
 
+    /// Sends `msg`, after the held deltas so the device sees everything in order.
     async fn send(&mut self, re: Option<u64>, msg: Message) -> Result<()> {
+        if !self.deltas.is_empty() {
+            for s in self.deltas.drain() {
+                self.send_now(None, Message::SessionUpd(s)).await?;
+            }
+        }
+        self.send_now(re, msg).await
+    }
+
+    /// Holds a session delta for coalescing; sends what it cannot be merged with.
+    async fn send_delta(&mut self, s: Session) -> Result<()> {
+        let s = self.for_peer(s);
+        if s == Session::delta(s.sid) {
+            return Ok(()); // every key it had is one this device does not take
+        }
+        match self.deltas.push(s, Instant::now()) {
+            Some(out) => self.send_now(None, Message::SessionUpd(out)).await,
+            None => Ok(()),
+        }
+    }
+
+    async fn send_due_deltas(&mut self) -> Result<()> {
+        for s in self.deltas.take_due(Instant::now()) {
+            self.send_now(None, Message::SessionUpd(s)).await?;
+        }
+        Ok(())
+    }
+
+    async fn send_now(&mut self, re: Option<u64>, msg: Message) -> Result<()> {
         let env = Envelope {
             id: self.next_id,
             re,
@@ -222,6 +254,7 @@ pub async fn run_link(
         next_id: 1,
         privacy: Privacy::Meta,
         peer_minor: 0,
+        deltas: DeltaQueue::default(),
     };
 
     let hello = loop {
@@ -291,6 +324,7 @@ async fn handshake(
     }
     c.next_id = 1;
     c.peer_minor = hello.1.proto.1;
+    c.deltas.clear(); // the snapshot below carries them
 
     // Subscribe before taking the snapshot so no update is lost in between.
     let (sessions, updates) = shared.registry.subscribe();
@@ -339,6 +373,7 @@ async fn serve(
     let mut inflight: Option<Inflight> = None;
     loop {
         let deferred_due = sc.deferred_due();
+        let deltas_due = c.deltas.next_due();
         tokio::select! {
             env = c.recv() => match env? {
                 None => return Ok(()),
@@ -360,13 +395,17 @@ async fn serve(
                     c.send(Some(re), Message::Result(r)).await?;
                 }
             },
+            _ = tokio::time::sleep_until(deltas_due.unwrap_or_else(Instant::now)), if deltas_due.is_some() => {
+                c.send_due_deltas().await?;
+            },
             u = updates.recv() => match u {
-                Ok(Update::Upsert(s)) => c.send(None, Message::SessionUpd(c.for_peer(s))).await?,
+                Ok(Update::Upsert(s)) => c.send_delta(s).await?,
                 Ok(Update::Gone(sid)) => c.send(None, Message::Gone(Gone { sid })).await?,
                 Ok(Update::Attention(a)) => c.send(None, Message::Attention(a)).await?,
                 Ok(Update::Clear(cl)) => c.send(None, Message::Clear(cl)).await?,
                 // Missed updates: the device has drifted, so send a full replacement.
                 Err(RecvError::Lagged(_)) => {
+                    c.deltas.clear();
                     let sessions = c.sessions_for_peer(shared.registry.snapshot());
                     c.send(None, Message::Snapshot(Snapshot { sessions, away: None })).await?;
                     for att in shared.broker.pending() {
@@ -1108,10 +1147,22 @@ mod tests {
             let mut upd = Session::delta(sid);
             upd.hn = Some("WIN-BUILD01".into());
             shared.registry.publish(Update::Upsert(upd));
-            let Message::SessionUpd(u) = d.next().await.msg else {
-                panic!("session_upd")
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            let ping = Envelope {
+                id: 99,
+                re: None,
+                msg: Message::Ping(Empty {}),
             };
-            assert_eq!(u.hn.as_deref(), want);
+            d.to_daemon.send(ping.to_bytes().unwrap()).unwrap();
+            // A held delta goes out before the pong; one left empty is not sent at all.
+            let mut m = d.next().await.msg;
+            if let Message::SessionUpd(u) = m {
+                assert_eq!(u.hn.as_deref(), want);
+                m = d.next().await.msg;
+            } else {
+                assert_eq!(want, None);
+            }
+            assert!(matches!(m, Message::Pong(_)), "{m:?}");
         }
     }
 
@@ -1126,6 +1177,7 @@ mod tests {
             next_id: 1,
             privacy: Privacy::Preview,
             peer_minor: 2,
+            deltas: DeltaQueue::default(),
         };
         let mut s = Session::delta(1);
         (s.snz, s.ntf, s.n, s.ok, s.sum) = (
@@ -1189,6 +1241,117 @@ mod tests {
         };
         d.to_daemon.send(cmd_bytes(id, c)).unwrap();
         assert_eq!(result_of(&mut d).await.err, Some(ResultErr::Stale));
+    }
+
+    /// A burst of hook events from 4 sessions: each step's start and result reach the device as
+    /// one delta, every step and state change still arrives in order, a `clear` is not
+    /// overtaken by the deltas published before it, and the device ends up with the registry's
+    /// state.
+    #[tokio::test]
+    async fn a_burst_of_deltas_is_coalesced_without_losing_steps_or_order() {
+        use crate::registry::{SessionEvent, SessionPatch, Step, Via};
+        const STEPS: u64 = 8;
+        let shared = shared();
+        let mut d = spawn_link(&shared);
+        d.to_daemon.send(hello_with_minor("1.0.0", 3)).unwrap();
+        d.next().await; // welcome
+        d.next().await; // snapshot
+        let (_, mut published) = shared.registry.subscribe();
+        let apply = |key: &str, f: &dyn Fn(&mut SessionPatch)| {
+            let mut p = SessionPatch::new(Agent::Copilot);
+            f(&mut p);
+            shared.registry.apply(SessionEvent::Update {
+                key: key.into(),
+                via: Via::Local,
+                patch: p,
+                ctx: crate::registry::HostCtx::default(),
+            });
+        };
+        let keys: Vec<String> = (0..4).map(|i| format!("copilot:s{i}")).collect();
+        for k in &keys {
+            apply(k, &|p| p.state = Some(SessState::Start));
+            apply(k, &|p| {
+                (p.state, p.step) = (Some(SessState::Work), Step::Reset)
+            });
+        }
+        for n in 1..=STEPS {
+            for k in &keys {
+                apply(k, &|p| {
+                    (p.state, p.step) = (Some(SessState::Work), Step::Start);
+                    (p.tool, p.summary) = (Some("bash".into()), Some(format!("bash · step {n}")));
+                });
+                apply(k, &|p| {
+                    (p.state, p.step) = (Some(SessState::Work), Step::Result(true))
+                });
+            }
+            if n == 4 {
+                shared.registry.publish(Update::Clear(Clear {
+                    rid: 7,
+                    why: ClearWhy::Cancelled,
+                }));
+            }
+        }
+        for k in &keys {
+            apply(k, &|p| p.state = Some(SessState::Done));
+        }
+        let mut before = 0;
+        while let Ok(u) = published.try_recv() {
+            before += matches!(u, Update::Upsert(_)) as usize;
+        }
+
+        let sids: Vec<u64> = keys
+            .iter()
+            .map(|k| shared.registry.sid_of(k).unwrap())
+            .collect();
+        let mut model: BTreeMap<u64, Session> = BTreeMap::new();
+        let mut steps: BTreeMap<u64, Vec<(u64, Option<bool>)>> = BTreeMap::new();
+        let mut states: BTreeMap<u64, Vec<SessState>> = BTreeMap::new();
+        let mut after = 0;
+        let mut cleared = false;
+        while model
+            .values()
+            .filter(|s| s.st == Some(SessState::Done))
+            .count()
+            < 4
+        {
+            match d.next().await.msg {
+                Message::SessionUpd(u) => {
+                    after += 1;
+                    if let Some(n) = u.n {
+                        steps.entry(u.sid).or_default().push((n, u.ok));
+                    } else if let Some(ok) = u.ok {
+                        steps.get_mut(&u.sid).unwrap().last_mut().unwrap().1 = Some(ok);
+                    }
+                    states.entry(u.sid).or_default().extend(u.st);
+                    model
+                        .entry(u.sid)
+                        .or_insert_with(|| Session::delta(u.sid))
+                        .merge(&u);
+                }
+                Message::Clear(c) => {
+                    assert_eq!(c.rid, 7);
+                    // everything published before the clear went out before it
+                    for sid in &sids {
+                        assert_eq!(steps[sid].last(), Some(&(4, Some(true))));
+                    }
+                    cleared = true;
+                }
+                m => panic!("{m:?}"),
+            }
+        }
+        assert!(cleared);
+        eprintln!("4 sessions x {STEPS} steps: {before} deltas published, {after} frames sent");
+        assert_eq!(before, 4 * (2 + 2 * STEPS as usize + 1));
+        assert_eq!(after, 4 * (1 + STEPS as usize));
+        let want: Vec<_> = (1..=STEPS).map(|n| (n, Some(true))).collect();
+        for s in shared.registry.snapshot() {
+            assert_eq!(steps[&s.sid], want);
+            assert_eq!(
+                states[&s.sid],
+                [SessState::Start, SessState::Work, SessState::Done]
+            );
+            assert_eq!(model[&s.sid], s);
+        }
     }
 
     #[tokio::test]

@@ -5,6 +5,7 @@
 
 mod ble;
 mod broker;
+mod deltas;
 mod device;
 mod focus;
 mod hook_source;
