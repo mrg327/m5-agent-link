@@ -92,13 +92,16 @@ EOF
 }
 
 # ── files ──
-file_of() {
-    local id=$1 f
-    for f in "$DIR"/"$id"*.md; do
-        [ -e "$f" ] || break
-        echo "$f"; return 0
+file_of() { # full id, a prefix of it, or the random suffix alone (e.g. d4c7)
+    local id=$1 f hit="" n=0
+    for f in "$DIR"/"$id"*.md "$DIR"/[0-9]*-"$id"*.md; do
+        [ -e "$f" ] || continue
+        [ "$f" = "$hit" ] && continue
+        hit=$f; n=$((n + 1))
     done
-    die "no issue $id"
+    [ $n -gt 0 ] || die "no issue $id"
+    [ $n -eq 1 ] || die "$id is ambiguous; use more of the id"
+    echo "$hit"
 }
 field() { awk -v k="$2" 'NR==1&&$0=="---"{fm=1;next} fm&&$0=="---"{exit} fm&&index($0,k":")==1{v=substr($0,length(k)+2);sub(/^ +/,"",v);print v;exit}' "$1"; }
 body_of() { awk 'NR==1&&$0=="---"{fm=1;next} fm&&$0=="---"{fm=0;next} !fm' "$1"; }
@@ -231,7 +234,7 @@ cmd=$1; shift
 case $cmd in
 new) cmd_new "$@" ;;
 list | ls) cmd_list "$@" ;;
-show) cat "$(file_of "${1:?ID}")" ;;
+show) f=$(file_of "${1:?ID}"); cat "$f" ;;
 claim) cmd_claim "${1:?ID}" ;;
 log) f=$(file_of "${1:?ID}"); append_log "$f" "${2:?MESSAGE}"; echo "logged on $1" ;;
 close) cmd_close "${1:?ID}" "${2:-}" "${3:-}" ;;

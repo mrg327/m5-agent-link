@@ -38,3 +38,4 @@ hal_rtc_get_unix() returns 0 when unset/VLF/I2C error. nav_quiet_next(…, 0) st
     - os: macOS 26.5 (Darwin 25.5.0)
     - git: 61369e5+dirty main
     - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74
+- 2026-11-09T17:13:57Z · copilot-cli/opus@mac-work · macos-arm64 · 75f780b+dirty: committed in 75f780b
