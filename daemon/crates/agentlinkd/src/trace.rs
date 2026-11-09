@@ -10,6 +10,25 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+/// Replaces a session's step summary (`sum`: command lines, paths) in a serialized session,
+/// `session_upd` body or snapshot body, like the scroll preview it never reaches the logs.
+/// Returns whether anything was replaced.
+pub fn redact_sum(v: &mut Value) -> bool {
+    let mut hit = false;
+    if let Some(o) = v.as_object_mut() {
+        if o.contains_key("sum") {
+            o.insert("sum".into(), "<private>".into());
+            hit = true;
+        }
+    }
+    if let Some(list) = v.get_mut("sessions").and_then(Value::as_array_mut) {
+        for s in list {
+            hit |= redact_sum(s);
+        }
+    }
+    hit
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum Dir {
     In,
@@ -128,11 +147,12 @@ impl Trace {
 
     /// Logs a protocol message with its decoded JSON and raw bytes.
     pub fn proto(&self, src: &str, dir: Dir, env: &Envelope, bytes: &[u8]) {
-        let msg = serde_json::to_value(env).unwrap_or(Value::Null);
+        let mut msg = serde_json::to_value(env).unwrap_or(Value::Null);
+        let private = msg.get_mut("b").is_some_and(redact_sum);
         let kind = msg["t"].as_str().unwrap_or("?").to_owned();
         let sid = msg["b"]["sid"].as_u64();
         let rid = msg["b"]["rid"].as_u64();
-        self.record(src, dir, &kind, sid, rid, msg, Some(bytes));
+        self.record(src, dir, &kind, sid, rid, msg, (!private).then_some(bytes));
     }
 
     /// Like `proto`, for a message that carries terminal content (a scroll result's preview):

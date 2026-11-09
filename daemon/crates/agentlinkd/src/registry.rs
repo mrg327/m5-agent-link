@@ -12,6 +12,9 @@ use tokio::sync::broadcast;
 /// Snapshot limit from the CDDL (`[0*32 session]`).
 const MAX_SESSIONS: usize = 32;
 
+/// Longest snooze a device may ask for.
+const MAX_SNOOZE_MIN: u64 = 24 * 60;
+
 /// What the focus driver needs to find the agent's terminal.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct HostCtx {
@@ -33,6 +36,20 @@ pub struct SessionPatch {
     pub branch: Option<String>,
     pub tool: Option<String>,
     pub summary: Option<String>,
+    pub step: Step,
+}
+
+/// What a hook line did to the turn's tool-step counter.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum Step {
+    #[default]
+    None,
+    /// A tool starts: `n` + 1, result cleared.
+    Start,
+    /// The current tool ended (true = succeeded).
+    Result(bool),
+    /// A new prompt: `n` = 0.
+    Reset,
 }
 
 impl SessionPatch {
@@ -45,6 +62,7 @@ impl SessionPatch {
             branch: None,
             tool: None,
             summary: None,
+            step: Step::None,
         }
     }
 }
@@ -214,12 +232,11 @@ impl Registry {
     /// Traces and broadcasts one update to every device link.
     pub fn publish(&self, u: Update) {
         let (kind, sid, rid, msg) = match &u {
-            Update::Upsert(s) => (
-                "session_upd",
-                s.sid,
-                None,
-                serde_json::to_value(s).unwrap_or_default(),
-            ),
+            Update::Upsert(s) => {
+                let mut v = serde_json::to_value(s).unwrap_or_default();
+                crate::trace::redact_sum(&mut v);
+                ("session_upd", s.sid, None, v)
+            }
             Update::Gone(sid) => ("gone", *sid, None, serde_json::json!({"sid": sid})),
             Update::Attention(a) => (
                 "attention",
@@ -344,10 +361,108 @@ impl Registry {
         upd!(br, p.branch.map(|v| clip(&v, 32)));
         upd!(tool, p.tool);
         upd!(sum, p.summary.map(|v| clip(&v, 80)));
+        match p.step {
+            Step::None => {}
+            Step::Start => {
+                s.n = Some(s.n.unwrap_or(0) + 1);
+                d.n = s.n;
+                // absent = unchanged in a delta, so the device reads a new `n` as "running"
+                s.ok = None;
+                changed = true;
+            }
+            Step::Result(ok) if s.n.unwrap_or(0) > 0 => {
+                if set(&mut s.ok, Some(ok)) {
+                    d.ok = s.ok;
+                    changed = true;
+                }
+            }
+            Step::Result(_) => {}
+            Step::Reset => {
+                s.ok = None;
+                if s.n.is_some_and(|n| n != 0) {
+                    s.n = Some(0);
+                    d.n = s.n;
+                    changed = true;
+                }
+            }
+        }
+        if matches!(d.st, Some(SessState::Done | SessState::Error)) {
+            s.seen = Some(false);
+            d.seen = Some(false);
+            if s.ntf == Some(true) {
+                s.ntf = Some(false);
+                d.ntf = Some(false);
+            }
+        }
         if !changed {
             return None;
         }
         Some(Update::Upsert(if created { s.clone() } else { d }))
+    }
+
+    /// Applies a device command to one session and broadcasts what changed (`f` fills the delta
+    /// and returns whether anything did). `None` = unknown sid.
+    fn edit(
+        &self,
+        sid: u64,
+        f: impl FnOnce(&mut Session, &mut Session, u64) -> bool,
+    ) -> Option<()> {
+        let upd = {
+            let mut st = self.state.lock().unwrap();
+            let s = &mut st.sessions.get_mut(&sid)?.session;
+            let mut d = Session::delta(sid);
+            f(s, &mut d, now_unix()).then_some(d)
+        };
+        if let Some(d) = upd {
+            self.publish(Update::Upsert(d));
+        }
+        Some(())
+    }
+
+    /// Device `ack`: the user has seen the session's outcome; an error then rests as idle.
+    pub fn ack(&self, sid: u64) -> Option<()> {
+        self.edit(sid, |s, d, now| {
+            let mut changed = false;
+            if s.seen != Some(true) {
+                s.seen = Some(true);
+                d.seen = Some(true);
+                changed = true;
+            }
+            if s.st == Some(SessState::Error) {
+                s.st = Some(SessState::Idle);
+                s.tst = Some(now);
+                d.st = s.st;
+                d.tst = s.tst;
+                s.sub = None;
+                changed = true;
+            }
+            changed
+        })
+    }
+
+    /// Device `snooze`: until now + `minutes` (0 clears it).
+    pub fn snooze(&self, sid: u64, minutes: u64) -> Option<()> {
+        self.edit(sid, |s, d, now| {
+            let until = if minutes == 0 {
+                0
+            } else {
+                now + minutes.min(MAX_SNOOZE_MIN) * 60
+            };
+            s.snz = Some(until);
+            d.snz = s.snz;
+            true
+        })
+    }
+
+    /// Device `notify_done`: arm or disarm the one-shot "tell me when it finishes".
+    pub fn notify_done(&self, sid: u64, arm: bool) -> Option<()> {
+        self.edit(sid, |s, d, _| {
+            if set(&mut s.ntf, Some(arm)) {
+                d.ntf = s.ntf;
+                return true;
+            }
+            false
+        })
     }
 
     /// Current sessions (newest state change first, capped) and a receiver that sees every
@@ -540,6 +655,84 @@ mod tests {
                 ..Default::default()
             },
         }
+    }
+
+    fn step_ev(step: Step, state: SessState) -> SessionEvent {
+        let SessionEvent::Update {
+            key,
+            via,
+            mut patch,
+            ctx,
+        } = ev(state)
+        else {
+            unreachable!()
+        };
+        patch.step = step;
+        SessionEvent::Update {
+            key,
+            via,
+            patch,
+            ctx,
+        }
+    }
+
+    fn next_delta(rx: &mut broadcast::Receiver<Update>) -> Session {
+        let Update::Upsert(d) = rx.try_recv().unwrap() else {
+            panic!()
+        };
+        d
+    }
+
+    #[test]
+    fn steps_count_ok_and_reset() {
+        let r = reg();
+        let (_, mut rx) = r.subscribe();
+        r.apply(step_ev(Step::Result(true), SessState::Work));
+        next_delta(&mut rx); // created
+        assert_eq!(r.snapshot()[0].ok, None, "no step running: result ignored");
+        r.apply(step_ev(Step::Start, SessState::Work));
+        let d = next_delta(&mut rx);
+        assert_eq!((d.n, d.ok), (Some(1), None));
+        r.apply(step_ev(Step::Result(false), SessState::Work));
+        let d = next_delta(&mut rx);
+        assert_eq!((d.n, d.ok), (None, Some(false)));
+        r.apply(step_ev(Step::Start, SessState::Work));
+        let d = next_delta(&mut rx);
+        assert_eq!((d.n, d.ok), (Some(2), None));
+        assert_eq!(r.snapshot()[0].ok, None, "stored ok cleared while it runs");
+        r.apply(step_ev(Step::Reset, SessState::Work));
+        assert_eq!(next_delta(&mut rx).n, Some(0));
+    }
+
+    #[test]
+    fn finishing_clears_seen_and_disarms_notify_ack_and_snooze() {
+        let r = reg();
+        let (_, mut rx) = r.subscribe();
+        r.apply(ev(SessState::Work));
+        next_delta(&mut rx);
+        assert_eq!(r.ack(9), None);
+        r.notify_done(1, true).unwrap();
+        assert_eq!(next_delta(&mut rx).ntf, Some(true));
+        r.apply(ev(SessState::Done));
+        let d = next_delta(&mut rx);
+        assert_eq!((d.seen, d.ntf), (Some(false), Some(false)));
+        r.ack(1).unwrap();
+        let d = next_delta(&mut rx);
+        assert_eq!((d.seen, d.st), (Some(true), None), "done stays done");
+        r.apply(ev(SessState::Work));
+        next_delta(&mut rx);
+        r.apply(ev(SessState::Error));
+        assert_eq!(next_delta(&mut rx).seen, Some(false));
+        r.ack(1).unwrap();
+        let d = next_delta(&mut rx);
+        assert_eq!((d.seen, d.st), (Some(true), Some(SessState::Idle)));
+        r.snooze(1, 30).unwrap();
+        let until = next_delta(&mut rx).snz.unwrap();
+        assert!((until - now_unix() - 1800) <= 1);
+        r.snooze(1, 99999).unwrap();
+        assert!(next_delta(&mut rx).snz.unwrap() <= now_unix() + 86400);
+        r.snooze(1, 0).unwrap();
+        assert_eq!(next_delta(&mut rx).snz, Some(0));
     }
 
     #[test]

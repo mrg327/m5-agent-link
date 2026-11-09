@@ -18,7 +18,7 @@
 use crate::broker::{request_of, Broker, Outcome};
 use crate::ipc;
 use crate::prompt;
-use crate::registry::{clip, HostCtx, Registry, SessionEvent, SessionPatch, Via};
+use crate::registry::{clip, HostCtx, Registry, SessionEvent, SessionPatch, Step, Via};
 use crate::remote;
 use crate::source::AgentSource;
 use crate::trace::{Dir, Trace};
@@ -307,8 +307,13 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
         .or_else(|| payload["tool_name"].as_str());
     match event.as_str() {
         "sessionstart" => p.state = Some(SessState::Start),
-        "userpromptsubmitted" | "userpromptsubmit" | "posttooluse" | "posttoolusefailure" => {
-            p.state = Some(SessState::Work)
+        "userpromptsubmitted" | "userpromptsubmit" => {
+            p.state = Some(SessState::Work);
+            p.step = Step::Reset;
+        }
+        "posttooluse" | "posttoolusefailure" => {
+            p.state = Some(SessState::Work);
+            p.step = Step::Result(tool_ok(&event, payload));
         }
         "pretooluse" if matches!(tool, Some("AskUserQuestion" | "ask_user")) => {
             p.state = Some(SessState::Input);
@@ -318,6 +323,8 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
         "pretooluse" => {
             p.state = Some(SessState::Work);
             p.tool = tool.map(str::to_owned);
+            p.summary = tool.map(|t| step_summary(t, payload));
+            p.step = Step::Start;
         }
         "agentstop" | "stop" => p.state = Some(SessState::Done),
         "erroroccurred" | "stopfailure" => p.state = Some(SessState::Error),
@@ -358,6 +365,64 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
         patch: p,
         ctx: host_ctx(v, cwd),
     })
+}
+
+/// Whether the tool that just ended succeeded.
+fn tool_ok(event: &str, payload: &Value) -> bool {
+    if event == "posttoolusefailure" {
+        return false;
+    }
+    !matches!(
+        payload["toolResult"]["resultType"].as_str(),
+        Some("failure" | "denied" | "rejected" | "error")
+    )
+}
+
+/// The tool's arguments: Copilot sends `toolArgs` as an object or a JSON-encoded string,
+/// Claude `tool_input` as an object.
+fn tool_args(payload: &Value) -> Value {
+    let raw = if payload.get("toolArgs").is_some() {
+        &payload["toolArgs"]
+    } else {
+        &payload["tool_input"]
+    };
+    match raw {
+        Value::String(s) => serde_json::from_str(s).unwrap_or(Value::Null),
+        v => v.clone(),
+    }
+}
+
+fn first_line(s: &str) -> Option<&str> {
+    s.lines().map(str::trim).find(|l| !l.is_empty())
+}
+
+/// `"<tool> · <argument>"` (≤ 80 chars): the command's first line, a file's last two path
+/// components, a URL or a pattern; the bare tool name when there is none.
+fn step_summary(tool: &str, payload: &Value) -> String {
+    let args = tool_args(payload);
+    let text = |k: &str| args[k].as_str();
+    let arg = text("command")
+        .and_then(first_line)
+        .map(str::to_owned)
+        .or_else(|| {
+            ["file_path", "path", "filePath"]
+                .iter()
+                .find_map(|k| text(k))
+                .and_then(|p| {
+                    let parts: Vec<&str> = p.split(['/', '\\']).filter(|c| !c.is_empty()).collect();
+                    let tail = parts.len().saturating_sub(2);
+                    (!parts.is_empty()).then(|| parts[tail..].join("/"))
+                })
+        })
+        .or_else(|| text("url").and_then(first_line).map(str::to_owned))
+        .or_else(|| text("pattern").and_then(first_line).map(str::to_owned))
+        .or_else(|| text("query").and_then(first_line).map(str::to_owned))
+        .or_else(|| text("description").and_then(first_line).map(str::to_owned))
+        .or_else(|| text("prompt").and_then(first_line).map(str::to_owned));
+    match arg {
+        Some(a) => clip(&format!("{tool} · {a}"), 80),
+        None => clip(tool, 80),
+    }
 }
 
 /// Last path component, splitting on both separators (remote paths may be Windows ones).
@@ -431,6 +496,63 @@ mod tests {
             panic!()
         };
         assert_eq!(patch.repo.as_deref(), Some("dir"));
+    }
+
+    fn patch_of(v: Value) -> SessionPatch {
+        let Some(SessionEvent::Update { patch, .. }) = to_session_event(&v, &Via::Local) else {
+            panic!()
+        };
+        patch
+    }
+
+    #[test]
+    fn step_summary_from_copilot_and_claude_args() {
+        let sum = |v: Value| patch_of(v).summary;
+        let c = json!({"agent":"copilot","event":"preToolUse","payload":{"sessionId":"s",
+            "toolName":"bash","toolArgs":"{\"command\":\"\\n  npm test\\nnext\"}"}});
+        assert_eq!(sum(c).as_deref(), Some("bash · npm test"));
+        let c = json!({"agent":"copilot","event":"preToolUse","payload":{"sessionId":"s",
+            "toolName":"edit","toolArgs":{"path":"C:\\src\\proj\\lib\\a.rs"}}});
+        assert_eq!(sum(c).as_deref(), Some("edit · lib/a.rs"));
+        let c = json!({"agent":"claude","event":"PreToolUse","payload":{"session_id":"s",
+            "tool_name":"Read","tool_input":{"file_path":"/a/b/c/d.txt"}}});
+        let p = patch_of(c);
+        assert_eq!(p.summary.as_deref(), Some("Read · c/d.txt"));
+        assert_eq!(p.step, Step::Start);
+        let c = json!({"agent":"claude","event":"PreToolUse","payload":{"session_id":"s",
+            "tool_name":"Task","tool_input":{}}});
+        assert_eq!(sum(c).as_deref(), Some("Task"));
+        let ask = json!({"agent":"claude","event":"PreToolUse","payload":{"session_id":"s",
+            "tool_name":"AskUserQuestion","tool_input":{"prompt":"x"}}});
+        assert_eq!(patch_of(ask).step, Step::None);
+    }
+
+    #[test]
+    fn step_results_and_prompt_reset() {
+        let r = |agent: &str, ev: &str, payload: Value| {
+            patch_of(json!({"agent":agent,"event":ev,"payload":payload})).step
+        };
+        assert_eq!(
+            r("claude", "PostToolUseFailure", json!({"session_id":"s"})),
+            Step::Result(false)
+        );
+        assert_eq!(
+            r("claude", "PostToolUse", json!({"session_id":"s"})),
+            Step::Result(true)
+        );
+        let res = |t: &str| json!({"sessionId":"s","toolResult":{"resultType":t}});
+        assert_eq!(
+            r("copilot", "postToolUse", res("denied")),
+            Step::Result(false)
+        );
+        assert_eq!(
+            r("copilot", "postToolUse", res("success")),
+            Step::Result(true)
+        );
+        assert_eq!(
+            r("copilot", "userPromptSubmitted", json!({"sessionId":"s"})),
+            Step::Reset
+        );
     }
 
     #[test]

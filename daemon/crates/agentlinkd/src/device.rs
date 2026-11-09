@@ -128,10 +128,17 @@ impl ScrollState {
 }
 
 impl Conn {
-    /// Devices below proto 0.2 reject unknown keys, so `hn` must not reach them.
+    /// Devices reject unknown keys: `hn` needs proto 0.2, `snz`/`ntf`/`n`/`ok` 0.3. The step
+    /// summary only goes to a device whose privacy allows content.
     fn for_peer(&self, mut s: Session) -> Session {
         if self.peer_minor < 2 {
             s.hn = None;
+        }
+        if self.peer_minor < 3 {
+            (s.snz, s.ntf, s.n, s.ok) = (None, None, None, None);
+        }
+        if self.privacy == Privacy::Meta {
+            s.sum = None;
         }
         s
     }
@@ -607,7 +614,22 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
             );
             res
         }
-        CmdOp::Ack => CmdResult::ok(),
+        CmdOp::Ack | CmdOp::Snooze | CmdOp::NotifyDone => {
+            let reg = &shared.registry;
+            let arg = match cmd.arg {
+                Some(Arg::Uint(n)) => Some(n),
+                _ => None,
+            };
+            let done = cmd.sid.and_then(|sid| match cmd.op {
+                CmdOp::Ack => reg.ack(sid),
+                CmdOp::Snooze => reg.snooze(sid, arg.unwrap_or(30)),
+                _ => reg.notify_done(sid, arg != Some(0)),
+            });
+            match done {
+                Some(()) => CmdResult::ok(),
+                None => fail(ResultErr::Stale, "unknown session"),
+            }
+        }
         _ => fail(ResultErr::Unsupported, "command not implemented"),
     }
 }
@@ -1091,6 +1113,82 @@ mod tests {
             };
             assert_eq!(u.hn.as_deref(), want);
         }
+    }
+
+    #[test]
+    fn for_peer_strips_keys_the_device_cannot_take() {
+        let (_tx, rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let mut c = Conn {
+            link: Box::new(ChanLink { rx, tx }),
+            trace: Trace::null(),
+            src: "t".into(),
+            next_id: 1,
+            privacy: Privacy::Preview,
+            peer_minor: 2,
+        };
+        let mut s = Session::delta(1);
+        (s.snz, s.ntf, s.n, s.ok, s.sum) = (
+            Some(5),
+            Some(true),
+            Some(2),
+            Some(true),
+            Some("bash · ls".into()),
+        );
+        let out = c.for_peer(s.clone());
+        assert_eq!((out.snz, out.ntf, out.n, out.ok), (None, None, None, None));
+        assert_eq!(out.sum.as_deref(), Some("bash · ls"));
+        c.peer_minor = 3;
+        let out = c.for_peer(s.clone());
+        assert_eq!((out.snz, out.n, out.ok), (Some(5), Some(2), Some(true)));
+        c.privacy = Privacy::Meta;
+        assert_eq!(c.for_peer(s).sum, None);
+    }
+
+    #[tokio::test]
+    async fn ack_snooze_and_notify_commands_edit_the_session() {
+        let shared = shared();
+        let sid = add_remote_session(&shared);
+        let mut d = spawn_link(&shared);
+        d.to_daemon.send(hello_with_minor("1.0.0", 3)).unwrap();
+        d.next().await; // welcome
+        d.next().await; // snapshot
+        let mut id = 1;
+        for (op, arg) in [
+            (CmdOp::Snooze, Some(Arg::Uint(0))),
+            (CmdOp::NotifyDone, None),
+            (CmdOp::NotifyDone, Some(Arg::Uint(0))),
+            (CmdOp::Ack, None),
+        ] {
+            let c = Cmd {
+                sid: Some(sid),
+                ..cmd(op, None, arg, None)
+            };
+            d.to_daemon.send(cmd_bytes(id, c)).unwrap();
+            id += 1;
+            let mut ok = false;
+            let mut upd = None;
+            for _ in 0..2 {
+                match d.next().await.msg {
+                    Message::Result(r) => ok = r.ok,
+                    Message::SessionUpd(u) => upd = Some(u),
+                    m => panic!("{m:?}"),
+                }
+            }
+            assert!(ok);
+            let u = upd.unwrap();
+            match op {
+                CmdOp::Snooze => assert_eq!(u.snz, Some(0)),
+                CmdOp::NotifyDone => assert_eq!(u.ntf, Some(id == 3)),
+                _ => assert_eq!(u.seen, Some(true)),
+            }
+        }
+        let c = Cmd {
+            sid: Some(99),
+            ..cmd(CmdOp::Ack, None, None, None)
+        };
+        d.to_daemon.send(cmd_bytes(id, c)).unwrap();
+        assert_eq!(result_of(&mut d).await.err, Some(ResultErr::Stale));
     }
 
     #[tokio::test]
