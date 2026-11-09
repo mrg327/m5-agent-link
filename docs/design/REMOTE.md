@@ -114,10 +114,12 @@ copilot ─hook─► agentlink-hook.exe                     agentlinkd ──BL
 
 ### 3.4 Lifetime and liveness
 
-- When the tunnel drops, remote hooks fail open. Remote session records stay until their
-  `SessionEnd`, as local ones do.
+- When the tunnel drops, remote hooks fail open.
 - When `agentlink ssh` exits, its attach socket is removed (audited as
-  `remote_attach_close`) and that window's sessions stop being focusable.
+  `remote_attach_close`) and the sessions that arrived through it are removed too (`gone` to
+  the watch): their `SessionEnd` can no longer arrive. A session that is still running remote
+  side reappears with its next hook through a new `agentlink ssh`. Sessions on the shared
+  `remote.sock` (no attach) stay until their `SessionEnd`, as local ones do.
 - An open attention whose hook connection drops is cleared the way the broker already
   clears a hook that is gone.
 
