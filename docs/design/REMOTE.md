@@ -259,6 +259,7 @@ unsupported in this case (§3.3).
   is attached to the kitty window. Hooks returned in 29-457 ms, and the attach socket was
   removed when ssh exited.
 - **Still to do on real hardware:** a real Copilot session over the tunnel (blocked on
-  Copilot sign-in in a key-auth ssh session, see §4), approve/deny from the watch, tunnel
+  Copilot sign-in in a key-auth ssh session, see §4), approve/deny from the watch (Copilot
+  prompts are typed into the session's `agentlink ssh` kitty window, DESIGN §6a), tunnel
   drop (fail-open), a port already in use, and focus and scroll through kitty into the
   Windows Copilot TUI.
