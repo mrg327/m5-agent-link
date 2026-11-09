@@ -1,0 +1,242 @@
+#!/usr/bin/env bash
+# scripts/issue: the shared issue log for humans and agents (protocol: issues/README.md).
+#
+# One Markdown file per issue under issues/, tracked in git, so it works offline, on every
+# machine, and merges cleanly when several agents work at once. Every entry is stamped with the
+# environment it was written on, so platform-specific problems can be told apart.
+#
+#   scripts/issue new -t TITLE [-s high|med|low] [-a AREA] [-p PLATFORMS] [-b BODY|-]   file an issue
+#   scripts/issue list [STATUS|all]                    open+claimed by default
+#   scripts/issue show ID
+#   scripts/issue claim ID                             take it (sets owner, status=claimed)
+#   scripts/issue log ID MESSAGE                       append a progress note
+#   scripts/issue close ID fixed|wontfix|duplicate [MESSAGE]   records the verifying env
+#   scripts/issue reopen ID [MESSAGE]
+#   scripts/issue env                                  print the environment stamp
+#   scripts/issue gh ID                                mirror to GitHub Issues (needs gh with write access)
+#
+# Identity: AGENT_NAME (e.g. "claude-code", "copilot-cli/sonnet-fw") and AGENT_HOST (a short
+# label such as "mac-work" or "linux-dev"). Never put hostnames, usernames, IPs or home paths
+# into issues: this repository is public.
+#
+# Portable to bash 3.2 (macOS) and GNU/BSD userlands: no associative arrays, no sed -i.
+set -eu
+
+ROOT=$(git rev-parse --show-toplevel)
+DIR="$ROOT/issues"
+SEVERITIES="high med low"
+AREAS="firmware daemon protocol simulator atlas board docs ci tools"
+STATUSES="open claimed fixed wontfix duplicate"
+
+die() { echo "issue: $*" >&2; exit 1; }
+now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+in_list() { case " $2 " in *" $1 "*) return 0 ;; esac; return 1; }
+
+# ── environment ──
+os_kind() {
+    case "$(uname -s)" in
+    Darwin) echo macos ;;
+    Linux) if grep -qi microsoft /proc/version 2>/dev/null; then echo wsl; else echo linux; fi ;;
+    MINGW* | MSYS* | CYGWIN*) echo windows ;;
+    *) uname -s | tr '[:upper:]' '[:lower:]' ;;
+    esac
+}
+arch() { uname -m | sed 's/aarch64/arm64/; s/amd64/x86_64/'; }
+platform() { echo "$(os_kind)-$(arch)"; }
+os_pretty() {
+    case "$(os_kind)" in
+    macos) echo "macOS $(sw_vers -productVersion 2>/dev/null || echo ?) (Darwin $(uname -r))" ;;
+    linux | wsl) (. /etc/os-release 2>/dev/null && echo "${PRETTY_NAME:-Linux}") | tr -d '\n'; echo " (kernel $(uname -r))" ;;
+    *) echo "$(uname -s) $(uname -r)" ;;
+    esac
+}
+agent() { echo "${AGENT_NAME:-${USER_AGENT_LABEL:-human}}"; }
+host() { echo "${AGENT_HOST:-$(os_kind)}"; }
+git_rev() {
+    local sha dirty=""
+    sha=$(git -C "$ROOT" rev-parse --short=7 HEAD 2>/dev/null || echo none)
+    git -C "$ROOT" diff --quiet HEAD -- . ':(exclude)issues' 2>/dev/null || dirty="+dirty"
+    echo "$sha$dirty $(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo ?)"
+}
+ver() { # ver LABEL CMD...: first line of a version command, or nothing when the tool is absent
+    local label=$1; shift
+    command -v "$1" >/dev/null 2>&1 || return 0
+    local v
+    v=$("$@" 2>&1 | head -1 | sed -E 's/^[^0-9]*([0-9][^ ,)]*).*/\1/') || return 0
+    [ -n "$v" ] && printf '%s %s, ' "$label" "$v"
+    return 0
+}
+toolchains() {
+    local s=""
+    s="$s$(ver cc cc --version)"
+    s="$s$(ver cmake cmake --version)"
+    s="$s$(ver ninja ninja --version)"
+    s="$s$(ver node node --version)"
+    s="$s$(ver python python3 --version)"
+    s="$s$(ver rustc rustc --version)"
+    s="$s$(ver cargo cargo --version)"
+    s="$s$(ver idf idf.py --version)"
+    s="$s$(ver sdl2 sdl2-config --version)"
+    echo "${s%, }"
+}
+stamp() { echo "$(agent)@$(host) · $(platform) · $(git_rev | cut -d' ' -f1)"; }
+env_block() {
+    cat <<EOF
+- agent: $(agent)
+- host: $(host)
+- platform: $(platform)
+- os: $(os_pretty)
+- git: $(git_rev)
+- toolchains: $(toolchains)
+EOF
+}
+
+# ── files ──
+file_of() {
+    local id=$1 f
+    for f in "$DIR"/"$id"*.md; do
+        [ -e "$f" ] || break
+        echo "$f"; return 0
+    done
+    die "no issue $id"
+}
+field() { awk -v k="$2" 'NR==1&&$0=="---"{fm=1;next} fm&&$0=="---"{exit} fm&&index($0,k":")==1{v=substr($0,length(k)+2);sub(/^ +/,"",v);print v;exit}' "$1"; }
+body_of() { awk 'NR==1&&$0=="---"{fm=1;next} fm&&$0=="---"{fm=0;next} !fm' "$1"; }
+set_field() { # set_field FILE KEY VALUE (front matter only)
+    local tmp="$1.tmp.$$"
+    awk -v k="$2" -v v="$3" '
+        NR==1&&$0=="---"{fm=1;print;next}
+        fm&&$0=="---"{if(!done)print (v==""?k":":k": "v);fm=0;print;next}
+        fm&&index($0,k":")==1{print (v==""?k":":k": "v);done=1;next}
+        {print}' "$1" >"$tmp" && mv "$tmp" "$1"
+}
+append_log() { printf -- '- %s · %s: %s\n' "$(now)" "$(stamp)" "$2" >>"$1"; }
+slug() { echo "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-//; s/-$//' | cut -c1-48 | sed 's/-$//'; }
+new_id() { echo "$(date -u +%Y%m%d)-$(od -An -N2 -tx1 /dev/urandom | tr -d ' \n')"; }
+
+# ── commands ──
+cmd_new() {
+    local title="" sev=med area="" plats=any body=""
+    while [ $# -gt 0 ]; do
+        case $1 in
+        -t) title=$2; shift 2 ;;
+        -s) sev=$2; shift 2 ;;
+        -a) area=$2; shift 2 ;;
+        -p) plats=$2; shift 2 ;;
+        -b) if [ "$2" = - ]; then body=$(cat); else body=$2; fi; shift 2 ;;
+        *) die "new: unknown option $1" ;;
+        esac
+    done
+    [ -n "$title" ] || die "new: -t TITLE is required"
+    in_list "$sev" "$SEVERITIES" || die "severity must be one of: $SEVERITIES"
+    [ -z "$area" ] || in_list "$area" "$AREAS" || die "area must be one of: $AREAS"
+    mkdir -p "$DIR"
+    local id f
+    id=$(new_id)
+    f="$DIR/$id-$(slug "$title").md"
+    cat >"$f" <<EOF
+---
+id: $id
+title: $title
+status: open
+severity: $sev
+area: ${area:-unknown}
+platforms: $plats
+owner:
+created: $(now)
+reporter: $(agent)@$(host)
+reported_on: $(platform)
+verified_on:
+gh:
+---
+
+## Summary
+
+${body:-_(describe the problem, how to reproduce it, and what should happen instead)_}
+
+## Environment (reporter)
+
+$(env_block)
+
+## Log
+
+EOF
+    append_log "$f" "filed"
+    echo "$id  ${f#"$ROOT"/}"
+}
+
+cmd_list() {
+    local want=${1:-active} f st
+    [ -d "$DIR" ] || return 0
+    printf '%-14s %-8s %-5s %-9s %-14s %s\n' ID STATUS SEV AREA PLATFORMS TITLE
+    for f in "$DIR"/[0-9]*.md; do
+        [ -e "$f" ] || continue
+        st=$(field "$f" status)
+        case $want in
+        all) ;;
+        active) [ "$st" = open ] || [ "$st" = claimed ] || continue ;;
+        *) [ "$st" = "$want" ] || continue ;;
+        esac
+        printf '%-14s %-8s %-5s %-9s %-14s %s%s\n' "$(field "$f" id)" "$st" "$(field "$f" severity)" \
+            "$(field "$f" area)" "$(field "$f" platforms)" "$(field "$f" title)" \
+            "$([ -n "$(field "$f" owner)" ] && echo "  [$(field "$f" owner)]")"
+    done
+}
+
+cmd_claim() {
+    local f owner
+    f=$(file_of "$1")
+    owner=$(field "$f" owner)
+    [ "$owner" != "$(agent)@$(host)" ] || { echo "already yours: $1"; return 0; }
+    [ -z "$owner" ] || die "$1 is already claimed by $owner (log on it, or ask them)"
+    set_field "$f" owner "$(agent)@$(host)"
+    set_field "$f" status claimed
+    append_log "$f" "claimed"
+    echo "claimed $1"
+}
+
+cmd_close() {
+    local f how=${2:-} msg=${3:-}
+    f=$(file_of "$1")
+    case $how in fixed | wontfix | duplicate) ;; *) die "close ID fixed|wontfix|duplicate [MESSAGE]" ;; esac
+    set_field "$f" status "$how"
+    if [ "$how" = fixed ]; then
+        local v
+        v=$(field "$f" verified_on)
+        in_list "$(platform)" "$(echo "$v" | tr ',' ' ')" || v="${v:+$v, }$(platform)"
+        set_field "$f" verified_on "$v"
+    fi
+    append_log "$f" "$how${msg:+: $msg}"
+    env_block | sed 's/^/    /' >>"$f" # the full environment it was verified on
+    echo "$how $1"
+}
+
+cmd_gh() {
+    local f repo url
+    f=$(file_of "$1")
+    command -v gh >/dev/null || die "gh is not installed"
+    [ -z "$(field "$f" gh)" ] || die "already mirrored: $(field "$f" gh)"
+    repo=${ISSUE_GH_REPO:-mrg327/m5-agent-link}
+    url=$(gh issue create -R "$repo" -t "$(field "$f" title)" \
+        -b "$(body_of "$f")
+
+_Mirrored from \`${f#"$ROOT"/}\`; the file in git is the source of truth._") || die "gh issue create failed (does this gh account have write access to $repo?)"
+    set_field "$f" gh "$url"
+    append_log "$f" "mirrored to $url"
+    echo "$url"
+}
+
+[ $# -gt 0 ] || { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+cmd=$1; shift
+case $cmd in
+new) cmd_new "$@" ;;
+list | ls) cmd_list "$@" ;;
+show) cat "$(file_of "${1:?ID}")" ;;
+claim) cmd_claim "${1:?ID}" ;;
+log) f=$(file_of "${1:?ID}"); append_log "$f" "${2:?MESSAGE}"; echo "logged on $1" ;;
+close) cmd_close "${1:?ID}" "${2:-}" "${3:-}" ;;
+reopen) f=$(file_of "${1:?ID}"); set_field "$f" status open; set_field "$f" owner ""; append_log "$f" "reopened${2:+: $2}"; echo "reopened $1" ;;
+env) env_block ;;
+gh) cmd_gh "${1:?ID}" ;;
+*) die "unknown command $cmd (run with no arguments for help)" ;;
+esac
