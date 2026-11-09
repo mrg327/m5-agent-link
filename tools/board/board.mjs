@@ -10,7 +10,8 @@
 // Run by Claude Code (see README.md):  claude --mcp-config tools/board/mcp.json \
 //     --dangerously-load-development-channels server:board
 // Env: BOARD_PORT (7880), BOARD_HOST (127.0.0.1; comma-separated list allowed),
-//      BOARD_TAILSCALE=1 also listens on this machine's Tailscale IPv4 (tailnet only, never 0.0.0.0).
+//      BOARD_TAILSCALE (default 1) also listens on this machine's Tailscale IPv4 (tailnet only,
+//      never 0.0.0.0); set BOARD_TAILSCALE=0 for localhost only.
 
 import http from "node:http";
 import fs from "node:fs";
@@ -22,7 +23,7 @@ import { execFileSync } from "node:child_process";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.BOARD_PORT || 7880);
 const HOSTS = (process.env.BOARD_HOST || "127.0.0.1").split(",").map((h) => h.trim()).filter(Boolean);
-if (process.env.BOARD_TAILSCALE === "1") {
+if (process.env.BOARD_TAILSCALE !== "0") {
   try {
     const ip = execFileSync("tailscale", ["ip", "-4"], { encoding: "utf8", timeout: 3000 }).trim().split("\n")[0];
     if (/^100\.\d+\.\d+\.\d+$/.test(ip) && !HOSTS.includes(ip)) HOSTS.push(ip);
@@ -177,8 +178,14 @@ const handler = async (req, res) => {
   }
   res.writeHead(404).end("not found");
 };
-for (const h of HOSTS) {
+// A reconnect can start this process while the previous copy still holds the port: keep retrying
+// instead of running headless (pushes would then go to a session no page can reach).
+function listenOn(h) {
   const srv = http.createServer(handler);
-  srv.on("error", (e) => log(`http error on ${h}:`, e.message));
+  srv.on("error", (e) => {
+    log(`http error on ${h}:`, e.message);
+    if (e.code === "EADDRINUSE") setTimeout(() => listenOn(h), 2000);
+  });
   srv.listen(PORT, h, () => log(`board on http://${h}:${PORT}`));
 }
+for (const h of HOSTS) listenOn(h);
