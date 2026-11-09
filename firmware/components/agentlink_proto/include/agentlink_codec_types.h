@@ -283,6 +283,10 @@ struct session_uint11uint {
 	uint32_t session_uint11uint;
 };
 
+struct session_uint12tstr {
+	struct zcbor_string session_uint12tstr;
+};
+
 struct session {
 	uint32_t session_uint0uint;
 	struct session_agent_m session_agent_m;
@@ -307,6 +311,8 @@ struct session {
 	bool session_uint10bool_present;
 	struct session_uint11uint session_uint11uint;
 	bool session_uint11uint_present;
+	struct session_uint12tstr session_uint12tstr;
+	bool session_uint12tstr_present;
 };
 
 struct att_kind_r {

@@ -185,7 +185,8 @@ session = {
   ? 8 => uint,               ; tst   last state change (unix)
   ? 9 => tstr,               ; sum   preview ≤ 80 chars (privacy-dependent)
   ? 10 => bool,              ; seen
-  ? 11 => uint              ; host  host index (0 in v1)
+  ? 11 => uint,              ; host  host index: 0 = the daemon's own PC, 1.. = remote hosts (REMOTE.md)
+  ? 12 => tstr              ; hn    remote host name ≤ 16 chars; only with host != 0, only to devices with proto ≥ 0.2
 }
 agent = agent_copilot / agent_claude / agent_cloud / agent_other
 agent_copilot = 0

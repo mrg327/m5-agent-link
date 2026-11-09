@@ -117,7 +117,9 @@ session = {
   tst: uint,                 ; time of last state change
   ? sum: tstr,               ; preview ≤ 80 chars (privacy-dependent)
   seen: bool,
-  host: uint                 ; host index (multi-PC ready; always 0 in v1)
+  host: uint,                ; host index: 0 = this PC; 1.. = a remote host (REMOTE.md)
+  ? hn: tstr                 ; remote host name (≤ 16 chars), with host != 0 only; sent only to devices
+                             ; whose hello proto is ≥ 0.2 (older firmware rejects unknown keys)
 }
 ```
 - `snapshot { sessions: [* session], away?: [* event] }`: a full replacement. It is sent on connect and whenever the daemon thinks the device has drifted. The `away` list holds the events the device missed while disconnected; the device shows them as "while you were away".

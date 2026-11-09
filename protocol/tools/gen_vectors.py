@@ -72,6 +72,13 @@ VECTORS = {
             {0: 2, 1: 1, 2: 2, 3: 0, 4: "webapp", 5: "feat/login", 7: 1793993000, 8: 1793995150,
              10: False, 11: 0}]}),
     ),
+    "session_remote": (
+        "New session from remote host 1 (REMOTE.md): host index plus host name",
+        {"t": "session_upd", "id": 4, "b": {"sid": 7, "ag": "copilot", "st": "work", "repo": "svc",
+         "t0": 1793995200, "tst": 1793995200, "seen": False, "host": 1, "hn": "WIN-BUILD01"}},
+        env("session_upd", 4, {0: 7, 1: 0, 2: 1, 4: "svc", 7: 1793995200, 8: 1793995200, 10: False,
+            11: 1, 12: "WIN-BUILD01"}),
+    ),
     "session_delta_done": (
         "Delta: session 1 finished",
         {"t": "session_upd", "id": 3, "b": {"sid": 1, "st": "done", "tst": 1793995300}},

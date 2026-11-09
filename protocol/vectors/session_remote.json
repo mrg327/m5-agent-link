@@ -1,0 +1,19 @@
+{
+  "desc": "New session from remote host 1 (REMOTE.md): host index plus host name",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 4,
+    "b": {
+      "sid": 7,
+      "ag": "copilot",
+      "st": "work",
+      "repo": "svc",
+      "t0": 1793995200,
+      "tst": 1793995200,
+      "seen": false,
+      "host": 1,
+      "hn": "WIN-BUILD01"
+    }
+  },
+  "cbor_hex": "a30004010403a90007010002010463737663071a6aee31c0081a6aee31c00af40b010c6b57494e2d4255494c443031"
+}
