@@ -1,9 +1,12 @@
-//! kitty: remote control selects (and on macOS raises) the OS window/tab/split, and drives its
-//! scrollback (`scroll-window`, `ls`, `get-text`) for the device's SCROLL mode.
+//! kitty: remote control selects (and on macOS raises) the OS window/tab/split, and is the
+//! window's mouse wheel for the device's SCROLL mode: one `kitten @ kitten` call runs
+//! `kitty_wheel.py` inside kitty, which scrolls exactly as a physical wheel would (so full-screen
+//! agent TUIs scroll too). `scroll-window`/`ls`/`get-text` remain as the fallback.
 
 use super::scroll::{tidy_preview, Tracked};
 use super::{args, env, generic, run, valid_kitty_id, valid_listen_on, FocusError, HostCtx};
 use agentlink_proto::{ScrollPos, ScrollUnit};
+use std::path::{Path, PathBuf};
 
 const MAC_BIN: &str = "/Applications/kitty.app/Contents/MacOS/kitty";
 
@@ -156,6 +159,122 @@ fn run_rc(a: &[String]) -> Result<super::Out, FocusError> {
     }
 }
 
+/// The wheel kitten's source; the daemon writes it to `~/.agentlink/kitty/` for kitty to run.
+pub const WHEEL_KITTEN: &str = include_str!("kitty_wheel.py");
+
+/// Writes the wheel kitten into `dir` (0700, file 0600) unless an identical copy is there, and
+/// returns its path.
+pub fn install_wheel(dir: &Path) -> std::io::Result<PathBuf> {
+    let path = dir.join("agentlink_wheel.py");
+    if std::fs::read_to_string(&path).is_ok_and(|s| s == WHEEL_KITTEN) {
+        return Ok(path);
+    }
+    std::fs::create_dir_all(dir)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
+    }
+    let tmp = dir.join("agentlink_wheel.py.tmp");
+    std::fs::write(&tmp, WHEEL_KITTEN)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600))?;
+    }
+    std::fs::rename(&tmp, &path)?;
+    Ok(path)
+}
+
+fn wheel_unit(unit: ScrollUnit) -> &'static str {
+    match unit {
+        ScrollUnit::Lines => "lines",
+        ScrollUnit::Pages => "pages",
+        ScrollUnit::ToEnd => "end",
+    }
+}
+
+/// `kitten @ kitten --match <m> <path> UNIT DELTA END_NOTCHES PREVIEW`: only integers and fixed
+/// words reach the kitten.
+pub fn wheel_args(
+    listen_on: &str,
+    matcher: &str,
+    kitten: &str,
+    unit: ScrollUnit,
+    delta: i64,
+    end_notches: u64,
+    preview: bool,
+) -> Vec<String> {
+    let (delta, end) = (delta.to_string(), end_notches.to_string());
+    let tail = [
+        kitten,
+        wheel_unit(unit),
+        &delta,
+        &end,
+        if preview { "1" } else { "0" },
+    ];
+    rc(listen_on, matcher, "kitten", &tail)
+}
+
+/// What the wheel kitten reports. `mode`: `main` (history scrolled), `mouse` (wheel events sent
+/// to a program that tracks the mouse), `keys` (up/down keys on the alternate screen), or `alt`
+/// (alternate screen, nothing sent). `moved` counts the wheel lines sent to a program (< 0 up).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+pub struct Wheel {
+    #[serde(default)]
+    pub mode: String,
+    #[serde(default)]
+    pub moved: i64,
+    #[serde(default)]
+    pub scrolled_by: u64,
+    #[serde(default)]
+    pub history: u64,
+    pub preview: Option<String>,
+    pub error: Option<String>,
+}
+
+/// The first JSON line of the kitten's output (several windows could match a pid chain).
+pub fn parse_wheel(stdout: &str) -> Option<Wheel> {
+    stdout
+        .lines()
+        .find_map(|l| serde_json::from_str::<Wheel>(l.trim()).ok())
+}
+
+/// Tracked key for a program's own view: separate from the main screen's history position.
+fn alt_key(matcher: &str) -> String {
+    format!("{matcher}#alt")
+}
+
+/// Position after a wheel move. On the main screen kitty knows it exactly; a full-screen program
+/// does not say, so the daemon counts the wheel lines it sent (up adds, down subtracts, `end`
+/// resets), which is also how many it sends back down for `end`.
+pub fn wheel_pos(
+    w: &Wheel,
+    tracked: &Tracked,
+    matcher: &str,
+    unit: ScrollUnit,
+    delta: i64,
+) -> ScrollPos {
+    let (lines_above, total) = if w.mode == "main" {
+        (w.scrolled_by, Some(w.history))
+    } else if unit == ScrollUnit::ToEnd && delta > 0 {
+        tracked.set(&alt_key(matcher), 0);
+        (0, None)
+    } else {
+        (tracked.apply(&alt_key(matcher), w.moved, None), None)
+    };
+    ScrollPos {
+        lines_above,
+        at_bottom: lines_above == 0,
+        total,
+        preview: w
+            .preview
+            .as_deref()
+            .map(tidy_preview)
+            .filter(|p| !p.is_empty()),
+    }
+}
+
 pub fn scroll(
     ctx: &HostCtx,
     tracked: &Tracked,
@@ -167,8 +286,50 @@ pub fn scroll(
     let (Some(matcher), Some(listen)) = (window_match(ctx), listen) else {
         return Err(FocusError::Internal(NEEDS_REMOTE_CONTROL.into()));
     };
+    let kitten = install_wheel(&crate::paths::home().join("kitty"))
+        .map_err(|e| tracing::warn!("kitty wheel kitten not installed: {e}"))
+        .ok();
+    if let Some(kitten) = kitten {
+        let end = tracked.get(&alt_key(&matcher));
+        let a = wheel_args(
+            &listen,
+            &matcher,
+            &kitten.to_string_lossy(),
+            unit,
+            delta,
+            end,
+            preview,
+        );
+        let out = run_rc(&a)?;
+        if !out.ok && out.stderr.contains("No matching windows") {
+            return Err(FocusError::NoWindow);
+        }
+        match parse_wheel(&out.stdout) {
+            Some(Wheel { error: Some(e), .. }) => {
+                return Err(FocusError::Internal(format!("kitty wheel: {e}")))
+            }
+            Some(w) if out.ok => return Ok(wheel_pos(&w, tracked, &matcher, unit, delta)),
+            // an old kitty, or a remote-control password that does not allow `kitten`
+            _ => tracing::debug!(
+                "kitty wheel unavailable ({}), using scroll-window",
+                out.stderr.trim()
+            ),
+        }
+    }
+    scroll_window(&listen, &matcher, tracked, unit, delta, preview)
+}
+
+/// The pre-wheel path: kitty's own scrollback only (no effect on the alternate screen).
+fn scroll_window(
+    listen: &str,
+    matcher: &str,
+    tracked: &Tracked,
+    unit: ScrollUnit,
+    delta: i64,
+    preview: bool,
+) -> Result<ScrollPos, FocusError> {
     if let Some(amount) = scroll_amount(unit, delta) {
-        let out = run_rc(&scroll_args(&listen, &matcher, &amount))?;
+        let out = run_rc(&scroll_args(listen, matcher, &amount))?;
         if !out.ok {
             if out.stderr.contains("No matching windows") {
                 return Err(FocusError::NoWindow);
@@ -181,7 +342,7 @@ pub fn scroll(
     }
     // kitty reports no scroll offset, so the daemon keeps its own estimate per window and
     // corrects it from `scrolled_by` or the text dump whenever either is available.
-    let geometry = run_rc(&ls_args(&listen, &matcher))
+    let geometry = run_rc(&ls_args(listen, matcher))
         .ok()
         .filter(|o| o.ok)
         .and_then(|o| window_geometry(&o.stdout));
@@ -189,7 +350,7 @@ pub fn scroll(
     let mut total = None;
     let mut dump = None;
     if preview {
-        if let Ok(o) = run_rc(&get_text_args(&listen, &matcher)) {
+        if let Ok(o) = run_rc(&get_text_args(listen, matcher)) {
             if o.ok {
                 total = Some(top_line(&o.stdout, height, 0).1);
                 dump = Some(o.stdout);
@@ -197,20 +358,20 @@ pub fn scroll(
         }
     }
     let mut lines_above = match unit {
-        ScrollUnit::Lines => tracked.apply(&matcher, delta, total),
-        ScrollUnit::Pages => tracked.apply(&matcher, delta.saturating_mul(height as i64), total),
+        ScrollUnit::Lines => tracked.apply(matcher, delta, total),
+        ScrollUnit::Pages => tracked.apply(matcher, delta.saturating_mul(height as i64), total),
         ScrollUnit::ToEnd if delta > 0 => {
-            tracked.set(&matcher, 0);
+            tracked.set(matcher, 0);
             0
         }
         ScrollUnit::ToEnd => {
-            let top = total.unwrap_or_else(|| tracked.get(&matcher));
-            tracked.set(&matcher, top);
+            let top = total.unwrap_or_else(|| tracked.get(matcher));
+            tracked.set(matcher, top);
             top
         }
     };
     if let Some((_, Some(reported))) = geometry {
-        tracked.set(&matcher, reported);
+        tracked.set(matcher, reported);
         lines_above = reported;
     }
     let preview = dump
@@ -315,6 +476,86 @@ mod tests {
                 "all"
             ]
         );
+    }
+
+    #[test]
+    fn builds_wheel_commands() {
+        assert_eq!(
+            wheel_args(
+                "unix:/tmp/k",
+                "id:7",
+                "/w.py",
+                ScrollUnit::Lines,
+                -3,
+                0,
+                true
+            ),
+            [
+                "@",
+                "--to",
+                "unix:/tmp/k",
+                "kitten",
+                "--match",
+                "id:7",
+                "/w.py",
+                "lines",
+                "-3",
+                "0",
+                "1"
+            ]
+        );
+        let a = wheel_args("u", "id:1", "/w.py", ScrollUnit::ToEnd, 1, 12, false);
+        assert_eq!(a[7..], ["end", "1", "12", "0"]);
+    }
+
+    #[test]
+    fn wheel_reports_become_positions() {
+        let t = Tracked::default();
+        assert_eq!(parse_wheel("not json\n"), None);
+        // a pid chain can match two windows: the first report wins
+        let w = parse_wheel(
+            "{\"mode\":\"main\",\"moved\":0,\"scrolled_by\":30,\"history\":200,\"preview\":\"  $ ls \"}\n{\"mode\":\"keys\"}\n",
+        )
+        .unwrap();
+        let p = wheel_pos(&w, &t, "id:7", ScrollUnit::Lines, -3);
+        assert_eq!(
+            (p.lines_above, p.at_bottom, p.total, p.preview.as_deref()),
+            (30, false, Some(200), Some("$ ls"))
+        );
+        // a full-screen program: the daemon counts the wheel lines it sent
+        let up = parse_wheel(r#"{"mode":"mouse","moved":-5,"preview":"  "}"#).unwrap();
+        let p = wheel_pos(&up, &t, "id:7", ScrollUnit::Lines, -5);
+        assert_eq!((p.lines_above, p.total, p.preview), (5, None, None));
+        assert_eq!(t.get("id:7#alt"), 5);
+        assert_eq!(t.get("id:7"), 0, "the main screen's position is kept apart");
+        let down = parse_wheel(r#"{"mode":"mouse","moved":2}"#).unwrap();
+        assert_eq!(
+            wheel_pos(&down, &t, "id:7", ScrollUnit::Lines, 2).lines_above,
+            3
+        );
+        let end = parse_wheel(r#"{"mode":"mouse","moved":3}"#).unwrap();
+        let p = wheel_pos(&end, &t, "id:7", ScrollUnit::ToEnd, 1);
+        assert!(p.at_bottom && t.get("id:7#alt") == 0);
+        let err = parse_wheel(r#"{"error":"bad unit"}"#).unwrap();
+        assert_eq!(err.error.as_deref(), Some("bad unit"));
+    }
+
+    #[test]
+    fn installs_the_wheel_kitten_once() {
+        let dir = std::env::temp_dir().join(format!("agentlink-wheel-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let p = install_wheel(&dir).unwrap();
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), WHEEL_KITTEN);
+        std::fs::write(&p, "tampered").unwrap();
+        assert_eq!(install_wheel(&dir).unwrap(), p);
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), WHEEL_KITTEN);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+            assert_eq!((mode(&dir), mode(&p)), (0o700, 0o600));
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
