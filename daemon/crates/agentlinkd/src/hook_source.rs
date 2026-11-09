@@ -9,10 +9,13 @@
 //! wait runs out, then one reply line goes back (`{"decision": "allow"|"deny"|"none", ..}`).
 //! Any other event from the same session settles what was pending there ("first answer
 //! wins": the terminal got there first).
+//!
+//! The same line protocol is spoken on the remote sockets (see `remote`), after an auth line.
 
 use crate::broker::{request_of, Broker, Outcome};
-use crate::ipc::{self, IpcStream};
-use crate::registry::{HostCtx, Registry, SessionEvent, SessionPatch};
+use crate::ipc;
+use crate::registry::{clip, HostCtx, Registry, SessionEvent, SessionPatch, Via};
+use crate::remote;
 use crate::source::AgentSource;
 use crate::trace::{Dir, Trace};
 use agentlink_proto::{Agent, ClearWhy, InputSub, SessState};
@@ -21,7 +24,7 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 
 pub type StatusFn = Arc<dyn Fn() -> Value + Send + Sync>;
 
@@ -31,9 +34,33 @@ const MAX_WAIT: Duration = Duration::from_secs(120);
 
 pub struct HookSource {
     pub socket: PathBuf,
+    pub remote_socket: PathBuf,
+    pub token_file: PathBuf,
+    /// Directory of the attach sockets.
+    pub home: PathBuf,
     pub trace: Trace,
     pub status: StatusFn,
     pub broker: Arc<Broker>,
+}
+
+/// What every connection handler needs.
+pub struct ConnEnv {
+    pub registry: Arc<Registry>,
+    pub broker: Arc<Broker>,
+    pub trace: Trace,
+    pub status: StatusFn,
+    pub token_file: PathBuf,
+    pub home: PathBuf,
+}
+
+/// Which socket a connection came in on.
+#[derive(Clone, Copy)]
+pub enum Peer {
+    Local,
+    /// `attach` is the attach socket's id; `None` for `remote.sock`.
+    Remote {
+        attach: Option<u64>,
+    },
 }
 
 #[async_trait]
@@ -45,32 +72,48 @@ impl AgentSource for HookSource {
     async fn run(self: Box<Self>, registry: Arc<Registry>) -> anyhow::Result<()> {
         let listener = ipc::bind(&self.socket)?;
         tracing::info!("hook socket listening on {}", self.socket.display());
+        let env = Arc::new(ConnEnv {
+            registry,
+            broker: self.broker,
+            trace: self.trace,
+            status: self.status,
+            token_file: self.token_file,
+            home: self.home,
+        });
+        remote::spawn_remote_socket(&self.remote_socket, env.clone());
         loop {
             let stream = listener.accept().await?;
-            tokio::spawn(handle_conn(
-                stream,
-                registry.clone(),
-                self.broker.clone(),
-                self.trace.clone(),
-                self.status.clone(),
-            ));
+            tokio::spawn(handle_conn(stream, env.clone(), Peer::Local));
         }
     }
 }
 
-async fn handle_conn(
-    stream: IpcStream,
-    registry: Arc<Registry>,
-    broker: Arc<Broker>,
-    trace: Trace,
-    status: StatusFn,
-) {
+pub async fn handle_conn<S>(stream: S, env: Arc<ConnEnv>, peer: Peer)
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    let ConnEnv {
+        registry,
+        broker,
+        trace,
+        status,
+        ..
+    } = &*env;
     let (r, mut w) = tokio::io::split(stream);
     let mut lines = BufReader::new(r).lines();
+    let via = match peer {
+        Peer::Local => Via::Local,
+        Peer::Remote { attach } => match remote::authenticate(&mut lines, &env, attach).await {
+            Some(via) => via,
+            None => return,
+        },
+    };
+    let src = if via == Via::Local { "hook" } else { "remote" };
+    let mut attach_guard = None;
     while let Ok(Some(line)) = lines.next_line().await {
         let Ok(v) = serde_json::from_str::<Value>(&line) else {
             trace.record(
-                "hook",
+                src,
                 Dir::In,
                 "invalid_json",
                 None,
@@ -80,15 +123,27 @@ async fn handle_conn(
             );
             continue;
         };
-        if v.get("ctl").and_then(Value::as_str) == Some("status") {
-            let reply = format!("{}\n", status());
-            let _ = w.write_all(reply.as_bytes()).await;
+        if v.get("ctl").is_some() && via != Via::Local {
+            trace.record(src, Dir::Internal, "ctl_ignored", None, None, v, None);
+            continue;
+        }
+        let reply = match v.get("ctl").and_then(Value::as_str) {
+            Some("status") => Some(status()),
+            Some("remote_attach") => {
+                let (reply, guard) = remote::open_attach(&env, &v);
+                attach_guard = guard.or(attach_guard); // dropping the old guard closes it
+                Some(reply)
+            }
+            _ => None,
+        };
+        if let Some(reply) = reply {
+            let _ = w.write_all(format!("{reply}\n").as_bytes()).await;
             continue;
         }
         let event = v["event"].as_str().unwrap_or("?").to_owned();
-        trace.record("hook", Dir::In, &event, None, None, v.clone(), None);
-        let key = session_key(&v);
-        if let Some(ev) = to_session_event(&v) {
+        trace.record(src, Dir::In, &event, None, None, v.clone(), None);
+        let key = session_key(&v, &via);
+        if let Some(ev) = to_session_event(&v, &via) {
             registry.apply(ev);
         }
         let Some(wait) = v["await"]["wait_ms"].as_u64() else {
@@ -107,9 +162,9 @@ async fn handle_conn(
             continue;
         };
         let outcome = await_decision(
-            &registry,
-            &broker,
-            &trace,
+            registry,
+            broker,
+            trace,
             &v,
             key,
             Duration::from_millis(wait),
@@ -118,6 +173,7 @@ async fn handle_conn(
         let reply = format!("{}\n", serde_json::to_string(&outcome).unwrap_or_default());
         let _ = w.write_all(reply.as_bytes()).await;
     }
+    drop(attach_guard);
 }
 
 /// Opens the request and waits for the device, the terminal, or the clock. Never returns
@@ -139,6 +195,7 @@ async fn await_decision(
     let Some(sid) = registry.sid_of(&key) else {
         return Outcome::NONE;
     };
+    let host = registry.host_of(sid);
     let Some(req) = request_of(sid, key, agent, event, &v["payload"], wait) else {
         trace.record(
             "hook",
@@ -158,7 +215,7 @@ async fn await_decision(
                 "decision",
                 Some(sid),
                 Some(rid),
-                json!({"from": "device", "outcome": outcome}),
+                json!({"from": "device", "outcome": outcome, "host": host}),
             );
             outcome
         }
@@ -168,7 +225,7 @@ async fn await_decision(
                 "decision",
                 Some(sid),
                 Some(rid),
-                json!({"from": "none", "why": "cancelled"}),
+                json!({"from": "none", "why": "cancelled", "host": host}),
             );
             Outcome::NONE
         }
@@ -178,15 +235,15 @@ async fn await_decision(
                 "decision",
                 Some(sid),
                 Some(rid),
-                json!({"from": "none", "why": "timeout"}),
+                json!({"from": "none", "why": "timeout", "host": host}),
             );
             Outcome::NONE
         }
     }
 }
 
-/// `agent:session` key of a hook line, as `to_session_event` derives it.
-pub fn session_key(v: &Value) -> Option<String> {
+/// `agent:session` key of a hook line (prefixed for remote ones), as `to_session_event` derives it.
+pub fn session_key(v: &Value, via: &Via) -> Option<String> {
     let agent_name = v["agent"].as_str()?;
     let payload = &v["payload"];
     let cwd = payload["cwd"]
@@ -198,7 +255,7 @@ pub fn session_key(v: &Value) -> Option<String> {
         .or_else(|| payload["session_id"].as_str())
         .map(str::to_owned)
         .unwrap_or_else(|| format!("{}#{}", cwd.unwrap_or("?"), v["ppid"].as_u64().unwrap_or(0)));
-    Some(format!("{agent_name}:{sid}"))
+    Some(via.key(&format!("{agent_name}:{sid}")))
 }
 
 fn agent_of(name: &str) -> Agent {
@@ -220,7 +277,7 @@ fn branch_of(cwd: &str) -> Option<String> {
 }
 
 /// Maps a hook line to a registry event. Pure apart from reading `.git/HEAD`.
-pub fn to_session_event(v: &Value) -> Option<SessionEvent> {
+pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
     let agent_name = v["agent"].as_str()?;
     let event = v["event"].as_str()?.to_ascii_lowercase();
     let payload = &v["payload"];
@@ -230,7 +287,7 @@ pub fn to_session_event(v: &Value) -> Option<SessionEvent> {
         .or_else(|| v["cwd"].as_str())
         .filter(|c| !c.is_empty())
         .map(str::to_owned);
-    let key = session_key(v)?;
+    let key = session_key(v, via)?;
     if event == "sessionend" {
         return Some(SessionEvent::End { key });
     }
@@ -279,36 +336,49 @@ pub fn to_session_event(v: &Value) -> Option<SessionEvent> {
         _ => return None,
     }
     if let Some(c) = &cwd {
-        p.repo = std::path::Path::new(c)
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned());
-        p.branch = branch_of(c);
+        p.repo = repo_of(c);
+        // A remote path means nothing on this machine: trust the hook's own branch instead.
+        p.branch = match via {
+            Via::Local => branch_of(c),
+            Via::Remote { .. } => v["branch"].as_str().map(|b| clip(b, 32)),
+        };
     }
-    let env = v["env"]
-        .as_object()
-        .map(|m| {
-            m.iter()
-                .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned())))
-                .collect()
-        })
-        .unwrap_or_default();
     Some(SessionEvent::Update {
         key,
+        via: via.clone(),
         patch: p,
-        ctx: HostCtx {
-            cwd,
-            env,
-            tty: v["tty"].as_str().map(str::to_owned),
-            pids: v["pids"]
-                .as_array()
-                .map(|a| {
-                    a.iter()
-                        .filter_map(|p| u32::try_from(p.as_u64()?).ok())
-                        .collect()
-                })
-                .unwrap_or_default(),
-        },
+        ctx: host_ctx(v, cwd),
     })
+}
+
+/// Last path component, splitting on both separators (remote paths may be Windows ones).
+fn repo_of(cwd: &str) -> Option<String> {
+    let name = cwd.rsplit(['/', '\\']).find(|c| !c.is_empty())?;
+    Some(name.to_owned())
+}
+
+/// `env`, `tty` and `pids` of a hook line or an attach request's `ctx`.
+pub fn host_ctx(v: &Value, cwd: Option<String>) -> HostCtx {
+    HostCtx {
+        cwd,
+        env: v["env"]
+            .as_object()
+            .map(|m| {
+                m.iter()
+                    .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned())))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        tty: v["tty"].as_str().map(str::to_owned),
+        pids: v["pids"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|p| u32::try_from(p.as_u64()?).ok())
+                    .collect()
+            })
+            .unwrap_or_default(),
+    }
 }
 
 #[cfg(test)]
@@ -320,7 +390,8 @@ mod tests {
     fn copilot_permission_notification_is_input_approval() {
         let v = json!({"agent":"copilot","event":"notification","cwd":"/nonexistent/proj",
                        "payload":{"sessionId":"s1","notification_type":"permission_prompt"}});
-        let Some(SessionEvent::Update { key, patch, .. }) = to_session_event(&v) else {
+        let Some(SessionEvent::Update { key, patch, .. }) = to_session_event(&v, &Via::Local)
+        else {
             panic!()
         };
         assert_eq!(key, "copilot:s1");
@@ -336,7 +407,8 @@ mod tests {
         let v = json!({"agent":"claude","event":"Stop","cwd":"/hook/proc/dir","tty":"/dev/ttys004",
                        "pids":[10,20],"env":{"TERM_PROGRAM":"kitty"},
                        "payload":{"session_id":"s","cwd":"/nonexistent/agent-proj"}});
-        let Some(SessionEvent::Update { patch, ctx, .. }) = to_session_event(&v) else {
+        let Some(SessionEvent::Update { patch, ctx, .. }) = to_session_event(&v, &Via::Local)
+        else {
             panic!()
         };
         assert_eq!(patch.repo.as_deref(), Some("agent-proj"));
@@ -346,7 +418,7 @@ mod tests {
         assert_eq!(ctx.env["TERM_PROGRAM"], "kitty");
         let v =
             json!({"agent":"claude","event":"Stop","cwd":"/hook/dir","payload":{"session_id":"s"}});
-        let Some(SessionEvent::Update { patch, .. }) = to_session_event(&v) else {
+        let Some(SessionEvent::Update { patch, .. }) = to_session_event(&v, &Via::Local) else {
             panic!()
         };
         assert_eq!(patch.repo.as_deref(), Some("dir"));
@@ -356,8 +428,28 @@ mod tests {
     fn claude_session_end_removes_and_unknown_is_ignored() {
         let end = json!({"agent":"claude","event":"SessionEnd","payload":{"session_id":"c1"}});
         assert!(
-            matches!(to_session_event(&end), Some(SessionEvent::End { key }) if key == "claude:c1")
+            matches!(to_session_event(&end, &Via::Local), Some(SessionEvent::End { key }) if key == "claude:c1")
         );
-        assert!(to_session_event(&json!({"agent":"claude","event":"Whatever"})).is_none());
+        assert!(
+            to_session_event(&json!({"agent":"claude","event":"Whatever"}), &Via::Local).is_none()
+        );
+    }
+
+    #[test]
+    fn remote_line_uses_its_own_branch_and_windows_repo_name() {
+        let via = Via::Remote {
+            host: "Win1".into(),
+            os: "win".into(),
+            attach: None,
+        };
+        let v = json!({"agent":"copilot","event":"Stop","branch":"feat/x","cwd":"C:\\src\\proj\\",
+                       "payload":{"sessionId":"s1"}});
+        let Some(SessionEvent::Update { key, patch, .. }) = to_session_event(&v, &via) else {
+            panic!()
+        };
+        assert_eq!(key, "r:win1|copilot:s1");
+        assert_eq!(patch.repo.as_deref(), Some("proj"));
+        assert_eq!(patch.branch.as_deref(), Some("feat/x"));
+        assert_eq!(session_key(&v, &via).as_deref(), Some(key.as_str()));
     }
 }

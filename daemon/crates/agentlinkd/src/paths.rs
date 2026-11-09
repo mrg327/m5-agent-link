@@ -14,6 +14,14 @@ pub fn hook_socket() -> PathBuf {
     home().join("hook.sock")
 }
 
+pub fn remote_token() -> PathBuf {
+    home().join("remote.token")
+}
+
+pub fn remote_socket() -> PathBuf {
+    home().join("remote.sock")
+}
+
 pub fn trace_dir() -> PathBuf {
     home().join("trace")
 }

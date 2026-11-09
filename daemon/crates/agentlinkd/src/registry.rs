@@ -5,6 +5,7 @@ use crate::trace::{Dir, Trace};
 use agentlink_proto::{Agent, Attention, Clear, InputSub, SessState, Session};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
+use std::path::PathBuf;
 use std::sync::Mutex;
 use tokio::sync::broadcast;
 
@@ -48,11 +49,52 @@ impl SessionPatch {
     }
 }
 
+/// Where an event came from, as the source saw it. `host` is already sanitized.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Via {
+    Local,
+    Remote {
+        host: String,
+        os: String,
+        attach: Option<u64>,
+    },
+}
+
+impl Via {
+    /// Registry key for a source-level key. Remote keys can never equal a local one.
+    pub fn key(&self, key: &str) -> String {
+        match self {
+            Via::Local => key.to_owned(),
+            Via::Remote { host, .. } => format!("r:{}|{key}", host.to_lowercase()),
+        }
+    }
+}
+
+/// Where a recorded session lives. Only the daemon's own machine (or the local window that
+/// holds the SSH connection) may ever be handed to a focus or scroll driver: see `route`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Origin {
+    Local,
+    Remote { host_idx: u64, attach: Option<u64> },
+}
+
+/// What a focus or scroll command may act on.
+#[allow(clippy::large_enum_variant)]
+pub enum Route {
+    Unknown,
+    /// A remote session without a live attach window.
+    Unsupported,
+    /// The session and the local context the drivers may use.
+    Ready(Session, HostCtx),
+}
+
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)] // short-lived, passed by value once
 pub enum SessionEvent {
     /// `key` identifies the session within its source (e.g. `copilot:<sessionId>`).
     Update {
         key: String,
+        via: Via,
         patch: SessionPatch,
         ctx: HostCtx,
     },
@@ -75,6 +117,18 @@ pub enum Update {
 
 struct Record {
     session: Session,
+    /// Display only for remote sessions.
+    ctx: HostCtx,
+    origin: Origin,
+}
+
+struct RemoteHost {
+    name: String,
+    os: String,
+}
+
+struct Attach {
+    socket: PathBuf,
     ctx: HostCtx,
 }
 
@@ -83,6 +137,10 @@ struct State {
     next_sid: u64,
     by_key: HashMap<String, u64>,
     sessions: BTreeMap<u64, Record>,
+    /// Host index = position + 1; 0 is the local machine.
+    hosts: Vec<RemoteHost>,
+    next_attach: u64,
+    attaches: BTreeMap<u64, Attach>,
 }
 
 pub struct Registry {
@@ -124,6 +182,7 @@ impl Registry {
         Registry {
             state: Mutex::new(State {
                 next_sid: 1,
+                next_attach: 1,
                 ..Default::default()
             }),
             tx,
@@ -135,7 +194,12 @@ impl Registry {
         let update = {
             let mut st = self.state.lock().unwrap();
             match ev {
-                SessionEvent::Update { key, patch, ctx } => Self::upsert(&mut st, key, patch, ctx),
+                SessionEvent::Update {
+                    key,
+                    via,
+                    patch,
+                    ctx,
+                } => Self::upsert(&mut st, key, via, patch, ctx),
                 SessionEvent::End { key } => st
                     .by_key
                     .remove(&key)
@@ -187,8 +251,37 @@ impl Registry {
         self.state.lock().unwrap().by_key.get(key).copied()
     }
 
-    fn upsert(st: &mut State, key: String, p: SessionPatch, ctx: HostCtx) -> Option<Update> {
+    /// Host index of a remote name (case-insensitive), allocated on first sight.
+    fn origin_of(st: &mut State, via: &Via) -> Origin {
+        let Via::Remote { host, os, attach } = via else {
+            return Origin::Local;
+        };
+        let pos = st
+            .hosts
+            .iter()
+            .position(|h| h.name.eq_ignore_ascii_case(host))
+            .unwrap_or_else(|| {
+                st.hosts.push(RemoteHost {
+                    name: host.clone(),
+                    os: os.clone(),
+                });
+                st.hosts.len() - 1
+            });
+        Origin::Remote {
+            host_idx: pos as u64 + 1,
+            attach: *attach,
+        }
+    }
+
+    fn upsert(
+        st: &mut State,
+        key: String,
+        via: Via,
+        p: SessionPatch,
+        ctx: HostCtx,
+    ) -> Option<Update> {
         let now = now_unix();
+        let origin = Self::origin_of(st, &via);
         let created = !st.by_key.contains_key(&key);
         let sid = *st.by_key.entry(key).or_insert(st.next_sid);
         if created {
@@ -199,16 +292,23 @@ impl Registry {
             s.t0 = Some(now);
             s.tst = Some(now);
             s.seen = Some(false);
-            s.host = Some(0);
+            if let (Origin::Remote { host_idx, .. }, Via::Remote { host, .. }) = (origin, &via) {
+                s.host = Some(host_idx);
+                s.hn = Some(clip(host, 16));
+            } else {
+                s.host = Some(0);
+            }
             st.sessions.insert(
                 sid,
                 Record {
                     session: s,
                     ctx: HostCtx::default(),
+                    origin,
                 },
             );
         }
         let rec = st.sessions.get_mut(&sid)?;
+        rec.origin = origin; // the latest attach a session's lines arrived on wins
         let old = std::mem::replace(&mut rec.ctx, ctx);
         // A hook that failed to capture identity must not erase what an earlier one found.
         if rec.ctx.tty.is_none() {
@@ -268,11 +368,88 @@ impl Registry {
         v
     }
 
-    pub fn get(&self, sid: u64) -> Option<(Session, HostCtx)> {
+    /// The context a focus or scroll driver may use for `sid`. A remote session's own context
+    /// describes another machine and is never returned.
+    pub fn route(&self, sid: u64) -> Route {
         let st = self.state.lock().unwrap();
-        st.sessions
-            .get(&sid)
-            .map(|r| (r.session.clone(), r.ctx.clone()))
+        let Some(rec) = st.sessions.get(&sid) else {
+            return Route::Unknown;
+        };
+        let ctx = match rec.origin {
+            Origin::Local => rec.ctx.clone(),
+            Origin::Remote {
+                attach: Some(id), ..
+            } => match st.attaches.get(&id) {
+                Some(a) => a.ctx.clone(),
+                None => return Route::Unsupported,
+            },
+            Origin::Remote { attach: None, .. } => return Route::Unsupported,
+        };
+        Route::Ready(rec.session.clone(), ctx)
+    }
+
+    /// Host index of a session (0 = local), for audit lines.
+    pub fn host_of(&self, sid: u64) -> Option<u64> {
+        self.state.lock().unwrap().sessions.get(&sid)?.session.host
+    }
+
+    pub fn new_attach_id(&self) -> u64 {
+        let mut st = self.state.lock().unwrap();
+        st.next_attach += 1;
+        st.next_attach - 1
+    }
+
+    /// Sessions that arrive through `id` become routable until `drop_attach`.
+    pub fn add_attach(&self, id: u64, socket: PathBuf, ctx: HostCtx) {
+        self.state
+            .lock()
+            .unwrap()
+            .attaches
+            .insert(id, Attach { socket, ctx });
+    }
+
+    pub fn drop_attach(&self, id: u64) {
+        self.state.lock().unwrap().attaches.remove(&id);
+    }
+
+    pub fn attach_sockets(&self) -> Vec<PathBuf> {
+        let st = self.state.lock().unwrap();
+        st.attaches.values().map(|a| a.socket.clone()).collect()
+    }
+
+    /// `{idx, name, os, sessions}` per remote host, for `agentlink status`.
+    pub fn remotes(&self) -> Vec<serde_json::Value> {
+        let st = self.state.lock().unwrap();
+        st.hosts
+            .iter()
+            .enumerate()
+            .map(|(i, h)| {
+                let idx = i as u64 + 1;
+                let n = st
+                    .sessions
+                    .values()
+                    .filter(
+                        |r| matches!(r.origin, Origin::Remote { host_idx, .. } if host_idx == idx),
+                    )
+                    .count();
+                serde_json::json!({"idx": idx, "name": h.name, "os": h.os, "sessions": n})
+            })
+            .collect()
+    }
+
+    /// `{id, socket, window}` per live attach; `window` has only the terminal-identifying env.
+    pub fn attaches(&self) -> Vec<serde_json::Value> {
+        let st = self.state.lock().unwrap();
+        st.attaches
+            .iter()
+            .map(|(id, a)| {
+                let window: BTreeMap<_, _> = ["KITTY_WINDOW_ID", "TMUX_PANE", "TERM_PROGRAM"]
+                    .into_iter()
+                    .filter_map(|k| Some((k, a.ctx.env.get(k)?)))
+                    .collect();
+                serde_json::json!({"id": id, "socket": a.socket, "window": window})
+            })
+            .collect()
     }
 }
 
@@ -289,6 +466,7 @@ mod tests {
         p.state = Some(state);
         SessionEvent::Update {
             key: "k".into(),
+            via: Via::Local,
             patch: p,
             ctx: HostCtx::default(),
         }
@@ -315,5 +493,85 @@ mod tests {
         assert_eq!((d.st, d.ag, d.t0), (Some(SessState::Done), None, None));
         r.apply(SessionEvent::End { key: "k".into() });
         assert!(matches!(rx.try_recv().unwrap(), Update::Gone(1)));
+    }
+
+    fn remote(host: &str, attach: Option<u64>) -> Via {
+        Via::Remote {
+            host: host.into(),
+            os: "win".into(),
+            attach,
+        }
+    }
+
+    fn remote_ev(host: &str, attach: Option<u64>, key: &str, env: &[(&str, &str)]) -> SessionEvent {
+        let via = remote(host, attach);
+        let mut p = SessionPatch::new(Agent::Copilot);
+        p.state = Some(SessState::Work);
+        SessionEvent::Update {
+            key: via.key(key),
+            via,
+            patch: p,
+            ctx: HostCtx {
+                env: env
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
+                ..Default::default()
+            },
+        }
+    }
+
+    #[test]
+    fn remote_session_gets_host_index_name_and_its_own_key() {
+        let r = reg();
+        r.apply(ev(SessState::Work)); // local key "k"
+        r.apply(remote_ev("WIN-BUILD01-LONGNAME-X", None, "k", &[]));
+        r.apply(remote_ev("win-build01-longname-x", None, "k", &[]));
+        r.apply(remote_ev("other", None, "k", &[]));
+        let by_sid = |sid| r.snapshot().into_iter().find(|s| s.sid == sid).unwrap();
+        let (local, rem, rem2) = (by_sid(1), by_sid(2), by_sid(3));
+        assert_eq!((local.host, local.hn), (Some(0), None));
+        assert_eq!(rem.host, Some(1));
+        assert_eq!(rem.hn.as_deref(), Some("WIN-BUILD01-LON…"));
+        assert_eq!(rem2.host, Some(2), "same name (any case) reuses the index");
+        assert_eq!(
+            r.snapshot().len(),
+            3,
+            "same session id on another host is distinct"
+        );
+        assert_eq!(r.remotes()[0]["sessions"], 1);
+    }
+
+    #[test]
+    fn remote_focus_target_is_only_ever_the_live_attach_window() {
+        let r = reg();
+        r.apply(remote_ev("h", None, "a", &[("TMUX_PANE", "%remote")]));
+        assert!(matches!(r.route(1), Route::Unsupported));
+        assert!(matches!(r.route(99), Route::Unknown));
+
+        let id = r.new_attach_id();
+        let win = HostCtx {
+            env: [("KITTY_WINDOW_ID".to_string(), "7".to_string())].into(),
+            ..Default::default()
+        };
+        r.add_attach(id, "/x/remote-1.sock".into(), win);
+        r.apply(remote_ev("h", Some(id), "a", &[("TMUX_PANE", "%remote")]));
+        let Route::Ready(_, ctx) = r.route(1) else {
+            panic!("routable")
+        };
+        assert_eq!(
+            ctx.env.get("KITTY_WINDOW_ID").map(String::as_str),
+            Some("7")
+        );
+        assert!(!ctx.env.contains_key("TMUX_PANE"));
+        assert_eq!(r.attaches()[0]["window"]["KITTY_WINDOW_ID"], "7");
+
+        r.drop_attach(id);
+        assert!(matches!(r.route(1), Route::Unsupported));
+        r.apply(ev(SessState::Work));
+        assert!(
+            matches!(r.route(2), Route::Ready(..)),
+            "local stays routable"
+        );
     }
 }

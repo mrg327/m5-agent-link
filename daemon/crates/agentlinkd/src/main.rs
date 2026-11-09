@@ -11,6 +11,7 @@ mod hook_source;
 mod ipc;
 mod paths;
 mod registry;
+mod remote;
 mod scroll;
 mod source;
 mod trace;
@@ -59,12 +60,17 @@ async fn main() -> Result<()> {
                 "host": shared.host,
                 "devices": shared.devices.lock().unwrap().values().collect::<Vec<_>>(),
                 "sessions": shared.registry.snapshot(),
+                "remotes": shared.registry.remotes(),
+                "attaches": shared.registry.attaches(),
             })
         })
     };
 
     let sources: Vec<Box<dyn AgentSource>> = vec![Box::new(hook_source::HookSource {
         socket: paths::hook_socket(),
+        remote_socket: paths::remote_socket(),
+        token_file: paths::remote_token(),
+        home: paths::home(),
         trace: trace.clone(),
         status,
         broker,
@@ -99,6 +105,10 @@ async fn main() -> Result<()> {
     tokio::signal::ctrl_c().await?;
     tracing::info!("shutting down");
     let _ = std::fs::remove_file(paths::hook_socket());
+    let _ = std::fs::remove_file(paths::remote_socket());
+    for socket in registry.attach_sockets() {
+        let _ = std::fs::remove_file(socket);
+    }
     Ok(())
 }
 

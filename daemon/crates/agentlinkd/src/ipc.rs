@@ -104,4 +104,4 @@ mod imp {
     }
 }
 
-pub use imp::{bind, IpcStream};
+pub use imp::{bind, IpcListener};

@@ -3,7 +3,7 @@
 
 use crate::broker::{Broker, Decision};
 use crate::focus::{FocusDriver, FocusError, FocusTarget, ScrollDriver};
-use crate::registry::{now_unix, Registry, Update};
+use crate::registry::{now_unix, Registry, Route, Update};
 use crate::scroll::{Batch, Coalescer, RESULT_MIN_GAP};
 use crate::trace::{Dir, Trace};
 use crate::transport::Link;
@@ -87,6 +87,8 @@ struct Conn {
     next_id: u64,
     /// The privacy setting this link's welcome gave the device: gates the scroll preview.
     privacy: Privacy,
+    /// Protocol minor the device announced in its hello.
+    peer_minor: u64,
 }
 
 /// Terminal content leaves the daemon only when the device may show it (UI-V2 §4.4).
@@ -126,6 +128,18 @@ impl ScrollState {
 }
 
 impl Conn {
+    /// Devices below proto 0.2 reject unknown keys, so `hn` must not reach them.
+    fn for_peer(&self, mut s: Session) -> Session {
+        if self.peer_minor < 2 {
+            s.hn = None;
+        }
+        s
+    }
+
+    fn sessions_for_peer(&self, v: Vec<Session>) -> Vec<Session> {
+        v.into_iter().map(|s| self.for_peer(s)).collect()
+    }
+
     async fn send(&mut self, re: Option<u64>, msg: Message) -> Result<()> {
         let env = Envelope {
             id: self.next_id,
@@ -200,6 +214,7 @@ pub async fn run_link(
         src: transport.to_owned(),
         next_id: 1,
         privacy: Privacy::Meta,
+        peer_minor: 0,
     };
 
     let hello = loop {
@@ -268,6 +283,7 @@ async fn handshake(
         );
     }
     c.next_id = 1;
+    c.peer_minor = hello.1.proto.1;
 
     // Subscribe before taking the snapshot so no update is lost in between.
     let (sessions, updates) = shared.registry.subscribe();
@@ -277,7 +293,7 @@ async fn handshake(
     c.send(
         None,
         Message::Snapshot(Snapshot {
-            sessions,
+            sessions: c.sessions_for_peer(sessions),
             away: None,
         }),
     )
@@ -338,13 +354,13 @@ async fn serve(
                 }
             },
             u = updates.recv() => match u {
-                Ok(Update::Upsert(s)) => c.send(None, Message::SessionUpd(s)).await?,
+                Ok(Update::Upsert(s)) => c.send(None, Message::SessionUpd(c.for_peer(s))).await?,
                 Ok(Update::Gone(sid)) => c.send(None, Message::Gone(Gone { sid })).await?,
                 Ok(Update::Attention(a)) => c.send(None, Message::Attention(a)).await?,
                 Ok(Update::Clear(cl)) => c.send(None, Message::Clear(cl)).await?,
                 // Missed updates: the device has drifted, so send a full replacement.
                 Err(RecvError::Lagged(_)) => {
-                    let sessions = shared.registry.snapshot();
+                    let sessions = c.sessions_for_peer(shared.registry.snapshot());
                     c.send(None, Message::Snapshot(Snapshot { sessions, away: None })).await?;
                     for att in shared.broker.pending() {
                         c.send(None, Message::Attention(att)).await?;
@@ -417,13 +433,16 @@ async fn scroll_cmd(
         Ok(b) => b,
         Err(r) => return c.send(Some(id), Message::Result(r)).await,
     };
-    let Some((session, ctx)) = shared.registry.get(b.sid) else {
-        return c
-            .send(
-                Some(id),
-                Message::Result(fail(ResultErr::Stale, "unknown session")),
-            )
-            .await;
+    let (session, ctx) = match shared.registry.route(b.sid) {
+        Route::Ready(s, ctx) => (s, ctx),
+        Route::Unknown => {
+            let r = fail(ResultErr::Stale, "unknown session");
+            return c.send(Some(id), Message::Result(r)).await;
+        }
+        Route::Unsupported => {
+            let r = fail(ResultErr::Unsupported, "scroll unsupported here");
+            return c.send(Some(id), Message::Result(r)).await;
+        }
     };
     if let Some(b) = sc.co.push(b) {
         let target = FocusTarget {
@@ -492,8 +511,8 @@ async fn scroll_done(
         }
     }
     if let Some(next) = sc.co.done() {
-        match shared.registry.get(next.sid) {
-            Some((session, ctx)) => {
+        match shared.registry.route(next.sid) {
+            Route::Ready(session, ctx) => {
                 *inflight = Some(ScrollState::start(
                     shared,
                     c.privacy,
@@ -505,8 +524,8 @@ async fn scroll_done(
                     next,
                 ))
             }
-            None => {
-                // the session ended mid-burst: drop what was queued for it
+            Route::Unknown | Route::Unsupported => {
+                // the session ended (or lost its window) mid-burst: drop what was queued for it
                 while sc.co.done().is_some() {}
             }
         }
@@ -518,8 +537,15 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
     let detail = serde_json::to_value(cmd).unwrap_or_default();
     match cmd.op {
         CmdOp::Focus => {
-            let Some((session, ctx)) = cmd.sid.and_then(|sid| shared.registry.get(sid)) else {
-                return fail(ResultErr::Stale, "unknown session");
+            let route = cmd
+                .sid
+                .map_or(Route::Unknown, |sid| shared.registry.route(sid));
+            let (session, ctx) = match route {
+                Route::Ready(s, ctx) => (s, ctx),
+                Route::Unknown => return fail(ResultErr::Stale, "unknown session"),
+                Route::Unsupported => {
+                    return fail(ResultErr::Unsupported, "focus unsupported here")
+                }
             };
             let target = FocusTarget {
                 sid: session.sid,
@@ -674,6 +700,10 @@ mod tests {
     }
 
     fn hello_bytes(fw: &str) -> Vec<u8> {
+        hello_with_minor(fw, 1)
+    }
+
+    fn hello_with_minor(fw: &str, minor: u64) -> Vec<u8> {
         let p = format!(
             "{}/../../../protocol/vectors/hello_sim.json",
             env!("CARGO_MANIFEST_DIR")
@@ -683,6 +713,7 @@ mod tests {
             Envelope::from_bytes(&hex::decode(v["cbor_hex"].as_str().unwrap()).unwrap()).unwrap();
         if let Message::Hello(h) = &mut env.msg {
             h.dev.fw = fw.into();
+            h.proto = Version(0, minor);
         }
         env.to_bytes().unwrap()
     }
@@ -723,6 +754,7 @@ mod tests {
         p.state = Some(SessState::Work);
         shared.registry.apply(SessionEvent::Update {
             key: "claude:s".into(),
+            via: crate::registry::Via::Local,
             patch: p,
             ctx: crate::registry::HostCtx::default(),
         });
@@ -1013,5 +1045,83 @@ mod tests {
         drop(b);
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         assert!(fws(&shared).is_empty());
+    }
+
+    fn add_remote_session(shared: &Shared) -> u64 {
+        use crate::registry::{SessionEvent, SessionPatch, Via};
+        let via = Via::Remote {
+            host: "WIN-BUILD01".into(),
+            os: "win".into(),
+            attach: None,
+        };
+        let mut p = SessionPatch::new(Agent::Copilot);
+        p.state = Some(SessState::Work);
+        let key = via.key("copilot:r");
+        shared.registry.apply(SessionEvent::Update {
+            key: key.clone(),
+            via,
+            patch: p,
+            ctx: crate::registry::HostCtx::default(),
+        });
+        shared.registry.sid_of(&key).unwrap()
+    }
+
+    #[tokio::test]
+    async fn host_name_only_reaches_devices_speaking_proto_0_2() {
+        let shared = shared();
+        let sid = add_remote_session(&shared);
+        for (minor, want) in [(1, None), (2, Some("WIN-BUILD01"))] {
+            let mut d = spawn_link(&shared);
+            d.to_daemon.send(hello_with_minor("1.0.0", minor)).unwrap();
+            d.next().await;
+            let Message::Snapshot(s) = d.next().await.msg else {
+                panic!("snapshot")
+            };
+            assert_eq!(
+                (s.sessions[0].host, s.sessions[0].hn.as_deref()),
+                (Some(1), want)
+            );
+
+            let mut upd = Session::delta(sid);
+            upd.hn = Some("WIN-BUILD01".into());
+            shared.registry.publish(Update::Upsert(upd));
+            let Message::SessionUpd(u) = d.next().await.msg else {
+                panic!("session_upd")
+            };
+            assert_eq!(u.hn.as_deref(), want);
+        }
+    }
+
+    #[tokio::test]
+    async fn focus_on_a_remote_session_without_attach_never_reaches_the_driver() {
+        struct Counting(Mutex<u32>);
+        #[async_trait]
+        impl FocusDriver for Counting {
+            async fn focus(&self, _: &FocusTarget) -> Result<(), FocusError> {
+                *self.0.lock().unwrap() += 1;
+                Ok(())
+            }
+        }
+        let drv = Arc::new(Counting(Mutex::new(0)));
+        let trace = Trace::null();
+        let registry = Arc::new(Registry::new(trace.clone()));
+        let shared = Arc::new(Shared::new(
+            registry.clone(),
+            Arc::new(Broker::new(registry)),
+            trace,
+            drv.clone(),
+            Arc::new(FakeScroll::default()),
+        ));
+        let remote = add_remote_session(&shared);
+        let local = add_session(&shared);
+        let c = |sid| Cmd {
+            sid: Some(sid),
+            ..cmd(CmdOp::Focus, None, None, None)
+        };
+        let r = handle_cmd(&shared, &c(remote)).await;
+        assert_eq!((r.ok, r.err), (false, Some(ResultErr::Unsupported)));
+        assert_eq!(*drv.0.lock().unwrap(), 0);
+        assert!(handle_cmd(&shared, &c(local)).await.ok);
+        assert_eq!(*drv.0.lock().unwrap(), 1);
     }
 }
