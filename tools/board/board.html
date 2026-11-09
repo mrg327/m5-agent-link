@@ -389,8 +389,15 @@ $("lb-form").onsubmit = async (e) => {
   e.preventDefault();
   const text = $("lb-text").value.trim();
   if (!text || !LB.pending) return;
-  const r = await post("/comments", { shot: LB.shot, sha: LB.sha, x: LB.pending.x, y: LB.pending.y, text, dev }).catch(() => ({ ok: false }));
-  if (!r.ok) { $("lb-hint").hidden = false; $("lb-hint").textContent = "Could not save the note."; return; }
+  const r = await fetch("/comments", { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ shot: LB.shot, sha: LB.sha, x: LB.pending.x, y: LB.pending.y, text, dev }) })
+    .then((x) => ({ ok: x.ok, status: x.status })).catch(() => ({ ok: false, status: 0 }));
+  if (!r.ok) {
+    $("lb-hint").hidden = false;
+    $("lb-hint").textContent = r.status === 404 ? "Not saved: the board server is older than this page. In Claude Code run /mcp → reconnect board, then try again (your text is kept)."
+      : r.status === 0 ? "Not saved: the board server isn't reachable. Your text is kept." : "Not saved (error " + r.status + "). Your text is kept.";
+    return;
+  }
   LB.pending = null;
   $("lb-text").value = "";
   $("lb-form").hidden = true;
