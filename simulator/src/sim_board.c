@@ -37,8 +37,13 @@ uint64_t hal_time_us(void)
     return (uint64_t)ts.tv_sec * 1000000u + (uint64_t)ts.tv_nsec / 1000u;
 }
 
-uint32_t hal_rtc_get_unix(void) { return (uint32_t)((int64_t)time(NULL) + s_rtc_offset); }
-void hal_rtc_set_unix(uint32_t unix_s) { s_rtc_offset = (int64_t)unix_s - (int64_t)time(NULL); }
+static bool s_rtc_unknown; /* set to 0: the clock stays unknown, as on a board whose RTC was never set */
+uint32_t hal_rtc_get_unix(void) { return s_rtc_unknown ? 0 : (uint32_t)((int64_t)time(NULL) + s_rtc_offset); }
+void hal_rtc_set_unix(uint32_t unix_s)
+{
+    s_rtc_unknown = unix_s == 0;
+    s_rtc_offset = (int64_t)unix_s - (int64_t)time(NULL);
+}
 
 void hal_buttons_set_callback(hal_button_cb_t cb) { s_button_cb = cb; }
 void hal_motion_set_callback(hal_motion_cb_t cb) { s_motion_cb = cb; }
@@ -66,9 +71,10 @@ void hal_haptic_play(const uint16_t *on_off_ms, size_t count)
 
 void hal_sound_play(hal_sound_t sound) { sim_log("sound", "\"id\":%d", (int)sound); }
 
-void hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
+hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
 {
     sim_log("power_enter", "\"state\":%d,\"wake_after_s\":%u", (int)state, (unsigned)wake_after_s);
+    return state;
 }
 
 static bool s_on_battery;

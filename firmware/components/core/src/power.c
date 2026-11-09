@@ -35,7 +35,7 @@ static void set_display(bool on)
     s_deep = false;
     s_off_since = s_last_activity;
     hal_display_set_power(on);
-    hal_power_enter(on ? HAL_POWER_ACTIVE : HAL_POWER_STANDBY, 0);
+    (void)hal_power_enter(on ? HAL_POWER_ACTIVE : HAL_POWER_STANDBY, 0);
     dbg_event("power", on ? "display_on" : "display_off", NULL);
 }
 
@@ -124,7 +124,12 @@ void power_tick(uint32_t now_ms)
         hal_retained_set(s_tries + 1);
         s_deep = true;
         dbg_event("power", "deep", "\"wake_after_s\":%u,\"tries\":%u", (unsigned)wake_after_s, (unsigned)s_tries);
-        hal_power_enter(HAL_POWER_DEEP, wake_after_s); /* on the device this does not return */
+        if (hal_power_enter(HAL_POWER_DEEP, wake_after_s) != HAL_POWER_DEEP) { /* on the device DEEP does not return */
+            s_deep = false; /* refused (USB present, button held): count again from now and retry */
+            s_off_since = now_ms;
+            hal_retained_set(s_tries);
+            dbg_event("power", "deep_refused", "\"tries\":%u", (unsigned)s_tries);
+        }
     }
     if (s_on && !s_glowing && s_idle_ms && now_ms - s_last_activity >= s_idle_ms) {
         set_display(false);

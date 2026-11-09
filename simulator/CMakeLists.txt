@@ -90,6 +90,11 @@ add_test(NAME sim_tap_wake_hold
 set_tests_properties(sim_tap_wake_hold PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
                      FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3"
                      PASS_REGULAR_EXPRESSION "\"ev\":\"display_off\".*\"wake_input\",\"touch\":true")
+add_test(NAME sim_tap_wake_tap
+         COMMAND agentlink_sim --headless --no-ws --idle-off 1 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/tap_wake_tap.txt)
+set_tests_properties(sim_tap_wake_tap PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"op\":5"
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"display_off\".*\"wake_input\",\"touch\":true")
 
 # Power: DEEP only on battery with no link, counted from display-off; timer wakes stay dark and
 # silent. Timer wakes are off (POWER_TIMER_WAKES=0), so every DEEP arms buttons only (wake_after_s 0).
@@ -154,6 +159,7 @@ sim_script_test(sim_scroll_unsupported scroll_unsupported.txt FAIL_REGULAR_EXPRE
 # exit path; quiet mode holds the permission buzz until it is turned off again, then it buzzes.
 sim_script_test(sim_status status.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4")
 set_tests_properties(sim_status PROPERTIES TIMEOUT 60)
+sim_script_test(sim_status_quiet_no_clock status_quiet_no_clock.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"quiet_set\",\"step\":[12]")
 sim_script_test(sim_quiet_buzz quiet_buzz.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4|\"ev\":\"glow\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"quiet\",\"rid\":7,.*\"ev\":\"quiet_set\",\"step\":0,\"until\":0.*\"ev\":\"attention\",\"rid\":8.*\"pattern_ms\":\\[250,120,250\\]")

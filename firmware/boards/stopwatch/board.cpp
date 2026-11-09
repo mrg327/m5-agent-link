@@ -168,7 +168,7 @@ uint64_t hal_time_us(void)
 
 /* ───────────── power & battery ───────────── */
 
-void hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
+hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
 {
     (void)wake_after_s;
     /* Guard: nothing below may take USB Serial/JTAG away while a host is attached. */
@@ -198,6 +198,7 @@ void hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
     char line[64];
     snprintf(line, sizeof(line), "{\"cat\":\"power\",\"ev\":\"state\",\"v\":%d}", (int)state);
     hal_debug_line(line);
+    return state;
 }
 
 static uint8_t mv_to_percent(uint16_t mv)

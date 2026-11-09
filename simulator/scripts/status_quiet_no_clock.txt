@@ -1,0 +1,15 @@
+# STATUS Quiet row with the RTC unset (reads 0): quiet mode must not start, a toast says why.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite
+wait 300
+rtc 0
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+expect_label > Quiet: off
+btn A
+wait 200
+expect_label Set the clock first
+expect_label > Quiet: off
+quit

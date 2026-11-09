@@ -170,6 +170,11 @@ static void commit(const status_item_t *it)
     uint32_t now = theme_now_unix();
     switch (it->id) {
     case ST_QUIET: {
+        if (!now) { /* the RTC is unset: a timed quiet would never end */
+            ui_toast("Set the clock first", RGB_AMBER);
+            dbg_event("ui", "quiet_set", "\"step\":0,\"note\":\"no clock\"");
+            break;
+        }
         int step = nav_quiet_step(st->quiet_until, now);
         st->quiet_until = nav_quiet_next(st->quiet_until, now);
         dbg_event("ui", "quiet_set", "\"step\":%d,\"until\":%u", step, (unsigned)st->quiet_until);

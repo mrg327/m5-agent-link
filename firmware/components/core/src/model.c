@@ -208,7 +208,14 @@ void model_attention_add(const attention_t *a)
     for (int i = 0; i < MODEL_MAX_ATTENTION && slot < 0; i++)
         if (!s_att_used[i]) slot = i;
     if (slot < 0) slot = 0; /* queue full: oldest is least likely to still be live */
+    attention_t old = s_att[slot];
+    bool had = s_att_used[slot] && old.rid == a->rid;
     s_att[slot] = *a;
+    if (had) { /* a re-sent request keeps the answer already given */
+        s_att[slot].answer_sent = old.answer_sent;
+        s_att[slot].answer = old.answer;
+        s_att[slot].answer_opt = old.answer_opt;
+    }
     s_att_used[slot] = true;
     s_rev++;
     dbg_event("model", "attention", "\"rid\":%u,\"sid\":%u,\"kind\":%d", (unsigned)a->rid, (unsigned)a->sid, (int)a->kind);
@@ -281,4 +288,8 @@ void model_settings_changed(void)
               (int)s_settings.alert, (unsigned)s_settings.quiet_until);
 }
 
-bool model_quiet_active(uint32_t now_unix) { return s_settings.quiet_until != 0 && now_unix < s_settings.quiet_until; }
+/* now_unix 0 = clock unknown (hal_rtc_get_unix): a timed quiet can never be judged, so it is off. */
+bool model_quiet_active(uint32_t now_unix)
+{
+    return now_unix != 0 && s_settings.quiet_until != 0 && now_unix < s_settings.quiet_until;
+}

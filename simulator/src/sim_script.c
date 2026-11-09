@@ -12,6 +12,7 @@
  *                                   a daemon `result` answering the last command the device sent
  *   result pos LINES AT_BOTTOM [TOTAL|- [PREVIEW TEXT...]]   a scroll result with scroll_pos
  *   cfg privacy meta|preview|full   a daemon `cfg` changing the device's privacy setting
+ *   rtc UNIX                        set the RTC (0 = clock unknown)
  *   clear RID [answered_pc|answered_dev|expired|cancelled]
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
  */
@@ -27,7 +28,7 @@
 #include "ui_theme.h"
 #include "sim.h"
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -143,6 +144,9 @@ static bool parse_line(char *line, uint32_t *t)
         *t += 220 + 450;
     } else if (!strcmp(cmd, "drag") && sscanf(rest, "%d %d %d %d", &a, &b, &c, &d) >= 3) {
         drag(t, a, b, c, sscanf(rest, "%d %d %d %d", &a, &b, &c, &d) == 4 ? d : 500);
+    } else if (!strcmp(cmd, "rtc") && sscanf(rest, "%d", &a) == 1) {
+        add(*t, E_RTC, a, 0, 0, NULL);
+        *t += 50;
     } else if (!strcmp(cmd, "cfg") && arg[0]) {
         add(*t, E_CFG, 0, 0, 0, arg);
         *t += 50;
@@ -460,6 +464,7 @@ static void run(const ev_t *e)
     case E_RESULT: run_result(e->text); break;
     case E_CLEAR: run_clear(e->a, e->text); break;
     case E_CFG: run_cfg(e->text); break;
+    case E_RTC: hal_rtc_set_unix((uint32_t)e->a); break;
     case E_QUIT: s_next = s_n; break;
     }
 }

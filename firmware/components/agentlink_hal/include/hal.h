@@ -103,8 +103,9 @@ typedef enum {
     HAL_POWER_DEEP = 2,       /* link off, only wake sources powered */
 } hal_power_state_t;
 /* Apply rails/clock policy for a state. DEEP may not return (board reboots on wake);
- * wake_after_s = 0 means wake only on lift/button. */
-void hal_power_enter(hal_power_state_t state, uint32_t wake_after_s);
+ * wake_after_s = 0 means wake only on lift/button. Returns the state actually entered: a board
+ * may refuse DEEP (USB present, button held) and fall back to STANDBY. */
+hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s);
 typedef enum { HAL_WAKE_POWER_ON = 0, HAL_WAKE_BUTTON = 1, HAL_WAKE_TIMER = 2 } hal_wake_t;
 /* Why this boot happened: power-on or reset, or which source ended a DEEP. */
 hal_wake_t hal_wake_reason(void);
