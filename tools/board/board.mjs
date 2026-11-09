@@ -26,7 +26,7 @@ Always answer each event with the board_reply tool, passing its id. Keep replies
 - kind="ping": reply at once with a one-line acknowledgement. Do nothing else.
 - kind="say": the body is a message the user typed. Answer it as you would in chat, in board_reply.
 - kind="agent": reply "started", start one background agent (Agent tool, run_in_background) that runs
-  the simulator tests (ctest in /home/matt/projects/m5-agent-link-ui-v2/simulator/build, reconfigure if
+  the simulator tests (ctest in ${path.resolve(HERE, "../..", "simulator", "build")}, reconfigure if
   needed, change no files), then when it reports, call board_reply again with the pass count.
 - kind="comments": a batch of notes the user pinned on simulator screenshots of the watch UI. Each note
   has an id (c12), the screen id, the build, the pin position on the 466x466 panel and the PNG path.

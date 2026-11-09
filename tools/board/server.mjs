@@ -74,11 +74,32 @@ function gallery() {
   return { current: currentSha(), index, states: readJson_(STATES, { groups: [] }), rendering: !!renderJob };
 }
 let renderJob = null;
+const LOCK = path.join(SHOTS, "render.lock");
+const pidAlive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; } };
+function renderLocked() {
+  let pid;
+  try { pid = Number(fs.readFileSync(LOCK, "utf8").trim()); } catch { return false; }
+  if (pid > 0 && pidAlive(pid)) return true;
+  try { fs.unlinkSync(LOCK); } catch {}
+  return false;
+}
+function stopRender() {
+  if (!renderJob) return;
+  // render.mjs runs in its own process group, so this also reaches cmake and the simulators it started
+  try { process.kill(-renderJob.pid, "SIGTERM"); } catch { try { renderJob.kill("SIGTERM"); } catch {} }
+}
 function startRender() {
-  if (renderJob) return false;
-  renderJob = spawn("node", [path.join(HERE, "render.mjs")], { cwd: ROOT });
+  if (renderJob || renderLocked()) return false;
+  const job = spawn("node", [path.join(HERE, "render.mjs")], { cwd: ROOT, detached: true });
+  if (!job.pid) return false;
+  renderJob = job;
+  try {
+    fs.mkdirSync(SHOTS, { recursive: true });
+    fs.writeFileSync(LOCK, String(job.pid));
+  } catch (e) { log("could not write render lock:", e.message); }
+  job.on("error", (e) => log("render spawn failed:", e.message));
   let buf = "";
-  renderJob.stdout.on("data", (d) => {
+  job.stdout.on("data", (d) => {
     buf += d;
     let i;
     while ((i = buf.indexOf("\n")) >= 0) {
@@ -86,7 +107,12 @@ function startRender() {
       try { broadcast("render", JSON.parse(line)); } catch {}
     }
   });
-  renderJob.on("close", () => { renderJob = null; shaCache.at = 0; broadcast("gallery", gallery()); });
+  job.on("close", () => {
+    renderJob = null;
+    try { if (Number(fs.readFileSync(LOCK, "utf8")) === job.pid) fs.unlinkSync(LOCK); } catch {}
+    shaCache.at = 0;
+    broadcast("gallery", gallery());
+  });
   return true;
 }
 
@@ -104,14 +130,17 @@ try {
 } catch { /* none yet */ }
 const commentList = () => [...comments.values()];
 function saveComments() {
+  let ok = true;
   try {
     fs.mkdirSync(path.dirname(COMMENTS), { recursive: true });
     const tmp = COMMENTS + ".tmp";
     fs.writeFileSync(tmp, commentList().map((c) => JSON.stringify(c)).join("\n") + (comments.size ? "\n" : ""));
     fs.renameSync(tmp, COMMENTS);
-  } catch (e) { log("could not save comments:", e.message); }
-  broadcast("comments", commentList());
+  } catch (e) { ok = false; saveError = e.message; log("could not save comments:", e.message); }
+  broadcast("comments", commentList()); // always the in-memory state; failed saves are rolled back by the caller where possible
+  return ok;
 }
+let saveError = "";
 const SHA_RE = /^[0-9a-f]{4,40}(?:-dirty)?$/, SHOT_RE = /^[a-z0-9_]{1,64}$/;
 function sendBatch(dev) {
   const drafts = commentList().filter((c) => !c.sent);
@@ -131,7 +160,11 @@ function sendBatch(dev) {
   for (const c of drafts) { c.sent = now; c.batch = id; }
   addPress({ id, n: nextN++, kind: "comments", text: drafts.map((c) => c.id).join(", "), dev, sent: now, pushed: now, answered: 0, replies: [] });
   record({ ev: "comments", id, notes: drafts.length, dev });
-  saveComments();
+  if (!saveComments()) {
+    // The channel push already happened, so keep the batch marked sent: unsending it would duplicate it.
+    log("batch", id, "was pushed but the notes could not be saved:", saveError);
+    return { error: `batch sent to the session but could not save notes: ${saveError}`, id, notes: drafts.length, pushed: true };
+  }
   return { id, notes: drafts.length };
 }
 
@@ -165,7 +198,7 @@ function callTool(name, args = {}) {
       const c = comments.get(String(id));
       if (c && c.sent) { if (!c.seen) c.seen = now; hit.push(c.id); }
     }
-    if (hit.length) saveComments();
+    if (hit.length && !saveComments()) return text(`marked seen in memory but could not save: ${saveError}`, true);
     return text(hit.length ? `marked seen: ${hit.join(", ")}` : "no sent notes with those ids", !hit.length);
   }
   if (name !== "board_reply") return text("unknown tool " + name, true);
@@ -176,7 +209,7 @@ function callTool(name, args = {}) {
     if (!c.answered) c.answered = now;
     c.replies.push(reply);
     record({ ev: "note_reply", id: c.id, at: now, ms_from_send: now - c.sent });
-    saveComments();
+    if (!saveComments()) return text(`reply shown on the board but could not save: ${saveError}`, true);
     return text("shown on the note");
   }
   const p = presses.get(String(args.id));
@@ -185,7 +218,7 @@ function callTool(name, args = {}) {
   p.replies.push(reply);
   if (p.kind === "comments") { // a reply to the whole batch marks its notes seen
     for (const c2 of comments.values()) if (c2.batch === p.id && !c2.seen) c2.seen = now;
-    saveComments();
+    if (!saveComments()) log("could not save notes marked seen:", saveError);
   }
   record({ ev: "reply", id: p.id, at: now, ms_from_press: now - p.sent });
   addPress(p);
@@ -201,7 +234,21 @@ process.on("message", (m) => {
     toShim({ t: "result", rid: m.rid, result: r });
   }
 });
-process.on("disconnect", () => process.exit(0)); // the shim went away
+const servers = [];
+let closing = false;
+function shutdown() {
+  if (closing) return;
+  closing = true;
+  stopRender();
+  for (const res of clients) { try { res.end(); } catch {} }
+  for (const srv of servers) { try { srv.close(); srv.closeAllConnections?.(); } catch {} }
+  const done = () => process.exit(0);
+  if (renderJob) { renderJob.once("close", done); setTimeout(() => { try { process.kill(-renderJob.pid, "SIGKILL"); } catch {} done(); }, 3000).unref(); }
+  else setTimeout(done, 50);
+}
+process.on("disconnect", shutdown); // the shim went away
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
 
 // ── page version: open pages reload when board.html changes ──
 const PAGE = path.join(HERE, "board.html");
@@ -216,15 +263,25 @@ fs.watch(HERE, (ev, f) => {
 });
 
 // ── HTTP ──
+// Resolves the parsed body, {} for an empty or invalid one, or null when the body was too big or the
+// connection broke before it ended.
 function readJson(req) {
   return new Promise((resolve) => {
-    let s = "";
-    req.on("data", (c) => { s += c; if (s.length > 16384) req.destroy(); });
-    req.on("end", () => { try { resolve(JSON.parse(s || "{}")); } catch { resolve({}); } });
+    let s = "", over = false;
+    const finish = (v) => resolve(v);
+    req.on("data", (c) => {
+      if (over) return;
+      s += c;
+      if (s.length > 16384) { over = true; s = ""; finish(null); req.resume(); }
+    });
+    req.on("end", () => { if (!over) { try { finish(JSON.parse(s || "{}")); } catch { finish({}); } } });
+    req.on("close", () => finish(null));
+    req.on("error", () => finish(null));
   });
 }
 
 const handler = async (req, res) => {
+  const tooBig = () => res.writeHead(413, { "content-type": "application/json", connection: "close" }).end(JSON.stringify({ error: "request body too large or incomplete" }));
   // Only same-origin pages may post: refuse cross-site form posts from other tabs.
   const origin = req.headers.origin;
   if (req.method === "POST" && origin && origin !== `http://${req.headers.host}`) {
@@ -252,6 +309,7 @@ const handler = async (req, res) => {
   }
   if (req.method === "POST" && req.url === "/comments") {
     const body = await readJson(req);
+    if (!body) return tooBig();
     const t = String(body.text || "").trim().slice(0, 1000);
     const x = Math.round(Number(body.x)), y = Math.round(Number(body.y));
     if (!SHOT_RE.test(body.shot || "") || !SHA_RE.test(body.sha || "") || !t || !(x >= 0 && x <= 466 && y >= 0 && y <= 466))
@@ -259,21 +317,32 @@ const handler = async (req, res) => {
     const n = nextC++;
     const c = { id: "c" + n, n, shot: body.shot, sha: body.sha, x, y, text: t, dev: String(body.dev || ""), created: Date.now(), sent: 0, seen: 0, answered: 0, batch: "", replies: [] };
     comments.set(c.id, c);
-    saveComments();
+    if (!saveComments()) {
+      comments.delete(c.id);
+      nextC = n;
+      broadcast("comments", commentList());
+      return json(500, { error: "could not save note: " + saveError });
+    }
     return json(200, c);
   }
   if (req.method === "POST" && req.url === "/comments/delete") {
     const body = await readJson(req);
+    if (!body) return tooBig();
     const c = comments.get(String(body.id));
     if (!c || c.sent) return json(400, { error: "only drafts can be deleted" });
     comments.delete(c.id);
-    saveComments();
+    if (!saveComments()) {
+      comments.set(c.id, c);
+      broadcast("comments", commentList());
+      return json(500, { error: "could not delete note: " + saveError });
+    }
     return json(200, { deleted: c.id });
   }
   if (req.method === "POST" && req.url === "/comments/send") {
     const body = await readJson(req);
+    if (!body) return tooBig();
     const r = sendBatch(String(body.dev || ""));
-    return json(r.error ? 409 : 200, r);
+    return json(r.pushed ? 500 : r.error ? 409 : 200, r);
   }
   if (req.method === "GET" && req.url === "/events") {
     res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });
@@ -287,6 +356,7 @@ const handler = async (req, res) => {
   }
   if (req.method === "POST" && req.url === "/press") {
     const body = await readJson(req);
+    if (!body) return tooBig();
     const kind = ["ping", "say", "agent"].includes(body.kind) ? body.kind : "ping";
     const t = String(body.text || "").slice(0, 2000);
     const sent = Number(body.sent) || Date.now(); // the page's clock
@@ -303,10 +373,19 @@ const handler = async (req, res) => {
   res.writeHead(404).end("not found");
 };
 
+const safeHandler = async (req, res) => {
+  try { await handler(req, res); } catch (e) {
+    log("handler error:", e && e.stack || e);
+    if (!res.headersSent) res.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: "internal error: " + (e && e.message) }));
+    else res.end();
+  }
+};
+
 // A restart can begin while the previous copy still holds the port: retry instead of giving up.
 let listening = 0;
 function listenOn(h) {
-  const srv = http.createServer(handler);
+  const srv = http.createServer(safeHandler);
+  servers.push(srv);
   srv.on("error", (e) => {
     log(`http error on ${h}:`, e.message);
     if (e.code === "EADDRINUSE") setTimeout(() => listenOn(h), 1000);

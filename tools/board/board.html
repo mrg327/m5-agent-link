@@ -296,7 +296,7 @@ function noteCard(c, { thumb = false, del = false } = {}) {
   if (c.sha !== shaNow() && shaNow()) meta.append(el("span", { className: "st-sent", textContent: "older build" }));
   if (del) {
     const b = el("button", { className: "link", textContent: "Delete", type: "button" });
-    b.onclick = async (e) => { e.stopPropagation(); await post("/comments/delete", { id: c.id }); };
+    b.onclick = async (e) => { e.stopPropagation(); const r = await post("/comments/delete", { id: c.id }).catch(() => null); if (!r || !r.ok) flash("Not deleted: " + ((r && r.data && r.data.error) || "board not reachable")); };
     meta.append(b);
   }
   const body = el("div", { className: "note" }, meta, el("div", { className: "text", textContent: c.text }));
@@ -391,11 +391,11 @@ $("lb-form").onsubmit = async (e) => {
   if (!text || !LB.pending) return;
   const r = await fetch("/comments", { method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ shot: LB.shot, sha: LB.sha, x: LB.pending.x, y: LB.pending.y, text, dev }) })
-    .then((x) => ({ ok: x.ok, status: x.status })).catch(() => ({ ok: false, status: 0 }));
+    .then(async (x) => ({ ok: x.ok, status: x.status, data: await x.json().catch(() => ({})) })).catch(() => ({ ok: false, status: 0, data: {} }));
   if (!r.ok) {
     $("lb-hint").hidden = false;
     $("lb-hint").textContent = r.status === 404 ? "Not saved: the board server is older than this page. In Claude Code run /mcp → reconnect board, then try again (your text is kept)."
-      : r.status === 0 ? "Not saved: the board server isn't reachable. Your text is kept." : "Not saved (error " + r.status + "). Your text is kept.";
+      : r.status === 0 ? "Not saved: the board server isn't reachable. Your text is kept." : "Not saved (error " + r.status + (r.data && r.data.error ? ": " + r.data.error : "") + "). Your text is kept.";
     return;
   }
   LB.pending = null;

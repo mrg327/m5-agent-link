@@ -13,7 +13,7 @@ The session starts the shim, so the board lives and dies with that session. Timi
 
 ## Gallery (B1)
 
-`node tools/board/render.mjs` runs every simulator script that has `shot` lines (about 45 s for 42 screens) and writes the PNGs to `build/board/<ui-sha>/`, which is git-ignored. `<ui-sha>` is the last commit that touched `firmware/` or `simulator/`, plus `-dirty` if those have uncommitted changes. When HEAD moves past the rendered build, the page marks the gallery stale and offers Re-render. Groups and labels come from `design/board/states.json`; a shot it doesn't list appears under "Other". 
+`node tools/board/render.mjs` runs every simulator script that has `shot` lines (about 45 s for 42 screens) and writes the PNGs to `build/board/<ui-sha>/`, which is git-ignored. `<ui-sha>` is the last commit that touched `firmware/` or `simulator/`, plus `-dirty` if those have uncommitted changes. When HEAD moves past the rendered build, the page marks the gallery stale and offers Re-render. Only one render runs at a time (`build/board/render.lock` holds its pid; a stale lock is removed), and restarting the server stops a running render and its simulators. Groups and labels come from `design/board/states.json`; a shot it doesn't list appears under "Other". 
 ## Notes (B2)
 
 Open a screen in the Gallery and tap where something is wrong: a pin drops at that spot on the 466 px panel and you write the note. Notes collect as drafts in the tray at the bottom (on any number of screens) and **Send** pushes them to the session as one `kind="comments"` event listing each note's id, screen, build, pin position and PNG path. Each note then shows draft → sent → seen (the session called `board_seen`) → answered (`board_reply` with the note id), and the Notes tab lists them with their replies. Notes are stored in `design/board/comments.jsonl`, one per line, and committed with the branch.
@@ -32,6 +32,8 @@ claude --mcp-config tools/board/mcp.json --dangerously-load-development-channels
 ```
 
 Accept the development-channels prompt, then open http://127.0.0.1:7880.
+
+**Per-machine path.** `mcp.json` holds an absolute path to `board.mjs` (it is the Linux dev host's checkout). On another machine, use a copy of it or edit the path to your own checkout before passing it to `--mcp-config`.
 
 **Phone.** `mcp.json` sets `BOARD_TAILSCALE=1`, so the board also listens on this machine's Tailscale address: `http://<tailscale ip -4>:7880`, e.g. `http://100.74.203.10:7880`. Only devices on your tailnet can reach it, and it never binds 0.0.0.0. Anyone who can reach the page can send text into the session, so keep it tailnet-only.
 

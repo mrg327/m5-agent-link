@@ -33,7 +33,7 @@ The architecture is the proof of concept, grown. There is still one process, `to
 ```
 
 - **State is files.** `design/board/` in the repo holds `decisions.json`, `questions.json`, `variants/<id>.json` and `comments.jsonl`. The session updates the board by editing these files; the server watches them and pushes changes to the page. The data then stays reviewable in git, and needs no special tools.
-- **Screenshots are generated.** `tools/board/render.sh` runs simulator scripts listed in `design/board/states.json` and writes `build/board/<sha>/<state>.png`. These images are git-ignored and rebuilt from any commit. The simulator already supports `shot FILE.png` in headless mode.
+- **Screenshots are generated.** `tools/board/render.mjs` builds the simulator, runs every script in `simulator/scripts/` that contains a `shot FILE.png` line (a few at a time, headless), and writes `build/board/<ui-sha>/<shot>.png` plus `index.json`. `design/board/states.json` does not choose what is rendered; it only supplies the labels and groups the gallery shows. Only one render runs at a time (`build/board/render.lock`). These images are git-ignored and rebuilt from any commit. The simulator already supports `shot FILE.png` in headless mode.
 - **Channel events** (page → session): `comment-batch`, `pick`, `answer`, `render`, and the existing `ping`, `say` and `agent`. Each carries ids, never free-form instructions, except a comment's own text.
 - **Tools** (session → page): `board_reply(id, text)`, which exists already, and `board_status(text)` for the "what I'm doing now" strip. Everything else goes through files.
 - **Reach:** `127.0.0.1` plus the Tailscale address only. Comment text is treated as data: the session never runs commands or flashes the watch because a comment asked.
@@ -52,7 +52,7 @@ The page stays one column at phone width.
 
 | Phase | Delivers | Proven when |
 |---|---|---|
-| B1 Gallery | `states.json`, `render.sh`, gallery view, SHA/stale stamps | Every UI-V2 state renders from HEAD, and a firmware change marks cards stale |
+| B1 Gallery | `states.json` (labels/groups), `render.mjs`, gallery view, SHA/stale stamps | Every UI-V2 state renders from HEAD, and a firmware change marks cards stale |
 | B2 Comment | Pins, draft tray, batch send, sent/seen/answered | A batch of 3 pins on 2 cards arrives as one channel event; replies land on the right pins |
 | B3 Decisions | `decisions.json` seeded from UI-V2.md, decisions view, questions view | The 26 decisions and invariants show; answering a question writes a record |
 | B4 Variants loop | A pin can ask for fixes: Fable renders 2–3 variants (sim scripts with patched theme values, not committed), Compare view, pick → decision | A real complaint becomes 3 rendered options, and a pick, without leaving the board |
