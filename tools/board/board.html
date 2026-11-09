@@ -5,109 +5,233 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Agent Link Board</title>
 <style>
-/* One narrow column: link status, three probes, live timing log. Phone first. */
+/* Layout: sticky header (link status + tabs); Gallery = groups of round watch faces in a wrapping grid;
+   Talk = the channel probes and timing log. Phone first; the watch is AMOLED, so faces sit on near-black. */
 :root{
-  --bg:#f3f4f6; --surface:#fff; --fg:#14181f; --muted:#5b6474; --line:#d9dde4;
-  --accent:#0072b2; --ok:#1a7f4b; --warn:#a8650a; --bad:#b3261e;
+  --bg:#f2f3f5; --surface:#fff; --fg:#14181f; --muted:#5b6474; --line:#d9dde4;
+  --accent:#0072b2; --ok:#1a7f4b; --warn:#a8650a; --bad:#b3261e; --face:#000; --facering:#2a2f38;
   --sans:system-ui,-apple-system,"Segoe UI",sans-serif; --mono:ui-monospace,"SFMono-Regular",Menlo,monospace;
 }
 @media (prefers-color-scheme: dark){:root{
-  --bg:#0c0f14; --surface:#151a22; --fg:#e6e9ef; --muted:#97a0b0; --line:#2a313d;
-  --accent:#56b4e9; --ok:#4fc58a; --warn:#e6a23c; --bad:#f2786d; color-scheme:dark}}
+  --bg:#0b0d11; --surface:#141920; --fg:#e6e9ef; --muted:#97a0b0; --line:#262d38;
+  --accent:#56b4e9; --ok:#4fc58a; --warn:#e6a23c; --bad:#f2786d; --facering:#323946; color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--sans)}
-.wrap{max-width:680px;margin:0 auto;padding:20px max(16px,env(safe-area-inset-left)) 40px;display:flex;flex-direction:column;gap:14px}
-h1{font-size:21px;margin:0}
-p{margin:0}
-.muted{color:var(--muted)}
-.pill{font:13px var(--mono);border-radius:999px;padding:2px 10px;border:1px solid var(--line);background:var(--surface);align-self:flex-start}
-.pill.ok{color:var(--ok);border-color:var(--ok)} .pill.bad{color:var(--bad);border-color:var(--bad)}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-button{font:600 15px var(--sans);border:0;border-radius:999px;padding:11px 18px;background:var(--accent);color:var(--bg);cursor:pointer;min-height:44px}
-button.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);
+  padding:10px max(16px,env(safe-area-inset-left)) 0}
+.hrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:1100px;margin:0 auto}
+h1{font-size:18px;margin:0;margin-right:auto}
+.pill{font:12px var(--mono);border-radius:999px;padding:2px 10px;border:1px solid var(--line);background:var(--surface);white-space:nowrap}
+.pill.ok{color:var(--ok);border-color:var(--ok)} .pill.bad{color:var(--bad);border-color:var(--bad)} .pill.warn{color:var(--warn);border-color:var(--warn)}
+nav{display:flex;gap:4px;max-width:1100px;margin:8px auto 0}
+nav button{font:600 14px var(--sans);background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 12px;cursor:pointer;min-height:40px}
+nav button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+main{max-width:1100px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-left)) 48px}
+.bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.bar .grow{margin-right:auto}
+.muted{color:var(--muted)} .small{font-size:13px}
+button.act{font:600 14px var(--sans);border:0;border-radius:999px;padding:9px 16px;background:var(--accent);color:var(--bg);cursor:pointer;min-height:40px}
+button.act.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
 button:disabled{opacity:.45;cursor:not-allowed}
-button:focus-visible,input:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
-input{flex:1;min-width:0;font:15px var(--sans);padding:10px 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--fg);min-height:44px}
+button:focus-visible,input:focus-visible,.face:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+h2{font-size:15px;margin:22px 0 10px;letter-spacing:.02em}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:18px 14px}
+figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.face{width:100%;max-width:200px;aspect-ratio:1;border-radius:50%;background:var(--face);padding:0;border:3px solid var(--facering);
+  overflow:hidden;cursor:zoom-in;display:block}
+.face img{width:100%;height:100%;display:block;image-rendering:auto}
+.face.stale{opacity:.5;filter:saturate(.4)}
+.face.missing{display:grid;place-items:center;color:#8a93a3;font:12px var(--mono);cursor:default}
+figcaption{text-align:center;font-size:13px;line-height:1.35}
+figcaption code{display:block;font:11px var(--mono);color:var(--muted)}
+.tag{font:11px var(--mono);color:var(--muted)}
+.fails{border:1px solid var(--bad);color:var(--bad);border-radius:10px;padding:8px 12px;font-size:13px;margin:10px 0}
+.empty{padding:40px 0;text-align:center}
+/* lightbox: 1:1 pixels when there is room */
+dialog{border:0;padding:0;background:transparent;max-width:100vw}
+dialog::backdrop{background:rgba(0,0,0,.85)}
+.lb{display:flex;flex-direction:column;align-items:center;gap:10px;color:#e6e9ef;padding:12px}
+.lb .face{width:min(466px,92vw);max-width:none;cursor:zoom-out;border-color:#323946}
+.lb p{margin:0;text-align:center;font-size:14px}
+/* talk */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+input{flex:1;min-width:0;font:15px var(--sans);padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--fg);min-height:40px}
 .logwrap{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font:13px var(--mono);font-variant-numeric:tabular-nums}
 th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap}
 th{color:var(--muted);font-weight:400}
 td.reply{white-space:normal;min-width:200px;font-family:var(--sans)}
 td.reply div+div{margin-top:4px;padding-top:4px;border-top:1px dashed var(--line)}
+@media (prefers-reduced-motion:no-preference){.face{transition:transform .12s ease-out}.face:hover{transform:scale(1.02)}}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Agent Link board</h1>
-  <p class="muted">Local proof of concept. A press goes straight into the Claude Code session through a channel. The session answers here.</p>
-  <span class="pill" id="st">connecting…</span>
+<header>
+  <div class="hrow">
+    <h1>Agent Link board</h1>
+    <span class="pill" id="st">connecting…</span>
+  </div>
+  <nav role="tablist">
+    <button role="tab" id="t-gallery" aria-selected="true" aria-controls="v-gallery">Gallery</button>
+    <button role="tab" id="t-talk" aria-selected="false" aria-controls="v-talk">Talk</button>
+  </nav>
+</header>
 
-  <section class="card">
-    <div class="row">
-      <button id="b-ping">Ping</button>
-      <button id="b-agent" class="ghost">Start agent</button>
+<main>
+  <section id="v-gallery" role="tabpanel" aria-labelledby="t-gallery">
+    <div class="bar">
+      <div class="grow">
+        <div><strong id="g-build">…</strong> <span class="pill" id="g-fresh">…</span></div>
+        <div class="small muted" id="g-meta">Every watch screen the simulator scripts reach, at the panel's own 466 px.</div>
+      </div>
+      <button class="act" id="b-render">Re-render</button>
     </div>
-    <form class="row" id="f-say">
-      <input id="say" placeholder="Say something to the session" autocomplete="off" maxlength="2000">
-      <button type="submit">Send</button>
-    </form>
+    <div id="g-progress" class="small muted" hidden></div>
+    <div id="g-fails" class="fails" hidden></div>
+    <div id="g-body"><p class="empty muted">Loading the gallery…</p></div>
   </section>
 
-  <section class="card">
-    <div class="logwrap"><table>
-      <thead><tr><th>#</th><th>kind</th><th>to session</th><th>answered</th><th class="reply">reply</th></tr></thead>
-      <tbody id="log"><tr><td colspan="5" class="muted">Nothing sent yet.</td></tr></tbody>
-    </table></div>
-    <p class="muted" style="font-size:13px">"To session" is press → channel push. "Answered" is press → first reply.</p>
+  <section id="v-talk" role="tabpanel" aria-labelledby="t-talk" hidden>
+    <div class="card">
+      <div class="row">
+        <button class="act" id="b-ping">Ping</button>
+        <button class="act ghost" id="b-agent">Start agent</button>
+      </div>
+      <form class="row" id="f-say">
+        <input id="say" placeholder="Say something to the session" autocomplete="off" maxlength="2000">
+        <button class="act" type="submit">Send</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="logwrap"><table>
+        <thead><tr><th>#</th><th>kind</th><th>to session</th><th>answered</th><th class="reply">reply</th></tr></thead>
+        <tbody id="log"><tr><td colspan="5" class="muted">Nothing sent yet.</td></tr></tbody>
+      </table></div>
+    </div>
   </section>
-</div>
+</main>
+
+<dialog id="lb"><div class="lb"><button class="face" id="lb-face" aria-label="Close"><img id="lb-img" alt=""></button><p id="lb-cap"></p></div></dialog>
+
 <script>
 const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
 const dev = matchMedia("(pointer:coarse)").matches ? "phone" : "desktop";
-const rows = new Map();
-let live = false;
 
-function setSession(s) {
-  live = !!s.connected;
-  $("st").textContent = live ? "session listening" : "no session: start Claude with the board channel";
-  $("st").className = "pill " + (live ? "ok" : "bad");
+/* tabs */
+const tabs = { gallery: $("t-gallery"), talk: $("t-talk") };
+function show(name) {
+  for (const [k, b] of Object.entries(tabs)) { b.setAttribute("aria-selected", k === name); $("v-" + k).hidden = k !== name; }
+  try { localStorage.setItem("board.tab", name); } catch {}
 }
+tabs.gallery.onclick = () => show("gallery");
+tabs.talk.onclick = () => show("talk");
+try { const t = localStorage.getItem("board.tab"); if (t && tabs[t]) show(t); } catch {}
+
+/* session status */
+function setSession(s) {
+  $("st").textContent = s.connected ? "session listening" : "no session";
+  $("st").className = "pill " + (s.connected ? "ok" : "bad");
+}
+
+/* gallery */
+const ago = (t) => { const s = Math.round((Date.now() - t) / 1000); return s < 90 ? s + " s ago" : s < 5400 ? Math.round(s / 60) + " min ago" : Math.round(s / 3600) + " h ago"; };
+let G = null;
+function renderGallery(g) {
+  G = g;
+  const idx = g.index;
+  const stale = idx && g.current && idx.sha !== g.current;
+  $("g-build").textContent = g.current ? "UI build " + g.current : "UI build unknown";
+  if (!idx) { $("g-fresh").textContent = "no shots yet"; $("g-fresh").className = "pill warn"; }
+  else if (stale) { $("g-fresh").textContent = "stale: shots from " + idx.sha; $("g-fresh").className = "pill warn"; }
+  else { $("g-fresh").textContent = "current"; $("g-fresh").className = "pill ok"; }
+  $("g-meta").textContent = idx
+    ? `${idx.shots.length} screens · simulator · rendered ${ago(idx.at)}. Tap a face for full size.`
+    : "No screenshots yet. Re-render to make them (about 45 s).";
+  $("b-render").disabled = g.rendering;
+  const fails = idx ? idx.scripts.filter((s) => !s.ok) : [];
+  $("g-fails").hidden = !fails.length;
+  $("g-fails").textContent = fails.length ? "Scripts that failed: " + fails.map((f) => `${f.script} (${f.error})`).join("; ") : "";
+  const body = $("g-body");
+  if (!idx) { body.replaceChildren(el("p", { className: "empty muted", textContent: "Nothing rendered yet." })); return; }
+  const have = new Set(idx.shots), listed = new Set();
+  const sections = [];
+  for (const grp of g.states.groups || []) {
+    const figs = [];
+    for (const [id, label] of Object.entries(grp.shots)) {
+      listed.add(id);
+      figs.push(face(id, label, have.has(id) ? idx.sha : null, stale));
+    }
+    sections.push(el("h2", { textContent: grp.title }), el("div", { className: "grid" }, ...figs));
+  }
+  const other = idx.shots.filter((s) => !listed.has(s));
+  if (other.length) sections.push(el("h2", { textContent: "Other" }), el("div", { className: "grid" }, ...other.map((id) => face(id, id, idx.sha, stale))));
+  body.replaceChildren(...sections);
+}
+function face(id, label, sha, stale) {
+  const cap = el("figcaption", {}, label, el("code", { textContent: id }));
+  if (!sha) return el("figure", {}, el("div", { className: "face missing", textContent: "not rendered" }), cap);
+  const img = el("img", { src: `/shots/${sha}/${id}.png`, alt: label, loading: "lazy", width: 466, height: 466 });
+  const btn = el("button", { className: "face" + (stale ? " stale" : ""), "aria-label": "Open " + label }, img);
+  btn.onclick = () => { $("lb-img").src = img.src; $("lb-img").alt = label; $("lb-cap").textContent = `${label} · ${id} · ${sha} · sim`; $("lb").showModal(); };
+  return el("figure", {}, btn, el("span", { className: "tag", textContent: "sim · " + sha }), cap);
+}
+$("lb-face").onclick = () => $("lb").close();
+$("lb").onclick = (e) => { if (e.target === $("lb")) $("lb").close(); };
+
+async function loadGallery() {
+  try { renderGallery(await (await fetch("/api/gallery")).json()); } catch {}
+}
+$("b-render").onclick = async () => {
+  $("b-render").disabled = true;
+  try { await fetch("/render", { method: "POST" }); } catch {}
+};
+let done = 0, total = 0;
+function onRender(r) {
+  const p = $("g-progress");
+  if (r.ev === "start") { done = 0; p.hidden = false; p.textContent = `Rendering build ${r.sha}…`; $("b-render").disabled = true; }
+  else if (r.ev === "script") { done++; p.textContent = `Rendering… ${done} scripts done (latest: ${r.script}${r.ok ? "" : ", failed"})`; }
+  else if (r.ev === "done") { p.textContent = `Rendered ${r.shots} screens from ${r.sha}${r.failed ? `, ${r.failed} scripts failed` : ""}.`; }
+  else if (r.ev === "error") { p.textContent = "Render failed: " + r.error; $("b-render").disabled = false; }
+}
+loadGallery();
+setInterval(loadGallery, 20000); /* picks up new commits (the build stamp) without a push */
+
+/* talk */
+const rows = new Map();
 const secs = (a, b) => (a && b ? ((b - a) / 1000).toFixed(1) + " s" : "…");
 const ms = (a, b) => (a && b ? (b - a) + " ms" : "not pushed");
-
-function render() {
+function renderLog() {
   const list = [...rows.values()].sort((a, b) => b.n - a.n);
-  const tb = $("log");
   if (!list.length) return;
-  tb.replaceChildren(...list.map((p) => {
-    const tr = document.createElement("tr");
-    for (const v of [p.n, p.kind, ms(p.sent, p.pushed), secs(p.sent, p.answered)]) {
-      const td = document.createElement("td"); td.textContent = v; tr.appendChild(td);
-    }
-    const rd = document.createElement("td"); rd.className = "reply";
-    if (p.kind === "say" && p.text) { const q = document.createElement("div"); q.className = "muted"; q.textContent = "you: " + p.text; rd.appendChild(q); }
-    if (!p.replies.length) { const w = document.createElement("div"); w.className = "muted"; w.textContent = "waiting…"; rd.appendChild(w); }
-    for (const r of p.replies) { const d = document.createElement("div"); d.textContent = r.text; rd.appendChild(d); }
-    tr.appendChild(rd);
+  $("log").replaceChildren(...list.map((p) => {
+    const tr = el("tr");
+    for (const v of [p.n, p.kind, ms(p.sent, p.pushed), secs(p.sent, p.answered)]) tr.append(el("td", { textContent: v }));
+    const rd = el("td", { className: "reply" });
+    if (p.kind === "say" && p.text) rd.append(el("div", { className: "muted", textContent: "you: " + p.text }));
+    if (!p.replies.length) rd.append(el("div", { className: "muted", textContent: "waiting…" }));
+    for (const r of p.replies) rd.append(el("div", { textContent: r.text }));
+    tr.append(rd);
     return tr;
   }));
 }
-
-const es = new EventSource("/events");
-es.addEventListener("session", (e) => setSession(JSON.parse(e.data)));
-es.addEventListener("press", (e) => { const p = JSON.parse(e.data); rows.set(p.id, p); render(); });
-es.onerror = () => { $("st").textContent = "board server not reachable"; $("st").className = "pill bad"; };
-
 async function press(kind, text = "") {
   try {
-    await fetch("/press", { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind, text, dev, sent: Date.now() }) });
-  } catch { $("st").textContent = "press failed: board server not reachable"; $("st").className = "pill bad"; }
+    await fetch("/press", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text, dev, sent: Date.now() }) });
+  } catch { $("st").textContent = "board server not reachable"; $("st").className = "pill bad"; }
 }
 $("b-ping").onclick = () => press("ping");
 $("b-agent").onclick = () => press("agent");
 $("f-say").onsubmit = (e) => { e.preventDefault(); const t = $("say").value.trim(); if (t) { press("say", t); $("say").value = ""; } };
+
+/* live events */
+const es = new EventSource("/events");
+es.addEventListener("session", (e) => setSession(JSON.parse(e.data)));
+es.addEventListener("press", (e) => { const p = JSON.parse(e.data); rows.set(p.id, p); renderLog(); });
+es.addEventListener("render", (e) => onRender(JSON.parse(e.data)));
+es.addEventListener("gallery", (e) => renderGallery(JSON.parse(e.data)));
+es.onerror = () => { $("st").textContent = "board server not reachable"; $("st").className = "pill bad"; };
 </script>
 </body>
 </html>

@@ -1,0 +1,61 @@
+{
+  "_doc": "Board gallery: the groups, labels and order of the simulator screenshots. Each key under 'shots' is a shot file name (without .png) written by a `shot` line in simulator/scripts/*.txt. tools/board/render.mjs runs every script that has a shot; any shot not listed here appears under 'Other'.",
+  "groups": [
+    { "id": "home", "title": "HOME · deck", "shots": {
+      "deck_work": "Working, with summary",
+      "deck_done": "Done: Focus + Ack",
+      "deck_error": "Error",
+      "deck_mixed": "Mixed ring, Working selected",
+      "deck_ambient": "Ambient (30 s idle)",
+      "deck_stale": "Link lost: stale",
+      "deck_quiet": "Quiet mode on",
+      "deck_long_work": "Long names: working",
+      "deck_long_ask": "Long names: asking"
+    }},
+    { "id": "ring", "title": "Ring", "shots": {
+      "ring_one": "One session",
+      "ring_empty": "No sessions",
+      "ring_work": "Working",
+      "ring_ask": "Asking",
+      "ring_error": "Error",
+      "ring_done": "Done (centre tap)",
+      "ring_done2": "Done",
+      "ring_idle": "Idle",
+      "ring_permission": "Permission waiting",
+      "ring_busy": "12 sessions merged",
+      "ring_busy_scrubbed": "12 sessions, merged slot expanded",
+      "ring_scrub": "Rim scrub"
+    }},
+    { "id": "agent", "title": "AGENT · wheel", "shots": {
+      "agent_wheel": "Wheel: Focus terminal",
+      "agent_wheel_scroll": "Wheel: Scroll terminal",
+      "agent_commit_toast": "After commit: toast"
+    }},
+    { "id": "ask", "title": "ASK · approvals and questions", "shots": {
+      "approve_card": "Approval card",
+      "ask_permission": "Permission request",
+      "ask_hold_progress": "Hold in progress",
+      "ask_grants": "Don't-ask-again grants",
+      "ask_denied": "Denied",
+      "ask_toast_hold": "Tap: hold hint",
+      "ask_error": "Reply failed",
+      "ask_question": "Question with options",
+      "ask_sent": "Answer sent"
+    }},
+    { "id": "scroll", "title": "SCROLL · terminal", "shots": {
+      "scroll_live": "Live",
+      "scroll_preview": "Scrolled, preview line",
+      "scroll_scrolled": "Scrolled far",
+      "scroll_private": "Privacy: no preview",
+      "scroll_unsupported": "Terminal not supported"
+    }},
+    { "id": "status", "title": "STATUS · quick settings", "shots": {
+      "status": "Status rows",
+      "status_quiet": "Quiet until …"
+    }},
+    { "id": "selftest", "title": "Self-test", "shots": {
+      "selftest_ring": "Self-test ring",
+      "selftest_attention": "Self-test attention"
+    }}
+  ]
+}

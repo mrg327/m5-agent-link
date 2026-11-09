@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.BOARD_PORT || 7880);
@@ -126,7 +126,43 @@ process.stdin.on("data", (chunk) => {
 process.stdin.on("end", () => { log("session closed stdin; exiting"); process.exit(0); });
 
 // ── HTTP ──
-const PAGE = fs.readFileSync(path.join(HERE, "board.html"), "utf8");
+// Read per request, so page edits show on reload without restarting the session's MCP server.
+const page = () => fs.readFileSync(path.join(HERE, "board.html"), "utf8");
+
+// ── gallery (B1) ──
+const ROOT = path.resolve(HERE, "../..");
+const SHOTS = path.join(ROOT, "build", "board");
+const STATES = path.join(ROOT, "design", "board", "states.json");
+const readJson_ = (f, d) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return d; } };
+let shaCache = { at: 0, sha: "" };
+function currentSha() {
+  if (Date.now() - shaCache.at < 5000) return shaCache.sha;
+  try {
+    shaCache = { at: Date.now(), sha: execFileSync("node", [path.join(HERE, "render.mjs"), "--sha"], { encoding: "utf8", timeout: 5000 }).trim() };
+  } catch { shaCache = { at: Date.now(), sha: "" }; }
+  return shaCache.sha;
+}
+function gallery() {
+  const latest = readJson_(path.join(SHOTS, "latest.json"), null);
+  const index = latest ? readJson_(path.join(SHOTS, latest.sha, "index.json"), null) : null;
+  return { current: currentSha(), index, states: readJson_(STATES, { groups: [] }), rendering: !!renderJob };
+}
+let renderJob = null;
+function startRender() {
+  if (renderJob) return false;
+  renderJob = spawn("node", [path.join(HERE, "render.mjs")], { cwd: ROOT });
+  let buf2 = "";
+  renderJob.stdout.on("data", (d) => {
+    buf2 += d;
+    let i;
+    while ((i = buf2.indexOf("\n")) >= 0) {
+      const line = buf2.slice(0, i); buf2 = buf2.slice(i + 1);
+      try { broadcast("render", JSON.parse(line)); } catch {}
+    }
+  });
+  renderJob.on("close", () => { renderJob = null; shaCache.at = 0; broadcast("gallery", gallery()); });
+  return true;
+}
 
 function readJson(req) {
   return new Promise((resolve) => {
@@ -144,7 +180,24 @@ const handler = async (req, res) => {
     return;
   }
   if (req.method === "GET" && req.url === "/") {
-    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }).end(PAGE);
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }).end(page());
+    return;
+  }
+  if (req.method === "GET" && req.url === "/api/gallery") {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }).end(JSON.stringify(gallery()));
+    return;
+  }
+  const shot = req.method === "GET" && req.url.match(/^\/shots\/([0-9a-f]{4,40}(?:-dirty)?)\/([a-z0-9_]{1,64})\.png$/);
+  if (shot) {
+    fs.readFile(path.join(SHOTS, shot[1], shot[2] + ".png"), (err, data) => {
+      if (err) res.writeHead(404).end("no such shot");
+      else res.writeHead(200, { "content-type": "image/png", "cache-control": "max-age=31536000, immutable" }).end(data);
+    });
+    return;
+  }
+  if (req.method === "POST" && req.url === "/render") {
+    const started = startRender();
+    res.writeHead(started ? 202 : 409, { "content-type": "application/json" }).end(JSON.stringify({ started }));
     return;
   }
   if (req.method === "GET" && req.url === "/events") {

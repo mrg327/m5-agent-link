@@ -1,6 +1,6 @@
 # Design board: plan
 
-Status: draft for review, 2026-11-09. Nothing below is built yet except the channel proof of concept in `tools/board/` (commit `9ce8617`).
+Status: approved 2026-11-09 (all three open questions answered as recommended). B1 in progress. Nothing below is built yet except the channel proof of concept in `tools/board/` (commit `9ce8617`).
 
 ## Purpose
 
@@ -60,7 +60,7 @@ The page stays one column at phone width.
 
 B1–B3 are each about a day of agent work. B4 is the payoff and the biggest.
 
-## Open questions
+## Decided (2026-11-09)
 
 1. **Where board data lives.** Recommended: `design/board/` on `ui-v2`, with decisions and comments committed and screenshots git-ignored. Alternative: outside the repo (`~/.agentlink/board/`).
 2. **Which session hosts the board.** Recommended: a dedicated "board session" started by `scripts/board`, which relaunches with `--resume` and restarts daily. Its context stays small, and it delegates heavy work (renders, Fable passes) to background agents. Alternative: this working session.

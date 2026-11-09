@@ -9,6 +9,10 @@ A local page that talks to a running Claude Code session with no claude.ai artif
 
 The session starts the server, so the board lives and dies with that session. Timings are appended to `~/.agentlink/board-log.jsonl`.
 
+## Gallery (B1)
+
+`node tools/board/render.mjs` runs every simulator script that has `shot` lines (about 45 s for 42 screens) and writes the PNGs to `build/board/<ui-sha>/`, which is git-ignored. `<ui-sha>` is the last commit that touched `firmware/` or `simulator/`, plus `-dirty` if those have uncommitted changes. When HEAD moves past the rendered build, the page marks the gallery stale and offers Re-render. Groups and labels come from `design/board/states.json`; a shot it doesn't list appears under "Other". `board.html` is read on every request, so page edits only need a reload. Changing `board.mjs` needs `/mcp` → reconnect board.
+
 ## Run
 
 From the worktree, in a terminal you keep open:
