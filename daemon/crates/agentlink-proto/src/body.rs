@@ -130,6 +130,10 @@ body!(
         #[n(10)] #[serde(skip_serializing_if = "Option::is_none")] seen: Option<bool>,
         #[n(11)] #[serde(skip_serializing_if = "Option::is_none")] host: Option<u64>,
         #[n(12)] #[serde(skip_serializing_if = "Option::is_none")] hn: Option<String>,
+        #[n(13)] #[serde(skip_serializing_if = "Option::is_none")] snz: Option<u64>,
+        #[n(14)] #[serde(skip_serializing_if = "Option::is_none")] ntf: Option<bool>,
+        #[n(15)] #[serde(skip_serializing_if = "Option::is_none")] n: Option<u64>,
+        #[n(16)] #[serde(skip_serializing_if = "Option::is_none")] ok: Option<bool>,
     }
 );
 impl Session {
@@ -149,13 +153,17 @@ impl Session {
             seen: None,
             host: None,
             hn: None,
+            snz: None,
+            ntf: None,
+            n: None,
+            ok: None,
         }
     }
 
     /// Applies a delta: keys present in `d` overwrite, absent keys are kept.
     pub fn merge(&mut self, d: &Session) {
         macro_rules! m { ($($f:ident),*) => { $(if d.$f.is_some() { self.$f = d.$f.clone(); })* }; }
-        m!(ag, st, sub, repo, br, tool, t0, tst, sum, seen, host, hn);
+        m!(ag, st, sub, repo, br, tool, t0, tst, sum, seen, host, hn, snz, ntf, n, ok);
     }
 }
 body!(Gone {

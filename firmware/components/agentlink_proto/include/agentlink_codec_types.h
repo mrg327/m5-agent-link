@@ -287,6 +287,22 @@ struct session_uint12tstr {
 	struct zcbor_string session_uint12tstr;
 };
 
+struct session_uint13uint {
+	uint32_t session_uint13uint;
+};
+
+struct session_uint14bool {
+	bool session_uint14bool;
+};
+
+struct session_uint15uint {
+	uint32_t session_uint15uint;
+};
+
+struct session_uint16bool {
+	bool session_uint16bool;
+};
+
 struct session {
 	uint32_t session_uint0uint;
 	struct session_agent_m session_agent_m;
@@ -313,6 +329,14 @@ struct session {
 	bool session_uint11uint_present;
 	struct session_uint12tstr session_uint12tstr;
 	bool session_uint12tstr_present;
+	struct session_uint13uint session_uint13uint;
+	bool session_uint13uint_present;
+	struct session_uint14bool session_uint14bool;
+	bool session_uint14bool_present;
+	struct session_uint15uint session_uint15uint;
+	bool session_uint15uint_present;
+	struct session_uint16bool session_uint16bool;
+	bool session_uint16bool_present;
 };
 
 struct att_kind_r {

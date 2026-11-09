@@ -1,0 +1,17 @@
+{
+  "desc": "Delta (proto 0.3): step 12 of the turn finished ok; summary, snooze and notify state",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 5,
+    "b": {
+      "sid": 3,
+      "tool": "Bash",
+      "sum": "Bash · npm test",
+      "snz": 0,
+      "ntf": true,
+      "n": 12,
+      "ok": true
+    }
+  },
+  "cbor_hex": "a30004010503a7000306644261736809704261736820c2b7206e706d20746573740d000ef50f0c10f5"
+}

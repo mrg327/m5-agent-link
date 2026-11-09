@@ -79,6 +79,12 @@ VECTORS = {
         env("session_upd", 4, {0: 7, 1: 0, 2: 1, 4: "svc", 7: 1793995200, 8: 1793995200, 10: False,
             11: 1, 12: "WIN-BUILD01"}),
     ),
+    "session_monitor": (
+        "Delta (proto 0.3): step 12 of the turn finished ok; summary, snooze and notify state",
+        {"t": "session_upd", "id": 5, "b": {"sid": 3, "tool": "Bash", "sum": "Bash · npm test",
+         "snz": 0, "ntf": True, "n": 12, "ok": True}},
+        env("session_upd", 5, {0: 3, 6: "Bash", 9: "Bash · npm test", 13: 0, 14: True, 15: 12, 16: True}),
+    ),
     "session_delta_done": (
         "Delta: session 1 finished",
         {"t": "session_upd", "id": 3, "b": {"sid": 1, "st": "done", "tst": 1793995300}},

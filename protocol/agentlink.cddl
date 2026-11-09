@@ -186,7 +186,11 @@ session = {
   ? 9 => tstr,               ; sum   preview ≤ 80 chars (privacy-dependent)
   ? 10 => bool,              ; seen
   ? 11 => uint,              ; host  host index: 0 = the daemon's own PC, 1.. = remote hosts (REMOTE.md)
-  ? 12 => tstr              ; hn    remote host name ≤ 16 chars; only with host != 0, only to devices with proto ≥ 0.2
+  ? 12 => tstr,             ; hn    remote host name ≤ 16 chars; only with host != 0, only to devices with proto ≥ 0.2
+  ? 13 => uint,             ; snz   snoozed until (unix); 0 = not snoozed. Keys 13-16 only to devices with proto ≥ 0.3
+  ? 14 => bool,             ; ntf   "notify when done" armed; the daemon clears it in the delta that enters done/error
+  ? 15 => uint,             ; n     tool steps in the current turn (resets on a new prompt)
+  ? 16 => bool              ; ok    result of step n; absent while it runs
 }
 agent = agent_copilot / agent_claude / agent_cloud / agent_other
 agent_copilot = 0

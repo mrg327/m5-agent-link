@@ -72,7 +72,7 @@ device                                 daemon
 ### `hello` (device → daemon)
 ```cddl
 hello = {
-  proto: [uint, uint],             ; [major, minor] = [0, 1]
+  proto: [uint, uint],             ; [major, minor] = [0, 3]
   dev: { class: tstr,              ; "watch" | "desk" | "pad" | "sim" | ...
          board: tstr,              ; "m5stopwatch"
          fw: tstr,                 ; semver
@@ -118,10 +118,22 @@ session = {
   ? sum: tstr,               ; preview ≤ 80 chars (privacy-dependent)
   seen: bool,
   host: uint,                ; host index: 0 = this PC; 1.. = a remote host (REMOTE.md)
-  ? hn: tstr                 ; remote host name (≤ 16 chars), with host != 0 only; sent only to devices
+  ? hn: tstr,                ; remote host name (≤ 16 chars), with host != 0 only; sent only to devices
                              ; whose hello proto is ≥ 0.2 (older firmware rejects unknown keys)
+  ? snz: uint,               ; snoozed until (unix), 0 = not snoozed          ┐ sent only to devices
+  ? ntf: bool,               ; "notify when done" armed                        │ whose hello proto
+  ? n: uint,                 ; tool steps in the current turn                  │ is ≥ 0.3
+  ? ok: bool                 ; result of step n; absent while it runs          ┘
 }
 ```
+- `sum` is the current step: `"<tool> · <argument>"` (the shell command's first line, a file's last two
+  path components, a URL or a search pattern), ≤ 80 chars. The daemon sends it only when the device's
+  privacy is not `meta`; otherwise the device sees `tool` alone.
+- `seen` is the daemon's: it becomes `false` when the session enters `done` or `error` and `true` on
+  `ack`, and every device gets the change.
+- `n` counts `pretooluse` events since the last prompt; `ok` arrives with the matching `posttooluse`
+  (false for a failed, denied or rejected tool). The device builds its step timeline (UI-V2 §4.5) from
+  these two keys and `sum`.
 - `snapshot { sessions: [* session], away?: [* event] }`: a full replacement. It is sent on connect and whenever the daemon thinks the device has drifted. The `away` list holds the events the device missed while disconnected; the device shows them as "while you were away".
 - `session { session }`: an upsert. The daemon sends only the changed keys plus `sid` (a delta).
 - `gone { sid }`: the session has been removed.
@@ -162,6 +174,14 @@ scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tst
 ```
 - `focus`: the daemon runs the FocusDriver for that session. On `no_window`, the device shows "Open terminal not found".
 - `scroll` (UI-V2 §6): the daemon moves the session's terminal scrollback (tmux copy mode first, else kitty remote control; other terminals answer `unsupported` and the device hides the item for that session). The daemon sums a burst into one move while the previous one runs, answers at most one `result` per 250 ms and only when the position changed or the move failed, and clamps `delta` to ±500 lines / ±20 pages. `pos.preview` is the terminal's top visible line, ≤ 48 chars, sent only when the device's privacy is `preview` or `full`; it is never written to the audit log or the trace. Scroll is read-only on the PC and is not audited.
+- `ack`: marks the session seen (all devices). On an `error` session it also dismisses the error: the
+  session becomes `idle`.
+- `snooze`: `arg` minutes (the watch sends 30); `0` cancels. The daemon stores `snz` and sends it to
+  every device. A snoozed session's attention and finish events do not buzz or glow and its ring segment
+  is dimmed; cards still appear. The snooze lapses by the clock; the daemon does not send a clear.
+- `notify_done`: `arg` 1 (or absent) arms, 0 disarms. The daemon sets `ntf`; when the session next
+  enters `done` or `error` the same delta carries `ntf: false`, and each device that saw `ntf` true
+  buzzes once.
 - `detail`: the daemon replies with `detail { rid|sid, text }`, which holds the full text. This is sent only when privacy ≠ `meta`.
 - `approve`/`deny`/`reply` on a `rid` that has already been cleared returns `err: "stale"`, so a race against the terminal answer is safe. The daemon's approval broker holds the agent's blocking hook for that `rid` (DESIGN §6a); the first of {device answer, terminal answer, timeout} settles it, and only a device answer ever becomes a decision for the agent.
 

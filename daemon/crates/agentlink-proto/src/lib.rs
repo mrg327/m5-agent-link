@@ -14,7 +14,7 @@ pub use enums::*;
 pub use envelope::{DecodeError, EncodeError, Envelope, Message, Unknown};
 
 /// Protocol version spoken by this crate: `[major, minor]`.
-pub const PROTO: Version = Version(0, 2);
+pub const PROTO: Version = Version(0, 3);
 
 fn ser_hex<S: serde::Serializer, T: AsRef<[u8]>>(v: &T, s: S) -> Result<S::Ok, S::Error> {
     s.serialize_str(&hex::encode(v.as_ref()))
