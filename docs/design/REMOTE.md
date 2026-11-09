@@ -1,7 +1,7 @@
-# m5-agent-link: remote sessions over SSH (design, not built)
+# m5-agent-link: remote sessions over SSH
 
-Status: design only. Tracking issue: `20261109-371b`.
-Nothing below is implemented yet. Items marked **[unverified]** still need a live test.
+Status: built (issue `20261109-371b`). It was tested on the Mac with a stand-in for `ssh -R`, but
+not yet against a real Windows machine (§6). Items marked **[unverified]** still need a live test.
 
 ## 1. Goal
 
@@ -42,106 +42,118 @@ There are three problems:
 ## 3. Design
 
 ```
-Windows (remote)                                      Mac (local)
-copilot ─hook─► agentlink-hook.exe                    agentlinkd ──BLE──► watch
-                 │ AGENTLINK_REMOTE=tcp:127.0.0.1:47533     ▲
-                 ▼                                          │ ~/.agentlink/remote.sock
-            127.0.0.1:47533 ◄════ ssh tunnel ════► (separate listener, token required)
+Windows (remote)                                       Mac (local)
+copilot ─hook─► agentlink-hook.exe                     agentlinkd ──BLE──► watch
+                 │ AGENTLINK_REMOTE=tcp:127.0.0.1:47533      ▲
+                 ▼                                           │ ~/.agentlink/remote-<id>.sock
+            127.0.0.1:47533 ◄═════ ssh -R (agentlink ssh) ════╛ (per window, token required)
 ```
 
-### 3.1 A separate remote listener (daemon)
+### 3.1 Remote listeners (daemon)
 
-- `agentlinkd` binds a second Unix socket, `~/.agentlink/remote.sock` (mode 0600). It only
-  does this when `~/.agentlink/remote.token` exists. `agentlink remote init` creates that
-  file: 32 random bytes, hex, mode 0600.
-- Every connection on `remote.sock` is treated as remote. Its first line must be
-  `{"auth":"<token>","host":"<name>","os":"win"}`. The token is compared in constant time;
-  on a mismatch the daemon closes the connection and writes an audit entry. After that the
-  usual hook protocol follows unchanged.
-- `hook.sock` stays local-only. A message on `hook.sock` can never claim to be remote, and
-  the tunnel never points at `hook.sock`.
+- `hook.sock` stays local-only. A line on it can never claim to be remote, and no tunnel
+  points at it. `{"ctl":...}` requests (status, attach) are accepted there only.
+- Remote connections arrive on one of two kinds of socket (all mode 0600 in `~/.agentlink`,
+  which `AGENTLINK_HOME` moves):
+  - `remote-<id>.sock`: one per **attach**. `agentlink ssh` asks for it with
+    `{"ctl":"remote_attach","ctx":{cwd, env, tty, pids}}` on `hook.sock`. The reply is
+    `{"ok":true,"id":N,"socket":"<path>"}`. The attach and its socket live exactly as long
+    as that ctl connection stays open; `agentlink ssh` holds it until ssh exits. Sessions
+    that arrive through an attach can be focused and scrolled (§3.3).
+  - `remote.sock`: always bound, for tunnels opened by hand (§4, RDP case). Its sessions are
+    shown and answerable, but focus and scroll answer `unsupported`.
+- Every remote connection must send `{"auth":"<token>","host":"<name>","os":"win"}` as its
+  first line, within 10 s. There is no reply to it. The token is `~/.agentlink/remote.token`,
+  64 hex chars written by `agentlink remote init`. It is re-read on every connection, so
+  `agentlink remote init --rotate` applies at once; with no token file, every remote
+  connection is refused. The compare is constant-time. A refusal is audited as
+  `remote_auth_fail` (host, reason; never the token) and the connection is closed. A good
+  line is audited as `remote_auth_ok`. After it, the normal hook protocol follows,
+  including the blocking `await` flow; `ctl` lines are ignored. Remote hook lines are traced
+  with source `remote`.
+- The host name is reduced to `[A-Za-z0-9._-]`, at most 32 chars (empty: `remote`).
 
 ### 3.2 Remote transport in the hook (Windows)
 
-- New environment variable `AGENTLINK_REMOTE=tcp:127.0.0.1:<port>`. When it is set, the
-  hook connects there instead of the named pipe and sends the auth line first. The token
-  comes from `%USERPROFILE%\.agentlink\remote.token` (or `AGENTLINK_HOME`), and `host` from
-  `COMPUTERNAME`.
-- The hook only accepts loopback addresses. `tcp:` to any other address is refused, so a
-  misconfiguration cannot send prompt text across the network unencrypted.
+- `AGENTLINK_REMOTE=tcp:<127.0.0.1|localhost|[::1]>:<port>`. When it is set, the hook uses
+  only this transport, not the named pipe. It connects with a 300 ms timeout, sends the auth
+  line and then the hook line. The token comes from `remote.token` in `AGENTLINK_HOME`, or
+  `%USERPROFILE%\.agentlink`; the host name from `COMPUTERNAME` (else `HOSTNAME`, else
+  `remote`).
+- Any other address is refused with one stderr line, so a misconfiguration cannot send
+  prompt text across the network unencrypted. A missing token sends nothing.
+- A remote hook line also carries `"branch"`, read from the agent's cwd `.git/HEAD` on
+  Windows. The daemon never reads remote paths on the Mac. The repo name is the last
+  component of the cwd, split on `/` and `\`.
 - All existing behaviour stays: fail-open, the 1.5 s deadline, exit 0, and the
   `AGENTLINK_WAIT_MS` wait for blocking Claude hooks. If the tunnel is down, the connect
   fails quickly and the agent shows its normal terminal prompt.
-- Secure the token file with the user's ACL only (`icacls`, set by `agentlink remote init`
-  when run on Windows, or by the setup steps below).
 
 ### 3.3 Hosts and routing
 
-- The daemon gives each remote `host` name a host index (1, 2, ...). Local sessions stay 0.
-  The protocol already carries `session.host` (PROTOCOL.md: "always 0 in v1"). The welcome
-  or snapshot then needs a host table (`{idx, name, os}`) so the watch can show a host badge.
-  That is a protocol and firmware follow-up. Until it exists, the watch shows remote
-  sessions without a badge.
-- The `HostCtx` of a remote session is stored for display only, never passed to local
-  drivers. Session ids are minted by the daemon, so remote and local sids cannot collide.
-- **Focus and scroll** for a remote session use the *local* terminal that holds the SSH
-  connection, not the remote context:
-  - `agentlink ssh <host> [ssh args]` is a thin wrapper. It picks a free port, runs
-    `ssh -R 127.0.0.1:<port>:$HOME/.agentlink/remote.sock <host> ...`, and registers
-    `{host, local HostCtx of this terminal}` with the daemon. The local context is the
-    wrapper's own `KITTY_WINDOW_ID`, `TMUX_PANE` and pid chain.
-  - Focus on a remote session raises that local kitty/tmux window. Scroll goes to the same
-    window: the kitty wheel kitten sends the wheel/arrow input into the SSH pty, so it
-    reaches the remote Copilot TUI on its alternate screen. On the main screen, kitty
-    scrolls its local history.
-  - If no local window is registered for the host (tunnel started by hand, RDP, VS Code
-    Remote, ...), focus and scroll answer `unsupported` and the watch hides them for that
-    session.
-- If several remote Copilot sessions share one SSH window (for example several panes
-  inside the remote session), focus and scroll reach the window, not the pane. This is
-  accepted.
+- The daemon gives each remote host name (case-insensitive) a host index, 1, 2, ..., stable
+  while the daemon runs. Local sessions stay 0. Remote session keys are
+  `r:<host>|<agent>:<session id>`, so they never merge with a local session.
+- Sessions carry `host` and, for remote ones, `hn` (the host name, ≤ 16 chars; PROTOCOL.md
+  §4). `hn` goes only to devices whose hello says proto ≥ 0.2, because older firmware rejects
+  unknown keys. The watch shows the host name next to the repo of a remote session
+  (UI-V2.md).
+- The `HostCtx` of a remote session (Windows pids, env, tty) is kept for display only and is
+  never passed to a focus or scroll driver. `registry.route(sid)` decides:
+  - a local session: its own ctx;
+  - a remote session whose latest line came through a **live** attach: that attach's local
+    ctx, i.e. the kitty/tmux window running `agentlink ssh`;
+  - otherwise `unsupported`, without calling a driver.
+- So focus raises the local kitty or tmux window that holds the SSH session. Scroll goes to
+  the same window: the kitty wheel kitten sends wheel or arrow input into the SSH pty, which
+  reaches the remote Copilot TUI on its alternate screen. On the main screen, kitty scrolls
+  its local history.
+- If several remote sessions share one SSH window (for example panes inside it), focus and
+  scroll reach the window, not the pane. This is accepted.
 
 ### 3.4 Lifetime and liveness
 
-- When the tunnel drops, remote hooks fail open. The remote sessions' records age out like
-  local ones, through the normal `SessionEnd`/staleness path.
-- `agentlink ssh` unregisters its window when ssh exits.
-- An open attention whose hook connection drops gets the `Clear` path the broker already
-  uses for a hook that is gone (d-answer-gone).
+- When the tunnel drops, remote hooks fail open. Remote session records stay until their
+  `SessionEnd`, as local ones do.
+- When `agentlink ssh` exits, its attach socket is removed (audited as
+  `remote_attach_close`) and that window's sessions stop being focusable.
+- An open attention whose hook connection drops is cleared the way the broker already
+  clears a hook that is gone.
 
-## 4. Setup (target user flow)
+## 4. Setup
 
 Prerequisites:
 - On Windows: OpenSSH Server running, and `AllowTcpForwarding` left at its default (`yes`).
   `GatewayPorts` left at `no`, so the forward binds loopback only.
 - Copilot CLI hooks on Windows point at `agentlink-hook.exe`, as for a local Windows install
-  (`agentlink hooks print`).
-- The same `agentlink-hook.exe` version as the Mac daemon, or one with a compatible
-  protocol major.
+  (`agentlink hooks print`). Build it on Windows with
+  `cargo build --release -p agentlink-hook`.
+- On the Mac: `agentlinkd` running, from this version on.
 
 Once:
 ```sh
 # Mac
-agentlink remote init                  # creates ~/.agentlink/remote.token (0600)
+agentlink remote init                  # ~/.agentlink/remote.token (0600); --rotate replaces it
+ssh <win-host> mkdir .agentlink
 scp ~/.agentlink/remote.token <win-host>:.agentlink/remote.token
-ssh <win-host> icacls %USERPROFILE%\.agentlink\remote.token /inheritance:r /grant:r "%USERNAME%:R"
+ssh <win-host> icacls .agentlink\remote.token /inheritance:r /grant:r "%USERNAME%:R"
 ```
 ```powershell
-# Windows, user environment (persist with setx)
+# Windows, user environment (new shells pick it up)
 setx AGENTLINK_REMOTE tcp:127.0.0.1:47533
 ```
 
 Each time:
 ```sh
 # Mac, in kitty (or tmux): opens the shell and the tunnel together
-agentlink ssh <win-host>               # = ssh -R 127.0.0.1:47533:$HOME/.agentlink/remote.sock <win-host>
+agentlink ssh <win-host> [ssh args]    # = ssh -o ExitOnForwardFailure=yes -R 127.0.0.1:47533:~/.agentlink/remote-<id>.sock <win-host>
 # then start copilot in that shell
 ```
 
-A fixed port (47533 above) keeps `AGENTLINK_REMOTE` static on Windows. If the port is
-already taken on Windows (a second Mac, or a stale sshd forward), ssh warns "remote port
-forwarding failed". The wrapper then exits with that message instead of opening a shell
-without the tunnel.
+`--port` changes 47533; `AGENTLINK_SSH` changes the ssh binary. If the port is already
+taken on Windows (a second Mac, or a stale sshd forward), `ExitOnForwardFailure` makes ssh
+exit instead of opening a shell without the tunnel. `agentlink status` lists the remote
+hosts and the attached windows.
 
 **RDP-only case.** If you reach Windows over RDP and there is no SSH session from the Mac,
 the Windows side can open the tunnel instead:
@@ -152,24 +164,24 @@ unsupported in this case (§3.3).
 ## 5. Security notes
 
 - The remote channel can show text on the watch and receive answers. It cannot run
-  commands on the Mac: remote `HostCtx` never reaches a focus or scroll driver.
+  commands on the Mac: a remote `HostCtx` never reaches a focus or scroll driver.
 - The token gates the Windows loopback port. Without it, another user on the Windows
   machine could put fake requests on the watch and read the answers. Revoke a token with
-  `agentlink remote init --rotate`, which re-creates the file; old tunnels then fail auth.
-- Everything is audited as it is for local sessions, plus the `host` name and auth failures.
+  `agentlink remote init --rotate`; old copies then fail auth.
+- Everything is audited as for local sessions. Decisions also record the session's `host`
+  index, and auth successes and failures are audited too.
 - Approving from the watch has the same limits as locally (`hold_ms >= 1000`,
   first answer wins, stale answers acked as `stale`).
 
-## 6. Work items
+## 6. Verification
 
-1. daemon: `remote.sock` listener, token auth, host index table, remote ctx kept out of
-   drivers, `agentlink remote init [--rotate]`, `agentlink ssh` (+ window registration over
-   the CLI's status IPC).
-2. hook: `AGENTLINK_REMOTE=tcp:` transport (loopback only) with the auth line; unit test for
-   the loopback check and the auth line.
-3. focus/scroll: route `host != 0` to the registered local window, else `Unsupported`.
-4. protocol + firmware: host table in welcome/snapshot, host badge on session rows.
-5. docs: README environment table (`AGENTLINK_REMOTE`), PROTOCOL `host` wording.
-6. live test: Mac + Windows 11 with OpenSSH Server. Covers the tunnel, approve/deny from
-   the watch, tunnel drop (fail-open), a wrong token, and port in use. Also check focus and
-   scroll through kitty into the Windows Copilot TUI.
+- Unit tests: token and constant-time compare, host sanitize, auth lines, remote keys and
+  host index, routing (no attach, live attach, dropped attach), `hn` only for proto ≥ 0.2,
+  the hook's loopback check and TCP transport, and the `agentlink ssh` argv.
+- On the Mac, with a fake `ssh` that forwards TCP to the attach socket: remote sessions
+  `@WIN-TEST` appear with Windows-path repo names, a blocking hook falls back after its
+  wait, a bad token and a non-loopback address are refused, and the attach socket goes away
+  when ssh exits.
+- **Still to do on real hardware:** Mac + Windows 11 with OpenSSH Server. Covers the
+  tunnel, approve/deny from the watch, tunnel drop (fail-open), a port already in use, and
+  focus and scroll through kitty into the Windows Copilot TUI.

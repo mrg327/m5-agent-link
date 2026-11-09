@@ -65,10 +65,12 @@ listen_on unix:/tmp/kitty
 | `AGENTLINK_BLE_NAME` | Connect only to the device advertising this name (`AgentLink-XXXX`) |
 | `AGENTLINK_BLE_WRITE_LEN` | BLE write size in bytes (default 20) |
 | `AGENTLINK_PIPE` | Windows only: hook named-pipe name override |
+| `AGENTLINK_REMOTE` | Hook on a remote machine: `tcp:127.0.0.1:<port>`, the loopback end of an SSH tunnel to the daemon (REMOTE.md) |
+| `AGENTLINK_SSH` | ssh binary used by `agentlink ssh` (default `ssh` on PATH) |
 
 Hook IPC uses `$AGENTLINK_HOME/hook.sock` on Unix. On Windows it is the named pipe `\\.\pipe\agentlink-<USERNAME>-<fnv64 of the socket path>`.
 
-Remote sessions (Copilot on a Windows machine reached over SSH, watch on this machine) are designed but not built yet: [docs/design/REMOTE.md](docs/design/REMOTE.md).
+Remote sessions: Copilot can run on a Windows machine reached over SSH while the watch stays on this machine. Run `agentlink remote init` once, then `agentlink ssh <win-host>`. Setup and security: [docs/design/REMOTE.md](docs/design/REMOTE.md).
 
 ## Status
 
