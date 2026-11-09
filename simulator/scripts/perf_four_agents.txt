@@ -1,0 +1,129 @@
+# Draw budget with four busy agents: each session delta may repaint what changed, not the whole screen
+# (LVGL invalidates on every style write, even an unchanged one). 16 deltas, one per frame, on the deck,
+# in AGENT (the deck must leave the ring alone) and in WATCH on session 1. The comet animation alone is ~0.3 M px
+# over this window; before the change-only setters the deck leg cost ~3.5 M.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login
+session 2 work api main
+session 3 work infra main
+session 4 work docs main
+wait 1500
+px_reset
+step 1 1 Read · src/a.c
+wait 50
+step 2 1 Bash · make
+wait 50
+step 3 1 Grep · TODO
+wait 50
+step 4 1 Edit · README.md
+wait 50
+step 1 1 ok
+wait 50
+step 2 1 ok
+wait 50
+step 3 1 ok
+wait 50
+step 4 1 ok
+wait 50
+step 1 2 Edit · src/b.c
+wait 50
+step 2 2 Bash · make test
+wait 50
+step 3 2 Read · main.tf
+wait 50
+step 4 2 Write · notes.md
+wait 50
+step 1 2 ok
+wait 50
+step 2 2 ok
+wait 50
+step 3 2 ok
+wait 50
+step 4 2 ok
+wait 50
+expect_px_max 900000
+tap 233 233
+wait 300
+expect_screen agent
+px_reset
+step 1 1 Read · src/a.c
+wait 50
+step 2 1 Bash · make
+wait 50
+step 3 1 Grep · TODO
+wait 50
+step 4 1 Edit · README.md
+wait 50
+step 1 1 ok
+wait 50
+step 2 1 ok
+wait 50
+step 3 1 ok
+wait 50
+step 4 1 ok
+wait 50
+step 1 2 Edit · src/b.c
+wait 50
+step 2 2 Bash · make test
+wait 50
+step 3 2 Read · main.tf
+wait 50
+step 4 2 Write · notes.md
+wait 50
+step 1 2 ok
+wait 50
+step 2 2 ok
+wait 50
+step 3 2 ok
+wait 50
+step 4 2 ok
+wait 50
+expect_px_max 100000
+btn B long
+wait 300
+expect_screen ring
+tap 233 233
+wait 300
+btn B
+wait 150
+expect_label > Watch
+btn A
+wait 300
+expect_screen watch
+px_reset
+step 1 1 Read · src/a.c
+wait 50
+step 2 1 Bash · make
+wait 50
+step 3 1 Grep · TODO
+wait 50
+step 4 1 Edit · README.md
+wait 50
+step 1 1 ok
+wait 50
+step 2 1 ok
+wait 50
+step 3 1 ok
+wait 50
+step 4 1 ok
+wait 50
+step 1 2 Edit · src/b.c
+wait 50
+step 2 2 Bash · make test
+wait 50
+step 3 2 Read · main.tf
+wait 50
+step 4 2 Write · notes.md
+wait 50
+step 1 2 ok
+wait 50
+step 2 2 ok
+wait 50
+step 3 2 ok
+wait 50
+step 4 2 ok
+wait 50
+expect_px_max 800000
+quit
