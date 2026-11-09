@@ -299,7 +299,7 @@ A live monitor for one running session on the small screen. Opened by the "Watch
 - When the session is not working, the centre shows the state instead: Done `Finished · 3m ago`, Error `Error`, Input `Waiting for you` with `tap to answer`, Idle `Idle`.
 - No timeout: WATCH stays until you leave. The display still turns off after 10 s idle, and the wrist raise wakes it on the same screen.
 - If the watched session ends or is removed, the device goes back to HOME with the toast "Session ended".
-- An attention for any session behaves as on HOME and may open ASK. When ASK closes, the device returns to HOME and watching stops (the ASK return path goes to HOME).
+- An attention for any session behaves as on HOME and may open ASK. When ASK closes (answered and cleared, B long, a question's swipe down, Open on PC), the device returns to WATCH on the session it was watching, if that session is still there; the A+B chord in ASK goes to HOME and watching stops. Checked by `watch_ask_return.txt`.
 - A Done or Error transition of the watched session buzzes the finished pattern (§5), unless it is snoozed or quiet mode runs.
 
 | Input | Action |

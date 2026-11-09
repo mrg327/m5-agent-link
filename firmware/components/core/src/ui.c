@@ -123,8 +123,12 @@ static void place_toast(void)
 
 bool ui_toast_active(void) { return !lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN); }
 
+/* The session WATCH was on when ASK took over; ASK returns there instead of HOME. */
+static uint32_t s_resume_watch_sid;
+
 static void enter_mode(nav_mode_t m)
 {
+    if (m != MODE_ASK) s_resume_watch_sid = 0;
     if (m == s_mode) return;
     if (s_mode == MODE_AGENT) ui_agent_close();
     if (s_mode == MODE_ASK) ui_ask_close();
@@ -143,7 +147,25 @@ static void enter_mode(nav_mode_t m)
     dbg_event("ui", "mode", "\"mode\":\"%s\"", nav_mode_name(m));
 }
 
-void ui_go_home(void) { enter_mode(MODE_HOME); }
+/* ASK opened over WATCH goes back to WATCH when it closes, if the watched session is still there. */
+static void leave_mode(void)
+{
+    uint32_t sid = s_mode == MODE_ASK ? s_resume_watch_sid : 0;
+    const session_t *s = sid ? model_find(sid) : NULL;
+    enter_mode(MODE_HOME);
+    if (!s || s->state == SESS_ENDED) return;
+    ui_home_select_sid(sid, "watch");
+    enter_mode(MODE_WATCH);
+}
+
+static void open_ask(void)
+{
+    uint32_t resume = s_mode == MODE_WATCH ? ui_watch_sid() : 0;
+    enter_mode(MODE_ASK);
+    if (s_mode == MODE_ASK) s_resume_watch_sid = resume;
+}
+
+void ui_go_home(void) { leave_mode(); }
 void ui_go_scroll(void) { enter_mode(MODE_SCROLL); }
 void ui_go_status(void) { enter_mode(MODE_STATUS); }
 void ui_go_watch(void) { enter_mode(MODE_WATCH); }
@@ -164,8 +186,12 @@ void ui_show_session(uint32_t sid)
 /* A permission or question opens ASK on its session (UI-V2 §2); done/error only update the card. */
 void ui_show_attention(uint32_t sid)
 {
+    uint32_t resume = s_mode == MODE_WATCH ? ui_watch_sid() : s_mode == MODE_ASK ? s_resume_watch_sid : 0;
     ui_show_session(sid);
-    if (ui_home_sel_sid() == sid && ui_home_askable()) enter_mode(MODE_ASK);
+    if (ui_home_sel_sid() == sid && ui_home_askable()) {
+        enter_mode(MODE_ASK);
+        s_resume_watch_sid = resume;
+    }
 }
 
 uint32_t ui_pending_attention_sid(void)
@@ -230,7 +256,7 @@ void ui_tick(uint32_t now_ms)
         s_seen_rev = model_rev();
         ui_home_refresh(now_ms);
         if (s_mode == MODE_AGENT && !ui_agent_refresh(now_ms)) enter_mode(MODE_HOME);
-        if (s_mode == MODE_ASK && !ui_ask_refresh(now_ms)) enter_mode(MODE_HOME);
+        if (s_mode == MODE_ASK && !ui_ask_refresh(now_ms)) leave_mode();
         if (s_mode == MODE_SCROLL && !ui_scroll_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_STATUS) ui_status_refresh(now_ms);
         if (s_mode == MODE_WATCH && !ui_watch_refresh(now_ms)) {
@@ -240,7 +266,7 @@ void ui_tick(uint32_t now_ms)
     }
     ui_home_tick(now_ms);
     if (s_mode == MODE_AGENT && ui_agent_tick(now_ms)) enter_mode(MODE_HOME);
-    if (s_mode == MODE_ASK && ui_ask_tick(now_ms)) enter_mode(MODE_HOME);
+    if (s_mode == MODE_ASK && ui_ask_tick(now_ms)) leave_mode();
     if (s_mode == MODE_SCROLL && ui_scroll_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_STATUS && ui_status_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_WATCH) ui_watch_tick(now_ms);
@@ -272,7 +298,7 @@ bool ui_on_gesture(const gesture_evt_t *g)
             g_ui_actions->reject();
             return true;
         }
-        enter_mode(MODE_ASK);
+        open_ask();
         g_ui_actions->tick();
         return true;
     case NAV_OPEN_STATUS:
@@ -283,7 +309,7 @@ bool ui_on_gesture(const gesture_evt_t *g)
     case NAV_BACK:
         if (g->kind == G_SWIPE_DOWN && !nav_long_swipe_down(g->y, s_rel_y)) return true; /* too short: ignored */
         if (s_mode == MODE_SCROLL && g->kind == G_TAP && ui_scroll_caught()) return true; /* it stopped a glide */
-        enter_mode(MODE_HOME);
+        leave_mode();
         g_ui_actions->tick();
         return true;
     case NAV_HOME:

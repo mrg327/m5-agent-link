@@ -181,6 +181,8 @@ sim_script_test(sim_agent_items agent_items.txt FAIL_REGULAR_EXPRESSION "SCRIPT 
 set_tests_properties(sim_agent_items PROPERTIES TIMEOUT 60)
 sim_script_test(sim_watch watch.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_watch PROPERTIES TIMEOUT 60)
+sim_script_test(sim_watch_ask_return watch_ask_return.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+set_tests_properties(sim_watch_ask_return PROPERTIES TIMEOUT 60)
 
 sim_script_test(sim_finished_buzz finished_buzz.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"glow\""

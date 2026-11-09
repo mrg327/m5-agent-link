@@ -1,0 +1,57 @@
+# WATCH + ASK (UI-V2 §4.7): a question that opens ASK over WATCH returns to WATCH on the watched
+# session when ASK closes (the daemon's clear, B long), even when the question was for another
+# session. The A+B chord still goes Home.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login
+session 2 work api main
+wait 300
+tap 233 233
+wait 300
+btn B
+wait 150
+expect_label > Watch
+btn A
+wait 300
+expect_screen watch
+expect_label webapp
+# a question on the watched session: answer it, the clear returns to WATCH
+session 1 ask webapp feat/login
+attention 8 1 question reply,focus 0 Which framework?|Pick the UI library|React|Vue
+wait 400
+expect_screen ask
+expect_label > React
+tap 233 233
+wait 300
+expect_label Sent "React"
+result ok
+clear 8 answered_dev
+session 1 work webapp feat/login
+wait 300
+expect_screen watch
+expect_label webapp
+# a question on another session: B long leaves ASK, WATCH is back on the watched session
+session 2 ask api main
+attention 9 2 question reply,focus 0 Run migrations?|Before the deploy|Yes|No
+wait 400
+expect_screen ask
+btn B long
+wait 300
+expect_screen watch
+expect_label webapp
+clear 9 answered_pc
+wait 300
+expect_screen watch
+# the chord in ASK goes Home and watching stops
+session 1 ask webapp feat/login
+attention 10 1 question reply,focus 0 Keep going?|Next step|Yes|No
+wait 400
+expect_screen ask
+chord
+wait 300
+expect_screen attention
+clear 10 answered_pc
+wait 300
+expect_screen ring
+quit
