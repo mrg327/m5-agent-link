@@ -16,6 +16,7 @@ static const char *TAG = "sw-touch";
 #define REG_SLEEP 0xE5
 
 static i2c_master_dev_handle_t s_dev;
+static bool s_asleep;
 
 static bool rd(uint8_t reg, uint8_t *buf, size_t len)
 {
@@ -68,8 +69,12 @@ void sw_touch_sleep(bool sleep)
     if (!s_dev) {
         return;
     }
+    if (sleep == s_asleep) {
+        return;
+    }
+    s_asleep = sleep;
     if (sleep) {
-        uint8_t cmd[2] = {REG_SLEEP, 0x03};
+        uint8_t cmd[2] = {REG_SLEEP, 0x03}; /* deep sleep: no touch reports until a reset */
         i2c_master_transmit(s_dev, cmd, sizeof(cmd), 50);
     } else {
         sw_touch_reset(); /* the controller wakes on a reset pulse */

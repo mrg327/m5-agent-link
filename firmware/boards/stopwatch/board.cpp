@@ -44,8 +44,9 @@ hal_wake_t hal_wake_reason(void)
     }
 }
 
-/* ESP32-S3 deep sleep: only the RTC domain, PM1 and IOE1 stay up. Either button (G1/G2, active low,
- * both RTC IOs) wakes it through EXT1, as does the optional timer; a wake is a reboot. The PM1 power
+/* ESP32-S3 deep sleep: only the RTC domain, PM1, IOE1 and the (sleeping) panel/touch rail stay up.
+ * Either button (G1/G2, active low, both RTC IOs) or a touch (CST820 INT on G13) wakes it through
+ * EXT1, as does the optional timer; a wake is a reboot. The PM1 power
  * button (single click = reset) is the recovery path if anything here goes wrong. */
 static bool deep_sleep(uint32_t wake_after_s)
 {
@@ -54,6 +55,12 @@ static bool deep_sleep(uint32_t wake_after_s)
         if (gpio_get_level(p) == 0) {
             return false; /* a held button would wake us at once and its release would be lost */
         }
+    }
+    /* Tap to wake: the CST820 pulls INT (G13, an RTC IO) low while touched. If it is low now (a
+     * finger, or a line that idles low), leave it out rather than wake straight back up. */
+    uint64_t mask = (1ULL << SW_PIN_BTN_A) | (1ULL << SW_PIN_BTN_B);
+    if (gpio_get_level((gpio_num_t)SW_PIN_TOUCH_INT) == 1) {
+        mask |= 1ULL << SW_PIN_TOUCH_INT;
     }
     hal_haptic_play(NULL, 0);
     vTaskDelay(pdMS_TO_TICKS(20));
@@ -64,8 +71,7 @@ static bool deep_sleep(uint32_t wake_after_s)
         rtc_gpio_pulldown_dis(p);
     }
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON); /* keeps the pull-ups */
-    if (esp_sleep_enable_ext1_wakeup_io((1ULL << SW_PIN_BTN_A) | (1ULL << SW_PIN_BTN_B), ESP_EXT1_WAKEUP_ANY_LOW) !=
-        ESP_OK) {
+    if (esp_sleep_enable_ext1_wakeup_io(mask, ESP_EXT1_WAKEUP_ANY_LOW) != ESP_OK) {
         return false;
     }
     if (wake_after_s) {
@@ -76,7 +82,6 @@ static bool deep_sleep(uint32_t wake_after_s)
              (unsigned)wake_after_s);
     hal_debug_line(line);
     vTaskDelay(pdMS_TO_TICKS(50)); /* let the line drain */
-    sw_ioe_write(SW_IOE_L3B_AMOLED, false); /* IOE1 stays up, so drop the AMOLED rail; boot re-inits it */
     esp_deep_sleep_start();
     return true; /* not reached */
 }
@@ -176,13 +181,13 @@ void hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
         sw_touch_sleep(false);
         break;
     case HAL_POWER_STANDBY:
-        /* TODO(power): auto light-sleep with BLE kept connected; wake on buttons / G12. */
-        sw_touch_sleep(true);
+        /* TODO(power): auto light-sleep with BLE kept connected; wake on buttons / G12.
+         * Touch stays in its normal (self-dozing) mode so a tap wakes the display. */
         hal_display_set_power(false);
         break;
     case HAL_POWER_DEEP:
-        /* Only reached on battery with no host (guard above), so losing USB Serial/JTAG is fine. */
-        sw_touch_sleep(true);
+        /* Only reached on battery with no host (guard above), so losing USB Serial/JTAG is fine.
+         * Touch stays awake: its INT line (G13) is a deep-sleep wake source, so a tap wakes too. */
         hal_display_set_power(false);
         if (!deep_sleep(wake_after_s)) {
             state = HAL_POWER_STANDBY; /* a button is held: its release is input and wakes the display */

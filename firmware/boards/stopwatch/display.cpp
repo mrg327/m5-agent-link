@@ -211,7 +211,7 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
     (void)indev;
     static lv_point_t last = {0, 0};
     uint16_t x, y;
-    if (s_powered && sw_touch_read(&x, &y)) {
+    if (sw_touch_read(&x, &y)) { /* read while dark too: a tap wakes the display (the core spends it) */
         last.x = x >= SW_PANEL_W ? SW_PANEL_W - 1 : x;
         last.y = y >= SW_PANEL_H ? SW_PANEL_H - 1 : y;
         data->state = LV_INDEV_STATE_PRESSED;

@@ -292,14 +292,33 @@ static void log_gesture(const gesture_evt_t *g)
     }
 }
 
+static bool is_touch_gesture(gesture_kind_t k)
+{
+    return !(k == G_BTN_A || k == G_BTN_B || k == G_BTN_A_LONG || k == G_BTN_B_LONG || k == G_BTN_A_DOUBLE ||
+             k == G_CHORD || k == G_LIFT || k == G_SHAKE);
+}
+
+/* The touch that wakes the display (or reveals a glow) is spent on that: every later event of the
+ * same contact (long press, release, swipe) is dropped, so a finger that lands on a dark screen and
+ * stays there can never become a hold on the card that appears under it. */
+static bool s_swallow_touch;
+
 static void dispatch(const gesture_evt_t *g)
 {
     log_gesture(g);
     if (g->kind == G_LIFT) return;
+    bool touch = is_touch_gesture(g->kind);
+    if (s_swallow_touch && touch) {
+        if (!s_gesture.pressed) s_swallow_touch = false; /* the waking contact has lifted */
+        power_activity(app_now_ms()); /* still activity: the display stays on under the finger */
+        return;
+    }
     bool glow = ui_glow_active();
     if (power_activity(app_now_ms())) { /* first touch only wakes the display (a glow: reveals the request) */
         uint32_t sid = glow ? ui_pending_attention_sid() : 0;
         if (sid) ui_show_attention(sid);
+        if (touch && s_gesture.pressed) s_swallow_touch = true;
+        dbg_event("power", "wake_input", "\"touch\":%s", touch ? "true" : "false");
         return;
     }
     ui_on_gesture(g);

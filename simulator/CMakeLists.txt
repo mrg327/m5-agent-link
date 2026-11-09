@@ -84,6 +84,12 @@ add_test(NAME sim_approve_after_glow
 set_tests_properties(sim_approve_after_glow PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
                      FAIL_REGULAR_EXPRESSION "SCRIPT FAIL" PASS_REGULAR_EXPRESSION "\"op\":3")
 sim_script_test(sim_approve_too_soon approve_too_soon.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
+# Tap to wake: the contact that wakes a dark display is spent on waking, so it can never approve.
+add_test(NAME sim_tap_wake_hold
+         COMMAND agentlink_sim --headless --no-ws --idle-off 1 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/tap_wake_hold.txt)
+set_tests_properties(sim_tap_wake_hold PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3"
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"display_off\".*\"wake_input\",\"touch\":true")
 
 # Power: DEEP only on battery with no link, counted from display-off; timer wakes stay dark and
 # silent. Timer wakes are off (POWER_TIMER_WAKES=0), so every DEEP arms buttons only (wake_after_s 0).
