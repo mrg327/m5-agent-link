@@ -346,6 +346,9 @@ async fn serve(
                 Err(RecvError::Lagged(_)) => {
                     let sessions = shared.registry.snapshot();
                     c.send(None, Message::Snapshot(Snapshot { sessions, away: None })).await?;
+                    for att in shared.broker.pending() {
+                        c.send(None, Message::Attention(att)).await?;
+                    }
                 }
                 Err(RecvError::Closed) => return Ok(()),
             },

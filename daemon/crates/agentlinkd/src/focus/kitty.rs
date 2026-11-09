@@ -88,8 +88,8 @@ pub fn scroll_amount(unit: ScrollUnit, delta: i64) -> Option<String> {
     match unit {
         ScrollUnit::ToEnd => Some(if delta < 0 { "start" } else { "end" }.to_owned()),
         _ if delta == 0 => None,
-        ScrollUnit::Lines => Some(format!("{}l{sign}", delta.abs())),
-        ScrollUnit::Pages => Some(format!("{}p{sign}", delta.abs())),
+        ScrollUnit::Lines => Some(format!("{}l{sign}", delta.unsigned_abs())),
+        ScrollUnit::Pages => Some(format!("{}p{sign}", delta.unsigned_abs())),
     }
 }
 

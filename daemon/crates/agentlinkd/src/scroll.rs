@@ -45,7 +45,7 @@ impl Coalescer {
         }
         if let Some(last) = self.pending.last_mut() {
             if last.sid == b.sid && last.unit == b.unit {
-                last.delta = clamp_delta(b.unit, last.delta + b.delta);
+                last.delta = clamp_delta(b.unit, last.delta.saturating_add(b.delta));
                 last.re = b.re;
                 last.n += b.n;
                 return None;
@@ -96,6 +96,18 @@ mod tests {
         let next = c.done().unwrap();
         assert_eq!((next.delta, next.re, next.n), (-12, 14, 4));
         assert_eq!(c.done(), None);
+    }
+
+    #[test]
+    fn extreme_deltas_do_not_overflow() {
+        let mut c = Coalescer::default();
+        c.push(b(ScrollUnit::Lines, 1, 1));
+        c.push(b(ScrollUnit::Lines, i64::MAX, 2));
+        c.push(b(ScrollUnit::Lines, i64::MAX, 3));
+        assert_eq!(c.done().unwrap().delta, crate::focus::scroll::MAX_LINES);
+        c.push(b(ScrollUnit::Lines, i64::MIN, 4));
+        c.push(b(ScrollUnit::Lines, i64::MIN, 5));
+        assert_eq!(c.done().unwrap().delta, -crate::focus::scroll::MAX_LINES);
     }
 
     #[test]

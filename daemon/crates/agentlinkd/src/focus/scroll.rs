@@ -88,7 +88,8 @@ impl Tracked {
     pub fn apply(&self, key: &str, delta_lines: i64, total: Option<u64>) -> u64 {
         let mut m = self.lines_above.lock().unwrap();
         let cur = m.entry(key.to_owned()).or_insert(0);
-        let mut next = (*cur as i64 - delta_lines).max(0) as u64;
+        let mut next =
+            (i128::from(*cur) - i128::from(delta_lines)).clamp(0, i128::from(u64::MAX)) as u64;
         if let Some(t) = total {
             next = next.min(t);
         }
@@ -174,6 +175,24 @@ mod tests {
         assert_eq!(clamp_delta(ScrollUnit::ToEnd, 99), 1);
         assert_eq!(clamp_delta(ScrollUnit::ToEnd, -7), -1);
         assert_eq!(clamp_delta(ScrollUnit::ToEnd, 0), 0);
+    }
+
+    #[test]
+    fn extreme_deltas_do_not_panic() {
+        assert_eq!(clamp_delta(ScrollUnit::Lines, i64::MIN), -MAX_LINES);
+        assert_eq!(clamp_delta(ScrollUnit::Pages, i64::MAX), MAX_PAGES);
+        assert_eq!(clamp_delta(ScrollUnit::ToEnd, i64::MIN), -1);
+        let t = Tracked::default();
+        assert_eq!(t.apply("k", i64::MIN, None), 1 << 63);
+        assert_eq!(t.apply("k", i64::MAX, None), 1);
+        assert_eq!(t.apply("k", i64::MIN, Some(5)), 5);
+        assert_eq!(
+            super::super::kitty::scroll_amount(ScrollUnit::Lines, i64::MIN)
+                .unwrap()
+                .len(),
+            21
+        );
+        assert!(super::super::tmux::scroll_keys(ScrollUnit::Lines, i64::MIN).is_some());
     }
 
     #[test]

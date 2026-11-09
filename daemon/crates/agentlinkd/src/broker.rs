@@ -220,12 +220,17 @@ impl Broker {
         };
         let p = g.pending.remove(&rid).unwrap();
         drop(g);
-        let _ = p.tx.send(outcome.clone()); // the hook may already be gone; the clear still goes out
+        // The hook may already be gone; the clear still goes out, but the device is told.
+        let delivered = p.tx.send(outcome.clone()).is_ok();
         self.registry.publish(Update::Clear(Clear {
             rid,
             why: ClearWhy::AnsweredDev,
         }));
-        Ok(outcome)
+        if delivered {
+            Ok(outcome)
+        } else {
+            Err((ResultErr::Stale, "hook gone"))
+        }
     }
 
     /// Ends a request without a device decision (timeout, terminal answer, hook gone).
@@ -557,6 +562,23 @@ mod tests {
             Duration::from_secs(1)
         )
         .is_none());
+    }
+
+    #[tokio::test]
+    async fn answer_with_the_hook_gone_is_stale_but_still_clears() {
+        let (b, mut rx) = broker();
+        let (rid, wait) = b.open(perm(false));
+        let _ = next_update(&mut rx);
+        drop(wait);
+        assert_eq!(
+            b.answer(rid, Decision::Approve).unwrap_err(),
+            (ResultErr::Stale, "hook gone")
+        );
+        assert!(b.pending().is_empty());
+        let Update::Clear(c) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert_eq!((c.rid, c.why), (rid, ClearWhy::AnsweredDev));
     }
 
     #[tokio::test]
