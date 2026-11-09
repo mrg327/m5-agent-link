@@ -126,6 +126,9 @@ typedef void (*hal_link_state_cb_t)(hal_link_kind_t kind, bool connected);
 void hal_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state);
 /* Returns false if that transport is not connected or the frame is too large. */
 bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len);
+/* While the watch drives the PC live (SCROLL), ask the links for low latency: BLE requests a
+ * 15–30 ms connection interval; false returns to the interval the central chose. No-op elsewhere. */
+void hal_link_interactive(bool on);
 
 /* ───────────── debug / observability (DESIGN §0) ───────────── */
 

@@ -8,6 +8,8 @@ void hal_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state)
     sw_ble_link_start(on_rx, on_state);
 }
 
+void hal_link_interactive(bool on) { sw_ble_link_interactive(on); }
+
 bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 {
     switch (kind) {

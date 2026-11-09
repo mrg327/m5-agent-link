@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "debug.h"
+#include "hal.h"
 #include "nav.h"
 #include "ui_internal.h"
 #include "ui_ring.h"
@@ -121,12 +122,14 @@ void ui_scroll_open(uint32_t sid, uint32_t now)
     if (g_ui_actions->sectors) g_ui_actions->sectors(0); /* the rim is unused here */
     ui_scroll_refresh(now);
     show(s_root, true);
+    hal_link_interactive(true);
     dbg_event("ui", "scroll", "\"sid\":%u,\"preview_allowed\":%s", (unsigned)sid, preview_allowed() ? "true" : "false");
 }
 
 void ui_scroll_close(void)
 {
     s_glide_v = 0;
+    hal_link_interactive(false);
     show(s_root, false);
     ring_set_still(ui_home_ring(), !ui_animations_allowed());
 }

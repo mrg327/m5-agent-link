@@ -42,6 +42,8 @@ bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len)
     return s_ws_enabled ? ws_send_binary(frame, len) : s_fake_up; /* fake link swallows frames */
 }
 
+void hal_link_interactive(bool on) { (void)on; }
+
 void sim_link_enable_ws(bool enable) { s_ws_enabled = enable; }
 
 void sim_link_set_connected(bool connected)

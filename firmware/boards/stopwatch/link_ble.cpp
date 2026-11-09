@@ -110,6 +110,51 @@ static void report_state(bool up)
 
 static void advertise(void);
 
+/* ── connection interval: the central's choice, or 15–30 ms while interactive (DESIGN §7) ── */
+
+#define BLE_FAST_ITVL_MIN 12  /* 1.25 ms units: 15 ms, Apple's floor */
+#define BLE_FAST_ITVL_MAX 24  /* 30 ms; Apple wants max ≥ min + 15 ms */
+#define BLE_FAST_TIMEOUT 400  /* 10 ms units: 4 s */
+static uint16_t s_base_itvl, s_base_latency, s_base_timeout;
+static bool s_fast;         /* wanted */
+static bool s_applied_fast; /* last requested */
+static bool s_req_pending;  /* one update at a time; the next is sent when it completes */
+
+static void conn_params(const char *why, bool save_base)
+{
+    struct ble_gap_conn_desc d;
+    if (s_conn == BLE_HS_CONN_HANDLE_NONE || ble_gap_conn_find(s_conn, &d) != 0) return;
+    ESP_LOGI(TAG, "%s: interval %u.%02u ms, latency %u, timeout %u ms", why, d.conn_itvl * 125 / 100,
+             d.conn_itvl * 125 % 100, d.conn_latency, d.supervision_timeout * 10);
+    if (save_base) {
+        s_base_itvl = d.conn_itvl;
+        s_base_latency = d.conn_latency;
+        s_base_timeout = d.supervision_timeout;
+    }
+}
+
+static void request_interval(bool fast)
+{
+    if (s_conn == BLE_HS_CONN_HANDLE_NONE || !s_base_itvl || s_req_pending) return;
+    if (s_base_itvl <= BLE_FAST_ITVL_MIN) return; /* the central already runs as fast as we would ask */
+    struct ble_gap_upd_params p = {};
+    p.itvl_min = fast ? BLE_FAST_ITVL_MIN : s_base_itvl;
+    p.itvl_max = fast ? BLE_FAST_ITVL_MAX : (uint16_t)(s_base_itvl + 12);
+    p.latency = fast ? 0 : s_base_latency;
+    p.supervision_timeout = fast ? BLE_FAST_TIMEOUT : s_base_timeout;
+    int rc = ble_gap_update_params(s_conn, &p);
+    s_req_pending = rc == 0;
+    if (rc == 0) s_applied_fast = fast;
+    ESP_LOGI(TAG, "interval request %s (%u–%u units): rc=%d", fast ? "fast" : "base", p.itvl_min, p.itvl_max, rc);
+}
+
+void sw_ble_link_interactive(bool on)
+{
+    if (on == s_fast) return;
+    s_fast = on;
+    request_interval(on);
+}
+
 static int gap_event(struct ble_gap_event *ev, void *arg)
 {
     (void)arg;
@@ -120,6 +165,9 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
             s_subscribed = false;
             ESP_LOGI(TAG, "central connected (handle %u)", ev->connect.conn_handle);
             ble_gap_set_prefered_le_phy(s_conn, BLE_GAP_LE_PHY_2M_MASK, BLE_GAP_LE_PHY_2M_MASK, 0);
+            s_req_pending = s_applied_fast = false;
+            conn_params("connected", true);
+            if (s_fast) request_interval(true);
         } else {
             ESP_LOGW(TAG, "connect failed: %d", ev->connect.status);
             advertise();
@@ -129,6 +177,7 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
         ESP_LOGI(TAG, "central disconnected (reason 0x%x)", ev->disconnect.reason);
         s_conn = BLE_HS_CONN_HANDLE_NONE;
         s_subscribed = false;
+        s_base_itvl = 0;
         report_state(false);
         advertise();
         break;
@@ -140,6 +189,15 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
             report_state(s_subscribed);
         }
         break;
+    case BLE_GAP_EVENT_CONN_UPDATE:
+    {
+        bool ours = s_req_pending;
+        s_req_pending = false;
+        if (ev->conn_update.status == 0) conn_params("updated", !ours && !s_applied_fast); /* the central's own change: new base */
+        else ESP_LOGW(TAG, "interval update failed: %d", ev->conn_update.status);
+        if (ev->conn_update.status == 0 && s_applied_fast != s_fast) request_interval(s_fast); /* changed meanwhile */
+        break;
+    }
     case BLE_GAP_EVENT_MTU: ESP_LOGI(TAG, "mtu = %u", ev->mtu.value); break;
     case BLE_GAP_EVENT_ADV_COMPLETE: advertise(); break;
     default: break;

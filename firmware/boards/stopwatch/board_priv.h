@@ -36,6 +36,7 @@ void sw_input_init(void);
 void sw_usb_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state); /* link_usb.cpp */
 bool sw_usb_link_send(const uint8_t *frame, size_t len);
 void sw_ble_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state); /* link_ble.cpp */
+void sw_ble_link_interactive(bool on);                                         /* link_ble.cpp */
 bool sw_ble_link_send(const uint8_t *frame, size_t len);
 
 #ifdef __cplusplus
