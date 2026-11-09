@@ -10,8 +10,9 @@
 #define GESTURE_TAP_SLOP_PX 18
 /* Button A waits this long after a release to see whether a second press follows. */
 #define GESTURE_BTN_DOUBLE_MS 300
-/* Vertical drag in the centre (SCROLL, UI-V2 §4.4): one G_DRAG per this much travel. */
-#define GESTURE_DRAG_STEP_PX 24
+/* Vertical drag in the centre (SCROLL, UI-V2 §4.4): one G_DRAG per this much travel, once the
+ * finger has left the tap slop (the stream starts where it crossed, so a tap never scrolls). */
+#define GESTURE_DRAG_STEP_PX 10
 /* A swipe released faster than this is a flick (measured over the last GESTURE_FLICK_WINDOW_MS). */
 #define GESTURE_FLICK_PX_PER_S 700
 #define GESTURE_FLICK_WINDOW_MS 80
@@ -40,8 +41,10 @@ typedef enum {
     G_SCRUB_END,                /* finger lifted after a scrub; x = last sector, y = angle */
     G_BTN_A_DOUBLE,             /* two A presses within GESTURE_BTN_DOUBLE_MS; a single A is delayed by that window */
     G_CHORD,                    /* A and B held together; the individual presses are swallowed */
-    G_DRAG                      /* a finger that started inside the rim moved GESTURE_DRAG_STEP_PX more vertically:
+    G_DRAG,                     /* a finger that started inside the rim moved GESTURE_DRAG_STEP_PX more vertically:
                                    x,y = press point, dy = the step (a multiple of the step size, up < 0) */
+    G_DRAG_END                  /* finger lifted after at least one G_DRAG (before any swipe): x,y = press point,
+                                   dx,dy = whole travel, vy = vertical release speed in px/s (up < 0) */
 } gesture_kind_t;
 
 typedef struct {
@@ -49,7 +52,8 @@ typedef struct {
     int16_t x, y;               /* press point (touch), or see G_SCRUB* */
     uint32_t dur_ms;            /* G_SCRUB*: arc swept so far, in degrees; drags and swipes: ms since the press */
     int16_t dx, dy;             /* swipes: whole travel; G_DRAG: travel since the previous G_DRAG */
-    bool flick;                 /* swipes: released at flick speed (SCROLL turns the swipe into a page) */
+    int16_t vy;                 /* G_DRAG_END: release velocity over GESTURE_FLICK_WINDOW_MS, px/s */
+    bool flick;                 /* swipes: released at flick speed */
 } gesture_evt_t;
 
 typedef void (*gesture_cb_t)(const gesture_evt_t *evt, void *ctx);
@@ -72,6 +76,7 @@ typedef struct {
     float last_deg, arc_deg;
     int sector;
     bool centre_start, dragging; /* drag stream: press began inside the rim; at least one G_DRAG went out */
+    bool drag_armed;             /* the finger left the tap slop: drag steps count from drag_y */
     int16_t drag_y;              /* y at the last G_DRAG */
     gesture_sample_t hist[GESTURE_HIST]; /* recent samples, for the release speed */
     uint8_t hist_n, hist_i;

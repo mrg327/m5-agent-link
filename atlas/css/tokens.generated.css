@@ -43,11 +43,11 @@
   --fw-long-swipe-px: 120px;
   --fw-deny-hold-ms: 800ms;
   --fw-agent-timeout-ms: 8000ms;
-  --fw-drag-step-px: 24px;
+  --fw-drag-step-px: 10px;
   --fw-flick-px-per-s: 700;
   --fw-flick-window-ms: 80ms;
-  --fw-scroll-lines-per-step: 3;
-  --fw-scroll-coalesce-ms: 50ms;
+  --fw-scroll-lines-per-step: 1;
+  --fw-scroll-coalesce-ms: 40ms;
   --fw-scroll-timeout-ms: 8000ms;
   --fw-status-timeout-ms: 8000ms;
   --fw-quiet-step1-s: 1800;

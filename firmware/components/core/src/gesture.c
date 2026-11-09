@@ -26,7 +26,7 @@ const char *gesture_name(gesture_kind_t k)
     static const char *const names[] = {
         "press", "release", "tap", "double_tap", "long_press", "swipe_up", "swipe_down",
         "swipe_left", "swipe_right", "btn_a", "btn_b", "btn_a_long", "btn_b_long", "lift", "shake",
-        "scrub_start", "scrub", "scrub_end", "btn_a_double", "chord", "drag"};
+        "scrub_start", "scrub", "scrub_end", "btn_a_double", "chord", "drag", "drag_end"};
     return (unsigned)k < sizeof names / sizeof *names ? names[k] : "?";
 }
 
@@ -102,26 +102,33 @@ static void hist_push(gesture_t *g, int x, int y, uint32_t t)
     if (g->hist_n < GESTURE_HIST) g->hist_n++;
 }
 
-/* Speed over the oldest sample still inside the flick window, in px/s. */
-static int release_speed(const gesture_t *g, uint32_t t_ms)
+/* Velocity over the oldest sample still inside the flick window, in px/s; 0 if the finger rested. */
+static void release_vel(const gesture_t *g, uint32_t t_ms, float *vx, float *vy)
 {
     int best = -1;
+    *vx = *vy = 0;
     for (int k = 0; k < g->hist_n; k++) {
         int i = (g->hist_i - 1 - k + 2 * GESTURE_HIST) % GESTURE_HIST;
         if (t_ms - g->hist[i].t > GESTURE_FLICK_WINDOW_MS) break;
         best = i;
     }
-    if (best < 0) return 0;
+    if (best < 0) return;
     uint32_t dt = t_ms - g->hist[best].t;
-    if (dt == 0) return 0;
-    int dx = g->x - g->hist[best].x, dy = g->y - g->hist[best].y;
-    float d = sqrtf((float)(dx * dx + dy * dy));
-    return (int)(d * 1000.0f / (float)dt);
+    if (dt == 0) return;
+    *vx = (float)(g->x - g->hist[best].x) * 1000.0f / (float)dt;
+    *vy = (float)(g->y - g->hist[best].y) * 1000.0f / (float)dt;
 }
 
-/* Drag stream (SCROLL): every GESTURE_DRAG_STEP_PX of vertical travel from a press inside the rim. */
+/* Drag stream (SCROLL): every GESTURE_DRAG_STEP_PX of vertical travel from a press inside the rim,
+ * counted from where the finger left the tap slop. */
 static void drag_track(gesture_t *g, int y, uint32_t t_ms)
 {
+    if (!g->drag_armed) {
+        if (!g->moved) return;
+        g->drag_armed = true;
+        g->drag_y = (int16_t)y;
+        return;
+    }
     int d = y - g->drag_y;
     if (abs(d) < GESTURE_DRAG_STEP_PX) return;
     int step = d / GESTURE_DRAG_STEP_PX * GESTURE_DRAG_STEP_PX;
@@ -141,6 +148,14 @@ static void finish_touch(gesture_t *g, uint32_t t_ms)
         emit(g, G_SCRUB_END, g->sector, (int)g->last_deg, (uint32_t)fabsf(g->arc_deg));
         return;
     }
+    float vx, vy;
+    release_vel(g, t_ms, &vx, &vy);
+    if (g->dragging) {
+        float v = vy < -32000.0f ? -32000.0f : vy > 32000.0f ? 32000.0f : vy;
+        gesture_evt_t e = {.kind = G_DRAG_END, .x = g->x0, .y = g->y0, .dur_ms = dur, .dx = (int16_t)(g->x - g->x0),
+                           .dy = (int16_t)(g->y - g->y0), .vy = (int16_t)v};
+        g->cb(&e, g->ctx);
+    }
     if (g->long_fired) return;
 
     if (g->moved) {
@@ -149,7 +164,7 @@ static void finish_touch(gesture_t *g, uint32_t t_ms)
         gesture_kind_t k = abs(dx) > abs(dy) ? (dx > 0 ? G_SWIPE_RIGHT : G_SWIPE_LEFT)
                                              : (dy > 0 ? G_SWIPE_DOWN : G_SWIPE_UP);
         gesture_evt_t e = {.kind = k, .x = g->x0, .y = g->y0, .dur_ms = dur, .dx = (int16_t)dx, .dy = (int16_t)dy,
-                           .flick = release_speed(g, t_ms) >= GESTURE_FLICK_PX_PER_S};
+                           .flick = sqrtf(vx * vx + vy * vy) >= GESTURE_FLICK_PX_PER_S};
         g->cb(&e, g->ctx);
         return;
     }
@@ -169,7 +184,7 @@ void gesture_touch(gesture_t *g, bool down, int x, int y, uint32_t t_ms)
         g->arc_deg = 0;
         g->rim_candidate = r >= GESTURE_RIM_IN_PX && r <= GESTURE_RIM_OUT_PX;
         g->centre_start = r < GESTURE_RIM_IN_PX;
-        g->dragging = false;
+        g->dragging = g->drag_armed = false;
         g->drag_y = (int16_t)y;
         g->hist_n = g->hist_i = 0;
         hist_push(g, x, y, t_ms);

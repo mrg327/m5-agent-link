@@ -1,5 +1,5 @@
-# SCROLL (UI-V2 §4.4): entered from the AGENT wheel; a slow drag is lines, a flick a page, B a page
-# down, A back to the bottom and out. The counter predicts, the daemon's scroll_pos corrects and
+# SCROLL (UI-V2 §4.4): entered from the AGENT wheel; a drag is wheel lines, the first sent at once,
+# a fast swipe glides on (never a page), B a page down, A back to the bottom and out. The counter predicts, the daemon's scroll_pos corrects and
 # brings the preview line.
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
@@ -17,10 +17,10 @@ expect_screen scroll
 expect_label Claude Code
 expect_label Live
 shot scroll_live.png
-# four steps up = 12 lines, one command after the coalescing window
+# 96 px up: the first 18 px are tap slop, then one line per 10 px = 7 lines
 drag 233 260 -96
 wait 200
-expect_label -12 lines
+expect_label -7 lines
 result pos 12 0 1200 $ npm test -- --watch=false
 wait 200
 expect_label -12 lines
@@ -30,7 +30,7 @@ result pos 142 0 1200 $ npm test -- --watch=false
 wait 200
 expect_label -142 lines
 shot scroll_scrolled.png
-# a flick up is a page toward older output; B is a page toward newer
+# a flick up is lines and a glide, not a page; B is a page toward newer
 swipe 233 300 233 150 120
 wait 200
 btn B

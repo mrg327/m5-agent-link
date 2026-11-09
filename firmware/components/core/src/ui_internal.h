@@ -64,7 +64,8 @@ void ui_scroll_open(uint32_t sid, uint32_t now_ms);
 void ui_scroll_close(void);
 bool ui_scroll_refresh(uint32_t now_ms); /* false: the session is gone */
 bool ui_scroll_act(nav_action_t a, const gesture_evt_t *g);
-bool ui_scroll_tick(uint32_t now_ms);    /* true: wants to close; also flushes the coalescer */
+bool ui_scroll_tick(uint32_t now_ms);    /* true: wants to close; also flushes the coalescer and glides */
+bool ui_scroll_caught(void);             /* the current touch stopped a glide */
 void ui_scroll_report(ui_report_t *r);
 void ui_scroll_on_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total, uint32_t total,
                       const char *preview);

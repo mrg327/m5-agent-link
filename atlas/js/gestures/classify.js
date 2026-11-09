@@ -24,7 +24,8 @@ export function angleDeg(th, x, y) {
  * @param {object} th facts.gesture
  * Kinds: press, release, tap, long_press, swipe_u/d/l/r (with dx, dy = whole travel and flick =
  * released at flick speed), drag (x, y = press point, dy = the step, up < 0; one per drag_step_px of
- * vertical travel from a press inside the rim), scrub_start, scrub, scrub_end (x = sector, y = angle,
+ * vertical travel from a press inside the rim, counted once the finger leaves the tap slop), drag_end
+ * (after a drag: dx, dy = whole travel, vy = release velocity in px/s), scrub_start, scrub, scrub_end (x = sector, y = angle,
  * dur_ms = arc swept), btn_a, btn_b, btn_a_long, btn_b_long, btn_a_double, chord
  */
 export function createClassifier(cb, th) {
@@ -32,7 +33,7 @@ export function createClassifier(cb, th) {
     pressed: false, moved: false, longFired: false, tDown: 0,
     x0: 0, y0: 0, x: 0, y: 0,
     sectors: 0, rimCandidate: false, scrubbing: false, lastDeg: 0, arcDeg: 0, sector: 0,
-    centreStart: false, dragging: false, dragY: 0, hist: [],
+    centreStart: false, dragging: false, dragArmed: false, dragY: 0, hist: [],
     aPending: false, aReleaseMs: 0,
     btn: [0, 1].map(() => ({ down: false, longFired: false, consumed: false, second: false, tDown: 0 })),
   };
@@ -74,21 +75,28 @@ export function createClassifier(cb, th) {
 
   const histPush = (x, y, t) => { g.hist.push({ x: Math.trunc(x), y: Math.trunc(y), t }); if (g.hist.length > HIST) g.hist.shift(); };
 
-  // Speed over the oldest sample still inside the flick window, in px/s (release_speed).
-  function releaseSpeed(t) {
+  // Velocity over the oldest sample still inside the flick window, in px/s; 0 if the finger rested (release_vel).
+  function releaseVel(t) {
     let best = null;
     for (let k = g.hist.length - 1; k >= 0; k--) {
       if (t - g.hist[k].t > th.flick_window_ms) break;
       best = g.hist[k];
     }
-    if (!best) return 0;
+    if (!best) return { vx: 0, vy: 0 };
     const dt = t - best.t;
-    if (dt === 0) return 0;
-    return Math.trunc(Math.hypot(g.x - best.x, g.y - best.y) * 1000 / dt);
+    if (dt === 0) return { vx: 0, vy: 0 };
+    return { vx: (g.x - best.x) * 1000 / dt, vy: (g.y - best.y) * 1000 / dt };
   }
 
-  // Drag stream (SCROLL): every drag_step_px of vertical travel from a press inside the rim (drag_track).
+  // Drag stream (SCROLL): every drag_step_px of vertical travel from a press inside the rim, counted
+  // from where the finger left the tap slop (drag_track).
   function dragTrack(y, t) {
+    if (!g.dragArmed) {
+      if (!g.moved) return;
+      g.dragArmed = true;
+      g.dragY = y;
+      return;
+    }
     const d = y - g.dragY;
     if (Math.abs(d) < th.drag_step_px) return;
     const step = Math.trunc(d / th.drag_step_px) * th.drag_step_px;
@@ -106,13 +114,18 @@ export function createClassifier(cb, th) {
       emit('scrub_end', g.sector, g.lastDeg, Math.abs(g.arcDeg));
       return;
     }
+    const { vx, vy } = releaseVel(t);
+    if (g.dragging) {
+      const v = Math.max(-32000, Math.min(32000, vy));
+      emit('drag_end', g.x0, g.y0, dur, { dx: g.x - g.x0, dy: g.y - g.y0, vy: Math.trunc(v) });
+    }
     if (g.longFired) return;
 
     if (g.moved) {
       const dx = g.x - g.x0, dy = g.y - g.y0;
       if (dur > th.swipe_max_ms || (Math.abs(dx) < th.swipe_min_px && Math.abs(dy) < th.swipe_min_px)) return;
       const k = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? SWIPE.right : SWIPE.left) : (dy > 0 ? SWIPE.down : SWIPE.up);
-      emit(k, g.x0, g.y0, dur, { dx, dy, flick: releaseSpeed(t) >= th.flick_px_per_s });
+      emit(k, g.x0, g.y0, dur, { dx, dy, flick: Math.hypot(vx, vy) >= th.flick_px_per_s });
       return;
     }
     emit('tap', g.x0, g.y0, dur);
@@ -131,7 +144,7 @@ export function createClassifier(cb, th) {
         g.arcDeg = 0;
         g.rimCandidate = r >= th.rim_in_px && r <= th.rim_out_px;
         g.centreStart = r < th.rim_in_px;
-        g.dragging = false;
+        g.dragging = g.dragArmed = false;
         g.dragY = g.y0;
         g.hist = [];
         histPush(x, y, t);

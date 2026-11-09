@@ -37,8 +37,9 @@ typedef enum {
     NAV_HOLD_RELEASE,   /* raw finger up: cancels a hold in progress */
     NAV_HOLD_LONG,      /* a long press whose duration already covers the hold (injected input) */
     NAV_SCROLL_DRAG,    /* SCROLL: a vertical drag step; dy → lines (up = older) */
-    NAV_PAGE_OLDER,     /* SCROLL: a page toward older output (a flick up) */
-    NAV_PAGE_NEWER,     /* SCROLL: a page toward newer output (a flick down, or button B) */
+    NAV_SCROLL_FLING,   /* SCROLL: the finger lifted off a drag; vy may start the glide */
+    NAV_SCROLL_CATCH,   /* SCROLL: any new touch stops the glide */
+    NAV_PAGE_NEWER,     /* SCROLL: a page toward newer output (button B) */
     NAV_TO_BOTTOM,      /* SCROLL: button A: back to the live bottom, then leave */
     NAV_COUNT
 } nav_action_t;
@@ -72,8 +73,15 @@ const char *nav_action_name(nav_action_t a);
 
 /* ── SCROLL (UI-V2 §4.4, §6): the device side of cmd_op_scroll ── */
 typedef enum { SCROLL_LINES = 0, SCROLL_PAGES = 1, SCROLL_TO_END = 2 } nav_scroll_unit_t; /* wire values */
-#define NAV_SCROLL_LINES_PER_STEP 3 /* one drag step (GESTURE_DRAG_STEP_PX) moves this many lines */
-#define NAV_SCROLL_COALESCE_MS 50   /* steps are summed into one command per this window (≤ 20 cmds/s) */
+#define NAV_SCROLL_LINES_PER_STEP 1 /* one drag step (GESTURE_DRAG_STEP_PX) is one wheel line */
+#define NAV_SCROLL_COALESCE_MS 40   /* at most one command per window (≤ 25 cmds/s); an idle link sends at once */
+#define NAV_SCROLL_DETENT_LINES 3   /* one detent per this many finger-driven lines, like a wheel notch */
+/* Glide after release (a trackpad's momentum): starts at this release speed, decays exponentially. */
+#define NAV_GLIDE_MIN_START 300 /* px/s */
+#define NAV_GLIDE_MAX 3000      /* px/s: a faster release glides at this */
+#define NAV_GLIDE_STOP 60       /* px/s: slower than this, the glide ends */
+#define NAV_GLIDE_TAU_MS 400    /* velocity time constant */
+#define NAV_GLIDE_CAP_MS 2500   /* hard limit on one glide */
 #define NAV_SCROLL_MAX_LINES 500    /* per command, as the daemon clamps */
 #define NAV_SCROLL_MAX_PAGES 20
 /* Lines for a drag step: negative = up = older, like the wire delta. */

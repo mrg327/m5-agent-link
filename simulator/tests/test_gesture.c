@@ -154,32 +154,54 @@ int main(void)
     sweep(&g, 40, 130, 200, t);
     EXPECT(seen[n_seen - 1].x == 1 && count(G_SCRUB) == 1, "changing the sector count mid-scrub re-syncs without a jump");
 
-    /* ── drag stream and flick (SCROLL) ── */
+    /* ── drag stream, release velocity and flick (SCROLL) ── */
+    reset(&g, 0);
+    gesture_touch(&g, true, 233, 233, 0);
+    gesture_touch(&g, true, 233, 243, 30);
+    gesture_touch(&g, true, 240, 225, 60);
+    gesture_touch(&g, true, 233, 250, 90); /* 17 px: still inside the tap slop */
+    gesture_touch(&g, false, 233, 250, 120);
+    EXPECT(count(G_DRAG) == 0 && count(G_DRAG_END) == 0 && n_seen == 1 && seen[0].kind == G_TAP,
+           "a tap with jitter inside the slop is a tap and no drag step");
+
     reset(&g, 0);
     gesture_touch(&g, true, 233, 260, 0);
     for (int i = 1; i <= 12; i++) gesture_touch(&g, true, 233, 260 - i * 8, (uint32_t)(i * 50)); /* 96 px up over 600 ms */
-    EXPECT(count(G_DRAG) == 4, "a slow drag emits one G_DRAG per 24 px");
-    EXPECT(seen[0].kind == G_DRAG && seen[0].dy == -24 && seen[0].x == 233 && seen[0].y == 260,
+    EXPECT(count(G_DRAG) == 7, "a slow drag: one G_DRAG per 10 px, counted from where it left the slop (24 px)");
+    EXPECT(seen[0].kind == G_DRAG && seen[0].dy == -10 && seen[0].x == 233 && seen[0].y == 260,
            "G_DRAG carries the step as dy (up < 0) and the press point as x,y");
     gesture_touch(&g, false, 233, 164, 650);
-    EXPECT(n_seen == 4 && count(G_TAP) == 0 && count(G_SWIPE_UP) == 0, "a slow drag ends without a tap or a swipe");
+    EXPECT(count(G_TAP) == 0 && count(G_SWIPE_UP) == 0, "a slow drag ends without a tap or a swipe");
+    EXPECT(n_seen == 8 && seen[7].kind == G_DRAG_END && seen[7].vy == 0 && seen[7].dy == -96,
+           "a drag that rested before the lift ends with no release speed");
 
     reset(&g, 0);
     gesture_touch(&g, true, 233, 200, 0);
-    gesture_touch(&g, true, 233, 250, 30); /* 50 px at once: two whole steps, the 2 px remainder carries */
-    EXPECT(count(G_DRAG) == 1 && seen[0].dy == 48, "a jump of 50 px is one G_DRAG of two steps");
-    gesture_touch(&g, true, 233, 300, 60);
-    EXPECT(count(G_DRAG) == 2 && seen[1].dy == 48, "the carried remainder plus 50 px is again 48 px");
-    gesture_touch(&g, true, 233, 320, 90);
-    EXPECT(count(G_DRAG) == 3 && seen[2].dy == 24, "the remainders add up to one more step");
+    gesture_touch(&g, true, 233, 220, 30); /* leaves the slop: the stream starts here */
+    EXPECT(count(G_DRAG) == 0, "crossing the slop is not yet a step");
+    gesture_touch(&g, true, 233, 245, 60); /* 25 px at once: two whole steps, the 5 px remainder carries */
+    EXPECT(count(G_DRAG) == 1 && seen[0].dy == 20, "a jump of 25 px is one G_DRAG of two steps");
+    gesture_touch(&g, true, 233, 250, 90);
+    EXPECT(count(G_DRAG) == 2 && seen[1].dy == 10, "the remainder adds up to one more step");
 
     reset(&g, 0);
     gesture_touch(&g, true, 233, 300, 0);
     for (int i = 1; i <= 6; i++) gesture_touch(&g, true, 233, 300 - i * 25, (uint32_t)(i * 20)); /* 150 px in 120 ms */
     gesture_touch(&g, false, 233, 150, 125);
-    EXPECT(count(G_DRAG) == 6 && count(G_SWIPE_UP) == 1, "a fast swipe streams drag steps and then swipes");
+    EXPECT(count(G_DRAG) == 5 && count(G_DRAG_END) == 1 && count(G_SWIPE_UP) == 1,
+           "a fast swipe streams drag steps, ends the drag and then swipes");
     EXPECT(seen[n_seen - 1].kind == G_SWIPE_UP && seen[n_seen - 1].flick && seen[n_seen - 1].dy == -150,
            "the swipe is a flick and carries its travel");
+    EXPECT(seen[n_seen - 2].kind == G_DRAG_END && seen[n_seen - 2].vy < -1000, "the drag end carries the release speed");
+
+    reset(&g, 0);
+    gesture_touch(&g, true, 233, 150, 0);
+    for (int i = 1; i <= 10; i++) gesture_touch(&g, true, 233, 150 + i * 10, (uint32_t)(i * 100)); /* slow, 1 s */
+    for (int i = 1; i <= 4; i++) gesture_touch(&g, true, 233, 250 + i * 25, (uint32_t)(1000 + i * 20)); /* then fast */
+    gesture_touch(&g, false, 233, 350, 1085);
+    EXPECT(count(G_SWIPE_DOWN) == 0 && seen[n_seen - 1].kind == G_DRAG_END, "a long drag is no swipe, but ends the drag");
+    EXPECT(seen[n_seen - 1].vy > 1000 && seen[n_seen - 1].vy < 1300,
+           "a long drag that ends fast carries its last 80 ms of speed (down > 0)");
 
     reset(&g, 0);
     gesture_touch(&g, true, 233, 300, 0);

@@ -145,12 +145,16 @@ sim_script_test(sim_ask_tap_never_approves ask_tap_never_approves.txt
                 PASS_REGULAR_EXPRESSION "\"op\":0,\"sid\":2")
 sim_script_test(sim_ask_result_error ask_result_error.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_ask_hold_bound_to_rid ask_hold_bound_to_rid.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"tx_cmd\"")
-# UI-V2 Phase 4: SCROLL. A drag is lines (op 10, unit 0), a flick a page (unit 1), A to_end (unit 2) and
-# out; leaving by tap, B long, chord or timeout never sends to_end; privacy meta hides the preview;
-# `unsupported` drops the item for the session.
+# UI-V2 Phase 4: SCROLL. A drag is lines (op 10, unit 0), the first sent with its step (leading edge);
+# a flick is never a page (unit 1 only from B); A to_end (unit 2) and out; leaving by tap, B long,
+# chord or timeout never sends to_end; privacy meta hides the preview; `unsupported` drops the item.
 sim_script_test(sim_scroll_mode scroll_mode.txt
-                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
-                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_scroll\",\"unit\":0,\"delta\":-3,.*\"ev\":\"tx_scroll\",\"unit\":1,\"delta\":-1,.*\"ev\":\"tx_scroll\",\"unit\":1,\"delta\":1,.*\"ev\":\"tx_scroll\",\"unit\":2,\"delta\":1,")
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"unit\":1,\"delta\":-"
+                PASS_REGULAR_EXPRESSION "\"action\":\"scroll_drag\"}[\r\n]+{[^{}]*\"ev\":\"tx_scroll\",\"unit\":0,\"delta\":-1,\"seq\":1}.*\"ev\":\"tx_scroll\",\"unit\":1,\"delta\":1,.*\"ev\":\"tx_scroll\",\"unit\":2,\"delta\":1,")
+# Trackpad glide: a fast release keeps sending lines; a touch stops it, and the tap that caught it stays.
+sim_script_test(sim_scroll_momentum scroll_momentum.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"action\":\"back\"}.*\"ev\":\"tx_scroll\""
+                PASS_REGULAR_EXPRESSION "\"action\":\"scroll_fling\"}.*\"ev\":\"scroll_glide\",\"v\":-[0-9]+}.*\"ev\":\"tx_scroll\",\"unit\":0,\"delta\":-[0-9]+,.*\"ev\":\"tx_scroll\",\"unit\":0,\"delta\":-[0-9]+,.*\"ev\":\"tx_scroll\",\"unit\":0,\"delta\":-[0-9]+,.*\"action\":\"back\"}")
 sim_script_test(sim_scroll_exit scroll_exit.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"unit\":2")
 set_tests_properties(sim_scroll_exit PROPERTIES TIMEOUT 60)
 sim_script_test(sim_scroll_privacy scroll_privacy.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")

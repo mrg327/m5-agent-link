@@ -311,9 +311,10 @@ ACTION_TEXT = {
     "NAV_COMMIT": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item answers 'hold to confirm' instead",
     "NAV_BACK": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is; on STATUS a swipe up); a request stays pending",
     "NAV_HOME": "A+B chord: straight back to the deck",
-    "NAV_SCROLL_DRAG": "SCROLL: each 24 px of vertical drag moves the terminal 3 lines (up = older), summed into one command per 50 ms",
-    "NAV_PAGE_OLDER": "SCROLL: a flick up moves one page toward older output (a slow swipe only counts by its drag steps)",
-    "NAV_PAGE_NEWER": "SCROLL: a flick down or button B moves one page toward newer output",
+    "NAV_SCROLL_DRAG": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms",
+    "NAV_SCROLL_FLING": "SCROLL: lifting off a fast drag keeps scrolling (a glide that slows down, like a trackpad)",
+    "NAV_SCROLL_CATCH": "SCROLL: any new touch stops a glide; a tap that stopped one does not leave",
+    "NAV_PAGE_NEWER": "SCROLL: button B moves one page toward newer output",
     "NAV_TO_BOTTOM": "SCROLL: button A jumps back to the live bottom and leaves the mode",
 }
 WHEN_TEXT = {"WHEN_ALWAYS": "", "WHEN_REQUEST": "with an approvable request on screen", "WHEN_NO_REQUEST": "without an approvable request",

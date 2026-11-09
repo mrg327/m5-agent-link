@@ -47,14 +47,14 @@ One table, every input × mode. "—" means ignored (and logged). Thresholds: lo
 | Input | OFF / glow | HOME (deck) | AGENT (wheel) | ASK (card + wheel) | SCROLL | STATUS |
 |---|---|---|---|---|---|---|
 | First touch after off/glow | wake only (glow: reveal ASK) | | | | | |
-| Tap centre | wake | open AGENT (open ASK when a permission or question is pending) | commit selected item (safe items; a destructive item shows "hold") | commit selected item if safe (Open on PC, a question option); else shows "hold" | exit, keep terminal position | commit selected row (nothing here is destructive) |
+| Tap centre | wake | open AGENT (open ASK when a permission or question is pending) | commit selected item (safe items; a destructive item shows "hold") | commit selected item if safe (Open on PC, a question option); else shows "hold" | exit, keep terminal position (a tap that stops a glide only stops it) | commit selected row (nothing here is destructive) |
 | Long-press centre (600 ms) | wake | — (reserved) | — | — | — | — |
 | Hold centre ≥ 1.2 s (arc + ramp) | — | — | commit a destructive item | **Approve**-class item (bound to `rid`), or Deny (0.8 s); arc colour = item colour | — | — |
 | Rim scrub CW / CCW | wake | next / previous session (detent) | next / previous item (detent) | next / previous option (detent) | — | next / previous row |
 | Tap rim | wake | select the session under the finger | select the item at that angle (items are laid out on the ring) | same | — | — |
-| Vertical drag in centre | wake | — | — | — | scroll lines: 1 detent per 24 px = 3 lines | — |
-| Swipe up (centre) | wake | open AGENT (ASK when a request is pending) | — | — | flick: page up (older) | back to HOME |
-| Swipe down (centre) | wake | open STATUS | back to HOME | **Deny** (permission only, strict) | flick: page down (newer) | — |
+| Vertical drag in centre | wake | — | — | — | trackpad: 1 line per 10 px past the tap slop, a detent per 3 lines; a fast release glides on | — |
+| Swipe up (centre) | wake | open AGENT (ASK when a request is pending) | — | — | its drag lines, then the glide (never a page) | back to HOME |
+| Swipe down (centre) | wake | open STATUS | back to HOME | **Deny** (permission only, strict) | its drag lines, then the glide (never a page, deny or back) | — |
 | Swipe left / right | wake | next / previous session | — | — | — | — |
 | Button A short | wake | default action (Focus; Done also acks) | commit selected item (safe only) | **Open on PC** (focus), whatever is selected: A never approves | to bottom (live) and exit | commit row (Quiet: off → 30 min → 1 h → off; Sounds: on/off; information rows: nothing) |
 | Button A double | wake | jump to next attention (Input › Error › Done-unseen) | — | — | — | — |
@@ -67,7 +67,7 @@ One table, every input × mode. "—" means ignored (and logged). Thresholds: lo
 
 Why this is conflict-free:
 - The centre and the rim are disjoint hit regions (r < 150 vs r ≥ 160); a press between them is a rim press. A scrub that starts in the annulus never becomes a swipe; a swipe or drag that starts in the centre never becomes a scrub.
-- **The centre's vertical motion has one meaning per mode:** HOME opens things (up = AGENT, down = STATUS), AGENT/ASK go back or deny (down only), SCROLL scrolls, STATUS goes back (up only, the reverse of the swipe that opened it; down is ignored there). Session switching is horizontal (left/right) or on the rim, so it can never be mistaken for a deny or a page flick. Deny exists only in ASK, and only as the strict swipe or the hold item.
+- **The centre's vertical motion has one meaning per mode:** HOME opens things (up = AGENT, down = STATUS), AGENT/ASK go back or deny (down only), SCROLL scrolls, STATUS goes back (up only, the reverse of the swipe that opened it; down is ignored there). Session switching is horizontal (left/right) or on the rim, so it can never be mistaken for a deny or a scroll drag. Deny exists only in ASK, and only as the strict swipe or the hold item.
 - The wheel is moved by the rim and B, never by a vertical drag, so the wheel and the deny swipe cannot overlap.
 - Holds only start in modes where the selected item is destructive. On HOME nothing is destructive, so no centre press can approve anything.
 - IMU is never a commit input (research: no trusted false-positive data). Shake is reserved.
@@ -193,7 +193,7 @@ User decision §9.1: tapping the centre opens a screen where gestures act on tha
 
 ### 4.4 SCROLL: the terminal's scrollback
 
-User decision §9.3: scrolling is by vertical swipe, not by rim scrub. A drag in the centre moves line by line with detents; a flick (release velocity above the swipe threshold) moves a page.
+User decision §9.3: scrolling is by vertical swipe, not by rim scrub. The centre behaves like a trackpad or a scroll wheel: the terminal moves with the finger, at once, and keeps gliding after a fast release.
 
 ```
               ╭──────────────────────────────────────╮
@@ -208,17 +208,20 @@ User decision §9.3: scrolling is by vertical swipe, not by rim scrub. A drag in
         │                     ▼                            │
         ╰╮                                                ╭╯
          ╰─╮  [A] TO BOTTOM                PAGE ▾ [B]  ╭─╯
-           ╰──╮   drag to scroll · flick for a page  ╭──╯
+           ╰──╮        drag like a trackpad          ╭──╯
               ╰──────────────────────────────────────╯
 ```
 
 - The index ring becomes a position track: a 6 px grey ring with a sky-blue arc whose length is the fraction of the scrollback above the bottom (from `scroll_pos`, §6).
-- Rate: a drag emits one step per 24 px = 3 lines (drag up = older, like dragging the page); a flick = 1 page; B = page down, swipe up = page up. The device coalesces steps into one `cmd_op_scroll` per 50 ms with the summed delta, so at most 20 commands per second cross the link; the BLE connection interval drops to the interactive setting while in SCROLL (not yet: Phase 4 leaves the interval alone, see §8.3).
-- Flick and drag together (Phase 4 decision): a fast swipe streams its drag steps *and* ends in a flick. Steps already sent stay sent; steps still waiting in the 50 ms window are dropped in favour of the page, so a flick is "a page, plus whatever the finger had already moved", never two pages. A swipe without flick speed (`GESTURE_FLICK_PX_PER_S`, measured over the last 80 ms) is only its steps.
+- Trackpad decision, 2026-11-09 (replaces the Phase 4 step-and-flick rate): the old 24 px = 3 lines steps, the 50 ms wait before the first command and the flick-is-a-page felt like "enter and send". Now:
+  - Rate: one step per 10 px of vertical travel = 1 line, the unit the daemon turns into one physical wheel line (drag up = older, like dragging the page). The stream starts only once the finger leaves the 18 px tap slop, counted from that point, so a tap never scrolls.
+  - Leading edge: the first step on an idle link goes out at once; steps within the next 40 ms are summed into one `cmd_op_scroll`, so at most 25 commands per second cross the link (`NAV_SCROLL_COALESCE_MS`). The BLE connection interval still stays as it is in SCROLL (§8.3).
+  - Glide: the lift after a drag reports its vertical speed over the last 80 ms (`G_DRAG_END`, any drag length). From 300 px/s (capped at 3000) the view keeps scrolling through the same path, decaying with a 400 ms time constant, until it falls under 60 px/s or after 2.5 s. A new touch anywhere, A or B, leaving SCROLL, the live bottom (scrolling newer) or a reported top (scrolling older) stops it; gliding counts as activity for the 8 s timeout. A tap that stops a glide only stops it.
+  - A flick is no longer a page; B is the only page (newer), A the jump to the bottom.
 - Counter: `Live` / `at the bottom` when `lines_above` is 0, else `-N lines` / `above the bottom`. The device predicts the counter from the lines it sent and the daemon's `scroll_pos` corrects it; pages are not predicted (the page height is the terminal's).
-- Haptics: a 15 ms detent per step, a 40 ms stop when `scroll_pos.at_bottom` (or top) is reported.
+- Haptics: a 15 ms detent per 3 lines the finger moves (one wheel notch), none while gliding; a 40 ms stop when `scroll_pos.at_bottom` (or top) is reported.
 - Preview (user decision §9.8): the daemon sends the terminal's top visible line, ≤ 48 chars, only when the device's `privacy` setting is `preview` or `full`; under `meta` the row is blank. It is terminal content, so it is never written to the audit log or the trace at `info`.
-- Entering: only from the AGENT wheel ("Scroll terminal"), which first sends `cmd_op_focus` so the terminal is frontmost (quietly: no "Opening on PC" or "Focused" toast while SCROLL is up), then enters SCROLL. Leaving: tap centre (keeps the position), A (sends `to_end` bottom, exits), B long, chord, 8 s idle, or any new attention (which opens ASK). The rim is ignored, and in SCROLL swipe down is a page, never deny or back (§3).
+- Entering: only from the AGENT wheel ("Scroll terminal"), which first sends `cmd_op_focus` so the terminal is frontmost (quietly: no "Opening on PC" or "Focused" toast while SCROLL is up), then enters SCROLL. Leaving: tap centre (keeps the position), A (sends `to_end` bottom, exits), B long, chord, 8 s idle, or any new attention (which opens ASK). The rim is ignored, and in SCROLL a swipe down is only scrolling, never deny or back (§3).
 - A session the daemon reports as `unsupported` hides the item after the first failure (`session_t.no_scroll`, device-side, reset by a snapshot) and the device returns to the deck with the "Not supported" toast. The item lists in §4.2 stay as they are (Done keeps it: scrolling a finished session's output is useful).
 
 ### 4.5 STATUS
@@ -261,7 +264,7 @@ ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a deten
 
 | Event | Pattern (on/off ms) | Shape | Where |
 |---|---|---|---|
-| Detent (session, item, scroll step) | 15 | click | scrub, B, drag |
+| Detent (session, item, 3 scroll lines) | 15 | click | scrub, B, drag (not the glide) |
 | Select / tick (focus sent, item picked) | 35 | one short | HOME, AGENT |
 | Permission arrived | 250, 120, 250 | two long | glow, ASK |
 | Question arrived | 40, 90, 40, 90, 40 | three short | glow, ASK |
@@ -319,9 +322,9 @@ Phase 4 decisions: `scroll_arg` is the third member of `cmd_arg = uint / tstr / 
 
 - `device.rs handle_cmd()`: new arm `CmdOp::Scroll`. Look up the session and its `HostCtx` exactly as `Focus` does, then call `shared.scroll.scroll(&target, unit, delta)`. Coalesce: keep one pending delta per `(device, sid)`; if a new command arrives while the previous is executing, sum them. Trace one line per burst, not per command; nothing goes to the audit log (scroll is read-only on the PC).
 - `focus/mod.rs`: a `ScrollDriver` trait beside `FocusDriver` with `scroll(ctx, unit, delta) -> Result<ScrollPos, FocusError>`, selected by the same `Outer` detection that focus uses. Scroll does **not** raise the window; the device already sent `focus` on entry.
-- `focus/kitty.rs`: `kitty @ --to <listen_on> scroll-window --match <matcher> <amount>` with `<amount>` = `"{n}l-"` (lines up), `"{n}l+"`, `"{n}p-"` / `"{n}p+"` (pages), `"start"` / `"end"`. Position: kitty's remote control reports no scroll offset, so the daemon keeps a per-window estimate (`scroll::Tracked`: the sum of what it asked for, clamped at 0 and at the known total, reset by `end`), reads `scrolled_by` from `kitty @ ls` whenever kitty includes it, and takes the exact total and the top visible line from `kitty @ get-text --extent all` (indexed by `lines` from `ls` and the position) only when the device's privacy allows a preview. `--extent screen` was not used: it is the live screen, not the scrolled view. Requires the same remote-control setup focus already needs; the existing `NEEDS_REMOTE_CONTROL` message applies.
+- `focus/kitty.rs` (wheel decision, 2026-11-09): one `kitten @ --to <listen_on> kitten --match <matcher> <path> <unit> <delta> <end_notches> <preview>` per burst runs `focus/kitty_wheel.py` inside kitty and does exactly what kitty does for a physical wheel (kitty `mouse.c` `scroll_event`): a program that tracks the mouse gets SGR wheel buttons 4/5 (mode `mouse`); otherwise the main screen's history scrolls (`Screen.scroll`, mode `main`); otherwise a full-screen program on the alternate screen gets up/down arrow keys (mode `keys`). This matters because agent TUIs (Copilot CLI, Claude Code) run on the alternate screen, which has no scrollback: the old `scroll-window` call reached `lines_above 0` every time and nothing moved. One round trip measured 24–30 ms. Pages are `lines-1` lines (keys) or `(lines-1)/3` notches (mouse); `to_end` down on the alternate screen sends `end_notches` lines, up does nothing. The kitten is written to `~/.agentlink/kitty/agentlink_wheel.py` (dir 0700, file 0600, rewritten only when it changed). It reports `{mode, moved, scrolled_by, history, lines, preview}`: on the main screen the position is kitty's exact `scrolled_by`/`history` and the preview the top visible line; on the alternate screen the daemon counts the wheel lines it sent (`scroll::Tracked` under `<matcher>#alt`, reset by `to_end`) and the preview is the last non-blank line at or above the centre. If the kitten cannot run, the driver falls back to the old `kitty @ scroll-window` path (`"{n}l-"`, `"{n}p+"`, `"start"`/`"end"`, position from `ls`/`get-text --extent all`). Requires the same remote-control setup focus already needs; the existing `NEEDS_REMOTE_CONTROL` message applies.
 - `focus/tmux.rs`: if the pane is not in copy mode, `tmux copy-mode -t <pane>`; then `tmux send-keys -t <pane> -X -N <n> scroll-up|scroll-down` or `-X -N <n> page-up|page-down`; `scroll_to_end` with `delta > 0` sends `-X cancel` (back to live), `delta < 0` sends `-X history-top`. Position via `display-message -p -t <pane> '#{pane_in_mode} #{scroll_position} #{history_size} #{pane_height}'`; preview via `capture-pane -p -t <pane> -S -<pos> -E -<pos>` (the top visible line). A move down that lands on position 0 sends `-X cancel`, so the pane leaves copy mode and the agent's output flows again, as tmux's own mouse wheel does; a move down while live is a no-op. The tmux layer runs **before** the outer-terminal layer: a tmux pane inside kitty scrolls tmux, not kitty.
-- Terminal.app and Windows Terminal: no scroll API; return `Unsupported` (the device hides the item). Key injection (Shift+PgUp) is explicitly out of scope: it is the same hazard DESIGN §9 rejects for STT.
+- Terminal.app and Windows Terminal: no scroll API; return `Unsupported` (the device hides the item). Free key injection (Shift+PgUp, typed text) stays out of scope: it is the same hazard DESIGN §9 rejects for STT. The kitty driver's arrow keys are the one exception, and only where kitty itself turns a physical wheel into arrow keys (a full-screen program that does not track the mouse); they are fixed keys, never device data. Synthesized OS wheel events (macOS `CGEvent`, needs Accessibility) are a possible later route for these terminals.
 - Safety: `delta` is clamped to ±500 lines / ±20 pages per command, the drivers never pass device data through a shell, and the preview is cut at 48 chars and stripped of control characters before it leaves the daemon.
 
 ## 7. Reply and option selection
@@ -351,7 +354,7 @@ Daemon side (Phase 3, `daemon/crates/agentlinkd/src/broker.rs`): the approval br
 ### 8.1 Reuse as is (`firmware/components/core/src/`)
 
 - `model.{c,h}`: sessions, attention queue (parses `opts` and `grant_mask`), settings, counts; `answer`/`answer_opt` record what went out so ASK can show the pending line and restore the options on a rejected command.
-- `gesture.{c,h}`: rim scrub, buttons, chord, double-A, strict deny geometry. Add a vertical drag stream (`G_DRAG` with dy, emitted every 24 px in the centre) for SCROLL and a release-velocity flag on swipes for the page flick.
+- `gesture.{c,h}`: rim scrub, buttons, chord, double-A, strict deny geometry. Add a vertical drag stream (`G_DRAG` with dy, every 10 px once the finger leaves the tap slop) for SCROLL, and `G_DRAG_END` with the release velocity `vy` that starts the glide (§4.4; the 2026-11-09 trackpad change replaced the 24 px steps and the page flick).
 - `ui_ring.c`: becomes the index ring (done in Phase 1: capsules, selection underline, dotted error, double-track permission). Still to add: a "track" mode (one grey ring plus one coloured arc) for SCROLL.
 - `ui_theme.{c,h}`: palette and fonts unchanged; add `theme_state_glyph()` per §4 and the new state words.
 - `power.c`: keep, with the glow first-touch fix.
@@ -418,7 +421,7 @@ Phase 3 decisions (2026-11-08, implementation):
 Phase 4 decisions (2026-11-08, implementation):
 
 14. **Scroll leaves by tap, A, B long, chord or timeout; swipe down is a page.** §3's SCROLL column already said so; the long-swipe-down back gesture of AGENT/ASK does not exist in SCROLL, so the centre's vertical motion keeps one meaning per mode.
-15. **A flick is a page plus the steps already sent**, never a double page (§4.4). The device drops steps still waiting in its 50 ms window when a flick arrives; the daemon's coalescer likewise lets `to_end` replace a queued burst.
+15. **A page (B) supersedes the steps still waiting**, never a double move (§4.4). The device drops lines still waiting in its 40 ms window when B pages; the daemon's coalescer likewise lets `to_end` replace a queued burst. (Before 2026-11-09 a flick was a page; it is now a glide of lines.)
 16. **kitty's position is tracked by the daemon**, corrected from `ls` when kitty reports `scrolled_by` and exact (with the top line) when the privacy setting lets the daemon read the text. `get-text --extent screen` would not give the scrolled view.
 17. **No `welcome.feats` yet.** The device advertises `feature_scroll`; a daemon without scroll answers `unsupported` and the item disappears for that session. Adding daemon features to `welcome` is a protocol change for a later phase.
 18. **Scroll is never audited** (read-only on the PC) and the preview never reaches the trace or the audit log; one trace line per coalesced batch.
@@ -452,5 +455,5 @@ Phase 5 decisions (2026-11-08, implementation):
 | Double-tap | focus | retired | **retired**; tap and A are immediate |
 | Button A default | focus | focus | **Focus** (Done also acks); on ASK A is "Open on PC", never approve |
 | Segment order | by priority | pinned | **pinned** by creation; auto-select the most urgent |
-| Terminal scroll | — | — | **new**: SCROLL mode by vertical drag/flick, `cmd_op_scroll`, kitty + tmux |
+| Terminal scroll | — | — | **new**: SCROLL mode by trackpad drag and glide, `cmd_op_scroll`, kitty + tmux |
 | IMU | lift/tilt wake | deferred | raise-to-wake only, once a driver exists; **never a commit input** |

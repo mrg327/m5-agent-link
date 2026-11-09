@@ -1,8 +1,10 @@
-/* The SCROLL screen (UI-V2 §4.4): the centre's vertical motion drives the focused terminal's
- * scrollback. A drag step is three lines, a flick a page, A jumps back to the live bottom. Steps are
- * summed into one cmd_op_scroll per NAV_SCROLL_COALESCE_MS; the daemon's scroll_pos corrects the
- * counter, fills the index ring's position track and (privacy ≥ preview) the one-line preview.
+/* The SCROLL screen (UI-V2 §4.4): the centre is a trackpad for the focused terminal's scrollback.
+ * A drag step is one wheel line, a release at speed glides on, B pages, A jumps back to the live
+ * bottom. The first step on an idle link goes out at once, later ones are summed into one
+ * cmd_op_scroll per NAV_SCROLL_COALESCE_MS; the daemon's scroll_pos corrects the counter, fills the
+ * index ring's position track and (privacy ≥ preview) the one-line preview.
  * Capsules look: one big number, two chevrons, a muted line of terminal text, circular key caps. */
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -31,9 +33,15 @@ static char s_header_txt[64], s_count_txt[24], s_caption_txt[32], s_preview_txt[
 /* position: the daemon's last word, nudged locally by what we sent since */
 static uint32_t s_lines_above, s_total;
 static bool s_at_bottom = true, s_has_total, s_have_pos;
-/* coalescer: pending lines or pages (pages win), flushed every NAV_SCROLL_COALESCE_MS */
+/* coalescer: pending lines or pages (pages win); one command per NAV_SCROLL_COALESCE_MS */
 static int s_pend_lines, s_pend_pages;
-static uint32_t s_pend_since;
+static uint32_t s_sent_ms;
+static bool s_sent_any;
+static int s_detent_lines; /* finger-driven lines since the last detent */
+/* glide: velocity (px/s, up < 0), sub-step travel carried between ticks, clock */
+static float s_glide_v, s_glide_px;
+static uint32_t s_glide_ms, s_glide_t0;
+static bool s_caught; /* the current touch stopped a glide: its tap must not leave */
 static int s_last_dir; /* -1 up (older), +1 down (newer): which chevron and which end can "stop" */
 static uint32_t s_lit_until, s_stop_ms;
 
@@ -103,6 +111,9 @@ void ui_scroll_open(uint32_t sid, uint32_t now)
     s_at_bottom = true;
     s_has_total = s_have_pos = false;
     s_pend_lines = s_pend_pages = 0;
+    s_sent_any = s_caught = false;
+    s_detent_lines = 0;
+    s_glide_v = 0;
     s_last_dir = 0;
     s_lit_until = s_stop_ms = 0;
     s_preview_txt[0] = 0;
@@ -115,6 +126,7 @@ void ui_scroll_open(uint32_t sid, uint32_t now)
 
 void ui_scroll_close(void)
 {
+    s_glide_v = 0;
     show(s_root, false);
     ring_set_still(ui_home_ring(), !ui_animations_allowed());
 }
@@ -126,6 +138,14 @@ static void flush(void)
     if (s_pend_pages) g_ui_actions->scroll(s_sid, SCROLL_PAGES, s_pend_pages);
     else g_ui_actions->scroll(s_sid, SCROLL_LINES, s_pend_lines);
     s_pend_lines = s_pend_pages = 0;
+    s_sent_ms = s_now;
+    s_sent_any = true;
+}
+
+/* Leading edge: an idle link sends at once; within the window the steps wait and are summed. */
+static void maybe_flush(void)
+{
+    if (!s_sent_any || s_now - s_sent_ms >= NAV_SCROLL_COALESCE_MS) flush();
 }
 
 static void moved(int dir)
@@ -143,60 +163,95 @@ static void stop_haptic(void)
     g_ui_actions->scroll_stop();
 }
 
+static void glide_stop(void) { s_glide_v = s_glide_px = 0; }
+
 static int clamp(int v, int lim) { return v < -lim ? -lim : v > lim ? lim : v; }
 
-static void drag(int dy)
+/* Lines from the finger (detents, like wheel notches) or from the glide (silent). */
+static void push(int lines, bool finger)
 {
-    int lines = nav_scroll_lines(dy);
     if (!lines) return;
     int dir = lines < 0 ? -1 : 1;
     if (dir > 0 && s_at_bottom && s_have_pos) { /* already live: nothing to scroll down to */
+        glide_stop();
         moved(dir);
         stop_haptic();
         render();
         return;
     }
-    if (!s_pend_lines && !s_pend_pages) s_pend_since = s_now;
     s_pend_lines = clamp(s_pend_lines + lines, NAV_SCROLL_MAX_LINES);
     /* predicted position until the daemon answers */
     if (lines < 0) s_lines_above += (uint32_t)-lines;
     else s_lines_above = (uint32_t)lines > s_lines_above ? 0 : s_lines_above - (uint32_t)lines;
     s_at_bottom = s_lines_above == 0;
     moved(dir);
-    g_ui_actions->detent();
+    if (finger && (s_detent_lines += lines < 0 ? -lines : lines) >= NAV_SCROLL_DETENT_LINES) {
+        s_detent_lines %= NAV_SCROLL_DETENT_LINES;
+        g_ui_actions->detent();
+    }
+    maybe_flush();
     render();
 }
 
 static void page(int dir)
 {
+    glide_stop();
     if (dir > 0 && s_at_bottom && s_have_pos) {
         moved(dir);
         stop_haptic();
         render();
         return;
     }
-    if (!s_pend_lines && !s_pend_pages) s_pend_since = s_now;
     s_pend_pages = clamp(s_pend_pages + dir, NAV_SCROLL_MAX_PAGES);
-    s_pend_lines = 0; /* a flick supersedes the steps dragged on the way */
+    s_pend_lines = 0; /* a page supersedes the steps still waiting */
     moved(dir);
     g_ui_actions->detent();
+    maybe_flush();
     render();
 }
+
+static void fling(int vy)
+{
+    float v = (float)clamp(vy, NAV_GLIDE_MAX);
+    if (fabsf(v) < NAV_GLIDE_MIN_START) return;
+    s_glide_v = v;
+    s_glide_px = 0;
+    s_glide_ms = s_glide_t0 = s_now;
+    dbg_event("ui", "scroll_glide", "\"v\":%d", (int)v);
+}
+
+/* The glide's travel this tick, exactly integrated over the exponential decay, in whole steps. */
+static void glide(void)
+{
+    if (s_glide_v == 0) return;
+    uint32_t dt = s_now - s_glide_ms;
+    if (!dt) return;
+    s_glide_ms = s_now;
+    s_last_input = s_now; /* gliding counts as activity for the timeout */
+    float k = expf(-(float)dt / NAV_GLIDE_TAU_MS);
+    s_glide_px += s_glide_v * NAV_GLIDE_TAU_MS * (1.0f - k) / 1000.0f;
+    s_glide_v *= k;
+    int steps = (int)(s_glide_px / GESTURE_DRAG_STEP_PX);
+    s_glide_px -= (float)(steps * GESTURE_DRAG_STEP_PX);
+    if (fabsf(s_glide_v) < NAV_GLIDE_STOP || s_now - s_glide_t0 >= NAV_GLIDE_CAP_MS) glide_stop();
+    push(nav_scroll_lines(steps * GESTURE_DRAG_STEP_PX), false);
+}
+
+bool ui_scroll_caught(void) { return s_caught; }
 
 bool ui_scroll_act(nav_action_t a, const gesture_evt_t *g)
 {
     if (g->kind != G_LIFT && g->kind != G_SHAKE) s_last_input = s_now;
     switch (a) {
-    case NAV_SCROLL_DRAG: drag(g->dy); return true;
-    case NAV_PAGE_OLDER:
-        if (g->kind == G_SWIPE_UP && !g->flick) return true; /* a slow swipe already scrolled by its steps */
-        page(-1);
+    case NAV_SCROLL_CATCH:
+        s_caught = s_glide_v != 0;
+        glide_stop();
         return true;
-    case NAV_PAGE_NEWER:
-        if (g->kind == G_SWIPE_DOWN && !g->flick) return true;
-        page(1);
-        return true;
+    case NAV_SCROLL_DRAG: push(nav_scroll_lines(g->dy), true); return true;
+    case NAV_SCROLL_FLING: fling(g->vy); return true;
+    case NAV_PAGE_NEWER: page(1); return true;
     case NAV_TO_BOTTOM:
+        glide_stop();
         s_pend_lines = s_pend_pages = 0;
         g_ui_actions->scroll(s_sid, SCROLL_TO_END, 1);
         g_ui_actions->tick();
@@ -210,7 +265,8 @@ bool ui_scroll_tick(uint32_t now)
 {
     s_now = now;
     if (!session()) return true;
-    if ((s_pend_lines || s_pend_pages) && now - s_pend_since >= NAV_SCROLL_COALESCE_MS) flush();
+    glide();
+    if (s_pend_lines || s_pend_pages) maybe_flush();
     if (s_lit_until && now >= s_lit_until) {
         s_lit_until = 0;
         render();
@@ -232,7 +288,10 @@ void ui_scroll_on_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool h
     else if (s_preview_txt[0]) set_txt(s_preview, s_preview_txt, sizeof s_preview_txt, "");
     /* an end reached by this move: the thud (UI-V2 §5), once per arrival at it */
     bool at_top = has_total && total > 0 && lines_above >= total;
-    if ((at_bottom && !was_bottom && s_last_dir > 0) || (at_top && s_last_dir < 0)) stop_haptic();
+    if ((at_bottom && !was_bottom && s_last_dir > 0) || (at_top && s_last_dir < 0)) {
+        stop_haptic();
+        glide_stop();
+    }
     dbg_event("ui", "scroll_pos", "\"lines_above\":%u,\"at_bottom\":%s,\"total\":%d,\"preview\":%s", (unsigned)lines_above,
               at_bottom ? "true" : "false", has_total ? (int)total : -1, preview[0] && preview_allowed() ? "shown" : "none");
     render();
@@ -274,7 +333,7 @@ lv_obj_t *ui_scroll_init(lv_obj_t *screen)
     s_chev_dn = line(s_root, 24, COL_MUTED, CHEV_DN_Y, 60);
     lv_label_set_text(s_chev_dn, LV_SYMBOL_DOWN);
     s_hint = line(s_root, 16, COL_MUTED, HINT_Y, 300);
-    lv_label_set_text(s_hint, "drag to scroll, flick for a page");
+    lv_label_set_text(s_hint, "drag like a trackpad");
     static const char *const words[2] = {"TO BOTTOM", "PAGE DOWN"};
     for (int i = 0; i < 2; i++)
         s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,

@@ -52,12 +52,12 @@ const nav_binding_t nav_bindings[] = {
     {MODE_ASK, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_NEXT},
     {MODE_ASK, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_ASK, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
-    /* SCROLL: the centre's vertical motion drives the terminal (UI-V2 §4.4). The rim is unused, so
-     * nothing here is a scrub, and swipe down means a page, never deny or back. */
+    /* SCROLL: the centre is a trackpad for the terminal (UI-V2 §4.4). The rim is unused, so nothing
+     * here is a scrub, and a swipe is only its drag steps plus the glide, never deny or back. */
+    {MODE_SCROLL, G_PRESS, ZONE_ANY, WHEN_ALWAYS, NAV_SCROLL_CATCH},
     {MODE_SCROLL, G_DRAG, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_DRAG},
-    {MODE_SCROLL, G_SWIPE_UP, ZONE_CENTRE, WHEN_ALWAYS, NAV_PAGE_OLDER},   /* only a flick counts */
-    {MODE_SCROLL, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_ALWAYS, NAV_PAGE_NEWER}, /* only a flick counts */
-    {MODE_SCROLL, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* leaves the terminal where it is */
+    {MODE_SCROLL, G_DRAG_END, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_FLING},
+    {MODE_SCROLL, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* leaves the terminal where it is; a tap that caught a glide only stops it */
     {MODE_SCROLL, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_TO_BOTTOM},
     {MODE_SCROLL, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_PAGE_NEWER},
     {MODE_SCROLL, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
@@ -104,8 +104,8 @@ const char *nav_action_name(nav_action_t a)
 {
     static const char *const names[NAV_COUNT] = {
         "none", "focus", "open_agent", "open_ask", "open_status", "back", "home", "next", "prev", "next_attention", "pick_rim",
-        "scrub", "commit", "deny", "hold_press", "hold_release", "hold_long", "scroll_drag", "page_older",
-        "page_newer", "to_bottom"};
+        "scrub", "commit", "deny", "hold_press", "hold_release", "hold_long", "scroll_drag", "scroll_fling",
+        "scroll_catch", "page_newer", "to_bottom"};
     return (unsigned)a < NAV_COUNT ? names[a] : "?";
 }
 
