@@ -89,7 +89,7 @@ bool ui_agent_refresh(uint32_t now)
     for (int i = 0; i < n; i++) w[i] = (wheel_item_t){label_of(items[i].id, s), rgb, items[i].hold, (int)items[i].id};
     int sel = wheel_count(s_wheel) == n ? wheel_sel(s_wheel) : 0;
     wheel_set(s_wheel, w, n, sel);
-    lv_obj_set_style_text_color(s_word[0], lv_color_hex(rgb), 0);
+    theme_set_text_color(s_word[0], lv_color_hex(rgb));
     ring_items();
     return true;
 }

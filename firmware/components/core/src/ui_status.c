@@ -28,6 +28,7 @@ static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static uint32_t s_now, s_last_input, s_last_render;
 static status_item_t s_items[ST_COUNT];
 static int s_n;
+static int32_t s_gauge_w = -1;
 static char s_link_txt[64], s_batt_txt[16], s_labels[ST_COUNT][28], s_word_txt[16];
 
 static void set_txt(lv_obj_t *l, char *cache, size_t cap, const char *t)
@@ -104,15 +105,19 @@ static void render(void)
     uint32_t rgb;
     ui_home_link_text(buf, sizeof buf, false, &rgb); /* the battery has its own row here */
     set_txt(s_link, s_link_txt, sizeof s_link_txt, buf);
-    lv_obj_set_style_text_color(s_link, lv_color_hex(rgb), 0);
+    theme_set_text_color(s_link, lv_color_hex(rgb));
 
     hal_battery_t b = hal_battery_read();
     if (b.percent <= 100) {
         snprintf(buf, sizeof buf, "%u %%%s", b.percent, b.charging ? "  " LV_SYMBOL_CHARGE : "");
         uint32_t c = b.charging ? RGB_ACCENT : b.percent <= 15 ? RGB_ERROR : b.percent <= 30 ? RGB_AMBER : RGB_SUCCESS;
         int w = GAUGE_W * b.percent / 100;
-        lv_obj_set_width(s_gauge_fill, w < GAUGE_H ? (b.percent ? GAUGE_H : 0) : w);
-        lv_obj_set_style_bg_color(s_gauge_fill, lv_color_hex(c), 0);
+        w = w < GAUGE_H ? (b.percent ? GAUGE_H : 0) : w;
+        if (w != s_gauge_w) {
+            s_gauge_w = w;
+            lv_obj_set_width(s_gauge_fill, w);
+        }
+        theme_set_bg_color(s_gauge_fill, lv_color_hex(c));
         show(s_gauge, true);
     } else {
         snprintf(buf, sizeof buf, "Battery ?");
@@ -120,7 +125,7 @@ static void render(void)
     }
     set_txt(s_batt, s_batt_txt, sizeof s_batt_txt, buf);
     lv_obj_update_layout(s_batt_row);
-    lv_obj_align(s_batt_row, LV_ALIGN_TOP_MID, 0, BATT_Y);
+    theme_align(s_batt_row, LV_ALIGN_TOP_MID, 0, BATT_Y);
 
     wheel_item_t w[ST_COUNT];
     for (int i = 0; i < s_n; i++) {
@@ -248,7 +253,7 @@ static lv_obj_t *capsule(lv_obj_t *parent, int w, int h, lv_color_t col)
     lv_obj_set_size(o, w, h);
     lv_obj_set_style_radius(o, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(o, col, 0);
+    theme_set_bg_color(o, col);
     lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     return o;
 }
@@ -286,7 +291,7 @@ lv_obj_t *ui_status_init(lv_obj_t *screen)
         s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,
                                      UI_BADGE_R, &s_key[i], &s_word[i]);
     snprintf(s_word_txt, sizeof s_word_txt, "%s", words[0]);
-    lv_obj_set_style_text_color(s_word[0], lv_color_hex(RGB_ACCENT), 0);
+    theme_set_text_color(s_word[0], lv_color_hex(RGB_ACCENT));
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     return s_root;
 }

@@ -48,6 +48,12 @@ const char *theme_agent_name(agent_t a);
 /* Nearest enabled Montserrat size; falls back to the default font. */
 const lv_font_t *theme_font(int px);
 lv_obj_t *theme_label(lv_obj_t *parent, int px, lv_color_t color);
+/* Change-only setters for the refresh paths: LVGL invalidates an object on every style write, even
+ * one that changes nothing, and the deck refreshes on every session delta. */
+void theme_set_text_color(lv_obj_t *o, lv_color_t c);
+void theme_set_bg_color(lv_obj_t *o, lv_color_t c);
+void theme_set_opa(lv_obj_t *o, lv_opa_t opa);
+void theme_align(lv_obj_t *o, lv_align_t align, int32_t x, int32_t y);
 /* Width of the visible circle at screen row y, minus a margin on each side. */
 int theme_chord(int y, int margin);
 /* Separator the font can draw (" · " when available). */

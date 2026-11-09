@@ -140,7 +140,10 @@ static void enter_mode(nav_mode_t m)
     if (m == MODE_AGENT) ui_agent_open(ui_home_sel_sid(), s_now_ms);
     else if (m == MODE_ASK) ui_ask_open(ui_home_sel_sid(), s_now_ms);
     else if (m == MODE_SCROLL) ui_scroll_open(ui_home_sel_sid(), s_now_ms);
-    else if (m == MODE_STATUS) ui_status_open(s_now_ms);
+    else if (m == MODE_STATUS) {
+        ui_home_refresh(s_now_ms); /* the ring shows sessions again, e.g. after AGENT -> Status */
+        ui_status_open(s_now_ms);
+    }
     else if (m == MODE_WATCH) ui_watch_open(ui_home_sel_sid(), s_now_ms);
     else ui_home_refresh(s_now_ms); /* the ring shows sessions again */
     if (ui_toast_active()) place_toast(); /* a toast that outlives the mode moves to the new slot */

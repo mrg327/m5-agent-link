@@ -29,7 +29,7 @@ static int s_n;
 static bool s_holding, s_hold_fired, s_ramp_started;
 static uint32_t s_hold_t0, s_hold_rid;
 static int s_hold_idx;
-static char s_header_txt[64], s_title_txt[48], s_text_txt[168], s_answer_txt[64];
+static char s_header_txt[64], s_title_txt[48], s_text_txt[168], s_answer_txt[64], s_hint_txt[40];
 static uint32_t s_answer_rgb;
 
 /* The request this screen is about: the selected session's unanswered permission or question. */
@@ -134,10 +134,10 @@ bool ui_ask_refresh(uint32_t now)
         }
         set_txt(s_answer, s_answer_txt, sizeof s_answer_txt, buf);
         s_answer_rgb = rgb;
-        lv_obj_set_style_text_color(s_answer, lv_color_hex(rgb), 0);
+        theme_set_text_color(s_answer, lv_color_hex(rgb));
         show(s_answer, true);
         wheel_set_shown(s_wheel, false);
-        lv_label_set_text(s_hint, "");
+        set_txt(s_hint, s_hint_txt, sizeof s_hint_txt, "");
         hold_cancel();
     } else {
         s_n = nav_ask_items(a, s_items, ASK_MAX_ITEMS);
@@ -147,9 +147,9 @@ bool ui_ask_refresh(uint32_t now)
         wheel_set(s_wheel, w, s_n, sel);
         wheel_set_shown(s_wheel, true);
         show(s_answer, false);
-        lv_label_set_text(s_hint, perm && (a->acts & (1u << ACT_DENY)) ? "long swipe down to deny" : "");
+        set_txt(s_hint, s_hint_txt, sizeof s_hint_txt, perm && (a->acts & (1u << ACT_DENY)) ? "long swipe down to deny" : "");
     }
-    lv_obj_set_style_text_color(s_word[0], lv_color_hex(RGB_ACCENT), 0);
+    theme_set_text_color(s_word[0], lv_color_hex(RGB_ACCENT));
     ring_items(a);
     return true;
 }
@@ -353,7 +353,7 @@ lv_obj_t *ui_ask_init(lv_obj_t *screen)
     lv_obj_set_size(s_divider, 180, 3);
     lv_obj_set_style_radius(s_divider, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_opa(s_divider, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(s_divider, COL_BORDER, 0);
+    theme_set_bg_color(s_divider, COL_BORDER);
     lv_obj_set_pos(s_divider, UI_CX - 90, DIVIDER_Y);
     s_wheel = wheel_create_at(s_root, ASK_WHEEL);
     s_answer = line(s_root, 24, COL_TEXT, ASK_WHEEL.cy - lv_font_get_line_height(theme_font(24)) / 2, 360, 1);

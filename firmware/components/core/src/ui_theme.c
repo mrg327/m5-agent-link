@@ -128,6 +128,41 @@ lv_obj_t *theme_label(lv_obj_t *parent, int px, lv_color_t color)
     return l;
 }
 
+static bool local_is(lv_obj_t *o, lv_style_prop_t prop, lv_style_value_t *v)
+{
+    return lv_obj_get_local_style_prop(o, prop, v, LV_PART_MAIN) == LV_STYLE_RES_FOUND;
+}
+
+void theme_set_text_color(lv_obj_t *o, lv_color_t c)
+{
+    lv_style_value_t v;
+    if (local_is(o, LV_STYLE_TEXT_COLOR, &v) && lv_color_eq(v.color, c)) return;
+    lv_obj_set_style_text_color(o, c, 0);
+}
+
+void theme_set_bg_color(lv_obj_t *o, lv_color_t c)
+{
+    lv_style_value_t v;
+    if (local_is(o, LV_STYLE_BG_COLOR, &v) && lv_color_eq(v.color, c)) return;
+    lv_obj_set_style_bg_color(o, c, 0);
+}
+
+void theme_set_opa(lv_obj_t *o, lv_opa_t opa)
+{
+    lv_style_value_t v;
+    if (local_is(o, LV_STYLE_OPA, &v) && v.num == opa) return;
+    lv_obj_set_style_opa(o, opa, 0);
+}
+
+void theme_align(lv_obj_t *o, lv_align_t align, int32_t x, int32_t y)
+{
+    lv_style_value_t a, vx, vy;
+    if (local_is(o, LV_STYLE_ALIGN, &a) && a.num == (int32_t)align && local_is(o, LV_STYLE_X, &vx) && vx.num == x &&
+        local_is(o, LV_STYLE_Y, &vy) && vy.num == y)
+        return;
+    lv_obj_align(o, align, x, y);
+}
+
 int theme_chord(int y, int margin)
 {
     float dy = (float)(y - 233);

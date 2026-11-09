@@ -35,7 +35,7 @@ static bool s_ambient, s_offline_dim, s_quiet_shown;
 
 static char s_agent_txt[64], s_repo_txt[40], s_state_txt[40], s_summary_txt[88], s_elapsed_txt[32], s_pill_txt[32],
     s_link_txt[64];
-static char s_req_title_txt[48], s_req_text_txt[168];
+static char s_req_title_txt[48], s_req_text_txt[168], s_hint_txt[32];
 
 static void set_txt(lv_obj_t *l, char *cache, size_t cap, const char *t)
 {
@@ -115,7 +115,7 @@ static void update_link(void)
     uint32_t link_rgb;
     ui_home_link_text(buf, sizeof buf, true, &link_rgb);
     set_txt(s_link, s_link_txt, sizeof s_link_txt, buf);
-    lv_obj_set_style_text_color(s_link, lv_color_hex(link_rgb), 0);
+    theme_set_text_color(s_link, lv_color_hex(link_rgb));
 }
 
 /* Time in the current state (UI-V2 §10). While offline the clock is frozen at the moment the link
@@ -135,7 +135,7 @@ static void update_elapsed(const session_t *s)
 /* One opacity for the card: ambient wins, then offline, else full. */
 static void apply_dim(void)
 {
-    lv_obj_set_style_opa(s_centre, s_ambient ? LV_OPA_30 : s_offline_dim ? LV_OPA_50 : LV_OPA_COVER, 0);
+    theme_set_opa(s_centre, s_ambient ? LV_OPA_30 : s_offline_dim ? LV_OPA_50 : LV_OPA_COVER);
 }
 
 void ui_home_card_set_ambient(bool ambient)
@@ -147,10 +147,10 @@ void ui_home_card_set_ambient(bool ambient)
 static void set_badges(bool show_a, bool show_b, uint32_t rgb_a)
 {
     bool off = offline();
-    lv_obj_set_style_text_color(s_word[0], off ? COL_MUTED : lv_color_hex(rgb_a), 0);
-    lv_obj_set_style_text_color(s_word[1], COL_MUTED, 0);
+    theme_set_text_color(s_word[0], off ? COL_MUTED : lv_color_hex(rgb_a));
+    theme_set_text_color(s_word[1], COL_MUTED);
     for (int i = 0; i < 2; i++) {
-        lv_obj_set_style_text_color(s_key[i], off ? COL_MUTED : COL_TEXT, 0);
+        theme_set_text_color(s_key[i], off ? COL_MUTED : COL_TEXT);
         if (i == 0 ? show_a : show_b) lv_obj_remove_flag(s_badge[i], LV_OBJ_FLAG_HIDDEN);
         else lv_obj_add_flag(s_badge[i], LV_OBJ_FLAG_HIDDEN);
     }
@@ -169,14 +169,14 @@ void ui_home_card_update(void)
     if (!s || n == 0) {
         set_txt(s_agent, s_agent_txt, sizeof s_agent_txt, "");
         set_repo("No sessions");
-        lv_obj_set_style_text_color(s_repo, COL_TEXT, 0);
+        theme_set_text_color(s_repo, COL_TEXT);
         set_txt(s_state, s_state_txt, sizeof s_state_txt, "");
         set_txt(s_summary, s_summary_txt, sizeof s_summary_txt, "Waiting for an agent");
         set_txt(s_elapsed, s_elapsed_txt, sizeof s_elapsed_txt, "");
         lv_obj_add_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_pill, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(s_hint, "swipe down for status"); /* the empty deck's one way onward (UI-V2 §4.5) */
+        set_txt(s_hint, s_hint_txt, sizeof s_hint_txt, "swipe down for status"); /* the empty deck's one way onward (UI-V2 §4.5) */
         set_badges(false, false, 0);
         return;
     }
@@ -196,10 +196,10 @@ void ui_home_card_update(void)
         const char *base = theme_basename(s->repo);
         set_repo(base[0] ? base : "(no folder)");
     }
-    lv_obj_set_style_text_color(s_repo, COL_TEXT, 0);
+    theme_set_text_color(s_repo, COL_TEXT);
     snprintf(buf, sizeof buf, "%s  %s", theme_state_glyph(s), theme_state_word(s));
     set_txt(s_state, s_state_txt, sizeof s_state_txt, buf);
-    lv_obj_set_style_text_color(s_state, lv_color_hex(rgb), 0);
+    theme_set_text_color(s_state, lv_color_hex(rgb));
     update_elapsed(s);
 
     const attention_t *req = ui_home_askable_of(s);
@@ -227,11 +227,10 @@ void ui_home_card_update(void)
     const char *pill = ask ? "TAP " LV_SYMBOL_RIGHT " ANSWER" : s->state == SESS_DONE ? "FOCUS + ACK" : "FOCUS";
     set_txt(s_pill_lbl, s_pill_txt, sizeof s_pill_txt, pill);
     lv_color_t pill_col = offline() ? COL_MUTED : lv_color_hex(rgb);
-    lv_obj_set_style_text_color(s_pill_lbl, pill_col, 0);
-    lv_obj_set_style_bg_color(s_pill, pill_col, 0);
+    theme_set_text_color(s_pill_lbl, pill_col);
+    theme_set_bg_color(s_pill, pill_col);
     lv_obj_remove_flag(s_pill, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_align(s_pill, LV_ALIGN_TOP_MID, 0, UI_ACTION_Y);
-    lv_label_set_text(s_hint, ""); /* deny lives only in ASK (UI-V2 §3); the deck answers nothing */
+    set_txt(s_hint, s_hint_txt, sizeof s_hint_txt, ""); /* deny lives only in ASK (UI-V2 §3); the deck answers nothing */
     set_badges(true, n > 1, rgb);
 }
 
@@ -287,6 +286,7 @@ void ui_home_card_create(lv_obj_t *centre)
     lv_obj_set_style_pad_hor(s_pill, 18, 0);
     lv_obj_set_style_pad_ver(s_pill, 8, 0);
     lv_obj_remove_flag(s_pill, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_align(s_pill, LV_ALIGN_TOP_MID, 0, UI_ACTION_Y); /* LV_SIZE_CONTENT: it stays centred as the text changes */
     s_pill_lbl = theme_label(s_pill, 20, COL_TEXT);
     lv_label_set_long_mode(s_pill_lbl, LV_LABEL_LONG_MODE_CLIP);
     lv_obj_set_width(s_pill_lbl, LV_SIZE_CONTENT);

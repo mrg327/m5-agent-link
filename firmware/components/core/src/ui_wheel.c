@@ -17,6 +17,7 @@ static const int row_px[ROWS] = {16, 20, 24, 20, 16};
 typedef struct {
     wheel_item_t items[WHEEL_MAX_ITEMS];
     char labels[WHEEL_MAX_ITEMS][28];
+    char shown[ROWS][28]; /* what each row label holds: rows are only rewritten when it changes */
     int n, sel;
     int row_y[ROWS];
     bool outer; /* the ±2 rows exist */
@@ -33,37 +34,37 @@ static void render(lv_obj_t *w)
         /* show an offset only when +k and -k are different items; when they would be the same
          * item (n == 2k) show it on the "next" side only */
         bool show = d->n > 0 && (off == 0 || d->n > 2 * k || (off > 0 && d->n == 2 * k)) && (k < 2 || d->outer);
-        if (!show) {
-            lv_label_set_text(d->row[r], "");
-            continue;
+        const char *t = "";
+        if (show) t = d->items[((d->sel + off) % d->n + d->n) % d->n].label;
+        if (strcmp(d->shown[r], t)) {
+            snprintf(d->shown[r], sizeof d->shown[r], "%s", t);
+            lv_label_set_text(d->row[r], t);
         }
-        int i = ((d->sel + off) % d->n + d->n) % d->n;
-        lv_label_set_text(d->row[r], d->items[i].label);
     }
     bool any = d->n > 0;
     const wheel_item_t *s = any ? &d->items[d->sel] : NULL;
     lv_color_t col = s ? lv_color_hex(s->rgb) : COL_MUTED;
-    lv_obj_set_style_text_color(d->chev_l, col, 0);
-    lv_obj_set_style_text_color(d->chev_r, col, 0);
+    theme_set_text_color(d->chev_l, col);
+    theme_set_text_color(d->chev_r, col);
     if (any) {
         lv_point_t sz;
         lv_text_get_size(&sz, s->label, theme_font(row_px[ROW_MID]), 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
         int half = (sz.x < ROW_W ? sz.x : ROW_W) / 2, cy = d->row_y[ROW_MID];
         lv_obj_remove_flag(d->chev_l, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(d->chev_r, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_align(d->chev_l, LV_ALIGN_TOP_MID, -half - CHEVRON_PAD - 8, cy + 4);
+        theme_align(d->chev_l, LV_ALIGN_TOP_MID, -half - CHEVRON_PAD - 8, cy + 4);
         if (s->hold) {
             /* The tag has a fixed slot at the right edge of the row, in place of the right chevron,
              * so every hold item reads the same way whatever the length of its label. */
-            lv_obj_set_style_bg_color(d->tag, col, 0);
-            lv_obj_set_style_text_color(d->tag_lbl, col, 0);
+            theme_set_bg_color(d->tag, col);
+            theme_set_text_color(d->tag_lbl, col);
             lv_obj_remove_flag(d->tag, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(d->chev_r, LV_OBJ_FLAG_HIDDEN);
             lv_obj_update_layout(d->tag);
-            lv_obj_align(d->tag, LV_ALIGN_TOP_MID, ROW_W / 2 + lv_obj_get_width(d->tag) / 2 - 2, cy + 3); /* inside the ring */
+            theme_align(d->tag, LV_ALIGN_TOP_MID, ROW_W / 2 + lv_obj_get_width(d->tag) / 2 - 2, cy + 3); /* inside the ring */
         } else {
             lv_obj_add_flag(d->tag, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_align(d->chev_r, LV_ALIGN_TOP_MID, half + CHEVRON_PAD + 8, cy + 4);
+            theme_align(d->chev_r, LV_ALIGN_TOP_MID, half + CHEVRON_PAD + 8, cy + 4);
         }
     } else {
         lv_obj_add_flag(d->chev_l, LV_OBJ_FLAG_HIDDEN);
@@ -93,6 +94,7 @@ lv_obj_t *wheel_create_at(lv_obj_t *parent, wheel_layout_t lay)
         int h = lv_font_get_line_height(theme_font(row_px[r]));
         lv_obj_set_size(l, ROW_W, h);
         lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(l, ""); /* matches the zeroed d->shown[r] */
         lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
         lv_obj_set_pos(l, 233 - ROW_W / 2, d->row_y[r] - h / 2);
         lv_label_set_text(l, "");

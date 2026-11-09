@@ -77,8 +77,8 @@ static void render(void)
         set_txt(s_caption, s_caption_txt, sizeof s_caption_txt, "above the bottom");
     }
     bool lit = s_now < s_lit_until;
-    lv_obj_set_style_text_color(s_chev_up, lit && s_last_dir < 0 ? lv_color_hex(rgb) : COL_MUTED, 0);
-    lv_obj_set_style_text_color(s_chev_dn, lit && s_last_dir > 0 ? lv_color_hex(rgb) : COL_MUTED, 0);
+    theme_set_text_color(s_chev_up, lit && s_last_dir < 0 ? lv_color_hex(rgb) : COL_MUTED);
+    theme_set_text_color(s_chev_dn, lit && s_last_dir > 0 ? lv_color_hex(rgb) : COL_MUTED);
     bool prev = preview_allowed() && s_preview_txt[0];
     show(s_preview, prev);
     /* the track: a thin grey ring with an arc for how far above the bottom the view sits */
@@ -88,7 +88,7 @@ static void render(void)
         else permille = (int)((uint64_t)s_lines_above * 1000 / (s_lines_above + UNKNOWN_TOTAL_SOFT));
     }
     ring_set_track(ui_home_ring(), permille, RGB_ACCENT);
-    lv_obj_set_style_text_color(s_word[0], lv_color_hex(rgb), 0);
+    theme_set_text_color(s_word[0], lv_color_hex(rgb));
 }
 
 bool ui_scroll_refresh(uint32_t now)

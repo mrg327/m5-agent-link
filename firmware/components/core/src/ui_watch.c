@@ -155,7 +155,7 @@ static void render(void)
     default: snprintf(tool, sizeof tool, "%s", theme_state_word(s)); break;
     }
     set_txt(s_tool, s_tool_txt, sizeof s_tool_txt, tool);
-    lv_obj_set_style_text_color(s_tool, lv_color_hex(tool_rgb), 0);
+    theme_set_text_color(s_tool, lv_color_hex(tool_rgb));
     set_txt(s_arg, s_arg_txt, sizeof s_arg_txt, arg);
 
     /* the rows sit against the centre: with fewer steps the top slots stay empty */
@@ -174,9 +174,12 @@ static void render(void)
         const char *sym;
         uint32_t mark_rgb;
         step_mark(st, &sym, &mark_rgb);
-        lv_label_set_text(s_mark[slot], sym);
-        lv_obj_set_style_text_color(s_mark[slot], lv_color_hex(mark_rgb), 0);
-        s_mark_txt[slot] = st->state == STEP_OK ? "ok" : st->state == STEP_FAIL ? "fail" : "run";
+        const char *mark = st->state == STEP_OK ? "ok" : st->state == STEP_FAIL ? "fail" : "run";
+        if (s_mark_txt[slot] != mark) {
+            lv_label_set_text(s_mark[slot], sym);
+            theme_set_text_color(s_mark[slot], lv_color_hex(mark_rgb));
+            s_mark_txt[slot] = mark;
+        }
         char shown[STEP_TEXT_MAX + 8];
         theme_display_text(shown, sizeof shown, st->text);
         set_txt(s_row[slot], s_row_txt[slot], sizeof s_row_txt[slot], shown);
