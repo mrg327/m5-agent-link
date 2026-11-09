@@ -76,6 +76,7 @@ static bool deep_sleep(uint32_t wake_after_s)
              (unsigned)wake_after_s);
     hal_debug_line(line);
     vTaskDelay(pdMS_TO_TICKS(50)); /* let the line drain */
+    sw_ioe_write(SW_IOE_L3B_AMOLED, false); /* IOE1 stays up, so drop the AMOLED rail; boot re-inits it */
     esp_deep_sleep_start();
     return true; /* not reached */
 }

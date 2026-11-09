@@ -54,7 +54,7 @@ public:
         return listno == 0 ? list0 : nullptr;
     }
 
-    // Re-run the init commands after the AMOLED rail (L3B) was power-cycled.
+    // Re-run the init commands (sleep-out, TE, brightness mode, display on) after a panel sleep.
     void reinitAfterRail()
     {
         startWrite(true);
@@ -250,6 +250,10 @@ void hal_display_set_brightness(uint8_t level)
     xSemaphoreGive(s_gfx_mtx);
 }
 
+/* Display off = CO5300 sleep-in (0x10) with brightness 0; the L3B rail stays up. Cutting L3B and
+ * re-running the init list after re-applying it left the panel dark on hardware (the vendor demo
+ * never drops L3B, and even re-checks that its enable took). Sleep-in draws microamps, so the rail
+ * buys little. Called from the core loop, so the LVGL invalidate below is safe. */
 void hal_display_set_power(bool on)
 {
     if (!s_gfx || on == s_powered) {
@@ -257,13 +261,9 @@ void hal_display_set_power(bool on)
     }
     xSemaphoreTake(s_gfx_mtx, portMAX_DELAY);
     if (on) {
-        sw_ioe_write(SW_IOE_L3B_AMOLED, true);
-        vTaskDelay(pdMS_TO_TICKS(20));
-        sw_ioe_write(SW_IOE_OLED_RST, false);
-        vTaskDelay(pdMS_TO_TICKS(10));
-        sw_ioe_write(SW_IOE_OLED_RST, true);
-        vTaskDelay(pdMS_TO_TICKS(20));
-        s_gfx->panel.reinitAfterRail();
+        sw_ioe_write(SW_IOE_L3B_AMOLED, true); /* idempotent; covers a rail dropped elsewhere */
+        s_gfx->panel.setSleep(false);          /* 0x11 sleep-out, then 150 ms */
+        s_gfx->panel.reinitAfterRail();        /* display-on, TE, brightness mode: cheap, and safe */
         s_powered = true;
         s_gfx->display(0, 0, SW_PANEL_W, SW_PANEL_H); /* repaint from the PSRAM framebuffer */
         s_gfx->waitDisplay();
@@ -272,11 +272,14 @@ void hal_display_set_power(bool on)
     } else {
         s_powered = false;
         s_gfx->panel.setBrightness(0);
-        s_gfx->panel.setSleep(true);
-        sw_ioe_write(SW_IOE_L3B_AMOLED, false);
+        s_gfx->panel.setSleep(true); /* 0x10 sleep-in */
         sw_pm1_led(true);
     }
     xSemaphoreGive(s_gfx_mtx);
+    /* Frames LVGL rendered while dark were dropped by flush_cb: redraw the whole screen now. */
+    if (on && s_disp) {
+        lv_obj_invalidate(lv_display_get_screen_active(s_disp));
+    }
 }
 
 void hal_display_set_rotation_180(bool flipped)

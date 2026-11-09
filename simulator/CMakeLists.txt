@@ -86,7 +86,7 @@ set_tests_properties(sim_approve_after_glow PROPERTIES WORKING_DIRECTORY ${CMAKE
 sim_script_test(sim_approve_too_soon approve_too_soon.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
 
 # Power: DEEP only on battery with no link, counted from display-off; timer wakes stay dark and
-# silent and walk the retry ladder (5, 10, 20 ... min, then buttons only).
+# silent. Timer wakes are off (POWER_TIMER_WAKES=0), so every DEEP arms buttons only (wake_after_s 0).
 function(sim_power_test name script)
     cmake_parse_arguments(P "" "" "ARGS;PROPS" ${ARGN})
     add_test(NAME ${name} COMMAND agentlink_sim --headless --no-ws ${P_ARGS}
@@ -95,14 +95,14 @@ function(sim_power_test name script)
 endfunction()
 sim_power_test(sim_deep_battery deep_sleep.txt ARGS --battery --idle-off 1 --deep-after 2
                PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
-                     PASS_REGULAR_EXPRESSION "\"ev\":\"display_on\".*\"ev\":\"deep\",\"wake_after_s\":300,\"tries\":0")
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"display_on\".*\"ev\":\"deep\",\"wake_after_s\":0,\"tries\":0")
 sim_power_test(sim_deep_not_on_usb deep_wait.txt ARGS --idle-off 1 --deep-after 1
                PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"deep\"")
 sim_power_test(sim_deep_not_linked deep_linked.txt ARGS --battery --idle-off 1 --deep-after 1
                PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"deep\"")
 sim_power_test(sim_deep_timer_wake deep_wait.txt ARGS --battery --deep-after 2 --wake timer --tries 2
                PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"haptic\"|\"ev\":\"display_on\""
-                     PASS_REGULAR_EXPRESSION "\"ev\":\"deep\",\"wake_after_s\":1200,\"tries\":2")
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"deep\",\"wake_after_s\":0,\"tries\":2")
 sim_power_test(sim_deep_ladder_end deep_wait.txt ARGS --battery --deep-after 2 --wake timer --tries 7
                PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                      PASS_REGULAR_EXPRESSION "\"ev\":\"deep\",\"wake_after_s\":0,\"tries\":7")

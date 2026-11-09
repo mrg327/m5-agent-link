@@ -14,7 +14,12 @@
 #define DEEP_AFTER_MS (10u * 60u * 1000u)
 /* After a timer wake the display stays off; this long to reconnect, then DEEP again. */
 #define RECONNECT_WINDOW_MS (90u * 1000u)
-/* Timer wakes to look for the host (FIRMWARE.md "DEEP"): 5 → 60 min, ~4 h in all, then buttons only. */
+/* Timer wakes to look for the host (FIRMWARE.md "DEEP"): 5 → 60 min, ~4 h in all, then buttons only.
+ * Off by default: a woken watch can only reach the host over BLE, and the Linux host has no working
+ * BLE (USB only), so a timer wake just burns battery. Build with POWER_TIMER_WAKES=1 to turn back on. */
+#ifndef POWER_TIMER_WAKES
+#define POWER_TIMER_WAKES 0
+#endif
 static const uint16_t kRetryMin[] = {5, 10, 20, 40, 60, 60, 60};
 #define N_RETRY (sizeof kRetryMin / sizeof kRetryMin[0])
 
@@ -115,7 +120,7 @@ void power_tick(uint32_t now_ms)
     if (link_connected()) reset_retries();
     uint32_t deep_after = s_timer_wake && RECONNECT_WINDOW_MS < s_deep_after_ms ? RECONNECT_WINDOW_MS : s_deep_after_ms;
     if (!s_on && !s_glowing && !s_deep && now_ms - s_off_since >= deep_after && may_deep()) {
-        uint32_t wake_after_s = s_tries < N_RETRY ? kRetryMin[s_tries] * 60u : 0;
+        uint32_t wake_after_s = POWER_TIMER_WAKES && s_tries < N_RETRY ? kRetryMin[s_tries] * 60u : 0;
         hal_retained_set(s_tries + 1);
         s_deep = true;
         dbg_event("power", "deep", "\"wake_after_s\":%u,\"tries\":%u", (unsigned)wake_after_s, (unsigned)s_tries);
