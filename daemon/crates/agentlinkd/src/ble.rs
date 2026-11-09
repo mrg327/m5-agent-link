@@ -235,8 +235,11 @@ async fn open(
                     None => break,
                 },
                 _ = liveness.tick() => {
-                    // Some backends never end the notification stream on disconnect.
-                    if !reader_p.is_connected().await.unwrap_or(false) {
+                    // Some backends never end the notification stream on disconnect, and on macOS
+                    // `is_connected` can hang for good once CoreBluetooth drops the peripheral.
+                    let alive = tokio::time::timeout(LIVENESS_POLL, reader_p.is_connected()).await;
+                    if !matches!(alive, Ok(Ok(true))) {
+                        tracing::info!("ble link to {} lost", reader_p.id());
                         break;
                     }
                 }
