@@ -10,7 +10,7 @@ The watch answers one question per glance and one gesture per intent. **Context 
 
 ## 2. Navigation model
 
-Five modes, one screen each. HOME is the only place you can stay; every other mode returns to HOME on commit, on **B long**, on the **A+B chord** (Home), or on timeout.
+Six modes, one screen each. HOME is the only place you can stay, except WATCH, which stays until you leave it. Every other mode returns to HOME on commit, on **B long**, on the **A+B chord** (Home), or on timeout.
 
 ```
                  lift / button / touch-wake              attention arrives
@@ -20,7 +20,7 @@ Five modes, one screen each. HOME is the only place you can stay; every other mo
    └─────┘    first touch = wake only)     └──────────┘                      └──────────┘
                                           │  ▲    │  ▲
                         tap centre /      │  │    │  │ swipe down
-                        swipe up          ▼  │    ▼  │ ("Watch…" item too)
+                        swipe up          ▼  │    ▼  │ ("Status…" item too)
                                      ┌─────────┐  ┌──────────┐
                                      │  AGENT  │  │  STATUS  │  link · battery · quiet mode
                                      │ (wheel) │  └──────────┘
@@ -30,40 +30,45 @@ Five modes, one screen each. HOME is the only place you can stay; every other mo
                                      ┌──────────┐
                                      │  SCROLL  │  vertical swipes drive the terminal
                                      └──────────┘
+                                          ▲  "Watch" item (AGENT) opens
+                                     ┌──────────┐
+                                     │  WATCH   │  live steps of one session; stays until you leave
+                                     └──────────┘
 ```
 
 - **HOME (deck).** One session card in the centre, a thin pinned index ring at the rim. Scrub, B or a side swipe changes the session. Button A does the state's default action (Focus). Tap centre or swipe up opens AGENT.
 - **AGENT.** The per-agent screen (user decision §9.1): a curved list ("wheel") of that session's actions, default item preselected, with gesture shortcuts layered on it. Scrub moves, tap commits a safe item, hold commits a destructive one.
 - **ASK.** Opened automatically when an attention (question, permission) arrives while the display is on, or on the first touch during a glow. It is AGENT with the agent's prompt text above the wheel and the agent's options as items. Done/error attentions do not open ASK; they update the card and buzz.
 - **SCROLL.** Vertical swipes drive the focused terminal's scrollback. Entered only from the AGENT wheel.
-- **STATUS.** Link, host, battery, quiet mode, sounds. Swipe down from HOME or the "Watch…" item; the empty deck points at it (§4.5).
+- **STATUS.** Link, host, battery, quiet mode, sounds. Swipe down from HOME or the "Status…" item; the empty deck points at it (§4.5).
+- **WATCH.** A live monitor for one session: its current step, the steps before it, the step count and the time. Opened by the "Watch" item; B or the rim moves to the next session (§4.7).
 
-Timeouts: AGENT 8 s, ASK none (it waits for the answer or a `clear`), SCROLL 8 s after the last swipe, STATUS 8 s. The display turns off 10 s after the last input on HOME unless an unanswered attention is showing.
+Timeouts: AGENT 8 s, ASK none (it waits for the answer or a `clear`), SCROLL 8 s after the last swipe, STATUS 8 s, WATCH none. The display turns off 10 s after the last input on HOME unless an unanswered attention is showing.
 
 ## 3. Gesture map
 
 One table, every input × mode. "—" means ignored (and logged). Thresholds: long-press 600 ms, hold ≥ 1200 ms (daemon floor 1000 ms), swipe ≥ 60 px within 400 ms, **deny swipe ≥ 120 px starting above the centre line**, rim annulus r 160–260 px, centre r < 150 px, scrub detent per item.
 
-| Input | OFF / glow | HOME (deck) | AGENT (wheel) | ASK (card + wheel) | SCROLL | STATUS |
-|---|---|---|---|---|---|---|
-| First touch after off/glow | wake only (glow: reveal ASK) | | | | | |
-| Tap centre | wake | open AGENT (open ASK when a permission or question is pending) | commit selected item (safe items; a destructive item shows "hold") | commit selected item if safe (Open on PC, a question option); else shows "hold" | exit, keep terminal position (a tap that stops a glide only stops it) | commit selected row (nothing here is destructive) |
-| Long-press centre (600 ms) | wake | — (reserved) | — | — | — | — |
-| Hold centre ≥ 1.2 s (arc + ramp) | — | — | commit a destructive item | **Approve**-class item (bound to `rid`), or Deny (0.8 s); arc colour = item colour | — | — |
-| Rim scrub CW / CCW | wake | next / previous session (detent) | next / previous item (detent) | next / previous option (detent) | — | next / previous row |
-| Tap rim | wake | select the session under the finger | select the item at that angle (items are laid out on the ring) | same | — | — |
-| Vertical drag in centre | wake | — | — | — | trackpad: 1 line per 10 px past the tap slop, a detent per 3 lines; a fast release glides on | — |
-| Swipe up (centre) | wake | open AGENT (ASK when a request is pending) | — | — | its drag lines, then the glide (never a page) | back to HOME |
-| Swipe down (centre) | wake | open STATUS | back to HOME | **Deny** (permission only, strict) | its drag lines, then the glide (never a page, deny or back) | — |
-| Swipe left / right | wake | next / previous session | — | — | — | — |
-| Button A short | wake | default action (Focus; Done also acks) | commit selected item (safe only) | **Open on PC** (focus), whatever is selected: A never approves | to bottom (live) and exit | commit row (Quiet: off → 30 min → 1 h → off; Sounds: on/off; information rows: nothing) |
-| Button A double | wake | jump to next attention (Input › Error › Done-unseen) | — | — | — | — |
-| Button A long | wake | — | — | — | — | — |
-| Button B short | wake | next session | next item | next option | page down (newer) | next row |
-| Button B long | wake | previous session | back to HOME | back to HOME (request stays pending) | back to HOME | back to HOME |
-| A+B chord | wake | — (already home) | **Home** | **Home** (request stays pending) | **Home** | **Home** |
-| Lift (IMU, later) | wake; during a glow opens ASK | — | — | — | — | — |
-| Shake (IMU) | — | — | — | — | — | — |
+| Input | OFF / glow | HOME (deck) | AGENT (wheel) | ASK (card + wheel) | SCROLL | STATUS | WATCH |
+|---|---|---|---|---|---|---|---|
+| First touch after off/glow | wake only (glow: reveal ASK) | | | | | | |
+| Tap centre | wake | open AGENT (open ASK when a permission or question is pending) | commit selected item (safe items; a destructive item shows "hold") | commit selected item if safe (Open on PC, a question option); else shows "hold" | exit, keep terminal position (a tap that stops a glide only stops it) | commit selected row (nothing here is destructive) | open the session in the terminal (ASK when a request is pending) |
+| Long-press centre (600 ms) | wake | — (reserved) | — | — | — | — | — |
+| Hold centre ≥ 1.2 s (arc + ramp) | — | — | commit a destructive item | **Approve**-class item (bound to `rid`), or Deny (0.8 s); arc colour = item colour | — | — | — |
+| Rim scrub CW / CCW | wake | next / previous session (detent) | next / previous item (detent) | next / previous option (detent) | — | next / previous row | next / previous session |
+| Tap rim | wake | select the session under the finger | select the item at that angle (items are laid out on the ring) | same | — | — | watch the session under the finger |
+| Vertical drag in centre | wake | — | — | — | trackpad: 1 line per 10 px past the tap slop, a detent per 3 lines; a fast release glides on | — | — |
+| Swipe up (centre) | wake | open AGENT (ASK when a request is pending) | — | — | its drag lines, then the glide (never a page) | back to HOME | back to HOME, watching stops |
+| Swipe down (centre) | wake | open STATUS | back to HOME | **Deny** (permission only, strict) | its drag lines, then the glide (never a page, deny or back) | — | — |
+| Swipe left / right | wake | next / previous session | — | — | — | — | — |
+| Button A short | wake | default action (Focus; Done also acks) | commit selected item (safe only) | **Open on PC** (focus), whatever is selected: A never approves | to bottom (live) and exit | commit row (Quiet: off → 30 min → 1 h → off; Sounds: on/off; information rows: nothing) | focus the terminal |
+| Button A double | wake | jump to next attention (Input › Error › Done-unseen) | — | — | — | — | — |
+| Button A long | wake | — | — | — | — | — | — |
+| Button B short | wake | next session | next item | next option | page down (newer) | next row | next session |
+| Button B long | wake | previous session | back to HOME | back to HOME (request stays pending) | back to HOME | back to HOME | back to HOME |
+| A+B chord | wake | — (already home) | **Home** | **Home** (request stays pending) | **Home** | **Home** | **Home** |
+| Lift (IMU, later) | wake; during a glow opens ASK | — | — | — | — | — | — |
+| Shake (IMU) | — | — | — | — | — | — | — |
 
 Why this is conflict-free:
 - The centre and the rim are disjoint hit regions (r < 150 vs r ≥ 160); a press between them is a rim press. A scrub that starts in the annulus never becomes a swipe; a swipe or drag that starts in the centre never becomes a scrub.
@@ -138,7 +143,7 @@ User decision §9.1: tapping the centre opens a screen where gestures act on tha
         │                                                  │
         │                Scroll terminal                   │  20 px muted (next)
         │                Notify when done                  │  16 px muted
-        │                Watch…                            │
+        │                Status…                           │
         ╰╮                                                ╭╯
          ╰─╮  [A] SELECT                     NEXT [B]  ╭─╯
            ╰──╮                                      ╭──╯
@@ -151,12 +156,19 @@ User decision §9.1: tapping the centre opens a screen where gestures act on tha
 
 | State | Items (default first) | Destructive (hold) |
 |---|---|---|
-| Working | Focus terminal · Scroll terminal · Snooze 30 min · Notify when done · Watch… | — |
-| Question | Focus terminal · *the agent's options (ASK)* · Scroll terminal · Watch… | — |
-| Permission | Open on PC (review) · Approve · *grant options* · Deny · Scroll terminal · Watch… | Approve, grants, Deny |
-| Done | Focus + acknowledge · Acknowledge · Scroll terminal · Watch… | — |
-| Error | Focus terminal · Dismiss · Scroll terminal · Watch… | — |
-| Idle | Focus terminal · Snooze 30 min · Watch… | — |
+| Working | Focus terminal · Watch · Scroll terminal · Notify when done · Snooze 30 min · Status… | — |
+| Question | Focus terminal · *the agent's options (ASK)* · Scroll terminal · Watch · Status… | — |
+| Permission | Open on PC (review) · Approve · *grant options* · Deny · Scroll terminal · Watch · Status… | Approve, grants, Deny |
+| Done | Focus terminal · Mark seen · Scroll terminal · Watch · Status… | — |
+| Error | Focus terminal · Dismiss error · Scroll terminal · Watch · Status… | — |
+| Idle | Focus terminal · Watch · Snooze 30 min · Status… | — |
+| Input (the session waits, no request listed) | Focus terminal · Scroll terminal · Watch · Status… | — |
+
+- **Watch** opens the WATCH monitor for this session (§4.7). **Status…** opens STATUS (§4.5). The device writes "Status..." with three dots when the font has no ellipsis glyph.
+- **Focus terminal** on a Done session still also acknowledges it, as the deck's A button does. There is no separate "Focus + acknowledge" item.
+- **Mark seen** (Done) and **Dismiss error** (Error) both send `ack`. The daemon stores the result: it sets `seen`, tells every device, and moves an acknowledged error session to idle. The device only dims the segment at once.
+- **Snooze 30 min** and **Notify when done** are toggles. While the session is snoozed (`snz` is in the future) the item reads **Unsnooze** and sends `snooze` with 0 minutes (toast "Unsnoozed"). While `ntf` is set, the item reads **Don't notify** and sends `notify_done` with 0 (toast "Won't notify"). Arming sends 1.
+- A snoozed session buzzes, glows and nags for nothing. Its card still appears, and its ring segment is dimmed. The card shows "snoozed" after the time.
 
 - Items the daemon has not advertised (`welcome.feats`, `attention.acts`, or a previous `result.err = unsupported`) are hidden, not greyed.
 - Deferred: "Cancel agent" (interrupt the running turn). It would be a hold item here; no decision yet.
@@ -243,7 +255,7 @@ User decision §9.3: scrolling is by vertical swipe, not by rim scrub. The centr
               ╰──────────────────────────────────────╯
 ```
 
-Reached by swipe down from HOME and by the "Watch…" item on the AGENT wheel; the empty deck says `swipe down for status`. The index ring keeps showing the sessions, so the deck's glance survives the visit. **Quiet mode lives only here** (user decision §9.7). Rows, in wheel order (`nav_status_items()`):
+Reached by swipe down from HOME and by the "Status…" item on the AGENT wheel; the empty deck says `swipe down for status`. The index ring keeps showing the sessions, so the deck's glance survives the visit. **Quiet mode lives only here** (user decision §9.7). Rows, in wheel order (`nav_status_items()`):
 
 | Row | Text | Commit (A or tap) |
 |---|---|---|
@@ -258,6 +270,45 @@ While quiet runs (`model_quiet_active()`), an attention that arrives neither buz
 ### 4.6 OFF and glow
 
 Unchanged intent, two fixes carried from `2702775`: the first touch after a glow or a dark display only wakes (`power_activity()` returns true while `s_glowing`), and the glow colour follows the attention kind. Lifting during a glow (IMU, later) opens ASK directly.
+
+### 4.7 WATCH
+
+A live monitor for one running session on the small screen. Opened by the "Watch" item (§4.2). The watched session is the deck's selection: B and the rim move the deck, and the watch follows. Only one session is watched at a time, and only while this screen is open.
+
+```
+              ╭──────────────────────────────────────╮
+           ╭──╯                                      ╰──╮
+         ╭─╯           Claude Code · webapp            ╰─╮   16 px header: agent · repo (host name first when remote)
+        ╭╯                                                ╰╮
+        │            ✓ Read · src/main.c                   │  16 px muted rows: up to 3 earlier steps, oldest on top
+        │            ✓ Edit · src/app.c                    │  mark: green check = ok, red cross = failed, accent play = running
+        │                                                  │
+        │                      Bash                        │  24 px: the current tool
+        │            npm test -- --watch=false             │  20 px muted: its argument, up to 2 lines, ellipsized
+        │                                                  │
+        │                3 steps · 1:37                    │  20 px muted footer
+        ╰╮  [A] FOCUS                          NEXT [B]  ╭─╯
+         ╰─╮          swipe up to go back              ╭─╯
+           ╰──╮                                      ╭──╯
+              ╰──────────────────────────────────────╯
+```
+
+- The rim keeps the index ring, with the watched session selected in its state colour.
+- The step comes from `sum` ("Tool · argument"), else `tool`. The timeline keeps the last four steps per session (`steps.c`): a new `n` pushes a running step, `ok` finishes step `n`, and a smaller `n` or 0 starts a new turn and clears it. The screen redraws on every delta for that session, and the clock once a second.
+- Footer: `<n> steps · <m:ss>`. The time is the time in the current state (`tst`, else `t0`) and shows only while the session works. The other states show the step count alone.
+- When the session is not working, the centre shows the state instead: Done `Finished · 3m ago`, Error `Error`, Input `Waiting for you` with `tap to answer`, Idle `Idle`.
+- No timeout: WATCH stays until you leave. The display still turns off after 10 s idle, and the wrist raise wakes it on the same screen.
+- If the watched session ends or is removed, the device goes back to HOME with the toast "Session ended".
+- An attention for any session behaves as on HOME and may open ASK. When ASK closes, the device returns to HOME and watching stops (the ASK return path goes to HOME).
+- A Done or Error transition of the watched session buzzes the finished pattern (§5), unless it is snoozed or quiet mode runs.
+
+| Input | Action |
+|---|---|
+| Tap centre | focus the terminal (opens ASK when the session waits for an answer) |
+| Button A | focus the terminal |
+| Button B / rim scrub / tap rim | next / previous session; the watch follows |
+| Swipe up, B long, A+B chord | back to HOME, watching stops |
+| Swipe down, left, right | ignored |
 
 ## 5. Haptic vocabulary
 
@@ -280,6 +331,10 @@ ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a deten
 | Scroll stop (at bottom/top) | 40 | one thud | SCROLL |
 | Mode change (enter AGENT/SCROLL/STATUS) | 35 | one short | all |
 | Quiet toggled | 35, 100, 35 | two spaced | STATUS |
+| **Finished: done** | 30, 200, 30 | two soft, long gap | a session moved into Done, when notify is armed or it is watched |
+| **Finished: error** | 120, 90, 120, 90, 120 | three firm | a session moved into Error, same rule |
+
+The finished buzz needs: the session just entered Done or Error, and (its `ntf` was set, or it is the watched session), and it is not snoozed, and quiet mode is not running. A snoozed session's attentions do not buzz, glow or nag either.
 
 Three controls (§4.5): the alert mode `silent` suppresses every haptic but `hello`; the alert mode `quiet` ("Sounds: off") suppresses sound only (sound is still a stub); the timed **Quiet** (`quiet_until`) suppresses the *alerts* (attention arrival, glow, nag) while leaving the detents, ticks and commit haptics, which answer the user's own input.
 
@@ -334,7 +389,7 @@ Sources of options, in order of precedence:
 
 1. `attention.opts` (≤ 4 × 24 chars): Claude Code `AskUserQuestion` choices, Copilot `elicitation_dialog` choices. Shown verbatim; a 5th or longer option is the daemon's job to shorten or drop (it already enforces the limits). Commit by tap or A → `cmd_op_reply {rid, arg: index}`.
 2. A permission with `acts` containing `approve`/`deny` but no `opts`: the device synthesises `Approve`, `Deny`, `Open on PC`. When the agent's prompt has "allow for this session / don't ask again" variants, the daemon sends them as `opts` with `kind = approval` and a new **required** `attention.grant_mask` (bit per option; set = the option grants something). Every set option is approve-class (hold); the reply is `cmd_op_reply {rid, arg: index}`, which the daemon maps to the agent's own choice. User decision §9.5: these grants are offered on the watch.
-3. Error / Done attentions: no options; `acts` drive AGENT items (Dismiss, Acknowledge).
+3. Error / Done attentions: no options; `acts` drive AGENT items (Dismiss error, Mark seen).
 
 Flow for a question:
 
@@ -374,10 +429,10 @@ Daemon side (Phase 3, `daemon/crates/agentlinkd/src/broker.rs`): the approval br
 |---|---|---|
 | 0 | Review fixes #1–#4 (`2702775`): prompt text on the card, glow first-touch, haptic triple, strict deny | `approve_card`, `approve_after_glow`, `approve_too_soon`, `deny_short_swipe` |
 | 1 | HOME deck: new hierarchy, summary row, time-in-state, index ring with tick and inset error dash, stale/offline, key badges, toast placement. Tap centre stays Focus until Phase 2 | screenshots of every state; `expect_label` on summary and stale |
-| 2 | `ui_wheel.c` + AGENT for Working/Done/Error/Idle (Focus, Ack, Dismiss, Snooze, Notify, Watch…); tap centre and swipe up open it; chord = Home. **Done** (`nav.c` interaction layer, §8a) | `actions_wheel.txt`, `agent_timeout.txt` |
+| 2 | `ui_wheel.c` + AGENT for Working/Done/Error/Idle (Focus, Mark seen, Dismiss error, Snooze, Notify, Watch, Status…); tap centre and swipe up open it; chord = Home. **Done** (`nav.c` interaction layer, §8a) | `actions_wheel.txt`, `agent_timeout.txt` |
 | 3 | ASK on the wheel: options from `opts`, `grant_mask`, `cmd_op_reply`, approve/grants/deny as hold items, answer-pending line; daemon approval broker + blocking Claude Code hooks. **Done** | `ask_reply`, `ask_grant_hold`, `ask_deny_hold`, `ask_tap_never_approves`, `ask_result_error`, `ask_hold_bound_to_rid`; vectors `attention_question_opts`, `attention_permission_grants`, `cmd_reply`; broker and hook unit tests |
 | 4 | SCROLL by drag/flick + `cmd_op_scroll` + `scroll_pos` + kitty and tmux drivers + privacy-gated preview. **Done** (simulator and daemon unit tests; not yet run against a real kitty or tmux, and the BLE interactive interval is still untouched) | `scroll_mode.txt`, `scroll_exit.txt`, `scroll_privacy.txt`, `scroll_unsupported.txt`; `test_gesture` drag/flick cases; vectors `cmd_scroll`, `result_scroll_pos`; daemon tests for kitty/tmux argument building, position parsing, preview tidying, the coalescer and the link-level burst test |
-| 5 | STATUS wheel (swipe down from HOME, "Watch…"; quiet cycle, sounds toggle, privacy / counts / firmware rows; quiet holds the alert buzz, glow and nag; the deck's mute glyph); deny removed from the deck; Atlas facts (gesture map from `nav.c`, `status` screen, `quiet_toggled` haptic). **Done** (simulator) | `status.txt` (rows, cycle, every exit path), `quiet_buzz.txt` (no permission buzz while quiet, buzz again after) |
+| 5 | STATUS wheel (swipe down from HOME, "Status…"; quiet cycle, sounds toggle, privacy / counts / firmware rows; quiet holds the alert buzz, glow and nag; the deck's mute glyph); deny removed from the deck; Atlas facts (gesture map from `nav.c`, `status` screen, `quiet_toggled` haptic). **Done** (simulator) | `status.txt` (rows, cycle, every exit path), `quiet_buzz.txt` (no permission buzz while quiet, buzz again after) |
 | 6 | IMU raise-to-wake and lift-during-glow (needs the BMI270 driver) | on-device only |
 
 The simulator is the acceptance tool at each phase: scripts under `simulator/scripts/`, screenshots compared by eye, `expect_screen` extended with the mode name.
@@ -408,7 +463,7 @@ Safety is in the interaction layer, so every skin keeps it for free: a tap is ne
 4. **Scroll entry only from the AGENT wheel.** Long-press centre on HOME is reserved (no action).
 5. **"Don't ask again" grants are offered**, as hold items, gated by `attention.grant_mask`.
 6. **Cancel agent: deferred** (no decision).
-7. **A+B chord = Home.** Quiet mode lives only in STATUS (swipe down from HOME, or "Watch…").
+7. **A+B chord = Home.** Quiet mode lives only in STATUS (swipe down from HOME, or "Status…").
 8. **Scroll preview: yes**, one line ≤ 48 chars, only when privacy ≥ preview.
 9. **Pebble-style `[A] WORD` key badges.**
 
@@ -435,7 +490,7 @@ Phase 5 decisions (2026-11-08, implementation):
 22. **Deny no longer exists on the deck.** `nav.c` still had `{MODE_HOME, G_SWIPE_DOWN, …, WHEN_REQUEST, NAV_DENY}`; it is now `NAV_OPEN_STATUS` unconditionally, as §3 said, and the extractor fails on any deck deny binding. The simulator's deny tests already ran in ASK.
 23. **The empty deck is not STATUS.** It keeps `No sessions` / `Waiting for an agent` plus the hint `swipe down for status`; embedding STATUS would loop its 8 s timeout against an always-empty deck.
 24. **No toast on STATUS, and no "Sleep now" row.** The row's new text and the haptic are the confirmation; the display-off path stays with `power.c`'s idle timer (§4.5 lists no sleep row).
-25. **"Watch…" opens STATUS** (it toasted "coming soon" before); `actions_wheel.txt` expects the `status` screen there now.
+25. **"Watch" opens the WATCH monitor** (§4.7); the STATUS screen is reached by the "Status…" item (and swipe down from HOME). `actions_wheel.txt` and `status.txt` check both.
 26. **Toasts on the wheel screens use the hint line** (ASK, STATUS; `ui.c place_toast()`): the deck's slot over the action pill lands on the selected row of a wheel laid out in the bottom half. A toast that outlives a mode change moves to the new mode's slot.
 
 ## 10. Decisions that reconcile DESIGN.md and UI-RING.md

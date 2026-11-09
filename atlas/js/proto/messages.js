@@ -53,6 +53,7 @@ const SPECS = {
     sid: [0, 'uint'], ag: [1, 'enum:agent'], st: [2, 'enum:sess_state'], sub: [3, 'enum:input_sub'],
     repo: [4, 'tstr'], br: [5, 'tstr'], tool: [6, 'tstr'], t0: [7, 'uint'], tst: [8, 'uint'],
     sum: [9, 'tstr'], seen: [10, 'bool'], host: [11, 'uint'], hn: [12, 'tstr'],
+    snz: [13, 'uint'], ntf: [14, 'bool'], n: [15, 'uint'], ok: [16, 'bool'],
   },
   snapshot: { sessions: [0, 'objs:session'], away: [1, 'objs:away_event'] },
   gone: { sid: [0, 'uint'] },
