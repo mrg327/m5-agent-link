@@ -114,8 +114,8 @@ enum RemoteCmd {
     List,
     /// Forget a saved remote (nothing on the remote is changed).
     Rm { name: String },
-    /// Onboard a saved Windows remote over ssh: installs this Mac's key if needed, copies the
-    /// token and agentlink-hook.exe, writes the Copilot hooks config, sets AGENTLINK_REMOTE.
+    /// Onboard a saved remote (Windows or Linux) over ssh: installs this Mac's key if needed, copies the
+    /// token and agentlink-hook, writes the Copilot hooks config, sets AGENTLINK_REMOTE.
     /// Safe to re-run (e.g. after `remote init --rotate` or a new hook build).
     Setup {
         name: String,
@@ -126,7 +126,8 @@ enum RemoteCmd {
 
 #[derive(clap::Args)]
 struct SetupOpts {
-    /// Windows hook binary (default ~/.agentlink/dist/windows-x64/agentlink-hook.exe).
+    /// Hook binary for the remote (default ~/.agentlink/dist/windows-x64/agentlink-hook.exe, or
+    /// dist/linux-<x64|arm64>/agentlink-hook for Unix).
     #[arg(long)]
     hook_exe: Option<std::path::PathBuf>,
     /// Public key to install when key login fails (default ~/.ssh/id_ed25519.pub).

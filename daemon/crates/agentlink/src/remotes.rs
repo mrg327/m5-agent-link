@@ -253,7 +253,10 @@ pub fn remote_command(p: &Profile) -> Option<String> {
             // Win32-OpenSSH's default shell may be cmd or PowerShell; -EncodedCommand is
             // parsed the same by both, so nothing in the script needs shell quoting.
             // Progress records otherwise leak to the terminal as CLIXML.
-            let mut s = String::from("$ProgressPreference = 'SilentlyContinue'\n");
+            let mut s = format!(
+                "$ProgressPreference = 'SilentlyContinue'\n$env:AGENTLINK_REMOTE = 'tcp:127.0.0.1:{}'\n",
+                p.port()
+            );
             if let Some(d) = &p.dir {
                 s.push_str(&format!("Set-Location -LiteralPath {}\n", ps_quote(d)));
             }
@@ -270,11 +273,17 @@ pub fn remote_command(p: &Profile) -> Option<String> {
             let cd = p
                 .dir
                 .as_deref()
-                .map(|d| format!("cd -- {} && ", sh_quote(d)))
+                .map(|d| format!("cd -- {} && ", sh_path(d)))
                 .unwrap_or_default();
+            let env = format!("export AGENTLINK_REMOTE=tcp:127.0.0.1:{}; ", p.port());
             Some(match &p.cmd {
-                Some(c) => format!("{cd}{c}"),
-                None => format!("{cd}exec \"${{SHELL:-sh}}\" -l"),
+                // An interactive login shell, so tools that rc files put on PATH (nvm) resolve.
+                // The env is set again inside it because rc files (setup's line) run after.
+                Some(c) => format!(
+                    "{env}{cd}exec \"${{SHELL:-sh}}\" -lic {}",
+                    sh_quote(&format!("{env}{c}"))
+                ),
+                None => format!("{env}{cd}exec \"${{SHELL:-sh}}\" -l"),
             })
         }
     }
@@ -299,6 +308,17 @@ fn ps_quote(s: &str) -> String {
 
 fn sh_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
+}
+
+/// Quotes a path for sh, keeping a leading `~` meaning the remote home.
+fn sh_path(d: &str) -> String {
+    match d {
+        "~" => "\"$HOME\"".into(),
+        _ => match d.strip_prefix("~/") {
+            Some(rest) => format!("\"$HOME\"/{}", sh_quote(rest)),
+            None => sh_quote(d),
+        },
+    }
 }
 
 /// `powershell -EncodedCommand` payload: base64 of the UTF-16LE script.
@@ -330,9 +350,36 @@ fn base64(b: &[u8]) -> String {
 #[cfg(unix)]
 pub fn setup(name: &str, hook_exe: Option<PathBuf>, key: Option<PathBuf>) -> Result<()> {
     let p = lookup(name)?.with_context(|| format!("no remote named '{name}'"))?;
-    if p.os != Os::Windows {
-        bail!("setup handles Windows remotes for now; see docs/design/REMOTE.md §4 for Unix");
+    let key = key.unwrap_or_else(|| {
+        PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".ssh/id_ed25519.pub")
+    });
+    match p.os {
+        Os::Windows => setup_windows(&p, hook_exe, &key)?,
+        Os::Unix => setup_unix(&p, hook_exe, &key)?,
     }
+    println!("{name} is set up. Connect with: agentlink ssh {name}");
+    Ok(())
+}
+
+#[cfg(unix)]
+fn ensure_token(home: &Path) -> Result<PathBuf> {
+    let token = home.join("remote.token");
+    if !token.is_file() {
+        crate::remote::write_token_quiet(home)?;
+        eprintln!("created {}", token.display());
+    }
+    Ok(token)
+}
+
+#[cfg(unix)]
+fn read_key(key: &Path) -> Result<String> {
+    let k = std::fs::read_to_string(key)
+        .with_context(|| format!("cannot read {} (use --key)", key.display()))?;
+    Ok(k.trim().to_owned())
+}
+
+#[cfg(unix)]
+fn setup_windows(p: &Profile, hook_exe: Option<PathBuf>, key: &Path) -> Result<()> {
     let home = crate::home();
     let exe = hook_exe.unwrap_or_else(|| default_hook_exe(&home));
     if !exe.is_file() {
@@ -341,47 +388,88 @@ pub fn setup(name: &str, hook_exe: Option<PathBuf>, key: Option<PathBuf>) -> Res
             exe.display()
         );
     }
-    let token = home.join("remote.token");
-    if !token.is_file() {
-        crate::remote::write_token_quiet(&home)?;
-        eprintln!("created {}", token.display());
-    }
+    let token = ensure_token(&home)?;
 
     eprintln!("[1/4] key login to {}", p.dest);
-    if run_ps(&p, "'ok'", true).is_err() {
-        let key = key.unwrap_or_else(|| {
-            PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".ssh/id_ed25519.pub")
-        });
-        let k = std::fs::read_to_string(&key)
-            .with_context(|| format!("cannot read {} (use --key)", key.display()))?;
+    if run_ps(p, "'ok'", true).is_err() {
+        let k = read_key(key)?;
         eprintln!(
             "      no key login yet: installing {} (enter the Windows password once)",
             key.display()
         );
-        let out = run_ps(&p, &install_key_script(k.trim()), false)?;
+        let out = run_ps(p, &install_key_script(&k), false)?;
         eprintln!("      {}", out.trim());
-        run_ps(&p, "'ok'", true).context("key login still fails after installing the key")?;
+        run_ps(p, "'ok'", true).context("key login still fails after installing the key")?;
     }
 
     eprintln!("[2/4] preparing folders");
-    let profile_dir = run_ps(&p, PREP_SCRIPT, true)?.trim().to_owned();
+    let profile_dir = run_ps(p, PREP_SCRIPT, true)?.trim().to_owned();
     if profile_dir.is_empty() {
         bail!("remote did not report its profile folder");
     }
 
     eprintln!("[3/4] copying hook and token");
-    scp(&p, &exe, ".agentlink/bin/agentlink-hook.exe")?;
-    scp(&p, &token, ".agentlink/remote.token")?;
+    scp(p, &exe, ".agentlink/bin/agentlink-hook.exe")?;
+    scp(p, &token, ".agentlink/remote.token")?;
 
     eprintln!("[4/4] token permissions, AGENTLINK_REMOTE, Copilot hooks");
     let hook_path = format!(r"{profile_dir}\.agentlink\bin\agentlink-hook.exe");
     let hooks = serde_json::to_string_pretty(&crate::hooks::copilot_with(&hook_path))?;
-    let out = run_ps(&p, &finish_script(p.port(), &hooks), true)?;
+    let out = run_ps(p, &finish_script(p.port(), &hooks), true)?;
+    print_indented(&out);
+    Ok(())
+}
+
+#[cfg(unix)]
+fn setup_unix(p: &Profile, hook_exe: Option<PathBuf>, key: &Path) -> Result<()> {
+    let home = crate::home();
+    let token = ensure_token(&home)?;
+
+    eprintln!("[1/4] key login to {}", p.dest);
+    if run_sh(p, "true", true).is_err() {
+        let k = read_key(key)?;
+        eprintln!(
+            "      no key login yet: installing {} (enter the password once)",
+            key.display()
+        );
+        let out = run_sh(p, &unix_install_key_script(&k), false)?;
+        print_indented(&out);
+        run_sh(p, "true", true).context("key login still fails after installing the key")?;
+    }
+
+    eprintln!("[2/4] preparing folders");
+    let out = run_sh(p, UNIX_PREP_SCRIPT, true)?;
+    let mut lines = out.lines().map(str::trim);
+    let (remote_home, arch) = match (lines.next(), lines.next()) {
+        (Some(h), Some(a)) if h.starts_with('/') => (h.to_owned(), a.to_owned()),
+        _ => bail!("remote did not report its home folder and machine type"),
+    };
+    let exe = hook_exe.unwrap_or_else(|| default_unix_hook(&home, &arch));
+    if !exe.is_file() {
+        bail!(
+            "no Linux hook for {arch} at {}\nbuild it with:\n  cargo zigbuild --release -p agentlink-hook --target {}-unknown-linux-musl\nthen pass --hook-exe PATH, or copy it to that path",
+            exe.display(),
+            arch
+        );
+    }
+
+    eprintln!("[3/4] copying hook and token");
+    scp(p, &exe, ".agentlink/bin/agentlink-hook")?;
+    scp(p, &token, ".agentlink/remote.token")?;
+
+    eprintln!("[4/4] token permissions, AGENTLINK_REMOTE, Copilot hooks");
+    let hook_path = format!("{remote_home}/.agentlink/bin/agentlink-hook");
+    let hooks = serde_json::to_string_pretty(&crate::hooks::copilot_with(&hook_path))?;
+    let out = run_sh(p, &unix_finish_script(p.port(), &hooks), true)?;
+    print_indented(&out);
+    Ok(())
+}
+
+#[cfg(unix)]
+fn print_indented(out: &str) {
     for l in out.lines().filter(|l| !l.trim().is_empty()) {
         eprintln!("      {}", l.trim());
     }
-    println!("{name} is set up. Connect with: agentlink ssh {name}");
-    Ok(())
 }
 
 #[cfg(not(unix))]
@@ -392,6 +480,62 @@ pub fn setup(_name: &str, _hook_exe: Option<PathBuf>, _key: Option<PathBuf>) -> 
 /// Where `setup` looks for the cross-compiled hook by default.
 pub fn default_hook_exe(home: &Path) -> PathBuf {
     home.join("dist/windows-x64/agentlink-hook.exe")
+}
+
+/// Default Linux hook for a remote whose `uname -m` is `arch`.
+pub fn default_unix_hook(home: &Path, arch: &str) -> PathBuf {
+    let a = match arch {
+        "x86_64" | "amd64" => "x64",
+        "aarch64" | "arm64" => "arm64",
+        other => other,
+    };
+    home.join(format!("dist/linux-{a}/agentlink-hook"))
+}
+
+/// Prints `$HOME` and `uname -m`; makes an existing token writable so scp can replace it.
+const UNIX_PREP_SCRIPT: &str = r#"set -e
+mkdir -p "$HOME/.agentlink/bin" "$HOME/.copilot/hooks"
+chmod 700 "$HOME/.agentlink"
+[ ! -f "$HOME/.agentlink/remote.token" ] || chmod 600 "$HOME/.agentlink/remote.token"
+printf '%s\n%s\n' "$HOME" "$(uname -m)"
+"#;
+
+/// The env line is tagged so a re-run replaces it instead of adding another.
+fn unix_finish_script(port: u16, hooks_json: &str) -> String {
+    format!(
+        r#"set -e
+chmod 755 "$HOME/.agentlink/bin/agentlink-hook"
+chmod 400 "$HOME/.agentlink/remote.token"
+line='export AGENTLINK_REMOTE=tcp:127.0.0.1:{port} # agentlink-remote'
+for f in "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc"; do
+  [ -f "$f" ] || [ "$f" = "$HOME/.profile" ] || continue
+  touch "$f"
+  grep -v '# agentlink-remote$' "$f" > "$f.agentlink" || true
+  cat "$f.agentlink" > "$f" && rm -f "$f.agentlink"
+  printf '%s
+' "$line" >> "$f"
+done
+printf '%s
+' {json} > "$HOME/.copilot/hooks/agentlink.json"
+echo "token readable only by $(id -un); AGENTLINK_REMOTE=tcp:127.0.0.1:{port} (login shells); hooks -> ~/.copilot/hooks/agentlink.json"
+"#,
+        json = sh_quote(hooks_json)
+    )
+}
+
+fn unix_install_key_script(key: &str) -> String {
+    format!(
+        r#"set -e
+umask 077
+mkdir -p "$HOME/.ssh"
+touch "$HOME/.ssh/authorized_keys"
+k={k}
+grep -qxF "$k" "$HOME/.ssh/authorized_keys" || printf '%s
+' "$k" >> "$HOME/.ssh/authorized_keys"
+echo "key added for $(id -un)"
+"#,
+        k = sh_quote(key)
+    )
 }
 
 const PREP_SCRIPT: &str = r#"$ProgressPreference = 'SilentlyContinue'
@@ -465,6 +609,30 @@ fn run_ps(p: &Profile, script: &str, batch: bool) -> Result<String> {
     let o = c.output().context("cannot run ssh")?;
     if !o.status.success() {
         bail!("{}", clean_stderr(&String::from_utf8_lossy(&o.stderr)));
+    }
+    Ok(String::from_utf8_lossy(&o.stdout).into_owned())
+}
+
+/// Runs a POSIX sh script on the remote and returns its stdout. `batch` forbids password
+/// prompts.
+#[cfg(unix)]
+fn run_sh(p: &Profile, script: &str, batch: bool) -> Result<String> {
+    let mut c = std::process::Command::new(ssh_bin());
+    if batch {
+        c.args(["-o", "BatchMode=yes"]);
+    }
+    c.args(["-o", "ConnectTimeout=15"])
+        .args(&p.ssh_args)
+        .arg(&p.dest)
+        .arg(format!("sh -c {}", sh_quote(script)))
+        .stdin(if batch {
+            std::process::Stdio::null()
+        } else {
+            std::process::Stdio::inherit()
+        });
+    let o = c.output().context("cannot run ssh")?;
+    if !o.status.success() {
+        bail!("{}", String::from_utf8_lossy(&o.stderr).trim());
     }
     Ok(String::from_utf8_lossy(&o.stdout).into_owned())
 }
@@ -559,7 +727,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             decode_ps(enc),
-            "$ProgressPreference = 'SilentlyContinue'\nSet-Location -LiteralPath 'C:\\work\\it''s'\ncopilot\nexit $LASTEXITCODE\n"
+            "$ProgressPreference = 'SilentlyContinue'\n$env:AGENTLINK_REMOTE = 'tcp:127.0.0.1:47533'\nSet-Location -LiteralPath 'C:\\work\\it''s'\ncopilot\nexit $LASTEXITCODE\n"
         );
     }
 
@@ -573,13 +741,45 @@ mod tests {
         };
         assert_eq!(
             remote_command(&p).unwrap(),
-            r"cd -- '/w/it'\''s' && copilot"
+            r#"export AGENTLINK_REMOTE=tcp:127.0.0.1:47533; cd -- '/w/it'\''s' && exec "${SHELL:-sh}" -lic 'export AGENTLINK_REMOTE=tcp:127.0.0.1:47533; copilot'"#
+        );
+        let home = Profile {
+            os: Os::Unix,
+            dir: Some("~/rfm_virt".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            remote_command(&home).unwrap(),
+            r#"export AGENTLINK_REMOTE=tcp:127.0.0.1:47533; cd -- "$HOME"/'rfm_virt' && exec "${SHELL:-sh}" -l"#
         );
         let bare = Profile {
             os: Os::Unix,
             ..Default::default()
         };
         assert_eq!(remote_command(&bare), None);
+    }
+
+    #[test]
+    fn unix_setup_scripts_parse_and_quote_values() {
+        let hooks = r#"{"exec": "/home/it's/.agentlink/bin/agentlink-hook"}"#;
+        for script in [
+            UNIX_PREP_SCRIPT.to_owned(),
+            unix_finish_script(47999, hooks),
+            unix_install_key_script("ssh-ed25519 AAAA it's@mac"),
+        ] {
+            let st = std::process::Command::new("sh")
+                .args(["-n", "-c", &script])
+                .status()
+                .unwrap();
+            assert!(st.success(), "{script}");
+        }
+        let fin = unix_finish_script(47999, hooks);
+        assert!(fin.contains(r#"'{"exec": "/home/it'\''s/.agentlink/bin/agentlink-hook"}'"#));
+        assert!(fin.contains("tcp:127.0.0.1:47999 # agentlink-remote"));
+        assert_eq!(
+            default_unix_hook(Path::new("/h"), "x86_64"),
+            Path::new("/h/dist/linux-x64/agentlink-hook")
+        );
     }
 
     #[test]
