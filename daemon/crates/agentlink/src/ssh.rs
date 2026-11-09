@@ -5,7 +5,7 @@
 use anyhow::Result;
 
 #[cfg(unix)]
-pub fn run(port: u16, dest: &str, extra: &[String]) -> Result<()> {
+pub fn run(port: u16, dest: &str, pre: &[String], extra: &[String]) -> Result<()> {
     use anyhow::{bail, Context};
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::net::UnixStream;
@@ -39,7 +39,7 @@ pub fn run(port: u16, dest: &str, extra: &[String]) -> Result<()> {
     eprintln!("agentlink: tunnel 127.0.0.1:{port} on {dest} → this watch (window registered)");
     let bin = std::env::var_os("AGENTLINK_SSH").unwrap_or_else(|| "ssh".into());
     let status = std::process::Command::new(&bin)
-        .args(ssh_argv(port, socket, dest, extra))
+        .args(ssh_argv(port, socket, pre, dest, extra))
         .status()
         .with_context(|| format!("cannot run {}", bin.to_string_lossy()))?;
     drop(s);
@@ -47,7 +47,7 @@ pub fn run(port: u16, dest: &str, extra: &[String]) -> Result<()> {
 }
 
 #[cfg(not(unix))]
-pub fn run(_port: u16, _dest: &str, _extra: &[String]) -> Result<()> {
+pub fn run(_port: u16, _dest: &str, _pre: &[String], _extra: &[String]) -> Result<()> {
     anyhow::bail!("run this on the Mac that runs agentlinkd")
 }
 
@@ -58,14 +58,16 @@ fn exit_code(st: std::process::ExitStatus) -> i32 {
     st.code().unwrap_or_else(|| 128 + st.signal().unwrap_or(0))
 }
 
-fn ssh_argv(port: u16, socket: &str, dest: &str, extra: &[String]) -> Vec<String> {
+/// `pre` goes before the destination (ssh options), `extra` after it (options or a command).
+fn ssh_argv(port: u16, socket: &str, pre: &[String], dest: &str, extra: &[String]) -> Vec<String> {
     let mut v = vec![
         "-o".into(),
         "ExitOnForwardFailure=yes".into(),
         "-R".into(),
         format!("127.0.0.1:{port}:{socket}"),
-        dest.to_owned(),
     ];
+    v.extend_from_slice(pre);
+    v.push(dest.to_owned());
     v.extend_from_slice(extra);
     v
 }
@@ -160,7 +162,13 @@ mod tests {
     #[test]
     fn argv_keeps_extra_args_after_dest_untouched() {
         let extra = vec!["-p".to_owned(), "2222".into(), "--".into(), "ls".into()];
-        let v = ssh_argv(47533, "/h/.agentlink/remote.sock", "win", &extra);
+        let v = ssh_argv(
+            47533,
+            "/h/.agentlink/remote.sock",
+            &["-t".to_owned()],
+            "win",
+            &extra,
+        );
         assert_eq!(
             v,
             [
@@ -168,6 +176,7 @@ mod tests {
                 "ExitOnForwardFailure=yes",
                 "-R",
                 "127.0.0.1:47533:/h/.agentlink/remote.sock",
+                "-t",
                 "win",
                 "-p",
                 "2222",

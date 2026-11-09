@@ -31,10 +31,16 @@ const CLAUDE_BLOCKING: &[&str] = &["PreToolUse", "PermissionRequest"];
 
 /// `~/.copilot/hooks/agentlink.json`
 fn copilot() -> Value {
+    copilot_with("agentlink-hook")
+}
+
+/// The Copilot hooks config with `exec` set to `exe` (an absolute path on remotes).
+pub(crate) fn copilot_with(exe: &str) -> Value {
     let hooks: serde_json::Map<String, Value> = COPILOT_EVENTS
         .iter()
         .map(|e| {
-            let h = json!([{"type": "command", "exec": "agentlink-hook", "args": ["copilot", e], "timeoutSec": 5}]);
+            let h =
+                json!([{"type": "command", "exec": exe, "args": ["copilot", e], "timeoutSec": 5}]);
             (e.to_string(), h)
         })
         .collect();

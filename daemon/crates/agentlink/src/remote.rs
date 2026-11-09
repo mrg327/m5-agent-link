@@ -23,15 +23,14 @@ pub fn init(json: bool, rotate: bool) -> Result<()> {
         }
     );
     if rotated {
-        println!("existing tunnels and remotes need the new token (repeat step 1 and 2).");
+        println!(
+            "existing remotes need the new token: run `agentlink remote setup <name>` for each."
+        );
     }
     println!(
-        "next steps for a Windows remote (<win-host> = its ssh name):
-  1. ssh <win-host> mkdir .agentlink   (once)
-     scp {p} <win-host>:.agentlink/remote.token
-  2. ssh <win-host> icacls .agentlink\\remote.token /inheritance:r /grant:r \"%USERNAME%:R\"
-  3. on Windows: setx AGENTLINK_REMOTE tcp:127.0.0.1:47533
-  4. agentlink ssh <win-host>"
+        "next steps for a Windows remote:
+  agentlink remote add <name> <user@host> [--dir <path>] [--cmd copilot] --setup
+  agentlink ssh <name>"
     );
     Ok(())
 }
@@ -39,6 +38,12 @@ pub fn init(json: bool, rotate: bool) -> Result<()> {
 #[cfg(not(unix))]
 pub fn init(_json: bool, _rotate: bool) -> Result<()> {
     anyhow::bail!("run this on the Mac that runs agentlinkd")
+}
+
+/// Creates the token if it is missing (used by `remote setup`).
+#[cfg(unix)]
+pub(crate) fn write_token_quiet(home: &Path) -> Result<()> {
+    write_token(home, false).map(|_| ())
 }
 
 /// Writes `<home>/remote.token` (64 hex chars, dir 0700, file 0600). Returns the path and

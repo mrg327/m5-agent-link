@@ -2,6 +2,7 @@
 
 mod hooks;
 mod remote;
+mod remotes;
 mod ssh;
 mod status;
 mod trace;
@@ -43,16 +44,21 @@ enum Cmd {
         #[command(subcommand)]
         cmd: HooksCmd,
     },
-    /// Remote sessions: set up the shared token.
+    /// Remote sessions: the shared token and saved remotes.
     Remote {
         #[command(subcommand)]
         cmd: RemoteCmd,
     },
     /// Run ssh with a tunnel to this Mac's daemon, so remote agents reach the watch.
+    /// DEST is a saved remote's name (agentlink remote list) or any ssh destination.
     Ssh {
         /// Remote loopback port the hook connects to (`AGENTLINK_REMOTE=tcp:127.0.0.1:<port>`).
-        #[arg(long, default_value_t = 47533)]
-        port: u16,
+        /// Default: the saved remote's port, else 47533.
+        #[arg(long)]
+        port: Option<u16>,
+        /// For a saved remote: open a plain shell instead of running its on-connect command.
+        #[arg(long)]
+        no_cmd: bool,
         dest: String,
         /// Extra arguments passed to ssh unchanged.
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
@@ -79,6 +85,53 @@ enum RemoteCmd {
         #[arg(long)]
         rotate: bool,
     },
+    /// Save a remote under a name, with an optional start directory and on-connect command.
+    Add {
+        name: String,
+        /// ssh destination: user@host or an ssh config alias.
+        dest: String,
+        /// Replace an existing remote with this name.
+        #[arg(long)]
+        force: bool,
+        /// Onboard it right away (same as `agentlink remote setup NAME`).
+        #[arg(long)]
+        setup: bool,
+        #[command(flatten)]
+        fields: remotes::Fields,
+        #[command(flatten)]
+        setup_opts: SetupOpts,
+    },
+    /// Change a saved remote; options not given keep their value, "" clears --dir/--cmd.
+    Edit {
+        name: String,
+        /// New ssh destination.
+        #[arg(long)]
+        dest: Option<String>,
+        #[command(flatten)]
+        fields: remotes::Fields,
+    },
+    /// List saved remotes.
+    List,
+    /// Forget a saved remote (nothing on the remote is changed).
+    Rm { name: String },
+    /// Onboard a saved Windows remote over ssh: installs this Mac's key if needed, copies the
+    /// token and agentlink-hook.exe, writes the Copilot hooks config, sets AGENTLINK_REMOTE.
+    /// Safe to re-run (e.g. after `remote init --rotate` or a new hook build).
+    Setup {
+        name: String,
+        #[command(flatten)]
+        opts: SetupOpts,
+    },
+}
+
+#[derive(clap::Args)]
+struct SetupOpts {
+    /// Windows hook binary (default ~/.agentlink/dist/windows-x64/agentlink-hook.exe).
+    #[arg(long)]
+    hook_exe: Option<std::path::PathBuf>,
+    /// Public key to install when key login fails (default ~/.ssh/id_ed25519.pub).
+    #[arg(long)]
+    key: Option<std::path::PathBuf>,
 }
 
 #[derive(Subcommand)]
@@ -102,10 +155,39 @@ fn main() -> Result<()> {
         Cmd::Hooks {
             cmd: HooksCmd::Print,
         } => hooks::print(cli.json),
-        Cmd::Remote {
-            cmd: RemoteCmd::Init { rotate },
-        } => remote::init(cli.json, rotate),
-        Cmd::Ssh { port, dest, args } => ssh::run(port, &dest, &args),
+        Cmd::Remote { cmd } => match cmd {
+            RemoteCmd::Init { rotate } => remote::init(cli.json, rotate),
+            RemoteCmd::Add {
+                name,
+                dest,
+                force,
+                setup,
+                fields,
+                setup_opts,
+            } => {
+                remotes::add(cli.json, &name, &dest, force, fields)?;
+                if setup {
+                    remotes::setup(&name, setup_opts.hook_exe, setup_opts.key)?;
+                }
+                Ok(())
+            }
+            RemoteCmd::Edit { name, dest, fields } => remotes::edit(cli.json, &name, dest, fields),
+            RemoteCmd::List => remotes::list(cli.json),
+            RemoteCmd::Rm { name } => remotes::rm(cli.json, &name),
+            RemoteCmd::Setup { name, opts } => remotes::setup(&name, opts.hook_exe, opts.key),
+        },
+        Cmd::Ssh {
+            port,
+            no_cmd,
+            dest,
+            args,
+        } => match remotes::lookup(&dest)? {
+            Some(p) => {
+                let (pre, post) = remotes::connect_args(&p, no_cmd, &args);
+                ssh::run(port.unwrap_or(p.port()), &p.dest, &pre, &post)
+            }
+            None => ssh::run(port.unwrap_or(remotes::DEFAULT_PORT), &dest, &[], &args),
+        },
         Cmd::Device { cmd } => {
             let name = match cmd {
                 DeviceCmd::State => "state",
@@ -176,12 +258,19 @@ mod tests {
             "-v",
         ])
         .unwrap();
-        let Cmd::Ssh { port, dest, args } = c.cmd else {
+        let Cmd::Ssh {
+            port, dest, args, ..
+        } = c.cmd
+        else {
             panic!("not ssh")
         };
         assert_eq!(
             (port, dest.as_str(), args),
-            (1234, "win", vec!["-p".to_owned(), "22".into(), "-v".into()])
+            (
+                Some(1234),
+                "win",
+                vec!["-p".to_owned(), "22".into(), "-v".into()]
+            )
         );
     }
 }
