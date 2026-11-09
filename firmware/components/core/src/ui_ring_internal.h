@@ -28,8 +28,8 @@
 #define TRACK_RING_W 6 /* ring_set_track: the grey track and the position arc share this width */
 #define PROG_OUT 212  /* hold-to-confirm fill, just inside the band */
 #define PROG_W 8
-#define INV_R_IN 190 /* every invalidated chunk covers this radius band */
-#define INV_R_OUT 233
+#define INV_R_IN (PROG_OUT - PROG_W) /* every invalidated chunk covers this radius band: all the ring draws */
+#define INV_R_OUT SEL_OUT
 #define TICK_MS 30
 
 #define WORK_PERIOD_MS 1400
@@ -65,6 +65,8 @@ typedef struct {
 /* ── geometry (ui_ring.c) ── */
 /* Degrees (clockwise from 12 o'clock) spanned by segment i of n, gap included. */
 void ring_seg_span(int n, int i, int *a0, int *a1);
+/* Degrees spanned by the comet of a working segment a0..a1 at animation level lvl. */
+void ring_comet_span(int a0, int a1, int lvl, int *c0, int *c1);
 
 /* ── painting (ui_ring_draw.c) ── */
 /* rgb at pct % brightness over black. */

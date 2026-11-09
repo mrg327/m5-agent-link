@@ -41,7 +41,7 @@ void ring_set_progress(lv_obj_t *ring, int permille, uint32_t rgb);
 void ring_set_ambient(lv_obj_t *ring, bool ambient);
 /* Freezes motion at each kind's settled look (animations disabled). */
 void ring_set_still(lv_obj_t *ring, bool still);
-/* Advances the comet, pulses and entry animations; call every core_step. */
+/* Advances the comet, pulses and entry animations; call every core_step. Holds still while the display is off. */
 void ring_tick(lv_obj_t *ring, uint32_t now_ms);
 /* Segment index under a screen point, or -1 when it is in the centre or off the ring. */
 int ring_hit(lv_obj_t *ring, int x, int y);

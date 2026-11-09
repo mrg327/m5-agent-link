@@ -105,9 +105,8 @@ void ring_draw_slot(lv_layer_t *l, const ring_data_t *d, int i)
     case RING_WORK: {
         ring_arc(l, out, w, a0, a1, mixk(k, rgb, d->ambient ? 20 : 38));
         if (!d->ambient) {
-            int p = lvl * COMET_STEP_DEG, len = span / 2 < COMET_DEG ? span / 2 : COMET_DEG;
-            int c0 = a0 + p, c1 = c0 + len;
-            if (c1 > a1) c1 = a1;
+            int c0, c1;
+            ring_comet_span(a0, a1, lvl, &c0, &c1);
             ring_arc(l, out, w, c0, c1, mixk(k, rgb, 100));
         }
         break;

@@ -5,6 +5,8 @@
  * of each shape is in ui_ring_draw.c. */
 #include "ui_ring_internal.h"
 
+#include "power.h"
+
 #include <math.h>
 #include <string.h>
 
@@ -21,45 +23,66 @@ void ring_seg_span(int n, int i, int *a0, int *a1)
     *a1 = (i + 1) * seg / 100 - gap / 2;
 }
 
-/* Bounding box of an arc chunk (degrees clockwise from 12 o'clock) over the ring band. */
-static void chunk_area(int a0, int a1, lv_area_t *out)
+void ring_comet_span(int a0, int a1, int lvl, int *c0, int *c1)
 {
-    int x1 = 9999, y1 = 9999, x2 = -9999, y2 = -9999;
-    for (int a = a0;; a += 6) {
-        if (a > a1) a = a1;
-        float rad = (float)a * (float)M_PI / 180.0f;
-        float sn = sinf(rad), cs = cosf(rad);
+    int span = a1 - a0, len = span / 2 < COMET_DEG ? span / 2 : COMET_DEG;
+    *c0 = a0 + lvl * COMET_STEP_DEG;
+    *c1 = *c0 + len < a1 ? *c0 + len : a1;
+}
+
+/* Bounding box of the band r_in..r_out between a0 and a1 (degrees clockwise from 12 o'clock): the
+ * corners plus every 3, 6, 9 and 12 o'clock extreme inside the range, 2 px wider for anti-aliasing. */
+static void arc_area(float a0, float a1, int r_in, int r_out, lv_area_t *out)
+{
+    float x1 = 1e9f, y1 = 1e9f, x2 = -1e9f, y2 = -1e9f;
+    float a[8];
+    int n = 0;
+    a[n++] = a0;
+    a[n++] = a1;
+    for (float q = ceilf(a0 / 90.0f) * 90.0f; q < a1 && n < 8; q += 90.0f) a[n++] = q;
+    for (int i = 0; i < n; i++) {
+        float rad = a[i] * (float)M_PI / 180.0f, sn = sinf(rad), cs = cosf(rad);
         for (int k = 0; k < 2; k++) {
-            int r = k ? INV_R_OUT : INV_R_IN;
-            int x = CX + (int)lroundf((float)r * sn), y = CY - (int)lroundf((float)r * cs);
+            float r = (float)(k ? r_out : r_in), x = CX + r * sn, y = CY - r * cs;
             if (x < x1) x1 = x;
             if (x > x2) x2 = x;
             if (y < y1) y1 = y;
             if (y > y2) y2 = y;
         }
-        if (a == a1) break;
     }
-    out->x1 = x1 - 2;
-    out->y1 = y1 - 2;
-    out->x2 = x2 + 2;
-    out->y2 = y2 + 2;
+    out->x1 = (int32_t)floorf(x1) - 2;
+    out->y1 = (int32_t)floorf(y1) - 2;
+    out->x2 = (int32_t)ceilf(x2) + 2;
+    out->y2 = (int32_t)ceilf(y2) + 2;
+}
+
+/* In 30 degree chunks over the band, so a long arc never becomes a near full-screen box. */
+static void inval_band(lv_obj_t *o, float a0, float a1, int r_in, int r_out)
+{
+    for (float a = a0; a < a1; a += 30.0f) {
+        lv_area_t ar;
+        arc_area(a, a + 30.0f < a1 ? a + 30.0f : a1, r_in, r_out, &ar);
+        lv_obj_invalidate_area(o, &ar);
+    }
 }
 
 static void inval_arc(lv_obj_t *o, int a0, int a1)
 {
-    if (a1 <= a0) return;
-    for (int a = a0; a < a1; a += 30) {
-        lv_area_t ar;
-        chunk_area(a, a + 30 < a1 ? a + 30 : a1, &ar);
-        lv_obj_invalidate_area(o, &ar);
-    }
+    if (a1 > a0) inval_band(o, (float)a0, (float)a1, INV_R_IN, INV_R_OUT);
+}
+
+/* Degrees a round cap of a capsule out/w reaches past its end angle, plus a margin. */
+static float cap_deg(int out, int w)
+{
+    return asinf((float)w / 2.0f / (float)(out - w / 2)) * 180.0f / (float)M_PI + 0.5f;
 }
 
 static void inval_seg(lv_obj_t *o, int n, int i)
 {
     int a0, a1;
     ring_seg_span(n, i, &a0, &a1);
-    inval_arc(o, a0 - 1, a1 + 1);
+    float cap = cap_deg(SEL_OUT, SEL_W);
+    inval_band(o, (float)a0 - cap, (float)a1 + cap, INV_R_IN, INV_R_OUT);
 }
 
 static void inval_all(lv_obj_t *o)
@@ -67,12 +90,31 @@ static void inval_all(lv_obj_t *o)
     inval_arc(o, 0, 360);
 }
 
+/* Only what a comet step changes: the tail it leaves and the head it gains, each with its round cap,
+ * on the capsule's own band. A jump (the wrap back to the start) repaints both whole comets. */
+static void inval_comet(lv_obj_t *o, const ring_data_t *d, int i, int a0, int a1, int old, int lvl)
+{
+    bool sel = d->seg[i].s.selected && d->n > 1;
+    int out = sel ? SEL_OUT : BAND_OUT, w = sel ? SEL_W : BAND_W;
+    float cap = cap_deg(out, w);
+    int o0, o1, n0, n1;
+    ring_comet_span(a0, a1, old, &o0, &o1);
+    ring_comet_span(a0, a1, lvl, &n0, &n1);
+    if ((o0 > n0 ? o0 : n0) < (o1 < n1 ? o1 : n1)) {
+        if (o0 != n0) inval_band(o, (float)(o0 < n0 ? o0 : n0) - cap, (float)(o0 < n0 ? n0 : o0) + cap, out - w, out);
+        if (o1 != n1) inval_band(o, (float)(o1 < n1 ? o1 : n1) - cap, (float)(o1 < n1 ? n1 : o1) + cap, out - w, out);
+    } else {
+        inval_band(o, (float)o0 - cap, (float)o1 + cap, out - w, out);
+        inval_band(o, (float)n0 - cap, (float)n1 + cap, out - w, out);
+    }
+}
+
 static bool seg_visible(const lv_layer_t *l, int a0, int a1)
 {
     for (int a = a0; a < a1; a += 30) {
         lv_area_t ar;
         const lv_area_t *c = &l->_clip_area;
-        chunk_area(a, a + 30 < a1 ? a + 30 : a1, &ar);
+        arc_area((float)a, (float)(a + 30 < a1 ? a + 30 : a1), INV_R_IN, INV_R_OUT, &ar);
         if (ar.x1 <= c->x2 && ar.x2 >= c->x1 && ar.y1 <= c->y2 && ar.y2 >= c->y1) return true;
     }
     return false;
@@ -220,7 +262,7 @@ void ring_set_ambient(lv_obj_t *ring, bool ambient)
 void ring_tick(lv_obj_t *ring, uint32_t now_ms)
 {
     ring_data_t *d = lv_obj_get_user_data(ring);
-    if (d->solid || d->track || d->ambient || d->still || d->n == 0) return;
+    if (d->solid || d->track || d->ambient || d->still || d->n == 0 || !power_display_on()) return; /* dark: no motion */
     if (d->have_tick && now_ms - d->last_tick < TICK_MS) return;
     d->have_tick = true;
     d->last_tick = now_ms;
@@ -233,10 +275,8 @@ void ring_tick(lv_obj_t *ring, uint32_t now_ms)
         if (lvl == s->lvl) continue;
         int old = s->lvl;
         s->lvl = (int16_t)lvl;
-        if (s->s.kind == RING_WORK) { /* only the comet's old and new spots */
-            int span = a1 - a0, len = span / 2 < COMET_DEG ? span / 2 : COMET_DEG;
-            inval_arc(ring, a0 + old * COMET_STEP_DEG - 1, a0 + old * COMET_STEP_DEG + len + 1);
-            inval_arc(ring, a0 + lvl * COMET_STEP_DEG - 1, a0 + lvl * COMET_STEP_DEG + len + 1);
+        if (s->s.kind == RING_WORK) {
+            inval_comet(ring, d, i, a0, a1, old, lvl);
         } else {
             inval_seg(ring, d->n, i);
         }

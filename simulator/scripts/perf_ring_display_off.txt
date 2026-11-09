@@ -1,0 +1,14 @@
+# Run with --idle-off 1: four working sessions, the display goes dark after a second without input
+# and the ring stops animating, so nothing is rendered for a panel that is off.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login
+session 2 work api main
+session 3 work infra main
+session 4 work docs main
+wait 2500
+px_reset
+wait 2000
+expect_px_max 100000
+quit
