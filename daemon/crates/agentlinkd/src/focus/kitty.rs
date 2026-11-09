@@ -120,6 +120,17 @@ pub fn get_text_args(listen_on: &str, matcher: &str) -> Vec<String> {
     rc(listen_on, matcher, "get-text", &["--extent", "all"])
 }
 
+/// The visible screen only, plain text: what a terminal prompt is read from.
+pub fn screen_args(listen_on: &str, matcher: &str) -> Vec<String> {
+    rc(listen_on, matcher, "get-text", &["--extent", "screen"])
+}
+
+/// Types `text` into the window as if from the keyboard. kitty decodes Python escapes in it
+/// (`\r`, `\x1b[B`); callers pass only fixed key strings, never agent text.
+pub fn send_text_args(listen_on: &str, matcher: &str, text: &str) -> Vec<String> {
+    rc(listen_on, matcher, "send-text", &["--", text])
+}
+
 /// From `kitty @ ls` JSON: the first matched window's `lines` (screen height) and, when kitty
 /// reports it, `scrolled_by` (lines above the live bottom).
 pub fn window_geometry(ls_json: &str) -> Option<(u64, Option<u64>)> {
@@ -385,6 +396,38 @@ fn scroll_window(
         total,
         preview,
     })
+}
+
+fn target(ctx: &HostCtx) -> Result<(String, String), FocusError> {
+    let listen = socket(ctx, |p| std::path::Path::new(p).exists());
+    match (listen, window_match(ctx)) {
+        (Some(l), Some(m)) => Ok((l, m)),
+        _ => Err(FocusError::Unsupported),
+    }
+}
+
+fn checked(a: &[String], what: &str) -> Result<String, FocusError> {
+    let out = run_rc(a)?;
+    if out.ok {
+        return Ok(out.stdout);
+    }
+    if out.stderr.contains("No matching windows") {
+        return Err(FocusError::NoWindow);
+    }
+    Err(FocusError::Internal(format!(
+        "kitty {what} failed: {}",
+        out.stderr.trim()
+    )))
+}
+
+pub fn read_screen(ctx: &HostCtx) -> Result<String, FocusError> {
+    let (listen, matcher) = target(ctx)?;
+    checked(&screen_args(&listen, &matcher), "get-text")
+}
+
+pub fn send_text(ctx: &HostCtx, text: &str) -> Result<(), FocusError> {
+    let (listen, matcher) = target(ctx)?;
+    checked(&send_text_args(&listen, &matcher, text), "send-text").map(drop)
 }
 
 fn raise(ctx: &HostCtx, os: &str) -> Result<(), FocusError> {

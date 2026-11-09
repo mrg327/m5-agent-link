@@ -10,6 +10,7 @@ mod focus;
 mod hook_source;
 mod ipc;
 mod paths;
+mod prompt;
 mod registry;
 mod remote;
 mod scroll;

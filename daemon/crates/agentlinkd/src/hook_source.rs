@@ -7,13 +7,17 @@
 //! A line with `"await": {"wait_ms": N}` is a blocking permission or question hook: it is
 //! opened on the approval broker and the connection stays up until a device answers or the
 //! wait runs out, then one reply line goes back (`{"decision": "allow"|"deny"|"none", ..}`).
-//! Any other event from the same session settles what was pending there ("first answer
-//! wins": the terminal got there first).
+//! Any other event from the same session, except a notification, settles what was pending
+//! there ("first answer wins": the terminal got there first).
+//!
+//! Copilot's hooks cannot answer, so its prompts are opened as cards by `prompt`, which
+//! types a device answer into the terminal.
 //!
 //! The same line protocol is spoken on the remote sockets (see `remote`), after an auth line.
 
 use crate::broker::{request_of, Broker, Outcome};
 use crate::ipc;
+use crate::prompt;
 use crate::registry::{clip, HostCtx, Registry, SessionEvent, SessionPatch, Via};
 use crate::remote;
 use crate::source::AgentSource;
@@ -109,6 +113,7 @@ where
         },
     };
     let src = if via == Via::Local { "hook" } else { "remote" };
+    let prompts = prompt::Env::system(registry.clone(), broker.clone(), trace.clone());
     let mut attach_guard = None;
     while let Ok(Some(line)) = lines.next_line().await {
         let Ok(v) = serde_json::from_str::<Value>(&line) else {
@@ -148,16 +153,20 @@ where
         }
         let Some(wait) = v["await"]["wait_ms"].as_u64() else {
             // The terminal moved on: whatever this session had pending was answered there.
+            // A notification is not a move: it may be the very prompt the card is about.
             if let Some(key) = &key {
                 let tool = v["payload"]["tool_name"].as_str();
-                broker.cancel_session(
-                    key,
-                    if event.eq_ignore_ascii_case("posttooluse") {
-                        tool
-                    } else {
-                        None
-                    },
-                );
+                if !event.eq_ignore_ascii_case("notification") {
+                    broker.cancel_session(
+                        key,
+                        if event.eq_ignore_ascii_case("posttooluse") {
+                            tool
+                        } else {
+                            None
+                        },
+                    );
+                }
+                prompt::on_event(&prompts, &v, key);
             }
             continue;
         };
@@ -301,7 +310,7 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
         "userpromptsubmitted" | "userpromptsubmit" | "posttooluse" | "posttoolusefailure" => {
             p.state = Some(SessState::Work)
         }
-        "pretooluse" if tool == Some("AskUserQuestion") => {
+        "pretooluse" if matches!(tool, Some("AskUserQuestion" | "ask_user")) => {
             p.state = Some(SessState::Input);
             p.sub = Some(InputSub::Question);
             p.tool = tool.map(str::to_owned);

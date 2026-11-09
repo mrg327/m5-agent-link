@@ -48,6 +48,10 @@ pub struct Outcome {
     pub grant: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub answer: Option<String>,
+    /// Index of the option the decision stands for (Approve: the first allow, Deny: the first
+    /// deny), so a typed answer knows which key to press. Not sent to hooks.
+    #[serde(skip)]
+    pub choice: Option<usize>,
 }
 
 impl Outcome {
@@ -55,7 +59,22 @@ impl Outcome {
         decision: "none",
         grant: false,
         answer: None,
+        choice: None,
     };
+
+    fn of(
+        decision: &'static str,
+        grant: bool,
+        answer: Option<String>,
+        choice: Option<usize>,
+    ) -> Self {
+        Outcome {
+            decision,
+            grant,
+            answer,
+            choice,
+        }
+    }
 }
 
 /// A request as the hook describes it, before it has a `rid`.
@@ -71,6 +90,8 @@ pub struct Request {
     /// `opts` and their meanings, same length; empty = the device synthesises Approve / Deny.
     pub opts: Vec<(String, Meaning)>,
     pub ttl: Duration,
+    /// Nothing can answer it but the terminal: the device only offers Focus.
+    pub focus_only: bool,
 }
 
 struct Pending {
@@ -141,10 +162,12 @@ impl Broker {
     pub fn open(&self, req: Request) -> (u64, oneshot::Receiver<Outcome>) {
         let (tx, rx) = oneshot::channel();
         let mut acts = match req.kind {
-            AttKind::Approval => vec![Action::Approve, Action::Deny, Action::Focus],
+            AttKind::Approval if !req.focus_only => {
+                vec![Action::Approve, Action::Deny, Action::Focus]
+            }
             _ => vec![Action::Focus],
         };
-        if !req.opts.is_empty() {
+        if !req.opts.is_empty() && !req.focus_only {
             acts.push(Action::Reply);
         }
         let grant_mask = req
@@ -166,11 +189,11 @@ impl Broker {
             kind: req.kind,
             title: req.title.map(|t| clip(&tidy(&t), 40)),
             text: req.text.map(|t| clip(&tidy(&t), 160)),
-            opts: (!req.opts.is_empty())
+            opts: (!req.opts.is_empty() && !req.focus_only)
                 .then(|| req.opts.iter().map(|(o, _)| clip(&tidy(o), 24)).collect()),
             acts,
             exp: Some(now_unix() + req.ttl.as_secs().max(1)),
-            grant_mask: (!req.opts.is_empty()).then_some(grant_mask),
+            grant_mask: (!req.opts.is_empty() && !req.focus_only).then_some(grant_mask),
         };
         g.pending.insert(
             rid,
@@ -198,38 +221,22 @@ impl Broker {
         let Some(p) = g.pending.get(&rid) else {
             return Err((ResultErr::Stale, "no pending request for rid"));
         };
+        if p.att.acts == [Action::Focus] {
+            return Err((ResultErr::Denied, "answer it in the terminal"));
+        }
+        let first = |want: fn(&Meaning) -> bool| p.meanings.iter().position(want);
         let outcome = match decision {
-            Decision::Approve if p.att.kind == AttKind::Approval => Outcome {
-                decision: "allow",
-                grant: false,
-                answer: None,
-            },
-            Decision::Deny if p.att.kind == AttKind::Approval => Outcome {
-                decision: "deny",
-                grant: false,
-                answer: None,
-            },
+            Decision::Approve if p.att.kind == AttKind::Approval => {
+                Outcome::of("allow", false, None, first(|m| matches!(m, Meaning::Allow)))
+            }
+            Decision::Deny if p.att.kind == AttKind::Approval => {
+                Outcome::of("deny", false, None, first(|m| matches!(m, Meaning::Deny)))
+            }
             Decision::Reply(i) => match p.meanings.get(i) {
-                Some(Meaning::Allow) => Outcome {
-                    decision: "allow",
-                    grant: false,
-                    answer: None,
-                },
-                Some(Meaning::AllowGrant) => Outcome {
-                    decision: "allow",
-                    grant: true,
-                    answer: None,
-                },
-                Some(Meaning::Deny) => Outcome {
-                    decision: "deny",
-                    grant: false,
-                    answer: None,
-                },
-                Some(Meaning::Answer(a)) => Outcome {
-                    decision: "allow",
-                    grant: false,
-                    answer: Some(a.clone()),
-                },
+                Some(Meaning::Allow) => Outcome::of("allow", false, None, Some(i)),
+                Some(Meaning::AllowGrant) => Outcome::of("allow", true, None, Some(i)),
+                Some(Meaning::Deny) => Outcome::of("deny", false, None, Some(i)),
+                Some(Meaning::Answer(a)) => Outcome::of("allow", false, Some(a.clone()), Some(i)),
                 None => return Err((ResultErr::Denied, "no such option")),
             },
             _ => return Err((ResultErr::Denied, "not a permission request")),
@@ -341,6 +348,7 @@ pub fn request_of(
                 text,
                 opts,
                 ttl,
+                focus_only: false,
             })
         }
         "pretooluse" if tool.as_deref() == Some("AskUserQuestion") => {
@@ -377,6 +385,7 @@ pub fn request_of(
                 text: q["question"].as_str().map(str::to_owned),
                 opts,
                 ttl,
+                focus_only: false,
             })
         }
         _ => None,

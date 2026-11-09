@@ -231,6 +231,30 @@ fn focus_blocking(ctx: &HostCtx, os: &str) -> Result<(), FocusError> {
 }
 
 /// The driver the daemon uses. Picks per-OS/per-terminal drivers (DESIGN §10).
+/// The agent's terminal as a keyboard and screen, for answering its prompts from the device.
+/// Only kitty (local, or the attach window of a remote session) can do both today.
+pub trait Terminal: Send + Sync {
+    fn read_screen(&self, ctx: &HostCtx) -> Result<String, FocusError>;
+    fn send_keys(&self, ctx: &HostCtx, keys: &str) -> Result<(), FocusError>;
+}
+
+pub struct SystemTerminal;
+
+impl Terminal for SystemTerminal {
+    fn read_screen(&self, ctx: &HostCtx) -> Result<String, FocusError> {
+        match select_outer(ctx, std::env::consts::OS) {
+            Outer::Kitty if tmux::pane(ctx).is_none() => kitty::read_screen(ctx),
+            _ => Err(FocusError::Unsupported),
+        }
+    }
+    fn send_keys(&self, ctx: &HostCtx, keys: &str) -> Result<(), FocusError> {
+        match select_outer(ctx, std::env::consts::OS) {
+            Outer::Kitty if tmux::pane(ctx).is_none() => kitty::send_text(ctx, keys),
+            _ => Err(FocusError::Unsupported),
+        }
+    }
+}
+
 pub fn default_driver() -> Arc<dyn FocusDriver> {
     Arc::new(SystemFocus)
 }
