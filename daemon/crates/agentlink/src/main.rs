@@ -1,6 +1,8 @@
 //! agentlink: the CLI window into the daemon (DESIGN §0: auditability).
 
 mod hooks;
+mod remote;
+mod ssh;
 mod status;
 mod trace;
 
@@ -41,6 +43,21 @@ enum Cmd {
         #[command(subcommand)]
         cmd: HooksCmd,
     },
+    /// Remote sessions: set up the shared token.
+    Remote {
+        #[command(subcommand)]
+        cmd: RemoteCmd,
+    },
+    /// Run ssh with a tunnel to this Mac's daemon, so remote agents reach the watch.
+    Ssh {
+        /// Remote loopback port the hook connects to (`AGENTLINK_REMOTE=tcp:127.0.0.1:<port>`).
+        #[arg(long, default_value_t = 47533)]
+        port: u16,
+        dest: String,
+        /// Extra arguments passed to ssh unchanged.
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
     /// Inspect or drive the connected device.
     Device {
         #[command(subcommand)]
@@ -52,6 +69,16 @@ enum Cmd {
 enum HooksCmd {
     /// Print the config snippets for Copilot CLI and Claude Code (nothing is installed).
     Print,
+}
+
+#[derive(Subcommand)]
+enum RemoteCmd {
+    /// Create ~/.agentlink/remote.token (the secret remote hooks authenticate with).
+    Init {
+        /// Replace an existing token.
+        #[arg(long)]
+        rotate: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -75,6 +102,10 @@ fn main() -> Result<()> {
         Cmd::Hooks {
             cmd: HooksCmd::Print,
         } => hooks::print(cli.json),
+        Cmd::Remote {
+            cmd: RemoteCmd::Init { rotate },
+        } => remote::init(cli.json, rotate),
+        Cmd::Ssh { port, dest, args } => ssh::run(port, &dest, &args),
         Cmd::Device { cmd } => {
             let name = match cmd {
                 DeviceCmd::State => "state",
@@ -126,4 +157,31 @@ pub(crate) fn home() -> std::path::PathBuf {
         .or_else(|| std::env::var_os("USERPROFILE"))
         .unwrap_or_default();
     std::path::PathBuf::from(user).join(".agentlink")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ssh_passes_hyphenated_args_through() {
+        let c = Cli::try_parse_from([
+            "agentlink",
+            "ssh",
+            "--port",
+            "1234",
+            "win",
+            "-p",
+            "22",
+            "-v",
+        ])
+        .unwrap();
+        let Cmd::Ssh { port, dest, args } = c.cmd else {
+            panic!("not ssh")
+        };
+        assert_eq!(
+            (port, dest.as_str(), args),
+            (1234, "win", vec!["-p".to_owned(), "22".into(), "-v".into()])
+        );
+    }
 }

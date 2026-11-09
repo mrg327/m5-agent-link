@@ -15,7 +15,7 @@
 //! `hookSpecificOutput.decision.behavior`; PreToolUse `permissionDecision` + `updatedInput`).
 
 use serde_json::{json, Map, Value};
-use std::io::Read;
+use std::io::{BufRead, Read};
 use std::sync::mpsc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -48,16 +48,28 @@ const ENV_KEYS: &[&str] = &[
     "COPILOT_HOME",
 ];
 
-fn socket_path() -> std::path::PathBuf {
+fn agentlink_home() -> std::path::PathBuf {
     if let Some(h) = std::env::var_os("AGENTLINK_HOME") {
-        return std::path::PathBuf::from(h).join("hook.sock");
+        return std::path::PathBuf::from(h);
     }
     let home = std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .unwrap_or_default();
-    std::path::PathBuf::from(home)
-        .join(".agentlink")
-        .join("hook.sock")
+    std::path::PathBuf::from(home).join(".agentlink")
+}
+
+fn socket_path() -> std::path::PathBuf {
+    agentlink_home().join("hook.sock")
+}
+
+/// Branch of the repo containing `cwd` (same rule as the daemon's `branch_of`).
+fn branch_of(cwd: &str) -> Option<String> {
+    let head = std::path::Path::new(cwd)
+        .ancestors()
+        .find_map(|d| std::fs::read_to_string(d.join(".git/HEAD")).ok())?;
+    head.trim()
+        .strip_prefix("ref: refs/heads/")
+        .map(str::to_owned)
 }
 
 /// Which Claude Code hooks wait for a decision: the permission prompt, and a question.
@@ -239,7 +251,7 @@ fn process_identity(_ppid: u32) -> (Vec<u32>, Option<String>) {
 
 /// The line for the daemon, plus the hook's event name and payload (for formatting a reply)
 /// and how long it waits for one (0: no wait).
-fn build_line(agent: &str, event: &str, stdin: &str) -> (String, String, Value, u64) {
+fn build_line(agent: &str, event: &str, stdin: &str, remote: bool) -> (String, String, Value, u64) {
     let payload: Value = serde_json::from_str(stdin).unwrap_or(Value::Null);
     let env: Map<String, Value> = ENV_KEYS
         .iter()
@@ -275,29 +287,127 @@ fn build_line(agent: &str, event: &str, stdin: &str) -> (String, String, Value, 
         0
     };
     let mut line = json!({"agent": agent, "event": event, "ts": ts, "cwd": cwd, "ppid": ppid, "tty": tty, "pids": pids, "env": env, "payload": payload});
+    if remote {
+        // the daemon cannot read a remote filesystem, so the hook reports the branch
+        let dir = payload["cwd"].as_str().or(cwd.as_deref()).unwrap_or("");
+        if let Some(b) = branch_of(dir).filter(|_| !dir.is_empty()) {
+            line["branch"] = json!(b);
+        }
+    }
     if wait > 0 {
         line["await"] = json!({"wait_ms": wait});
     }
     (line.to_string(), event.to_owned(), payload, wait)
 }
 
-/// Sends `line`; for blocking hooks also waits up to `reply_wait` for a one-line reply.
+/// Writes each line newline-terminated.
+fn write_lines(w: &mut impl std::io::Write, lines: &[String]) -> Option<()> {
+    for l in lines {
+        w.write_all(l.as_bytes()).ok()?;
+        w.write_all(b"\n").ok()?;
+    }
+    w.flush().ok()
+}
+
+/// Reads one reply line; `None` when empty or on error.
+fn read_reply(r: impl std::io::Read) -> Option<String> {
+    let mut reply = String::new();
+    std::io::BufReader::new(r).read_line(&mut reply).ok()?;
+    Some(reply.trim().to_owned()).filter(|r| !r.is_empty())
+}
+
+/// Sends `lines` to the local daemon; for blocking hooks also waits up to `reply_wait` for
+/// a one-line reply.
 #[cfg(unix)]
-fn send(line: &str, reply_wait: Option<Duration>) -> Option<String> {
-    use std::io::{BufRead, BufReader, Write};
+fn send_local(lines: &[String], reply_wait: Option<Duration>) -> Option<String> {
     use std::net::Shutdown;
     use std::os::unix::net::UnixStream;
 
     let mut s = UnixStream::connect(socket_path()).ok()?;
     s.set_write_timeout(Some(Duration::from_millis(300))).ok()?;
-    s.write_all(line.as_bytes()).ok()?;
-    s.write_all(b"\n").ok()?;
+    write_lines(&mut s, lines)?;
     s.shutdown(Shutdown::Write).ok()?;
-    let wait = reply_wait?;
-    s.set_read_timeout(Some(wait)).ok()?;
-    let mut reply = String::new();
-    BufReader::new(s).read_line(&mut reply).ok()?;
-    Some(reply.trim().to_owned()).filter(|r| !r.is_empty())
+    s.set_read_timeout(Some(reply_wait?)).ok()?;
+    read_reply(s)
+}
+
+/// `AGENTLINK_REMOTE=tcp:<loopback>:<port>` -> (host to resolve, port). Only loopback is
+/// accepted, so prompt text can never leave the machine unencrypted.
+fn parse_remote(spec: &str) -> Option<(&'static str, u16)> {
+    let (addr, port) = spec.strip_prefix("tcp:")?.rsplit_once(':')?;
+    let host = match addr {
+        "127.0.0.1" => "127.0.0.1",
+        "localhost" => "localhost",
+        "[::1]" => "::1",
+        _ => return None,
+    };
+    Some((host, port.parse().ok().filter(|p| *p != 0)?))
+}
+
+fn remote_token() -> Option<String> {
+    let t = std::fs::read_to_string(agentlink_home().join("remote.token")).ok()?;
+    Some(t.trim().to_owned()).filter(|t| !t.is_empty())
+}
+
+fn host_name() -> String {
+    ["COMPUTERNAME", "HOSTNAME"]
+        .iter()
+        .find_map(|k| std::env::var(k).ok().filter(|v| !v.is_empty()))
+        .unwrap_or_else(|| "remote".into())
+}
+
+fn auth_line(token: &str, host: &str, os: &str) -> String {
+    json!({"auth": token, "host": host, "os": os}).to_string()
+}
+
+fn local_os() -> &'static str {
+    if cfg!(windows) {
+        "win"
+    } else if cfg!(target_os = "macos") {
+        "mac"
+    } else {
+        "linux"
+    }
+}
+
+/// Sends the auth line and then `lines` over the (ssh-forwarded) loopback TCP port.
+fn send_tcp(
+    addr: (&str, u16),
+    auth: String,
+    lines: &[String],
+    reply_wait: Option<Duration>,
+) -> Option<String> {
+    use std::net::{Shutdown, TcpStream, ToSocketAddrs};
+
+    let connect = Duration::from_millis(300);
+    let mut s = addr
+        .to_socket_addrs()
+        .ok()?
+        .find_map(|a| TcpStream::connect_timeout(&a, connect).ok())?;
+    s.set_write_timeout(Some(connect)).ok()?;
+    let all: Vec<String> = std::iter::once(auth).chain(lines.iter().cloned()).collect();
+    write_lines(&mut s, &all)?;
+    s.shutdown(Shutdown::Write).ok()?;
+    s.set_read_timeout(Some(reply_wait?)).ok()?;
+    read_reply(s)
+}
+
+/// Remote transport from `AGENTLINK_REMOTE`; a bad spec or missing token sends nothing.
+fn send_remote(spec: &str, lines: &[String], reply_wait: Option<Duration>) -> Option<String> {
+    let Some(addr) = parse_remote(spec) else {
+        eprintln!("agentlink-hook: AGENTLINK_REMOTE must be tcp:127.0.0.1:<port>; not sending");
+        return None;
+    };
+    let auth = auth_line(&remote_token()?, &host_name(), local_os());
+    send_tcp(addr, auth, lines, reply_wait)
+}
+
+fn send(lines: &[String], reply_wait: Option<Duration>) -> Option<String> {
+    match std::env::var("AGENTLINK_REMOTE") {
+        Ok(spec) => send_remote(&spec, lines, reply_wait),
+        Err(std::env::VarError::NotUnicode(_)) => None,
+        Err(_) => send_local(lines, reply_wait),
+    }
 }
 
 /// Per-user pipe name; must match `paths::hook_pipe_name` in agentlinkd. `AGENTLINK_PIPE`
@@ -319,12 +429,10 @@ fn pipe_name(socket: &std::path::Path) -> String {
     format!(r"\\.\pipe\agentlink-{user}-{hash:016x}")
 }
 
-/// Windows twin of the unix `send`: one line over the named pipe, then an optional reply
-/// read on a helper thread so a silent daemon cannot hold us past the wait.
+/// Windows twin of the unix `send_local`: the lines over the named pipe, then an optional
+/// reply read on a helper thread so a silent daemon cannot hold us past the wait.
 #[cfg(windows)]
-fn send(line: &str, reply_wait: Option<Duration>) -> Option<String> {
-    use std::io::{BufRead, BufReader, Write};
-
+fn send_local(lines: &[String], reply_wait: Option<Duration>) -> Option<String> {
     const ERROR_PIPE_BUSY: i32 = 231;
     let name = pipe_name(&socket_path());
     let mut tries = 0;
@@ -342,22 +450,17 @@ fn send(line: &str, reply_wait: Option<Duration>) -> Option<String> {
             Err(_) => return None,
         }
     };
-    pipe.write_all(line.as_bytes()).ok()?;
-    pipe.write_all(b"\n").ok()?;
-    pipe.flush().ok()?;
+    write_lines(&mut pipe, lines)?;
     let wait = reply_wait?;
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        let mut reply = String::new();
-        let _ = BufReader::new(pipe).read_line(&mut reply);
-        let _ = tx.send(reply);
+        let _ = tx.send(read_reply(pipe));
     });
-    let reply = rx.recv_timeout(wait).ok()?;
-    Some(reply.trim().to_owned()).filter(|r| !r.is_empty())
+    rx.recv_timeout(wait).ok()?
 }
 
 #[cfg(not(any(unix, windows)))]
-fn send(_line: &str, _reply_wait: Option<Duration>) -> Option<String> {
+fn send_local(_lines: &[String], _reply_wait: Option<Duration>) -> Option<String> {
     None
 }
 
@@ -371,10 +474,11 @@ fn main() {
     let (kind_tx, kind_rx) = mpsc::channel();
     let (reply_tx, reply_rx) = mpsc::channel();
     std::thread::spawn(move || {
-        let (line, event, payload, wait) = build_line(&agent, &event, &read_stdin());
+        let remote = std::env::var_os("AGENTLINK_REMOTE").is_some();
+        let (line, event, payload, wait) = build_line(&agent, &event, &read_stdin(), remote);
         let _ = kind_tx.send((event, payload, wait));
         let reply_wait = (wait > 0).then(|| Duration::from_millis(wait) + WAIT_SLACK);
-        let _ = reply_tx.send(send(&line, reply_wait));
+        let _ = reply_tx.send(send(&[line], reply_wait));
     });
     let Ok((event, payload, wait)) = kind_rx.recv_timeout(DEADLINE) else {
         std::process::exit(0);
@@ -480,12 +584,13 @@ mod tests {
         assert!(!blocks_for_watch("claude", "PreToolUse", &bash));
         assert!(!blocks_for_watch("claude", "Notification", &bash));
         assert!(!blocks_for_watch("copilot", "permissionRequest", &bash));
-        let (line, event, _, wait) = build_line("claude", "PermissionRequest", &bash.to_string());
+        let (line, event, _, wait) =
+            build_line("claude", "PermissionRequest", &bash.to_string(), false);
         assert_eq!(event, "PermissionRequest");
         assert!(wait > 0);
         let v: Value = serde_json::from_str(&line).unwrap();
         assert_eq!(v["await"]["wait_ms"].as_u64(), Some(wait));
-        let (line, _, _, wait) = build_line("claude", "Stop", "{}");
+        let (line, _, _, wait) = build_line("claude", "Stop", "{}", false);
         assert_eq!(wait, 0);
         assert!(serde_json::from_str::<Value>(&line)
             .unwrap()
@@ -503,5 +608,93 @@ mod tests {
             n,
             pipe_name(std::path::Path::new("c:\\users\\a\\.agentlink\\hook.sock"))
         );
+    }
+
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let d = std::env::temp_dir().join(format!("agentlink-hook-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(d.join(".git")).unwrap();
+        d
+    }
+
+    #[test]
+    fn remote_spec_accepts_only_loopback() {
+        assert_eq!(
+            parse_remote("tcp:127.0.0.1:47533"),
+            Some(("127.0.0.1", 47533))
+        );
+        assert_eq!(parse_remote("tcp:localhost:1"), Some(("localhost", 1)));
+        assert_eq!(parse_remote("tcp:[::1]:9"), Some(("::1", 9)));
+        for bad in [
+            "tcp:0.0.0.0:1",
+            "tcp:10.0.0.5:1",
+            "tcp:example.com:1",
+            "tcp:127.0.0.1",
+            "tcp:127.0.0.1:",
+            "tcp:127.0.0.1:0",
+            "tcp:::1:9",
+            "udp:127.0.0.1:1",
+            "",
+        ] {
+            assert_eq!(parse_remote(bad), None, "{bad}");
+        }
+    }
+
+    #[test]
+    fn auth_line_shape() {
+        let v: Value = serde_json::from_str(&auth_line("tok", "PC1", "win")).unwrap();
+        assert_eq!(v, json!({"auth": "tok", "host": "PC1", "os": "win"}));
+    }
+
+    #[test]
+    fn branch_from_git_head() {
+        let d = scratch("branch");
+        std::fs::write(d.join(".git/HEAD"), "ref: refs/heads/feat/x\n").unwrap();
+        std::fs::create_dir_all(d.join("sub/dir")).unwrap();
+        let sub = d.join("sub/dir");
+        assert_eq!(branch_of(&sub.to_string_lossy()).as_deref(), Some("feat/x"));
+        std::fs::write(d.join(".git/HEAD"), "0123456789abcdef\n").unwrap();
+        assert_eq!(branch_of(&sub.to_string_lossy()), None);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn remote_line_carries_payload_cwd_branch() {
+        let d = scratch("line");
+        std::fs::write(d.join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
+        let payload = json!({"cwd": d.to_string_lossy()}).to_string();
+        let v: Value = serde_json::from_str(&build_line("copilot", "x", &payload, true).0).unwrap();
+        assert_eq!(v["branch"], "main");
+        let v: Value =
+            serde_json::from_str(&build_line("copilot", "x", &payload, false).0).unwrap();
+        assert!(v.get("branch").is_none());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn tcp_sends_auth_then_line_and_reads_reply() {
+        use std::io::Write;
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = l.local_addr().unwrap().port();
+        let srv = std::thread::spawn(move || {
+            let (mut s, _) = l.accept().unwrap();
+            let mut r = std::io::BufReader::new(s.try_clone().unwrap());
+            let (mut a, mut b) = (String::new(), String::new());
+            r.read_line(&mut a).unwrap();
+            r.read_line(&mut b).unwrap();
+            s.write_all(b"{\"decision\":\"allow\"}\n").unwrap();
+            (a, b)
+        });
+        let lines = [json!({"agent": "claude"}).to_string()];
+        let reply = send_tcp(
+            ("127.0.0.1", port),
+            auth_line("tok", "h", "linux"),
+            &lines,
+            Some(Duration::from_secs(2)),
+        );
+        assert_eq!(reply.as_deref(), Some("{\"decision\":\"allow\"}"));
+        let (a, b) = srv.join().unwrap();
+        assert!(a.contains("\"auth\":\"tok\""));
+        assert_eq!(b.trim(), lines[0]);
     }
 }

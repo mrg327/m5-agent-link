@@ -15,7 +15,7 @@ agent hooks ─► agentlink-hook ─► ~/.agentlink/hook.sock ─► agentlink
 | `crates/agentlink-proto` | Wire types and CBOR codec (`minicbor`, integer keys) mirroring `protocol/agentlink.cddl`; `Envelope::{to_bytes, from_bytes}`; serde JSON (symbolic names) for traces. Tests round-trip every `protocol/vectors/*.json`. |
 | `crates/agentlinkd` | The daemon. `source.rs` (`AgentSource` trait), `hook_source.rs` (hook IPC → events), `registry.rs` (sessions + deltas), `transport.rs` (`Transport`/`Link` traits), `ws.rs` (WebSocket, 127.0.0.1:7878), `ble.rs` (+`ble/frag.rs`), `usb.rs` (+`usb/frame.rs`), `focus/` (`FocusDriver`; kitty, Terminal.app, Windows Terminal, tmux, generic), `broker.rs` (approval broker: `rid` → the hook waiting for a decision; first answer wins), `device.rs` (hello→welcome→snapshot, deltas, attentions, `cmd` handling), `trace.rs` (JSONL trace + audit log). |
 | `crates/agentlink-hook` | Tiny shim for agent hooks: `agentlink-hook <agent> <event>` with the hook JSON on stdin. Fail-open, hard 1.5 s deadline, always exits 0, silent on stdout. Two Claude Code hooks block instead: `PermissionRequest` and `PreToolUse` for `AskUserQuestion` wait `AGENTLINK_WAIT_MS` (15 s) for a watch answer and print it in Claude Code's hook-output format; no answer prints nothing, so the terminal prompt appears as usual. |
-| `crates/agentlink` | CLI: `status`, `trace [--follow] [--sid N]`, `decode <hex>`, `hooks print`, `device state\|tap\|press\|lift` (stubs). All accept `--json`. |
+| `crates/agentlink` | CLI: `status`, `trace [--follow] [--sid N]`, `decode <hex>`, `hooks print`, `remote init [--rotate]`, `ssh [--port P] <host> [ssh args]` (REMOTE.md), `device state\|tap\|press\|lift` (stubs). All accept `--json`. |
 
 ## Build, test, lint
 
@@ -40,7 +40,7 @@ cargo run -p agentlink -- hooks print        # config snippets (nothing is insta
 echo '{"sessionId":"s1","toolName":"bash"}' | cargo run -p agentlink-hook -- copilot preToolUse
 ```
 
-Environment: `AGENTLINK_HOME` (default `~/.agentlink`), `AGENTLINK_WAIT_MS` (how long a blocking hook holds the prompt for the watch, default 15000, max 120000), `AGENTLINK_WS_ADDR` (default `127.0.0.1:7878`), `AGENTLINK_USB=0` / `AGENTLINK_BLE=0` (disable a transport), `AGENTLINK_USB_PORT`, `AGENTLINK_BLE_NAME`, `AGENTLINK_BLE_WRITE_LEN`, `AGENTLINK_PIPE` (Windows hook pipe name; default `\\.\pipe\agentlink-<USERNAME>-<fnv64 of socket path>`), `RUST_LOG`.
+Environment: `AGENTLINK_HOME` (default `~/.agentlink`), `AGENTLINK_WAIT_MS` (how long a blocking hook holds the prompt for the watch, default 15000, max 120000), `AGENTLINK_WS_ADDR` (default `127.0.0.1:7878`), `AGENTLINK_USB=0` / `AGENTLINK_BLE=0` (disable a transport), `AGENTLINK_USB_PORT`, `AGENTLINK_BLE_NAME`, `AGENTLINK_BLE_WRITE_LEN`, `AGENTLINK_PIPE` (Windows hook pipe name; default `\\.\pipe\agentlink-<USERNAME>-<fnv64 of socket path>`), `AGENTLINK_REMOTE` (hook: `tcp:<loopback>:<port>`, see docs/design/REMOTE.md), `AGENTLINK_SSH`, `RUST_LOG`.
 
 ## Files written
 
@@ -49,4 +49,4 @@ Environment: `AGENTLINK_HOME` (default `~/.agentlink`), `AGENTLINK_WAIT_MS` (how
 
 ## Status
 
-Hook IPC is a Unix socket, or a named pipe on Windows. `cmd approve|deny|reply` for a `rid` the broker no longer holds is acked as `stale`, so a race against the terminal is safe; a device-side approve needs `hold_ms >= 1000`. Focus drivers and their verification status: DESIGN §10.
+Hook IPC is a Unix socket, or a named pipe on Windows. Remote hooks use `remote.sock` or a per-window `remote-<id>.sock` and must authenticate with `remote.token` first (docs/design/REMOTE.md). `cmd approve|deny|reply` for a `rid` the broker no longer holds is acked as `stale`, so a race against the terminal is safe; a device-side approve needs `hold_ms >= 1000`. Focus drivers and their verification status: DESIGN §10.

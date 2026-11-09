@@ -47,13 +47,40 @@ pub fn run(json: bool) -> Result<()> {
     println!("sessions: {}", sessions.len());
     for s in &sessions {
         println!(
-            "  #{} {} {} {} {}",
+            "  #{} {} {} {} {}{}",
             s["sid"],
             s["ag"].as_str().unwrap_or("?"),
             s["st"].as_str().unwrap_or("?"),
             s["repo"].as_str().unwrap_or(""),
-            s["tool"].as_str().unwrap_or("")
+            s["tool"].as_str().unwrap_or(""),
+            match s["hn"].as_str() {
+                Some(hn) if s["host"].as_u64().unwrap_or(0) != 0 => format!(" @{hn}"),
+                _ => String::new(),
+            }
         );
+    }
+    if let Some(remotes) = v["remotes"].as_array() {
+        println!("remotes: {}", remotes.len());
+        for r in remotes {
+            println!(
+                "  [{}] {} ({}) sessions: {}",
+                r["idx"],
+                r["name"].as_str().unwrap_or("?"),
+                r["os"].as_str().unwrap_or("?"),
+                r["sessions"]
+            );
+        }
+    }
+    if let Some(attaches) = v["attaches"].as_array() {
+        println!("attached windows: {}", attaches.len());
+        for a in attaches {
+            println!(
+                "  #{} {} window {}",
+                a["id"],
+                a["socket"].as_str().unwrap_or("?"),
+                a["window"]
+            );
+        }
     }
     Ok(())
 }
