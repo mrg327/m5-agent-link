@@ -408,8 +408,29 @@ impl Registry {
             .insert(id, Attach { socket, ctx });
     }
 
+    /// Closes an attach. Its sessions go too: once the tunnel is down their `sessionEnd` can
+    /// never arrive, and a live one comes back with its next hook through a new attach.
     pub fn drop_attach(&self, id: u64) {
-        self.state.lock().unwrap().attaches.remove(&id);
+        let gone: Vec<u64> = {
+            let mut st = self.state.lock().unwrap();
+            st.attaches.remove(&id);
+            let sids: Vec<u64> = st
+                .sessions
+                .iter()
+                .filter(
+                    |(_, r)| matches!(r.origin, Origin::Remote { attach: Some(a), .. } if a == id),
+                )
+                .map(|(sid, _)| *sid)
+                .collect();
+            for sid in &sids {
+                st.sessions.remove(sid);
+            }
+            st.by_key.retain(|_, sid| !sids.contains(sid));
+            sids
+        };
+        for sid in gone {
+            self.publish(Update::Gone(sid));
+        }
     }
 
     pub fn attach_sockets(&self) -> Vec<PathBuf> {
@@ -566,12 +587,36 @@ mod tests {
         assert!(!ctx.env.contains_key("TMUX_PANE"));
         assert_eq!(r.attaches()[0]["window"]["KITTY_WINDOW_ID"], "7");
 
+        let (_, mut rx) = r.subscribe();
         r.drop_attach(id);
-        assert!(matches!(r.route(1), Route::Unsupported));
+        assert!(matches!(rx.try_recv().unwrap(), Update::Gone(1)));
+        assert!(
+            matches!(r.route(1), Route::Unknown),
+            "its sessions end with it"
+        );
+        assert_eq!(r.sid_of(&remote("h", None).key("a")), None);
         r.apply(ev(SessState::Work));
         assert!(
             matches!(r.route(2), Route::Ready(..)),
             "local stays routable"
         );
+    }
+
+    #[test]
+    fn dropping_an_attach_keeps_sessions_of_other_attaches_and_remote_sock() {
+        let r = reg();
+        let (a, b) = (r.new_attach_id(), r.new_attach_id());
+        r.add_attach(a, "/x/a.sock".into(), HostCtx::default());
+        r.add_attach(b, "/x/b.sock".into(), HostCtx::default());
+        r.apply(remote_ev("h", Some(a), "1", &[]));
+        r.apply(remote_ev("h", Some(b), "2", &[]));
+        r.apply(remote_ev("h", None, "3", &[]));
+        r.drop_attach(a);
+        assert!(matches!(r.route(1), Route::Unknown));
+        assert!(matches!(r.route(2), Route::Ready(..)));
+        assert!(matches!(r.route(3), Route::Unsupported));
+        // a session that is still alive returns with its next hook
+        r.apply(remote_ev("h", Some(b), "1", &[]));
+        assert_eq!(r.remotes()[0]["sessions"], 3);
     }
 }

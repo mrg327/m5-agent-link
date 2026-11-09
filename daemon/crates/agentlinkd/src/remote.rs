@@ -361,10 +361,10 @@ mod tests {
 
         drop(guard2);
         assert!(!sock.exists());
-        assert!(matches!(
-            env.registry.route(1),
-            crate::registry::Route::Unsupported
-        ));
+        assert!(
+            env.registry.snapshot().is_empty(),
+            "its sessions end with the tunnel"
+        );
         assert!(env.registry.attaches().is_empty());
         let _ = std::fs::remove_dir_all(d);
     }
