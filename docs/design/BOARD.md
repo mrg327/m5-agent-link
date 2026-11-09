@@ -1,6 +1,6 @@
 # Design board: plan
 
-Status: approved 2026-11-09 (all three open questions answered as recommended). B1 in progress. Nothing below is built yet except the channel proof of concept in `tools/board/` (commit `9ce8617`).
+Status: approved 2026-11-09 (all three open questions answered as recommended). B1 (gallery) and B2 (notes) built; the board server now reloads itself on edit. B3 next.
 
 ## Purpose
 
@@ -24,7 +24,7 @@ The design board is where the watch UI's current state and the decisions about i
 
 ## Architecture
 
-The architecture is the proof of concept, grown. There is still one process, `tools/board/board.mjs`, started by the Claude Code session as a channel server.
+The architecture is the proof of concept, grown. There is still one process, `tools/board/board.mjs`, started by the Claude Code session as a channel server. (Since B2 it is a small shim that forks `server.mjs` and restarts it on edit, so server changes don't need an MCP reconnect.)
 
 ```
  phone / desktop browser ──HTTP+SSE──▶ board.mjs ──channel push──▶ Claude Code session

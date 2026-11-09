@@ -6,10 +6,12 @@
 <title>Agent Link Board</title>
 <style>
 /* Layout: sticky header (link status + tabs); Gallery = groups of round watch faces in a wrapping grid;
-   Talk = the channel probes and timing log. Phone first; the watch is AMOLED, so faces sit on near-black. */
+   Notes = pinned comments and their replies; Talk = the channel probes and timing log.
+   Phone first; the watch is AMOLED, so faces sit on near-black. */
 :root{
   --bg:#f2f3f5; --surface:#fff; --fg:#14181f; --muted:#5b6474; --line:#d9dde4;
   --accent:#0072b2; --ok:#1a7f4b; --warn:#a8650a; --bad:#b3261e; --face:#000; --facering:#2a2f38;
+  --pin:#ffb000; --pinfg:#14181f;
   --sans:system-ui,-apple-system,"Segoe UI",sans-serif; --mono:ui-monospace,"SFMono-Regular",Menlo,monospace;
 }
 @media (prefers-color-scheme: dark){:root{
@@ -17,42 +19,82 @@
   --accent:#56b4e9; --ok:#4fc58a; --warn:#e6a23c; --bad:#f2786d; --facering:#323946; color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--sans)}
+body.has-tray main{padding-bottom:120px}
 header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);
   padding:10px max(16px,env(safe-area-inset-left)) 0}
 .hrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:1100px;margin:0 auto}
 h1{font-size:18px;margin:0;margin-right:auto}
 .pill{font:12px var(--mono);border-radius:999px;padding:2px 10px;border:1px solid var(--line);background:var(--surface);white-space:nowrap}
 .pill.ok{color:var(--ok);border-color:var(--ok)} .pill.bad{color:var(--bad);border-color:var(--bad)} .pill.warn{color:var(--warn);border-color:var(--warn)}
+.pill.acc{color:var(--accent);border-color:var(--accent)}
 nav{display:flex;gap:4px;max-width:1100px;margin:8px auto 0}
 nav button{font:600 14px var(--sans);background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 12px;cursor:pointer;min-height:40px}
 nav button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+nav .count{font:11px var(--mono);margin-left:4px}
 main{max-width:1100px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-left)) 48px}
 .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 .bar .grow{margin-right:auto}
 .muted{color:var(--muted)} .small{font-size:13px}
-button.act{font:600 14px var(--sans);border:0;border-radius:999px;padding:9px 16px;background:var(--accent);color:var(--bg);cursor:pointer;min-height:40px}
+button.act{white-space:nowrap;font:600 14px var(--sans);border:0;border-radius:999px;padding:9px 16px;background:var(--accent);color:var(--bg);cursor:pointer;min-height:40px}
 button.act.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+button.link{font:13px var(--sans);background:none;border:0;color:var(--accent);cursor:pointer;padding:6px 4px;min-height:32px}
 button:disabled{opacity:.45;cursor:not-allowed}
-button:focus-visible,input:focus-visible,.face:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+button:focus-visible,input:focus-visible,textarea:focus-visible,.face:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 h2{font-size:15px;margin:22px 0 10px;letter-spacing:.02em}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:18px 14px}
 figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
-.face{width:100%;max-width:200px;aspect-ratio:1;border-radius:50%;background:var(--face);padding:0;border:3px solid var(--facering);
+.face{position:relative;width:100%;max-width:200px;aspect-ratio:1;border-radius:50%;background:var(--face);padding:0;border:3px solid var(--facering);
   overflow:hidden;cursor:zoom-in;display:block}
-.face img{width:100%;height:100%;display:block;image-rendering:auto}
+.face img{width:100%;height:100%;display:block}
 .face.stale{opacity:.5;filter:saturate(.4)}
 .face.missing{display:grid;place-items:center;color:#8a93a3;font:12px var(--mono);cursor:default}
+.dot{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--pin);border:2px solid #000;pointer-events:none}
 figcaption{text-align:center;font-size:13px;line-height:1.35}
 figcaption code{display:block;font:11px var(--mono);color:var(--muted)}
 .tag{font:11px var(--mono);color:var(--muted)}
 .fails{border:1px solid var(--bad);color:var(--bad);border-radius:10px;padding:8px 12px;font-size:13px;margin:10px 0}
 .empty{padding:40px 0;text-align:center}
-/* lightbox: 1:1 pixels when there is room */
-dialog{border:0;padding:0;background:transparent;max-width:100vw}
-dialog::backdrop{background:rgba(0,0,0,.85)}
-.lb{display:flex;flex-direction:column;align-items:center;gap:10px;color:#e6e9ef;padding:12px}
-.lb .face{width:min(466px,92vw);max-width:none;cursor:zoom-out;border-color:#323946}
-.lb p{margin:0;text-align:center;font-size:14px}
+/* lightbox: the shot at up to 1:1, pins on it, notes under it */
+dialog{border:0;padding:0;background:transparent;max-width:100vw;max-height:100dvh;width:100%;overflow:auto}
+dialog::backdrop{background:rgba(5,7,10,.97)}
+.lb{display:flex;flex-direction:column;align-items:center;gap:10px;color:#e6e9ef;padding:12px 16px 24px;max-width:520px;margin:0 auto}
+.lbhead{display:flex;align-items:center;gap:8px;width:100%}
+.lbhead p{margin:0;margin-right:auto;font-size:14px;min-width:0}
+.lbhead code{font:11px var(--mono);color:#97a0b0}
+.lbhead button{color:#56b4e9;border-color:#56b4e9}
+.stage{position:relative;width:min(466px,calc(100vw - 32px));aspect-ratio:1}
+.stage img{width:100%;height:100%;display:block;border-radius:50%;box-shadow:0 0 0 3px #323946;cursor:crosshair;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.pin{position:absolute;min-width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:13px;background:var(--pin);color:var(--pinfg);
+  font:700 12px var(--mono);display:grid;place-items:center;padding:0 5px;border:2px solid #000;cursor:pointer}
+.pin.sent{background:#e6e9ef} .pin.answered{background:#4fc58a}
+.pin.new{background:transparent;color:var(--pin);border:2px dashed var(--pin);pointer-events:none}
+.pin.hl{box-shadow:0 0 0 3px #56b4e9}
+.hint{margin:0;font-size:13px;color:#97a0b0;text-align:center}
+.lb form{width:100%;display:flex;flex-direction:column;gap:8px}
+textarea{width:100%;min-height:80px;font:15px var(--sans);padding:10px 12px;border-radius:12px;border:1px solid #323946;background:#141920;color:#e6e9ef;resize:vertical}
+.lb .row{justify-content:flex-end}
+.lbnotes{width:100%;display:flex;flex-direction:column;gap:8px}
+.lbnotes .note{background:#141920;border-color:#262d38;color:#e6e9ef}
+/* notes */
+.note{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.note .meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:12px var(--mono);color:var(--muted)}
+.note .meta b{color:inherit}
+.note .text{white-space:pre-wrap;overflow-wrap:anywhere}
+.note .reply{border-top:1px dashed var(--line);padding-top:6px;margin-top:2px;white-space:pre-wrap;overflow-wrap:anywhere}
+.note .reply::before{content:"reply · ";font:12px var(--mono);color:var(--muted)}
+.notesrow{display:flex;gap:12px;align-items:flex-start}
+.thumb{flex:none;width:64px;height:64px;position:relative;border-radius:50%;overflow:hidden;background:#000;border:2px solid var(--facering);padding:0;cursor:pointer}
+.thumb img{width:100%;height:100%;display:block}
+.thumb .dot{width:10px;height:10px;margin:-5px 0 0 -5px}
+.list{display:flex;flex-direction:column;gap:10px}
+.st-draft{color:var(--muted)} .st-sent{color:var(--warn)} .st-seen{color:var(--accent)} .st-answered{color:var(--ok)}
+/* draft tray */
+.tray{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
+  padding:10px max(16px,env(safe-area-inset-left)) max(10px,env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(0,0,0,.15)}
+.tray .in{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.tray .top{display:flex;align-items:center;gap:10px}
+.tray .top .grow{margin-right:auto}
+.tray .list{max-height:40dvh;overflow:auto}
 /* talk */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
 .row{display:flex;gap:8px;flex-wrap:wrap}
@@ -74,6 +116,7 @@ td.reply div+div{margin-top:4px;padding-top:4px;border-top:1px dashed var(--line
   </div>
   <nav role="tablist">
     <button role="tab" id="t-gallery" aria-selected="true" aria-controls="v-gallery">Gallery</button>
+    <button role="tab" id="t-notes" aria-selected="false" aria-controls="v-notes">Notes<span class="count" id="notes-count"></span></button>
     <button role="tab" id="t-talk" aria-selected="false" aria-controls="v-talk">Talk</button>
   </nav>
 </header>
@@ -90,6 +133,11 @@ td.reply div+div{margin-top:4px;padding-top:4px;border-top:1px dashed var(--line
     <div id="g-progress" class="small muted" hidden></div>
     <div id="g-fails" class="fails" hidden></div>
     <div id="g-body"><p class="empty muted">Loading the gallery…</p></div>
+  </section>
+
+  <section id="v-notes" role="tabpanel" aria-labelledby="t-notes" hidden>
+    <p class="small muted">Open a screen in the Gallery and tap where something is wrong to pin a note. Drafts collect in the tray and go to the session together.</p>
+    <div id="n-body" class="list"><p class="empty muted">No notes yet.</p></div>
   </section>
 
   <section id="v-talk" role="tabpanel" aria-labelledby="t-talk" hidden>
@@ -112,34 +160,68 @@ td.reply div+div{margin-top:4px;padding-top:4px;border-top:1px dashed var(--line
   </section>
 </main>
 
-<dialog id="lb"><div class="lb"><button class="face" id="lb-face" aria-label="Close"><img id="lb-img" alt=""></button><p id="lb-cap"></p></div></dialog>
+<div class="tray" id="tray" hidden>
+  <div class="in">
+    <div class="top">
+      <strong class="grow" id="tray-title">Drafts</strong>
+      <button class="act ghost" id="tray-toggle" aria-expanded="false">Review</button>
+      <button class="act" id="tray-send">Send</button>
+    </div>
+    <div id="tray-msg" class="small muted" hidden></div>
+    <div class="list" id="tray-list" hidden></div>
+  </div>
+</div>
+
+<dialog id="lb">
+  <div class="lb">
+    <div class="lbhead"><p id="lb-cap"></p><button class="act ghost" id="lb-close">Close</button></div>
+    <div class="stage" id="lb-stage"><img id="lb-img" alt="" draggable="false"></div>
+    <p class="hint" id="lb-hint">Tap the screen to pin a note.</p>
+    <form id="lb-form" hidden>
+      <textarea id="lb-text" maxlength="1000" placeholder="What's wrong here, or what would you like instead?"></textarea>
+      <div class="row">
+        <button class="act ghost" type="button" id="lb-cancel">Cancel</button>
+        <button class="act" type="submit">Add to drafts</button>
+      </div>
+    </form>
+    <div class="lbnotes" id="lb-notes"></div>
+  </div>
+</dialog>
 
 <script>
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
 const dev = matchMedia("(pointer:coarse)").matches ? "phone" : "desktop";
+const post = async (url, body) => {
+  const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body || {}) });
+  return { ok: r.ok, data: await r.json().catch(() => ({})) };
+};
 
 /* tabs */
-const tabs = { gallery: $("t-gallery"), talk: $("t-talk") };
+const tabs = { gallery: $("t-gallery"), notes: $("t-notes"), talk: $("t-talk") };
 function show(name) {
   for (const [k, b] of Object.entries(tabs)) { b.setAttribute("aria-selected", k === name); $("v-" + k).hidden = k !== name; }
   try { localStorage.setItem("board.tab", name); } catch {}
 }
-tabs.gallery.onclick = () => show("gallery");
-tabs.talk.onclick = () => show("talk");
+for (const [k, b] of Object.entries(tabs)) b.onclick = () => show(k);
 try { const t = localStorage.getItem("board.tab"); if (t && tabs[t]) show(t); } catch {}
 
 /* session status */
+let SESSION = { connected: false };
 function setSession(s) {
+  SESSION = s;
   $("st").textContent = s.connected ? "session listening" : "no session";
   $("st").className = "pill " + (s.connected ? "ok" : "bad");
+  renderTray();
 }
 
 /* gallery */
 const ago = (t) => { const s = Math.round((Date.now() - t) / 1000); return s < 90 ? s + " s ago" : s < 5400 ? Math.round(s / 60) + " min ago" : Math.round(s / 3600) + " h ago"; };
 let G = null;
+const LABELS = {};
 function renderGallery(g) {
   G = g;
+  for (const grp of g.states.groups || []) Object.assign(LABELS, grp.shots);
   const idx = g.index;
   const stale = idx && g.current && idx.sha !== g.current;
   $("g-build").textContent = g.current ? "UI build " + g.current : "UI build unknown";
@@ -147,7 +229,7 @@ function renderGallery(g) {
   else if (stale) { $("g-fresh").textContent = "stale: shots from " + idx.sha; $("g-fresh").className = "pill warn"; }
   else { $("g-fresh").textContent = "current"; $("g-fresh").className = "pill ok"; }
   $("g-meta").textContent = idx
-    ? `${idx.shots.length} screens · simulator · rendered ${ago(idx.at)}. Tap a face for full size.`
+    ? `${idx.shots.length} screens · simulator · rendered ${ago(idx.at)}. Tap a face to open it and pin notes.`
     : "No screenshots yet. Re-render to make them (about 45 s).";
   $("b-render").disabled = g.rendering;
   const fails = idx ? idx.scripts.filter((s) => !s.ok) : [];
@@ -169,16 +251,16 @@ function renderGallery(g) {
   if (other.length) sections.push(el("h2", { textContent: "Other" }), el("div", { className: "grid" }, ...other.map((id) => face(id, id, idx.sha, stale))));
   body.replaceChildren(...sections);
 }
+const dotsFor = (shot) => notesFor(shot).map((c) => el("span", { className: "dot", style: `left:${c.x / 4.66}%;top:${c.y / 4.66}%` }));
 function face(id, label, sha, stale) {
-  const cap = el("figcaption", {}, label, el("code", { textContent: id }));
+  const n = notesFor(id).length;
+  const cap = el("figcaption", {}, label, el("code", { textContent: id + (n ? ` · ${n} note${n > 1 ? "s" : ""}` : "") }));
   if (!sha) return el("figure", {}, el("div", { className: "face missing", textContent: "not rendered" }), cap);
   const img = el("img", { src: `/shots/${sha}/${id}.png`, alt: label, loading: "lazy", width: 466, height: 466 });
-  const btn = el("button", { className: "face" + (stale ? " stale" : ""), "aria-label": "Open " + label }, img);
-  btn.onclick = () => { $("lb-img").src = img.src; $("lb-img").alt = label; $("lb-cap").textContent = `${label} · ${id} · ${sha} · sim`; $("lb").showModal(); };
+  const btn = el("button", { className: "face" + (stale ? " stale" : ""), "aria-label": "Open " + label }, img, ...dotsFor(id));
+  btn.onclick = () => openShot(id);
   return el("figure", {}, btn, el("span", { className: "tag", textContent: "sim · " + sha }), cap);
 }
-$("lb-face").onclick = () => $("lb").close();
-$("lb").onclick = (e) => { if (e.target === $("lb")) $("lb").close(); };
 
 async function loadGallery() {
   try { renderGallery(await (await fetch("/api/gallery")).json()); } catch {}
@@ -187,7 +269,7 @@ $("b-render").onclick = async () => {
   $("b-render").disabled = true;
   try { await fetch("/render", { method: "POST" }); } catch {}
 };
-let done = 0, total = 0;
+let done = 0;
 function onRender(r) {
   const p = $("g-progress");
   if (r.ev === "start") { done = 0; p.hidden = false; p.textContent = `Rendering build ${r.sha}…`; $("b-render").disabled = true; }
@@ -197,6 +279,126 @@ function onRender(r) {
 }
 loadGallery();
 setInterval(loadGallery, 20000); /* picks up new commits (the build stamp) without a push */
+
+/* notes */
+let NOTES = [];
+const notesFor = (shot) => NOTES.filter((c) => c.shot === shot);
+const status = (c) => (c.answered ? "answered" : c.seen ? "seen" : c.sent ? "sent" : "draft");
+const shaNow = () => (G && G.index ? G.index.sha : "");
+function noteCard(c, { thumb = false, del = false } = {}) {
+  const st = status(c);
+  const meta = el("div", { className: "meta" },
+    el("b", { textContent: "#" + c.n }),
+    el("span", { textContent: c.shot }),
+    el("span", { textContent: `(${c.x}, ${c.y})` }),
+    el("span", { textContent: c.sha }),
+    el("span", { className: "st-" + st, textContent: "● " + st }));
+  if (c.sha !== shaNow() && shaNow()) meta.append(el("span", { className: "st-sent", textContent: "older build" }));
+  if (del) {
+    const b = el("button", { className: "link", textContent: "Delete", type: "button" });
+    b.onclick = async (e) => { e.stopPropagation(); await post("/comments/delete", { id: c.id }); };
+    meta.append(b);
+  }
+  const body = el("div", { className: "note" }, meta, el("div", { className: "text", textContent: c.text }));
+  for (const r of c.replies || []) body.append(el("div", { className: "reply", textContent: r.text }));
+  if (!thumb) return body;
+  const t = el("button", { className: "thumb", "aria-label": "Open " + c.shot, type: "button" },
+    el("img", { src: `/shots/${c.sha}/${c.shot}.png`, alt: "", loading: "lazy" }),
+    el("span", { className: "dot", style: `left:${c.x / 4.66}%;top:${c.y / 4.66}%` }));
+  t.onclick = () => openShot(c.shot, c.id);
+  body.style.flex = "1"; body.style.minWidth = "0";
+  return el("div", { className: "notesrow" }, t, body);
+}
+function renderNotes() {
+  const sent = NOTES.filter((c) => c.sent).sort((a, b) => b.n - a.n);
+  const open = sent.filter((c) => !c.answered).length;
+  $("notes-count").textContent = sent.length ? (open ? `${open} open` : String(sent.length)) : "";
+  $("n-body").replaceChildren(...(sent.length ? sent.map((c) => noteCard(c, { thumb: true }))
+    : [el("p", { className: "empty muted", textContent: "No notes sent yet." })]));
+  renderTray();
+  if (G) renderGallery(G);
+  if ($("lb").open) renderLightboxNotes();
+}
+let trayOpen = false;
+function renderTray() {
+  const drafts = NOTES.filter((c) => !c.sent).sort((a, b) => a.n - b.n);
+  $("tray").hidden = !drafts.length;
+  document.body.classList.toggle("has-tray", drafts.length > 0);
+  if (!drafts.length) { trayOpen = false; return; }
+  const shots = new Set(drafts.map((c) => c.shot)).size;
+  $("tray-title").textContent = `${drafts.length} draft note${drafts.length > 1 ? "s" : ""} on ${shots} screen${shots > 1 ? "s" : ""}`;
+  $("tray-send").disabled = !SESSION.connected;
+  $("tray-send").textContent = SESSION.connected ? "Send" : "Offline";
+  $("tray-toggle").textContent = trayOpen ? "Hide" : "Review";
+  $("tray-toggle").setAttribute("aria-expanded", trayOpen);
+  $("tray-list").hidden = !trayOpen;
+  $("tray-list").replaceChildren(...drafts.map((c) => noteCard(c, { thumb: true, del: true })));
+}
+$("tray-toggle").onclick = () => { trayOpen = !trayOpen; renderTray(); };
+$("tray-send").onclick = async () => {
+  $("tray-send").disabled = true;
+  const r = await post("/comments/send", { dev }).catch(() => ({ ok: false, data: { error: "board not reachable" } }));
+  const m = $("tray-msg");
+  m.hidden = r.ok;
+  if (!r.ok) m.textContent = "Not sent: " + (r.data.error || "error");
+  else { trayOpen = false; flash(`Sent ${r.data.notes} note${r.data.notes > 1 ? "s" : ""}. Status shows on each note.`); }
+  renderTray();
+};
+function flash(t) { const p = $("g-progress"); p.hidden = false; p.textContent = t; }
+
+/* lightbox: open a shot, tap to pin */
+let LB = { shot: "", sha: "", pending: null, hl: "" };
+function openShot(shot, hl = "") {
+  const sha = G && G.index && G.index.shots.includes(shot) ? G.index.sha : (NOTES.find((c) => c.shot === shot) || {}).sha;
+  if (!sha) return;
+  LB = { shot, sha, pending: null, hl };
+  $("lb-img").src = `/shots/${sha}/${shot}.png`;
+  $("lb-img").alt = LABELS[shot] || shot;
+  $("lb-cap").replaceChildren(LABELS[shot] || shot, el("br"), el("code", { textContent: `${shot} · ${sha} · sim` }));
+  $("lb-form").hidden = true;
+  $("lb-hint").hidden = false;
+  $("lb-text").value = "";
+  renderLightboxNotes();
+  if (!$("lb").open) $("lb").showModal();
+}
+function renderLightboxNotes() {
+  const list = notesFor(LB.shot).sort((a, b) => a.n - b.n);
+  const pins = list.map((c) => {
+    const p = el("button", { type: "button", className: `pin ${status(c) === "draft" ? "" : status(c) === "answered" ? "answered" : "sent"}${c.id === LB.hl ? " hl" : ""}`,
+      style: `left:${c.x / 4.66}%;top:${c.y / 4.66}%`, textContent: c.n, "aria-label": "Note " + c.n });
+    p.onclick = (e) => { e.stopPropagation(); LB.hl = c.id; renderLightboxNotes(); document.getElementById("lbn-" + c.id)?.scrollIntoView({ block: "nearest", behavior: "smooth" }); };
+    return p;
+  });
+  if (LB.pending) pins.push(el("span", { className: "pin new", style: `left:${LB.pending.x / 4.66}%;top:${LB.pending.y / 4.66}%`, textContent: "+" }));
+  $("lb-stage").replaceChildren($("lb-img"), ...pins);
+  $("lb-notes").replaceChildren(...list.map((c) => { const n = noteCard(c, { del: !c.sent }); n.id = "lbn-" + c.id; if (c.id === LB.hl) n.style.borderColor = "#56b4e9"; return n; }));
+}
+$("lb-img").addEventListener("click", (e) => {
+  const r = e.currentTarget.getBoundingClientRect();
+  const x = Math.round(((e.clientX - r.left) / r.width) * 466), y = Math.round(((e.clientY - r.top) / r.height) * 466);
+  if (x < 0 || y < 0 || x > 466 || y > 466) return;
+  LB.pending = { x, y };
+  $("lb-form").hidden = false;
+  $("lb-hint").hidden = true;
+  renderLightboxNotes();
+  $("lb-text").focus({ preventScroll: true });
+  $("lb-form").scrollIntoView({ block: "nearest" });
+});
+$("lb-cancel").onclick = () => { LB.pending = null; $("lb-form").hidden = true; $("lb-hint").hidden = false; renderLightboxNotes(); };
+$("lb-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const text = $("lb-text").value.trim();
+  if (!text || !LB.pending) return;
+  const r = await post("/comments", { shot: LB.shot, sha: LB.sha, x: LB.pending.x, y: LB.pending.y, text, dev }).catch(() => ({ ok: false }));
+  if (!r.ok) { $("lb-hint").hidden = false; $("lb-hint").textContent = "Could not save the note."; return; }
+  LB.pending = null;
+  $("lb-text").value = "";
+  $("lb-form").hidden = true;
+  $("lb-hint").hidden = false;
+  $("lb-hint").textContent = "Saved to drafts. Tap again for another note.";
+};
+$("lb-close").onclick = () => $("lb").close();
+$("lb").addEventListener("close", () => { LB.pending = null; maybeReload(); });
 
 /* talk */
 const rows = new Map();
@@ -210,28 +412,42 @@ function renderLog() {
     for (const v of [p.n, p.kind, ms(p.sent, p.pushed), secs(p.sent, p.answered)]) tr.append(el("td", { textContent: v }));
     const rd = el("td", { className: "reply" });
     if (p.kind === "say" && p.text) rd.append(el("div", { className: "muted", textContent: "you: " + p.text }));
-    if (!p.replies.length) rd.append(el("div", { className: "muted", textContent: "waiting…" }));
+    if (p.kind === "comments") rd.append(el("div", { className: "muted", textContent: "notes " + p.text }));
+    if (!p.replies.length && p.kind !== "comments") rd.append(el("div", { className: "muted", textContent: "waiting…" }));
     for (const r of p.replies) rd.append(el("div", { textContent: r.text }));
     tr.append(rd);
     return tr;
   }));
 }
 async function press(kind, text = "") {
-  try {
-    await fetch("/press", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, text, dev, sent: Date.now() }) });
-  } catch { $("st").textContent = "board server not reachable"; $("st").className = "pill bad"; }
+  try { await post("/press", { kind, text, dev, sent: Date.now() }); }
+  catch { $("st").textContent = "board server not reachable"; $("st").className = "pill bad"; }
 }
 $("b-ping").onclick = () => press("ping");
 $("b-agent").onclick = () => press("agent");
 $("f-say").onsubmit = (e) => { e.preventDefault(); const t = $("say").value.trim(); if (t) { press("say", t); $("say").value = ""; } };
 
+/* reload when board.html changes (the server says so), but never while a note is being typed */
+let PAGE = null, wantReload = false;
+function maybeReload() {
+  if (!wantReload) return;
+  if ($("lb").open || $("say").value) return;
+  location.reload();
+}
+function onHello(h) {
+  if (PAGE === null) PAGE = h.page;
+  else if (h.page !== PAGE) { wantReload = true; maybeReload(); }
+}
+
 /* live events */
 const es = new EventSource("/events");
+es.addEventListener("hello", (e) => onHello(JSON.parse(e.data)));
 es.addEventListener("session", (e) => setSession(JSON.parse(e.data)));
 es.addEventListener("press", (e) => { const p = JSON.parse(e.data); rows.set(p.id, p); renderLog(); });
+es.addEventListener("comments", (e) => { NOTES = JSON.parse(e.data); renderNotes(); });
 es.addEventListener("render", (e) => onRender(JSON.parse(e.data)));
 es.addEventListener("gallery", (e) => renderGallery(JSON.parse(e.data)));
-es.onerror = () => { $("st").textContent = "board server not reachable"; $("st").className = "pill bad"; };
+es.onerror = () => { $("st").textContent = "board server restarting…"; $("st").className = "pill warn"; };
 </script>
 </body>
 </html>

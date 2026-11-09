@@ -1,17 +1,26 @@
-# Board (proof of concept)
+# Design board
 
-A local page that talks to a running Claude Code session with no claude.ai artifact in between.
+A local page that talks to a running Claude Code session with no claude.ai artifact in between. Plan: `docs/design/BOARD.md`.
 
-`board.mjs` is one dependency-free Node process with two jobs:
+Two dependency-free Node processes:
 
-- **Channel server.** It is an MCP stdio server that declares `experimental["claude/channel"]`. Each press on the page is sent into the session as a `<channel source="board" id=… kind=…>` message through `notifications/claude/channel`. The session answers with the `board_reply` tool.
-- **Web server.** It serves the page at `http://127.0.0.1:7880`, with live updates over server-sent events (`/events`) and presses at `POST /press`. Cross-site posts are refused.
+- **`board.mjs`, the channel shim.** The session loads it as an MCP stdio server that declares `experimental["claude/channel"]`. Page events reach the session as `<channel source="board" id=… kind=…>` messages via `notifications/claude/channel`; the session answers with the `board_reply` and `board_seen` tools. The shim does nothing else: it forwards tool calls to the server and pushes from it.
+- **`server.mjs`, everything else.** The page at `http://127.0.0.1:7880`, live updates over server-sent events (`/events`), presses, the gallery and notes. Cross-site posts are refused.
 
-The session starts the server, so the board lives and dies with that session. Timings are appended to `~/.agentlink/board-log.jsonl`.
+**Reloading.** The shim restarts `server.mjs` whenever the file changes (after `node --check`, so a half-saved file keeps the old server up) and tells the session the tool list changed. Open pages reload themselves when `board.html` changes, except while a note is being written. So only edits to `board.mjs` itself need `/mcp` → reconnect board; the channel instructions live there too.
+
+The session starts the shim, so the board lives and dies with that session. Timings are appended to `~/.agentlink/board-log.jsonl`.
 
 ## Gallery (B1)
 
-`node tools/board/render.mjs` runs every simulator script that has `shot` lines (about 45 s for 42 screens) and writes the PNGs to `build/board/<ui-sha>/`, which is git-ignored. `<ui-sha>` is the last commit that touched `firmware/` or `simulator/`, plus `-dirty` if those have uncommitted changes. When HEAD moves past the rendered build, the page marks the gallery stale and offers Re-render. Groups and labels come from `design/board/states.json`; a shot it doesn't list appears under "Other". `board.html` is read on every request, so page edits only need a reload. Changing `board.mjs` needs `/mcp` → reconnect board.
+`node tools/board/render.mjs` runs every simulator script that has `shot` lines (about 45 s for 42 screens) and writes the PNGs to `build/board/<ui-sha>/`, which is git-ignored. `<ui-sha>` is the last commit that touched `firmware/` or `simulator/`, plus `-dirty` if those have uncommitted changes. When HEAD moves past the rendered build, the page marks the gallery stale and offers Re-render. Groups and labels come from `design/board/states.json`; a shot it doesn't list appears under "Other". 
+## Notes (B2)
+
+Open a screen in the Gallery and tap where something is wrong: a pin drops at that spot on the 466 px panel and you write the note. Notes collect as drafts in the tray at the bottom (on any number of screens) and **Send** pushes them to the session as one `kind="comments"` event listing each note's id, screen, build, pin position and PNG path. Each note then shows draft → sent → seen (the session called `board_seen`) → answered (`board_reply` with the note id), and the Notes tab lists them with their replies. Notes are stored in `design/board/comments.jsonl`, one per line, and committed with the branch.
+
+## Checking the page
+
+`drive.mjs` drives headless Chrome over the DevTools protocol (tap, run JS, screenshot); Chrome's own `--screenshot` fires before the page's data arrives. Run a second board on a spare port for tests: `sleep 600 | BOARD_PORT=7881 BOARD_TAILSCALE=0 node tools/board/board.mjs`.
 
 ## Run
 
