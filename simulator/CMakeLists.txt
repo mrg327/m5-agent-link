@@ -185,6 +185,15 @@ sim_script_test(sim_watch_ask_return watch_ask_return.txt FAIL_REGULAR_EXPRESSIO
 set_tests_properties(sim_watch_ask_return PROPERTIES TIMEOUT 60)
 sim_script_test(sim_perf_four_agents perf_four_agents.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_perf_four_agents PROPERTIES TIMEOUT 60)
+# Per-screen redraw budgets with four busy agents: HOME/STATUS/WATCH and the AGENT/ASK/SCROLL overlays.
+sim_script_test(sim_perf_core_screens perf_core_screens.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+set_tests_properties(sim_perf_core_screens PROPERTIES TIMEOUT 60)
+sim_script_test(sim_perf_core_overlays perf_core_overlays.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+set_tests_properties(sim_perf_core_overlays PROPERTIES TIMEOUT 60)
+sim_script_test(sim_perf_ring_idle4 perf_ring_idle4.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+set_tests_properties(sim_perf_ring_idle4 PROPERTIES TIMEOUT 60)
+add_test(NAME sim_perf_ring_display_off COMMAND agentlink_sim --headless --no-ws --idle-off 1 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/perf_ring_display_off.txt)
+set_tests_properties(sim_perf_ring_display_off PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 
 sim_script_test(sim_finished_buzz finished_buzz.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"glow\""

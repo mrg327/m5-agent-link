@@ -316,7 +316,8 @@ void ui_home_tick(uint32_t now)
         ui_home_card_set_ambient(amb);
     }
 
-    if (now - s_last_elapsed >= 500) {
+    /* The card is hidden outside HOME; entering HOME refreshes it. */
+    if (ui_mode() == MODE_HOME && now - s_last_elapsed >= 500) {
         s_last_elapsed = now;
         ui_home_card_tick();
     }
@@ -326,7 +327,7 @@ void ui_home_refresh(uint32_t now)
 {
     s_now = now;
     rebuild();
-    ui_home_card_update();
+    if (ui_mode() == MODE_HOME) ui_home_card_update();
 }
 
 void ui_home_animations_changed(void)

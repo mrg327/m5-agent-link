@@ -24,21 +24,21 @@
       "color": "#56b4e9",
       "palette": "working",
       "label": "Starting",
-      "source": "firmware/components/core/src/ui_theme.c:16"
+      "source": "firmware/components/core/src/ui_theme.c:17"
     },
     "work": {
       "id": 1,
       "color": "#56b4e9",
       "palette": "working",
       "label": "Working",
-      "source": "firmware/components/core/src/ui_theme.c:16"
+      "source": "firmware/components/core/src/ui_theme.c:17"
     },
     "input": {
       "id": 2,
       "color": "#f0e442",
       "palette": "ask",
       "label": "Question",
-      "source": "firmware/components/core/src/ui_theme.c:12",
+      "source": "firmware/components/core/src/ui_theme.c:13",
       "sub_labels": {
         "0": "Approve?",
         "1": "Question"
@@ -53,28 +53,28 @@
       "color": "#d55e00",
       "palette": "error",
       "label": "Error",
-      "source": "firmware/components/core/src/ui_theme.c:13"
+      "source": "firmware/components/core/src/ui_theme.c:14"
     },
     "done": {
       "id": 4,
       "color": "#009e73",
       "palette": "done",
       "label": "Done",
-      "source": "firmware/components/core/src/ui_theme.c:14"
+      "source": "firmware/components/core/src/ui_theme.c:15"
     },
     "idle": {
       "id": 5,
       "color": "#999999",
       "palette": "idle",
       "label": "Idle",
-      "source": "firmware/components/core/src/ui_theme.c:34"
+      "source": "firmware/components/core/src/ui_theme.c:35"
     },
     "ended": {
       "id": 6,
       "color": "#999999",
       "palette": "idle",
       "label": "Ended",
-      "source": "firmware/components/core/src/ui_theme.c:35"
+      "source": "firmware/components/core/src/ui_theme.c:36"
     }
   },
   "gesture": {
@@ -828,7 +828,7 @@
     {
       "id": "attention",
       "title": "Deck · a request is waiting",
-      "source": "firmware/components/core/src/ui_home.c:341"
+      "source": "firmware/components/core/src/ui_home.c:342"
     },
     {
       "id": "agent",
@@ -2025,13 +2025,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:282",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:231",
-    "gesture_map.chord": "firmware/components/core/src/app.c:317",
+    "gesture_map.chord": "firmware/components/core/src/app.c:348",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:187",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:133",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:236",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:267",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:344",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:375",
     "haptics.approved": "firmware/components/core/src/feedback.c:72",
     "haptics.denied": "firmware/components/core/src/feedback.c:78",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:59",
@@ -2111,15 +2111,15 @@
     "ring.underline_gap_px": "firmware/components/core/src/ui_ring_internal.h:22",
     "ring.underline_w_px": "firmware/components/core/src/ui_ring_internal.h:21",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:35",
-    "screens": "firmware/components/core/src/ui_home.c:341",
+    "screens": "firmware/components/core/src/ui_home.c:342",
     "screens.agent": "firmware/components/core/src/ui_agent.c:230",
     "screens.ask": "firmware/components/core/src/ui_ask.c:309",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:307",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:64",
     "screens.status": "firmware/components/core/src/ui_status.c:231",
-    "states": "firmware/components/core/src/ui_theme.c:10",
-    "states.input_words": "firmware/components/core/src/ui_theme.c:31",
-    "states.permission_colour": "firmware/components/core/src/ui_theme.c:23",
+    "states": "firmware/components/core/src/ui_theme.c:11",
+    "states.input_words": "firmware/components/core/src/ui_theme.c:32",
+    "states.permission_colour": "firmware/components/core/src/ui_theme.c:24",
     "usb.baud": "daemon/crates/agentlinkd/src/usb.rs:23",
     "usb.crc": "daemon/crates/agentlinkd/src/usb/frame.rs:11",
     "usb.crc_poly": "daemon/crates/agentlinkd/src/usb/frame.rs:16",

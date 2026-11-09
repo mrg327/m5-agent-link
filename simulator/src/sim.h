@@ -35,3 +35,6 @@ bool sim_script_load(const char *path);
 /* Runs due actions; returns false once the script has finished (or failed: see sim_script_failed). */
 bool sim_script_poll(uint32_t now_ms);
 bool sim_script_failed(void);
+
+/* main.c: CPU time spent in core_step() so far (thread CPU clock), in microseconds. */
+uint64_t sim_core_cpu_us(void);

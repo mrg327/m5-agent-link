@@ -20,6 +20,7 @@
  *   clear RID [answered_pc|answered_dev|expired|cancelled]
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
  *   px_reset | expect_px_max PX     redraw budget: pixels flushed since px_reset must stay within PX
+ *                                   (the log line also reports core_step host CPU as cpu_us, not asserted)
  */
 #include <stdio.h>
 #include <math.h>
@@ -27,6 +28,7 @@
 #include <string.h>
 
 #include "agentlink_codec_encode.h"
+#include "app.h"
 #include "core.h"
 #include "link_internal.h"
 #include "model.h"
@@ -47,6 +49,7 @@ static size_t s_n, s_cap, s_next;
 static uint32_t s_t0;
 static bool s_started, s_failed;
 static uint32_t s_px0;
+static uint64_t s_cpu0;
 
 bool sim_script_failed(void) { return s_failed; }
 
@@ -542,10 +545,14 @@ static void run(const ev_t *e)
     case E_EXPECT_NO_LABEL:
         if (core_ui_has_label(e->text)) fail("unexpected label", e->text);
         break;
-    case E_PX_RESET: s_px0 = core_px_flushed(); break;
+    case E_PX_RESET:
+        s_px0 = core_px_flushed();
+        s_cpu0 = sim_core_cpu_us();
+        break;
     case E_EXPECT_PX_MAX: {
         uint32_t px = core_px_flushed() - s_px0;
-        sim_log("px", "\"flushed\":%u,\"max\":%d", (unsigned)px, e->a);
+        sim_log("px", "\"flushed\":%u,\"max\":%d,\"cpu_us\":%llu", (unsigned)px, e->a,
+                (unsigned long long)(sim_core_cpu_us() - s_cpu0)); /* informational: host CPU, not asserted */
         if (px > (uint32_t)e->a) {
             char buf[48];
             snprintf(buf, sizeof buf, "%u px", (unsigned)px);
@@ -561,7 +568,10 @@ static void run(const ev_t *e)
     case E_RESULT: run_result(e->text); break;
     case E_CLEAR: run_clear(e->a, e->text); break;
     case E_CFG: run_cfg(e->text); break;
-    case E_RTC: hal_rtc_set_unix((uint32_t)e->a); break;
+    case E_RTC:
+        hal_rtc_set_unix((uint32_t)e->a);
+        app_clock_resync();
+        break;
     case E_QUIT: s_next = s_n; break;
     }
 }

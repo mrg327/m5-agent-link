@@ -2,10 +2,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "core.h"
 #include "sim.h"
+
+static uint64_t s_cpu_ns;
+
+/* CPU time spent inside core_step() (LVGL render + core), for the scripts' redraw reports. */
+uint64_t sim_core_cpu_us(void) { return s_cpu_ns / 1000; }
+
+static uint32_t timed_core_step(void)
+{
+    struct timespec a, b;
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &a);
+    uint32_t wait = core_step();
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &b);
+    s_cpu_ns += (uint64_t)(b.tv_sec - a.tv_sec) * 1000000000u + (uint64_t)b.tv_nsec - (uint64_t)a.tv_nsec;
+    return wait;
+}
 
 static void usage(const char *argv0)
 {
@@ -66,7 +82,7 @@ int main(int argc, char **argv)
             if (headless || no_ws) break;
             script_running = false;
         }
-        usleep(core_step() * 1000);
+        usleep(timed_core_step() * 1000);
     }
     return 0;
 }

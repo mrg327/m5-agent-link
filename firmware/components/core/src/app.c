@@ -39,6 +39,33 @@ static lv_indev_t *s_touch;
 
 uint32_t app_now_ms(void) { return (uint32_t)(hal_time_us() / 1000); }
 uint32_t app_fps(void) { return s_fps; }
+
+/* The RTC sits on I2C (~1 ms per read on the StopWatch) and the UI asks for the time many times per
+ * step, so read it every 10 s and count whole seconds on the CPU clock in between. Never steps back. */
+#define CLOCK_RESYNC_MS 10000u
+static uint32_t s_clk_unix, s_clk_ms, s_clk_last;
+static bool s_clk_valid;
+
+uint32_t app_now_unix(void)
+{
+    uint32_t ms = app_now_ms();
+    if (!s_clk_valid || ms - s_clk_ms >= CLOCK_RESYNC_MS) {
+        s_clk_unix = hal_rtc_get_unix();
+        s_clk_ms = ms;
+        s_clk_valid = true;
+    }
+    if (!s_clk_unix) return s_clk_last = 0;
+    uint32_t t = s_clk_unix + (ms - s_clk_ms) / 1000u;
+    if (t < s_clk_last) t = s_clk_last;
+    return s_clk_last = t;
+}
+
+void app_clock_resync(void)
+{
+    s_clk_valid = false;
+    s_clk_last = 0;
+}
+
 static uint32_t tick_cb(void) { return app_now_ms(); }
 
 void app_inject_gesture(const gesture_evt_t *g) { ring_push(&s_gestures, g); }
@@ -183,7 +210,7 @@ static void act_notify_done(uint32_t sid, bool arm)
     toast_cmd_result(sent, arm ? "Will buzz when done" : "Won't notify");
 }
 
-static bool sid_snoozed(uint32_t sid) { return model_session_snoozed(model_find(sid), hal_rtc_get_unix()); }
+static bool sid_snoozed(uint32_t sid) { return model_session_snoozed(model_find(sid), app_now_unix()); }
 
 /* Entering SCROLL: focus without the "Opening on PC..." toast; the mode-change tick is the feedback. */
 static void act_scroll_open(uint32_t sid)
@@ -203,7 +230,7 @@ static void act_nag(void)
 {
     const attention_t *first = model_attention_first();
     if (first && sid_snoozed(first->sid)) return;
-    if (!model_quiet_active(hal_rtc_get_unix())) feedback_attention(ATT_APPROVAL);
+    if (!model_quiet_active(app_now_unix())) feedback_attention(ATT_APPROVAL);
 }
 
 static const ui_actions_t s_actions = {.focus = act_focus,
@@ -228,12 +255,16 @@ static const ui_actions_t s_actions = {.focus = act_focus,
 
 /* ── link → app ── */
 
-static void on_link(bool welcomed) { ui_set_link_state(welcomed); }
+static void on_link(bool welcomed)
+{
+    if (welcomed) app_clock_resync(); /* the welcome has just set the RTC */
+    ui_set_link_state(welcomed);
+}
 
 static void on_attention(const attention_t *a)
 {
     uint32_t rgb = a->kind == ATT_ERROR ? RGB_ERROR : a->kind == ATT_DONE ? RGB_DONE : a->kind == ATT_QUESTION ? RGB_ASK : RGB_PERMISSION;
-    if (model_quiet_active(hal_rtc_get_unix())) {
+    if (model_quiet_active(hal_rtc_get_unix())) { /* once per attention; atlas extract.py matches this line */
         /* Quiet (UI-V2 §4.5): no buzz, no glow, no nag. The card and the ring still change, and a
          * request still opens ASK when the display is already on. */
         dbg_event("ui", "quiet", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
@@ -263,7 +294,7 @@ static void on_session(const session_t *before, const session_t *now, uint32_t p
     if (before && before->state == now->state) return;
     bool armed = before && before->ntf;
     if (!armed && now->sid != ui_watched_sid()) return;
-    uint32_t unix_now = hal_rtc_get_unix();
+    uint32_t unix_now = app_now_unix();
     if (model_session_snoozed(now, unix_now) || model_quiet_active(unix_now)) return;
     feedback_finished(now->state == SESS_ERROR);
 }
@@ -448,7 +479,7 @@ uint32_t core_step(void)
 
     gesture_evt_t g;
     while (ring_pop(&s_gestures, &g)) dispatch(&g);
-    model_attention_expire(hal_rtc_get_unix());
+    model_attention_expire(app_now_unix());
     ui_tick(now);
     dbg_tick(now);
 

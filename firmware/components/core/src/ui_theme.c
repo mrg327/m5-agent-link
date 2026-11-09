@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "app.h"
 #include "hal.h"
 
 uint32_t theme_state_rgb(sess_state_t s)
@@ -212,7 +213,7 @@ void theme_elapsed(char *dst, size_t cap, uint32_t secs)
     else snprintf(dst, cap, "%uh%02um", (unsigned)(secs / 3600), (unsigned)(secs / 60 % 60));
 }
 
-uint32_t theme_now_unix(void) { return hal_rtc_get_unix(); }
+uint32_t theme_now_unix(void) { return app_now_unix(); }
 
 void theme_elapsed_long(char *dst, size_t cap, uint32_t secs)
 {

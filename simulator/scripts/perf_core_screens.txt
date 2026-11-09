@@ -1,0 +1,146 @@
+# Redraw budget per screen with four busy agents (deltas and idle ticks): HOME, STATUS, WATCH.
+# Each window logs its flushed pixels and the host CPU spent in core_step ("cpu_us", not asserted).
+# Budgets: the ring comet dominates (~0.67M deltas / ~1.17M idle before the comet rework); the
+# card itself only redraws the summary and, once a second, the elapsed label.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login
+session 2 work api main
+session 3 work infra main
+session 4 work docs main
+wait 1500
+expect_screen ring
+# HOME: 16 session deltas, one per frame
+px_reset
+step 1 3 Read · src/a.c
+wait 50
+step 2 3 Bash · make
+wait 50
+step 3 3 Grep · TODO
+wait 50
+step 4 3 Edit · README.md
+wait 50
+step 1 3 ok
+wait 50
+step 2 3 ok
+wait 50
+step 3 3 ok
+wait 50
+step 4 3 ok
+wait 50
+step 1 4 Edit · src/b.c
+wait 50
+step 2 4 Bash · make test
+wait 50
+step 3 4 Read · main.tf
+wait 50
+step 4 4 Write · notes.md
+wait 50
+step 1 4 ok
+wait 50
+step 2 4 ok
+wait 50
+step 3 4 ok
+wait 50
+step 4 4 ok
+wait 50
+expect_px_max 400000
+# HOME: 3 s idle, only the clocks tick
+px_reset
+wait 3000
+expect_px_max 600000
+swipe 233 180 233 300 160
+wait 400
+expect_screen status
+# STATUS: 16 session deltas, one per frame
+px_reset
+step 1 3 Read · src/a.c
+wait 50
+step 2 3 Bash · make
+wait 50
+step 3 3 Grep · TODO
+wait 50
+step 4 3 Edit · README.md
+wait 50
+step 1 3 ok
+wait 50
+step 2 3 ok
+wait 50
+step 3 3 ok
+wait 50
+step 4 3 ok
+wait 50
+step 1 4 Edit · src/b.c
+wait 50
+step 2 4 Bash · make test
+wait 50
+step 3 4 Read · main.tf
+wait 50
+step 4 4 Write · notes.md
+wait 50
+step 1 4 ok
+wait 50
+step 2 4 ok
+wait 50
+step 3 4 ok
+wait 50
+step 4 4 ok
+wait 50
+expect_px_max 400000
+# STATUS: 3 s idle, only the clocks tick
+px_reset
+wait 3000
+expect_px_max 600000
+swipe 233 300 233 180 160
+wait 400
+expect_screen ring
+tap 233 233
+wait 300
+expect_screen agent
+btn B
+wait 150
+expect_label > Watch
+btn A
+wait 400
+expect_screen watch
+# WATCH: 16 session deltas, one per frame
+px_reset
+step 1 3 Read · src/a.c
+wait 50
+step 2 3 Bash · make
+wait 50
+step 3 3 Grep · TODO
+wait 50
+step 4 3 Edit · README.md
+wait 50
+step 1 3 ok
+wait 50
+step 2 3 ok
+wait 50
+step 3 3 ok
+wait 50
+step 4 3 ok
+wait 50
+step 1 4 Edit · src/b.c
+wait 50
+step 2 4 Bash · make test
+wait 50
+step 3 4 Read · main.tf
+wait 50
+step 4 4 Write · notes.md
+wait 50
+step 1 4 ok
+wait 50
+step 2 4 ok
+wait 50
+step 3 4 ok
+wait 50
+step 4 4 ok
+wait 50
+expect_px_max 400000
+# WATCH: 3 s idle, only the clocks tick
+px_reset
+wait 3000
+expect_px_max 600000
+quit

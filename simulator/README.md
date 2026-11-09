@@ -57,7 +57,8 @@ firmware's own codec. `connect` fakes the transport being up for `--no-ws` runs.
 exits with code 1. `shot` writes a PNG of the framebuffer (round mask applied); `press` without a
 `release` keeps the finger down, so a hold can be photographed mid-way.
 `px_reset` / `expect_px_max` bound the pixels LVGL flushed in between (`core_px_flushed()`); see
-`perf_four_agents.txt` for the redraw budget with four busy agents.
+`perf_four_agents.txt` for the redraw budget with four busy agents. The log line also reports
+`cpu_us` (host CPU inside `core_step`), informational only since it varies with machine load.
 
 ## Notes
 
