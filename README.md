@@ -68,6 +68,8 @@ listen_on unix:/tmp/kitty
 
 Hook IPC uses `$AGENTLINK_HOME/hook.sock` on Unix. On Windows it is the named pipe `\\.\pipe\agentlink-<USERNAME>-<fnv64 of the socket path>`.
 
+Remote sessions (Copilot on a Windows machine reached over SSH, watch on this machine) are designed but not built yet: [docs/design/REMOTE.md](docs/design/REMOTE.md).
+
 ## Status
 
 Early scaffold. See `docs/design/DESIGN.md` §13 for phasing.

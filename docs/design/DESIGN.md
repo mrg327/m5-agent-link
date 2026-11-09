@@ -296,3 +296,5 @@ docs/
 
 ## 14. Open questions
 Resolved: Q1 BLE OK · Q2 preview+tap · Q3 lanyard · Q4 multi-day, display off · Q5 animated agent visualizer · **Q6 approvals reuse the agent's own permission rules** (the device only answers prompts the agent itself raised; no separate allow-list) · Q7 second device undecided, so design generically via layout profiles.
+
+Open: remote sessions. Agents run on remote Windows machines and the watch stays on the local daemon, connected through an SSH tunnel with a token. Design in [REMOTE.md](REMOTE.md); not built.
