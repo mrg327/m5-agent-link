@@ -1,7 +1,8 @@
 # m5-agent-link: remote sessions over SSH
 
-Status: built (issue `20261109-371b`). It was tested on the Mac with a stand-in for `ssh -R`, but
-not yet against a real Windows machine (§6). Items marked **[unverified]** still need a live test.
+Status: built (issue `20261109-371b`). The tunnel, auth and session path have been tested
+against a real Windows 11 machine. A full interactive Copilot session is still pending (issue
+`20261109-e9b2`, §6). Items marked **[unverified]** still need a live test.
 
 ## 1. Goal
 
@@ -126,9 +127,26 @@ Prerequisites:
 - On Windows: OpenSSH Server running, and `AllowTcpForwarding` left at its default (`yes`).
   `GatewayPorts` left at `no`, so the forward binds loopback only.
 - Copilot CLI hooks on Windows point at `agentlink-hook.exe`, as for a local Windows install
-  (`agentlink hooks print`). Build it on Windows with
-  `cargo build --release -p agentlink-hook`.
+  (`agentlink hooks print`). Use an absolute path in `exec`
+  (`C:\Users\<me>\.agentlink\bin\agentlink-hook.exe`) so it doesn't depend on PATH. Build it on
+  Windows with `cargo build --release -p agentlink-hook`, or cross-compile on the Mac with
+  `cargo install cargo-xwin` then
+  `cargo xwin build --release -p agentlink-hook --target x86_64-pc-windows-msvc`
+  (needs `rustup target add x86_64-pc-windows-msvc`), and `scp` the exe over.
 - On the Mac: `agentlinkd` running, from this version on.
+
+Windows quirks seen on Windows 11 with OpenSSH 9.5:
+- **Admin accounts** ignore `~\.ssh\authorized_keys`: sshd reads
+  `C:\ProgramData\ssh\administrators_authorized_keys`, which must be readable only by
+  Administrators and SYSTEM
+  (`icacls <file> /inheritance:r /grant Administrators:F /grant SYSTEM:F`).
+- **The default ssh shell may be PowerShell**, not cmd, so `$` in a remote command is expanded
+  twice. Send scripts with `powershell -NoProfile -EncodedCommand <UTF-16LE base64>`.
+- **Copilot sign-in in a key-auth ssh session:** Windows Credential Manager isn't reachable
+  from a public-key logon, so Copilot reports "Saved sign-in could not be read from credential
+  storage". Fix it by authenticating in that session (`/login`, or a token in the env vars the
+  Copilot CLI documents). This is Windows behaviour, not agent link.
+- `setx AGENTLINK_REMOTE ...` is picked up by new ssh sessions.
 
 Once:
 ```sh
@@ -182,6 +200,12 @@ unsupported in this case (§3.3).
   `@WIN-TEST` appear with Windows-path repo names, a blocking hook falls back after its
   wait, a bad token and a non-loopback address are refused, and the attach socket goes away
   when ssh exits.
-- **Still to do on real hardware:** Mac + Windows 11 with OpenSSH Server. Covers the
-  tunnel, approve/deny from the watch, tunnel drop (fail-open), a port already in use, and
-  focus and scroll through kitty into the Windows Copilot TUI.
+- **Real Windows 11 (build 26200, Win32-OpenSSH 9.5), cross-compiled `agentlink-hook.exe`:**
+  `agentlink ssh` opens the `-R` forward to the Mac's Unix socket. The hook reaches it over
+  TCP with token auth (`remote_auth_ok`, `os: win`), and the session appears as `@<HOST>` and
+  is attached to the kitty window. Hooks returned in 29-457 ms, and the attach socket was
+  removed when ssh exited.
+- **Still to do on real hardware:** a real Copilot session over the tunnel (blocked on
+  Copilot sign-in in a key-auth ssh session, see §4), approve/deny from the watch, tunnel
+  drop (fail-open), a port already in use, and focus and scroll through kitty into the
+  Windows Copilot TUI.

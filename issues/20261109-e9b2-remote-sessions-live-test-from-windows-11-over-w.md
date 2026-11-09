@@ -1,11 +1,11 @@
 ---
 id: 20261109-e9b2
 title: Remote sessions: live test from Windows 11 over Win32-OpenSSH
-status: open
+status: claimed
 severity: med
 area: daemon
 platforms: windows,macos
-owner:
+owner: copilot-cli/opus@mac-work
 created: 2026-11-09T19:15:35Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
@@ -29,3 +29,5 @@ Run agentlink-hook.exe on a Windows 11 machine with AGENTLINK_REMOTE set, throug
 ## Log
 
 - 2026-11-09T19:15:35Z · copilot-cli/opus@mac-work · macos-arm64 · 24f47bf: filed
+- 2026-11-09T20:08:33Z · copilot-cli/opus@mac-work · macos-arm64 · 84907c2+dirty: claimed
+- 2026-11-09T20:08:33Z · copilot-cli/opus@mac-work · macos-arm64 · 84907c2+dirty: Win11 26200 / Win32-OpenSSH 9.5, hook cross-compiled with cargo-xwin: tunnel (-R TCP to Mac unix socket), token auth (os=win), session shown with host and attached to the kitty window, hooks 29-457 ms, attach socket removed on exit. All pass. Blocked: Copilot CLI over a key-auth ssh logon cannot read saved sign-in (Credential Manager is not available), so the user must authenticate in that session. Quirks recorded in REMOTE.md section 4: admin authorized_keys location, PowerShell default shell. Remaining: interactive session, approve/deny, tunnel drop, port in use, focus/scroll.
