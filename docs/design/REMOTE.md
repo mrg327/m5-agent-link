@@ -148,6 +148,45 @@ Windows quirks seen on Windows 11 with OpenSSH 9.5:
   Copilot CLI documents). This is Windows behaviour, not agent link.
 - `setx AGENTLINK_REMOTE ...` is picked up by new ssh sessions.
 
+### 4.1 Saved remotes (recommended)
+
+Profiles live in `~/.agentlink/remotes.json` (0600) on the Mac. A name is 1-32 of
+`[A-Za-z0-9_-]`.
+
+```sh
+# Once per machine: save it and onboard it (Windows only)
+agentlink remote add <name> <user@host> [--os windows|unix] [--dir <path>] [--cmd <command>] \
+    [--port 47533] [--ssh-arg <arg>]... [--setup [--hook-exe <exe>] [--key <pub>]] [--force]
+agentlink remote list | edit <name> [--dest ..] [--dir ..] [--cmd ..] | rm <name> | setup <name>
+
+# Each time
+agentlink ssh <name>              # tunnel + cd <dir> + run <cmd>; ssh closes when <cmd> exits
+agentlink ssh <name> --no-cmd     # just a shell with the tunnel
+```
+
+`edit` keeps fields you don't pass; `--dir ""` or `--cmd ""` clears one. Extra ssh args after the
+name (`agentlink ssh <name> -- -v`) also skip the on-connect command. Anything that isn't a
+saved name is passed to ssh as a destination, as before.
+
+`remote setup` (also `add --setup`) onboards a Windows machine from the Mac, and is safe to
+re-run (for example after `remote init --rotate` or a new hook build):
+1. checks key login with `BatchMode`; if that fails it installs `--key`
+   (default `~/.ssh/id_ed25519.pub`) with one password prompt, using
+   `administrators_authorized_keys` for admin accounts;
+2. creates `~\.agentlink\bin` and makes an existing token writable again;
+3. `scp`s the hook exe (default `~/.agentlink/dist/windows-x64/agentlink-hook.exe`, built with
+   cargo-xwin as above) and the token, creating the token if it's missing;
+4. makes the token readable only by the user, runs `setx AGENTLINK_REMOTE`, and writes
+   `~\.copilot\hooks\agentlink.json` with the absolute exe path.
+
+On Windows the on-connect command runs as
+`powershell -NoLogo -EncodedCommand <Set-Location <dir>; <cmd>; exit $LASTEXITCODE>`, so `<cmd>`
+is PowerShell syntax. If the account's default ssh shell is PowerShell, the outer shell turns
+the command's exit code into 0 or 1; the session still closes when the command exits.
+On Unix it runs as `cd -- '<dir>' && <cmd>`.
+
+### 4.2 Manual setup
+
 Once:
 ```sh
 # Mac
