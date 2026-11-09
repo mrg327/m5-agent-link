@@ -1,0 +1,19 @@
+menu "Agent Link StopWatch display"
+
+    config AGENTLINK_DISPLAY_DIRECT_DMA
+        bool "Push LVGL bands straight to the CO5300 by DMA (no PSRAM framebuffer)"
+        default y
+        help
+            Each LVGL band is byte-swapped in place and sent to the panel with one asynchronous
+            QSPI DMA transfer, so LVGL renders the next band while the previous one is on the wire.
+            Off: the old path, which copies every band into a full-screen PSRAM framebuffer
+            (M5GFX Panel_fb) and then pushes it to the panel line by line, synchronously.
+
+    config AGENTLINK_DISPLAY_STATS
+        bool "Log flush timing every 5 s"
+        default n
+        help
+            Logs flushes, pixels, CPU time spent in the flush callback and time spent waiting
+            for the previous DMA transfer (ESP_LOGI, tag sw-display).
+
+endmenu

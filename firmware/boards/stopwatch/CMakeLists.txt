@@ -24,3 +24,13 @@ idf_component_register(
         m5stack__m5gfx
         lvgl__lvgl
 )
+
+# The project builds at the IDF default -Og; the pixel path (LVGL's software renderer, M5GFX) gets -O2.
+# Set AGENTLINK_GFX_O2=OFF to drop back to the global level.
+option(AGENTLINK_GFX_O2 "Build LVGL and M5GFX with -O2" ON)
+if(AGENTLINK_GFX_O2 AND CONFIG_COMPILER_OPTIMIZATION_DEBUG)
+    foreach(_gfx lvgl__lvgl m5stack__m5gfx)
+        idf_component_get_property(_gfx_lib ${_gfx} COMPONENT_LIB)
+        target_compile_options(${_gfx_lib} PRIVATE -O2)
+    endforeach()
+endif()
