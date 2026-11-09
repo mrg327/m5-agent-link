@@ -54,6 +54,8 @@ int theme_chord(int y, int margin);
 const char *theme_sep(void);
 /* "repo · branch"; `display` picks a separator the font can draw, otherwise the canonical " · ". */
 void theme_session_label(char *dst, size_t cap, const session_t *s, bool display);
+/* "HOST · " in front of the muted line of a remote session (host != 0); "" for local ones. */
+void theme_host_prefix(char *dst, size_t cap, const session_t *s);
 void theme_elapsed(char *dst, size_t cap, uint32_t secs);
 /* "42s", "4m 12s", "1h 05m". */
 void theme_elapsed_long(char *dst, size_t cap, uint32_t secs);

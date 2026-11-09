@@ -24,6 +24,8 @@ typedef struct {
     sess_state_t state;
     uint8_t sub; /* 0 approval, 1 question; meaningful when state == SESS_INPUT */
     char repo[33], branch[33], tool[25], summary[81];
+    uint8_t host;  /* 0 = the daemon's PC, 1.. = a remote host */
+    char hn[17];   /* remote host name; empty for host 0 or an old daemon */
     uint32_t t0, tst; /* unix seconds: start, last state change */
     bool seen;
     bool no_scroll; /* device-side: the daemon answered a scroll with `unsupported`; hide the item */
@@ -33,7 +35,8 @@ typedef struct {
 enum {
     SF_AGENT = 1 << 0, SF_STATE = 1 << 1, SF_SUB = 1 << 2, SF_REPO = 1 << 3, SF_BRANCH = 1 << 4,
     SF_TOOL = 1 << 5, SF_T0 = 1 << 6, SF_TST = 1 << 7, SF_SUMMARY = 1 << 8, SF_SEEN = 1 << 9,
-    SF_NO_SCROLL = 1 << 10 /* not on the wire: set by the device itself */
+    SF_NO_SCROLL = 1 << 10, /* not on the wire: set by the device itself */
+    SF_HOST = 1 << 11, SF_HN = 1 << 12
 };
 
 typedef struct {

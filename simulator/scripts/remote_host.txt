@@ -1,0 +1,22 @@
+# A remote session (host 1) leads its muted line with the host name; a local one is unchanged.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 ask keel main
+remote 2 1 WIN-BUILD01
+wait 600
+expect_label keel
+expect_label WIN-BUILD01
+shot remote_card.png
+btn B
+wait 300
+expect_label WIN-BUILD01
+shot remote_agent.png
+btn A
+wait 300
+session 1 work ember feat/x Running tests
+drop 2
+wait 400
+expect_label ember
+expect_no_label WIN-BUILD01
+shot remote_local.png
+quit

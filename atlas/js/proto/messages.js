@@ -52,7 +52,7 @@ const SPECS = {
   session: {
     sid: [0, 'uint'], ag: [1, 'enum:agent'], st: [2, 'enum:sess_state'], sub: [3, 'enum:input_sub'],
     repo: [4, 'tstr'], br: [5, 'tstr'], tool: [6, 'tstr'], t0: [7, 'uint'], tst: [8, 'uint'],
-    sum: [9, 'tstr'], seen: [10, 'bool'], host: [11, 'uint'],
+    sum: [9, 'tstr'], seen: [10, 'bool'], host: [11, 'uint'], hn: [12, 'tstr'],
   },
   snapshot: { sessions: [0, 'objs:session'], away: [1, 'objs:away_event'] },
   gone: { sid: [0, 'uint'] },

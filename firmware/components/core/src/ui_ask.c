@@ -112,7 +112,9 @@ bool ui_ask_refresh(uint32_t now)
     }
     char buf[80];
     const char *base = theme_basename(s->repo);
-    snprintf(buf, sizeof buf, "%s%s%s", theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
+    char host[24];
+    theme_host_prefix(host, sizeof host, s);
+    snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
     set_txt(s_header, s_header_txt, sizeof s_header_txt, buf);
     bool perm = a->kind == ATT_APPROVAL;
     set_txt(s_title, s_title_txt, sizeof s_title_txt,

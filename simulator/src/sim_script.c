@@ -5,6 +5,7 @@
  *   scrub DEG0 DEG1 [MS [RADIUS]]   drag along the rim, degrees clockwise from 12 o'clock
  *   drag X Y DY [MS]                a slow vertical drag in the centre (default 500 ms: steps, no swipe); a flick is a fast `swipe`
  *   session SID work|input|ask|error|done|idle|doneseen REPO   add or update a session (input = permission, ask = question)
+ *   remote SID HOST [NAME]          set host / host name on a session (host 0 = local)
  *   drop SID | lift | shake | connect | disconnect | rx HEX | ui | shot FILE.png
  *   attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OPT...
  *                                   a daemon `attention`; ACTS = comma list of approve,deny,focus,reply,ack
@@ -28,7 +29,7 @@
 #include "ui_theme.h"
 #include "sim.h"
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -156,6 +157,9 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "session") && arg[0]) {
         add(*t, E_SESSION, 0, 0, 0, arg);
         *t += 50;
+    } else if (!strcmp(cmd, "remote") && arg[0]) {
+        add(*t, E_REMOTE, 0, 0, 0, arg);
+        *t += 50;
     } else if (!strcmp(cmd, "drop") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_DROP, a, 0, 0, NULL);
         *t += 50;
@@ -274,6 +278,24 @@ static void run_session(const char *spec)
         d.seen = st[4] == 's';
     } else if (!strcmp(st, "idle")) d.state = SESS_IDLE;
     snprintf(d.repo, sizeof d.repo, "%s", repo);
+    model_upsert(&d, present);
+}
+
+/* remote SID HOST [NAME]: mark an existing session as running on a remote host (delta, like the wire) */
+static void run_remote(const char *spec)
+{
+    unsigned sid, host;
+    char hn[17] = "";
+    if (sscanf(spec, "%u %u %16s", &sid, &host, hn) < 2) {
+        s_failed = true;
+        return;
+    }
+    session_t d = {.sid = sid, .host = (uint8_t)host};
+    uint32_t present = SF_HOST;
+    if (hn[0]) {
+        snprintf(d.hn, sizeof d.hn, "%s", hn);
+        present |= SF_HN;
+    }
     model_upsert(&d, present);
 }
 
@@ -459,6 +481,7 @@ static void run(const ev_t *e)
         if (core_ui_has_label(e->text)) fail("unexpected label", e->text);
         break;
     case E_SESSION: run_session(e->text); break;
+    case E_REMOTE: run_remote(e->text); break;
     case E_DROP: model_remove((uint32_t)e->a); break;
     case E_ATTENTION: run_attention(e->text); break;
     case E_RESULT: run_result(e->text); break;

@@ -123,6 +123,7 @@ sim_script_test(sim_deck_summary deck_summary.txt)
 sim_script_test(sim_deck_stale deck_stale.txt)
 sim_script_test(sim_deck_long_names deck_long_names.txt)
 sim_script_test(sim_deck_mixed deck_mixed.txt)
+sim_script_test(sim_remote_host remote_host.txt)
 sim_script_test(sim_deck_ambient deck_ambient.txt)
 set_tests_properties(sim_deck_ambient PROPERTIES TIMEOUT 60)
 # UI-V2 Phase 2: the AGENT wheel.

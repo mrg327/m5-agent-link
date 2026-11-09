@@ -65,7 +65,9 @@ bool ui_agent_refresh(uint32_t now)
     if (!s || s->state == SESS_ENDED) return false;
     char buf[64];
     const char *base = theme_basename(s->repo);
-    snprintf(buf, sizeof buf, "%s%s%s", theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
+    char host[24];
+    theme_host_prefix(host, sizeof host, s);
+    snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
     if (strcmp(buf, s_header_txt)) {
         snprintf(s_header_txt, sizeof s_header_txt, "%s", buf);
         lv_label_set_text(s_header, buf);

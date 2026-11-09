@@ -156,6 +156,12 @@ void theme_session_label(char *dst, size_t cap, const session_t *s, bool display
     else snprintf(dst, cap, "%s", theme_agent_name(s->agent));
 }
 
+void theme_host_prefix(char *dst, size_t cap, const session_t *s)
+{
+    if (!s->host) dst[0] = 0;
+    else snprintf(dst, cap, "%s%s", s->hn[0] ? s->hn : "Remote", theme_sep());
+}
+
 void theme_elapsed(char *dst, size_t cap, uint32_t secs)
 {
     if (secs < 60) snprintf(dst, cap, "%us", (unsigned)secs);

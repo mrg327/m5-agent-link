@@ -184,8 +184,10 @@ void ui_home_card_update(void)
         set_repo("Done");
     } else {
         /* agent · branch: two sessions on the same folder stay distinguishable */
-        if (s->branch[0]) snprintf(buf, sizeof buf, "%s%s%s", theme_agent_name(s->agent), theme_sep(), s->branch);
-        else snprintf(buf, sizeof buf, "%s", theme_agent_name(s->agent));
+        char host[24];
+        theme_host_prefix(host, sizeof host, s);
+        if (s->branch[0]) snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), s->branch);
+        else snprintf(buf, sizeof buf, "%s%s", host, theme_agent_name(s->agent));
         set_txt(s_agent, s_agent_txt, sizeof s_agent_txt, buf);
         const char *base = theme_basename(s->repo);
         set_repo(base[0] ? base : "(no folder)");
@@ -240,6 +242,7 @@ void ui_home_card_tick(void)
 void ui_home_card_report(ui_report_t *r)
 {
     const session_t *s = ui_home_sel_session();
+    if (s_agent_txt[0]) ui_report_add(r, "%s", s_agent_txt);
     if (s_repo_txt[0]) ui_report_add(r, "%s", s_repo_txt);
     if (s_state_txt[0] && s) ui_report_add(r, "%s", theme_state_word(s));
     if (s_summary_txt[0]) ui_report_add(r, "%s", s_summary_txt);

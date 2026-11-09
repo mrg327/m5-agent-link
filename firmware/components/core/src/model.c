@@ -77,6 +77,8 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
     if (present & SF_TST) dst->tst = src->tst;
     if (present & SF_SUMMARY) memcpy(dst->summary, src->summary, sizeof dst->summary);
     if (present & SF_SEEN) dst->seen = src->seen;
+    if (present & SF_HOST) dst->host = src->host;
+    if (present & SF_HN) memcpy(dst->hn, src->hn, sizeof dst->hn);
     if (present & SF_NO_SCROLL) dst->no_scroll = src->no_scroll;
 }
 
@@ -100,8 +102,9 @@ void model_upsert(const session_t *delta, uint32_t present)
     sess_state_t before = dst->state;
     apply(dst, delta, present);
     s_rev++;
-    dbg_event("model", "session", "\"sid\":%u,\"st\":\"%s\",\"prev\":\"%s\",\"label\":%s",
-              (unsigned)dst->sid, sess_state_name(dst->state), sess_state_name(before), dbg_q(dst->repo));
+    dbg_event("model", "session", "\"sid\":%u,\"st\":\"%s\",\"prev\":\"%s\",\"label\":%s,\"host\":%u,\"hn\":%s",
+              (unsigned)dst->sid, sess_state_name(dst->state), sess_state_name(before), dbg_q(dst->repo),
+              (unsigned)dst->host, dbg_q(dst->hn));
 }
 
 void model_replace_all(const session_t *list, size_t n)
