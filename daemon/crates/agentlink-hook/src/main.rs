@@ -353,6 +353,14 @@ fn host_name() -> String {
     ["COMPUTERNAME", "HOSTNAME"]
         .iter()
         .find_map(|k| std::env::var(k).ok().filter(|v| !v.is_empty()))
+        // bash sets HOSTNAME without exporting it.
+        .or_else(|| {
+            ["/proc/sys/kernel/hostname", "/etc/hostname"]
+                .iter()
+                .find_map(|f| std::fs::read_to_string(f).ok())
+                .map(|h| h.trim().to_owned())
+                .filter(|h| !h.is_empty())
+        })
         .unwrap_or_else(|| "remote".into())
 }
 
