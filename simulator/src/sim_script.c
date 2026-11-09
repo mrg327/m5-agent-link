@@ -19,6 +19,7 @@
  *   rtc UNIX                        set the RTC (0 = clock unknown)
  *   clear RID [answered_pc|answered_dev|expired|cancelled]
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
+ *   px_reset | expect_px_max PX     redraw budget: pixels flushed since px_reset must stay within PX
  */
 #include <stdio.h>
 #include <math.h>
@@ -32,7 +33,7 @@
 #include "ui_theme.h"
 #include "sim.h"
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -45,6 +46,7 @@ static ev_t *s_ev;
 static size_t s_n, s_cap, s_next;
 static uint32_t s_t0;
 static bool s_started, s_failed;
+static uint32_t s_px0;
 
 bool sim_script_failed(void) { return s_failed; }
 
@@ -207,6 +209,10 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "expect_label") && arg[0]) {
         add(*t, E_EXPECT_LABEL, 0, 0, 0, arg);
         *t += 50;
+    } else if (!strcmp(cmd, "px_reset")) {
+        add(*t, E_PX_RESET, 0, 0, 0, NULL);
+    } else if (!strcmp(cmd, "expect_px_max") && sscanf(rest, "%d", &a) == 1) {
+        add(*t, E_EXPECT_PX_MAX, a, 0, 0, NULL);
     } else if (!strcmp(cmd, "quit")) {
         add(*t, E_QUIT, 0, 0, 0, NULL);
     } else {
@@ -536,6 +542,17 @@ static void run(const ev_t *e)
     case E_EXPECT_NO_LABEL:
         if (core_ui_has_label(e->text)) fail("unexpected label", e->text);
         break;
+    case E_PX_RESET: s_px0 = core_px_flushed(); break;
+    case E_EXPECT_PX_MAX: {
+        uint32_t px = core_px_flushed() - s_px0;
+        sim_log("px", "\"flushed\":%u,\"max\":%d", (unsigned)px, e->a);
+        if (px > (uint32_t)e->a) {
+            char buf[48];
+            snprintf(buf, sizeof buf, "%u px", (unsigned)px);
+            fail("redraw over budget", buf);
+        }
+        break;
+    }
     case E_SESSION: run_session(e->text); break;
     case E_DELTA: run_delta(e->text); break;
     case E_REMOTE: run_remote(e->text); break;

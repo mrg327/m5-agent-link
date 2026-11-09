@@ -22,3 +22,5 @@ void core_dump_ui_state(void);
 /* Test hooks for scripted runs: current screen name, and whether a visible label contains `text`. */
 const char *core_screen_name(void);
 bool core_ui_has_label(const char *text);
+/* Pixels handed to the display's flush since boot: the redraw cost, for tests and profiling. */
+uint32_t core_px_flushed(void);

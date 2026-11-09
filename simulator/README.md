@@ -48,7 +48,7 @@ scrub DEG0 DEG1 [MS [RADIUS]] | session SID STATE REPO [BRANCH [SUMMARY]] | drop
 lift | shake | connect | disconnect | rx HEX | ui | shot FILE.png
 attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OPT...
 result ok | result err stale|denied|... | clear RID [WHY]
-expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
+expect_screen NAME | expect_label TEXT | expect_no_label TEXT | px_reset | expect_px_max PX | quit
 ```
 
 `rx` feeds a CBOR envelope (e.g. `cbor_hex` from `protocol/vectors`) as if the daemon sent it;
@@ -56,6 +56,8 @@ expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
 firmware's own codec. `connect` fakes the transport being up for `--no-ws` runs. A failed `expect_*`
 exits with code 1. `shot` writes a PNG of the framebuffer (round mask applied); `press` without a
 `release` keeps the finger down, so a hold can be photographed mid-way.
+`px_reset` / `expect_px_max` bound the pixels LVGL flushed in between (`core_px_flushed()`); see
+`perf_four_agents.txt` for the redraw budget with four busy agents.
 
 ## Notes
 

@@ -34,7 +34,7 @@ static btn_evt_t s_btn_buf[16];
 static hal_motion_evt_t s_motion_buf[8];
 static gesture_evt_t s_gesture_buf[32];
 
-static uint32_t s_frames_drawn, s_fps, s_fps_t0;
+static uint32_t s_frames_drawn, s_fps, s_fps_t0, s_px_flushed;
 static lv_indev_t *s_touch;
 
 uint32_t app_now_ms(void) { return (uint32_t)(hal_time_us() / 1000); }
@@ -96,6 +96,14 @@ static void on_refr_ready(lv_event_t *e)
     (void)e;
     s_frames_drawn++;
 }
+
+static void on_flush_start(lv_event_t *e)
+{
+    const lv_area_t *a = lv_event_get_param(e);
+    if (a) s_px_flushed += (uint32_t)lv_area_get_size(a);
+}
+
+uint32_t core_px_flushed(void) { return s_px_flushed; }
 
 /* ── UI actions → link ── */
 
@@ -410,6 +418,7 @@ void core_init(void)
     lv_tick_set_cb(tick_cb);
     lv_display_t *disp = hal_display_create();
     lv_display_add_event_cb(disp, on_refr_ready, LV_EVENT_REFR_READY, NULL);
+    lv_display_add_event_cb(disp, on_flush_start, LV_EVENT_FLUSH_START, NULL);
     s_touch = hal_touch_create(disp);
     if (s_touch) {
         s_hal_touch_read = lv_indev_get_read_cb(s_touch);
