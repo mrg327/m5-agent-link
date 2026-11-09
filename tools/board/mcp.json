@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "board": {
+      "command": "node",
+      "args": ["/home/matt/projects/m5-agent-link-ui-v2/tools/board/board.mjs"],
+      "env": { "BOARD_TAILSCALE": "1" }
+    }
+  }
+}

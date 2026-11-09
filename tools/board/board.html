@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Agent Link Board</title>
+<style>
+/* One narrow column: link status, three probes, live timing log. Phone first. */
+:root{
+  --bg:#f3f4f6; --surface:#fff; --fg:#14181f; --muted:#5b6474; --line:#d9dde4;
+  --accent:#0072b2; --ok:#1a7f4b; --warn:#a8650a; --bad:#b3261e;
+  --sans:system-ui,-apple-system,"Segoe UI",sans-serif; --mono:ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0c0f14; --surface:#151a22; --fg:#e6e9ef; --muted:#97a0b0; --line:#2a313d;
+  --accent:#56b4e9; --ok:#4fc58a; --warn:#e6a23c; --bad:#f2786d; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--sans)}
+.wrap{max-width:680px;margin:0 auto;padding:20px max(16px,env(safe-area-inset-left)) 40px;display:flex;flex-direction:column;gap:14px}
+h1{font-size:21px;margin:0}
+p{margin:0}
+.muted{color:var(--muted)}
+.pill{font:13px var(--mono);border-radius:999px;padding:2px 10px;border:1px solid var(--line);background:var(--surface);align-self:flex-start}
+.pill.ok{color:var(--ok);border-color:var(--ok)} .pill.bad{color:var(--bad);border-color:var(--bad)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button{font:600 15px var(--sans);border:0;border-radius:999px;padding:11px 18px;background:var(--accent);color:var(--bg);cursor:pointer;min-height:44px}
+button.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+input{flex:1;min-width:0;font:15px var(--sans);padding:10px 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--fg);min-height:44px}
+.logwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font:13px var(--mono);font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap}
+th{color:var(--muted);font-weight:400}
+td.reply{white-space:normal;min-width:200px;font-family:var(--sans)}
+td.reply div+div{margin-top:4px;padding-top:4px;border-top:1px dashed var(--line)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Agent Link board</h1>
+  <p class="muted">Local proof of concept. A press goes straight into the Claude Code session through a channel. The session answers here.</p>
+  <span class="pill" id="st">connecting…</span>
+
+  <section class="card">
+    <div class="row">
+      <button id="b-ping">Ping</button>
+      <button id="b-agent" class="ghost">Start agent</button>
+    </div>
+    <form class="row" id="f-say">
+      <input id="say" placeholder="Say something to the session" autocomplete="off" maxlength="2000">
+      <button type="submit">Send</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="logwrap"><table>
+      <thead><tr><th>#</th><th>kind</th><th>to session</th><th>answered</th><th class="reply">reply</th></tr></thead>
+      <tbody id="log"><tr><td colspan="5" class="muted">Nothing sent yet.</td></tr></tbody>
+    </table></div>
+    <p class="muted" style="font-size:13px">"To session" is press → channel push. "Answered" is press → first reply.</p>
+  </section>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const dev = matchMedia("(pointer:coarse)").matches ? "phone" : "desktop";
+const rows = new Map();
+let live = false;
+
+function setSession(s) {
+  live = !!s.connected;
+  $("st").textContent = live ? "session listening" : "no session: start Claude with the board channel";
+  $("st").className = "pill " + (live ? "ok" : "bad");
+}
+const secs = (a, b) => (a && b ? ((b - a) / 1000).toFixed(1) + " s" : "…");
+const ms = (a, b) => (a && b ? (b - a) + " ms" : "not pushed");
+
+function render() {
+  const list = [...rows.values()].sort((a, b) => b.n - a.n);
+  const tb = $("log");
+  if (!list.length) return;
+  tb.replaceChildren(...list.map((p) => {
+    const tr = document.createElement("tr");
+    for (const v of [p.n, p.kind, ms(p.sent, p.pushed), secs(p.sent, p.answered)]) {
+      const td = document.createElement("td"); td.textContent = v; tr.appendChild(td);
+    }
+    const rd = document.createElement("td"); rd.className = "reply";
+    if (p.kind === "say" && p.text) { const q = document.createElement("div"); q.className = "muted"; q.textContent = "you: " + p.text; rd.appendChild(q); }
+    if (!p.replies.length) { const w = document.createElement("div"); w.className = "muted"; w.textContent = "waiting…"; rd.appendChild(w); }
+    for (const r of p.replies) { const d = document.createElement("div"); d.textContent = r.text; rd.appendChild(d); }
+    tr.appendChild(rd);
+    return tr;
+  }));
+}
+
+const es = new EventSource("/events");
+es.addEventListener("session", (e) => setSession(JSON.parse(e.data)));
+es.addEventListener("press", (e) => { const p = JSON.parse(e.data); rows.set(p.id, p); render(); });
+es.onerror = () => { $("st").textContent = "board server not reachable"; $("st").className = "pill bad"; };
+
+async function press(kind, text = "") {
+  try {
+    await fetch("/press", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind, text, dev, sent: Date.now() }) });
+  } catch { $("st").textContent = "press failed: board server not reachable"; $("st").className = "pill bad"; }
+}
+$("b-ping").onclick = () => press("ping");
+$("b-agent").onclick = () => press("agent");
+$("f-say").onsubmit = (e) => { e.preventDefault(); const t = $("say").value.trim(); if (t) { press("say", t); $("say").value = ""; } };
+</script>
+</body>
+</html>
