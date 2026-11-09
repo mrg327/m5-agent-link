@@ -52,6 +52,7 @@ lv_obj_t *theme_label(lv_obj_t *parent, int px, lv_color_t color);
 int theme_chord(int y, int margin);
 /* Separator the font can draw (" · " when available). */
 const char *theme_sep(void);
+void theme_display_text(char *dst, size_t cap, const char *text); /* sum with its separator made displayable */
 /* "repo · branch"; `display` picks a separator the font can draw, otherwise the canonical " · ". */
 void theme_session_label(char *dst, size_t cap, const session_t *s, bool display);
 /* "HOST · " in front of the muted line of a remote session (host != 0); "" for local ones. */

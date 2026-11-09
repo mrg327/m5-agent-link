@@ -9,12 +9,17 @@ wait 300
 expect_screen agent
 expect_label Claude Code
 expect_label > Focus terminal
-expect_label 5 items
+expect_label 6 items
 shot agent_wheel.png
+btn B
+wait 150
+expect_label > Watch
 btn B
 wait 150
 expect_label > Scroll terminal
 shot agent_wheel_scroll.png
+btn B
+wait 150
 btn B
 wait 150
 expect_label > Snooze 30 min
@@ -47,6 +52,8 @@ tap 233 233
 wait 300
 btn B
 wait 150
+btn B
+wait 150
 expect_label > Scroll terminal
 btn A
 wait 200
@@ -54,7 +61,7 @@ expect_screen scroll
 btn B long
 wait 300
 expect_screen ring
-# "Watch..." opens STATUS (Phase 5); swipe up goes back to the deck
+# "Status..." opens STATUS (Phase 5); swipe up goes back to the deck
 tap 233 233
 wait 300
 btn B
@@ -65,7 +72,9 @@ btn B
 wait 150
 btn B
 wait 150
-expect_label > Watch...
+btn B
+wait 150
+expect_label > Status...
 btn A
 wait 200
 expect_screen status

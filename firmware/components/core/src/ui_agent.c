@@ -23,12 +23,22 @@ static char s_header_txt[64];
 
 /* Presentation of the interaction model's action ids. */
 static const char *const s_labels[AG_COUNT] = {
-    [AG_FOCUS] = "Focus terminal", [AG_FOCUS_ACK] = "Focus + acknowledge", [AG_ACK] = "Acknowledge",
-    [AG_DISMISS] = "Dismiss",      [AG_SCROLL] = "Scroll terminal",       [AG_SNOOZE] = "Snooze 30 min",
-    [AG_NOTIFY] = "Notify when done", [AG_WATCH] = "Watch...",
+    [AG_FOCUS] = "Focus terminal", [AG_ACK] = "Mark seen",         [AG_DISMISS] = "Dismiss error",
+    [AG_SCROLL] = "Scroll terminal", [AG_SNOOZE] = "Snooze 30 min", [AG_NOTIFY] = "Notify when done",
+    [AG_WATCH] = "Watch",          [AG_STATUS] = "Status...",
 };
 
 static const session_t *session(void) { return model_find(s_sid); }
+
+/* Snooze and Notify are toggles: the label says what a commit will do now. */
+static bool snoozed(const session_t *s) { return model_session_snoozed(s, theme_now_unix()); }
+
+static const char *label_of(agent_action_t id, const session_t *s)
+{
+    if (id == AG_SNOOZE && snoozed(s)) return "Unsnooze";
+    if (id == AG_NOTIFY && s->ntf) return "Don't notify";
+    return s_labels[id];
+}
 
 /* The index ring shows the items while the wheel is open: one capsule each, selected one wide. */
 static void ring_items(void)
@@ -76,7 +86,7 @@ bool ui_agent_refresh(uint32_t now)
     int n = nav_agent_items(s->state, !s->no_scroll, items, WHEEL_MAX_ITEMS);
     uint32_t rgb = theme_session_rgb(s);
     wheel_item_t w[WHEEL_MAX_ITEMS];
-    for (int i = 0; i < n; i++) w[i] = (wheel_item_t){s_labels[items[i].id], rgb, items[i].hold, (int)items[i].id};
+    for (int i = 0; i < n; i++) w[i] = (wheel_item_t){label_of(items[i].id, s), rgb, items[i].hold, (int)items[i].id};
     int sel = wheel_count(s_wheel) == n ? wheel_sel(s_wheel) : 0;
     wheel_set(s_wheel, w, n, sel);
     lv_obj_set_style_text_color(s_word[0], lv_color_hex(rgb), 0);
@@ -121,19 +131,22 @@ static void commit(const wheel_item_t *it)
     dbg_event("ui", "commit", "\"sid\":%u,\"id\":%d", (unsigned)s->sid, it->id);
     switch ((agent_action_t)it->id) {
     case AG_FOCUS:
-    case AG_FOCUS_ACK:
         g_ui_actions->focus(s->sid);
         if (s->state == SESS_DONE) g_ui_actions->ack(s->sid);
         break;
     case AG_ACK:
     case AG_DISMISS: g_ui_actions->ack(s->sid); g_ui_actions->tick(); break;
-    case AG_SNOOZE: g_ui_actions->snooze(s->sid); break;
-    case AG_NOTIFY: g_ui_actions->notify_done(s->sid); break;
+    case AG_SNOOZE: g_ui_actions->snooze(s->sid, snoozed(s) ? 0 : 30); break;
+    case AG_NOTIFY: g_ui_actions->notify_done(s->sid, !s->ntf); break;
     case AG_SCROLL: /* the terminal comes to the front first, then the drag stream drives it (UI-V2 §4.4) */
         g_ui_actions->scroll_open(s->sid);
         ui_go_scroll();
         return;
-    case AG_WATCH: /* the watch's own screen (UI-V2 §4.5) */
+    case AG_WATCH: /* the monitor for this session (UI-V2 §4.7) */
+        g_ui_actions->tick();
+        ui_go_watch();
+        return;
+    case AG_STATUS: /* the watch's own screen (UI-V2 §4.5) */
         g_ui_actions->tick();
         ui_go_status();
         return;

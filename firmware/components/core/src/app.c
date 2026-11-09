@@ -151,7 +151,7 @@ static void act_reply(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms)
     toast_cmd_result(sent, "Sent");
 }
 
-/* The daemon only answers ack; there is no stored state. So the device remembers it: the segment dims. */
+/* The daemon stores seen and echoes it to every device; the local update makes the segment dim at once. */
 static void act_ack(uint32_t sid)
 {
     link_send_cmd(LINK_OP_ACK, sid, 0, 0);
@@ -159,21 +159,23 @@ static void act_ack(uint32_t sid)
     model_upsert(&d, SF_SEEN);
 }
 
-static void act_snooze(uint32_t sid)
+static void act_snooze(uint32_t sid, uint32_t minutes)
 {
-    bool sent = link_send_cmd_arg(LINK_OP_SNOOZE, sid, 0, 30, 0); /* minutes, stated rather than defaulted */
+    bool sent = link_send_cmd_arg(LINK_OP_SNOOZE, sid, 0, minutes, 0); /* 0 cancels */
     if (sent) feedback_tick();
     else feedback_reject();
-    toast_cmd_result(sent, "Snoozed 30 min");
+    toast_cmd_result(sent, minutes ? "Snoozed 30 min" : "Unsnoozed");
 }
 
-static void act_notify_done(uint32_t sid)
+static void act_notify_done(uint32_t sid, bool arm)
 {
-    bool sent = link_send_cmd(LINK_OP_NOTIFY_DONE, sid, 0, 0);
+    bool sent = link_send_cmd_arg(LINK_OP_NOTIFY_DONE, sid, 0, arm ? 1 : 0, 0);
     if (sent) feedback_tick();
     else feedback_reject();
-    toast_cmd_result(sent, "Will buzz when done");
+    toast_cmd_result(sent, arm ? "Will buzz when done" : "Won't notify");
 }
+
+static bool sid_snoozed(uint32_t sid) { return model_session_snoozed(model_find(sid), hal_rtc_get_unix()); }
 
 /* Entering SCROLL: focus without the "Opening on PC..." toast; the mode-change tick is the feedback. */
 static void act_scroll_open(uint32_t sid)
@@ -191,6 +193,8 @@ static void act_scroll(uint32_t sid, nav_scroll_unit_t unit, int delta)
 /* The nag is an alert too: quiet mode holds it as it holds the arrival buzz. */
 static void act_nag(void)
 {
+    const attention_t *first = model_attention_first();
+    if (first && sid_snoozed(first->sid)) return;
     if (!model_quiet_active(hal_rtc_get_unix())) feedback_attention(ATT_APPROVAL);
 }
 
@@ -225,6 +229,8 @@ static void on_attention(const attention_t *a)
         /* Quiet (UI-V2 §4.5): no buzz, no glow, no nag. The card and the ring still change, and a
          * request still opens ASK when the display is already on. */
         dbg_event("ui", "quiet", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
+    } else if (sid_snoozed(a->sid)) {
+        dbg_event("ui", "snoozed", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
     } else {
         feedback_attention(a->kind);
         power_attention(rgb, app_now_ms());
@@ -239,6 +245,19 @@ static void on_attention(const attention_t *a)
     if (busy_elsewhere) return;
     if (a->kind == ATT_ERROR) ui_show_session(a->sid);
     else ui_show_attention(a->sid); /* a permission or question opens ASK (UI-V2 §2) */
+}
+
+/* A session moved into done or error: buzz when it was armed with Notify, or the watch is on it. */
+static void on_session(const session_t *before, const session_t *now, uint32_t present)
+{
+    if (!(present & SF_STATE)) return;
+    if (now->state != SESS_DONE && now->state != SESS_ERROR) return;
+    if (before && before->state == now->state) return;
+    bool armed = before && before->ntf;
+    if (!armed && now->sid != ui_watched_sid()) return;
+    uint32_t unix_now = hal_rtc_get_unix();
+    if (model_session_snoozed(now, unix_now) || model_quiet_active(unix_now)) return;
+    feedback_finished(now->state == SESS_ERROR);
 }
 
 static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, const char *msg)
@@ -385,6 +404,7 @@ void core_init(void)
               (unsigned)bi->width, (unsigned)bi->height);
 
     model_init();
+    model_set_session_hook(on_session);
     power_init();
     lv_init();
     lv_tick_set_cb(tick_cb);

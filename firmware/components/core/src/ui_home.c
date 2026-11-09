@@ -129,7 +129,7 @@ static void rebuild(void)
         segs[i].rgb = theme_session_rgb(s);
         segs[i].kind = (uint8_t)kind_of(s);
         segs[i].selected = i == s_sel && s_n > 0;
-        segs[i].dim = s->state == SESS_DONE && (s->seen || s_slots[i].n_merged);
+        segs[i].dim = (s->state == SESS_DONE && (s->seen || s_slots[i].n_merged)) || model_session_snoozed(s, theme_now_unix());
     }
     ring_set(s_ring, segs, s_n, s_now);
 }

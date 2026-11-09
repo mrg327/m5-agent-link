@@ -10,7 +10,7 @@
 #include "nav.h"
 
 typedef struct {
-    char screen[12];            /* "ring" | "attention" (selected session has a pending request) | "agent" | "ask" | "scroll" | "status" | "off" */
+    char screen[12];            /* "ring" | "attention" (selected session has a pending request) | "agent" | "ask" | "scroll" | "status" | "watch" | "off" */
     bool has_sel_sid;
     uint32_t sel_sid;
     bool has_rid;
@@ -28,8 +28,8 @@ typedef struct {
     void (*deny)(uint32_t sid, uint32_t rid);
     void (*reply)(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms); /* ASK: answer a question / pick a grant option */
     void (*ack)(uint32_t sid);
-    void (*snooze)(uint32_t sid);      /* AGENT: snooze this session for 30 min */
-    void (*notify_done)(uint32_t sid); /* AGENT: buzz when this session finishes */
+    void (*snooze)(uint32_t sid, uint32_t minutes); /* AGENT: snooze this session (0 cancels) */
+    void (*notify_done)(uint32_t sid, bool arm);    /* AGENT: buzz when this session finishes (false disarms) */
     void (*scroll_open)(uint32_t sid); /* entering SCROLL: bring the terminal to the front, quietly */
     void (*scroll)(uint32_t sid, nav_scroll_unit_t unit, int delta); /* SCROLL: one coalesced cmd_op_scroll */
     void (*scroll_stop)(void); /* SCROLL reached the bottom or the top */
@@ -57,6 +57,8 @@ void ui_set_link_transport(int kind);
 void ui_show_session(uint32_t sid);
 /* A request arrived (or a glow was touched): select its session and open ASK on it. */
 void ui_show_attention(uint32_t sid);
+/* The session the WATCH screen is showing, 0 when it is not open. */
+uint32_t ui_watched_sid(void);
 /* The first unanswered request, if any, else 0. */
 uint32_t ui_pending_attention_sid(void);
 void ui_toast(const char *text, uint32_t rgb);

@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "steps.h"
+
 #define MODEL_MAX_SESSIONS 32
 #define MODEL_MAX_ATTENTION 4
 
@@ -28,6 +30,11 @@ typedef struct {
     char hn[17];   /* remote host name; empty for host 0 or an old daemon */
     uint32_t t0, tst; /* unix seconds: start, last state change */
     bool seen;
+    uint32_t snz;   /* snoozed until (unix); 0 = not snoozed */
+    bool ntf;       /* "notify when done" is armed */
+    uint32_t n;     /* tool steps in the current turn */
+    uint8_t step;   /* step_state_t of step n: STEP_RUNNING while the daemon sent no `ok` */
+    steps_t steps;  /* the last STEPS_MAX steps, built by model_upsert() from n / ok / the step text */
     bool no_scroll; /* device-side: the daemon answered a scroll with `unsupported`; hide the item */
 } session_t;
 
@@ -36,7 +43,8 @@ enum {
     SF_AGENT = 1 << 0, SF_STATE = 1 << 1, SF_SUB = 1 << 2, SF_REPO = 1 << 3, SF_BRANCH = 1 << 4,
     SF_TOOL = 1 << 5, SF_T0 = 1 << 6, SF_TST = 1 << 7, SF_SUMMARY = 1 << 8, SF_SEEN = 1 << 9,
     SF_NO_SCROLL = 1 << 10, /* not on the wire: set by the device itself */
-    SF_HOST = 1 << 11, SF_HN = 1 << 12
+    SF_HOST = 1 << 11, SF_HN = 1 << 12, SF_SNZ = 1 << 13, SF_NTF = 1 << 14, SF_N = 1 << 15,
+    SF_OK = 1 << 16 /* with SF_OK, `step` is STEP_OK or STEP_FAIL */
 };
 
 typedef struct {
@@ -77,6 +85,12 @@ const session_t *model_find(uint32_t sid);
 /* Fills idx[] (size >= MODEL_MAX_SESSIONS) with session slots in display priority order. */
 size_t model_sorted(uint8_t *idx);
 const session_t *model_at(uint8_t slot);
+/* True while the session is snoozed. now_unix 0 = clock unknown: a snooze can never be judged, so off. */
+bool model_session_snoozed(const session_t *s, uint32_t now_unix);
+/* Called after every session upsert (daemon delta or device-side change) with a copy of the session as
+ * it was (`before`, NULL for a new session), the session now, and the fields the delta carried. */
+typedef void (*model_session_hook_t)(const session_t *before, const session_t *now, uint32_t present);
+void model_set_session_hook(model_session_hook_t hook);
 model_counts_t model_counts(void);
 
 void model_attention_add(const attention_t *a);

@@ -107,6 +107,20 @@ void feedback_quiet_toggled(void)
     haptic(quiet, 3);
 }
 
+/* A session finished (UI-V2 §5): done is two soft pulses with a long gap, error three firm pulses. */
+void feedback_finished(bool error)
+{
+    static const uint16_t done[] = {30, 200, 30};
+    static const uint16_t fail[] = {120, 90, 120, 90, 120};
+    if (error) {
+        haptic(fail, 5);
+        sound(HAL_SOUND_TONE_ERROR);
+    } else {
+        haptic(done, 3);
+        sound(HAL_SOUND_TICK_DONE);
+    }
+}
+
 void feedback_hello(void)
 {
     static const uint16_t hello[] = {60};

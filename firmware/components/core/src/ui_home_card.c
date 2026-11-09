@@ -33,7 +33,7 @@ static lv_obj_t *s_centre;
 
 static bool s_ambient, s_offline_dim, s_quiet_shown;
 
-static char s_agent_txt[64], s_repo_txt[40], s_state_txt[40], s_summary_txt[88], s_elapsed_txt[16], s_pill_txt[32],
+static char s_agent_txt[64], s_repo_txt[40], s_state_txt[40], s_summary_txt[88], s_elapsed_txt[32], s_pill_txt[32],
     s_link_txt[64];
 static char s_req_title_txt[48], s_req_text_txt[168];
 
@@ -123,8 +123,12 @@ static void update_link(void)
 static void update_elapsed(const session_t *s)
 {
     uint32_t now = theme_now_unix() - ui_link_down_ms() / 1000, from = s->tst ? s->tst : s->t0;
-    char buf[16] = "";
+    char buf[32] = "";
     if (from && now >= from) theme_elapsed_long(buf, sizeof buf, now - from);
+    if (model_session_snoozed(s, theme_now_unix())) {
+        size_t n = strlen(buf);
+        snprintf(buf + n, sizeof buf - n, "%ssnoozed", n ? theme_sep() : "");
+    }
     set_txt(s_elapsed, s_elapsed_txt, sizeof s_elapsed_txt, buf);
 }
 
@@ -212,7 +216,9 @@ void ui_home_card_update(void)
         if (req->text[0]) lv_obj_remove_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
         else lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
     } else {
-        set_txt(s_summary, s_summary_txt, sizeof s_summary_txt, sl->n_merged ? "" : s->summary);
+        char sum[sizeof s->summary + 4];
+        theme_display_text(sum, sizeof sum, sl->n_merged ? "" : s->summary);
+        set_txt(s_summary, s_summary_txt, sizeof s_summary_txt, sum);
         lv_obj_remove_flag(s_elapsed, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);

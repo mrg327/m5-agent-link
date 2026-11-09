@@ -12,7 +12,7 @@
 #define TOAST_MS 1800
 
 const ui_actions_t *g_ui_actions;
-static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status;
+static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch;
 static nav_mode_t s_mode = MODE_HOME;
 static int s_rel_y;
 static bool s_link_up, s_animate = true;
@@ -69,6 +69,7 @@ void ui_init(const ui_actions_t *actions)
     s_ask = ui_ask_init(s_home);
     s_scroll = ui_scroll_init(s_home);
     s_status = ui_status_init(s_home);
+    s_watch = ui_watch_init(s_home);
     create_overlays();
     lv_screen_load(s_home);
     ui_home_refresh(0);
@@ -115,7 +116,7 @@ int ui_last_release_y(void) { return s_rel_y; }
  * readable while it shows. */
 static void place_toast(void)
 {
-    bool low = s_mode == MODE_ASK || s_mode == MODE_STATUS;
+    bool low = s_mode == MODE_ASK || s_mode == MODE_STATUS || s_mode == MODE_WATCH;
     lv_obj_update_layout(s_toast);
     lv_obj_align(s_toast, LV_ALIGN_TOP_MID, 0, low ? UI_TOAST_LOW_Y : UI_ACTION_Y - 4);
 }
@@ -129,12 +130,14 @@ static void enter_mode(nav_mode_t m)
     if (s_mode == MODE_ASK) ui_ask_close();
     if (s_mode == MODE_SCROLL) ui_scroll_close();
     if (s_mode == MODE_STATUS) ui_status_close();
+    if (s_mode == MODE_WATCH) ui_watch_close();
     s_mode = m;
     ui_home_set_card_shown(m == MODE_HOME);
     if (m == MODE_AGENT) ui_agent_open(ui_home_sel_sid(), s_now_ms);
     else if (m == MODE_ASK) ui_ask_open(ui_home_sel_sid(), s_now_ms);
     else if (m == MODE_SCROLL) ui_scroll_open(ui_home_sel_sid(), s_now_ms);
     else if (m == MODE_STATUS) ui_status_open(s_now_ms);
+    else if (m == MODE_WATCH) ui_watch_open(ui_home_sel_sid(), s_now_ms);
     else ui_home_refresh(s_now_ms); /* the ring shows sessions again */
     if (ui_toast_active()) place_toast(); /* a toast that outlives the mode moves to the new slot */
     dbg_event("ui", "mode", "\"mode\":\"%s\"", nav_mode_name(m));
@@ -143,6 +146,8 @@ static void enter_mode(nav_mode_t m)
 void ui_go_home(void) { enter_mode(MODE_HOME); }
 void ui_go_scroll(void) { enter_mode(MODE_SCROLL); }
 void ui_go_status(void) { enter_mode(MODE_STATUS); }
+void ui_go_watch(void) { enter_mode(MODE_WATCH); }
+uint32_t ui_watched_sid(void) { return s_mode == MODE_WATCH ? ui_watch_sid() : 0; }
 
 void ui_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total, uint32_t total, const char *preview)
 {
@@ -187,6 +192,7 @@ void ui_report(ui_report_t *r)
     else if (s_mode == MODE_ASK) ui_ask_report(r);
     else if (s_mode == MODE_SCROLL) ui_scroll_report(r);
     else if (s_mode == MODE_STATUS) ui_status_report(r);
+    else if (s_mode == MODE_WATCH) ui_watch_report(r);
     else ui_home_report(r);
 }
 
@@ -227,12 +233,17 @@ void ui_tick(uint32_t now_ms)
         if (s_mode == MODE_ASK && !ui_ask_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_SCROLL && !ui_scroll_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_STATUS) ui_status_refresh(now_ms);
+        if (s_mode == MODE_WATCH && !ui_watch_refresh(now_ms)) {
+            enter_mode(MODE_HOME);
+            ui_toast("Session ended", RGB_IDLE);
+        }
     }
     ui_home_tick(now_ms);
     if (s_mode == MODE_AGENT && ui_agent_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_ASK && ui_ask_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_SCROLL && ui_scroll_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_STATUS && ui_status_tick(now_ms)) enter_mode(MODE_HOME);
+    if (s_mode == MODE_WATCH) ui_watch_tick(now_ms);
 }
 
 /* The interaction layer maps the gesture to an action; mode changes are handled here, everything
@@ -295,6 +306,10 @@ bool ui_on_gesture(const gesture_evt_t *g)
     if (s_mode == MODE_STATUS) {
         ui_home_note_input();
         return ui_status_act(a, g);
+    }
+    if (s_mode == MODE_WATCH) {
+        ui_home_note_input();
+        return ui_watch_act(a, g);
     }
     return ui_home_act(a, g);
 }

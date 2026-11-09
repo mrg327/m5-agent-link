@@ -27,7 +27,8 @@ lv_obj_t *ui_new_screen(void);
 nav_mode_t ui_mode(void);
 void ui_go_home(void);          /* leave AGENT (commit, back, chord, timeout) */
 void ui_go_scroll(void);        /* AGENT's "Scroll terminal": open SCROLL on the selected session */
-void ui_go_status(void);        /* AGENT's "Watch...": open STATUS */
+void ui_go_status(void);        /* AGENT's "Status...": open STATUS */
+void ui_go_watch(void);         /* AGENT's "Watch": open WATCH on the selected session */
 int ui_last_release_y(void);    /* where the last touch lifted, for the long-swipe rules */
 bool ui_toast_active(void);     /* a toast is showing: ASK and STATUS hide their hint line under it */
 
@@ -87,3 +88,13 @@ void ui_status_refresh(uint32_t now_ms);
 bool ui_status_act(nav_action_t a, const gesture_evt_t *g);
 bool ui_status_tick(uint32_t now_ms);    /* true: wants to close */
 void ui_status_report(ui_report_t *r);
+
+/* The WATCH screen (ui_watch.c): a live monitor for the session the deck has selected. */
+lv_obj_t *ui_watch_init(lv_obj_t *screen);
+void ui_watch_open(uint32_t sid, uint32_t now_ms);
+void ui_watch_close(void);
+bool ui_watch_refresh(uint32_t now_ms); /* false: the session is gone */
+bool ui_watch_act(nav_action_t a, const gesture_evt_t *g);
+void ui_watch_tick(uint32_t now_ms);    /* the clock; WATCH never closes by itself */
+uint32_t ui_watch_sid(void);
+void ui_watch_report(ui_report_t *r);

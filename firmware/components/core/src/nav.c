@@ -75,6 +75,21 @@ const nav_binding_t nav_bindings[] = {
     {MODE_STATUS, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_NEXT},
     {MODE_STATUS, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_STATUS, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
+    /* WATCH: a monitor for one running session (UI-V2 §4.7). It follows the deck's selection, so the
+     * session moves like on HOME (rim, B). Tap focuses the terminal, or opens ASK when the session
+     * waits for you. Swipe up (like STATUS) goes back; swipe down is ignored, so it can never read as
+     * deny. There is no timeout. */
+    {MODE_WATCH, G_TAP, ZONE_CENTRE, WHEN_ASKABLE, NAV_OPEN_ASK},
+    {MODE_WATCH, G_TAP, ZONE_CENTRE, WHEN_NOT_ASKABLE, NAV_FOCUS},
+    {MODE_WATCH, G_TAP, ZONE_RIM, WHEN_ALWAYS, NAV_PICK_RIM},
+    {MODE_WATCH, G_SWIPE_UP, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK},
+    {MODE_WATCH, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_WATCH, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_WATCH, G_SCRUB_END, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_WATCH, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_FOCUS},
+    {MODE_WATCH, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_NEXT},
+    {MODE_WATCH, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
+    {MODE_WATCH, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
 };
 const int nav_n_bindings = (int)(sizeof nav_bindings / sizeof nav_bindings[0]);
 
@@ -96,7 +111,7 @@ nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool
 
 const char *nav_mode_name(nav_mode_t m)
 {
-    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll", "status"};
+    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll", "status", "watch"};
     return (unsigned)m < MODE_COUNT ? names[m] : "?";
 }
 
@@ -132,19 +147,20 @@ int nav_scroll_lines(int dy_px)
 
 int nav_agent_items(sess_state_t state, bool scroll_ok, agent_item_t *out, int cap)
 {
-    static const agent_item_t work[] = {{AG_FOCUS, false}, {AG_SCROLL, false}, {AG_SNOOZE, false}, {AG_NOTIFY, false}, {AG_WATCH, false}};
-    static const agent_item_t done[] = {{AG_FOCUS_ACK, false}, {AG_ACK, false}, {AG_SCROLL, false}, {AG_WATCH, false}};
-    static const agent_item_t error[] = {{AG_FOCUS, false}, {AG_DISMISS, false}, {AG_SCROLL, false}, {AG_WATCH, false}};
-    static const agent_item_t idle[] = {{AG_FOCUS, false}, {AG_SNOOZE, false}, {AG_WATCH, false}};
-    static const agent_item_t input[] = {{AG_FOCUS, false}, {AG_SCROLL, false}, {AG_WATCH, false}}; /* ASK takes over in Phase 3 */
+    static const agent_item_t work[] = {{AG_FOCUS, false}, {AG_WATCH, false}, {AG_SCROLL, false},
+                                        {AG_NOTIFY, false}, {AG_SNOOZE, false}, {AG_STATUS, false}};
+    static const agent_item_t done[] = {{AG_FOCUS, false}, {AG_ACK, false}, {AG_SCROLL, false}, {AG_WATCH, false}, {AG_STATUS, false}};
+    static const agent_item_t error[] = {{AG_FOCUS, false}, {AG_DISMISS, false}, {AG_SCROLL, false}, {AG_WATCH, false}, {AG_STATUS, false}};
+    static const agent_item_t idle[] = {{AG_FOCUS, false}, {AG_WATCH, false}, {AG_SNOOZE, false}, {AG_STATUS, false}};
+    static const agent_item_t input[] = {{AG_FOCUS, false}, {AG_SCROLL, false}, {AG_WATCH, false}, {AG_STATUS, false}}; /* ASK takes over in Phase 3 */
     const agent_item_t *src;
     int n;
     switch (state) {
-    case SESS_DONE: src = done; n = 4; break;
-    case SESS_ERROR: src = error; n = 4; break;
-    case SESS_IDLE: src = idle; n = 3; break;
-    case SESS_INPUT: src = input; n = 3; break;
-    default: src = work; n = 5; break;
+    case SESS_DONE: src = done; n = 5; break;
+    case SESS_ERROR: src = error; n = 5; break;
+    case SESS_IDLE: src = idle; n = 4; break;
+    case SESS_INPUT: src = input; n = 4; break;
+    default: src = work; n = 6; break;
     }
     int k = 0;
     for (int i = 0; i < n && k < cap; i++) {

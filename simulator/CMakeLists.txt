@@ -46,6 +46,10 @@ target_include_directories(test_gesture PRIVATE ${FW}/core/src)
 target_link_libraries(test_gesture PRIVATE m)
 add_test(NAME gesture_recognizer COMMAND test_gesture)
 
+add_executable(test_steps tests/test_steps.c ${FW}/core/src/steps.c)
+target_include_directories(test_steps PRIVATE ${FW}/core/src)
+add_test(NAME step_timeline COMMAND test_steps)
+
 add_test(NAME sim_headless_selftest
          COMMAND agentlink_sim --headless --no-ws --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/selftest.txt)
 set_tests_properties(sim_headless_selftest PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30)
@@ -172,9 +176,19 @@ sim_script_test(sim_quiet_buzz quiet_buzz.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4|\"ev\":\"glow\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"quiet\",\"rid\":7,.*\"ev\":\"quiet_set\",\"step\":0,\"until\":0.*\"ev\":\"attention\",\"rid\":8.*\"pattern_ms\":\\[250,120,250\\]")
 
+# Protocol 0.3: AGENT item lists and toggles, the WATCH screen, the finished buzz and snoozed attentions.
+sim_script_test(sim_agent_items agent_items.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+set_tests_properties(sim_agent_items PROPERTIES TIMEOUT 60)
+sim_script_test(sim_watch watch.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+set_tests_properties(sim_watch PROPERTIES TIMEOUT 60)
+
+sim_script_test(sim_finished_buzz finished_buzz.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"glow\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"mode\",\"mode\":\"watch\"([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[30,200,30\\]([^p]|p[^a]|pa[^t])*\"ev\":\"snoozed\",\"rid\":8,([^p]|p[^a]|pa[^t])*\"ev\":\"attention\",\"rid\":9.*\"pattern_ms\":\\[250,120,250\\]")
+
 # Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
 add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c
-               ${FW}/core/src/link_tx.c ${FW}/core/src/model.c)
+               ${FW}/core/src/link_tx.c ${FW}/core/src/model.c ${FW}/core/src/steps.c)
 target_include_directories(test_link_arb PRIVATE ${FW}/core/src)
 target_link_libraries(test_link_arb PRIVATE agentlink_hal agentlink_proto lvgl::lvgl m)
 add_test(NAME link_arbitration COMMAND test_link_arb)

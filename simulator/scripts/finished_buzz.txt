@@ -1,0 +1,33 @@
+# Finished buzz (UI-V2 §5): a session that moves into done buzzes [30,200,30] when it is the watched
+# one; armed with Notify it buzzes too; an unwatched, unarmed one stays silent. A snoozed session's
+# attention neither buzzes nor glows, an unsnoozed one still buzzes [250,120,250].
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login
+session 2 work api main
+session 3 input docs main
+wait 300
+# unwatched, unarmed: no buzz
+session 2 done api main Finished quietly
+wait 300
+session 2 work api main
+wait 300
+# watch session 1
+tap 233 233
+wait 300
+btn B
+wait 150
+btn A
+wait 300
+expect_screen watch
+session 1 done webapp feat/login All done
+wait 300
+# the snoozed session 2: its attention is held back
+snooze 2 1800003600
+session 2 input api main
+attention 8 2 approval approve,deny,focus 0 Run shell command|make
+wait 400
+attention 9 3 approval approve,deny,focus 0 Write file|docs/a.md
+wait 400
+quit

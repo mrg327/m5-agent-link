@@ -1,0 +1,64 @@
+# WATCH (UI-V2 §4.7): the current step from sum, the timeline marks after n/ok deltas, the footer step
+# count, B moves to the next session, a gone session returns to the deck, swipe up leaves.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login
+session 2 work api main
+wait 300
+tap 233 233
+wait 300
+btn B
+wait 150
+expect_label > Watch
+btn A
+wait 300
+expect_screen watch
+step 1 1 Read · src/main.c
+wait 200
+expect_label Read
+expect_label src/main.c
+expect_label 1 step
+step 1 1 ok
+step 1 2 Edit · src/app.c
+wait 200
+step 1 2 ok
+step 1 3 Bash · npm test -- --watch=false
+wait 200
+expect_label Bash
+expect_label npm test
+expect_label 3 steps
+expect_label [ok] Read
+expect_label [ok] Edit
+shot watch_screen.png
+step 1 3 fail
+step 1 4 Grep · TODO
+wait 200
+expect_label [fail] Bash
+expect_label 4 steps
+# B follows the deck to the next session
+btn B
+wait 200
+expect_screen watch
+expect_label api
+expect_no_label Grep
+# no idle timeout
+wait 9000
+expect_screen watch
+# a gone session returns to the deck
+drop 2
+wait 300
+expect_screen ring
+expect_label Session ended
+# watch again, then swipe up leaves
+tap 233 233
+wait 300
+btn B
+wait 150
+btn A
+wait 300
+expect_screen watch
+swipe 233 300 233 150 120
+wait 300
+expect_screen ring
+quit

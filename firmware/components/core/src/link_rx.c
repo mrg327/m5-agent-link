@@ -48,6 +48,13 @@ static uint32_t convert_session(const struct session *in, session_t *out)
     if (in->session_uint10bool_present) { out->seen = in->session_uint10bool.session_uint10bool; p |= SF_SEEN; }
     if (in->session_uint11uint_present) { out->host = (uint8_t)in->session_uint11uint.session_uint11uint; p |= SF_HOST; }
     if (in->session_uint12tstr_present) { STR(in->session_uint12tstr.session_uint12tstr, out->hn); p |= SF_HN; }
+    if (in->session_uint13uint_present) { out->snz = in->session_uint13uint.session_uint13uint; p |= SF_SNZ; }
+    if (in->session_uint14bool_present) { out->ntf = in->session_uint14bool.session_uint14bool; p |= SF_NTF; }
+    if (in->session_uint15uint_present) { out->n = in->session_uint15uint.session_uint15uint; p |= SF_N; }
+    if (in->session_uint16bool_present) {
+        out->step = in->session_uint16bool.session_uint16bool ? STEP_OK : STEP_FAIL;
+        p |= SF_OK;
+    }
     return p;
 }
 

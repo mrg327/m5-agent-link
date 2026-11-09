@@ -148,6 +148,14 @@ const char *theme_sep(void)
     return sep;
 }
 
+/* The daemon's separator is U+00B7, which the built-in font may lack: show the theme's separator. */
+void theme_display_text(char *dst, size_t cap, const char *text)
+{
+    const char *sep = strstr(text, " \xC2\xB7 ");
+    if (sep) snprintf(dst, cap, "%.*s%s%s", (int)(sep - text), text, theme_sep(), sep + 4);
+    else snprintf(dst, cap, "%s", text);
+}
+
 void theme_session_label(char *dst, size_t cap, const session_t *s, bool display)
 {
     const char *sep = display ? theme_sep() : " \xC2\xB7 ";

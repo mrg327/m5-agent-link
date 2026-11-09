@@ -8,7 +8,7 @@
 #include "gesture.h"
 #include "model.h"
 
-typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_STATUS, MODE_COUNT } nav_mode_t;
+typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_STATUS, MODE_WATCH, MODE_COUNT } nav_mode_t;
 
 /* Where a touch gesture happened, by its press (or swipe start) point. */
 typedef enum { ZONE_ANY, ZONE_CENTRE, ZONE_RIM } nav_zone_t;
@@ -70,6 +70,7 @@ const char *nav_action_name(nav_action_t a);
 #define NAV_AGENT_TIMEOUT_MS 8000
 #define NAV_SCROLL_TIMEOUT_MS 8000 /* SCROLL closes this long after the last input */
 #define NAV_STATUS_TIMEOUT_MS 8000 /* STATUS closes this long after the last input */
+/* WATCH has no timeout: it monitors until the user leaves (UI-V2 §4.7). */
 
 /* ── SCROLL (UI-V2 §4.4, §6): the device side of cmd_op_scroll ── */
 typedef enum { SCROLL_LINES = 0, SCROLL_PAGES = 1, SCROLL_TO_END = 2 } nav_scroll_unit_t; /* wire values */
@@ -95,7 +96,7 @@ bool nav_long_swipe_down(int y_start, int y_end);
 
 /* ── AGENT: which actions a session offers, in wheel order, default first (UI-V2 §4.2) ── */
 typedef enum {
-    AG_FOCUS, AG_FOCUS_ACK, AG_ACK, AG_DISMISS, AG_SCROLL, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_COUNT
+    AG_FOCUS, AG_ACK, AG_DISMISS, AG_SCROLL, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_STATUS, AG_COUNT
 } agent_action_t;
 
 typedef struct {

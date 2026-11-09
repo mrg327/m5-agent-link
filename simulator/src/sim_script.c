@@ -13,6 +13,9 @@
  *                                   a daemon `result` answering the last command the device sent
  *   result pos LINES AT_BOTTOM [TOTAL|- [PREVIEW TEXT...]]   a scroll result with scroll_pos
  *   cfg privacy meta|preview|full   a daemon `cfg` changing the device's privacy setting
+ *   step SID N [ok|fail] [TOOL · ARG...]   a delta with a new step count n (and its result ok): the step timeline
+ *   snooze SID UNIX|off             a delta with snz (snoozed until UNIX, 0 = off)
+ *   notify SID on|off               a delta with ntf (notify when done armed)
  *   rtc UNIX                        set the RTC (0 = clock unknown)
  *   clear RID [answered_pc|answered_dev|expired|cancelled]
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
@@ -29,7 +32,7 @@
 #include "ui_theme.h"
 #include "sim.h"
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -157,6 +160,11 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "session") && arg[0]) {
         add(*t, E_SESSION, 0, 0, 0, arg);
         *t += 50;
+    } else if ((!strcmp(cmd, "step") || !strcmp(cmd, "snooze") || !strcmp(cmd, "notify")) && arg[0]) {
+        char line[160];
+        snprintf(line, sizeof line, "%s %s", cmd, arg);
+        add(*t, E_DELTA, 0, 0, 0, line);
+        *t += 50;
     } else if (!strcmp(cmd, "remote") && arg[0]) {
         add(*t, E_REMOTE, 0, 0, 0, arg);
         *t += 50;
@@ -278,6 +286,54 @@ static void run_session(const char *spec)
         d.seen = st[4] == 's';
     } else if (!strcmp(st, "idle")) d.state = SESS_IDLE;
     snprintf(d.repo, sizeof d.repo, "%s", repo);
+    model_upsert(&d, present);
+}
+
+/* step SID N [ok|fail] [text...] | snooze SID UNIX|off | notify SID on|off: protocol 0.3 session deltas */
+static void run_delta(const char *spec)
+{
+    char cmd[8], w[16] = "";
+    unsigned sid, n = 0;
+    session_t d = {0};
+    uint32_t present = 0;
+    if (sscanf(spec, "%7s %u", cmd, &sid) != 2) {
+        fprintf(stderr, "SCRIPT FAIL: bad delta '%s'\n", spec);
+        s_failed = true;
+        return;
+    }
+    d.sid = sid;
+    if (!strcmp(cmd, "step")) {
+        int off = 0;
+        if (sscanf(spec, "%*s %*u %u %15s %n", &n, w, &off) < 2) {
+            if (sscanf(spec, "%*s %*u %u", &n) != 1) {
+                fprintf(stderr, "SCRIPT FAIL: bad step '%s'\n", spec);
+                s_failed = true;
+                return;
+            }
+        }
+        d.n = n;
+        present |= SF_N;
+        const char *text = off > 0 ? spec + off : "";
+        if (!strcmp(w, "ok") || !strcmp(w, "fail")) {
+            d.step = !strcmp(w, "ok") ? STEP_OK : STEP_FAIL;
+            present |= SF_OK;
+        } else if (w[0]) { /* the first word was text, not a result */
+            sscanf(spec, "%*s %*u %*u %n", &off);
+            text = spec + off;
+        }
+        if (text[0]) {
+            snprintf(d.summary, sizeof d.summary, "%s", text);
+            present |= SF_SUMMARY;
+        }
+    } else if (!strcmp(cmd, "snooze")) {
+        sscanf(spec, "%*s %*u %15s", w);
+        d.snz = strcmp(w, "off") ? (uint32_t)strtoul(w, NULL, 10) : 0;
+        present |= SF_SNZ;
+    } else if (!strcmp(cmd, "notify")) {
+        sscanf(spec, "%*s %*u %15s", w);
+        d.ntf = !strcmp(w, "on");
+        present |= SF_NTF;
+    }
     model_upsert(&d, present);
 }
 
@@ -481,6 +537,7 @@ static void run(const ev_t *e)
         if (core_ui_has_label(e->text)) fail("unexpected label", e->text);
         break;
     case E_SESSION: run_session(e->text); break;
+    case E_DELTA: run_delta(e->text); break;
     case E_REMOTE: run_remote(e->text); break;
     case E_DROP: model_remove((uint32_t)e->a); break;
     case E_ATTENTION: run_attention(e->text); break;

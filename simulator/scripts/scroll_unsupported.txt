@@ -5,7 +5,9 @@ session 1 work webapp feat/login Running the test suite
 wait 300
 tap 233 233
 wait 300
-expect_label 5 items
+expect_label 6 items
+btn B
+wait 150
 btn B
 wait 150
 btn A
@@ -22,5 +24,5 @@ tap 233 233
 wait 300
 expect_screen agent
 expect_no_label Scroll terminal
-expect_label 4 items
+expect_label 5 items
 quit

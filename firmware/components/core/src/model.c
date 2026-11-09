@@ -13,6 +13,7 @@ static settings_t s_settings;
 static uint32_t s_rev;
 
 static char s_host[33];
+static model_session_hook_t s_hook;
 
 void model_init(void)
 {
@@ -79,12 +80,20 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
     if (present & SF_SEEN) dst->seen = src->seen;
     if (present & SF_HOST) dst->host = src->host;
     if (present & SF_HN) memcpy(dst->hn, src->hn, sizeof dst->hn);
+    if (present & SF_SNZ) dst->snz = src->snz;
+    if (present & SF_NTF) dst->ntf = src->ntf;
+    if (present & SF_N) {
+        if (src->n != dst->n) dst->step = STEP_RUNNING; /* a new step runs until its `ok` arrives */
+        dst->n = src->n;
+    }
+    if (present & SF_OK) dst->step = src->step;
     if (present & SF_NO_SCROLL) dst->no_scroll = src->no_scroll;
 }
 
 void model_upsert(const session_t *delta, uint32_t present)
 {
     int slot = find_slot(delta->sid);
+    bool is_new = slot < 0;
     if (slot < 0) {
         for (int i = 0; i < MODEL_MAX_SESSIONS && slot < 0; i++)
             if (!s_used[i]) slot = i;
@@ -99,19 +108,34 @@ void model_upsert(const session_t *delta, uint32_t present)
         s_used[slot] = true;
     }
     session_t *dst = &s_sessions[slot];
+    session_t prev = *dst;
     sess_state_t before = dst->state;
     apply(dst, delta, present);
+    if (present & (SF_N | SF_OK | SF_SUMMARY | SF_TOOL)) {
+        const char *text = (present & SF_SUMMARY) && delta->summary[0] ? delta->summary
+                           : (present & SF_TOOL) && delta->tool[0]       ? delta->tool
+                           : dst->summary[0]                             ? dst->summary
+                                                                         : dst->tool;
+        steps_update(&dst->steps, present & SF_N, dst->n, present & SF_OK, dst->step == STEP_OK, text);
+    }
     s_rev++;
     dbg_event("model", "session", "\"sid\":%u,\"st\":\"%s\",\"prev\":\"%s\",\"label\":%s,\"host\":%u,\"hn\":%s",
               (unsigned)dst->sid, sess_state_name(dst->state), sess_state_name(before), dbg_q(dst->repo),
               (unsigned)dst->host, dbg_q(dst->hn));
+    if (s_hook) s_hook(is_new ? NULL : &prev, dst, present);
 }
+
+void model_set_session_hook(model_session_hook_t hook) { s_hook = hook; }
+
+bool model_session_snoozed(const session_t *s, uint32_t now_unix) { return s && now_unix != 0 && s->snz > now_unix; }
 
 void model_replace_all(const session_t *list, size_t n)
 {
     memset(s_used, 0, sizeof s_used);
     for (size_t i = 0; i < n && i < MODEL_MAX_SESSIONS; i++) {
         s_sessions[i] = list[i];
+        steps_seed(&s_sessions[i].steps, list[i].n, (step_state_t)list[i].step,
+                   list[i].summary[0] ? list[i].summary : list[i].tool);
         s_used[i] = true;
     }
     for (int a = 0; a < MODEL_MAX_ATTENTION; a++)
