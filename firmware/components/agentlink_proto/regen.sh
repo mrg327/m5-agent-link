@@ -18,4 +18,9 @@ done
 cp "$pkg/include/zcbor_tags.h" "$here/include/zcbor_tags.h"
 cp "$pkg/include/zcbor_print.h" "$here/include/zcbor_print.h"
 cp "$pkg/src/zcbor_print.c" "$here/src/zcbor_print.c"
+# Backports not yet in a zcbor release (0.9.1 is the latest on PyPI):
+# upstream a801b2422c + 95e020e89d, float16<->32 type punning (strict-aliasing UB, breaks -O2).
+for p in "$here"/patches/*.patch; do
+    patch -s -p1 -d "$here" < "$p"
+done
 echo "regenerated agentlink_proto"

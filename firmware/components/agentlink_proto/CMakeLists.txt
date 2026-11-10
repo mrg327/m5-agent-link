@@ -12,3 +12,9 @@ endif()
 # Definite-length maps/lists on encode (the daemon's CBOR libraries expect them). Decoding stays
 # lenient on purpose, so only the encoder is built canonical.
 set_source_files_properties(src/zcbor_encode.c PROPERTIES COMPILE_DEFINITIONS ZCBOR_CANONICAL)
+
+# Benign warnings in generated/vendored code (regen.sh would overwrite source edits): zcbor emits
+# `len >= 0` range checks on size_t, and zcbor_any_skip keeps an unused `additional`.
+set_property(SOURCE src/agentlink_codec_decode.c src/agentlink_codec_encode.c
+    APPEND PROPERTY COMPILE_OPTIONS -Wno-type-limits)
+set_property(SOURCE src/zcbor_decode.c APPEND PROPERTY COMPILE_OPTIONS -Wno-unused-but-set-variable)
