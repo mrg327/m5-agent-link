@@ -6,7 +6,7 @@ import { encode, decode } from './cbor.js';
 const ENUMS = {
   device_class: { watch: 0, desk: 1, pad: 2, sim: 3, other: 15 },
   input_kind: { touch: 0, btn: 1, rotary: 2, imu: 3 },
-  feature: { focus: 0, ack: 1, approve: 2, reply: 3, voice: 4, badge: 5, debug: 6, scroll: 7 },
+  feature: { focus: 0, ack: 1, approve: 2, reply: 3, voice: 4, badge: 5, debug: 6, scroll: 7, keys: 8 },
   privacy: { meta: 0, preview: 1, full: 2 },
   alert_mode: { full: 0, quiet: 1, silent: 2 },
   agent: { copilot: 0, claude: 1, cloud: 2, other: 15 },
@@ -14,7 +14,7 @@ const ENUMS = {
   input_sub: { approval: 0, question: 1 },
   att_kind: { approval: 0, question: 1, error: 2, done: 3 },
   action: { approve: 0, deny: 1, focus: 2, reply: 3, ack: 4 },
-  cmd_op: { focus: 0, ack: 1, snooze: 2, approve: 3, deny: 4, reply: 5, cancel: 6, detail: 7, notify_done: 8, quiet: 9, scroll: 10, type: 11 },
+  cmd_op: { focus: 0, ack: 1, snooze: 2, approve: 3, deny: 4, reply: 5, cancel: 6, detail: 7, notify_done: 8, quiet: 9, scroll: 10, type: 11, dictate: 12, kb_pick: 13, kb_del: 14, kb_send: 15, kb_end: 16 },
   scroll_unit: { lines: 0, pages: 1, to_end: 2 },
   disp_shape: { round: 0, rect: 1 },
   host_os: { mac: 0, win: 1, linux: 2 },
@@ -28,7 +28,8 @@ const ENUMS = {
 export const MSG_TYPES = {
   hello: 1, welcome: 2, snapshot: 3, session_upd: 4, gone: 5, attention: 6, clear: 7, cmd: 8,
   result: 9, detail: 10, cfg: 11, batt: 12, ping: 13, pong: 14, log: 15, audio_start: 16,
-  audio: 17, audio_end: 18, transcript: 19, dbg_ui_state_req: 64, dbg_ui_state: 65,
+  audio: 17, audio_end: 18, transcript: 19, kb_start: 20, kb_stroke: 21, kb_cands: 22,
+  dbg_ui_state_req: 64, dbg_ui_state: 65,
   dbg_screenshot_req: 66, dbg_screenshot_chunk: 67, dbg_inject_input: 68, dbg_set_log_level: 69,
 };
 const MT_NAME = Object.fromEntries(Object.entries(MSG_TYPES).map(([k, v]) => [v, k]));
@@ -47,7 +48,7 @@ const SPECS = {
   host_info: { id: [0, 'hex'], name: [1, 'tstr'], os: [2, 'enum:host_os'] },
   time_sync: { unix: [0, 'uint'], tz_off: [1, 'int'] },
   device_cfg: { privacy: [0, 'enum:privacy'], alert: [1, 'enum:alert_mode'], quiet_until: [2, 'uint'], brightness: [3, 'uint'], badge_handle: [4, 'tstr'] },
-  welcome: { proto: [0, 'ints'], host: [1, 'obj:host_info'], time: [2, 'obj:time_sync'], cfg: [3, 'obj:device_cfg'], replies: [4, 'tstrs'] },
+  welcome: { proto: [0, 'ints'], host: [1, 'obj:host_info'], time: [2, 'obj:time_sync'], cfg: [3, 'obj:device_cfg'], replies: [4, 'tstrs'], voice: [5, 'bool'], keys: [6, 'bool'] },
   away_event: { sid: [0, 'uint'], kind: [1, 'enum:att_kind'], ts: [2, 'uint'] },
   session: {
     sid: [0, 'uint'], ag: [1, 'enum:agent'], st: [2, 'enum:sess_state'], sub: [3, 'enum:input_sub'],
@@ -71,9 +72,12 @@ const SPECS = {
   batt: { pct: [0, 'uint'], chg: [1, 'bool'] },
   log: { lvl: [0, 'enum:log_level'], msg: [1, 'tstr'] },
   audio_start: { aid: [0, 'uint'], codec: [1, 'enum:audio_codec'], sid: [2, 'uint'] },
-  audio: { aid: [0, 'uint'], seq: [1, 'uint'], data: [2, 'bstr'] },
+  audio: { aid: [0, 'uint'], seq: [1, 'uint'], data: [2, 'hex'] },
   audio_end: { aid: [0, 'uint'] },
   transcript: { aid: [0, 'uint'], text: [1, 'tstr'], autosend_ms: [2, 'uint'] },
+  kb_start: { kid: [0, 'uint'], sid: [1, 'uint'], keys: [2, 'hex'] },
+  kb_stroke: { kid: [0, 'uint'], seq: [1, 'uint'], pts: [2, 'hex'] },
+  kb_cands: { kid: [0, 'uint'], seq: [1, 'uint'], cands: [2, 'tstrs'], typed: [3, 'uint'], err: [4, 'enum:result_err'] },
   dbg_ui_state: { screen: [0, 'tstr'], sel_sid: [1, 'uint'], rid: [2, 'uint'], visible: [3, 'tstrs'], power: [4, 'tstr'], fps: [5, 'uint'] },
   dbg_screenshot_chunk: { w: [0, 'uint'], h: [1, 'uint'], offset: [2, 'uint'], data: [3, 'bstr'], last: [4, 'bool'] },
   dbg_inject_input: { kind: [0, 'enum:input_event'], x: [1, 'int'], y: [2, 'int'] },
@@ -187,7 +191,7 @@ export const pong = (id, re) => ({ t: 'pong', id, re, b: {} });
 // ───────────── description ─────────────
 const STATE_WORD = { start: 'starting', work: 'working', input: 'waiting for you', error: 'in error', done: 'Done', idle: 'idle', ended: 'ended' };
 const AGENT_NAME = { copilot: 'Copilot CLI', claude: 'Claude Code', cloud: 'a cloud agent', other: 'an agent' };
-const DEVICE_SENT = new Set(['hello', 'cmd', 'ping', 'batt', 'log', 'dbg_ui_state', 'dbg_screenshot_chunk', 'audio_start', 'audio', 'audio_end']);
+const DEVICE_SENT = new Set(['hello', 'cmd', 'ping', 'batt', 'log', 'dbg_ui_state', 'dbg_screenshot_chunk', 'audio_start', 'audio', 'audio_end', 'kb_start', 'kb_stroke']);
 
 /** Short human sentence for a decoded message. dir: 'tx' (watch sent) | 'rx' (watch received). */
 export function describe(msg, dir) {

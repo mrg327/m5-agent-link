@@ -15,7 +15,7 @@ macro_rules! uint_enum {
 
 uint_enum!(DeviceClass { Watch = 0, Desk = 1, Pad = 2, Sim = 3, Other = 15 });
 uint_enum!(InputKind { Touch = 0, Btn = 1, Rotary = 2, Imu = 3 });
-uint_enum!(Feature { Focus = 0, Ack = 1, Approve = 2, Reply = 3, Voice = 4, Badge = 5, Debug = 6, Scroll = 7 });
+uint_enum!(Feature { Focus = 0, Ack = 1, Approve = 2, Reply = 3, Voice = 4, Badge = 5, Debug = 6, Scroll = 7, Keys = 8 });
 uint_enum!(Privacy { Meta = 0, Preview = 1, Full = 2 });
 uint_enum!(AlertMode { Full = 0, Quiet = 1, Silent = 2 });
 uint_enum!(Agent { Copilot = 0, Claude = 1, Cloud = 2, Other = 15 });
@@ -26,6 +26,7 @@ uint_enum!(Action { Approve = 0, Deny = 1, Focus = 2, Reply = 3, Ack = 4 });
 uint_enum!(CmdOp {
     Focus = 0, Ack = 1, Snooze = 2, Approve = 3, Deny = 4, Reply = 5, Cancel = 6,
     Detail = 7, NotifyDone = 8, Quiet = 9, Scroll = 10, Type = 11, Dictate = 12,
+    KbPick = 13, KbDel = 14, KbSend = 15, KbEnd = 16,
 });
 uint_enum!(ScrollUnit { Lines = 0, Pages = 1, ToEnd = 2 });
 uint_enum!(ResultErr {

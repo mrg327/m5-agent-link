@@ -12,6 +12,7 @@ envelope = msg_hello / msg_welcome / msg_snapshot / msg_session_upd / msg_gone
          / msg_attention / msg_clear / msg_cmd / msg_result / msg_detail
          / msg_cfg / msg_batt / msg_ping / msg_pong / msg_log
          / msg_audio_start / msg_audio / msg_audio_end / msg_transcript
+         / msg_kb_start / msg_kb_stroke / msg_kb_cands
          / msg_dbg_ui_state_req / msg_dbg_ui_state / msg_dbg_screenshot_req
          / msg_dbg_screenshot_chunk / msg_dbg_inject_input / msg_dbg_set_log_level
 
@@ -36,6 +37,9 @@ msg_audio_start          = { 0 => mt_audio_start, hdr, 3 => audio_start }
 msg_audio                = { 0 => mt_audio, hdr, 3 => audio }
 msg_audio_end            = { 0 => mt_audio_end, hdr, 3 => audio_end }
 msg_transcript           = { 0 => mt_transcript, hdr, 3 => transcript }
+msg_kb_start             = { 0 => mt_kb_start, hdr, 3 => kb_start }
+msg_kb_stroke            = { 0 => mt_kb_stroke, hdr, 3 => kb_stroke }
+msg_kb_cands             = { 0 => mt_kb_cands, hdr, 3 => kb_cands }
 msg_dbg_ui_state_req     = { 0 => mt_dbg_ui_state_req, hdr, 3 => empty }
 msg_dbg_ui_state         = { 0 => mt_dbg_ui_state, hdr, 3 => dbg_ui_state }
 msg_dbg_screenshot_req   = { 0 => mt_dbg_screenshot_req, hdr, 3 => empty }
@@ -63,6 +67,9 @@ mt_audio_start = 16
 mt_audio = 17
 mt_audio_end = 18
 mt_transcript = 19
+mt_kb_start = 20
+mt_kb_stroke = 21
+mt_kb_cands = 22
 mt_dbg_ui_state_req = 64
 mt_dbg_ui_state = 65
 mt_dbg_screenshot_req = 66
@@ -103,7 +110,7 @@ caps = {
   5 => bool,             ; mic
   6 => bool,             ; batt
   7 => uint,             ; max_msg (bytes)
-  8 => [0*8 feature]      ; feats
+  8 => [0*12 feature]     ; feats
 }
 display_caps = {
   0 => disp_shape,   ; shape
@@ -118,7 +125,7 @@ input_kind_rotary = 2
 input_kind_imu = 3
 
 feature = feature_focus / feature_ack / feature_approve / feature_reply /
-  feature_voice / feature_badge / feature_debug / feature_scroll
+  feature_voice / feature_badge / feature_debug / feature_scroll / feature_keys
 feature_focus = 0
 feature_ack = 1
 feature_approve = 2
@@ -127,6 +134,7 @@ feature_voice = 4
 feature_badge = 5
 feature_debug = 6
 feature_scroll = 7   ; the device drives the terminal's scrollback (cmd_op_scroll, UI-V2 §6)
+feature_keys = 8     ; the device has the KEYS swipe keyboard (kb_*, proto 0.7)
 
 welcome = {
   0 => [major: uint, minor: uint],   ; proto
@@ -135,8 +143,10 @@ welcome = {
   3 => device_cfg,                   ; cfg
   ? 4 => [0*6 tstr],                 ; replies  quick replies, each <= 24 chars (proto 0.4); present = the
                                      ;          daemon types into terminals (cmd_op_type, cmd_op_cancel)
-  ? 5 => bool                        ; voice    the daemon transcribes audio_* and answers with transcript
+  ? 5 => bool,                       ; voice    the daemon transcribes audio_* and answers with transcript
                                      ;          (proto 0.6); cmd_op_dictate then types it
+  ? 6 => bool                        ; keys     the daemon decodes kb_stroke into kb_cands and types them
+                                     ;          (proto 0.7, cmd_op_kb_*)
 }
 host_info = {
   0 => bstr .size 8,                  ; id
@@ -261,7 +271,7 @@ cmd = {
 cmd_arg = uint / tstr / scroll_arg
 cmd_op = cmd_op_focus / cmd_op_ack / cmd_op_snooze / cmd_op_approve / cmd_op_deny /
   cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet / cmd_op_scroll /
-  cmd_op_type / cmd_op_dictate
+  cmd_op_type / cmd_op_dictate / cmd_op_kb_pick / cmd_op_kb_del / cmd_op_kb_send / cmd_op_kb_end
 cmd_op_focus = 0
 cmd_op_ack = 1
 cmd_op_snooze = 2
@@ -275,6 +285,10 @@ cmd_op_quiet = 9
 cmd_op_scroll = 10
 cmd_op_type = 11    ; type quick reply `arg` (an index into welcome.replies) + Enter into the session's terminal
 cmd_op_dictate = 12 ; type the transcript of recording `arg` (an aid) + Enter into the session's terminal
+cmd_op_kb_pick = 13 ; KEYS: replace the last typed word with candidate `arg` of the latest kb_cands
+cmd_op_kb_del = 14  ; KEYS: erase the last word typed from the watch
+cmd_op_kb_send = 15 ; KEYS: press Enter (hold_ms >= 1000); the composition is sent to the agent
+cmd_op_kb_end = 16  ; KEYS: the keyboard closed; `arg` 1 erases what it typed and was not sent, 0 keeps it
 
 ; cmd_op_scroll argument (UI-V2 §6.1): move the session's terminal scrollback.
 scroll_arg = {
@@ -335,6 +349,27 @@ transcript = {
   0 => uint,   ; aid
   1 => tstr,   ; text      "" when nothing was heard (or the recording failed)
   2 => uint   ; autosend_ms  0: never; the device sends only on the user's hold (cmd_op_dictate)
+}
+
+; ───────────────────────── keyboard (proto 0.7) ─────────────────────────
+; KEYS (PROTOCOL.md §7): the watch sends key geometry and finger paths, never text; the daemon decodes
+; them and types into the session's terminal.
+kb_start = {
+  0 => uint,                    ; kid    one per opening of the keyboard; a repeat with the same kid swaps the layer
+  1 => uint,                    ; sid
+  2 => bstr .size (0..640)      ; keys   per key 10 B LE: u16 cp, i16 x, i16 y, u16 w, u16 h (top-left, px)
+}
+kb_stroke = {
+  0 => uint,                    ; kid
+  1 => uint,                    ; seq    stroke number within kid, from 1
+  2 => bstr .size (0..1200)     ; pts    per point 6 B LE: i16 x, i16 y, u16 t_ms since touch-down
+}
+kb_cands = {
+  0 => uint,                    ; kid
+  1 => uint,                    ; seq    the stroke these answer
+  2 => [0*4 tstr],              ; cands  best first, each <= 24 chars
+  ? 3 => uint,                  ; typed  index of the candidate now in the terminal (absent: none typed)
+  ? 4 => result_err             ; err    why nothing was typed
 }
 
 ; ───────────────────────── debug / observability ─────────────────────────

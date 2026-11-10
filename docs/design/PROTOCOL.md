@@ -164,7 +164,7 @@ The device must show approve/deny **only if** they are in `acts`. The daemon inc
 
 ```cddl
 cmd = {
-  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type",
+  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end",
   ? sid: uint,
   ? rid: uint,               ; required for approve/deny/reply
   ? arg: uint / tstr / scroll_arg,  ; snooze minutes (the watch sends 30), reply option index, quiet duration,
@@ -203,6 +203,23 @@ cmd { op: "dictate", sid, arg: aid, hold_ms }    device → daemon
 - On `audio_end` the daemon decodes the blocks in `seq` order, runs whisper (the WAV exists only while it runs, 0600 in `~/.agentlink/voice/`), drops whisper's own annotations (`[BLANK_AUDIO]`, `(music)`), and answers `transcript` with `text` ≤ 240 chars, `""` when nothing was heard. `autosend_ms` is always 0: nothing is sent without the user.
 - `dictate` types the transcript of `aid` and Enter into the session's terminal, after a hold (`hold_ms` ≥ 1000, else `denied`), with the same refusals as `type` (an open request, a question or approval waiting, a selection list on screen). A transcript is used once, only for the session it was recorded for, and forgotten after 5 min (`stale`).
 - Speech and transcripts never reach the trace or the audit log (the trace replaces `data` and `text` with `<private>`); the daemon logs only the duration and the word count.
+
+## 6a. Keyboard: KEYS swipe input (proto 0.7, issue 1e57)
+```
+kb_start  { kid, sid, keys: bstr }                    device → daemon (≤ 64 keys × 10 B)
+kb_stroke { kid, seq, pts: bstr }                     device → daemon (≤ 200 points × 6 B)
+kb_cands  { kid, seq, cands: [≤ 4 tstr], typed?, err? } daemon → device
+cmd { op: "kb_pick", sid, arg: index }                device → daemon
+cmd { op: "kb_del",  sid }                            device → daemon
+cmd { op: "kb_send", sid, hold_ms }                   device → daemon
+cmd { op: "kb_end",  sid, arg: 1 erase / 0 keep }     device → daemon
+```
+- The daemon offers KEYS with `welcome.keys: true` only to devices that advertise `feature_keys` with proto ≥ 0.7. The device draws the keyboard and owns its geometry; the daemon owns the lexicon and the decoder. The device still never sends text: only key rectangles, touch points and candidate indices.
+- `kb_start.keys`: per key 10 bytes LE: u16 code point, i16 x, i16 y, u16 w, u16 h (top-left rectangle, display px). Code points: a letter types itself, `0x20` space, `0x08` backspace (deletes the last word), `0x0E` layer switch (handled on the device, which resends `kb_start` with the same `kid`). A repeated `kb_start` replaces the layout and keeps the composition.
+- `kb_stroke.pts`: per point 6 bytes LE: i16 x, i16 y, u16 ms since touch-down, sampled at the touch rate (~30 Hz). A stroke is one word. A stroke whose extent stays under 18 px is a tap on the key under its first point.
+- On each stroke the daemon decodes (SHARK2-style shape and location channels plus a word-frequency and context prior), answers `kb_cands` with up to four words, best first, and types the first one (with a leading space after a previous word) into the session's terminal; `typed` is the index it typed. `kb_pick` replaces the last typed word with candidate `arg` of the latest `kb_cands`; `kb_del` erases the last word. `kb_send` presses Enter after a hold (`hold_ms` ≥ 1000, else `denied`) and starts a new composition. `kb_end` closes the keyboard and, with `arg` 1, erases what it typed and did not send.
+- Typing has the same refusals as `type` (an open request, a question or approval waiting, a selection list on screen): then `kb_cands` still carries the candidates but `err: "denied"` and no `typed`. Kitty only today, else `unsupported`.
+- Strokes, candidates and typed words never reach the audit log; the trace replaces `keys`, `pts` and `cands` with `<private>`. The daemon logs only word counts.
 
 ## 7. Misc
 - `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray.

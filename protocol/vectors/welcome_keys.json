@@ -1,0 +1,32 @@
+{
+  "desc": "Welcome (proto 0.7): quick replies and the 71002100a6002800300077004900a60028003000200099003601a0003000 swipe keyboard (the daemon decodes strokes)",
+  "symbolic": {
+    "t": "welcome",
+    "id": 1,
+    "re": 1,
+    "b": {
+      "proto": [
+        0,
+        7
+      ],
+      "host": {
+        "id": "a1a2a3a4a5a6a7a8",
+        "name": "dev-mac",
+        "os": "mac"
+      },
+      "time": {
+        "unix": 1793995200,
+        "tz_off": -480
+      },
+      "cfg": {
+        "privacy": "preview",
+        "alert": "full"
+      },
+      "replies": [
+        "Continue"
+      ],
+      "keys": true
+    }
+  },
+  "cbor_hex": "a400020101020103a60082000701a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a200010100048168436f6e74696e756506f5"
+}

@@ -239,7 +239,7 @@ mod tests {
             index as u8,
             0,
         ];
-        let mut nib = |sample: i32, pred: &mut i32, index: &mut i32| -> u8 {
+        let nib = |sample: i32, pred: &mut i32, index: &mut i32| -> u8 {
             let mut step = STEP[*index as usize];
             let mut diff = sample - *pred;
             let mut code = 0u8;
@@ -318,8 +318,10 @@ mod tests {
             return;
         };
         let pcm: Vec<i16> = bytes[44..]
-            .chunks_exact(2)
-            .map(|c| i16::from_le_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| i16::from_le_bytes(*c))
             .collect();
         let mut rec = Recording::new(Some(1));
         let mut index = 0;

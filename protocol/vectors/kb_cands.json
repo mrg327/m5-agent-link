@@ -1,0 +1,19 @@
+{
+  "desc": "Daemon answers stroke 1: four candidates, the first one typed into the terminal",
+  "symbolic": {
+    "t": "kb_cands",
+    "id": 30,
+    "b": {
+      "kid": 5,
+      "seq": 1,
+      "cands": [
+        "flash",
+        "flask",
+        "flashed",
+        "slash"
+      ],
+      "typed": 0
+    }
+  },
+  "cbor_hex": "a3001601181e03a400050101028465666c61736865666c61736b67666c617368656465736c6173680300"
+}

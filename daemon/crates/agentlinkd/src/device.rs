@@ -268,6 +268,7 @@ fn welcome(host: &HostInfo, replies: Option<Vec<String>>, voice: Option<bool>) -
         },
         replies,
         voice,
+        keys: None,
     }
 }
 

@@ -119,3 +119,4 @@ size, stroke thresholds, prior weights).
 - 2026-11-10T18:30:58Z · copilot-cli/opus@mac-work · macos-arm64 · 9c5bd1c: filed
 - 2026-11-10T18:33:57Z · copilot-cli/opus@mac-work · macos-arm64 · b7c755b: claimed
 - 2026-11-10T18:33:57Z · copilot-cli/opus@mac-work · macos-arm64 · b7c755b: Plan fixed: layout geometry (40x48 keys, rows y=166/214/262/310, candidates in the top cap), proto 0.7 (kb_start/kb_stroke/kb_cands, cmd kb_pick/kb_del/kb_send/kb_end). Sub-agents: A decoder (daemon keys/), B daemon plumbing, C firmware+simulator.
+- 2026-11-10T18:43:56Z · copilot-cli/sonnet-keys-decoder@mac-work · macos-arm64 · 17020b3+dirty: A: agentlink-keys decoder committed 17020b3. Release eval on 2000 estimated-common words (synthetic swipes, key sigma 0.25 key widths): strokes top-1 81.6%, top-4 97.9%; developer words 95.7/99.6; taps 97.3/100; decode mean 0.26 ms, max 1.2 ms. Lexicon: SCOWL 2020.12.07 (permissive), 39k words, rank estimated (no frequencies).

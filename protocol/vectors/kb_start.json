@@ -1,0 +1,13 @@
+{
+  "desc": "Keyboard 5 opens for session 3 with three keys (q, w, space): u16 cp, i16 x, i16 y, u16 w, u16 h each",
+  "symbolic": {
+    "t": "kb_start",
+    "id": 15,
+    "b": {
+      "kid": 5,
+      "sid": 3,
+      "keys": "71002100a6002800300077004900a60028003000200099003601a0003000"
+    }
+  },
+  "cbor_hex": "a30014010f03a30005010302581e71002100a6002800300077004900a60028003000200099003601a0003000"
+}

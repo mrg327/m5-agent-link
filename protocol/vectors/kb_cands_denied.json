@@ -1,0 +1,17 @@
+{
+  "desc": "Daemon decoded stroke 2 but typed nothing: the session waits on an approval",
+  "symbolic": {
+    "t": "kb_cands",
+    "id": 31,
+    "b": {
+      "kid": 5,
+      "seq": 2,
+      "cands": [
+        "yes",
+        "tea"
+      ],
+      "err": "denied"
+    }
+  },
+  "cbor_hex": "a3001601181f03a400050102028263796573637465610401"
+}

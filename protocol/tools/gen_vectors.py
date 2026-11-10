@@ -26,6 +26,7 @@ OUT = Path(__file__).resolve().parent.parent / "vectors"
 MT = dict(hello=1, welcome=2, snapshot=3, session_upd=4, gone=5, attention=6, clear=7,
           cmd=8, result=9, detail=10, cfg=11, batt=12, ping=13, pong=14, log=15,
           audio_start=16, audio=17, audio_end=18, transcript=19,
+          kb_start=20, kb_stroke=21, kb_cands=22,
           dbg_ui_state=65, dbg_inject_input=68)
 
 
@@ -197,6 +198,51 @@ VECTORS = {
         "Daemon answers recording 4 with its transcript; never sent automatically",
         {"t": "transcript", "id": 20, "b": {"aid": 4, "text": "run the tests again", "autosend_ms": 0}},
         env("transcript", 20, {0: 4, 1: "run the tests again", 2: 0}),
+    ),
+    "welcome_keys": (
+        "Welcome (proto 0.7): quick replies and the 71002100a6002800300077004900a60028003000200099003601a0003000 swipe keyboard (the daemon decodes strokes)",
+        {"t": "welcome", "id": 1, "re": 1, "b": {"proto": [0, 7],
+         "host": {"id": "a1a2a3a4a5a6a7a8", "name": "dev-mac", "os": "mac"},
+         "time": {"unix": 1793995200, "tz_off": -480},
+         "cfg": {"privacy": "preview", "alert": "full"},
+         "replies": ["Continue"], "keys": True}},
+        env("welcome", 1, {0: [0, 7], 1: {0: bytes.fromhex("a1a2a3a4a5a6a7a8"), 1: "dev-mac", 2: 0},
+            2: {0: 1793995200, 1: -480}, 3: {0: 1, 1: 0}, 4: ["Continue"], 6: True}, re_=1),
+    ),
+    "kb_start": (
+        "Keyboard 5 opens for session 3 with three keys (q, w, space): u16 cp, i16 x, i16 y, u16 w, u16 h each",
+        {"t": "kb_start", "id": 15, "b": {"kid": 5, "sid": 3, "keys": "71002100a6002800300077004900a60028003000200099003601a0003000"}},
+        env("kb_start", 15, {0: 5, 1: 3, 2: bytes.fromhex("71002100a6002800300077004900a60028003000200099003601a0003000")}),
+    ),
+    "kb_stroke": (
+        "Stroke 1 of keyboard 5: four points (i16 x, i16 y, u16 t_ms since touch-down)",
+        {"t": "kb_stroke", "id": 16, "b": {"kid": 5, "seq": 1, "pts": "d500be0000008c00f00021004200ee0042003c00ec006300"}},
+        env("kb_stroke", 16, {0: 5, 1: 1, 2: bytes.fromhex("d500be0000008c00f00021004200ee0042003c00ec006300")}),
+    ),
+    "kb_cands": (
+        "Daemon answers stroke 1: four candidates, the first one typed into the terminal",
+        {"t": "kb_cands", "id": 30, "b": {"kid": 5, "seq": 1, "cands": ["flash", "flask", "flashed", "slash"], "typed": 0}},
+        env("kb_cands", 30, {0: 5, 1: 1, 2: ["flash", "flask", "flashed", "slash"], 3: 0}),
+    ),
+    "kb_cands_denied": (
+        "Daemon decoded stroke 2 but typed nothing: the session waits on an approval",
+        {"t": "kb_cands", "id": 31, "b": {"kid": 5, "seq": 2, "cands": ["yes", "tea"], "err": "denied"}},
+        env("kb_cands", 31, {0: 5, 1: 2, 2: ["yes", "tea"], 4: 1}),
+    ),
+    "cmd_kb_pick": (
+        "Device replaces the last typed word of session 3 with candidate 2",
+        {"t": "cmd", "id": 17, "b": {"op": "kb_pick", "sid": 3, "arg": 2}},
+        env("cmd", 17, {0: 13, 1: 3, 3: 2}),
+    ),
+    "cmd_kb_send": (
+        "Device presses Enter for session 3 after a hold: the typed text goes to the agent",
+        {"t": "cmd", "id": 18, "b": {"op": "kb_send", "sid": 3, "hold_ms": 1250}},
+        env("cmd", 18, {0: 15, 1: 3, 4: 1250}),
+    ),
+    "cmd_kb_end": (
+        "Keyboard closed; erase what it typed and did not send",
+        {"t": "cmd", "id": 19, "b": {"op": "kb_end", "sid": 3, "arg": 1}},
+        env("cmd", 19, {0: 16, 1: 3, 3: 1}),
     ),
     "result_scroll_pos": (
         "Daemon answers a scroll: 142 lines above the live bottom of 1200, with the top visible line (privacy >= preview)",

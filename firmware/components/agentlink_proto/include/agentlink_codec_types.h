@@ -93,6 +93,7 @@ struct feature_r {
 		feature_badge_m_c = 5,
 		feature_debug_m_c = 6,
 		feature_scroll_m_c = 7,
+		feature_keys_m_c = 8,
 	} feature_choice;
 };
 
@@ -108,7 +109,7 @@ struct caps {
 	bool caps_uint5bool;
 	bool caps_uint6bool;
 	uint32_t caps_uint7uint;
-	struct feature_r caps_feature_m_l_feature_m[8];
+	struct feature_r caps_feature_m_l_feature_m[12];
 	size_t caps_feature_m_l_feature_m_count;
 };
 
@@ -207,6 +208,10 @@ struct welcome_uint5bool {
 	bool welcome_uint5bool;
 };
 
+struct welcome_uint6bool {
+	bool welcome_uint6bool;
+};
+
 struct welcome {
 	uint32_t welcome_major_l_major;
 	uint32_t welcome_major_l_minor;
@@ -217,6 +222,8 @@ struct welcome {
 	bool welcome_tstr_l_present;
 	struct welcome_uint5bool welcome_uint5bool;
 	bool welcome_uint5bool_present;
+	struct welcome_uint6bool welcome_uint6bool;
+	bool welcome_uint6bool_present;
 };
 
 struct msg_welcome {
@@ -499,6 +506,10 @@ struct cmd_op_r {
 		cmd_op_scroll_m_c = 10,
 		cmd_op_type_m_c = 11,
 		cmd_op_dictate_m_c = 12,
+		cmd_op_kb_pick_m_c = 13,
+		cmd_op_kb_del_m_c = 14,
+		cmd_op_kb_send_m_c = 15,
+		cmd_op_kb_end_m_c = 16,
 	} cmd_op_choice;
 };
 
@@ -739,6 +750,52 @@ struct msg_transcript {
 	struct transcript msg_transcript_transcript_m;
 };
 
+struct kb_start {
+	uint32_t kb_start_uint0uint;
+	uint32_t kb_start_uint1uint;
+	struct zcbor_string kb_start_uint2bstr;
+};
+
+struct msg_kb_start {
+	struct hdr_r msg_kb_start_hdr_m;
+	struct kb_start msg_kb_start_kb_start_m;
+};
+
+struct kb_stroke {
+	uint32_t kb_stroke_uint0uint;
+	uint32_t kb_stroke_uint1uint;
+	struct zcbor_string kb_stroke_uint2bstr;
+};
+
+struct msg_kb_stroke {
+	struct hdr_r msg_kb_stroke_hdr_m;
+	struct kb_stroke msg_kb_stroke_kb_stroke_m;
+};
+
+struct kb_cands_uint3uint {
+	uint32_t kb_cands_uint3uint;
+};
+
+struct kb_cands_result_err_m {
+	struct result_err_r kb_cands_result_err_m;
+};
+
+struct kb_cands {
+	uint32_t kb_cands_uint0uint;
+	uint32_t kb_cands_uint1uint;
+	struct zcbor_string kb_cands_tstr_l_tstr[4];
+	size_t kb_cands_tstr_l_tstr_count;
+	struct kb_cands_uint3uint kb_cands_uint3uint;
+	bool kb_cands_uint3uint_present;
+	struct kb_cands_result_err_m kb_cands_result_err_m;
+	bool kb_cands_result_err_m_present;
+};
+
+struct msg_kb_cands {
+	struct hdr_r msg_kb_cands_hdr_m;
+	struct kb_cands msg_kb_cands_kb_cands_m;
+};
+
 struct msg_dbg_ui_state_req {
 	struct hdr_r msg_dbg_ui_state_req_hdr_m;
 };
@@ -859,6 +916,9 @@ struct envelope_r {
 		struct msg_audio envelope_msg_audio_m;
 		struct msg_audio_end envelope_msg_audio_end_m;
 		struct msg_transcript envelope_msg_transcript_m;
+		struct msg_kb_start envelope_msg_kb_start_m;
+		struct msg_kb_stroke envelope_msg_kb_stroke_m;
+		struct msg_kb_cands envelope_msg_kb_cands_m;
 		struct msg_dbg_ui_state_req envelope_msg_dbg_ui_state_req_m;
 		struct msg_dbg_ui_state envelope_msg_dbg_ui_state_m;
 		struct msg_dbg_screenshot_req envelope_msg_dbg_screenshot_req_m;
@@ -886,6 +946,9 @@ struct envelope_r {
 		envelope_msg_audio_m_c,
 		envelope_msg_audio_end_m_c,
 		envelope_msg_transcript_m_c,
+		envelope_msg_kb_start_m_c,
+		envelope_msg_kb_stroke_m_c,
+		envelope_msg_kb_cands_m_c,
 		envelope_msg_dbg_ui_state_req_m_c,
 		envelope_msg_dbg_ui_state_m_c,
 		envelope_msg_dbg_screenshot_req_m_c,

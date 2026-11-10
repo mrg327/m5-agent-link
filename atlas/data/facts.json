@@ -1233,7 +1233,7 @@
           "name": "batt_pct"
         }
       ],
-      "source": "protocol/agentlink.cddl:47"
+      "source": "protocol/agentlink.cddl:51"
     },
     {
       "name": "welcome",
@@ -1275,9 +1275,16 @@
           "type": "bool",
           "note": "voice    the daemon transcribes audio_* and answers with transcript",
           "name": "voice"
+        },
+        {
+          "key": 6,
+          "optional": true,
+          "type": "bool",
+          "note": "keys     the daemon decodes kb_stroke into kb_cands and types them",
+          "name": "keys"
         }
       ],
-      "source": "protocol/agentlink.cddl:48"
+      "source": "protocol/agentlink.cddl:52"
     },
     {
       "name": "snapshot",
@@ -1300,7 +1307,7 @@
           "name": "away"
         }
       ],
-      "source": "protocol/agentlink.cddl:49"
+      "source": "protocol/agentlink.cddl:53"
     },
     {
       "name": "session_upd",
@@ -1442,7 +1449,7 @@
           "name": "rp"
         }
       ],
-      "source": "protocol/agentlink.cddl:50"
+      "source": "protocol/agentlink.cddl:54"
     },
     {
       "name": "gone",
@@ -1450,7 +1457,7 @@
       "dir": "pc→dev",
       "summary": "A session ended and left the list",
       "fields": [],
-      "source": "protocol/agentlink.cddl:51"
+      "source": "protocol/agentlink.cddl:55"
     },
     {
       "name": "attention",
@@ -1522,7 +1529,7 @@
           "name": "grant_mask"
         }
       ],
-      "source": "protocol/agentlink.cddl:52"
+      "source": "protocol/agentlink.cddl:56"
     },
     {
       "name": "clear",
@@ -1545,7 +1552,7 @@
           "name": "why"
         }
       ],
-      "source": "protocol/agentlink.cddl:53"
+      "source": "protocol/agentlink.cddl:57"
     },
     {
       "name": "cmd",
@@ -1589,7 +1596,7 @@
           "name": "hold_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:54"
+      "source": "protocol/agentlink.cddl:58"
     },
     {
       "name": "result",
@@ -1626,7 +1633,7 @@
           "name": "pos"
         }
       ],
-      "source": "protocol/agentlink.cddl:55"
+      "source": "protocol/agentlink.cddl:59"
     },
     {
       "name": "detail",
@@ -1656,7 +1663,7 @@
           "name": "text"
         }
       ],
-      "source": "protocol/agentlink.cddl:56"
+      "source": "protocol/agentlink.cddl:60"
     },
     {
       "name": "cfg",
@@ -1700,7 +1707,7 @@
           "name": "badge_handle"
         }
       ],
-      "source": "protocol/agentlink.cddl:57"
+      "source": "protocol/agentlink.cddl:61"
     },
     {
       "name": "batt",
@@ -1723,7 +1730,7 @@
           "name": "chg"
         }
       ],
-      "source": "protocol/agentlink.cddl:58"
+      "source": "protocol/agentlink.cddl:62"
     },
     {
       "name": "ping",
@@ -1731,7 +1738,7 @@
       "dir": "both",
       "summary": "Link-liveness probe",
       "fields": [],
-      "source": "protocol/agentlink.cddl:59"
+      "source": "protocol/agentlink.cddl:63"
     },
     {
       "name": "pong",
@@ -1739,7 +1746,7 @@
       "dir": "both",
       "summary": "Answer to a ping",
       "fields": [],
-      "source": "protocol/agentlink.cddl:60"
+      "source": "protocol/agentlink.cddl:64"
     },
     {
       "name": "log",
@@ -1762,7 +1769,7 @@
           "name": "msg"
         }
       ],
-      "source": "protocol/agentlink.cddl:61"
+      "source": "protocol/agentlink.cddl:65"
     },
     {
       "name": "audio_start",
@@ -1792,7 +1799,7 @@
           "name": "sid"
         }
       ],
-      "source": "protocol/agentlink.cddl:62"
+      "source": "protocol/agentlink.cddl:66"
     },
     {
       "name": "audio",
@@ -1822,7 +1829,7 @@
           "name": "data"
         }
       ],
-      "source": "protocol/agentlink.cddl:63"
+      "source": "protocol/agentlink.cddl:67"
     },
     {
       "name": "audio_end",
@@ -1859,7 +1866,7 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:64"
+      "source": "protocol/agentlink.cddl:68"
     },
     {
       "name": "transcript",
@@ -1889,7 +1896,111 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:65"
+      "source": "protocol/agentlink.cddl:69"
+    },
+    {
+      "name": "kb_start",
+      "type": 20,
+      "dir": "dev→pc",
+      "summary": "KEYS: keyboard opens, with its key rectangles",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "kid    one per opening of the keyboard; a repeat with the same kid swaps the layer",
+          "name": "kid"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "uint",
+          "note": "sid",
+          "name": "sid"
+        },
+        {
+          "key": 2,
+          "optional": false,
+          "type": "bstr .size (0..640)",
+          "note": "keys   per key 10 B LE: u16 cp, i16 x, i16 y, u16 w, u16 h (top-left, px)",
+          "name": "keys"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:70"
+    },
+    {
+      "name": "kb_stroke",
+      "type": 21,
+      "dir": "dev→pc",
+      "summary": "KEYS: the touch points of one swiped word",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "kid",
+          "name": "kid"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "uint",
+          "note": "seq    stroke number within kid, from 1",
+          "name": "seq"
+        },
+        {
+          "key": 2,
+          "optional": false,
+          "type": "bstr .size (0..1200)",
+          "note": "pts    per point 6 B LE: i16 x, i16 y, u16 t_ms since touch-down",
+          "name": "pts"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:71"
+    },
+    {
+      "name": "kb_cands",
+      "type": 22,
+      "dir": "pc→dev",
+      "summary": "KEYS: decoded word candidates and which one was typed",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "kid",
+          "name": "kid"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "uint",
+          "note": "seq    the stroke these answer",
+          "name": "seq"
+        },
+        {
+          "key": 2,
+          "optional": false,
+          "type": "[0*4 tstr]",
+          "note": "cands  best first, each <= 24 chars",
+          "name": "cands"
+        },
+        {
+          "key": 3,
+          "optional": true,
+          "type": "uint",
+          "note": "typed  index of the candidate now in the terminal (absent: none typed)",
+          "name": "typed"
+        },
+        {
+          "key": 4,
+          "optional": true,
+          "type": "result_err",
+          "note": "err    why nothing was typed",
+          "name": "err"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:72"
     },
     {
       "name": "dbg_ui_state_req",
@@ -1897,7 +2008,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask which screen is showing",
       "fields": [],
-      "source": "protocol/agentlink.cddl:66"
+      "source": "protocol/agentlink.cddl:73"
     },
     {
       "name": "dbg_ui_state",
@@ -1948,7 +2059,7 @@
           "name": "fps"
         }
       ],
-      "source": "protocol/agentlink.cddl:67"
+      "source": "protocol/agentlink.cddl:74"
     },
     {
       "name": "dbg_screenshot_req",
@@ -1956,7 +2067,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask for a screenshot",
       "fields": [],
-      "source": "protocol/agentlink.cddl:68"
+      "source": "protocol/agentlink.cddl:75"
     },
     {
       "name": "dbg_screenshot_chunk",
@@ -2000,7 +2111,7 @@
           "name": "last"
         }
       ],
-      "source": "protocol/agentlink.cddl:69"
+      "source": "protocol/agentlink.cddl:76"
     },
     {
       "name": "dbg_inject_input",
@@ -2030,7 +2141,7 @@
           "name": "y"
         }
       ],
-      "source": "protocol/agentlink.cddl:70"
+      "source": "protocol/agentlink.cddl:77"
     },
     {
       "name": "dbg_set_log_level",
@@ -2046,7 +2157,7 @@
           "name": ""
         }
       ],
-      "source": "protocol/agentlink.cddl:71"
+      "source": "protocol/agentlink.cddl:78"
     }
   ],
   "haptic_meaning": {

@@ -82,6 +82,10 @@ body!(Welcome {
     #[n(5)]
     #[serde(skip_serializing_if = "Option::is_none")]
     voice: Option<bool>,
+    /// KEYS swipe keyboard (proto 0.7): this daemon decodes `kb_stroke` into `kb_cands` and types them.
+    #[n(6)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    keys: Option<bool>,
 });
 body!(HostInfo {
     #[n(0)]
@@ -369,6 +373,27 @@ body!(Transcript {
     text: String,
     #[n(2)]
     autosend_ms: u64,
+});
+
+// ── keyboard (proto 0.7) ──
+body!(KbStart {
+    #[n(0)] kid: u64,
+    #[n(1)] sid: u64,
+    /// Per key 10 B LE: u16 cp, i16 x, i16 y, u16 w, u16 h (top-left, px).
+    #[n(2)] #[cbor(with = "minicbor::bytes")] #[serde(serialize_with = "hex_ser")] keys: Vec<u8>,
+});
+body!(KbStroke {
+    #[n(0)] kid: u64,
+    #[n(1)] seq: u64,
+    /// Per point 6 B LE: i16 x, i16 y, u16 t_ms since touch-down.
+    #[n(2)] #[cbor(with = "minicbor::bytes")] #[serde(serialize_with = "hex_ser")] pts: Vec<u8>,
+});
+body!(KbCands {
+    #[n(0)] kid: u64,
+    #[n(1)] seq: u64,
+    #[n(2)] cands: Vec<String>,
+    #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] typed: Option<u64>,
+    #[n(4)] #[serde(skip_serializing_if = "Option::is_none")] err: Option<ResultErr>,
 });
 
 // ── debug / observability ──

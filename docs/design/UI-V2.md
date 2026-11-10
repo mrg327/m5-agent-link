@@ -324,6 +324,16 @@ Dictate a reply to one session. "Dictate…" ends the Reply list when the daemon
 - **Failed:** the reason (`Nothing heard`, `Offline`, `No microphone`, `No transcript`), hint `tap to try again`.
 - Long swipe down or B held discards, the A+B chord goes HOME, and an arriving request opens ASK; a recording left this way is never sent. The badges read A `STOP` / `HOLD` / `RETRY` and B `BACK`.
 
+### 4.9 KEYS (issue 1e57)
+
+A swipe keyboard for one session, for fine edits or when speaking is not possible. "Type…" ends the Reply list after "Dictate…" when the daemon decodes strokes (`welcome.keys`). The text itself is not shown on the watch: it appears in the terminal as you write.
+
+- **Layout:** QWERTY in three rows of 40 × 48 px keys (y 166, 214, 262), then a bottom row of layer switch, space and backspace (y 310). The top cap above the keys holds the daemon's three best candidates as tappable labels, the typed one highlighted (a deviation from the plan's rim arcs: the cap is larger and easier to hit).
+- **Writing:** draw one word per stroke through its letters; lift to finish. A short tap types a single letter. The trail of the current stroke is drawn on the keys.
+- **Candidates:** tapping one replaces the last word (`kb_pick`). Backspace or B erases the last word (`kb_del`).
+- **Sending:** A held 1.2 s presses Enter (`kb_send`, the approve ramp in the answer colour). The toast reads `Sent`.
+- B held leaves and erases unsent text (`kb_end` 1); the A+B chord goes HOME and also erases; an arriving request opens ASK. Touch gestures (swipe, scrub) are off in this mode. The badges read A `SEND` and B `DEL`.
+
 ## 5. Haptic vocabulary
 
 ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a detent only. Distinguish by **count and rhythm, never by 10 ms differences**; gaps ≥ 60 ms; at most 3 pulses outside ramps. The approve/deny/reject triple is already in `feedback.c` (`2702775`).
@@ -533,6 +543,10 @@ Voice dictation (2026-11-10, user decisions, issue 0ea9):
 Wheel cleanup (2026-11-10, user decision, issue 6696):
 
 32. **No "Mark seen" row.** It was pointless: the user has already looked at a session by the time its wheel is open. Opening AGENT on a Done, unseen session sends `ack` once (the segment dims and leaves the attention cycle); button A on a Done session still acknowledges too. The Done wheel is *Reply…* · Watch. Dismiss error stays, since it also moves the session to idle.
+
+Swipe keyboard (2026-11-10, user decisions, issue 1e57):
+
+33. **KEYS: swipe on the watch, decode on the PC.** The watch only records strokes over a QWERTY layout; the daemon decodes them against a lexicon with the terminal's context and types the best word straight into the session's terminal, so the watch never shows the composed text. Candidates sit in the top cap; Enter needs a hold.
 
 ## 10. Decisions that reconcile DESIGN.md and UI-RING.md
 

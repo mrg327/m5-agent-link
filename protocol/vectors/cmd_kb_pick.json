@@ -1,0 +1,13 @@
+{
+  "desc": "Device replaces the last typed word of session 3 with candidate 2",
+  "symbolic": {
+    "t": "cmd",
+    "id": 17,
+    "b": {
+      "op": "kb_pick",
+      "sid": 3,
+      "arg": 2
+    }
+  },
+  "cbor_hex": "a30008011103a3000d01030302"
+}

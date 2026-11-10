@@ -1,0 +1,13 @@
+{
+  "desc": "Device presses Enter for session 3 after a hold: the typed text goes to the agent",
+  "symbolic": {
+    "t": "cmd",
+    "id": 18,
+    "b": {
+      "op": "kb_send",
+      "sid": 3,
+      "hold_ms": 1250
+    }
+  },
+  "cbor_hex": "a30008011203a3000f0103041904e2"
+}

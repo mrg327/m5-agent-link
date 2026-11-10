@@ -1,0 +1,13 @@
+{
+  "desc": "Stroke 1 of keyboard 5: four points (i16 x, i16 y, u16 t_ms since touch-down)",
+  "symbolic": {
+    "t": "kb_stroke",
+    "id": 16,
+    "b": {
+      "kid": 5,
+      "seq": 1,
+      "pts": "d500be0000008c00f00021004200ee0042003c00ec006300"
+    }
+  },
+  "cbor_hex": "a30015011003a300050101025818d500be0000008c00f00021004200ee0042003c00ec006300"
+}

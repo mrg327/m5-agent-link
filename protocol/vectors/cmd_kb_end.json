@@ -1,0 +1,13 @@
+{
+  "desc": "Keyboard closed; erase what it typed and did not send",
+  "symbolic": {
+    "t": "cmd",
+    "id": 19,
+    "b": {
+      "op": "kb_end",
+      "sid": 3,
+      "arg": 1
+    }
+  },
+  "cbor_hex": "a30008011303a3001001030301"
+}
