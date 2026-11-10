@@ -12,7 +12,8 @@
 //!   answer)` last) and `↑/↓ select · enter accept · ctrl+d decline · esc cancel`; arrows
 //!   move, Enter (sent on its own) accepts. A form with several fields shows them as tabs
 //!   (a tab bar above the field, `tab next`/`shift+tab prev` in the footer), one at a time
-//!   in schema order; Enter accepts the field and moves to the next, and submits on the last.
+//!   and not in schema order; Enter accepts the field and moves to the next, and submits on
+//!   the last.
 
 use crate::broker::{Broker, Meaning, Outcome, Request};
 use crate::focus::{FocusError, SystemTerminal, Terminal};
@@ -302,8 +303,9 @@ fn field_labels(field: &Value) -> Vec<String> {
 }
 
 /// Cards and screen expectations for Copilot's `ask_user` (`toolArgs`: `message` +
-/// `requestedSchema`): one card per field, in schema order, when every field has fixed
-/// choices; otherwise a single Focus-only card.
+/// `requestedSchema`): one card per field when every field has fixed choices; otherwise a
+/// single Focus-only card. Copilot does not draw the fields in schema order, so with several
+/// fields each card names its field (title, else key) and is matched to the screen.
 pub fn ask_requests(sid: u64, key: String, tool_args: &Value) -> Vec<(Request, Option<Expect>)> {
     let parsed;
     let args = match tool_args.as_str() {
@@ -328,10 +330,15 @@ pub fn ask_requests(sid: u64, key: String, tool_args: &Value) -> Vec<(Request, O
     let fields: Vec<(Option<String>, Vec<String>)> = args["requestedSchema"]["properties"]
         .as_object()
         .map(|p| {
-            p.values()
-                .map(|f| {
+            p.iter()
+                .map(|(k, f)| {
                     let title = f["title"].as_str().filter(|t| !t.is_empty());
-                    (title.map(str::to_owned), field_labels(f))
+                    let name = match title {
+                        Some(t) => Some(t.to_owned()),
+                        None if p.len() > 1 => Some(k.clone()),
+                        None => None,
+                    };
+                    (name, field_labels(f))
                 })
                 .collect()
         })
@@ -346,18 +353,13 @@ pub fn ask_requests(sid: u64, key: String, tool_args: &Value) -> Vec<(Request, O
         }
         return vec![(base, None)];
     }
-    let n = fields.len();
     fields
         .into_iter()
-        .enumerate()
-        .map(|(i, (title, labels))| {
+        .map(|(title, labels)| {
             let labels: Vec<String> = labels.into_iter().take(4).collect();
             let mut req = base.clone();
             if let Some(t) = &title {
                 req.title = Some(t.clone());
-            }
-            if n > 1 {
-                req.text = Some(format!("({}/{n}) {message}", i + 1).trim_end().to_owned());
             }
             req.opts = labels
                 .iter()
@@ -488,13 +490,7 @@ pub fn on_event(env: &Env, v: &Value, key: &str) {
     match event.as_str() {
         "pretooluse" if tool == Some("ask_user") => {
             let steps = ask_requests(sid, key, &payload["toolArgs"]);
-            tokio::spawn(async move {
-                for (req, expect) in steps {
-                    if !open_and_wait(env.clone(), sid, req, expect).await {
-                        break;
-                    }
-                }
-            });
+            tokio::spawn(async move { ask_in_turn(env, sid, steps).await });
         }
         "notification" if payload["notification_type"].as_str() == Some("permission_prompt") => {
             let message = payload["message"].as_str().unwrap_or("").to_owned();
@@ -505,6 +501,49 @@ pub fn on_event(env: &Env, v: &Value, key: &str) {
             });
         }
         _ => {}
+    }
+}
+
+/// The not-yet-answered card whose field is on screen.
+fn step_on_screen(screen: &Screen, steps: &[(Request, Option<Expect>)]) -> Option<usize> {
+    let shown = screen.body.last()?.strip_suffix(':')?;
+    steps.iter().position(
+        |(_, e)| matches!(e, Some(Expect::Choice { field: Some(f), .. }) if same_label(shown, f)),
+    )
+}
+
+/// Opens the `ask_user` cards one at a time: each for the field the screen shows next, after
+/// the previous answer was typed. A field the screen check can't place ends the run there.
+async fn ask_in_turn(env: Env, sid: u64, mut steps: Vec<(Request, Option<Expect>)>) {
+    if steps.len() == 1 {
+        let (req, expect) = steps.pop().unwrap();
+        open_and_wait(env, sid, req, expect).await;
+        return;
+    }
+    let n = steps.len();
+    for k in 1..=n {
+        // just after an Enter the previous field can still be drawn
+        let mut found = None;
+        for _ in 0..4 {
+            let Some(screen) = wait_for_screen(&env, sid, Kind::Choice).await else {
+                return;
+            };
+            found = step_on_screen(&screen, &steps);
+            if found.is_some() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+        let Some(i) = found else {
+            tracing::warn!("ask_user: the field on screen is not one a card expects");
+            return;
+        };
+        let (mut req, expect) = steps.remove(i);
+        let text = req.text.take().unwrap_or_default();
+        req.text = Some(format!("({k}/{n}) {text}").trim_end().to_owned());
+        if !open_and_wait(env.clone(), sid, req, expect).await {
+            return;
+        }
     }
 }
 
@@ -704,17 +743,21 @@ mod tests {
     }
 
     #[test]
-    fn ask_user_fields_become_cards_in_schema_order() {
-        // keys deliberately not in alphabetical order, as a JSON string like the hook's
+    fn ask_user_fields_become_cards_matched_to_the_screen() {
         let form = r#"{"message": "Sample", "requestedSchema": {"properties": {
-            "color": {"type": "string", "title": "Pick a color", "enum": ["Red", "Green"]},
-            "again": {"type": "boolean", "title": "Run again?"}}}}"#;
+            "again": {"type": "boolean", "title": "Run again?"},
+            "color": {"type": "string", "enum": ["Red", "Green"]}}}}"#;
         let steps = ask_requests(1, "k".into(), &Value::String(form.into()));
-        let titles: Vec<_> = steps.iter().map(|s| s.0.title.clone().unwrap()).collect();
-        assert_eq!(titles, ["Pick a color", "Run again?"]);
-        assert_eq!(steps[0].0.text.as_deref(), Some("(1/2) Sample"));
-        assert_eq!(steps[1].0.text.as_deref(), Some("(2/2) Sample"));
-        assert!(steps.iter().all(|s| !s.0.focus_only && s.1.is_some()));
+        assert_eq!(steps.len(), 2);
+        assert!(steps.iter().all(|s| !s.0.focus_only));
+        // Copilot may draw "color" first: the card for the field on screen is picked, by
+        // title, or by key when the field has none
+        let color = TABS
+            .replace(" Run again?:", " color:")
+            .replace("   Yes\n ❯ No", " ❯ Red\n   Green");
+        assert_eq!(step_on_screen(&parse(&color).unwrap(), &steps), Some(1));
+        assert_eq!(step_on_screen(&parse(TABS).unwrap(), &steps), Some(0));
+        assert_eq!(step_on_screen(&parse(FORM).unwrap(), &steps), None);
     }
 
     /// A screen that changes with each key, and the keys it got.

@@ -15,7 +15,7 @@ gh:
 
 ## Summary
 
-When Copilot CLI asks through its form tool (the hook sends Notification "Information requested"), the watch shows a question and plays the input sound, but the user can't answer it from the watch. The form's fields and choices aren't in the hook payload, and typing a reply doesn't fill a structured form. Look into exposing the choices (an enum/boolean field as options) or at least an "Open on PC" path that's clearly the only action. Seen during the f718 sound test.
+When Copilot CLI asks through its form tool (the hook sends Notification "Information requested"), the watch shows a question and plays the input sound, but the user can't answer it from the watch. Correction after investigating: the schema IS in the preToolUse payload. A form with one choice field was already answerable; the form in the f718 test had several fields (one free text), so it fell back to Focus-only. Fix: forms whose fields all have fixed choices get one card per field, matched to the tab Copilot is showing. Seen during the f718 sound test.
 
 ## Environment (reporter)
 
