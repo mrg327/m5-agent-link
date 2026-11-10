@@ -21,6 +21,7 @@ static const hal_board_info_t s_bi = {.board = "sim", .fw_version = "t"};
 const hal_board_info_t *hal_board_info(void) { return &s_bi; }
 hal_battery_t hal_battery_read(void) { hal_battery_t b = {0}; return b; }
 void hal_rtc_set_unix(uint32_t s) { (void)s; }
+const char *hal_reset_reason(void) { return "poweron"; }
 void hal_display_set_brightness(uint8_t l) { (void)l; }
 bool hal_link_send(hal_link_kind_t k, const uint8_t *f, size_t n)
 {

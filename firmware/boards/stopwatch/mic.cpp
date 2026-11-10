@@ -5,10 +5,13 @@
 // A capture task moves DMA blocks into a 1 s stream buffer that hal_mic_read() drains without
 // blocking, so a slow UI frame never loses audio.
 
+#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "board_priv.h"
 #include "driver/i2s_std.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/stream_buffer.h"
@@ -30,11 +33,26 @@ static i2s_chan_handle_t s_rx;
 static StreamBufferHandle_t s_buf;
 static TaskHandle_t s_task;
 static volatile bool s_running;
+static char s_err[80];
+
+__attribute__((format(printf, 1, 2))) static bool FAIL(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(s_err, sizeof s_err, fmt, ap);
+    va_end(ap);
+    ESP_LOGW(TAG, "%s", s_err);
+    return false;
+}
+
+extern "C" const char *hal_mic_error(void) { return s_err; }
 
 static bool wr(uint8_t reg, uint8_t val)
 {
     uint8_t b[2] = {reg, val};
-    return i2c_master_transmit(s_codec, b, 2, 50) == ESP_OK;
+    esp_err_t e = i2c_master_transmit(s_codec, b, 2, 50);
+    if (e != ESP_OK) snprintf(s_err, sizeof s_err, "codec reg 0x%02x: %s", reg, esp_err_to_name(e));
+    return e == ESP_OK;
 }
 
 static bool codec_init(void)
@@ -44,7 +62,8 @@ static bool codec_init(void)
         cfg.dev_addr_length = I2C_ADDR_BIT_LEN_7;
         cfg.device_address = ES8311_ADDR;
         cfg.scl_speed_hz = SW_I2C_DEV_HZ;
-        if (i2c_master_bus_add_device(sw_i2c_bus(), &cfg, &s_codec) != ESP_OK) return false;
+        esp_err_t e = i2c_master_bus_add_device(sw_i2c_bus(), &cfg, &s_codec);
+        if (e != ESP_OK) return FAIL("codec add: %s", esp_err_to_name(e));
     }
     /* reg, value: reset and clocks for MCLK = 256 fs at 16 kHz (pre_div 1, adc_osr 0x10) */
     static const uint8_t seq[][2] = {
@@ -73,7 +92,7 @@ static bool codec_init(void)
     };
     for (size_t i = 0; i < sizeof seq / sizeof *seq; i++)
         if (!wr(seq[i][0], seq[i][1])) {
-            ESP_LOGW(TAG, "codec write 0x%02x failed", seq[i][0]);
+            ESP_LOGW(TAG, "%s", s_err);
             return false;
         }
     return true;
@@ -85,7 +104,8 @@ static bool i2s_init(void)
     i2s_chan_config_t ch = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
     ch.dma_desc_num = 6;
     ch.dma_frame_num = BLOCK_SAMPLES;
-    if (i2s_new_channel(&ch, NULL, &s_rx) != ESP_OK) return false;
+    esp_err_t e = i2s_new_channel(&ch, NULL, &s_rx);
+    if (e != ESP_OK) return FAIL("i2s channel: %s", esp_err_to_name(e));
     i2s_std_config_t std = {};
     std.clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(HAL_MIC_RATE);
     std.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_256;
@@ -96,10 +116,11 @@ static bool i2s_init(void)
     std.gpio_cfg.ws = PIN_WS;
     std.gpio_cfg.dout = PIN_DOUT;
     std.gpio_cfg.din = PIN_DIN;
-    if (i2s_channel_init_std_mode(s_rx, &std) != ESP_OK) {
+    e = i2s_channel_init_std_mode(s_rx, &std);
+    if (e != ESP_OK) {
         i2s_del_channel(s_rx);
         s_rx = NULL;
-        return false;
+        return FAIL("i2s std mode: %s", esp_err_to_name(e));
     }
     return true;
 }
@@ -118,28 +139,50 @@ static void capture_task(void *)
     }
 }
 
+static void hal_mic_stop_hw(void)
+{
+    i2s_channel_disable(s_rx);
+    sw_ioe_write(SW_IOE_AUDIO_EN, false);
+}
+
 extern "C" bool hal_mic_start(void)
 {
     if (s_running) return true;
+    s_err[0] = 0;
+    /* The 1 s buffer lives in PSRAM: xStreamBufferCreate() would take it from internal RAM,
+       which BLE and LVGL leave too fragmented for 32 KB. */
+    if (!s_buf) {
+        static StaticStreamBuffer_t ctl;
+        uint8_t *mem = (uint8_t *)heap_caps_malloc(BUFFER_BYTES + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!mem) return FAIL("no PSRAM for the buffer");
+        s_buf = xStreamBufferCreateStatic(BUFFER_BYTES, 2, mem, &ctl);
+    }
     sw_ioe_write(SW_IOE_AUDIO_EN, true);
     vTaskDelay(pdMS_TO_TICKS(20)); /* rail and codec settle */
     if (!i2s_init()) {
-        ESP_LOGW(TAG, "i2s init failed");
         sw_ioe_write(SW_IOE_AUDIO_EN, false);
         return false;
     }
     /* MCLK must run before the codec's clock manager is configured */
-    if (i2s_channel_enable(s_rx) != ESP_OK || !codec_init()) {
-        ESP_LOGW(TAG, "codec did not answer");
-        i2s_channel_disable(s_rx);
+    esp_err_t e = i2s_channel_enable(s_rx);
+    if (e != ESP_OK) {
         sw_ioe_write(SW_IOE_AUDIO_EN, false);
+        return FAIL("i2s enable: %s", esp_err_to_name(e));
+    }
+    if (!codec_init()) {
+        hal_mic_stop_hw();
         return false;
     }
-    if (!s_buf) s_buf = xStreamBufferCreate(BUFFER_BYTES, 2);
     xStreamBufferReset(s_buf);
     s_running = true;
-    if (!s_task) xTaskCreatePinnedToCore(capture_task, "mic", 3072, NULL, 6, &s_task, 1);
-    else xTaskNotifyGive(s_task);
+    if (!s_task && xTaskCreatePinnedToCore(capture_task, "mic", 4096, NULL, 6, &s_task, 1) != pdPASS) {
+        s_task = NULL;
+        s_running = false;
+        hal_mic_stop_hw();
+        return FAIL("no memory for the capture task (internal free %u)",
+                    (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    }
+    xTaskNotifyGive(s_task);
     ESP_LOGI(TAG, "capture on");
     return true;
 }

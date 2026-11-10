@@ -54,6 +54,8 @@ bool hal_mic_start(void)
     return true;
 }
 
+const char *hal_mic_error(void) { return ""; }
+
 size_t hal_mic_read(int16_t *pcm, size_t max)
 {
     if (!s_on) return 0;

@@ -158,6 +158,28 @@ impl Stt {
         (cli.is_file() && model.is_file()).then_some(Stt { cli, model })
     }
 
+    /// Runs whisper once on silence in the background. A cold whisper-cli (Metal shaders, model
+    /// pages) takes ~5 s on an Apple M-series against ~0.3 s warm, so the daemon warms it at start
+    /// and when a recording begins, while the user is still speaking. One warm-up at a time.
+    pub fn warm(&self) {
+        static BUSY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        if BUSY.swap(true, std::sync::atomic::Ordering::AcqRel) {
+            return;
+        }
+        let stt = self.clone();
+        std::thread::spawn(move || {
+            let dir = crate::paths::home().join("voice");
+            let t0 = std::time::Instant::now();
+            let r = stt.transcribe(&vec![0i16; RATE as usize / 2], &dir, u64::MAX);
+            tracing::debug!(
+                "whisper warm-up in {} ms: {:?}",
+                t0.elapsed().as_millis(),
+                r.err()
+            );
+            BUSY.store(false, std::sync::atomic::Ordering::Release);
+        });
+    }
+
     /// Blocking: transcribes `pcm` (16 kHz mono). The WAV lives in `dir` (0700) only while whisper runs.
     pub fn transcribe(&self, pcm: &[i16], dir: &Path, aid: u64) -> Result<String, String> {
         if pcm.len() < RATE as usize / 4 {

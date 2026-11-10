@@ -514,6 +514,9 @@ async fn handle(
         Message::AudioStart(a) if shared.stt.is_some() => {
             vs.recs.clear(); // one recording at a time per watch
             vs.recs.insert(a.aid, crate::voice::Recording::new(a.sid));
+            if let Some(stt) = &shared.stt {
+                stt.warm();
+            }
             Ok(())
         }
         Message::Audio(a) => {
@@ -593,6 +596,10 @@ async fn handle(
             c.send(Some(env.id), Message::Result(res)).await
         }
         Message::Ping(_) => c.send(Some(env.id), Message::Pong(Empty {})).await,
+        Message::Log(l) => {
+            tracing::info!(target: "device", lvl = ?l.lvl, "device: {}", l.msg);
+            Ok(())
+        }
         // Traced on receipt; nothing else to do yet.
         _ => Ok(()),
     }

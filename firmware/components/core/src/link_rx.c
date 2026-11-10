@@ -1,4 +1,5 @@
 /* Daemon → device messages: decoded envelope in, model/app notifications out. */
+#include <stdio.h>
 #include <string.h>
 
 #include "link_internal.h"
@@ -118,6 +119,13 @@ static void on_welcome(const struct welcome *w)
        (issue 20261109-1173), so drop them all; the daemon re-sends the open ones next. */
     model_attention_clear_all();
     if (g_link.hooks.on_link) g_link.hooks.on_link(true);
+    /* Once per boot, so a crash shows up in the daemon's trace as the next boot's reset cause. */
+    static bool s_reported;
+    if (!s_reported) {
+        char msg[40];
+        snprintf(msg, sizeof msg, "boot reset=%s", hal_reset_reason());
+        s_reported = link_send_log(2, msg);
+    }
 }
 
 static void on_snapshot(const struct snapshot *s)

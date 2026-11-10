@@ -63,3 +63,8 @@ CONFIG_BT_CTRL_BLE_MAX_ACT=3
 # Big static tables (the session model, the snapshot buffer) live in PSRAM: internal DRAM is
 # what the BLE controller needs at boot.
 CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+
+# Crash diagnostics: a panic writes an ELF core dump to the coredump partition (idf.py coredump-info)
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+CONFIG_ESP_COREDUMP_CHECKSUM_CRC32=y

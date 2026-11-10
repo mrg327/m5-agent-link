@@ -100,6 +100,8 @@ void hal_sound_play(hal_sound_t sound);   /* non-blocking; no-op without a speak
 #define HAL_MIC_RATE 16000 /* mono, 16-bit signed PCM */
 /* Powers the codec and starts capture; false without a mic (or when it did not answer). */
 bool hal_mic_start(void);
+/* Why the last hal_mic_start() failed (short text for the daemon's log), "" after a success. */
+const char *hal_mic_error(void);
 /* Non-blocking: copies up to `max` samples captured since the last call (about 1 s is buffered). */
 size_t hal_mic_read(int16_t *pcm, size_t max);
 /* Stops capture and powers the codec down. Safe to call when not started. */
@@ -122,6 +124,8 @@ hal_wake_t hal_wake_reason(void);
 /* One word that survives DEEP (RTC memory); 0 after a power-on or reset. */
 uint32_t hal_retained_get(void);
 void hal_retained_set(uint32_t v);
+/* Short name of the cause of the last chip reset ("poweron", "panic", "brownout", ...), for crash reports. */
+const char *hal_reset_reason(void);
 typedef struct { uint8_t percent; bool charging; bool usb_present; } hal_battery_t;
 hal_battery_t hal_battery_read(void);
 

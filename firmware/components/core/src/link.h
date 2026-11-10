@@ -54,6 +54,8 @@ bool link_send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms);
 bool link_send_audio_start(uint32_t aid, uint32_t sid);
 bool link_send_audio(uint32_t aid, uint32_t seq, const uint8_t *data, size_t len);
 bool link_send_audio_end(uint32_t aid);
+/* Debug text to the daemon (lvl 0 err .. 3 debug); the trace keeps it. */
+bool link_send_log(int lvl, const char *msg);
 /* KEYS (issue 1e57): kb_start {kid, sid, keys} and kb_stroke {kid, seq, pts}; the byte layouts are PROTOCOL.md 6a. */
 bool link_send_kb_start(uint32_t kid, uint32_t sid, const uint8_t *keys, size_t len);
 bool link_send_kb_stroke(uint32_t kid, uint32_t seq, const uint8_t *pts, size_t len);

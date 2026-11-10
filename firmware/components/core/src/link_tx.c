@@ -124,6 +124,18 @@ bool link_send_audio(uint32_t aid, uint32_t seq, const uint8_t *data, size_t len
     return send_env(g_link.kind, "audio");
 }
 
+bool link_send_log(int lvl, const char *msg)
+{
+    if (!g_link.welcomed) return false;
+    memset(&g_tx_env, 0, sizeof g_tx_env);
+    g_tx_env.envelope_choice = envelope_msg_log_m_c;
+    struct msg_log *m = &g_tx_env.envelope_msg_log_m;
+    set_hdr(&m->msg_log_hdr_m, false, 0);
+    m->msg_log_log_m.log_level_m.log_level_choice = lvl;
+    m->msg_log_log_m.log_uint1tstr = (struct zcbor_string){.value = (const uint8_t *)msg, .len = strlen(msg)};
+    return send_env(g_link.kind, "log");
+}
+
 bool link_send_audio_end(uint32_t aid)
 {
     if (!g_link.welcomed) return false;

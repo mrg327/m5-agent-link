@@ -7,6 +7,7 @@
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
 #include "esp_sleep.h"
+#include "esp_system.h"
 #include "driver/usb_serial_jtag.h"
 #include "esp_app_desc.h"
 #include "esp_log.h"
@@ -33,6 +34,25 @@ static hal_power_state_t s_power_state = HAL_POWER_ACTIVE;
 /* Kept in RTC slow memory across deep sleep; the bootloader zeroes it on a power-on or reset. */
 static RTC_DATA_ATTR uint32_t s_retained;
 uint32_t hal_retained_get(void) { return s_retained; }
+
+const char *hal_reset_reason(void)
+{
+    switch (esp_reset_reason()) {
+    case ESP_RST_POWERON: return "poweron";
+    case ESP_RST_EXT: return "ext";
+    case ESP_RST_SW: return "sw";
+    case ESP_RST_PANIC: return "panic";
+    case ESP_RST_INT_WDT: return "int_wdt";
+    case ESP_RST_TASK_WDT: return "task_wdt";
+    case ESP_RST_WDT: return "wdt";
+    case ESP_RST_DEEPSLEEP: return "deepsleep";
+    case ESP_RST_BROWNOUT: return "brownout";
+    case ESP_RST_SDIO: return "sdio";
+    case ESP_RST_USB: return "usb";
+    case ESP_RST_JTAG: return "jtag";
+    default: return "unknown";
+    }
+}
 void hal_retained_set(uint32_t v) { s_retained = v; }
 
 hal_wake_t hal_wake_reason(void)

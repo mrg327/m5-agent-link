@@ -53,6 +53,9 @@ async fn main() -> Result<()> {
         focus::default_driver(),
         focus::default_scroll_driver(),
     ));
+    if let Some(stt) = &shared.stt {
+        stt.warm();
+    }
     let started = registry::now_unix();
 
     let status: hook_source::StatusFn = {

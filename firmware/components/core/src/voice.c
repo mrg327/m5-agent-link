@@ -110,6 +110,9 @@ bool voice_start(uint32_t sid, uint32_t now_ms)
     if (!hal_board_info()->has_mic || !hal_mic_start()) {
         s_err = "No microphone";
         s_state = VOICE_FAILED;
+        char msg[96];
+        snprintf(msg, sizeof msg, "mic start failed: %s", hal_board_info()->has_mic ? hal_mic_error() : "no mic");
+        link_send_log(0, msg);
         return false;
     }
     if (!link_send_audio_start(s_aid, sid)) {

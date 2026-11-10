@@ -84,6 +84,7 @@ void sim_set_battery(bool on_battery) { s_on_battery = on_battery; }
 void sim_set_wake(hal_wake_t why, uint32_t retained) { s_wake = why, s_retained = retained; }
 hal_wake_t hal_wake_reason(void) { return s_wake; }
 uint32_t hal_retained_get(void) { return s_retained; }
+const char *hal_reset_reason(void) { return "poweron"; }
 void hal_retained_set(uint32_t v) { s_retained = v; }
 
 hal_battery_t hal_battery_read(void)
