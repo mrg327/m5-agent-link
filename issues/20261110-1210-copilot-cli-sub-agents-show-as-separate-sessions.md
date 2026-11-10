@@ -1,7 +1,7 @@
 ---
 id: 20261110-1210
 title: Copilot CLI sub-agents show as separate sessions on the watch
-status: claimed
+status: fixed
 severity: med
 area: daemon
 platforms: any
@@ -9,7 +9,7 @@ owner: copilot-cli/opus@mac-work
 created: 2026-11-10T18:30:58Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -42,3 +42,10 @@ chains match. Claude Code sub-agents (SubagentStop) may need the same treatment.
 - 2026-11-10T18:30:59Z · copilot-cli/opus@mac-work · macos-arm64 · 9c5bd1c: filed
 - 2026-11-10T18:44:18Z · copilot-cli/opus@mac-work · macos-arm64 · 17020b3+dirty: User report: every sub-agent adds an extra agent to the HOME deck, but selecting it does nothing useful (it has no terminal of its own, so Focus/Reply/Watch don't apply), which is confusing. Acceptance: sub-agents never appear as their own HOME entries; at most their activity shows inside the parent's timeline. Raising severity to med.
 - 2026-11-10T20:46:17Z · copilot-cli/opus@mac-work · macos-arm64 · 4464673: claimed
+- 2026-11-10T20:48:22Z · copilot-cli/opus@mac-work · macos-arm64 · 5dbff3b: fixed: 5dbff3b: sub-agents keyed by parentAgentId into the parent session; lifecycle events dropped, steps labelled, approvals kept, parent cards not cancelled by sub-agent activity. cargo fmt/clippy/test green (new test copilot_sub_agents_fold_into_their_parent). Live: explore sub-agent with 12 hooks, agentlink status shows a single session.
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: 5dbff3b main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74
