@@ -1,11 +1,11 @@
 ---
 id: 20261110-420c
 title: Copilot CLI question forms (ask_user) can't be answered from the watch
-status: open
+status: claimed
 severity: med
 area: daemon
 platforms: any
-owner:
+owner: copilot-cli/opus@mac-work
 created: 2026-11-10T22:12:52Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
@@ -29,3 +29,4 @@ When Copilot CLI asks through its form tool (the hook sends Notification "Inform
 ## Log
 
 - 2026-11-10T22:12:52Z · copilot-cli/opus@mac-work · macos-arm64 · fe042e2: filed
+- 2026-11-10T22:27:45Z · copilot-cli/opus@mac-work · macos-arm64 · a697c78: claimed
