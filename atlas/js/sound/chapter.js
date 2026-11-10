@@ -57,7 +57,7 @@ export function mount(section, ctx) {
 
   const notes = bank.bank.flatMap((s) => steps(s).filter((x) => x.wave !== 'noise').flatMap((x) => [x.note, x.slide])).filter(Boolean);
   const lo = Math.min(...notes) - 2, hi = Math.max(...notes) + 2;
-  const picks = loadPicks();
+  const picks = { ...Object.fromEntries(bank.roles.map((r) => [r.id, r.pick])), ...loadPicks() };
   let small = true, volume = 0.8, playing = null;
 
   function play(sound, card) {
@@ -129,7 +129,8 @@ export function mount(section, ctx) {
         showPicks();
         play(s, card);
       });
-      card.append(btn, h('label', { class: 'snd__pick' }, radio, ' Pick'));
+      const chosen = role.pick === s.id ? h('span', { class: 'snd__chosen', text: 'On the watch' }) : null;
+      card.append(btn, h('label', { class: 'snd__pick' }, radio, ' Pick', chosen));
       grid.append(card);
     }
     root.append(h('section', { class: 'snd__role', 'aria-labelledby': `snd-role-${role.id}` },
@@ -139,7 +140,8 @@ export function mount(section, ctx) {
   showPicks();
   root.append(summary,
     h('p', { class: 'snd__note' }, 'Sounds live in ', h('code', { text: 'firmware/components/core/src/sound_bank.c' }),
-      '. Add a candidate there, run ', h('code', { text: 'python3 atlas/tools/extract.py' }), ' and it shows up here.'));
+      '. Add a candidate there, run ', h('code', { text: 'python3 atlas/tools/extract.py' }), ' and it shows up here. ',
+      'The watch plays the role\'s ', h('code', { text: 'pick' }), ' from ', h('code', { text: 'snd_roles' }), '; picks on this page stay in your browser.'));
 }
 
 export function onLeave() {

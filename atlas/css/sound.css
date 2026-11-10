@@ -20,6 +20,7 @@
 .snd__meta { color: var(--muted); font-size: var(--t-xs); }
 .snd__pick { display: flex; align-items: center; gap: .4rem; padding: 0 var(--s-3) var(--s-3); color: var(--muted); font-size: var(--t-xs); cursor: pointer; }
 .snd__pick input { accent-color: var(--c); }
+.snd__chosen { margin-left: auto; padding: .1rem .5rem; border-radius: 999px; background: var(--c); color: var(--ink); font-weight: 600; letter-spacing: .03em; }
 .snd__card::after { content: ""; position: absolute; top: var(--s-3); bottom: auto; left: var(--s-3); height: 3.2rem; width: 2px; background: var(--paper); opacity: 0; pointer-events: none; }
 .snd__card[data-playing="1"]::after { animation: snd-head var(--dur, 500ms) linear forwards; }
 @keyframes snd-head { from { opacity: .9; left: var(--s-3); } to { opacity: .9; left: calc(100% - var(--s-3)); } }

@@ -3,6 +3,8 @@
  * adding a snd_roles line. Keep cues short, echo tail included: done under 1.5 s, select under 150 ms. */
 #include "sound_bank.h"
 
+#include <string.h>
+
 #define N_OF(a) (uint8_t)(sizeof(a) / sizeof((a)[0]))
 /* S(wave, note, slide, vol, ms, decay) */
 #define S(w, n, sl, v, ms, d) {SND_##w, n, sl, v, ms, d}
@@ -10,8 +12,8 @@
 #define T(a) {a, N_OF(a)}
 
 const snd_role_t snd_roles[] = {
-    {"done", "A session you armed with Notify when done (or are watching) finishes"},
-    {"select", "You commit an item on the wheel"},
+    {"done", "A session you armed with Notify when done (or are watching) finishes", "done-ff"},
+    {"select", "You commit an item on the wheel", "select-ff"},
 };
 const unsigned snd_role_count = sizeof snd_roles / sizeof snd_roles[0];
 
@@ -197,3 +199,12 @@ const snd_sound_t snd_bank[] = {
     {"select-tetris", "select", "Rotate (Tetris style)", {T(hom_tetris_sel)}, 0, 0},
 };
 const unsigned snd_bank_count = sizeof snd_bank / sizeof snd_bank[0];
+
+const snd_sound_t *snd_for(const char *role) {
+    for (unsigned r = 0; r < snd_role_count; r++) {
+        if (strcmp(snd_roles[r].id, role) != 0) continue;
+        for (unsigned i = 0; i < snd_bank_count; i++)
+            if (strcmp(snd_bank[i].id, snd_roles[r].pick) == 0) return &snd_bank[i];
+    }
+    return NULL;
+}

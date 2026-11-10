@@ -8,7 +8,10 @@ const { sounds } = JSON.parse(readFileSync(new URL('../data/facts.json', import.
 test('bank has candidates for every role, ids unique, waves known', () => {
   const ids = sounds.bank.map((s) => s.id);
   assert.equal(new Set(ids).size, ids.length);
-  for (const r of sounds.roles) assert.ok(sounds.bank.filter((s) => s.role === r.id).length >= 2, r.id);
+  for (const r of sounds.roles) {
+    assert.ok(sounds.bank.filter((s) => s.role === r.id).length >= 2, r.id);
+    assert.equal(sounds.bank.find((s) => s.id === r.pick)?.role, r.id, `${r.id} pick`);
+  }
   for (const s of sounds.bank) for (const x of s.tracks.flat()) assert.ok(sounds.waves.includes(x.wave), `${s.id} ${x.wave}`);
 });
 

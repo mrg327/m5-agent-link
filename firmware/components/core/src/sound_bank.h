@@ -44,6 +44,7 @@ typedef struct {
 typedef struct {
     const char *id;   /* "done", "select", ... */
     const char *when; /* when it plays, for people */
+    const char *pick; /* id of the chosen sound in snd_bank */
 } snd_role_t;
 
 typedef struct {
@@ -64,3 +65,6 @@ extern const snd_role_t snd_roles[];
 extern const unsigned snd_role_count;
 extern const snd_sound_t snd_bank[];
 extern const unsigned snd_bank_count;
+
+/* The chosen sound for a role, or NULL for an unknown role. */
+const snd_sound_t *snd_for(const char *role);
