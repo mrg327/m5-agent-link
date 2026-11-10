@@ -10,7 +10,9 @@
 //!   the digit picks an option at once.
 //! - `ask_user`: `Field:` then one option per line (`❯` marks the cursor, `Other (type your
 //!   answer)` last) and `↑/↓ select · enter accept · ctrl+d decline · esc cancel`; arrows
-//!   move, Enter (sent on its own) accepts.
+//!   move, Enter (sent on its own) accepts. A form with several fields shows them as tabs
+//!   (a tab bar above the field, `tab next`/`shift+tab prev` in the footer), one at a time
+//!   in schema order; Enter accepts the field and moves to the next, and submits on the last.
 
 use crate::broker::{Broker, Meaning, Outcome, Request};
 use crate::focus::{FocusError, SystemTerminal, Terminal};
@@ -54,8 +56,12 @@ pub enum Expect {
         n: usize,
         map: Vec<usize>,
     },
-    /// The card's options are the first screen options, in order.
-    Choice { labels: Vec<String> },
+    /// The card's options are the first screen options, in order. `field` is the title the
+    /// screen must show above them (`Title:`), when the form gave one.
+    Choice {
+        labels: Vec<String>,
+        field: Option<String>,
+    },
 }
 
 fn is_rule(s: &str) -> bool {
@@ -276,39 +282,9 @@ pub fn permission_request(
     (req, Some(expect))
 }
 
-/// Card and screen expectation for Copilot's `ask_user` (`toolArgs`: `message` +
-/// `requestedSchema`). One field with fixed choices can be answered; anything else is a
-/// Focus-only card.
-pub fn ask_request(sid: u64, key: String, tool_args: &Value) -> (Request, Option<Expect>) {
-    let parsed;
-    let args = match tool_args.as_str() {
-        Some(s) => {
-            parsed = serde_json::from_str::<Value>(s).unwrap_or(Value::Null);
-            &parsed
-        }
-        None => tool_args,
-    };
-    let message = args["message"].as_str().unwrap_or("").to_owned();
-    let props = args["requestedSchema"]["properties"].as_object();
-    let mut req = Request {
-        sid,
-        key,
-        tool: Some("ask_user".into()),
-        kind: AttKind::Question,
-        title: Some("Question".into()),
-        text: (!message.is_empty()).then_some(message),
-        opts: Vec::new(),
-        ttl: CARD_TTL,
-        focus_only: true,
-    };
-    let Some(props) = props.filter(|p| p.len() == 1) else {
-        return (req, None);
-    };
-    let field = props.values().next().unwrap();
-    if let Some(t) = field["title"].as_str().filter(|t| !t.is_empty()) {
-        req.title = Some(t.to_owned());
-    }
-    let labels: Vec<String> = if let Some(e) = field["enum"].as_array() {
+/// The choices a form field is drawn with, or none for free text.
+fn field_labels(field: &Value) -> Vec<String> {
+    if let Some(e) = field["enum"].as_array() {
         e.iter()
             .filter_map(|v| v.as_str().map(str::to_owned))
             .collect()
@@ -322,17 +298,81 @@ pub fn ask_request(sid: u64, key: String, tool_args: &Value) -> (Request, Option
         vec!["Yes".to_owned(), "No".to_owned()]
     } else {
         Vec::new()
-    };
-    if labels.is_empty() {
-        return (req, None);
     }
-    let labels: Vec<String> = labels.into_iter().take(4).collect();
-    req.opts = labels
-        .iter()
-        .map(|l| (l.clone(), Meaning::Answer(l.clone())))
-        .collect();
-    req.focus_only = false;
-    (req, Some(Expect::Choice { labels }))
+}
+
+/// Cards and screen expectations for Copilot's `ask_user` (`toolArgs`: `message` +
+/// `requestedSchema`): one card per field, in schema order, when every field has fixed
+/// choices; otherwise a single Focus-only card.
+pub fn ask_requests(sid: u64, key: String, tool_args: &Value) -> Vec<(Request, Option<Expect>)> {
+    let parsed;
+    let args = match tool_args.as_str() {
+        Some(s) => {
+            parsed = serde_json::from_str::<Value>(s).unwrap_or(Value::Null);
+            &parsed
+        }
+        None => tool_args,
+    };
+    let message = args["message"].as_str().unwrap_or("").to_owned();
+    let base = Request {
+        sid,
+        key,
+        tool: Some("ask_user".into()),
+        kind: AttKind::Question,
+        title: Some("Question".into()),
+        text: (!message.is_empty()).then(|| message.clone()),
+        opts: Vec::new(),
+        ttl: CARD_TTL,
+        focus_only: true,
+    };
+    let fields: Vec<(Option<String>, Vec<String>)> = args["requestedSchema"]["properties"]
+        .as_object()
+        .map(|p| {
+            p.values()
+                .map(|f| {
+                    let title = f["title"].as_str().filter(|t| !t.is_empty());
+                    (title.map(str::to_owned), field_labels(f))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    if fields.is_empty() || fields.iter().any(|(_, l)| l.is_empty()) {
+        if fields.len() == 1 {
+            let mut req = base;
+            if let Some(t) = &fields[0].0 {
+                req.title = Some(t.clone());
+            }
+            return vec![(req, None)];
+        }
+        return vec![(base, None)];
+    }
+    let n = fields.len();
+    fields
+        .into_iter()
+        .enumerate()
+        .map(|(i, (title, labels))| {
+            let labels: Vec<String> = labels.into_iter().take(4).collect();
+            let mut req = base.clone();
+            if let Some(t) = &title {
+                req.title = Some(t.clone());
+            }
+            if n > 1 {
+                req.text = Some(format!("({}/{n}) {message}", i + 1).trim_end().to_owned());
+            }
+            req.opts = labels
+                .iter()
+                .map(|l| (l.clone(), Meaning::Answer(l.clone())))
+                .collect();
+            req.focus_only = false;
+            (
+                req,
+                Some(Expect::Choice {
+                    labels,
+                    field: title,
+                }),
+            )
+        })
+        .collect()
 }
 
 fn same_label(screen: &str, want: &str) -> bool {
@@ -369,12 +409,19 @@ pub fn type_answer(
             let idx = *map.get(choice).ok_or("no such option")?;
             term.send_keys(ctx, &(idx + 1).to_string()).map_err(err)
         }
-        Expect::Choice { labels } => {
+        Expect::Choice { labels, field } => {
             if choice >= labels.len() {
                 return Err("no such option".into());
             }
             let on_screen: Vec<&String> = s.opts.iter().filter(|o| *o != OTHER).collect();
+            let field_ok = field.as_ref().is_none_or(|f| {
+                s.body
+                    .last()
+                    .and_then(|l| l.strip_suffix(':'))
+                    .is_some_and(|l| same_label(l, f))
+            });
             if s.kind != Kind::Choice
+                || !field_ok
                 || on_screen.len() < labels.len()
                 || !labels.iter().zip(&on_screen).all(|(w, o)| same_label(o, w))
             {
@@ -440,15 +487,21 @@ pub fn on_event(env: &Env, v: &Value, key: &str) {
     let key = key.to_owned();
     match event.as_str() {
         "pretooluse" if tool == Some("ask_user") => {
-            let (req, expect) = ask_request(sid, key, &payload["toolArgs"]);
-            tokio::spawn(async move { open_and_wait(env, sid, req, expect).await });
+            let steps = ask_requests(sid, key, &payload["toolArgs"]);
+            tokio::spawn(async move {
+                for (req, expect) in steps {
+                    if !open_and_wait(env.clone(), sid, req, expect).await {
+                        break;
+                    }
+                }
+            });
         }
         "notification" if payload["notification_type"].as_str() == Some("permission_prompt") => {
             let message = payload["message"].as_str().unwrap_or("").to_owned();
             tokio::spawn(async move {
                 let screen = wait_for_screen(&env, sid, Kind::Permission).await;
                 let (req, expect) = permission_request(sid, key, &message, screen.as_ref());
-                open_and_wait(env, sid, req, expect).await
+                open_and_wait(env, sid, req, expect).await;
             });
         }
         _ => {}
@@ -476,19 +529,20 @@ async fn wait_for_screen(env: &Env, sid: u64, kind: Kind) -> Option<Screen> {
     None
 }
 
-async fn open_and_wait(env: Env, sid: u64, req: Request, expect: Option<Expect>) {
+/// Opens one card and types the device's answer; true when an answer was typed.
+async fn open_and_wait(env: Env, sid: u64, req: Request, expect: Option<Expect>) -> bool {
     let ttl = req.ttl;
     let (rid, rx) = env.broker.open(req);
     let outcome: Outcome = match tokio::time::timeout(ttl, rx).await {
         Ok(Ok(o)) => o,
-        Ok(Err(_)) => return, // the terminal answered (or the card was cancelled)
+        Ok(Err(_)) => return false, // the terminal answered (or the card was cancelled)
         Err(_) => {
             env.broker.cancel(rid, ClearWhy::Expired);
-            return;
+            return false;
         }
     };
     let (Some(expect), Some(choice)) = (expect, outcome.choice) else {
-        return;
+        return false;
     };
     let res = match ctx_of(&env.registry, sid) {
         Ok(ctx) => {
@@ -506,9 +560,10 @@ async fn open_and_wait(env: Env, sid: u64, req: Request, expect: Option<Expect>)
         "decision",
         Some(sid),
         Some(rid),
-        json!({"from": "device", "typed": res.is_ok(), "error": res.err(), "choice": choice,
+        json!({"from": "device", "typed": res.is_ok(), "error": res.as_ref().err(), "choice": choice,
                "decision": outcome.decision}),
     );
+    res.is_ok()
 }
 
 #[cfg(test)]
@@ -607,42 +662,59 @@ mod tests {
         assert_eq!(req.title.as_deref(), Some("Permission needed"));
     }
 
+    fn one(args: &Value) -> (Request, Option<Expect>) {
+        let mut steps = ask_requests(1, "k".into(), args);
+        assert_eq!(steps.len(), 1);
+        steps.pop().unwrap()
+    }
+
     #[test]
     fn ask_user_cards() {
-        let one = json!({"message": "Pick a color", "requestedSchema": {"properties": {
+        let single = json!({"message": "Pick a color", "requestedSchema": {"properties": {
             "color": {"type": "string", "title": "Color", "enum": ["red", "green", "blue"]}}}});
-        let (req, expect) = ask_request(1, "copilot:s".into(), &one);
+        let (req, expect) = one(&single);
         assert_eq!(req.title.as_deref(), Some("Color"));
+        assert_eq!(req.text.as_deref(), Some("Pick a color"));
         assert_eq!(req.opts.len(), 3);
         assert_eq!(
             expect,
             Some(Expect::Choice {
-                labels: vec!["red".into(), "green".into(), "blue".into()]
+                labels: vec!["red".into(), "green".into(), "blue".into()],
+                field: Some("Color".into()),
             })
         );
         let one_of = json!({"message": "m", "requestedSchema": {"properties": {"x": {"type": "string",
             "oneOf": [{"const": "a", "title": "Alpha"}, {"const": "b", "title": "Beta"}]}}}});
-        assert_eq!(ask_request(1, "k".into(), &one_of).0.opts[1].0, "Beta");
+        assert_eq!(one(&one_of).0.opts[1].0, "Beta");
         let yes_no = json!({"message": "m", "requestedSchema": {"properties": {"ok": {"type": "boolean",
             "title": "Restart?", "default": true}}}});
-        let (req, expect) = ask_request(1, "k".into(), &yes_no);
+        let (req, expect) = one(&yes_no);
         assert!(!req.focus_only);
         assert_eq!(req.title.as_deref(), Some("Restart?"));
-        assert_eq!(
-            expect,
-            Some(Expect::Choice {
-                labels: vec!["Yes".into(), "No".into()]
-            })
-        );
-        // as a JSON string, two fields, and free text: Focus only
-        let two = json!({"message": "m", "requestedSchema": {"properties": {
+        assert!(matches!(expect, Some(Expect::Choice { labels, .. }) if labels == ["Yes", "No"]));
+        // a free-text field anywhere: one Focus-only card
+        let mixed = json!({"message": "m", "requestedSchema": {"properties": {
             "a": {"type": "string", "enum": ["x"]}, "b": {"type": "string"}}}});
-        let (req, expect) = ask_request(1, "k".into(), &Value::String(two.to_string()));
+        let (req, expect) = one(&Value::String(mixed.to_string()));
         assert!(req.focus_only && expect.is_none());
         assert_eq!(req.text.as_deref(), Some("m"));
         let text =
             json!({"message": "m", "requestedSchema": {"properties": {"a": {"type": "string"}}}});
-        assert!(ask_request(1, "k".into(), &text).0.focus_only);
+        assert!(one(&text).0.focus_only);
+    }
+
+    #[test]
+    fn ask_user_fields_become_cards_in_schema_order() {
+        // keys deliberately not in alphabetical order, as a JSON string like the hook's
+        let form = r#"{"message": "Sample", "requestedSchema": {"properties": {
+            "color": {"type": "string", "title": "Pick a color", "enum": ["Red", "Green"]},
+            "again": {"type": "boolean", "title": "Run again?"}}}}"#;
+        let steps = ask_requests(1, "k".into(), &Value::String(form.into()));
+        let titles: Vec<_> = steps.iter().map(|s| s.0.title.clone().unwrap()).collect();
+        assert_eq!(titles, ["Pick a color", "Run again?"]);
+        assert_eq!(steps[0].0.text.as_deref(), Some("(1/2) Sample"));
+        assert_eq!(steps[1].0.text.as_deref(), Some("(2/2) Sample"));
+        assert!(steps.iter().all(|s| !s.0.focus_only && s.1.is_some()));
     }
 
     /// A screen that changes with each key, and the keys it got.
@@ -694,6 +766,7 @@ mod tests {
     fn moves_the_cursor_checks_it_then_accepts() {
         let expect = Expect::Choice {
             labels: vec!["red".into(), "green".into(), "blue".into()],
+            field: Some("Color".into()),
         };
         let moved = FORM.replace("❯ red", "  red").replace("  blue", "❯ blue");
         let t = Fake::new(&[FORM, &moved]);
@@ -707,8 +780,44 @@ mod tests {
 
         let wrong = Expect::Choice {
             labels: vec!["yes".into(), "no".into()],
+            field: None,
         };
         let t = Fake::new(&[FORM]);
         assert!(type_answer(&t, &HostCtx::default(), &wrong, 0, Duration::ZERO).is_err());
+    }
+
+    const TABS: &str = "\
+ ○ Asking user Waiting for response
+────────────────────────────────────────
+ Copilot needs information.
+ Sample form.
+  Pick a color   Run again?
+ Run again?:
+   Yes
+ ❯ No
+   Other (type your answer)
+ ↑/↓ select · enter accept · shift+tab prev · ctrl+d decline · esc cancel
+────────────────────────────────────────
+";
+
+    #[test]
+    fn answers_only_the_field_on_screen() {
+        let again = Expect::Choice {
+            labels: vec!["Yes".into(), "No".into()],
+            field: Some("Run again?".into()),
+        };
+        let up = TABS.replace("   Yes", " ❯ Yes").replace(" ❯ No", "   No");
+        let t = Fake::new(&[TABS, &up]);
+        type_answer(&t, &HostCtx::default(), &again, 0, Duration::ZERO).unwrap();
+        assert_eq!(*t.keys.lock().unwrap(), [UP, ENTER]);
+
+        // same choices, but the screen is on another field: nothing typed
+        let other = Expect::Choice {
+            labels: vec!["Yes".into(), "No".into()],
+            field: Some("Restart?".into()),
+        };
+        let t = Fake::new(&[TABS]);
+        assert!(type_answer(&t, &HostCtx::default(), &other, 1, Duration::ZERO).is_err());
+        assert!(t.keys.lock().unwrap().is_empty());
     }
 }

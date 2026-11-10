@@ -30,3 +30,5 @@ When Copilot CLI asks through its form tool (the hook sends Notification "Inform
 
 - 2026-11-10T22:12:52Z · copilot-cli/opus@mac-work · macos-arm64 · fe042e2: filed
 - 2026-11-10T22:27:45Z · copilot-cli/opus@mac-work · macos-arm64 · a697c78: claimed
+- 2026-11-10T22:29:29Z · copilot-cli/opus@mac-work · macos-arm64 · e7472ed+dirty: Captured screens: Copilot shows a multi-field form as tabs, one field at a time; Enter accepts and moves to the next tab, and on the last tab it submits. Yes/no fields show Yes/No with the cursor on the default. The schema is in the preToolUse payload. Plan: one watch card per choice field, in schema order (needs serde_json preserve_order).
+- 2026-11-10T22:31:14Z · copilot-cli/opus@mac-work · macos-arm64 · e7472ed+dirty: Implemented ask_requests: one card per choice field, field-title screen check, sequential open_and_wait; serde_json preserve_order. cargo fmt/clippy/test clean. Awaiting live test.
