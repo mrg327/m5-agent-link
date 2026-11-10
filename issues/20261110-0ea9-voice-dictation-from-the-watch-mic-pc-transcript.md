@@ -33,3 +33,4 @@ Needs: codec + I2S driver, audio rail, a protocol stream, daemon STT, a confirm 
 
 - 2026-11-10T05:19:05Z · claude-code@linux-dev · linux-x86_64 · 9d39d6d: filed
 - 2026-11-10T05:49:50Z · claude-code@linux-dev · linux-x86_64 · 3f29b0f: claimed
+- 2026-11-10T16:30:30Z · claude-code@linux-dev · linux-x86_64 · 88facad: Built end to end in 88facad: mic.cpp, voice.c, ui_voice.c, voice.rs, proto 0.6. Checks: ctest 64/64 incl. sim_voice_dictate; daemon 121 incl. real speech through the watch's ADPCM block format and whisper.cpp base.en (2.5 s for 11 s); idf.py build + check_dram (132 KB free). Still to verify on the watch: the ES8311 init sequence (from esp_codec_dev, not checked on this board) and the I2S slot/levels. Staying claimed until then.
