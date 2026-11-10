@@ -18,6 +18,7 @@ mod scroll;
 mod source;
 mod trace;
 mod transport;
+mod typing;
 mod usb;
 mod ws;
 

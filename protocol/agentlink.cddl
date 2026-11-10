@@ -132,7 +132,9 @@ welcome = {
   0 => [major: uint, minor: uint],   ; proto
   1 => host_info,                    ; host
   2 => time_sync,                    ; time
-  3 => device_cfg                   ; cfg
+  3 => device_cfg,                   ; cfg
+  ? 4 => [0*6 tstr]                  ; replies  quick replies, each <= 24 chars (proto 0.4); present = the
+                                     ;          daemon types into terminals (cmd_op_type, cmd_op_cancel)
 }
 host_info = {
   0 => bstr .size 8,                  ; id
@@ -254,18 +256,20 @@ cmd = {
 ; Scalars for snooze / reply / quiet; a map for scroll. Further structured arguments ({aid}) join this union when they land.
 cmd_arg = uint / tstr / scroll_arg
 cmd_op = cmd_op_focus / cmd_op_ack / cmd_op_snooze / cmd_op_approve / cmd_op_deny /
-  cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet / cmd_op_scroll
+  cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet / cmd_op_scroll /
+  cmd_op_type
 cmd_op_focus = 0
 cmd_op_ack = 1
 cmd_op_snooze = 2
 cmd_op_approve = 3
 cmd_op_deny = 4
 cmd_op_reply = 5
-cmd_op_cancel = 6
+cmd_op_cancel = 6   ; interrupt the session's running turn (the daemon sends Esc to its terminal)
 cmd_op_detail = 7
 cmd_op_notify_done = 8
 cmd_op_quiet = 9
 cmd_op_scroll = 10
+cmd_op_type = 11    ; type quick reply `arg` (an index into welcome.replies) + Enter into the session's terminal
 
 ; cmd_op_scroll argument (UI-V2 §6.1): move the session's terminal scrollback.
 scroll_arg = {

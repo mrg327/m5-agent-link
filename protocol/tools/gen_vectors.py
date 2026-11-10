@@ -59,6 +59,16 @@ VECTORS = {
         env("welcome", 1, {0: [0, 1], 1: {0: bytes.fromhex("a1a2a3a4a5a6a7a8"), 1: "dev-mac", 2: 0},
             2: {0: 1793995200, 1: -480}, 3: {0: 1, 1: 0, 3: 160, 4: "@octo"}}, re_=1),
     ),
+    "welcome_replies": (
+        "Welcome (proto 0.4) with quick replies: this daemon types into terminals",
+        {"t": "welcome", "id": 1, "re": 1, "b": {"proto": [0, 4],
+         "host": {"id": "a1a2a3a4a5a6a7a8", "name": "dev-linux", "os": "linux"},
+         "time": {"unix": 1793995200, "tz_off": -480},
+         "cfg": {"privacy": "preview", "alert": "full"},
+         "replies": ["Continue", "Yes", "Run the tests"]}},
+        env("welcome", 1, {0: [0, 4], 1: {0: bytes.fromhex("a1a2a3a4a5a6a7a8"), 1: "dev-linux", 2: 2},
+            2: {0: 1793995200, 1: -480}, 3: {0: 1, 1: 0}, 4: ["Continue", "Yes", "Run the tests"]}, re_=1),
+    ),
     "snapshot_two": (
         "Snapshot with one working Copilot session and one Claude session needing approval",
         {"t": "snapshot", "id": 2, "b": {"sessions": [
@@ -135,6 +145,16 @@ VECTORS = {
         "Device scrolls session 2's terminal three lines up (older); seq 1 of the burst",
         {"t": "cmd", "id": 8, "b": {"op": "scroll", "sid": 2, "arg": {"unit": "lines", "delta": -3, "seq": 1}}},
         env("cmd", 8, {0: 10, 1: 2, 3: {0: 0, 1: -3, 2: 1}}),
+    ),
+    "cmd_type": (
+        "Device types quick reply 2 (welcome.replies) into session 3's terminal (proto 0.4)",
+        {"t": "cmd", "id": 9, "b": {"op": "type", "sid": 3, "arg": 2}},
+        env("cmd", 9, {0: 11, 1: 3, 3: 2}),
+    ),
+    "cmd_cancel": (
+        "Device interrupts session 3's running turn after a hold (Esc in its terminal)",
+        {"t": "cmd", "id": 10, "b": {"op": "cancel", "sid": 3, "hold_ms": 1250}},
+        env("cmd", 10, {0: 6, 1: 3, 4: 1250}),
     ),
     "result_scroll_pos": (
         "Daemon answers a scroll: 142 lines above the live bottom of 1200, with the top visible line (privacy >= preview)",

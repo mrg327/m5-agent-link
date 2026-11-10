@@ -1,0 +1,13 @@
+{
+  "desc": "Device interrupts session 3's running turn after a hold (Esc in its terminal)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 10,
+    "b": {
+      "op": "cancel",
+      "sid": 3,
+      "hold_ms": 1250
+    }
+  },
+  "cbor_hex": "a30008010a03a300060103041904e2"
+}

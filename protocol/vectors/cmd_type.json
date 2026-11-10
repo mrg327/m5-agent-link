@@ -1,0 +1,13 @@
+{
+  "desc": "Device types quick reply 2 (welcome.replies) into session 3's terminal (proto 0.4)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 9,
+    "b": {
+      "op": "type",
+      "sid": 3,
+      "arg": 2
+    }
+  },
+  "cbor_hex": "a30008010903a3000b01030302"
+}

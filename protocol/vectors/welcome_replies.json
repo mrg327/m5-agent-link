@@ -1,0 +1,33 @@
+{
+  "desc": "Welcome (proto 0.4) with quick replies: this daemon types into terminals",
+  "symbolic": {
+    "t": "welcome",
+    "id": 1,
+    "re": 1,
+    "b": {
+      "proto": [
+        0,
+        4
+      ],
+      "host": {
+        "id": "a1a2a3a4a5a6a7a8",
+        "name": "dev-linux",
+        "os": "linux"
+      },
+      "time": {
+        "unix": 1793995200,
+        "tz_off": -480
+      },
+      "cfg": {
+        "privacy": "preview",
+        "alert": "full"
+      },
+      "replies": [
+        "Continue",
+        "Yes",
+        "Run the tests"
+      ]
+    }
+  },
+  "cbor_hex": "a400020101020103a50082000401a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473"
+}

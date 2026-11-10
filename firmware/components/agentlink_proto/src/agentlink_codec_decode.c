@@ -50,6 +50,7 @@ static bool decode_repeated_device_cfg_uint2uint(zcbor_state_t *state, struct de
 static bool decode_repeated_device_cfg_uint3uint(zcbor_state_t *state, struct device_cfg_uint3uint *result);
 static bool decode_repeated_device_cfg_uint4tstr(zcbor_state_t *state, struct device_cfg_uint4tstr *result);
 static bool decode_device_cfg(zcbor_state_t *state, struct device_cfg *result);
+static bool decode_repeated_welcome_tstr_l(zcbor_state_t *state, struct welcome_tstr_l_r *result);
 static bool decode_welcome(zcbor_state_t *state, struct welcome *result);
 static bool decode_msg_welcome(zcbor_state_t *state, struct msg_welcome *result);
 static bool decode_agent(zcbor_state_t *state, struct agent_r *result);
@@ -549,6 +550,25 @@ static bool decode_device_cfg(
 	return res;
 }
 
+static bool decode_repeated_welcome_tstr_l(
+		zcbor_state_t *state, struct welcome_tstr_l_r *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (4))))
+	&& (zcbor_list_start_decode(state) && ((zcbor_multi_decode(0, 6, &(*result).welcome_tstr_l_tstr_count, (zcbor_decoder_t *)zcbor_tstr_decode, state, (*&(*result).welcome_tstr_l_tstr), sizeof(struct zcbor_string))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_list_end_decode(state))));
+
+	if (false) {
+		/* For testing that the types of the arguments are correct.
+		 * A compiler error here means a bug in zcbor.
+		 */
+		zcbor_tstr_decode(state, (*&(*result).welcome_tstr_l_tstr));
+	}
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_welcome(
 		zcbor_state_t *state, struct welcome *result)
 {
@@ -562,7 +582,15 @@ static bool decode_welcome(
 	&& (((zcbor_uint32_expect(state, (2))))
 	&& (decode_time_sync(state, (&(*result).welcome_time_sync_m))))
 	&& (((zcbor_uint32_expect(state, (3))))
-	&& (decode_device_cfg(state, (&(*result).welcome_device_cfg_m))))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+	&& (decode_device_cfg(state, (&(*result).welcome_device_cfg_m))))
+	&& zcbor_present_decode(&((*result).welcome_tstr_l_present), (zcbor_decoder_t *)decode_repeated_welcome_tstr_l, state, (&(*result).welcome_tstr_l))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	if (false) {
+		/* For testing that the types of the arguments are correct.
+		 * A compiler error here means a bug in zcbor.
+		 */
+		decode_repeated_welcome_tstr_l(state, (&(*result).welcome_tstr_l));
+	}
 
 	log_result(state, res, __func__);
 	return res;
@@ -1185,7 +1213,8 @@ static bool decode_cmd_op(
 	|| (((*result).cmd_op_choice == cmd_op_detail_m_c) && ((1)))
 	|| (((*result).cmd_op_choice == cmd_op_notify_done_m_c) && ((1)))
 	|| (((*result).cmd_op_choice == cmd_op_quiet_m_c) && ((1)))
-	|| (((*result).cmd_op_choice == cmd_op_scroll_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
+	|| (((*result).cmd_op_choice == cmd_op_scroll_m_c) && ((1)))
+	|| (((*result).cmd_op_choice == cmd_op_type_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
 
 	log_result(state, res, __func__);
 	return res;

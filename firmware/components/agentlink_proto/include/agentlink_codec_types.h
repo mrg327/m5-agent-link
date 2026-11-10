@@ -198,12 +198,19 @@ struct device_cfg {
 	bool device_cfg_uint4tstr_present;
 };
 
+struct welcome_tstr_l_r {
+	struct zcbor_string welcome_tstr_l_tstr[6];
+	size_t welcome_tstr_l_tstr_count;
+};
+
 struct welcome {
 	uint32_t welcome_major_l_major;
 	uint32_t welcome_major_l_minor;
 	struct host_info welcome_host_info_m;
 	struct time_sync welcome_time_sync_m;
 	struct device_cfg welcome_device_cfg_m;
+	struct welcome_tstr_l_r welcome_tstr_l;
+	bool welcome_tstr_l_present;
 };
 
 struct msg_welcome {
@@ -471,6 +478,7 @@ struct cmd_op_r {
 		cmd_op_notify_done_m_c = 8,
 		cmd_op_quiet_m_c = 9,
 		cmd_op_scroll_m_c = 10,
+		cmd_op_type_m_c = 11,
 	} cmd_op_choice;
 };
 

@@ -299,6 +299,12 @@ impl Broker {
         }
     }
 
+    /// Whether `sid` has a request waiting for an answer (typing into it is refused then).
+    pub fn open_for(&self, sid: u64) -> bool {
+        let g = self.inner.lock().unwrap();
+        g.pending.values().any(|p| p.att.sid == sid)
+    }
+
     /// Open requests, for a device that connects while they are pending.
     pub fn pending(&self) -> Vec<Attention> {
         let g = self.inner.lock().unwrap();

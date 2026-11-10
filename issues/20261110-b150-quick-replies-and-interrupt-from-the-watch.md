@@ -35,3 +35,4 @@ prompt is on screen.
 
 - 2026-11-10T05:19:05Z · claude-code@linux-dev · linux-x86_64 · 9d39d6d: filed
 - 2026-11-10T05:19:11Z · claude-code@linux-dev · linux-x86_64 · 9d39d6d: claimed
+- 2026-11-10T05:33:54Z · claude-code@linux-dev · linux-x86_64 · 4bfa916+dirty: Part 1 (protocol + daemon) in this commit: proto 0.4, welcome.replies (sent only to devices with minor >= 4), cmd_op_type = 11 (index into replies; never device text), cmd_op_cancel implemented as Esc after a >= 1000 ms hold. Typing refused while the session has an open request, is input/approval|question, or shows a numbered selection list (Enter would pick the highlighted option, e.g. Claude's 'Yes'). Replies from ~/.agentlink/replies.txt, defaults Continue / Yes / Run the tests. Daemon fmt+clippy+test ok (10 new tests). Atlas proto tests not runnable here (Node 18, f95e). Part 2: firmware items + sim.

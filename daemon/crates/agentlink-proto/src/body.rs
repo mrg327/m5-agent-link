@@ -73,6 +73,11 @@ body!(Welcome {
     time: TimeSync,
     #[n(3)]
     cfg: DeviceCfg,
+    /// Quick replies (proto 0.4): present means this daemon types into terminals
+    /// (`CmdOp::Type` with an index into this list, and `CmdOp::Cancel`).
+    #[n(4)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    replies: Option<Vec<String>>,
 });
 body!(HostInfo {
     #[n(0)]

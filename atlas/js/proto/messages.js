@@ -14,7 +14,7 @@ const ENUMS = {
   input_sub: { approval: 0, question: 1 },
   att_kind: { approval: 0, question: 1, error: 2, done: 3 },
   action: { approve: 0, deny: 1, focus: 2, reply: 3, ack: 4 },
-  cmd_op: { focus: 0, ack: 1, snooze: 2, approve: 3, deny: 4, reply: 5, cancel: 6, detail: 7, notify_done: 8, quiet: 9, scroll: 10 },
+  cmd_op: { focus: 0, ack: 1, snooze: 2, approve: 3, deny: 4, reply: 5, cancel: 6, detail: 7, notify_done: 8, quiet: 9, scroll: 10, type: 11 },
   scroll_unit: { lines: 0, pages: 1, to_end: 2 },
   disp_shape: { round: 0, rect: 1 },
   host_os: { mac: 0, win: 1, linux: 2 },
@@ -47,7 +47,7 @@ const SPECS = {
   host_info: { id: [0, 'hex'], name: [1, 'tstr'], os: [2, 'enum:host_os'] },
   time_sync: { unix: [0, 'uint'], tz_off: [1, 'int'] },
   device_cfg: { privacy: [0, 'enum:privacy'], alert: [1, 'enum:alert_mode'], quiet_until: [2, 'uint'], brightness: [3, 'uint'], badge_handle: [4, 'tstr'] },
-  welcome: { proto: [0, 'ints'], host: [1, 'obj:host_info'], time: [2, 'obj:time_sync'], cfg: [3, 'obj:device_cfg'] },
+  welcome: { proto: [0, 'ints'], host: [1, 'obj:host_info'], time: [2, 'obj:time_sync'], cfg: [3, 'obj:device_cfg'], replies: [4, 'tstrs'] },
   away_event: { sid: [0, 'uint'], kind: [1, 'enum:att_kind'], ts: [2, 'uint'] },
   session: {
     sid: [0, 'uint'], ag: [1, 'enum:agent'], st: [2, 'enum:sess_state'], sub: [3, 'enum:input_sub'],

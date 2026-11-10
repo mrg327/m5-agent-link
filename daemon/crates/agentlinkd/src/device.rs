@@ -3,7 +3,7 @@
 
 use crate::broker::{Broker, Decision};
 use crate::deltas::DeltaQueue;
-use crate::focus::{FocusDriver, FocusError, FocusTarget, ScrollDriver};
+use crate::focus::{FocusDriver, FocusError, FocusTarget, ScrollDriver, SystemTerminal, Terminal};
 use crate::registry::{now_unix, Registry, Route, Update};
 use crate::scroll::{Batch, Coalescer, RESULT_MIN_GAP};
 use crate::trace::{Dir, Trace};
@@ -28,6 +28,10 @@ pub struct Shared {
     pub trace: Trace,
     pub focus: Arc<dyn FocusDriver>,
     pub scroll: Arc<dyn ScrollDriver>,
+    /// The agent's terminal as a keyboard, for quick replies and interrupt (typing.rs).
+    pub term: Arc<dyn Terminal>,
+    /// Quick replies offered in the welcome; `CmdOp::Type` names one by index.
+    pub replies: Vec<String>,
     pub host: HostInfo,
     /// Connected, handshaken devices keyed by device uid, for `agentlink status`.
     pub devices: Mutex<BTreeMap<String, Value>>,
@@ -48,6 +52,8 @@ impl Shared {
             trace,
             focus,
             scroll,
+            term: Arc::new(SystemTerminal),
+            replies: crate::typing::load_replies(&crate::paths::home()),
             host: host_info(),
             devices: Mutex::default(),
             next_link: AtomicU64::new(1),
@@ -222,7 +228,11 @@ impl Conn {
     }
 }
 
-fn welcome(host: &HostInfo) -> Welcome {
+/// Welcome keys a device must know before it is sent them: `replies` arrived in proto 0.4, and an
+/// older decoder would reject the whole message.
+const REPLIES_MINOR: u64 = 4;
+
+fn welcome(host: &HostInfo, replies: Option<Vec<String>>) -> Welcome {
     let tz = chrono::Local::now().offset().local_minus_utc() / 60;
     Welcome {
         proto: PROTO,
@@ -238,6 +248,7 @@ fn welcome(host: &HostInfo) -> Welcome {
             brightness: None,
             badge_handle: None,
         },
+        replies,
     }
 }
 
@@ -328,7 +339,8 @@ async fn handshake(
 
     // Subscribe before taking the snapshot so no update is lost in between.
     let (sessions, updates) = shared.registry.subscribe();
-    let w = welcome(&shared.host);
+    let replies = (c.peer_minor >= REPLIES_MINOR).then(|| shared.replies.clone());
+    let w = welcome(&shared.host, replies);
     c.privacy = w.cfg.privacy.unwrap_or(Privacy::Meta);
     c.send(Some(hello.0), Message::Welcome(w)).await?;
     c.send(
@@ -669,7 +681,64 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
                 None => fail(ResultErr::Stale, "unknown session"),
             }
         }
+        CmdOp::Type | CmdOp::Cancel => type_cmd(shared, cmd).await,
         _ => fail(ResultErr::Unsupported, "command not implemented"),
+    }
+}
+
+/// Quick reply (`Type`, arg = index into the welcome's replies) or interrupt (`Cancel`, Esc, only
+/// after a hold) typed into the session's terminal (typing.rs; issue 20261110-b150).
+async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
+    let detail = serde_json::to_value(cmd).unwrap_or_default();
+    let route = cmd
+        .sid
+        .map_or(Route::Unknown, |sid| shared.registry.route(sid));
+    let (session, ctx) = match route {
+        Route::Ready(s, ctx) => (s, ctx),
+        Route::Unknown => return fail(ResultErr::Stale, "unknown session"),
+        Route::Unsupported => return fail(ResultErr::Unsupported, "no terminal for this session"),
+    };
+    let text = if cmd.op == CmdOp::Type {
+        let idx = match cmd.arg {
+            Some(Arg::Uint(i)) => usize::try_from(i).ok(),
+            _ => None,
+        };
+        let Some(text) = idx.and_then(|i| shared.replies.get(i)).cloned() else {
+            return fail(ResultErr::Denied, "no such reply");
+        };
+        if let Some(why) = crate::typing::refusal(&session, shared.broker.open_for(session.sid)) {
+            return fail(ResultErr::Denied, why);
+        }
+        Some(text)
+    } else {
+        if cmd.hold_ms.unwrap_or(0) < MIN_APPROVE_HOLD_MS {
+            return fail(ResultErr::Denied, "hold-to-confirm too short");
+        }
+        None
+    };
+    let term = shared.term.clone();
+    let res = tokio::task::spawn_blocking(move || match text {
+        Some(t) => crate::typing::type_reply(term.as_ref(), &ctx, &t),
+        None => crate::typing::interrupt(term.as_ref(), &ctx),
+    })
+    .await
+    .unwrap_or_else(|e| Err(e.to_string()));
+    // the reply's text is the user's own fixed list, not terminal content: the index is enough
+    shared.trace.audit(
+        if cmd.op == CmdOp::Type {
+            "type"
+        } else {
+            "interrupt"
+        },
+        cmd.sid,
+        None,
+        json!({"cmd": detail, "ok": res.is_ok()}),
+    );
+    match res {
+        Ok(()) => CmdResult::ok(),
+        Err(m) if m.contains("cannot be typed") => fail(ResultErr::Unsupported, &m),
+        Err(m) if m.contains("no window") => fail(ResultErr::NoWindow, &m),
+        Err(m) => fail(ResultErr::Denied, &m),
     }
 }
 
@@ -820,6 +889,111 @@ mod tests {
             ctx: crate::registry::HostCtx::default(),
         });
         shared.registry.sid_of("claude:s").unwrap()
+    }
+
+    /// Records the keys a quick reply or interrupt types (issue 20261110-b150).
+    #[derive(Default)]
+    struct FakeTerm {
+        sent: Mutex<Vec<String>>,
+    }
+    impl Terminal for FakeTerm {
+        fn read_screen(&self, _: &crate::registry::HostCtx) -> Result<String, FocusError> {
+            Ok("> \n".into())
+        }
+        fn send_keys(&self, _: &crate::registry::HostCtx, k: &str) -> Result<(), FocusError> {
+            self.sent.lock().unwrap().push(k.to_owned());
+            Ok(())
+        }
+    }
+
+    fn shared_typing(term: Arc<FakeTerm>) -> Arc<Shared> {
+        let trace = Trace::null();
+        let registry = Arc::new(Registry::new(trace.clone()));
+        let mut s = Shared::new(
+            registry.clone(),
+            Arc::new(Broker::new(registry)),
+            trace,
+            Arc::new(NoFocus),
+            Arc::new(FakeScroll::default()),
+        );
+        s.term = term;
+        s.replies = vec!["Continue".into(), "Run the tests".into()];
+        Arc::new(s)
+    }
+
+    fn type_cmd_of(op: CmdOp, sid: u64, arg: Option<u64>, hold_ms: Option<u64>) -> Cmd {
+        Cmd {
+            op,
+            sid: Some(sid),
+            rid: None,
+            arg: arg.map(Arg::Uint),
+            hold_ms,
+        }
+    }
+
+    #[tokio::test]
+    async fn quick_reply_types_the_named_reply_and_enter() {
+        let term = Arc::new(FakeTerm::default());
+        let shared = shared_typing(term.clone());
+        let sid = add_session(&shared);
+        let r = handle_cmd(&shared, &type_cmd_of(CmdOp::Type, sid, Some(1), None)).await;
+        assert!(r.ok, "{r:?}");
+        assert_eq!(*term.sent.lock().unwrap(), vec!["Run the tests", "\\r"]);
+        let r = handle_cmd(&shared, &type_cmd_of(CmdOp::Type, sid, Some(5), None)).await;
+        assert!(!r.ok && r.err == Some(ResultErr::Denied), "no such reply");
+        let r = handle_cmd(&shared, &type_cmd_of(CmdOp::Type, 999, Some(0), None)).await;
+        assert!(!r.ok && r.err == Some(ResultErr::Stale));
+    }
+
+    #[tokio::test]
+    async fn quick_reply_is_refused_while_a_request_is_open() {
+        let term = Arc::new(FakeTerm::default());
+        let shared = shared_typing(term.clone());
+        let sid = add_session(&shared);
+        let payload = json!({"tool_name": "Bash", "tool_input": {"command": "rm -rf build"}});
+        let req = crate::broker::request_of(
+            sid,
+            "claude:s".into(),
+            "claude",
+            "PermissionRequest",
+            &payload,
+            std::time::Duration::from_secs(15),
+        )
+        .unwrap();
+        let (_rid, _wait) = shared.broker.open(req);
+        let r = handle_cmd(&shared, &type_cmd_of(CmdOp::Type, sid, Some(0), None)).await;
+        assert!(!r.ok && r.err == Some(ResultErr::Denied), "{r:?}");
+        assert!(term.sent.lock().unwrap().is_empty(), "nothing typed");
+    }
+
+    #[tokio::test]
+    async fn interrupt_needs_a_hold_then_sends_escape() {
+        let term = Arc::new(FakeTerm::default());
+        let shared = shared_typing(term.clone());
+        let sid = add_session(&shared);
+        let r = handle_cmd(&shared, &type_cmd_of(CmdOp::Cancel, sid, None, Some(300))).await;
+        assert!(
+            !r.ok && r.err == Some(ResultErr::Denied),
+            "a short hold is refused"
+        );
+        assert!(term.sent.lock().unwrap().is_empty());
+        let r = handle_cmd(&shared, &type_cmd_of(CmdOp::Cancel, sid, None, Some(1250))).await;
+        assert!(r.ok, "{r:?}");
+        assert_eq!(*term.sent.lock().unwrap(), vec!["\\x1b"]);
+    }
+
+    #[tokio::test]
+    async fn replies_reach_only_devices_that_know_them() {
+        for (minor, want) in [(3u64, false), (4, true)] {
+            let shared = shared_typing(Arc::new(FakeTerm::default()));
+            let mut d = spawn_link(&shared);
+            d.to_daemon.send(hello_with_minor("1.0.0", minor)).unwrap();
+            let w = d.next().await;
+            let Message::Welcome(w) = w.msg else {
+                panic!("welcome first")
+            };
+            assert_eq!(w.replies.is_some(), want, "minor {minor}");
+        }
     }
 
     /// A burst of scroll commands is summed behind the running one, each batch answers with the
