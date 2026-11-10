@@ -29,3 +29,4 @@ SCROLL works in kitty (wheel kitten, a059) and tmux only; other terminals return
 ## Log
 
 - 2026-11-09T17:43:19Z · copilot-cli/opus@mac-work · macos-arm64 · 32ae514: filed
+- 2026-11-10T05:19:11Z · claude-code@linux-dev · linux-x86_64 · 9d39d6d: Heads-up: per user decision 2026-11-09 the firmware SCROLL mode is being removed (issue 71da); the daemon keeps its scroll support. Watch scroll for other terminals has no device entry point after that, so this is on hold unless SCROLL returns.
