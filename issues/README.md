@@ -77,7 +77,7 @@ You may use a unique prefix of an ID.
 | Area | Command |
 |---|---|
 | firmware / simulator | `cmake -S simulator -B build/sim -G Ninja && cmake --build build/sim && ctest --test-dir build/sim --output-on-failure` |
-| firmware (device) | `. ~/esp/esp-idf/export.sh && idf.py -C firmware build` |
+| firmware (device) | `. ~/esp/esp-idf/export.sh && idf.py -C firmware build && python firmware/tools/check_dram.py` (internal RAM left for BLE; after a flash, read the boot log for asserts) |
 | daemon | `cd daemon && cargo fmt --check && cargo clippy --workspace -- -D warnings && cargo test --workspace` |
 | protocol | `uv run protocol/tools/validate_vectors.py && uv run protocol/tools/gen_vectors.py && git diff --exit-code protocol/vectors` |
 | atlas | `python3 atlas/tools/extract.py --check && node --test atlas/test/*.test.mjs` (after any firmware edit, run `python3 atlas/tools/extract.py` and commit `facts.json`) |

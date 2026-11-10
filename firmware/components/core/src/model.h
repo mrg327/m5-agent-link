@@ -20,11 +20,14 @@ typedef enum { ACT_APPROVE = 0, ACT_DENY = 1, ACT_FOCUS = 2, ACT_REPLY = 3, ACT_
 typedef enum { PRIVACY_META = 0, PRIVACY_PREVIEW = 1, PRIVACY_FULL = 2 } privacy_t;
 typedef enum { ALERT_FULL = 0, ALERT_QUIET = 1, ALERT_SILENT = 2 } alert_mode_t;
 
-/* Large static tables go to PSRAM on the device (internal DRAM is what BLE needs at boot); a no-op in
- * the simulator. */
+/* Large static tables go to PSRAM on the device (internal DRAM is what BLE needs at boot). In the
+ * simulator they get a section of their own, so simulator/tools/ram_budget.py can count everything
+ * else against the internal-RAM budget. */
 #ifdef ESP_PLATFORM
 #include "esp_attr.h"
 #define MODEL_EXT_BSS EXT_RAM_BSS_ATTR
+#elif defined(__ELF__)
+#define MODEL_EXT_BSS __attribute__((section(".ext_ram.bss")))
 #else
 #define MODEL_EXT_BSS
 #endif

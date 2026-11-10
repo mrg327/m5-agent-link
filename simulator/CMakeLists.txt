@@ -220,3 +220,13 @@ add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/c
 target_include_directories(test_link_arb PRIVATE ${FW}/core/src)
 target_link_libraries(test_link_arb PRIVATE agentlink_hal agentlink_proto lvgl::lvgl m)
 add_test(NAME link_arbitration COMMAND test_link_arb)
+# A stand-in for the watch's internal-RAM limit (the simulator has none): core's static .data/.bss
+# outside PSRAM (MODEL_EXT_BSS) must stay under budget. 2026-11-10: 20 KB more of session tables
+# passed every test and boot-looped the watch. Host (64-bit) bytes; skipped without GNU `size`.
+# Device check: firmware/tools/check_dram.py after idf.py build.
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_FOUND)
+    add_test(NAME core_ram_budget
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ram_budget.py $<TARGET_FILE:core> 81920)
+    set_tests_properties(core_ram_budget PROPERTIES SKIP_RETURN_CODE 77)
+endif()
