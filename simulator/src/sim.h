@@ -25,6 +25,9 @@ bool sim_save_png(const char *path);  /* current framebuffer, round mask applied
 void sim_link_enable_ws(bool enable);
 void sim_link_poll(uint32_t now_ms);
 void sim_link_set_connected(bool connected); /* for --no-ws scripts */
+/* `connect usb|ble`, `rx usb|ble HEX`: fake transports beside the default WS one (kind = hal_link_kind_t). */
+void sim_link_set_connected_kind(int kind, bool connected);
+void sim_link_inject_rx_kind(int kind, const uint8_t *frame, size_t len);
 void sim_link_inject_rx(const uint8_t *frame, size_t len);
 
 /* sim_png.c: writes an RGB (3 bytes/pixel) image; returns false on I/O error. */

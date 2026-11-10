@@ -1,4 +1,5 @@
-/* Link arbitration: hello on every up transport, first welcome wins, fallback when it drops.
+/* Link arbitration: hello on every up transport, first welcome wins, fallback when it drops, and USB is
+ * preferred when plugged in: a USB welcome takes over another transport.
  * Builds link*.c and model.c against stubbed HAL/debug; no simulator needed. */
 #include <stdarg.h>
 #include <stdio.h>
@@ -14,6 +15,7 @@ static const char *WELCOME_HEX =
     "a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f";
 
 static int sent[3], hellos[3], links_up, links_down;
+static bool usb_fails; /* an attached host that does not read: sends time out */
 static const hal_board_info_t s_bi = {.board = "sim", .fw_version = "t"};
 
 const hal_board_info_t *hal_board_info(void) { return &s_bi; }
@@ -24,7 +26,7 @@ bool hal_link_send(hal_link_kind_t k, const uint8_t *f, size_t n)
 {
     sent[k]++;
     if (n > 3 && f[2] == 0x01) hellos[k]++; /* envelope type 1 = hello */
-    return true;
+    return !(k == HAL_LINK_USB && usb_fails);
 }
 void dbg_event(const char *c, const char *e, const char *f, ...) { (void)c; (void)e; (void)f; }
 void dbg_event_at(dbg_level_t l, const char *c, const char *e, const char *f, ...) { (void)l; (void)c; (void)e; (void)f; }
@@ -80,19 +82,42 @@ int main(void)
                sent[HAL_LINK_USB] == usb_before,
            "commands go to the active transport only");
 
-    rx_welcome(HAL_LINK_USB); /* ignored while BLE is active */
-    EXPECT(link_active_kind() == HAL_LINK_BLE && links_up == 1, "frames from other transport ignored");
+    /* USB stays plugged in: it is offered a hello every 5 s while BLE is active */
+    link_tick(8000);
+    EXPECT(hellos[HAL_LINK_USB] == 3 && sent[HAL_LINK_BLE] == ble_before + 1, "USB offered a hello while on BLE");
+    rx_welcome(HAL_LINK_USB); /* USB is preferred: its welcome takes the link over */
+    EXPECT(link_welcomed() && link_active_kind() == HAL_LINK_USB && links_up == 2, "USB welcome takes over from BLE");
+    rx_welcome(HAL_LINK_BLE);
+    EXPECT(link_active_kind() == HAL_LINK_USB && links_up == 2, "BLE frames ignored once USB is active");
+    int usb_now = sent[HAL_LINK_USB];
+    link_tick(20000);
+    EXPECT(hellos[HAL_LINK_BLE] == 2 && sent[HAL_LINK_USB] == usb_now, "no offers to BLE while on USB");
 
-    int h0 = hellos[HAL_LINK_USB];
-    link_on_state(HAL_LINK_BLE, false);
-    EXPECT(!link_welcomed() && link_connected() && links_down == 1, "active down -> unwelcomed, still connected");
-    EXPECT(hellos[HAL_LINK_USB] == h0 + 1, "fallback restarts hello on remaining transport");
-    EXPECT(!link_send_cmd(LINK_OP_FOCUS, 1, 0, 0), "no commands before welcome");
-    rx_welcome(HAL_LINK_USB);
-    EXPECT(link_welcomed() && link_active_kind() == HAL_LINK_USB && links_up == 2, "USB welcome after fallback");
-
+    int h0 = hellos[HAL_LINK_BLE];
     link_on_state(HAL_LINK_USB, false);
+    EXPECT(!link_welcomed() && link_connected() && links_down == 1, "active down -> unwelcomed, still connected");
+    EXPECT(hellos[HAL_LINK_BLE] == h0 + 1, "fallback restarts hello on remaining transport");
+    EXPECT(!link_send_cmd(LINK_OP_FOCUS, 1, 0, 0), "no commands before welcome");
+    rx_welcome(HAL_LINK_BLE);
+    EXPECT(link_welcomed() && link_active_kind() == HAL_LINK_BLE && links_up == 3, "BLE welcome after fallback");
+
+    link_on_state(HAL_LINK_BLE, false);
     EXPECT(!link_connected() && !link_welcomed() && links_down == 2, "all down");
+
+    /* an attached host that never reads: offers back off to every 30 s instead of every 5 s */
+    reset();
+    usb_fails = true;
+    link_on_state(HAL_LINK_BLE, true);
+    rx_welcome(HAL_LINK_BLE);
+    link_on_state(HAL_LINK_USB, true); /* plugged in: one offer at once (it times out) */
+    int u0 = hellos[HAL_LINK_USB];
+    link_tick(5000);  /* first periodic offer, fails: backs off */
+    link_tick(10000);
+    link_tick(20000);
+    EXPECT(hellos[HAL_LINK_USB] == u0 + 1, "a failing USB offer backs off");
+    link_tick(35100);
+    EXPECT(hellos[HAL_LINK_USB] == u0 + 2, "and retries after 30 s");
+    usb_fails = false;
 
     reset();
     link_on_state(HAL_LINK_USB, true);
@@ -104,8 +129,10 @@ int main(void)
     reset();
     link_on_state(HAL_LINK_WS, true);
     rx_welcome(HAL_LINK_WS);
+    link_on_state(HAL_LINK_BLE, true);
+    EXPECT(hellos[HAL_LINK_BLE] == 0 && link_active_kind() == HAL_LINK_WS, "no hello to extra transport while welcomed");
     link_on_state(HAL_LINK_USB, true);
-    EXPECT(hellos[HAL_LINK_USB] == 0 && link_active_kind() == HAL_LINK_WS, "no hello to extra transport while welcomed");
+    EXPECT(hellos[HAL_LINK_USB] == 1 && link_active_kind() == HAL_LINK_WS, "except USB, which is preferred");
 
     if (failures) return EXIT_FAILURE;
     puts("link arbitration OK");

@@ -6,7 +6,7 @@
  *   drag X Y DY [MS]                a slow vertical drag in the centre (default 500 ms: steps, no swipe); a flick is a fast `swipe`
  *   session SID work|input|ask|error|done|idle|doneseen REPO   add or update a session (input = permission, ask = question)
  *   remote SID HOST [NAME]          set host / host name on a session (host 0 = local)
- *   drop SID | lift | shake | connect | disconnect | rx HEX | ui | shot FILE.png
+ *   drop SID | lift | shake | connect [usb|ble] | disconnect [usb|ble] | rx [usb|ble] HEX | ui | shot FILE.png
  *   attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OPT...
  *                                   a daemon `attention`; ACTS = comma list of approve,deny,focus,reply,ack
  *   result ok | result err stale|denied|unsupported|no_window|timeout|internal
@@ -195,10 +195,18 @@ static bool parse_line(char *line, uint32_t *t)
         add(*t, E_MOTION, HAL_MOTION_SHAKE, 0, 0, NULL);
         *t += 100;
     } else if (!strcmp(cmd, "connect") || !strcmp(cmd, "disconnect")) {
-        add(*t, E_CONNECT, cmd[0] == 'c', 0, 0, NULL);
+        /* optional transport: usb | ble (default: the WS fake link) */
+        int kind = !strncmp(arg, "usb", 3) ? HAL_LINK_USB : !strncmp(arg, "ble", 3) ? HAL_LINK_BLE : HAL_LINK_WS;
+        add(*t, E_CONNECT, cmd[0] == 'c', kind, 0, NULL);
         *t += 50;
     } else if (!strcmp(cmd, "rx") && arg[0]) {
-        add(*t, E_RX, 0, 0, 0, arg);
+        int kind = HAL_LINK_WS;
+        const char *hex = arg;
+        if (!strncmp(arg, "usb ", 4) || !strncmp(arg, "ble ", 4)) {
+            kind = arg[0] == 'u' ? HAL_LINK_USB : HAL_LINK_BLE;
+            hex += 4;
+        }
+        add(*t, E_RX, 0, kind, 0, hex);
         *t += 50;
     } else if (!strcmp(cmd, "ui")) {
         add(*t, E_UI, 0, 0, 0, NULL);
@@ -251,7 +259,7 @@ bool sim_script_load(const char *path)
     return true;
 }
 
-static void send_hex(const char *hex)
+static void send_hex_kind(int kind, const char *hex)
 {
     uint8_t buf[4096];
     size_t n = 0;
@@ -260,7 +268,7 @@ static void send_hex(const char *hex)
         if (sscanf(hex, "%2x", &v) != 1) break;
         buf[n++] = (uint8_t)v;
     }
-    sim_link_inject_rx(buf, n);
+    sim_link_inject_rx_kind(kind, buf, n);
 }
 
 static void run_session(const char *spec)
@@ -529,8 +537,8 @@ static void run(const ev_t *e)
     case E_PTR: sim_input_pointer(e->a, e->b, e->c); break;
     case E_BTN: sim_input_button(e->a, e->b); break;
     case E_MOTION: sim_input_motion((hal_motion_kind_t)e->a); break;
-    case E_CONNECT: sim_link_set_connected(e->a); break;
-    case E_RX: send_hex(e->text); break;
+    case E_CONNECT: sim_link_set_connected_kind(e->b, e->a); break;
+    case E_RX: send_hex_kind(e->b, e->text); break;
     case E_UI: core_dump_ui_state(); break;
     case E_SHOT:
         if (!sim_save_png(e->text)) fail("cannot write", e->text);

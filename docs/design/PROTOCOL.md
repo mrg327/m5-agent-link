@@ -67,7 +67,7 @@ device                                 daemon
 
 - **Re-handshake:** a `hello` on a live link is a full re-handshake (device reboot or link timeout). The link's message ids reset, and the daemon replies with `welcome` and a full `snapshot`. The daemon's device registry is keyed by the device `uid`, so a re-handshake updates the same entry.
 - **USB timing:** on USB the daemon pings every 5 s and the device re-handshakes after 12 s of silence (§1).
-- TODO: transport arbitration (behaviour when the same device is reachable over both USB and BLE).
+- **Transport arbitration** (device side, `link.c`): the device sends `hello` on every transport that is up, and the first `welcome` claims the link; frames from the other transports are then ignored. **USB is preferred when plugged in** (2026-11-10): while welcomed on BLE or WS with a USB host attached, the device also offers a `hello` on USB, at once and then every 5 s (every 30 s while those sends time out, i.e. a host that is attached but not reading). A `welcome` on USB takes the link over: it is a new link (cards dropped, a snapshot follows) and the old transport is ignored from then on. When the active transport drops, the device falls back to a handshake on whatever is still up. The daemon that loses the device simply stops hearing from it.
 
 ### `hello` (device → daemon)
 ```cddl

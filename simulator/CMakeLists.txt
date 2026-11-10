@@ -61,6 +61,11 @@ function(sim_script_test name script)
 endfunction()
 
 sim_script_test(sim_link_indicator link_indicator.txt)
+# USB is preferred when plugged in (over a BLE link already welcomed): hello on USB at once and again
+# after 5 s, the USB welcome takes over, unplugging USB goes back to a BLE handshake.
+sim_script_test(sim_link_prefer_usb link_prefer_usb.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+  PASS_REGULAR_EXPRESSION "\"ev\":\"welcome\".*\"fake_tx\",\"transport\":0.*\"fake_tx\",\"transport\":0.*\"ev\":\"prefer_usb\",\"from\":1.*\"ev\":\"welcome\".*\"ev\":\"down\",\"transport\":0.*\"fake_tx\",\"transport\":1")
 sim_script_test(sim_ring_empty ring_empty.txt)
 sim_script_test(sim_ring_one one_session.txt)
 sim_script_test(sim_ring_busy busy.txt)

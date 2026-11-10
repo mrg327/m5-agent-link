@@ -6,6 +6,11 @@ link_state_t g_link;
 struct envelope_r g_rx_env, g_tx_env;
 
 #define HELLO_RETRY_MS 3000
+/* While welcomed on another transport with USB plugged in, offer a hello on USB this often: a daemon
+ * there takes the link over (USB is preferred when plugged in). */
+#define USB_PREFER_MS 5000
+#define USB_PREFER_BACKOFF_MS 30000
+static uint32_t s_usb_offer_gap = USB_PREFER_MS;
 #define IDLE_PING_MS 60000
 
 static uint32_t s_now_ms;
@@ -14,6 +19,7 @@ void link_init(const link_hooks_t *hooks)
 {
     memset(&g_link, 0, sizeof g_link);
     g_link.hooks = *hooks;
+    s_usb_offer_gap = USB_PREFER_MS;
 }
 
 bool link_connected(void) { return g_link.connected; }
@@ -51,7 +57,11 @@ void link_on_state(hal_link_kind_t kind, bool connected)
     g_link.connected = false;
     for (int k = 0; k < LINK_N_KINDS; k++) g_link.connected |= g_link.up[k];
     if (connected) {
-        if (g_link.welcomed) return; /* stay on the active transport */
+        if (g_link.welcomed) {
+            /* stay on the active transport, unless USB arrives: it is preferred, so offer it a hello */
+            if (kind == HAL_LINK_USB && g_link.kind != HAL_LINK_USB) hello_on(HAL_LINK_USB);
+            return;
+        }
         if (!g_link.hello_cycle) {
             g_link.hello_cycle = true;
             start_handshake();
@@ -75,7 +85,8 @@ void link_on_state(hal_link_kind_t kind, bool connected)
 void link_on_frame_from(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 {
     if ((int)kind < 0 || (int)kind >= LINK_N_KINDS || !g_link.up[kind]) return;
-    if (g_link.welcomed && kind != g_link.kind) return;
+    /* Another transport is only heard when it is USB taking the link over with a welcome. */
+    if (g_link.welcomed && kind != g_link.kind && kind != HAL_LINK_USB) return;
     size_t used = 0;
     memset(&g_rx_env, 0, sizeof g_rx_env);
     int rc = cbor_decode_envelope(frame, len, &g_rx_env, &used);
@@ -83,6 +94,15 @@ void link_on_frame_from(hal_link_kind_t kind, const uint8_t *frame, size_t len)
         /* Unknown message types land here too; the protocol says to ignore them. */
         dbg_event_at(DBG_DEBUG, "link", "rx_undecodable", "\"len\":%u,\"rc\":%d", (unsigned)len, rc);
         return;
+    }
+    if (g_link.welcomed && kind != g_link.kind) {
+        if (g_rx_env.envelope_choice != envelope_msg_welcome_m_c) return;
+        /* USB is preferred when plugged in: its daemon takes over. The welcome below starts the new
+         * link (cards dropped, a snapshot follows); the old transport is ignored from now on. */
+        dbg_event("link", "prefer_usb", "\"from\":%d", (int)g_link.kind);
+        g_link.welcomed = false;
+        memset(g_link.pending, 0, sizeof g_link.pending);
+        g_link.tx_id = 0;
     }
     if (!g_link.welcomed) {
         if (g_rx_env.envelope_choice != envelope_msg_welcome_m_c) return;
@@ -111,6 +131,13 @@ void link_tick(uint32_t now_ms)
             dbg_event("link", "hello_retry", "\"transport\":%d", k);
             hello_on(k);
         }
+    }
+    if (g_link.welcomed && g_link.kind != HAL_LINK_USB && g_link.up[HAL_LINK_USB] &&
+        now_ms - g_link.hello_ms[HAL_LINK_USB] >= s_usb_offer_gap) {
+        /* A USB daemon would take the link over. A host that is attached but not reading fills the
+         * USB buffer and each send can block 200 ms, so back off while the offer does not go out. */
+        g_link.hello_ms[HAL_LINK_USB] = now_ms;
+        s_usb_offer_gap = link_tx_hello(HAL_LINK_USB) ? USB_PREFER_MS : USB_PREFER_BACKOFF_MS;
     }
     if (g_link.welcomed && now_ms - g_link.last_activity_ms >= IDLE_PING_MS) {
         g_link.last_activity_ms = now_ms;

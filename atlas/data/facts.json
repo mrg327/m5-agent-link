@@ -2061,7 +2061,7 @@
     "haptics.scroll_stop": "firmware/components/core/src/feedback.c:98",
     "haptics.tick": "firmware/components/core/src/feedback.c:34",
     "link.hello_retry_ms": "firmware/components/core/src/link.c:8",
-    "link.idle_ping_ms": "firmware/components/core/src/link.c:9",
+    "link.idle_ping_ms": "firmware/components/core/src/link.c:14",
     "link.ping_interval_ms": "daemon/crates/agentlinkd/src/usb.rs:26",
     "link.silence_timeout_ms": "firmware/boards/stopwatch/link_usb.cpp:32",
     "messages": "protocol/agentlink.cddl:1",
