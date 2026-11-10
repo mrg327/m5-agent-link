@@ -24,6 +24,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "agentlink-keys"
+version = "0.1.0"
+
+[[package]]
 name = "agentlink-proto"
 version = "0.1.0"
 dependencies = [

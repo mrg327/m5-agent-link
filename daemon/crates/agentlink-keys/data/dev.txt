@@ -1,0 +1,14 @@
+git commit push pull rebase merge branch checkout diff stash status log add reset revert tag clone fetch remote origin main master head cherry pick squash amend conflict patch
+test tests build flash cargo npm yarn pnpm pip python rust node make cmake ninja clippy fmt lint format run debug release install update upgrade deploy compile clean check
+yes no ok okay please fix bug error warning fail failed pass passed retry skip continue stop abort cancel approve deny allow reject accept confirm proceed done
+file files folder directory path read write edit delete create rename move copy paste save open close show hide list search find replace
+code function method class struct enum trait module crate package import export return async await const static public private
+daemon server client socket port host config settings token key secret password login logout user admin root sudo bash shell terminal kitty
+watch device firmware serial usb bluetooth ble wifi battery sleep wake reboot boot
+agent session prompt question answer reply send dictate type keyboard voice listen speak
+thanks sorry wrong right correct again explain why what how where when looks good ship
+docs readme license issue issues request review comment message
+json yaml toml html css java swift kotlin docker kubernetes linux macos windows ubuntu
+src lib bin tmp dev prod staging stage
+refactor optimize simplify implement remove revise
+todo plan next step undo redo apply

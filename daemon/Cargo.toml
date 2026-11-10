@@ -5,6 +5,7 @@ members = [
     "crates/agentlinkd",
     "crates/agentlink-hook",
     "crates/agentlink",
+    "crates/agentlink-keys",
 ]
 
 [workspace.package]

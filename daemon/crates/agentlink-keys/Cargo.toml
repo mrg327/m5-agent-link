@@ -1,0 +1,11 @@
+[package]
+name = "agentlink-keys"
+description = "Gesture-typing (SHARK2) decoder for the watch's round keyboard: strokes and taps to ranked word candidates"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+
+[[example]]
+name = "eval"
