@@ -9,7 +9,7 @@ wait 300
 tap 233 233
 wait 300
 expect_screen agent
-# Working: Watch, Notify when done, Snooze
+# Working: Watch, Notify when done, Snooze (Watch always first)
 expect_label 3 items
 expect_label > Watch
 expect_no_label Focus terminal
@@ -47,24 +47,27 @@ expect_no_label Mark seen
 expect_label > Watch
 btn B long
 wait 300
-# Error: Dismiss error, Watch
+# Error: Watch, Dismiss error
 session 1 error webapp feat/login Build failed
 wait 300
 tap 233 233
 wait 300
 expect_label 2 items
-expect_label > Dismiss error
+expect_label > Watch
 btn B
 wait 150
-expect_label > Watch
+expect_label > Dismiss error
 btn B long
 wait 300
-# Idle: Snooze
+# Idle: Watch, Snooze
 session 1 idle webapp feat/login
 wait 300
 tap 233 233
 wait 300
-expect_label 1 items
+expect_label 2 items
+expect_label > Watch
+btn B
+wait 150
 expect_label > Snooze 30 min
 btn B long
 wait 300
@@ -74,7 +77,10 @@ wait 300
 tap 233 233
 wait 300
 expect_screen agent
-expect_label 1 items
+expect_label 2 items
+expect_label > Watch
+btn B
+wait 150
 expect_label > Focus terminal
 expect_no_label Snooze
 expect_no_label Notify

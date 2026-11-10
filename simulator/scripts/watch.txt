@@ -1,5 +1,5 @@
 # WATCH (UI-V2 §4.7): the current step from sum, the timeline marks after n/ok deltas, the footer step
-# count, B moves to the next session, a gone session returns to the deck, a drag scrolls the terminal (SCROLL over WATCH, back to WATCH), B held leaves.
+# count, B moves to the next session, a gone session returns to the deck, a drag scrolls the terminal (SCROLL over WATCH, back to WATCH), B held leaves; so does holding a finger still on the centre.
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 rtc 1800000000
@@ -60,7 +60,8 @@ expect_screen scroll
 btn B long
 wait 300
 expect_screen watch
-btn B long
+# holding a finger still on the centre also goes back (issue dd44)
+hold 233 233 800
 wait 300
 expect_screen ring
 quit

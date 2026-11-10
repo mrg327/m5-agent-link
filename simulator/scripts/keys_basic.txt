@@ -10,6 +10,8 @@ wait 300
 tap 233 233
 wait 300
 expect_screen agent
+btn B
+wait 150
 btn A
 wait 200
 expect_label > Continue

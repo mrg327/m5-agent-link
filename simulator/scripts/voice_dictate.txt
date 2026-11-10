@@ -11,6 +11,8 @@ mic audio/tone_1s.wav
 tap 233 233
 wait 300
 expect_screen agent
+btn B
+wait 150
 expect_label > Reply...
 btn A
 wait 200
@@ -45,6 +47,8 @@ expect_screen ring
 # again: nothing heard, then discard
 tap 233 233
 wait 300
+btn B
+wait 150
 btn A
 wait 200
 btn B

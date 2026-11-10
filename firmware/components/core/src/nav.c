@@ -89,6 +89,7 @@ const nav_binding_t nav_bindings[] = {
     {MODE_WATCH, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_FOCUS},
     {MODE_WATCH, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_NEXT},
     {MODE_WATCH, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
+    {MODE_WATCH, G_LONG_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* hold still 600 ms: back (issue dd44) */
     {MODE_WATCH, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
     /* VOICE: dictate a reply (issue 0ea9). Tap or A stops the recording (or retries a failed one);
      * only the hold sends the transcript; a long swipe down or B held discards it. */
@@ -171,15 +172,14 @@ int nav_agent_items(sess_state_t state, bool typing, bool replies, agent_item_t 
     int n = 0;
     bool reply = typing && replies;
 #define ADD(id, hold) list[n++] = (agent_item_t){(id), (hold)}
+    ADD(AG_WATCH, false); /* always first: tap, tap opens the monitor, a third tap focuses */
     switch (state) {
     case SESS_DONE:
         if (reply) ADD(AG_REPLY, false);
-        ADD(AG_WATCH, false);
         break;
     case SESS_ERROR:
         ADD(AG_DISMISS, false);
         if (reply) ADD(AG_REPLY, false);
-        ADD(AG_WATCH, false);
         break;
     case SESS_IDLE:
         if (reply) ADD(AG_REPLY, false);
@@ -190,7 +190,6 @@ int nav_agent_items(sess_state_t state, bool typing, bool replies, agent_item_t 
         ADD(AG_FOCUS, false);
         break;
     default:
-        ADD(AG_WATCH, false);
         ADD(AG_NOTIFY, false);
         ADD(AG_SNOOZE, false);
         if (typing) ADD(AG_INTERRUPT, true);

@@ -7,6 +7,8 @@ session 1 done webapp feat/login Finished the work
 wait 300
 tap 233 233
 wait 300
+btn B
+wait 150
 btn A
 wait 200
 btn B

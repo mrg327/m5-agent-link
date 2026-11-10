@@ -807,13 +807,22 @@
         "source": "firmware/components/core/src/nav.c:91"
       },
       {
+        "gesture": "G_LONG_PRESS",
+        "mode": "watch",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is; on STATUS a swipe up); a request stays pending",
+        "source": "firmware/components/core/src/nav.c:92"
+      },
+      {
         "gesture": "G_CHORD",
         "mode": "watch",
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
         "action": "A+B chord: straight back to the deck",
-        "source": "firmware/components/core/src/nav.c:92"
+        "source": "firmware/components/core/src/nav.c:93"
       },
       {
         "gesture": "G_PRESS",
@@ -822,7 +831,7 @@
         "when": "",
         "nav": "NAV_HOLD_PRESS",
         "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
-        "source": "firmware/components/core/src/nav.c:95"
+        "source": "firmware/components/core/src/nav.c:96"
       },
       {
         "gesture": "G_RELEASE",
@@ -831,7 +840,7 @@
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
         "action": "Lifting cancels a hold in progress",
-        "source": "firmware/components/core/src/nav.c:96"
+        "source": "firmware/components/core/src/nav.c:97"
       },
       {
         "gesture": "G_TAP",
@@ -840,7 +849,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item answers 'hold to confirm' instead",
-        "source": "firmware/components/core/src/nav.c:97"
+        "source": "firmware/components/core/src/nav.c:98"
       },
       {
         "gesture": "G_SWIPE_DOWN",
@@ -849,7 +858,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is; on STATUS a swipe up); a request stays pending",
-        "source": "firmware/components/core/src/nav.c:98"
+        "source": "firmware/components/core/src/nav.c:99"
       },
       {
         "gesture": "G_BTN_A",
@@ -858,7 +867,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item answers 'hold to confirm' instead",
-        "source": "firmware/components/core/src/nav.c:99"
+        "source": "firmware/components/core/src/nav.c:100"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -867,7 +876,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is; on STATUS a swipe up); a request stays pending",
-        "source": "firmware/components/core/src/nav.c:100"
+        "source": "firmware/components/core/src/nav.c:101"
       },
       {
         "gesture": "G_CHORD",
@@ -876,7 +885,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "A+B chord: straight back to the deck",
-        "source": "firmware/components/core/src/nav.c:101"
+        "source": "firmware/components/core/src/nav.c:102"
       },
       {
         "gesture": "G_BTN_A",
@@ -885,7 +894,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item answers 'hold to confirm' instead",
-        "source": "firmware/components/core/src/nav.c:105"
+        "source": "firmware/components/core/src/nav.c:106"
       },
       {
         "gesture": "G_BTN_A_LONG",
@@ -894,7 +903,7 @@
         "when": "",
         "nav": "NAV_HOLD_PRESS",
         "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
-        "source": "firmware/components/core/src/nav.c:106"
+        "source": "firmware/components/core/src/nav.c:107"
       },
       {
         "gesture": "G_BTN_B",
@@ -903,7 +912,7 @@
         "when": "",
         "nav": "NAV_ERASE",
         "action": "KEYS: button B deletes the last typed word",
-        "source": "firmware/components/core/src/nav.c:107"
+        "source": "firmware/components/core/src/nav.c:108"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -912,7 +921,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is; on STATUS a swipe up); a request stays pending",
-        "source": "firmware/components/core/src/nav.c:108"
+        "source": "firmware/components/core/src/nav.c:109"
       },
       {
         "gesture": "G_CHORD",
@@ -921,7 +930,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "A+B chord: straight back to the deck",
-        "source": "firmware/components/core/src/nav.c:109"
+        "source": "firmware/components/core/src/nav.c:110"
       }
     ],
     "chord": "A + B held together: Home from any mode (logged on the deck, no action there)",
@@ -2274,7 +2283,7 @@
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:224",
     "gesture_map.chord": "firmware/components/core/src/app.c:397",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:187",
-    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:150",
+    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:151",
     "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:313",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",

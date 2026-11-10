@@ -53,7 +53,7 @@ One table, every input × mode. "—" means ignored (and logged). Thresholds: lo
 |---|---|---|---|---|---|---|---|
 | First touch after off/glow | wake only (glow: reveal ASK) | | | | | | |
 | Tap centre | wake | open AGENT (open ASK when a permission or question is pending) | commit selected item (safe items; a destructive item shows "hold") | commit selected item if safe (Open on PC, a question option); else shows "hold" | back to WATCH, keep terminal position (a tap that stops a glide only stops it) | commit selected row (nothing here is destructive) | open the session in the terminal (ASK when a request is pending) |
-| Long-press centre (600 ms) | wake | — (reserved) | — | — | — | — | — |
+| Long-press centre (600 ms) | wake | — (reserved) | — | — | — | — | back to HOME |
 | Hold centre ≥ 1.2 s (arc + ramp) | — | — | commit a destructive item | **Approve**-class item (bound to `rid`), or Deny (0.8 s); arc colour = item colour | — | — | — |
 | Rim scrub CW / CCW | wake | next / previous session (detent) | next / previous item (detent) | next / previous option (detent) | — | next / previous row | next / previous session |
 | Tap rim | wake | select the session under the finger | select the item at that angle (items are laid out on the ring) | same | — | — | watch the session under the finger |
@@ -157,10 +157,10 @@ User decision §9.1: tapping the centre opens a screen where gestures act on tha
 |---|---|---|
 | Working | Watch · Notify when done · Snooze 30 min · *Interrupt* | Interrupt |
 | Question, Permission | *ASK opens instead (§4.3)* | Approve, grants, Deny (in ASK) |
-| Done | *Reply…* · Watch | — |
-| Error | Dismiss error · *Reply…* · Watch | — |
-| Idle | *Reply…* · Snooze 30 min | — |
-| Input (the session waits, no request listed) | *Reply…* · Focus terminal | — |
+| Done | Watch · *Reply…* | — |
+| Error | Watch · Dismiss error · *Reply…* | — |
+| Idle | Watch · *Reply…* · Snooze 30 min | — |
+| Input (the session waits, no request listed) | Watch · *Reply…* · Focus terminal | — |
 
 Nothing that has another path takes a row (decision 27, 2026-11-09): **Focus** is button A on HOME and WATCH (on a Done session it also acknowledges), **Status** is the swipe down on HOME. A session that waits for input keeps Focus.
 
@@ -291,7 +291,7 @@ A live monitor for one running session on the small screen. Opened by the "Watch
         │                                                  │
         │                3 steps · 1:37                    │  20 px muted footer
         ╰╮  [A] FOCUS                          NEXT [B]  ╭─╯
-         ╰─╮          swipe up to go back              ╭─╯
+         ╰─╮    drag to scroll • hold to go back       ╭─╯
            ╰──╮                                      ╭──╯
               ╰──────────────────────────────────────╯
 ```
@@ -311,7 +311,7 @@ A live monitor for one running session on the small screen. Opened by the "Watch
 | Button A | focus the terminal |
 | Button B / rim scrub / tap rim | next / previous session; the watch follows |
 | Vertical drag in the centre | scroll the terminal: opens SCROLL over WATCH (§4.4) |
-| B long, A+B chord | back to HOME, watching stops |
+| Hold a finger still on the centre (600 ms), B long, A+B chord | back to HOME, watching stops |
 | Swipe left, right | ignored |
 
 ### 4.8 VOICE (issue 0ea9)
@@ -544,11 +544,13 @@ Voice dictation (2026-11-10, user decisions, issue 0ea9):
 
 Wheel cleanup (2026-11-10, user decision, issue 6696):
 
-32. **No "Mark seen" row.** It was pointless: the user has already looked at a session by the time its wheel is open. Opening AGENT on a Done, unseen session sends `ack` once (the segment dims and leaves the attention cycle); button A on a Done session still acknowledges too. The Done wheel is *Reply…* · Watch. Dismiss error stays, since it also moves the session to idle.
+32. **No "Mark seen" row.** It was pointless: the user has already looked at a session by the time its wheel is open. Opening AGENT on a Done, unseen session sends `ack` once (the segment dims and leaves the attention cycle); button A on a Done session still acknowledges too. The Done wheel was *Reply…* · Watch (Watch now leads every wheel, decision 34). Dismiss error stays, since it also moves the session to idle.
 
 Swipe keyboard (2026-11-10, user decisions, issue 1e57):
 
 33. **KEYS: swipe on the watch, decode on the PC.** The watch only records strokes over a QWERTY layout; the daemon decodes them against a lexicon with the terminal's context and types the best word straight into the session's terminal, so the watch never shows the composed text. Candidates sit in the top cap; Enter needs a hold.
+
+34. **Watch leads every wheel; holding still leaves WATCH** (issue dd44, 2026-11-10). The user asked for "tap, tap" from the deck to the monitor, and a third tap focuses the terminal, so Watch is the first (default) item in every state. WATCH also needed a touch way back besides B long and the A+B chord: a long press on the centre (600 ms without moving) is unused everywhere else and cannot be mistaken for the drag that scrolls, which starts only once the finger moves.
 
 ## 10. Decisions that reconcile DESIGN.md and UI-RING.md
 

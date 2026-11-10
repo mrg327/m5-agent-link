@@ -301,7 +301,7 @@ lv_obj_t *ui_watch_init(lv_obj_t *screen)
     place_lines(s_footer, UI_CX - 125, FOOTER_Y, 250, 1, LV_TEXT_ALIGN_CENTER);
     s_hint = theme_label(s_root, 16, COL_MUTED);
     place_lines(s_hint, UI_CX - 150, HINT_Y, 300, 1, LV_TEXT_ALIGN_CENTER);
-    lv_label_set_text(s_hint, "drag to scroll");
+    lv_label_set_text_fmt(s_hint, "drag to scroll%shold to go back", theme_sep());
     static const char *const words[2] = {"FOCUS", "NEXT"};
     for (int i = 0; i < 2; i++)
         s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,

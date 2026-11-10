@@ -10,9 +10,11 @@ wait 300
 tap 233 233
 wait 300
 expect_screen agent
+btn B
+wait 150
 expect_label > Reply...
 expect_label Focus terminal
-expect_label 2 items
+expect_label 3 items
 btn A
 wait 200
 expect_screen agent
