@@ -165,28 +165,28 @@ impl Layout {
     pub fn stopwatch_qwerty() -> Self {
         let mut keys = Vec::new();
         let rows: [(&str, i16, i16); 3] = [
-            ("qwertyuiop", 33, 166),
-            ("asdfghjkl", 53, 214),
-            ("zxcvbnm", 93, 262),
+            ("qwertyuiop", 13, 170),
+            ("asdfghjkl", 35, 224),
+            ("zxcvbnm", 79, 278),
         ];
         for (letters, x0, y) in rows {
             for (i, c) in letters.chars().enumerate() {
                 keys.push(Key {
                     cp: c as u32,
-                    x: x0 + 40 * i as i16,
+                    x: x0 + 44 * i as i16,
                     y,
-                    w: 40,
-                    h: 48,
+                    w: 44,
+                    h: 54,
                 });
             }
         }
-        for (cp, x, w) in [(0x0E, 93, 60), (0x20, 153, 160), (0x08, 313, 60)] {
+        for (cp, x, w) in [(0x0E, 79, 66), (0x20, 145, 176), (0x08, 321, 66)] {
             keys.push(Key {
                 cp,
                 x,
-                y: 310,
+                y: 332,
                 w,
-                h: 48,
+                h: 54,
             });
         }
         Layout { keys }

@@ -328,11 +328,12 @@ Dictate a reply to one session. "Dictate…" ends the Reply list when the daemon
 
 A swipe keyboard for one session, for fine edits or when speaking is not possible. "Type…" ends the Reply list after "Dictate…" when the daemon decodes strokes (`welcome.keys`). The text itself is not shown on the watch: it appears in the terminal as you write.
 
-- **Layout:** QWERTY in three rows of 40 × 48 px keys (y 166, 214, 262), then a bottom row of layer switch, space and backspace (y 310). The top cap above the keys holds the daemon's three best candidates as tappable labels, the typed one highlighted (a deviation from the plan's rim arcs: the cap is larger and easier to hit).
+- **Layout:** QWERTY in three rows of 44 × 54 px keys (y 170, 224, 278; 2026-11-10, up from 40 × 48, which cut the stroke decoder's top-1 misses slightly: 82.4 % vs 81.6 %), then a bottom row of layer switch, space and backspace (y 332). Each key corner sits at least 4 px inside the glass. The top cap above the keys holds the daemon's three best candidates as tappable labels, the typed one highlighted (a deviation from the plan's rim arcs: the cap is larger and easier to hit).
 - **Writing:** draw one word per stroke through its letters; lift to finish. A short tap types a single letter. The trail of the current stroke is drawn on the keys.
 - **Candidates:** tapping one replaces the last word (`kb_pick`). Backspace or B erases the last word (`kb_del`).
 - **Sending:** A held 1.2 s presses Enter (`kb_send`, the approve ramp in the answer colour). The toast reads `Sent`.
-- B held leaves and erases unsent text (`kb_end` 1); the A+B chord goes HOME and also erases; an arriving request opens ASK. Touch gestures (swipe, scrub) are off in this mode. The badges read A `SEND` and B `DEL`; they sit at radius 188 (220° / 140°) instead of the usual 158, because the usual spot overlaps the bottom row.
+- B held leaves and erases unsent text (`kb_end` 1); the A+B chord goes HOME and also erases; an arriving request opens ASK. Touch gestures (swipe, scrub) are off in this mode. The badges read A `SEND` and B `DEL`; they sit below the keys at radius 190 (199° / 161°) instead of the usual spot, which the keys now cover.
+- A double tap below the keys (y ≥ 386, two taps within 400 ms) goes back like B held: it leaves and erases unsent text. A single tap there does nothing and is never sent as a stroke.
 - **Device details:** the layer key (`cp` 0x0E, "123"/"abc") is local: it swaps in a digits-and-symbols layer (`1234567890`, `-_./:~=+@`, `#%&*?!'`) and resends `kb_start` with the same `kid`. Strokes are sampled at ≥ 30 ms, at most 200 points, `seq` from 0 per keyboard. A tap on a candidate sends `kb_pick`, never a stroke. Every exit sends `kb_end` with arg 1; the keyboard stays open after `kb_send`. Only three candidates are shown.
 
 ## 5. Haptic vocabulary

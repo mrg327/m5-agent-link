@@ -8,11 +8,12 @@
 #include "link.h"
 
 static const char *const kRows[2][3] = {{"qwertyuiop", "asdfghjkl", "zxcvbnm"}, {"1234567890", "-_./:~=+@", "#%&*?!'"}};
-static const int16_t kRowX[3] = {33, 53, 93};
-static const int16_t kRowY[3] = {166, 214, 262};
-#define KEY_W 40
-#define KEY_H 48
-#define BOTTOM_Y 310
+/* 44 x 54 keys, as large as the circle allows with the candidates above (each corner >= 4 px inside the glass) */
+static const int16_t kRowX[3] = {13, 35, 79};
+static const int16_t kRowY[3] = {170, 224, 278};
+#define KEY_W 44
+#define KEY_H 54
+#define BOTTOM_Y 332
 
 int keys_layout(int layer, keys_key_t *out, int cap)
 {
@@ -22,9 +23,9 @@ int keys_layout(int layer, keys_key_t *out, int cap)
         for (int i = 0; kRows[layer][r][i] && n < cap; i++)
             out[n++] = (keys_key_t){(uint16_t)kRows[layer][r][i], (int16_t)(kRowX[r] + KEY_W * i), kRowY[r], KEY_W, KEY_H};
     if (n + 3 <= cap) {
-        out[n++] = (keys_key_t){KEYS_CP_LAYER, 93, BOTTOM_Y, 60, KEY_H};
-        out[n++] = (keys_key_t){KEYS_CP_SPACE, 153, BOTTOM_Y, 160, KEY_H};
-        out[n++] = (keys_key_t){KEYS_CP_BKSP, 313, BOTTOM_Y, 60, KEY_H};
+        out[n++] = (keys_key_t){KEYS_CP_LAYER, 79, BOTTOM_Y, 66, KEY_H};
+        out[n++] = (keys_key_t){KEYS_CP_SPACE, 145, BOTTOM_Y, 176, KEY_H};
+        out[n++] = (keys_key_t){KEYS_CP_BKSP, 321, BOTTOM_Y, 66, KEY_H};
     }
     return n;
 }

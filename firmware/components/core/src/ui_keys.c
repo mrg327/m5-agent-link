@@ -2,7 +2,7 @@
  * the Reply list. The watch only draws the keys and records strokes (keys.c); the daemon decodes
  * them into words and types them into the terminal, then reports candidates back. A tap on a
  * candidate in the top cap swaps the typed word, B deletes the last word, A held 1.2 s sends
- * (Enter). B held or the A+B chord leave, and the daemon erases what was not sent. No text is
+ * (Enter). B held, a double tap below the keys or the A+B chord leave, and the daemon erases what was not sent. No text is
  * composed or shown here beyond the candidates. */
 #include <stdio.h>
 #include <string.h>
@@ -25,9 +25,10 @@
 #define N_SLOTS 3
 #define TRAIL_PTS 64
 #define FADE_MS 250
-#define BADGE_R 188
-#define BADGE_A_DEG 220
-#define BADGE_B_DEG 140
+/* below the keys, either side of the centre: the lower corners are keys now */
+#define BADGE_R 190
+#define BADGE_A_DEG 199
+#define BADGE_B_DEG 161
 
 static lv_obj_t *s_root, *s_draw, *s_header, *s_status, *s_slot[N_SLOTS], *s_trail;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
@@ -36,7 +37,8 @@ static lv_point_precise_t s_pts[TRAIL_PTS];
 static uint32_t s_sid, s_now, s_cands_rev, s_lift_ms;
 static int s_trail_n;
 static bool s_holding, s_ramp_started, s_was_down;
-static uint32_t s_hold_t0;
+static uint32_t s_hold_t0, s_bottom_tap_ms;
+static bool s_bottom_tapped;
 
 static void show(lv_obj_t *o, bool on)
 {
@@ -118,7 +120,7 @@ void ui_keys_open(uint32_t sid, uint32_t now)
 {
     s_sid = sid;
     s_now = now;
-    s_holding = s_ramp_started = s_was_down = false;
+    s_holding = s_ramp_started = s_was_down = s_bottom_tapped = false;
     s_trail_n = 0;
     s_cands_rev = (uint32_t)-1;
     s_header_txt[0] = s_status_txt[0] = 0;
@@ -191,16 +193,28 @@ static bool on_layer_key(const keys_pt_t *p)
     return false;
 }
 
-/* What a finished stroke means: the layer key and the candidates are local, the rest is the daemon's. */
-static void classify(const keys_stroke_t *st)
+/* What a finished stroke means: the layer key, the candidates and the strip below the keys are
+ * local, the rest is the daemon's. Returns true when the stroke left the keyboard. */
+static bool classify(const keys_stroke_t *st)
 {
     const keys_pt_t *p0 = &st->pts[0];
     bool tap = keys_is_tap(st);
+    bool bottom = tap && p0->y >= KEYS_BOTTOM_Y;
+    if (bottom && s_bottom_tapped && s_now - s_bottom_tap_ms <= KEYS_BACK_DOUBLE_MS) {
+        s_bottom_tapped = false;
+        dbg_event("keys", "back", "\"how\":\"double_tap\"");
+        ui_go_home(); /* leaves KEYS like B held: ui_keys_close erases what was not sent */
+        g_ui_actions->tick();
+        return true;
+    }
+    s_bottom_tapped = bottom;
+    s_bottom_tap_ms = s_now;
+    if (bottom) return false; /* a single tap down there types nothing */
     if (tap && on_layer_key(p0)) {
         keys_set_layer(keys_layer() ? 0 : 1);
         g_ui_actions->tick();
         lv_obj_invalidate(s_draw);
-        return;
+        return false;
     }
     if (tap && p0->y < KEYS_TOP_Y) {
         int i = slot_at(p0->x);
@@ -208,9 +222,10 @@ static void classify(const keys_stroke_t *st)
             if (keys_pick(i)) g_ui_actions->tick();
             else g_ui_actions->reject();
         }
-        return;
+        return false;
     }
     if (!keys_send_stroke(st)) g_ui_actions->reject();
+    return false;
 }
 
 static void update_trail(void)
@@ -249,8 +264,9 @@ void ui_keys_tick(uint32_t now)
     s_now = now;
     const keys_stroke_t *st;
     while ((st = keys_next_stroke()) != NULL) {
-        classify(st);
+        bool left = classify(st);
         keys_stroke_done();
+        if (left) return;
     }
     update_trail();
     if (s_holding) {

@@ -10,7 +10,9 @@
 #define KEYS_MAX_PTS 200      /* points in one stroke (1200 B on the wire) */
 #define KEYS_SAMPLE_MS 30     /* touch samples are kept at least this far apart (~30 Hz) */
 #define KEYS_TAP_PX 18        /* a stroke whose extent stays under this is a tap */
-#define KEYS_TOP_Y 166        /* top of the key block; the cap with the candidates lies above it */
+#define KEYS_TOP_Y 170        /* top of the key block; the cap with the candidates lies above it */
+#define KEYS_BOTTOM_Y 386     /* bottom of the key block; a double tap below it leaves the keyboard */
+#define KEYS_BACK_DOUBLE_MS 400 /* the second tap of that double tap must land within this */
 #define KEYS_MAX_CANDS 4
 #define KEYS_CAND_LEN 32
 

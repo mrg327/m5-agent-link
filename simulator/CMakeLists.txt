@@ -188,6 +188,10 @@ sim_script_test(sim_voice_dictate voice_dictate.txt
 sim_script_test(sim_keys_basic keys_basic.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":15,\"sid\":[0-9]+,\"rid\":0,\"hold_ms\":[0-9][0-9]?[0-9]?,"
   PASS_REGULAR_EXPRESSION "\"msg\":\"kb_start\".*\"seq\":0,.*\"seq\":1,.*\"msg\":\"kb_start\".*\"msg\":\"kb_start\".*\"op\":14,\"sid\":1.*\"op\":15,\"sid\":1,\"rid\":0,\"hold_ms\":1[0-9][0-9][0-9].*\"op\":16,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":1")
+# KEYS: a double tap below the keys leaves with kb_end arg 1; a single tap there is never a stroke.
+sim_script_test(sim_keys_back keys_back.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"stroke\""
+  PASS_REGULAR_EXPRESSION "\"ev\":\"back\".*\"op\":16,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":1")
 # KEYS candidates: a tap on a candidate is kb_pick (op 13) with its index, never a stroke; the chord
 # leaves with kb_end arg 1.
 sim_script_test(sim_keys_pick keys_pick.txt

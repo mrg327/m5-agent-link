@@ -136,7 +136,7 @@ fn packed_forms_round_trip() {
     assert_eq!(l.keys(), l2.keys());
     assert!(Layout::from_packed(&[0; 11]).is_err());
     assert_eq!(l.key_at(40, 180).unwrap().cp, 'q' as u32);
-    assert_eq!(l.key_at(200, 330).unwrap().cp, 0x20);
+    assert_eq!(l.key_at(200, 350).unwrap().cp, 0x20);
     assert!(l.key_at(5, 5).is_none());
     let pts = [
         Point {
