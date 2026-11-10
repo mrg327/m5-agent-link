@@ -35,12 +35,14 @@ typedef struct {
     uint32_t n;     /* tool steps in the current turn */
     uint8_t step;   /* step_state_t of step n: STEP_RUNNING while the daemon sent no `ok` */
     steps_t steps;  /* the last STEPS_MAX steps, built by model_upsert() from n / ok / the step text */
+    bool no_scroll; /* device-side: the daemon answered a scroll with `unsupported`; hide the item */
 } session_t;
 
 /* Which fields of a session delta were present on the wire. */
 enum {
     SF_AGENT = 1 << 0, SF_STATE = 1 << 1, SF_SUB = 1 << 2, SF_REPO = 1 << 3, SF_BRANCH = 1 << 4,
     SF_TOOL = 1 << 5, SF_T0 = 1 << 6, SF_TST = 1 << 7, SF_SUMMARY = 1 << 8, SF_SEEN = 1 << 9,
+    SF_NO_SCROLL = 1 << 10, /* not on the wire: set by the device itself */
     SF_HOST = 1 << 11, SF_HN = 1 << 12, SF_SNZ = 1 << 13, SF_NTF = 1 << 14, SF_N = 1 << 15,
     SF_OK = 1 << 16 /* with SF_OK, `step` is STEP_OK or STEP_FAIL */
 };

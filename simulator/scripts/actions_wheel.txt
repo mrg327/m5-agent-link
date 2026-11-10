@@ -53,13 +53,13 @@ expect_screen agent
 swipe 233 150 233 330 200
 wait 300
 expect_screen ring
-# Watch (the default) opens WATCH; swipe up goes back
+# Watch (the default) opens WATCH; B held goes back (a vertical drag there scrolls, issue 5cbb)
 tap 233 233
 wait 300
 btn A
 wait 200
 expect_screen watch
-swipe 233 300 233 180 160
+btn B long
 wait 300
 expect_screen ring
 # A done session: Mark seen first, then Watch

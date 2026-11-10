@@ -1,0 +1,26 @@
+# SCROLL glides like a trackpad (UI-V2 §4.4): a fast swipe up keeps sending older lines after the
+# finger lifts; a new touch stops the glide, and the tap that caught it does not leave SCROLL.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite
+wait 300
+tap 233 233
+wait 300
+btn A
+wait 300
+expect_screen watch
+# a drag on WATCH opens SCROLL over it, and moves the terminal one line
+drag 233 260 -30
+wait 300
+expect_screen scroll
+swipe 233 330 233 130 120
+wait 300
+press 233 233
+wait 100
+release
+wait 600
+expect_screen scroll
+tap 233 233
+wait 300
+expect_screen watch
+quit

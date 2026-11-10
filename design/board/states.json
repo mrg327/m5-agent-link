@@ -41,6 +41,13 @@
       "ask_question": "Question with options",
       "ask_sent": "Answer sent"
     }},
+    { "id": "scroll", "title": "SCROLL · drag on WATCH", "shots": {
+      "scroll_live": "Live",
+      "scroll_preview": "Scrolled, preview line",
+      "scroll_scrolled": "Scrolled far",
+      "scroll_private": "Privacy: no preview",
+      "scroll_unsupported": "Terminal not supported"
+    }},
     { "id": "status", "title": "STATUS · quick settings", "shots": {
       "status": "Status rows",
       "status_quiet": "Quiet until …"

@@ -25,6 +25,7 @@
 #define SEL_TRACK_W 4
 #define IDLE_W 4
 #define GLOW_W 14     /* ring_set_solid: the display-off alert glow is wider than the index band */
+#define TRACK_RING_W 6 /* ring_set_track: the grey track and the position arc share this width */
 #define PROG_OUT 212  /* hold-to-confirm fill, just inside the band */
 #define PROG_W 8
 #define INV_R_IN (PROG_OUT - PROG_W) /* every invalidated chunk covers this radius band: all the ring draws */
@@ -52,6 +53,9 @@ typedef struct {
     int n;
     bool ambient, still, solid; /* still: show the settled look, no motion */
     lv_color_t solid_color;
+    bool track; /* SCROLL position track instead of segments */
+    int track_permille;
+    uint32_t track_rgb;
     int prog;
     uint32_t prog_rgb;
     uint32_t last_tick;

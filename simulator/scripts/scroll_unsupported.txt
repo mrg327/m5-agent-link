@@ -1,0 +1,28 @@
+# The daemon answers `unsupported`: SCROLL closes back to WATCH with a toast, and later drags on that
+# session's WATCH only repeat the toast.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite
+wait 300
+tap 233 233
+wait 300
+btn A
+wait 300
+expect_screen watch
+# a drag on WATCH opens SCROLL over it, and moves the terminal one line
+drag 233 260 -30
+wait 300
+expect_screen scroll
+drag 233 260 -96
+wait 200
+result err unsupported
+wait 200
+expect_screen watch
+expect_label Not supported
+shot scroll_unsupported.png
+wait 2500
+drag 233 260 -60
+wait 300
+expect_screen watch
+expect_label Not supported
+quit
