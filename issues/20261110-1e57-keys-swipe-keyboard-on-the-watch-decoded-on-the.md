@@ -1,11 +1,11 @@
 ---
 id: 20261110-1e57
 title: KEYS: swipe keyboard on the watch, decoded on the PC
-status: open
+status: claimed
 severity: med
 area: firmware
 platforms: any
-owner:
+owner: copilot-cli/opus@mac-work
 created: 2026-11-10T18:30:58Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
@@ -117,3 +117,5 @@ size, stroke thresholds, prior weights).
 ## Log
 
 - 2026-11-10T18:30:58Z · copilot-cli/opus@mac-work · macos-arm64 · 9c5bd1c: filed
+- 2026-11-10T18:33:57Z · copilot-cli/opus@mac-work · macos-arm64 · b7c755b: claimed
+- 2026-11-10T18:33:57Z · copilot-cli/opus@mac-work · macos-arm64 · b7c755b: Plan fixed: layout geometry (40x48 keys, rows y=166/214/262/310, candidates in the top cap), proto 0.7 (kb_start/kb_stroke/kb_cands, cmd kb_pick/kb_del/kb_send/kb_end). Sub-agents: A decoder (daemon keys/), B daemon plumbing, C firmware+simulator.
