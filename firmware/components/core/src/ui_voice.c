@@ -26,13 +26,6 @@ static voice_state_t s_shown = (voice_state_t)-1;
 static bool s_holding, s_ramp_started;
 static uint32_t s_hold_t0;
 
-static void set(lv_obj_t *l, char *cache, size_t cap, const char *t)
-{
-    if (!strcmp(cache, t)) return;
-    snprintf(cache, cap, "%s", t);
-    lv_label_set_text(l, t);
-}
-
 static void show(lv_obj_t *o, bool on)
 {
     if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
@@ -55,7 +48,7 @@ static void render(void)
     char buf[64];
     const char *base = s ? theme_basename(s->repo) : "";
     snprintf(buf, sizeof buf, "Dictate%s%s", theme_sep(), base[0] ? base : "(no folder)");
-    set(s_header, s_header_txt, sizeof s_header_txt, buf);
+    theme_set_text(s_header, s_header_txt, sizeof s_header_txt, buf);
     if (st != s_shown) {
         if (st == VOICE_TEXT) s_text_since = s_now;
         if (st != VOICE_TEXT) hold_cancel();
@@ -66,35 +59,35 @@ static void render(void)
     case VOICE_REC: {
         uint32_t ms = voice_elapsed_ms(s_now);
         snprintf(buf, sizeof buf, "%u:%02u", (unsigned)(ms / 60000), (unsigned)(ms / 1000 % 60));
-        set(s_big, s_big_txt, sizeof s_big_txt, buf);
-        set(s_text, s_text_txt, sizeof s_text_txt, "Listening...");
+        theme_set_text(s_big, s_big_txt, sizeof s_big_txt, buf);
+        theme_set_text(s_text, s_text_txt, sizeof s_text_txt, "Listening...");
         hint = "tap to stop";
         if (!s_holding) ring_set_progress(ui_home_ring(), voice_level() * 10, RGB_ASK); /* loudness */
         break;
     }
     case VOICE_WAIT:
-        set(s_big, s_big_txt, sizeof s_big_txt, "");
-        set(s_text, s_text_txt, sizeof s_text_txt, "Transcribing...");
+        theme_set_text(s_big, s_big_txt, sizeof s_big_txt, "");
+        theme_set_text(s_text, s_text_txt, sizeof s_text_txt, "Transcribing...");
         ring_set_progress(ui_home_ring(), 0, RGB_ASK);
         word = "WAIT";
         break;
     case VOICE_TEXT:
-        set(s_big, s_big_txt, sizeof s_big_txt, "");
-        set(s_text, s_text_txt, sizeof s_text_txt, voice_text());
+        theme_set_text(s_big, s_big_txt, sizeof s_big_txt, "");
+        theme_set_text(s_text, s_text_txt, sizeof s_text_txt, voice_text());
         hint = "hold to send";
         word = "HOLD";
         break;
     case VOICE_FAILED:
     default:
-        set(s_big, s_big_txt, sizeof s_big_txt, "");
-        set(s_text, s_text_txt, sizeof s_text_txt, voice_error()[0] ? voice_error() : "Not sent");
+        theme_set_text(s_big, s_big_txt, sizeof s_big_txt, "");
+        theme_set_text(s_text, s_text_txt, sizeof s_text_txt, voice_error()[0] ? voice_error() : "Not sent");
         ring_set_progress(ui_home_ring(), 0, RGB_ASK);
         hint = "tap to try again";
         word = "RETRY";
         break;
     }
     show(s_big, s_big_txt[0] != 0);
-    set(s_hint, s_hint_txt, sizeof s_hint_txt, hint);
+    theme_set_text(s_hint, s_hint_txt, sizeof s_hint_txt, hint);
     if (strcmp(word, s_word_txt)) {
         snprintf(s_word_txt, sizeof s_word_txt, "%s", word);
         theme_key_badge_set_word(s_badge[0], s_word[0], word, UI_BADGE_A_DEG, UI_BADGE_R);
