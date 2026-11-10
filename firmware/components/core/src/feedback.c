@@ -24,8 +24,8 @@ void feedback_attention(att_kind_t kind)
     static const uint16_t error[] = {500};
     static const uint16_t done[] = {35};
     switch (kind) {
-    case ATT_APPROVAL: haptic(permission, 3); break;
-    case ATT_QUESTION: haptic(question, 3); break;
+    case ATT_APPROVAL: haptic(permission, 3); sound("input"); break;
+    case ATT_QUESTION: haptic(question, 3); sound("input"); break;
     case ATT_ERROR: haptic(error, 1); break;
     case ATT_DONE: haptic(done, 1); sound("done"); break;
     }
@@ -35,7 +35,6 @@ void feedback_tick(void)
 {
     static const uint16_t tick[] = {35};
     haptic(tick, 1);
-    sound("select");
 }
 
 /* The board plays a pulse of at most 15 ms at the 100 % kick level only, which feels like a click. */

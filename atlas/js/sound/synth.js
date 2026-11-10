@@ -63,6 +63,14 @@ export function render(sound, rate = 16000) {
   return out;
 }
 
+// A role's cue: the pick played `times` times with `gapMs` of silence between (snd_role_t).
+export function repeat(pcm, times = 1, gapMs = 0, rate = 16000) {
+  const gap = samples(gapMs, rate), n = Math.max(1, times);
+  const out = new Float32Array(n * pcm.length + (n - 1) * gap);
+  for (let k = 0; k < n; k++) out.set(pcm, k * (pcm.length + gap));
+  return out;
+}
+
 // Sample-and-hold upsample to the AudioContext rate (as a plain DAC would), so every browser
 // accepts the buffer whatever rates it allows for createBuffer.
 export function hold(pcm, from, to) {

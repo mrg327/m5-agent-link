@@ -103,32 +103,41 @@ size_t snd_render(const snd_sound_t *s, int16_t *out, size_t max)
     return n;
 }
 
+size_t snd_role_length(const snd_role_t *r, const snd_sound_t *s)
+{
+    unsigned times = r->repeat ? r->repeat : 1;
+    return times * snd_length(s) + (times - 1) * samples(r->gap_ms);
+}
+
 void sound_play(const char *role)
 {
     static struct {
-        const snd_sound_t *s;
+        const snd_role_t *r;
         int16_t *pcm;
         size_t n;
     } cache[4];
+    const snd_role_t *r = snd_role(role);
     const snd_sound_t *s = snd_for(role);
-    if (!s || !hal_board_info()->has_speaker) return;
+    if (!r || !s || !hal_board_info()->has_speaker) return;
     unsigned i = 0;
-    while (i < sizeof cache / sizeof *cache && cache[i].s && cache[i].s != s) i++;
+    while (i < sizeof cache / sizeof *cache && cache[i].r && cache[i].r != r) i++;
     if (i == sizeof cache / sizeof *cache) return;
-    if (!cache[i].s) {
-        size_t n = snd_length(s);
+    if (!cache[i].r) {
+        size_t n = snd_role_length(r, s), one = snd_length(s), gap = samples(r->gap_ms);
         int16_t *pcm = hal_audio_alloc(n * sizeof *pcm);
         if (!pcm) return;
-        cache[i].n = snd_render(s, pcm, n);
+        memset(pcm, 0, n * sizeof *pcm);
+        for (size_t at = 0; at + one <= n; at += one + gap) snd_render(s, pcm + at, one);
+        cache[i].n = n;
         cache[i].pcm = pcm;
-        cache[i].s = s;
+        cache[i].r = r;
     }
     /* A finish can arrive as both an attention and a session change: play it once, not restarted. */
-    static const snd_sound_t *last;
+    static const snd_role_t *last;
     static uint64_t last_us;
     uint64_t now = hal_time_us();
-    if (s == last && now - last_us < 300000 && now - last_us < cache[i].n * 1000000ull / SND_RATE) return;
-    last = s;
+    if (r == last && now - last_us < 300000 && now - last_us < cache[i].n * 1000000ull / SND_RATE) return;
+    last = r;
     last_us = now;
     hal_audio_play(cache[i].pcm, cache[i].n);
 }

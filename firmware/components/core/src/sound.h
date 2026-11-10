@@ -12,5 +12,8 @@ size_t snd_length(const snd_sound_t *s);
 /* Renders up to `max` samples of 16-bit PCM; returns the number written. */
 size_t snd_render(const snd_sound_t *s, int16_t *out, size_t max);
 
-/* Plays the chosen sound for a role ("done", "select"). Renders it on first use and keeps it. */
+/* Samples a role plays: its pick `repeat` times with `gap_ms` between. */
+size_t snd_role_length(const snd_role_t *r, const snd_sound_t *s);
+
+/* Plays the chosen sound for a role ("done", "input"). Renders it on first use and keeps it. */
 void sound_play(const char *role);

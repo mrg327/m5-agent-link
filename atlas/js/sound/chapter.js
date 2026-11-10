@@ -1,10 +1,10 @@
 // "sound" chapter: audition the watch's notification sounds. The bank is firmware data
 // (sound_bank.c → facts.sounds) rendered by the same chip synth the watch will run.
 import { h, svg, bodySlot } from '../gestures/dom.js';
-import { render, hold, durationMs } from './synth.js';
+import { render, hold, durationMs, repeat } from './synth.js';
 
 const PICKS_KEY = 'atlas.sound.picks';
-const ROLE_COLOR = { done: 'var(--c-success)', select: 'var(--c-accent)' };
+const ROLE_COLOR = { done: 'var(--c-success)', input: 'var(--c-accent)' };
 const WAVE_LABEL = { sq12: 'pulse 12%', sq25: 'pulse 25%', sq50: 'square', tri: 'triangle', saw: 'saw', noise: 'noise', sine: 'sine', fm: 'FM piano', bell: 'FM bell' };
 const steps = (s) => s.tracks.flat();
 
@@ -64,7 +64,9 @@ export function mount(section, ctx) {
     const ac = ctxAudio();
     if (!ac) return;
     playing?.src.stop();
-    const pcm = hold(render(sound, bank.rate), bank.rate, ac.sampleRate);
+    const role = bank.roles.find((r) => r.id === sound.role) || {};
+    const cue = repeat(render(sound, bank.rate), role.repeat, role.gap_ms, bank.rate);
+    const pcm = hold(cue, bank.rate, ac.sampleRate);
     const buf = ac.createBuffer(1, pcm.length, ac.sampleRate);
     buf.getChannelData(0).set(pcm);
     const src = ac.createBufferSource();
@@ -79,7 +81,7 @@ export function mount(section, ctx) {
       node.connect(hp); hp.connect(lp); node = lp;
     }
     node.connect(gain); gain.connect(ac.destination);
-    card.style.setProperty('--dur', `${durationMs(sound)}ms`);
+    card.style.setProperty('--dur', `${(cue.length * 1000) / bank.rate}ms`);
     card.dataset.playing = '';
     void card.offsetWidth;
     card.dataset.playing = '1';
@@ -134,7 +136,8 @@ export function mount(section, ctx) {
       grid.append(card);
     }
     root.append(h('section', { class: 'snd__role', 'aria-labelledby': `snd-role-${role.id}` },
-      h('h3', { class: 'snd__role-t', id: `snd-role-${role.id}` }, h('span', { class: 'mono', text: role.id }), ' ', role.when),
+      h('h3', { class: 'snd__role-t', id: `snd-role-${role.id}` }, h('span', { class: 'mono', text: role.id }), ' ', role.when,
+        role.repeat > 1 ? ` (plays ${role.repeat}×, ${role.gap_ms} ms apart)` : ''),
       grid));
   }
   showPicks();

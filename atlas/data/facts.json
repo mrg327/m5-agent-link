@@ -2231,12 +2231,16 @@
       {
         "id": "done",
         "when": "A session you armed with Notify when done (or are watching) finishes",
-        "pick": "done-ff"
+        "pick": "done-ff",
+        "repeat": 1,
+        "gap_ms": 0
       },
       {
-        "id": "select",
-        "when": "You commit an item on the wheel",
-        "pick": "select-ff"
+        "id": "input",
+        "when": "An agent asks a question or needs your approval",
+        "pick": "input-ff",
+        "repeat": 3,
+        "gap_ms": 90
       }
     ],
     "bank": [
@@ -3057,8 +3061,8 @@
         }
       },
       {
-        "id": "select-blip",
-        "role": "select",
+        "id": "input-blip",
+        "role": "input",
         "name": "Blip",
         "tracks": [
           [
@@ -3078,8 +3082,8 @@
         }
       },
       {
-        "id": "select-tick",
-        "role": "select",
+        "id": "input-tick",
+        "role": "input",
         "name": "Tick",
         "tracks": [
           [
@@ -3099,8 +3103,8 @@
         }
       },
       {
-        "id": "select-confirm",
-        "role": "select",
+        "id": "input-confirm",
+        "role": "input",
         "name": "Confirm",
         "tracks": [
           [
@@ -3128,8 +3132,8 @@
         }
       },
       {
-        "id": "select-pop",
-        "role": "select",
+        "id": "input-pop",
+        "role": "input",
         "name": "Pop",
         "tracks": [
           [
@@ -3149,8 +3153,8 @@
         }
       },
       {
-        "id": "select-chk",
-        "role": "select",
+        "id": "input-chk",
+        "role": "input",
         "name": "Chk",
         "tracks": [
           [
@@ -3170,8 +3174,8 @@
         }
       },
       {
-        "id": "select-jump",
-        "role": "select",
+        "id": "input-jump",
+        "role": "input",
         "name": "Jump",
         "tracks": [
           [
@@ -3191,8 +3195,8 @@
         }
       },
       {
-        "id": "select-soft",
-        "role": "select",
+        "id": "input-soft",
+        "role": "input",
         "name": "Soft tap",
         "tracks": [
           [
@@ -3212,8 +3216,8 @@
         }
       },
       {
-        "id": "select-pew",
-        "role": "select",
+        "id": "input-pew",
+        "role": "input",
         "name": "Pew",
         "tracks": [
           [
@@ -3233,8 +3237,8 @@
         }
       },
       {
-        "id": "select-bubble",
-        "role": "select",
+        "id": "input-bubble",
+        "role": "input",
         "name": "Bubble",
         "tracks": [
           [
@@ -3254,8 +3258,8 @@
         }
       },
       {
-        "id": "select-bell",
-        "role": "select",
+        "id": "input-bell",
+        "role": "input",
         "name": "Bell",
         "tracks": [
           [
@@ -3275,8 +3279,8 @@
         }
       },
       {
-        "id": "select-lock",
-        "role": "select",
+        "id": "input-lock",
+        "role": "input",
         "name": "Lock-on",
         "tracks": [
           [
@@ -3314,8 +3318,8 @@
         }
       },
       {
-        "id": "select-swish",
-        "role": "select",
+        "id": "input-swish",
+        "role": "input",
         "name": "Swish",
         "tracks": [
           [
@@ -4165,8 +4169,8 @@
         }
       },
       {
-        "id": "select-pokemon",
-        "role": "select",
+        "id": "input-pokemon",
+        "role": "input",
         "name": "Menu (Pokémon style)",
         "tracks": [
           [
@@ -4194,8 +4198,8 @@
         }
       },
       {
-        "id": "select-zelda",
-        "role": "select",
+        "id": "input-zelda",
+        "role": "input",
         "name": "Sword (Zelda style)",
         "tracks": [
           [
@@ -4225,8 +4229,8 @@
         }
       },
       {
-        "id": "select-contra",
-        "role": "select",
+        "id": "input-contra",
+        "role": "input",
         "name": "Shot (Contra style)",
         "tracks": [
           [
@@ -4256,8 +4260,8 @@
         }
       },
       {
-        "id": "select-sf2",
-        "role": "select",
+        "id": "input-sf2",
+        "role": "input",
         "name": "Hit (Street Fighter style)",
         "tracks": [
           [
@@ -4287,8 +4291,8 @@
         }
       },
       {
-        "id": "select-megaman",
-        "role": "select",
+        "id": "input-megaman",
+        "role": "input",
         "name": "Buster (Mega Man style)",
         "tracks": [
           [
@@ -4316,8 +4320,8 @@
         }
       },
       {
-        "id": "select-metroid",
-        "role": "select",
+        "id": "input-metroid",
+        "role": "input",
         "name": "Beam (Metroid style)",
         "tracks": [
           [
@@ -4347,8 +4351,8 @@
         }
       },
       {
-        "id": "select-ff",
-        "role": "select",
+        "id": "input-ff",
+        "role": "input",
         "name": "Cursor (Final Fantasy style)",
         "tracks": [
           [
@@ -4378,8 +4382,8 @@
         }
       },
       {
-        "id": "select-sonic",
-        "role": "select",
+        "id": "input-sonic",
+        "role": "input",
         "name": "Spin (Sonic style)",
         "tracks": [
           [
@@ -4399,8 +4403,8 @@
         }
       },
       {
-        "id": "select-pacman",
-        "role": "select",
+        "id": "input-pacman",
+        "role": "input",
         "name": "Wakka (Pac-Man style)",
         "tracks": [
           [
@@ -4428,8 +4432,8 @@
         }
       },
       {
-        "id": "select-tetris",
-        "role": "select",
+        "id": "input-tetris",
+        "role": "input",
         "name": "Rotate (Tetris style)",
         "tracks": [
           [
@@ -4532,26 +4536,26 @@
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
     "gesture_map.wake_swallow": "firmware/components/core/src/app.c:424",
-    "haptics.approved": "firmware/components/core/src/feedback.c:75",
-    "haptics.denied": "firmware/components/core/src/feedback.c:81",
-    "haptics.deny_ramp": "firmware/components/core/src/feedback.c:62",
-    "haptics.detent": "firmware/components/core/src/feedback.c:44",
+    "haptics.approved": "firmware/components/core/src/feedback.c:74",
+    "haptics.denied": "firmware/components/core/src/feedback.c:80",
+    "haptics.deny_ramp": "firmware/components/core/src/feedback.c:61",
+    "haptics.detent": "firmware/components/core/src/feedback.c:43",
     "haptics.detent_min_gap_ms": "firmware/components/core/src/feedback.c:6",
     "haptics.done": "firmware/components/core/src/feedback.c:25",
     "haptics.duty": "firmware/boards/stopwatch/input.cpp:17",
     "haptics.error": "firmware/components/core/src/feedback.c:24",
-    "haptics.hello": "firmware/components/core/src/feedback.c:128",
-    "haptics.hold_ramp": "firmware/components/core/src/feedback.c:55",
+    "haptics.hello": "firmware/components/core/src/feedback.c:127",
+    "haptics.hold_ramp": "firmware/components/core/src/feedback.c:54",
     "haptics.kick_duty": "firmware/boards/stopwatch/input.cpp:18",
     "haptics.kick_ms": "firmware/boards/stopwatch/input.cpp:19",
     "haptics.kick_only_rule": "firmware/boards/stopwatch/input.cpp:122",
     "haptics.kick_rule": "firmware/boards/stopwatch/input.cpp:108",
     "haptics.permission": "firmware/components/core/src/feedback.c:22",
     "haptics.question": "firmware/components/core/src/feedback.c:23",
-    "haptics.quiet_toggled": "firmware/components/core/src/feedback.c:109",
-    "haptics.reject": "firmware/components/core/src/feedback.c:94",
-    "haptics.reply_sent": "firmware/components/core/src/feedback.c:88",
-    "haptics.scroll_stop": "firmware/components/core/src/feedback.c:101",
+    "haptics.quiet_toggled": "firmware/components/core/src/feedback.c:108",
+    "haptics.reject": "firmware/components/core/src/feedback.c:93",
+    "haptics.reply_sent": "firmware/components/core/src/feedback.c:87",
+    "haptics.scroll_stop": "firmware/components/core/src/feedback.c:100",
     "haptics.tick": "firmware/components/core/src/feedback.c:36",
     "link.hello_retry_ms": "firmware/components/core/src/link.c:8",
     "link.idle_ping_ms": "firmware/components/core/src/link.c:14",
@@ -4639,29 +4643,29 @@
     "sounds.done-treasure": "firmware/components/core/src/sound_bank.c:34",
     "sounds.done-warp": "firmware/components/core/src/sound_bank.c:44",
     "sounds.done-zelda": "firmware/components/core/src/sound_bank.c:104",
+    "sounds.input-bell": "firmware/components/core/src/sound_bank.c:88",
+    "sounds.input-blip": "firmware/components/core/src/sound_bank.c:79",
+    "sounds.input-bubble": "firmware/components/core/src/sound_bank.c:87",
+    "sounds.input-chk": "firmware/components/core/src/sound_bank.c:83",
+    "sounds.input-confirm": "firmware/components/core/src/sound_bank.c:81",
+    "sounds.input-contra": "firmware/components/core/src/sound_bank.c:142",
+    "sounds.input-ff": "firmware/components/core/src/sound_bank.c:149",
+    "sounds.input-jump": "firmware/components/core/src/sound_bank.c:84",
+    "sounds.input-lock": "firmware/components/core/src/sound_bank.c:89",
+    "sounds.input-megaman": "firmware/components/core/src/sound_bank.c:146",
+    "sounds.input-metroid": "firmware/components/core/src/sound_bank.c:147",
+    "sounds.input-pacman": "firmware/components/core/src/sound_bank.c:152",
+    "sounds.input-pew": "firmware/components/core/src/sound_bank.c:86",
+    "sounds.input-pokemon": "firmware/components/core/src/sound_bank.c:139",
+    "sounds.input-pop": "firmware/components/core/src/sound_bank.c:82",
+    "sounds.input-sf2": "firmware/components/core/src/sound_bank.c:144",
+    "sounds.input-soft": "firmware/components/core/src/sound_bank.c:85",
+    "sounds.input-sonic": "firmware/components/core/src/sound_bank.c:151",
+    "sounds.input-swish": "firmware/components/core/src/sound_bank.c:91",
+    "sounds.input-tetris": "firmware/components/core/src/sound_bank.c:153",
+    "sounds.input-tick": "firmware/components/core/src/sound_bank.c:80",
+    "sounds.input-zelda": "firmware/components/core/src/sound_bank.c:140",
     "sounds.rate": "firmware/components/core/src/sound_bank.h:28",
-    "sounds.select-bell": "firmware/components/core/src/sound_bank.c:88",
-    "sounds.select-blip": "firmware/components/core/src/sound_bank.c:79",
-    "sounds.select-bubble": "firmware/components/core/src/sound_bank.c:87",
-    "sounds.select-chk": "firmware/components/core/src/sound_bank.c:83",
-    "sounds.select-confirm": "firmware/components/core/src/sound_bank.c:81",
-    "sounds.select-contra": "firmware/components/core/src/sound_bank.c:142",
-    "sounds.select-ff": "firmware/components/core/src/sound_bank.c:149",
-    "sounds.select-jump": "firmware/components/core/src/sound_bank.c:84",
-    "sounds.select-lock": "firmware/components/core/src/sound_bank.c:89",
-    "sounds.select-megaman": "firmware/components/core/src/sound_bank.c:146",
-    "sounds.select-metroid": "firmware/components/core/src/sound_bank.c:147",
-    "sounds.select-pacman": "firmware/components/core/src/sound_bank.c:152",
-    "sounds.select-pew": "firmware/components/core/src/sound_bank.c:86",
-    "sounds.select-pokemon": "firmware/components/core/src/sound_bank.c:139",
-    "sounds.select-pop": "firmware/components/core/src/sound_bank.c:82",
-    "sounds.select-sf2": "firmware/components/core/src/sound_bank.c:144",
-    "sounds.select-soft": "firmware/components/core/src/sound_bank.c:85",
-    "sounds.select-sonic": "firmware/components/core/src/sound_bank.c:151",
-    "sounds.select-swish": "firmware/components/core/src/sound_bank.c:91",
-    "sounds.select-tetris": "firmware/components/core/src/sound_bank.c:153",
-    "sounds.select-tick": "firmware/components/core/src/sound_bank.c:80",
-    "sounds.select-zelda": "firmware/components/core/src/sound_bank.c:140",
     "sounds.waves": "firmware/components/core/src/sound_bank.h:30",
     "states": "firmware/components/core/src/ui_theme.c:11",
     "states.input_words": "firmware/components/core/src/ui_theme.c:32",

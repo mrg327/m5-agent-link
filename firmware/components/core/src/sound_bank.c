@@ -1,6 +1,6 @@
 /* The sound bank (format and synth: sound_bank.h). Melodies are original; MIDI note names in
  * the comments. Add a candidate by adding its steps and one snd_bank line; add a moment by
- * adding a snd_roles line. Keep cues short, echo tail included: done under 1.5 s, select under 150 ms. */
+ * adding a snd_roles line. Keep cues short, echo tail included: done under 1.5 s, input under 150 ms. */
 #include "sound_bank.h"
 
 #include <string.h>
@@ -12,8 +12,8 @@
 #define T(a) {a, N_OF(a)}
 
 const snd_role_t snd_roles[] = {
-    {"done", "A session you armed with Notify when done (or are watching) finishes", "done-ff"},
-    {"select", "You commit an item on the wheel", "select-ff"},
+    {"done", "A session you armed with Notify when done (or are watching) finishes", "done-ff", 1, 0},
+    {"input", "An agent asks a question or needs your approval", "input-ff", 3, 90},
 };
 const unsigned snd_role_count = sizeof snd_roles / sizeof snd_roles[0];
 
@@ -75,20 +75,20 @@ static const snd_step_t done_levelup_a[] = {S(SQ25, 72, 0, 9, 40, 0), S(SQ25, 74
 static const snd_step_t done_levelup_b[] = {S(TRI, 60, 0, 12, 280, 0), S(TRI, 55, 0, 12, 120, 0),
                                             S(TRI, 48, 0, 12, 350, 1)};
 
-/* ── select ── */
-static const snd_step_t select_blip[] = {S(SQ50, 81, 0, 10, 40, 1)};                            /* A5 */
-static const snd_step_t select_tick[] = {S(SQ25, 88, 0, 8, 22, 1)};                             /* E6 */
-static const snd_step_t select_confirm[] = {S(SQ25, 84, 0, 10, 45, 0), S(SQ25, 91, 0, 10, 90, 1)}; /* C6 G6 */
-static const snd_step_t select_pop[] = {S(SQ50, 72, 96, 10, 70, 1)};                            /* C5 -> C7 */
-static const snd_step_t select_chk[] = {S(NOISE, 96, 0, 9, 30, 1)};                             /* noise */
-static const snd_step_t select_jump[] = {S(SQ12, 76, 88, 10, 110, 1)};                          /* E5 -> E6 */
-static const snd_step_t select_soft[] = {S(SINE, 88, 0, 12, 25, 1)};                             /* E6, modern menu */
-static const snd_step_t select_pew[] = {S(SQ50, 96, 64, 9, 80, 1)};                              /* sci-fi laser */
-static const snd_step_t select_bubble[] = {S(SINE, 64, 88, 13, 60, 1)};                          /* water pop */
-static const snd_step_t select_bell[] = {S(BELL, 93, 0, 10, 60, 1)};                             /* A6, with echo */
-static const snd_step_t select_lock_a[] = {S(NOISE, 96, 0, 8, 15, 1)};                           /* click... */
-static const snd_step_t select_lock_b[] = {S(TRI, 0, 0, 0, 12, 0), S(TRI, 91, 0, 13, 55, 1)};    /* ...then G6 */
-static const snd_step_t select_swish[] = {S(NOISE, 96, 88, 5, 40, 0), S(NOISE, 88, 76, 8, 60, 1)}; /* sword */
+/* ── input ── */
+static const snd_step_t input_blip[] = {S(SQ50, 81, 0, 10, 40, 1)};                            /* A5 */
+static const snd_step_t input_tick[] = {S(SQ25, 88, 0, 8, 22, 1)};                             /* E6 */
+static const snd_step_t input_confirm[] = {S(SQ25, 84, 0, 10, 45, 0), S(SQ25, 91, 0, 10, 90, 1)}; /* C6 G6 */
+static const snd_step_t input_pop[] = {S(SQ50, 72, 96, 10, 70, 1)};                            /* C5 -> C7 */
+static const snd_step_t input_chk[] = {S(NOISE, 96, 0, 9, 30, 1)};                             /* noise */
+static const snd_step_t input_jump[] = {S(SQ12, 76, 88, 10, 110, 1)};                          /* E5 -> E6 */
+static const snd_step_t input_soft[] = {S(SINE, 88, 0, 12, 25, 1)};                             /* E6, modern menu */
+static const snd_step_t input_pew[] = {S(SQ50, 96, 64, 9, 80, 1)};                              /* sci-fi laser */
+static const snd_step_t input_bubble[] = {S(SINE, 64, 88, 13, 60, 1)};                          /* water pop */
+static const snd_step_t input_bell[] = {S(BELL, 93, 0, 10, 60, 1)};                             /* A6, with echo */
+static const snd_step_t input_lock_a[] = {S(NOISE, 96, 0, 8, 15, 1)};                           /* click... */
+static const snd_step_t input_lock_b[] = {S(TRI, 0, 0, 0, 12, 0), S(TRI, 91, 0, 13, 55, 1)};    /* ...then G6 */
+static const snd_step_t input_swish[] = {S(NOISE, 96, 88, 5, 40, 0), S(NOISE, 88, 76, 8, 60, 1)}; /* sword */
 
 /* ── homages ──
  * Original cues in the style of classic games: their sound chips and gestures, not their
@@ -165,18 +165,18 @@ const snd_sound_t snd_bank[] = {
     {"done-sparkle", "done", "Sparkle", {T(done_sparkle)}, 90, 45},
     {"done-ko", "done", "K.O.", {T(done_ko_a), T(done_ko_b)}, 0, 0},
     {"done-levelup", "done", "Level up", {T(done_levelup_a), T(done_levelup_b)}, 0, 0},
-    {"select-blip", "select", "Blip", {T(select_blip)}, 0, 0},
-    {"select-tick", "select", "Tick", {T(select_tick)}, 0, 0},
-    {"select-confirm", "select", "Confirm", {T(select_confirm)}, 0, 0},
-    {"select-pop", "select", "Pop", {T(select_pop)}, 0, 0},
-    {"select-chk", "select", "Chk", {T(select_chk)}, 0, 0},
-    {"select-jump", "select", "Jump", {T(select_jump)}, 0, 0},
-    {"select-soft", "select", "Soft tap", {T(select_soft)}, 0, 0},
-    {"select-pew", "select", "Pew", {T(select_pew)}, 0, 0},
-    {"select-bubble", "select", "Bubble", {T(select_bubble)}, 0, 0},
-    {"select-bell", "select", "Bell", {T(select_bell)}, 25, 30},
-    {"select-lock", "select", "Lock-on", {T(select_lock_a), T(select_lock_b)}, 0, 0},
-    {"select-swish", "select", "Swish", {T(select_swish)}, 0, 0},
+    {"input-blip", "input", "Blip", {T(input_blip)}, 0, 0},
+    {"input-tick", "input", "Tick", {T(input_tick)}, 0, 0},
+    {"input-confirm", "input", "Confirm", {T(input_confirm)}, 0, 0},
+    {"input-pop", "input", "Pop", {T(input_pop)}, 0, 0},
+    {"input-chk", "input", "Chk", {T(input_chk)}, 0, 0},
+    {"input-jump", "input", "Jump", {T(input_jump)}, 0, 0},
+    {"input-soft", "input", "Soft tap", {T(input_soft)}, 0, 0},
+    {"input-pew", "input", "Pew", {T(input_pew)}, 0, 0},
+    {"input-bubble", "input", "Bubble", {T(input_bubble)}, 0, 0},
+    {"input-bell", "input", "Bell", {T(input_bell)}, 25, 30},
+    {"input-lock", "input", "Lock-on", {T(input_lock_a), T(input_lock_b)}, 0, 0},
+    {"input-swish", "input", "Swish", {T(input_swish)}, 0, 0},
     {"done-pokemon", "done", "Healed (Pokémon style)", {T(hom_poke_lead), T(hom_poke_harm), T(hom_poke_bass)}, 0, 0},
     {"done-zelda", "done", "Discovery (Zelda style)", {T(hom_zelda)}, 120, 35},
     {"done-contra", "done", "Stage cleared (Contra style)", {T(hom_contra_boom), T(hom_contra_bugle)}, 0, 0},
@@ -187,24 +187,28 @@ const snd_sound_t snd_bank[] = {
     {"done-sonic", "done", "Rings (Sonic style)", {T(hom_sonic)}, 70, 30},
     {"done-pacman", "done", "Maze clear (Pac-Man style)", {T(hom_pac)}, 0, 0},
     {"done-tetris", "done", "Korobeiniki (Tetris style)", {T(hom_tetris_lead), T(hom_tetris_bass)}, 0, 0},
-    {"select-pokemon", "select", "Menu (Pokémon style)", {T(hom_poke_sel)}, 0, 0},
-    {"select-zelda", "select", "Sword (Zelda style)", {T(hom_zelda_swish), T(hom_zelda_ring)}, 0, 0},
-    {"select-contra", "select", "Shot (Contra style)", {T(hom_contra_shot_n), T(hom_contra_shot_t)}, 0, 0},
-    {"select-sf2", "select", "Hit (Street Fighter style)", {T(hom_sf_punch_n), T(hom_sf_punch_t)}, 0, 0},
-    {"select-megaman", "select", "Buster (Mega Man style)", {T(hom_mega_sel)}, 0, 0},
-    {"select-metroid", "select", "Beam (Metroid style)", {T(hom_metroid_tri), T(hom_metroid_sq)}, 0, 0},
-    {"select-ff", "select", "Cursor (Final Fantasy style)", {T(hom_ff_click), T(hom_ff_tone)}, 0, 0},
-    {"select-sonic", "select", "Spin (Sonic style)", {T(hom_sonic_sel)}, 0, 0},
-    {"select-pacman", "select", "Wakka (Pac-Man style)", {T(hom_pac_sel)}, 0, 0},
-    {"select-tetris", "select", "Rotate (Tetris style)", {T(hom_tetris_sel)}, 0, 0},
+    {"input-pokemon", "input", "Menu (Pokémon style)", {T(hom_poke_sel)}, 0, 0},
+    {"input-zelda", "input", "Sword (Zelda style)", {T(hom_zelda_swish), T(hom_zelda_ring)}, 0, 0},
+    {"input-contra", "input", "Shot (Contra style)", {T(hom_contra_shot_n), T(hom_contra_shot_t)}, 0, 0},
+    {"input-sf2", "input", "Hit (Street Fighter style)", {T(hom_sf_punch_n), T(hom_sf_punch_t)}, 0, 0},
+    {"input-megaman", "input", "Buster (Mega Man style)", {T(hom_mega_sel)}, 0, 0},
+    {"input-metroid", "input", "Beam (Metroid style)", {T(hom_metroid_tri), T(hom_metroid_sq)}, 0, 0},
+    {"input-ff", "input", "Cursor (Final Fantasy style)", {T(hom_ff_click), T(hom_ff_tone)}, 0, 0},
+    {"input-sonic", "input", "Spin (Sonic style)", {T(hom_sonic_sel)}, 0, 0},
+    {"input-pacman", "input", "Wakka (Pac-Man style)", {T(hom_pac_sel)}, 0, 0},
+    {"input-tetris", "input", "Rotate (Tetris style)", {T(hom_tetris_sel)}, 0, 0},
 };
 const unsigned snd_bank_count = sizeof snd_bank / sizeof snd_bank[0];
 
+const snd_role_t *snd_role(const char *id) {
+    for (unsigned r = 0; r < snd_role_count; r++)
+        if (strcmp(snd_roles[r].id, id) == 0) return &snd_roles[r];
+    return NULL;
+}
+
 const snd_sound_t *snd_for(const char *role) {
-    for (unsigned r = 0; r < snd_role_count; r++) {
-        if (strcmp(snd_roles[r].id, role) != 0) continue;
-        for (unsigned i = 0; i < snd_bank_count; i++)
-            if (strcmp(snd_bank[i].id, snd_roles[r].pick) == 0) return &snd_bank[i];
-    }
+    const snd_role_t *r = snd_role(role);
+    for (unsigned i = 0; r && i < snd_bank_count; i++)
+        if (strcmp(snd_bank[i].id, r->pick) == 0) return &snd_bank[i];
     return NULL;
 }

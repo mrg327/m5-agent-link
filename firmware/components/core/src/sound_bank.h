@@ -42,9 +42,11 @@ typedef struct {
 
 /* A moment the watch makes a sound for. Each role has several candidates; one is chosen. */
 typedef struct {
-    const char *id;   /* "done", "select", ... */
+    const char *id;   /* "done", "input", ... */
     const char *when; /* when it plays, for people */
     const char *pick; /* id of the chosen sound in snd_bank */
+    uint8_t repeat;   /* plays the pick this many times (a short cue repeats to get attention); 0 = once */
+    uint16_t gap_ms;  /* silence between repeats */
 } snd_role_t;
 
 typedef struct {
@@ -66,5 +68,7 @@ extern const unsigned snd_role_count;
 extern const snd_sound_t snd_bank[];
 extern const unsigned snd_bank_count;
 
+/* The role with this id, or NULL. */
+const snd_role_t *snd_role(const char *id);
 /* The chosen sound for a role, or NULL for an unknown role. */
 const snd_sound_t *snd_for(const char *role);

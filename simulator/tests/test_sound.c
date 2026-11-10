@@ -48,10 +48,16 @@ int main(void)
     s_now_us += 2000000;
     sound_play("done");
     EXPECT(s_plays == 2, "plays again once finished");
-    sound_play("select");
-    s_now_us += 50000;
-    sound_play("select");
-    EXPECT(s_plays == 4, "select can repeat as soon as the short cue has played");
+    const snd_sound_t *input = snd_for("input");
+    sound_play("input");
+    EXPECT(s_plays == 3 && s_last_n == 3 * snd_length(input) + 2 * 90 * SND_RATE / 1000,
+           "input plays its pick three times with gaps");
+    s_now_us += 100000;
+    sound_play("input");
+    EXPECT(s_plays == 3, "a second request during the triple is dropped");
+    s_now_us += 1000000;
+    sound_play("input");
+    EXPECT(s_plays == 4, "input plays again once finished");
     sound_play("nope");
     EXPECT(s_plays == 4, "unknown role is silent");
     s_info.has_speaker = false;

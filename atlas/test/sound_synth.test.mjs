@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { render, hold, durationMs, midiHz } from '../js/sound/synth.js';
+import { render, hold, durationMs, midiHz, repeat } from '../js/sound/synth.js';
 
 const { sounds } = JSON.parse(readFileSync(new URL('../data/facts.json', import.meta.url), 'utf8'));
 
@@ -16,7 +16,7 @@ test('bank has candidates for every role, ids unique, waves known', () => {
 });
 
 test('every sound renders audible, unclipped, short and click-free at the ends', () => {
-  const limit = { done: 1500, select: 150 };
+  const limit = { done: 1500, input: 150 };
   for (const s of sounds.bank) {
     const pcm = render(s, sounds.rate);
     assert.equal(pcm.length, Math.round((durationMs(s) * sounds.rate) / 1000), s.id);
@@ -48,4 +48,11 @@ test('hold upsamples without changing duration', () => {
   const out = hold(new Float32Array([0, 1, 0, -1]), 16000, 48000);
   assert.equal(out.length, 12);
   assert.deepEqual([...out.slice(3, 6)], [1, 1, 1]);
+});
+
+test('a role cue repeats its pick with silent gaps', () => {
+  const pcm = Float32Array.from([0.5, -0.5, 0.25]);
+  const cue = repeat(pcm, 3, 1, 1000);
+  assert.deepEqual(Array.from(cue), [0.5, -0.5, 0.25, 0, 0.5, -0.5, 0.25, 0, 0.5, -0.5, 0.25]);
+  assert.equal(repeat(pcm, 1, 90).length, 3);
 });

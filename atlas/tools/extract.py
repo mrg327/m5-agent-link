@@ -505,8 +505,9 @@ def extract_sounds():
         r"SND_(\w+)", find(hdr, r"typedef enum \{([^}]*)\} snd_wave_t", "sounds.waves").group(1))]
     rate = int(find(hdr, r"#define SND_RATE\s+(\d+)", "sounds.rate").group(1))
     body = text(src)
-    roles = [{"id": m.group(1), "when": m.group(2), "pick": m.group(3)}
-             for m in re.finditer(r'\{"(\w+)",\s*"([^"]+)",\s*"([\w-]+)"\}', body.split("snd_roles[] = {", 1)[1].split("};", 1)[0])]
+    roles = [{"id": m.group(1), "when": m.group(2), "pick": m.group(3),
+              "repeat": max(1, int(m.group(4))), "gap_ms": int(m.group(5))}
+             for m in re.finditer(r'\{"(\w+)",\s*"([^"]+)",\s*"([\w-]+)",\s*(\d+),\s*(\d+)\}', body.split("snd_roles[] = {", 1)[1].split("};", 1)[0])]
     if not roles:
         raise Drift(f"{src}: no snd_roles")
     step_re = r"S\((\w+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)"
