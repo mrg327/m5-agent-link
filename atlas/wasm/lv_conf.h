@@ -7,6 +7,10 @@
 #define LV_USE_STDLIB_MALLOC LV_STDLIB_BUILTIN
 #define LV_MEM_SIZE (384 * 1024)
 #define LV_DEF_REFR_PERIOD 33
+/* Per-frame cache of anti-aliased circle edges (LVGL flushes it after every refresh): the ring alone
+ * needs 9 radii in one frame (capsule 226/218 + cap 4, selected 229/215 + cap 7, underline 212/210 + cap 1),
+ * the deck adds a few small ones. With the default 4 the large ones are recomputed several times a frame. */
+#define LV_DRAW_SW_CIRCLE_CACHE_SIZE 12
 
 #define LV_USE_OS LV_OS_NONE
 #define LV_USE_LOG 0
