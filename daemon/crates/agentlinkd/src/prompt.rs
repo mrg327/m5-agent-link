@@ -13,7 +13,8 @@
 //!   move, Enter (sent on its own) accepts. A form with several fields shows them as tabs
 //!   (a tab bar above the field, `tab next`/`shift+tab prev` in the footer), one at a time
 //!   and not in schema order; Enter accepts the field and moves to the next, and submits on
-//!   the last.
+//!   the last. A free-text field is its title (no colon) above an input box (`▄` rule, `❯ `
+//!   and what was typed, `▀` rule) and `enter accept · … · ctrl+d decline · esc cancel`.
 
 use crate::broker::{Broker, Meaning, Outcome, Request};
 use crate::focus::{FocusError, SystemTerminal, Terminal};
@@ -36,6 +37,8 @@ const OTHER: &str = "Other (type your answer)";
 pub enum Kind {
     Permission,
     Choice,
+    /// A form's free-text field.
+    Text,
 }
 
 /// The prompt at the bottom of a screen dump.
@@ -46,6 +49,8 @@ pub struct Screen {
     pub body: Vec<String>,
     pub opts: Vec<String>,
     pub cursor: Option<usize>,
+    /// What a free-text field's box holds.
+    pub input: String,
 }
 
 /// What the screen must show for a device answer to be typed.
@@ -63,6 +68,8 @@ pub enum Expect {
         labels: Vec<String>,
         field: Option<String>,
     },
+    /// A free-text field, answered by dictation; `field` as for `Choice`.
+    Text { field: Option<String> },
 }
 
 fn is_rule(s: &str) -> bool {
@@ -105,7 +112,8 @@ pub fn parse(dump: &str) -> Option<Screen> {
     let raw: Vec<&str> = dump.lines().collect();
     let lines: Vec<&str> = raw.iter().map(|l| clean(l)).collect();
     let f = lines.iter().rposition(|l| {
-        l.starts_with("↑/↓") && (l.contains("enter to select") || l.contains("enter accept"))
+        (l.starts_with("↑/↓") && (l.contains("enter to select") || l.contains("enter accept")))
+            || (l.starts_with("enter accept") && l.contains("ctrl+d decline"))
     })?;
     // Anything but blank lines and box edges below the footer means the prompt is gone.
     if lines[f + 1..].iter().any(|l| !l.is_empty() && !is_rule(l)) {
@@ -113,6 +121,8 @@ pub fn parse(dump: &str) -> Option<Screen> {
     }
     if lines[f].contains("enter to select") {
         parse_permission(&raw, &lines, f)
+    } else if lines[f].starts_with("enter accept") {
+        parse_text(&lines, f)
     } else {
         parse_choice(&raw, &lines, f)
     }
@@ -160,6 +170,7 @@ fn parse_permission(raw: &[&str], lines: &[&str], f: usize) -> Option<Screen> {
         body,
         opts: opts.into_iter().map(|o| o.1).collect(),
         cursor,
+        input: String::new(),
     })
 }
 
@@ -190,9 +201,20 @@ fn parse_choice(_raw: &[&str], lines: &[&str], f: usize) -> Option<Screen> {
     }
     let cursor = cursor.map(|c| opts.len() - 1 - c);
     opts.reverse();
+    Some(Screen {
+        kind: Kind::Choice,
+        body: body_above(lines, i),
+        opts,
+        cursor,
+        input: String::new(),
+    })
+}
+
+/// The body ends at a rule; `from` is the line above the field's own content.
+fn body_above(lines: &[&str], from: usize) -> Vec<String> {
     let mut body = Vec::new();
-    let mut j = i + 1;
-    while j > 0 && i + 1 - j < 12 {
+    let mut j = from + 1;
+    while j > 0 && from + 1 - j < 12 {
         j -= 1;
         let l = lines[j];
         if !l.is_empty() && is_rule(l) {
@@ -203,11 +225,44 @@ fn parse_choice(_raw: &[&str], lines: &[&str], f: usize) -> Option<Screen> {
         }
     }
     body.reverse();
+    body
+}
+
+fn parse_text(lines: &[&str], f: usize) -> Option<Screen> {
+    // up from the footer: the box's bottom edge, its lines, its top edge
+    let mut i = (0..f).rev().find(|&j| !lines[j].is_empty())?;
+    if !lines[i].starts_with('▀') {
+        return None;
+    }
+    let mut boxed = Vec::new();
+    loop {
+        if i == 0 || f - i > 12 {
+            return None;
+        }
+        i -= 1;
+        if lines[i].starts_with('▄') {
+            break;
+        }
+        boxed.push(lines[i]);
+    }
+    boxed.reverse();
+    let first = boxed.first()?.strip_prefix('❯')?;
+    let input = std::iter::once(first)
+        .chain(boxed[1..].iter().copied())
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let body = body_above(lines, i.checked_sub(1)?);
+    if body.is_empty() {
+        return None;
+    }
     Some(Screen {
-        kind: Kind::Choice,
+        kind: Kind::Text,
         body,
-        opts,
-        cursor,
+        opts: Vec::new(),
+        cursor: None,
+        input,
     })
 }
 
@@ -248,6 +303,7 @@ pub fn permission_request(
         opts: Vec::new(),
         ttl: CARD_TTL,
         focus_only: true,
+        dictate: false,
     };
     let Some(s) = screen.filter(|s| s.kind == Kind::Permission && s.opts.len() <= 9) else {
         return (req, None);
@@ -302,9 +358,19 @@ fn field_labels(field: &Value) -> Vec<String> {
     }
 }
 
+/// A field without fixed choices that is typed as text (string or number); anything else
+/// (multi-select arrays, objects) is not answered from the device.
+fn is_text_field(field: &Value) -> bool {
+    matches!(
+        field["type"].as_str(),
+        None | Some("string") | Some("number") | Some("integer")
+    )
+}
+
 /// Cards and screen expectations for Copilot's `ask_user` (`toolArgs`: `message` +
-/// `requestedSchema`): one card per field when every field has fixed choices; otherwise a
-/// single Focus-only card. Copilot does not draw the fields in schema order, so with several
+/// `requestedSchema`): one card per field, a field with fixed choices answered by picking one
+/// and a free-text field by dictation (or on the PC); a form with any other kind of field is
+/// a single Focus-only card. Copilot does not draw the fields in schema order, so with several
 /// fields each card names its field (title, else key) and is matched to the screen.
 pub fn ask_requests(sid: u64, key: String, tool_args: &Value) -> Vec<(Request, Option<Expect>)> {
     let parsed;
@@ -326,8 +392,9 @@ pub fn ask_requests(sid: u64, key: String, tool_args: &Value) -> Vec<(Request, O
         opts: Vec::new(),
         ttl: CARD_TTL,
         focus_only: true,
+        dictate: false,
     };
-    let fields: Vec<(Option<String>, Vec<String>)> = args["requestedSchema"]["properties"]
+    let fields: Vec<(Option<String>, Vec<String>, bool)> = args["requestedSchema"]["properties"]
         .as_object()
         .map(|p| {
             p.iter()
@@ -338,12 +405,14 @@ pub fn ask_requests(sid: u64, key: String, tool_args: &Value) -> Vec<(Request, O
                         None if p.len() > 1 => Some(k.clone()),
                         None => None,
                     };
-                    (name, field_labels(f))
+                    let labels = field_labels(f);
+                    let text = labels.is_empty() && is_text_field(f);
+                    (name, labels, text)
                 })
                 .collect()
         })
         .unwrap_or_default();
-    if fields.is_empty() || fields.iter().any(|(_, l)| l.is_empty()) {
+    if fields.is_empty() || fields.iter().any(|(_, l, text)| l.is_empty() && !text) {
         if fields.len() == 1 {
             let mut req = base;
             if let Some(t) = &fields[0].0 {
@@ -355,11 +424,16 @@ pub fn ask_requests(sid: u64, key: String, tool_args: &Value) -> Vec<(Request, O
     }
     fields
         .into_iter()
-        .map(|(title, labels)| {
+        .map(|(title, labels, text)| {
             let labels: Vec<String> = labels.into_iter().take(4).collect();
             let mut req = base.clone();
             if let Some(t) = &title {
                 req.title = Some(t.clone());
+            }
+            if text {
+                req.focus_only = false;
+                req.dictate = true;
+                return (req, Some(Expect::Text { field: title }));
             }
             req.opts = labels
                 .iter()
@@ -379,6 +453,22 @@ pub fn ask_requests(sid: u64, key: String, tool_args: &Value) -> Vec<(Request, O
 
 fn same_label(screen: &str, want: &str) -> bool {
     screen == want || (screen.len() >= 8 && want.starts_with(screen.trim_end_matches('…')))
+}
+
+/// The field title a form screen shows: `Title:` above choices, `Title` above a text box.
+fn field_shown(s: &Screen) -> Option<&str> {
+    let last = s.body.last()?;
+    match s.kind {
+        Kind::Choice => last.strip_suffix(':'),
+        Kind::Text => Some(last.as_str()),
+        Kind::Permission => None,
+    }
+}
+
+fn field_ok(s: &Screen, field: &Option<String>) -> bool {
+    field
+        .as_ref()
+        .is_none_or(|f| field_shown(s).is_some_and(|l| same_label(l, f)))
 }
 
 fn read(term: &dyn Terminal, ctx: &HostCtx) -> Result<Screen, String> {
@@ -416,14 +506,8 @@ pub fn type_answer(
                 return Err("no such option".into());
             }
             let on_screen: Vec<&String> = s.opts.iter().filter(|o| *o != OTHER).collect();
-            let field_ok = field.as_ref().is_none_or(|f| {
-                s.body
-                    .last()
-                    .and_then(|l| l.strip_suffix(':'))
-                    .is_some_and(|l| same_label(l, f))
-            });
             if s.kind != Kind::Choice
-                || !field_ok
+                || !field_ok(&s, field)
                 || on_screen.len() < labels.len()
                 || !labels.iter().zip(&on_screen).all(|(w, o)| same_label(o, w))
             {
@@ -442,7 +526,45 @@ pub fn type_answer(
             }
             term.send_keys(ctx, ENTER).map_err(err)
         }
+        Expect::Text { .. } => Err("a text field takes a dictated answer".into()),
     }
+}
+
+/// How much of a typed answer the box must show before Enter: enough to tell it is ours.
+const TEXT_CHECK: usize = 16;
+
+/// Types a dictated answer into the free-text field `field`, if the screen still shows that
+/// field with an empty box, then checks the box shows it before pressing Enter.
+pub fn type_text(
+    term: &dyn Terminal,
+    ctx: &HostCtx,
+    field: &Option<String>,
+    text: &str,
+    gap: Duration,
+) -> Result<(), String> {
+    let text = crate::broker::tidy(text);
+    if text.is_empty() {
+        return Err("nothing was heard".into());
+    }
+    let s = read(term, ctx)?;
+    if s.kind != Kind::Text || !field_ok(&s, field) {
+        return Err("a different prompt is on screen".into());
+    }
+    if !s.input.is_empty() {
+        return Err("the field already holds text".into());
+    }
+    term.send_keys(ctx, &crate::typing::escape(&text))
+        .map_err(err)?;
+    let want: String = text.chars().take(TEXT_CHECK).collect();
+    // the TUI draws what was typed a moment later
+    for _ in 0..5 {
+        std::thread::sleep(gap);
+        let s = read(term, ctx)?;
+        if s.kind == Kind::Text && field_ok(&s, field) && s.input.starts_with(want.trim_end()) {
+            return term.send_keys(ctx, ENTER).map_err(err);
+        }
+    }
+    Err("the answer did not show in the field".into())
 }
 
 /// Everything the background tasks need.
@@ -495,7 +617,7 @@ pub fn on_event(env: &Env, v: &Value, key: &str) {
         "notification" if payload["notification_type"].as_str() == Some("permission_prompt") => {
             let message = payload["message"].as_str().unwrap_or("").to_owned();
             tokio::spawn(async move {
-                let screen = wait_for_screen(&env, sid, Kind::Permission).await;
+                let screen = wait_for_screen(&env, sid, &[Kind::Permission]).await;
                 let (req, expect) = permission_request(sid, key, &message, screen.as_ref());
                 open_and_wait(env, sid, req, expect).await;
             });
@@ -506,10 +628,12 @@ pub fn on_event(env: &Env, v: &Value, key: &str) {
 
 /// The not-yet-answered card whose field is on screen.
 fn step_on_screen(screen: &Screen, steps: &[(Request, Option<Expect>)]) -> Option<usize> {
-    let shown = screen.body.last()?.strip_suffix(':')?;
-    steps.iter().position(
-        |(_, e)| matches!(e, Some(Expect::Choice { field: Some(f), .. }) if same_label(shown, f)),
-    )
+    let shown = field_shown(screen)?;
+    steps.iter().position(|(_, e)| match (e, screen.kind) {
+        (Some(Expect::Choice { field: Some(f), .. }), Kind::Choice)
+        | (Some(Expect::Text { field: Some(f) }), Kind::Text) => same_label(shown, f),
+        _ => false,
+    })
 }
 
 /// Opens the `ask_user` cards one at a time: each for the field the screen shows next, after
@@ -525,7 +649,7 @@ async fn ask_in_turn(env: Env, sid: u64, mut steps: Vec<(Request, Option<Expect>
         // just after an Enter the previous field can still be drawn
         let mut found = None;
         for _ in 0..4 {
-            let Some(screen) = wait_for_screen(&env, sid, Kind::Choice).await else {
+            let Some(screen) = wait_for_screen(&env, sid, &[Kind::Choice, Kind::Text]).await else {
                 return;
             };
             found = step_on_screen(&screen, &steps);
@@ -548,7 +672,7 @@ async fn ask_in_turn(env: Env, sid: u64, mut steps: Vec<(Request, Option<Expect>
 }
 
 /// The notification can arrive a moment before the prompt is drawn.
-async fn wait_for_screen(env: &Env, sid: u64, kind: Kind) -> Option<Screen> {
+async fn wait_for_screen(env: &Env, sid: u64, kinds: &[Kind]) -> Option<Screen> {
     for _ in 0..8 {
         let ctx = ctx_of(&env.registry, sid).ok()?;
         let term = env.term.clone();
@@ -557,7 +681,7 @@ async fn wait_for_screen(env: &Env, sid: u64, kind: Kind) -> Option<Screen> {
             .ok()?;
         match got {
             Ok(dump) => {
-                if let Some(s) = parse(&dump).filter(|s| s.kind == kind) {
+                if let Some(s) = parse(&dump).filter(|s| kinds.contains(&s.kind)) {
                     return Some(s);
                 }
             }
@@ -580,15 +704,27 @@ async fn open_and_wait(env: Env, sid: u64, req: Request, expect: Option<Expect>)
             return false;
         }
     };
-    let (Some(expect), Some(choice)) = (expect, outcome.choice) else {
+    let Some(expect) = expect else {
         return false;
     };
+    let choice = outcome.choice;
+    // a dictated answer is the user's own words: typed, never traced
+    let text = outcome
+        .answer
+        .filter(|_| matches!(expect, Expect::Text { .. }));
+    if choice.is_none() && text.is_none() {
+        return false;
+    }
     let res = match ctx_of(&env.registry, sid) {
         Ok(ctx) => {
             let term = env.term.clone();
-            tokio::task::spawn_blocking(move || type_answer(&*term, &ctx, &expect, choice, KEY_GAP))
-                .await
-                .unwrap_or_else(|e| Err(e.to_string()))
+            tokio::task::spawn_blocking(move || match (&expect, text, choice) {
+                (Expect::Text { field }, Some(t), _) => type_text(&*term, &ctx, field, &t, KEY_GAP),
+                (_, _, Some(c)) => type_answer(&*term, &ctx, &expect, c, KEY_GAP),
+                _ => Err("no answer to type".into()),
+            })
+            .await
+            .unwrap_or_else(|e| Err(e.to_string()))
         }
         Err(e) => Err(e),
     };
@@ -731,15 +867,25 @@ mod tests {
         assert!(!req.focus_only);
         assert_eq!(req.title.as_deref(), Some("Restart?"));
         assert!(matches!(expect, Some(Expect::Choice { labels, .. }) if labels == ["Yes", "No"]));
-        // a free-text field anywhere: one Focus-only card
-        let mixed = json!({"message": "m", "requestedSchema": {"properties": {
-            "a": {"type": "string", "enum": ["x"]}, "b": {"type": "string"}}}});
-        let (req, expect) = one(&Value::String(mixed.to_string()));
-        assert!(req.focus_only && expect.is_none());
+        // free text: a card answered by dictation, no options
+        let text = json!({"message": "m", "requestedSchema": {"properties": {
+            "a": {"type": "string", "title": "Your note"}}}});
+        let (req, expect) = one(&text);
+        assert!(req.dictate && !req.focus_only && req.opts.is_empty());
+        assert_eq!(req.title.as_deref(), Some("Your note"));
+        assert_eq!(
+            expect,
+            Some(Expect::Text {
+                field: Some("Your note".into())
+            })
+        );
+        // a field the device cannot answer anywhere (multi-select): one Focus-only card
+        let multi = json!({"message": "m", "requestedSchema": {"properties": {
+            "a": {"type": "string", "enum": ["x"]},
+            "b": {"type": "array", "items": {"enum": ["p", "q"]}}}}});
+        let (req, expect) = one(&Value::String(multi.to_string()));
+        assert!(req.focus_only && !req.dictate && expect.is_none());
         assert_eq!(req.text.as_deref(), Some("m"));
-        let text =
-            json!({"message": "m", "requestedSchema": {"properties": {"a": {"type": "string"}}}});
-        assert!(one(&text).0.focus_only);
     }
 
     #[test]
@@ -758,6 +904,73 @@ mod tests {
         assert_eq!(step_on_screen(&parse(&color).unwrap(), &steps), Some(1));
         assert_eq!(step_on_screen(&parse(TABS).unwrap(), &steps), Some(0));
         assert_eq!(step_on_screen(&parse(FORM).unwrap(), &steps), None);
+    }
+
+    /// As Copilot draws a free-text field (captured from v1.0.10x).
+    const TEXT: &str = "\
+ ○ Asking user Waiting for response
+────────────────────────────────────────
+ Copilot needs information.
+ Tell me about it.
+  Your note   Pick a size
+ Your note
+ ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+  ❯
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ enter accept · tab next · ctrl+d decline · esc cancel
+────────────────────────────────────────
+";
+
+    #[test]
+    fn reads_a_free_text_field() {
+        let s = parse(TEXT).unwrap();
+        assert_eq!(s.kind, Kind::Text);
+        assert_eq!(field_shown(&s), Some("Your note"));
+        assert_eq!(s.input, "");
+        let typed = TEXT.replace("  ❯\n", "  ❯ fix the login bug\n");
+        assert_eq!(parse(&typed).unwrap().input, "fix the login bug");
+        // a mixed form: the text card goes with the text field, the choice card with the list
+        let form = json!({"message": "m", "requestedSchema": {"properties": {
+            "note": {"type": "string", "title": "Your note"},
+            "size": {"type": "string", "title": "Pick a size", "enum": ["Small", "Large"]}}}});
+        let steps = ask_requests(1, "k".into(), &form);
+        assert_eq!(step_on_screen(&s, &steps), Some(0));
+        let size = TABS
+            .replace(" Run again?:", " Pick a size:")
+            .replace("   Yes\n ❯ No", " ❯ Small\n   Large");
+        assert_eq!(step_on_screen(&parse(&size).unwrap(), &steps), Some(1));
+    }
+
+    #[test]
+    fn types_a_dictated_answer_checks_it_then_accepts() {
+        let note = Some("Your note".to_owned());
+        let typed = TEXT.replace("  ❯\n", "  ❯ fix the login bug\n");
+        let t = Fake::new(&[TEXT, &typed]);
+        type_text(
+            &t,
+            &HostCtx::default(),
+            &note,
+            " fix the\nlogin bug ",
+            Duration::ZERO,
+        )
+        .unwrap();
+        assert_eq!(*t.keys.lock().unwrap(), ["fix the login bug", ENTER]);
+
+        // the text never showed: no Enter
+        let t = Fake::new(&[TEXT, TEXT]);
+        assert!(type_text(&t, &HostCtx::default(), &note, "hello", Duration::ZERO).is_err());
+        assert_eq!(*t.keys.lock().unwrap(), ["hello"]);
+
+        // another field, a filled box, or a choice list on screen: nothing typed
+        for screen in [
+            TEXT.replace(" Your note\n", " Other\n"),
+            typed,
+            FORM.to_owned(),
+        ] {
+            let t = Fake::new(&[&screen]);
+            assert!(type_text(&t, &HostCtx::default(), &note, "hello", Duration::ZERO).is_err());
+            assert!(t.keys.lock().unwrap().is_empty());
+        }
     }
 
     /// A screen that changes with each key, and the keys it got.

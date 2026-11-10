@@ -239,12 +239,17 @@ static void act_interrupt(uint32_t sid, uint32_t hold_ms)
     toast_cmd_result(sent, "Interrupting");
 }
 
-/* Voice: type recording aid's transcript, only after the hold (the daemon checks hold_ms too). */
-static void act_dictate(uint32_t sid, uint32_t aid, uint32_t hold_ms)
+/* Voice: type recording aid's transcript, only after the hold (the daemon checks hold_ms too). With a
+ * rid the transcript answers that request instead (proto 0.8); the daemon then clears it. */
+static void act_dictate(uint32_t sid, uint32_t rid, uint32_t aid, uint32_t hold_ms)
 {
-    bool sent = link_send_cmd_arg(LINK_OP_DICTATE, sid, 0, aid, hold_ms);
-    if (sent) feedback_approved();
-    else feedback_reject();
+    bool sent = link_send_cmd_arg(LINK_OP_DICTATE, sid, rid, aid, hold_ms);
+    if (sent) {
+        if (rid) model_attention_set_answer(rid, ATT_ANSWER_DICTATE, 0);
+        feedback_approved();
+    } else {
+        feedback_reject();
+    }
     toast_cmd_result(sent, "Sent");
     voice_cancel(); /* done with it on the device */
 }
@@ -353,7 +358,7 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
         return;
     }
     /* The daemon refused an answer: the request is unanswered again, so ASK restores its options. */
-    if (rid && (op == LINK_OP_APPROVE || op == LINK_OP_DENY || op == LINK_OP_REPLY))
+    if (rid && (op == LINK_OP_APPROVE || op == LINK_OP_DENY || op == LINK_OP_REPLY || op == LINK_OP_DICTATE))
         model_attention_set_answer(rid, ATT_ANSWER_NONE, 0);
     if (op == LINK_OP_SCROLL && sid) {
         if (err == 2) { /* unsupported: this terminal has no scroll API; the item disappears for the session */

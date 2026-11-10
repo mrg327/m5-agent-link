@@ -45,6 +45,7 @@ static const char *label_of(const ask_item_t *it, const attention_t *a)
     case ASK_OPT: return a->opts[it->opt];
     case ASK_APPROVE: return "Approve";
     case ASK_DENY: return "Deny";
+    case ASK_DICTATE: return "Dictate...";
     default: return "Open on PC";
     }
 }
@@ -122,6 +123,9 @@ bool ui_ask_refresh(uint32_t now)
         } else if (a->answer == ATT_ANSWER_REPLY) {
             snprintf(buf, sizeof buf, "Sent \"%s\"%swaiting for PC", a->opts[a->answer_opt % 4], theme_sep());
             rgb = RGB_ASK;
+        } else if (a->answer == ATT_ANSWER_DICTATE) {
+            snprintf(buf, sizeof buf, "Sent dictation%swaiting for PC", theme_sep());
+            rgb = RGB_ASK;
         } else {
             snprintf(buf, sizeof buf, "Approved%swaiting for PC", theme_sep());
         }
@@ -133,7 +137,7 @@ bool ui_ask_refresh(uint32_t now)
         theme_set_text(s_hint, s_hint_txt, sizeof s_hint_txt, "");
         hold_cancel();
     } else {
-        s_n = nav_ask_items(a, s_items, ASK_MAX_ITEMS);
+        s_n = nav_ask_items(a, model_voice(), s_items, ASK_MAX_ITEMS);
         wheel_item_t w[ASK_MAX_ITEMS];
         for (int i = 0; i < s_n; i++) w[i] = (wheel_item_t){label_of(&s_items[i], a), rgb_of(&s_items[i]), s_items[i].hold_ms > 0, i};
         int sel = wheel_count(s_wheel) == s_n ? wheel_sel(s_wheel) : 0;
@@ -191,6 +195,7 @@ static void commit(const attention_t *a, int idx, uint32_t hold_ms)
     case ASK_OPT: g_ui_actions->reply(s_sid, a->rid, (uint8_t)it->opt, hold_ms); break;
     case ASK_APPROVE: g_ui_actions->approve(s_sid, a->rid, hold_ms); break;
     case ASK_DENY: g_ui_actions->deny(s_sid, a->rid); break;
+    case ASK_DICTATE: ui_go_voice(a->rid); break;
     case ASK_OPEN_PC:
         g_ui_actions->focus(s_sid);
         ui_go_home();

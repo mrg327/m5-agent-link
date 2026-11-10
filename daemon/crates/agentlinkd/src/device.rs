@@ -102,6 +102,8 @@ struct Conn {
     privacy: Privacy,
     /// Protocol minor the device announced in its hello.
     peer_minor: u64,
+    /// The device can answer a card by dictation (`Action::Dictate`).
+    dictate: bool,
     /// `session_upd` deltas waiting for the coalescing window.
     deltas: DeltaQueue,
 }
@@ -167,7 +169,12 @@ impl Conn {
     }
 
     /// Sends `msg`, after the held deltas so the device sees everything in order.
-    async fn send(&mut self, re: Option<u64>, msg: Message) -> Result<()> {
+    async fn send(&mut self, re: Option<u64>, mut msg: Message) -> Result<()> {
+        if let Message::Attention(a) = &mut msg {
+            if !self.dictate {
+                a.acts.retain(|x| *x != Action::Dictate);
+            }
+        }
         if !self.deltas.is_empty() {
             for s in self.deltas.drain() {
                 self.send_now(None, Message::SessionUpd(s)).await?;
@@ -253,6 +260,9 @@ const VOICE_MINOR: u64 = 6;
 /// `welcome.keys` and the keyboard messages need proto 0.7 and the device's `feature_keys`.
 const KEYS_MINOR: u64 = 7;
 
+/// `action_dictate` on an attention, and `dictate` naming its `rid`, need proto 0.8.
+const DICTATE_MINOR: u64 = 8;
+
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
 }
@@ -297,6 +307,7 @@ pub async fn run_link(
         next_id: 1,
         privacy: Privacy::Meta,
         peer_minor: 0,
+        dictate: false,
         deltas: DeltaQueue::default(),
     };
 
@@ -374,6 +385,9 @@ async fn handshake(
     let replies = (c.peer_minor >= REPLIES_MINOR).then(|| shared.replies.clone());
     let voice = (c.peer_minor >= VOICE_MINOR && shared.stt.is_some()).then_some(true);
     let keys = keys_offered(c.peer_minor, &hello.1.caps.feats);
+    c.dictate = voice.is_some()
+        && c.peer_minor >= DICTATE_MINOR
+        && hello.1.caps.feats.contains(&Feature::Voice);
     let w = welcome(&shared.host, replies, voice, keys);
     c.privacy = w.cfg.privacy.unwrap_or(Privacy::Meta);
     c.send(Some(hello.0), Message::Welcome(w)).await?;
@@ -840,6 +854,31 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
     }
 }
 
+/// A transcript answering card `rid` (`Action::Dictate`); the card's owner types it.
+fn dictate_answer(shared: &Shared, detail: &Value, sid: u64, rid: u64, aid: u64) -> CmdResult {
+    let res = if !shared.broker.takes_dictation(rid) {
+        fail(ResultErr::Stale, "no card for that answer")
+    } else {
+        match shared.transcripts.lock().unwrap().take(aid, sid) {
+            None => fail(ResultErr::Stale, "no transcript for that recording"),
+            Some(text) => match shared.broker.answer_text(rid, text) {
+                Ok(_) => {
+                    tracing::info!("rid {rid} answered from device by dictation");
+                    CmdResult::ok()
+                }
+                Err((err, msg)) => fail(err, msg),
+            },
+        }
+    };
+    shared.trace.audit(
+        "approval",
+        Some(sid),
+        Some(rid),
+        json!({"cmd": detail, "result": res}),
+    );
+    res
+}
+
 /// Quick reply (`Type`, arg = index into the welcome's replies) or interrupt (`Cancel`, Esc, only
 /// after a hold) typed into the session's terminal (typing.rs; issue 20261110-b150).
 async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
@@ -861,6 +900,10 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
             Some(Arg::Uint(a)) => a,
             _ => return fail(ResultErr::Denied, "dictate needs a recording id"),
         };
+        if let Some(rid) = cmd.rid {
+            // an answer to that card (a form's free-text field), not a new prompt
+            return dictate_answer(shared, &detail, session.sid, rid, aid);
+        }
         if let Some(why) = crate::typing::refusal(&session, shared.broker.open_for(session.sid)) {
             return fail(ResultErr::Denied, why);
         }
@@ -1191,6 +1234,7 @@ mod tests {
                 next_id: 1,
                 privacy,
                 peer_minor: minor,
+                dictate: false,
                 deltas: DeltaQueue::default(),
             };
             let out = c.for_peer(s.clone());
@@ -1398,6 +1442,7 @@ mod tests {
             opts,
             ttl: Duration::from_secs(15),
             focus_only: false,
+            dictate: false,
         };
         let (rid, wait) = shared.broker.open(req(vec![]));
         let mut d = spawn_link(&shared);
@@ -1608,6 +1653,7 @@ mod tests {
             next_id: 1,
             privacy: Privacy::Preview,
             peer_minor: 2,
+            dictate: false,
             deltas: DeltaQueue::default(),
         };
         let mut s = Session::delta(1);

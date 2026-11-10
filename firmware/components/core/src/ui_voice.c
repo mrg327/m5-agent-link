@@ -1,5 +1,5 @@
 /* The VOICE screen (issue 0ea9): dictate a reply to one session. Opened by "Dictate..." at the end of
- * the Reply list. Listening (tap or A stops; 15 s at most), Transcribing, then the transcript with
+ * the Reply list, or on ASK for a request that takes free text (rid != 0: the transcript answers it). Listening (tap or A stops; 15 s at most), Transcribing, then the transcript with
  * "hold to send": only the 1.2 s hold sends it (cmd dictate names the recording; the daemon holds
  * the text and types it). Long swipe down or B held discards. voice.c does the recording. */
 #include <stdio.h>
@@ -21,7 +21,7 @@
 static lv_obj_t *s_root, *s_header, *s_big, *s_text, *s_hint;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static char s_header_txt[64], s_big_txt[32], s_text_txt[256], s_hint_txt[64], s_word_txt[16];
-static uint32_t s_sid, s_now, s_text_since;
+static uint32_t s_sid, s_rid, s_now, s_text_since;
 static voice_state_t s_shown = (voice_state_t)-1;
 static bool s_holding, s_ramp_started;
 static uint32_t s_hold_t0;
@@ -94,9 +94,10 @@ static void render(void)
     }
 }
 
-void ui_voice_open(uint32_t sid, uint32_t now)
+void ui_voice_open(uint32_t sid, uint32_t rid, uint32_t now)
 {
     s_sid = sid;
+    s_rid = rid;
     s_now = now;
     s_shown = (voice_state_t)-1;
     s_holding = s_ramp_started = false;
@@ -104,8 +105,10 @@ void ui_voice_open(uint32_t sid, uint32_t now)
     voice_start(sid, now); /* a refusal shows as the failed state with its reason */
     render();
     show(s_root, true);
-    dbg_event("ui", "voice", "\"sid\":%u,\"state\":%d", (unsigned)sid, (int)voice_state());
+    dbg_event("ui", "voice", "\"sid\":%u,\"rid\":%u,\"state\":%d", (unsigned)sid, (unsigned)rid, (int)voice_state());
 }
+
+uint32_t ui_voice_rid(void) { return s_rid; }
 
 void ui_voice_close(void)
 {
@@ -121,6 +124,7 @@ bool ui_voice_refresh(uint32_t now)
     s_now = now;
     const session_t *s = model_find(s_sid);
     if (!s || s->state == SESS_ENDED) return false;
+    if (s_rid && !model_attention_find(s_rid)) return false; /* the request was answered elsewhere */
     render();
     return true;
 }
@@ -172,7 +176,7 @@ bool ui_voice_tick(uint32_t now)
         if (el >= NAV_HOLD_MS) {
             s_holding = s_ramp_started = false;
             ring_set_progress(ui_home_ring(), 0, RGB_ASK);
-            g_ui_actions->dictate(s_sid, voice_aid(), el);
+            g_ui_actions->dictate(s_sid, s_rid, voice_aid(), el);
             return true;
         }
     }

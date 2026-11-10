@@ -92,6 +92,8 @@ pub struct Request {
     pub ttl: Duration,
     /// Nothing can answer it but the terminal: the device only offers Focus.
     pub focus_only: bool,
+    /// Takes a dictated answer (`answer_text`): the device offers Dictate.
+    pub dictate: bool,
 }
 
 struct Pending {
@@ -170,6 +172,9 @@ impl Broker {
         if !req.opts.is_empty() && !req.focus_only {
             acts.push(Action::Reply);
         }
+        if req.dictate {
+            acts.push(Action::Dictate);
+        }
         let grant_mask = req
             .opts
             .iter()
@@ -217,7 +222,7 @@ impl Broker {
         rid: u64,
         decision: Decision,
     ) -> Result<Outcome, (ResultErr, &'static str)> {
-        let mut g = self.inner.lock().unwrap();
+        let g = self.inner.lock().unwrap();
         let Some(p) = g.pending.get(&rid) else {
             return Err((ResultErr::Stale, "no pending request for rid"));
         };
@@ -241,6 +246,39 @@ impl Broker {
             },
             _ => return Err((ResultErr::Denied, "not a permission request")),
         };
+        self.settle(g, rid, outcome)
+    }
+
+    /// Whether `rid` is open and takes a dictated answer.
+    pub fn takes_dictation(&self, rid: u64) -> bool {
+        let g = self.inner.lock().unwrap();
+        g.pending
+            .get(&rid)
+            .is_some_and(|p| p.att.acts.contains(&Action::Dictate))
+    }
+
+    /// A device's dictated answer to a card that takes one (`Action::Dictate`).
+    pub fn answer_text(
+        &self,
+        rid: u64,
+        text: String,
+    ) -> Result<Outcome, (ResultErr, &'static str)> {
+        let g = self.inner.lock().unwrap();
+        let Some(p) = g.pending.get(&rid) else {
+            return Err((ResultErr::Stale, "no pending request for rid"));
+        };
+        if !p.att.acts.contains(&Action::Dictate) {
+            return Err((ResultErr::Denied, "this card takes no dictation"));
+        }
+        self.settle(g, rid, Outcome::of("allow", false, Some(text), None))
+    }
+
+    fn settle(
+        &self,
+        mut g: std::sync::MutexGuard<'_, Inner>,
+        rid: u64,
+        outcome: Outcome,
+    ) -> Result<Outcome, (ResultErr, &'static str)> {
         let p = g.pending.remove(&rid).unwrap();
         drop(g);
         // The hook may already be gone; the clear still goes out, but the device is told.
@@ -283,7 +321,8 @@ impl Broker {
     }
 
     /// The terminal moved on (a later event from the same session, optionally for the same
-    /// tool): whatever was pending there was answered on the PC.
+    /// tool): whatever was pending there was answered on the PC. A tool's end also answers
+    /// cards that name no tool (a prompt read off the screen), but not another tool's card.
     pub fn cancel_session(&self, key: &str, tool: Option<&str>) {
         let rids: Vec<u64> = self
             .inner
@@ -291,7 +330,9 @@ impl Broker {
             .unwrap()
             .pending
             .iter()
-            .filter(|(_, p)| p.key == key && tool.is_none_or(|t| p.tool.as_deref() == Some(t)))
+            .filter(|(_, p)| {
+                p.key == key && tool.is_none_or(|t| p.tool.as_deref().is_none_or(|pt| pt == t))
+            })
             .map(|(rid, _)| *rid)
             .collect();
         for rid in rids {
@@ -355,6 +396,7 @@ pub fn request_of(
                 opts,
                 ttl,
                 focus_only: false,
+                dictate: false,
             })
         }
         "pretooluse" if tool.as_deref() == Some("AskUserQuestion") => {
@@ -392,6 +434,7 @@ pub fn request_of(
                 opts,
                 ttl,
                 focus_only: false,
+                dictate: false,
             })
         }
         _ => None,
@@ -715,5 +758,71 @@ mod tests {
         let (_, _w) = b.open(r);
         let att = b.pending().pop().unwrap();
         assert_eq!(att.text.unwrap().chars().count(), 160);
+    }
+
+    #[tokio::test]
+    async fn a_dictated_answer_goes_only_to_a_card_that_takes_one() {
+        let (b, _rx) = broker();
+        let card = |dictate: bool| Request {
+            sid: 1,
+            key: "copilot:s".into(),
+            tool: Some("ask_user".into()),
+            kind: AttKind::Question,
+            title: None,
+            text: None,
+            opts: Vec::new(),
+            ttl: Duration::from_secs(5),
+            focus_only: !dictate,
+            dictate,
+        };
+        let (plain, _w1) = b.open(card(false));
+        let (text, w2) = b.open(card(true));
+        assert!(b
+            .pending()
+            .iter()
+            .any(|a| a.rid == text && a.acts == [Action::Focus, Action::Dictate]));
+        assert!(!b.takes_dictation(plain) && b.takes_dictation(text));
+        assert_eq!(
+            b.answer_text(plain, "hi".into()).unwrap_err().0,
+            ResultErr::Denied
+        );
+        // a dictation card has no options to pick
+        assert_eq!(
+            b.answer(text, Decision::Reply(0)).unwrap_err().0,
+            ResultErr::Denied
+        );
+        b.answer_text(text, "hi".into()).unwrap();
+        assert_eq!(w2.await.unwrap().answer.as_deref(), Some("hi"));
+        assert_eq!(
+            b.answer_text(text, "again".into()).unwrap_err().0,
+            ResultErr::Stale
+        );
+    }
+
+    #[tokio::test]
+    async fn a_tool_ending_leaves_another_tools_card() {
+        let (b, _rx) = broker();
+        let card = |tool: Option<&str>| Request {
+            sid: 1,
+            key: "copilot:s".into(),
+            tool: tool.map(str::to_owned),
+            kind: AttKind::Question,
+            title: None,
+            text: None,
+            opts: Vec::new(),
+            ttl: Duration::from_secs(5),
+            focus_only: true,
+            dictate: false,
+        };
+        let (ask, _w1) = b.open(card(Some("ask_user")));
+        let (screen, w2) = b.open(card(None));
+        // a parallel `bash` call finishing: the form is still up, a screen-read prompt is not
+        b.cancel_session("copilot:s", Some("bash"));
+        assert!(w2.await.is_err());
+        let left: Vec<u64> = b.pending().iter().map(|a| a.rid).collect();
+        assert_eq!(left, vec![ask]);
+        assert_ne!(ask, screen);
+        b.cancel_session("copilot:s", Some("ask_user"));
+        assert!(b.pending().is_empty());
     }
 }

@@ -30,7 +30,7 @@ void ui_go_scroll(void);        /* AGENT's "Scroll terminal": open SCROLL on the
 void ui_go_status(void);        /* AGENT's "Status...": open STATUS */
 void ui_go_watch(void);
 void ui_go_keys(void);  /* the Reply list's "Type...": open KEYS on the selected session */
-void ui_go_voice(void); /* the Reply list's "Dictate...": open VOICE on the selected session */
+void ui_go_voice(uint32_t rid); /* "Dictate...": open VOICE on the selected session; rid != 0 answers that request */
 /* The KEYS screen (ui_keys.c). */
 lv_obj_t *ui_keys_init(lv_obj_t *screen);
 void ui_keys_open(uint32_t sid, uint32_t now_ms);
@@ -41,7 +41,8 @@ void ui_keys_tick(uint32_t now_ms);
 void ui_keys_report(ui_report_t *r);
 /* The VOICE screen (ui_voice.c). */
 lv_obj_t *ui_voice_init(lv_obj_t *screen);
-void ui_voice_open(uint32_t sid, uint32_t now_ms);
+void ui_voice_open(uint32_t sid, uint32_t rid, uint32_t now_ms);
+uint32_t ui_voice_rid(void); /* the request the dictation answers; 0 = typed into the terminal */
 void ui_voice_close(void);
 bool ui_voice_refresh(uint32_t now_ms); /* false: the session is gone */
 bool ui_voice_act(nav_action_t a, const gesture_evt_t *g);

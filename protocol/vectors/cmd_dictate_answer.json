@@ -1,0 +1,15 @@
+{
+  "desc": "Device answers card 9 (a free-text form field) with recording 4's transcript (proto 0.8)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 12,
+    "b": {
+      "op": "dictate",
+      "sid": 3,
+      "rid": 9,
+      "arg": 4,
+      "hold_ms": 1250
+    }
+  },
+  "cbor_hex": "a30008010c03a5000c010302090304041904e2"
+}

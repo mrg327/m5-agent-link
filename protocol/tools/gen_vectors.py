@@ -179,6 +179,17 @@ VECTORS = {
         {"t": "cmd", "id": 11, "b": {"op": "dictate", "sid": 3, "arg": 4, "hold_ms": 1250}},
         env("cmd", 11, {0: 12, 1: 3, 3: 4, 4: 1250}),
     ),
+    "cmd_dictate_answer": (
+        "Device answers card 9 (a free-text form field) with recording 4's transcript (proto 0.8)",
+        {"t": "cmd", "id": 12, "b": {"op": "dictate", "sid": 3, "rid": 9, "arg": 4, "hold_ms": 1250}},
+        env("cmd", 12, {0: 12, 1: 3, 2: 9, 3: 4, 4: 1250}),
+    ),
+    "attention_question_dictate": (
+        "Free-text question for session 3: no choices, answered by dictation or on the PC (proto 0.8)",
+        {"t": "attention", "id": 14, "b": {"rid": 9, "sid": 3, "kind": "question",
+         "title": "Your note", "text": "Describe the bug", "acts": ["focus", "dictate"], "exp": 1793995500}},
+        env("attention", 14, {0: 9, 1: 3, 2: 1, 3: "Your note", 4: "Describe the bug", 6: [2, 5], 7: 1793995500}),
+    ),
     "audio_start": (
         "Device starts recording 4 for session 3: IMA ADPCM blocks at 16 kHz (proto 0.6)",
         {"t": "audio_start", "id": 12, "b": {"aid": 4, "codec": "adpcm16k", "sid": 3}},

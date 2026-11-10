@@ -1059,7 +1059,8 @@ static bool encode_action(
 	: (((*input).action_choice == action_focus_m_c) ? ((zcbor_uint32_put(state, (2))))
 	: (((*input).action_choice == action_reply_m_c) ? ((zcbor_uint32_put(state, (3))))
 	: (((*input).action_choice == action_ack_m_c) ? ((zcbor_uint32_put(state, (4))))
-	: false)))))));
+	: (((*input).action_choice == action_dictate_m_c) ? ((zcbor_uint32_put(state, (5))))
+	: false))))))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1104,7 +1105,7 @@ static bool encode_attention(
 	&& (!(*input).attention_uint4tstr_present || encode_repeated_attention_uint4tstr(state, (&(*input).attention_uint4tstr)))
 	&& (!(*input).attention_tstr_l_present || encode_repeated_attention_tstr_l(state, (&(*input).attention_tstr_l)))
 	&& (((zcbor_uint32_put(state, (6))))
-	&& (zcbor_list_start_encode(state, 5) && ((zcbor_multi_encode_minmax(0, 5, &(*input).attention_action_m_l_action_m_count, (zcbor_encoder_t *)encode_action, state, (*&(*input).attention_action_m_l_action_m), sizeof(struct action_r))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_list_end_encode(state, 5)))
+	&& (zcbor_list_start_encode(state, 6) && ((zcbor_multi_encode_minmax(0, 6, &(*input).attention_action_m_l_action_m_count, (zcbor_encoder_t *)encode_action, state, (*&(*input).attention_action_m_l_action_m), sizeof(struct action_r))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_list_end_encode(state, 6)))
 	&& (!(*input).attention_uint7uint_present || encode_repeated_attention_uint7uint(state, (&(*input).attention_uint7uint)))
 	&& (!(*input).attention_uint8uint_present || encode_repeated_attention_uint8uint(state, (&(*input).attention_uint8uint)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 9))));
 

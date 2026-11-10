@@ -155,11 +155,13 @@ where
             // The terminal moved on: whatever this session had pending was answered there.
             // A notification is not a move: it may be the very prompt the card is about.
             if let Some(key) = &key {
-                let tool = v["payload"]["tool_name"].as_str();
+                // Claude names the tool `tool_name`, Copilot `toolName`
+                let tool = v["payload"]["tool_name"]
+                    .as_str()
+                    .or_else(|| v["payload"]["toolName"].as_str());
                 if parent_of(&v).is_some() {
                     // A sub-agent moving on says nothing about the parent's open cards; its own
                     // tool ending answers only a card for that tool.
-                    let tool = tool.or_else(|| v["payload"]["toolName"].as_str());
                     if event.to_ascii_lowercase().starts_with("posttooluse") && tool.is_some() {
                         broker.cancel_session(key, tool);
                     }

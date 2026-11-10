@@ -50,6 +50,10 @@ add_executable(test_steps tests/test_steps.c ${FW}/core/src/steps.c)
 target_include_directories(test_steps PRIVATE ${FW}/core/src)
 add_test(NAME step_timeline COMMAND test_steps)
 
+add_executable(test_nav tests/test_nav.c ${FW}/core/src/nav.c)
+target_include_directories(test_nav PRIVATE ${FW}/core/src)
+add_test(NAME nav_model COMMAND test_nav)
+
 add_executable(test_sound tests/test_sound.c ${FW}/core/src/sound.c ${FW}/core/src/sound_bank.c)
 target_include_directories(test_sound PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
 target_link_libraries(test_sound PRIVATE lvgl::lvgl m)
@@ -187,6 +191,11 @@ sim_script_test(sim_reply_question reply_question.txt
 sim_script_test(sim_voice_dictate voice_dictate.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":12,\"sid\":[0-9]+,\"rid\":0,\"hold_ms\":[0-9][0-9]?[0-9]?,"
   PASS_REGULAR_EXPRESSION "\"msg\":\"audio_start\".*\"msg\":\"audio_end\".*\"ev\":\"stop\",\"aid\":[0-9]+,\"ms\":[0-9]+,\"blocks\":[1-9].*\"op\":12,\"sid\":1,\"rid\":0,\"hold_ms\":1[0-9][0-9][0-9],\"arg\":[0-9]+")
+# Dictating an answer (issue 7941): a free-text question offers Dictate... before Open on PC; the hold in
+# VOICE sends op 12 with the request's rid; ASK shows it pending until the daemon's clear.
+sim_script_test(sim_ask_dictate ask_dictate.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":12,\"sid\":[0-9]+,\"rid\":0,"
+  PASS_REGULAR_EXPRESSION "\"msg\":\"audio_start\".*\"op\":12,\"sid\":2,\"rid\":8,\"hold_ms\":1[0-9][0-9][0-9],\"arg\":[0-9]+")
 # KEYS swipe keyboard (issue 1e57): kb_start on open, swipes and taps as kb_stroke with counting seq, the
 # layer key resends kb_start with the same kid, B deletes (op 14), only the A hold sends (op 15,
 # hold_ms >= 1000), B held leaves with kb_end arg 1 (op 16).

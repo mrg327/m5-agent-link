@@ -112,10 +112,11 @@ int nav_agent_items(sess_state_t state, bool typing, bool replies, agent_item_t 
 
 /* ── ASK: the answer options of a request, in wheel order, default first (UI-V2 §4.3, §7) ──
  * Options come from attention.opts verbatim; a bare permission synthesises Approve / Deny; "Open on
- * PC" is always last. Anything that grants permission (grant_mask bit, or Approve) commits only by
+ * PC" is always last, after "Dictate..." where the request takes free text (acts has ACT_DICTATE) and
+ * the daemon transcribes (voice). Anything that grants permission (grant_mask bit, or Approve) commits only by
  * the NAV_HOLD_MS hold; a deny-class option by the NAV_DENY_HOLD_MS hold (or the strict swipe); a
  * question option by a tap. */
-typedef enum { ASK_OPT, ASK_APPROVE, ASK_DENY, ASK_OPEN_PC } ask_action_t;
+typedef enum { ASK_OPT, ASK_APPROVE, ASK_DENY, ASK_DICTATE, ASK_OPEN_PC } ask_action_t;
 
 typedef struct {
     ask_action_t id;
@@ -124,8 +125,8 @@ typedef struct {
     bool grants;      /* approve-class: hold arc and haptic ramp use the approve pattern */
 } ask_item_t;
 
-#define ASK_MAX_ITEMS 7 /* 4 options + Approve + Deny + Open on PC never all coexist, but keep room */
-int nav_ask_items(const attention_t *a, ask_item_t *out, int cap);
+#define ASK_MAX_ITEMS 7 /* 4 options + Approve + Deny + Dictate + Open on PC never all coexist, but keep room */
+int nav_ask_items(const attention_t *a, bool voice, ask_item_t *out, int cap);
 
 /* ── STATUS: the watch's own rows, in wheel order (UI-V2 §4.5) ──
  * Quiet first: it is what the screen is for. Rows that are not actionable only inform; committing

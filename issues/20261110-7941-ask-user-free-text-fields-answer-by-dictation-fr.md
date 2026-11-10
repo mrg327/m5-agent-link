@@ -30,3 +30,4 @@ A Copilot ask_user form field without fixed choices (free text) gets a Focus-onl
 
 - 2026-11-10T22:37:22Z · copilot-cli/opus@mac-work · macos-arm64 · f6473c1: filed
 - 2026-11-10T22:37:25Z · copilot-cli/opus@mac-work · macos-arm64 · f6473c1: claimed
+- 2026-11-10T22:44:52Z · copilot-cli/opus@mac-work · macos-arm64 · 63d5f73+dirty: daemon: text-field cards (Expect::Text, type_text with field/empty-box/echo checks), dictate rid answer via broker.answer_text, per-device Dictate gating (minor>=8 + voice), postToolUse toolName fix; protocol 0.8 action_dictate + vectors; daemon checks green. Firmware in progress.

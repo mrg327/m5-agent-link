@@ -16,7 +16,7 @@ typedef enum {
     SESS_DONE = 4, SESS_IDLE = 5, SESS_ENDED = 6
 } sess_state_t;
 typedef enum { ATT_APPROVAL = 0, ATT_QUESTION = 1, ATT_ERROR = 2, ATT_DONE = 3 } att_kind_t;
-typedef enum { ACT_APPROVE = 0, ACT_DENY = 1, ACT_FOCUS = 2, ACT_REPLY = 3, ACT_ACK = 4 } att_action_t;
+typedef enum { ACT_APPROVE = 0, ACT_DENY = 1, ACT_FOCUS = 2, ACT_REPLY = 3, ACT_ACK = 4, ACT_DICTATE = 5 } att_action_t;
 typedef enum { PRIVACY_META = 0, PRIVACY_PREVIEW = 1, PRIVACY_FULL = 2 } privacy_t;
 typedef enum { ALERT_FULL = 0, ALERT_QUIET = 1, ALERT_SILENT = 2 } alert_mode_t;
 
@@ -73,11 +73,11 @@ typedef struct {
     uint8_t acts; /* bitmask of 1 << att_action_t */
     uint8_t grant_mask; /* bit i set: opts[i] grants permission (approve-class, hold to commit) */
     uint32_t exp; /* unix, 0 = none */
-    bool answer_sent; /* an answer (approve/deny/reply) is out; waiting for clear */
+    bool answer_sent; /* an answer (approve/deny/reply/dictate) is out; waiting for clear */
     uint8_t answer;   /* what was sent: ATT_ANSWER_* */
     uint8_t answer_opt; /* option index for ATT_ANSWER_REPLY */
 } attention_t;
-enum { ATT_ANSWER_NONE = 0, ATT_ANSWER_APPROVE, ATT_ANSWER_DENY, ATT_ANSWER_REPLY };
+enum { ATT_ANSWER_NONE = 0, ATT_ANSWER_APPROVE, ATT_ANSWER_DENY, ATT_ANSWER_REPLY, ATT_ANSWER_DICTATE };
 
 typedef struct { uint32_t waiting, error, running, done_unseen; } model_counts_t;
 

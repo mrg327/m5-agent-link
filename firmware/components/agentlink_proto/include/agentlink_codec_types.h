@@ -438,6 +438,7 @@ struct action_r {
 		action_focus_m_c = 2,
 		action_reply_m_c = 3,
 		action_ack_m_c = 4,
+		action_dictate_m_c = 5,
 	} action_choice;
 };
 
@@ -459,7 +460,7 @@ struct attention {
 	bool attention_uint4tstr_present;
 	struct attention_tstr_l_r attention_tstr_l;
 	bool attention_tstr_l_present;
-	struct action_r attention_action_m_l_action_m[5];
+	struct action_r attention_action_m_l_action_m[6];
 	size_t attention_action_m_l_action_m_count;
 	struct attention_uint7uint attention_uint7uint;
 	bool attention_uint7uint_present;

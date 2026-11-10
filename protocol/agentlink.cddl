@@ -237,7 +237,7 @@ attention = {
   ? 3 => tstr,            ; title  e.g. "Run shell command"
   ? 4 => tstr,            ; text   preview ≤ 160 chars
   ? 5 => [0*4 tstr],        ; opts   ≤ 4 choices, each ≤ 24 chars
-  6 => [0*5 action],        ; acts   actions the device may offer
+  6 => [0*6 action],        ; acts   actions the device may offer
   ? 7 => uint,            ; exp    unix time after which to drop
   ? 8 => uint            ; grant_mask  bit i set = opts[i] grants permission (approve-class: hold to commit)
 }
@@ -247,12 +247,13 @@ att_kind_question = 1
 att_kind_error = 2
 att_kind_done = 3
 
-action = action_approve / action_deny / action_focus / action_reply / action_ack
+action = action_approve / action_deny / action_focus / action_reply / action_ack / action_dictate
 action_approve = 0
 action_deny = 1
 action_focus = 2
 action_reply = 3
 action_ack = 4
+action_dictate = 5   ; the card takes a dictated answer: cmd_op_dictate with its rid (proto 0.8)
 
 clear = {
   0 => uint,   ; rid
@@ -263,7 +264,7 @@ clear = {
 cmd = {
   0 => cmd_op,     ; op
   ? 1 => uint,     ; sid
-  ? 2 => uint,     ; rid
+  ? 2 => uint,     ; rid   (dictate: the card the transcript answers, proto 0.8)
   ? 3 => cmd_arg,  ; arg   snooze minutes, reply option index, quiet secs
   ? 4 => uint     ; hold_ms  measured hold-to-confirm (approve)
 }

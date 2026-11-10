@@ -1,0 +1,40 @@
+# Dictating an answer (issue 7941). A question with a free-text field comes without options and with
+# acts focus,dictate; with welcome.voice the ASK wheel is "Dictate..." then "Open on PC". A tap opens
+# VOICE on that request; the hold sends cmd dictate (op 12) with the request's rid and the recording
+# id; ASK shows the answer pending until the daemon's clear returns to the deck.
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 1 work webapp feat/login Running the test suite
+session 2 ask dashboard main
+wait 300
+mic audio/tone_1s.wav
+attention 8 2 question focus,dictate 0 Commit message|What should the commit message say?
+wait 400
+expect_screen ask
+expect_label Commit message
+expect_label > Dictate...
+expect_label Open on PC
+expect_label 2 options
+shot ask_dictate.png
+tap 233 233
+wait 300
+expect_screen voice
+expect_label Listening...
+wait 1200
+tap 233 233
+wait 300
+expect_label Transcribing...
+transcript fix the login redirect
+wait 300
+expect_label hold to send
+hold 233 233 1600
+wait 400
+expect_screen ask
+expect_label Sent dictation
+result ok
+wait 200
+expect_label Sent dictation
+clear 8 answered_dev
+wait 300
+expect_screen ring
+quit

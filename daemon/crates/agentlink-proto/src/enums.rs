@@ -22,7 +22,7 @@ uint_enum!(Agent { Copilot = 0, Claude = 1, Cloud = 2, Other = 15 });
 uint_enum!(SessState { Start = 0, Work = 1, Input = 2, Error = 3, Done = 4, Idle = 5, Ended = 6 });
 uint_enum!(InputSub { Approval = 0, Question = 1 });
 uint_enum!(AttKind { Approval = 0, Question = 1, Error = 2, Done = 3 });
-uint_enum!(Action { Approve = 0, Deny = 1, Focus = 2, Reply = 3, Ack = 4 });
+uint_enum!(Action { Approve = 0, Deny = 1, Focus = 2, Reply = 3, Ack = 4, Dictate = 5 });
 uint_enum!(CmdOp {
     Focus = 0, Ack = 1, Snooze = 2, Approve = 3, Deny = 4, Reply = 5, Cancel = 6,
     Detail = 7, NotifyDone = 8, Quiet = 9, Scroll = 10, Type = 11, Dictate = 12,

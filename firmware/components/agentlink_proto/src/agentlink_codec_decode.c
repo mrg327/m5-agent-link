@@ -1151,7 +1151,8 @@ static bool decode_action(
 	|| (((*result).action_choice == action_deny_m_c) && ((1)))
 	|| (((*result).action_choice == action_focus_m_c) && ((1)))
 	|| (((*result).action_choice == action_reply_m_c) && ((1)))
-	|| (((*result).action_choice == action_ack_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
+	|| (((*result).action_choice == action_ack_m_c) && ((1)))
+	|| (((*result).action_choice == action_dictate_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1196,7 +1197,7 @@ static bool decode_attention(
 	&& zcbor_present_decode(&((*result).attention_uint4tstr_present), (zcbor_decoder_t *)decode_repeated_attention_uint4tstr, state, (&(*result).attention_uint4tstr))
 	&& zcbor_present_decode(&((*result).attention_tstr_l_present), (zcbor_decoder_t *)decode_repeated_attention_tstr_l, state, (&(*result).attention_tstr_l))
 	&& (((zcbor_uint32_expect(state, (6))))
-	&& (zcbor_list_start_decode(state) && ((zcbor_multi_decode(0, 5, &(*result).attention_action_m_l_action_m_count, (zcbor_decoder_t *)decode_action, state, (*&(*result).attention_action_m_l_action_m), sizeof(struct action_r))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_list_end_decode(state)))
+	&& (zcbor_list_start_decode(state) && ((zcbor_multi_decode(0, 6, &(*result).attention_action_m_l_action_m_count, (zcbor_decoder_t *)decode_action, state, (*&(*result).attention_action_m_l_action_m), sizeof(struct action_r))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_list_end_decode(state)))
 	&& zcbor_present_decode(&((*result).attention_uint7uint_present), (zcbor_decoder_t *)decode_repeated_attention_uint7uint, state, (&(*result).attention_uint7uint))
 	&& zcbor_present_decode(&((*result).attention_uint8uint_present), (zcbor_decoder_t *)decode_repeated_attention_uint8uint, state, (&(*result).attention_uint8uint))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
 

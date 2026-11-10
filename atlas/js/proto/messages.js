@@ -13,7 +13,7 @@ const ENUMS = {
   sess_state: { start: 0, work: 1, input: 2, error: 3, done: 4, idle: 5, ended: 6 },
   input_sub: { approval: 0, question: 1 },
   att_kind: { approval: 0, question: 1, error: 2, done: 3 },
-  action: { approve: 0, deny: 1, focus: 2, reply: 3, ack: 4 },
+  action: { approve: 0, deny: 1, focus: 2, reply: 3, ack: 4, dictate: 5 },
   cmd_op: { focus: 0, ack: 1, snooze: 2, approve: 3, deny: 4, reply: 5, cancel: 6, detail: 7, notify_done: 8, quiet: 9, scroll: 10, type: 11, dictate: 12, kb_pick: 13, kb_del: 14, kb_send: 15, kb_end: 16 },
   scroll_unit: { lines: 0, pages: 1, to_end: 2 },
   disp_shape: { round: 0, rect: 1 },

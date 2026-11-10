@@ -127,6 +127,7 @@ bool ui_toast_active(void) { return !lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN
 
 /* The session WATCH was on when ASK or SCROLL took over; they return there instead of HOME. */
 static uint32_t s_resume_watch_sid;
+static uint32_t s_voice_rid; /* the request VOICE answers (ui_go_voice) */
 
 static void enter_mode(nav_mode_t m)
 {
@@ -149,7 +150,7 @@ static void enter_mode(nav_mode_t m)
         ui_status_open(s_now_ms);
     }
     else if (m == MODE_WATCH) ui_watch_open(ui_home_sel_sid(), s_now_ms);
-    else if (m == MODE_VOICE) ui_voice_open(ui_home_sel_sid(), s_now_ms);
+    else if (m == MODE_VOICE) ui_voice_open(ui_home_sel_sid(), s_voice_rid, s_now_ms);
     else if (m == MODE_KEYS) ui_keys_open(ui_home_sel_sid(), s_now_ms);
     else ui_home_refresh(s_now_ms); /* the ring shows sessions again */
     if (ui_toast_active()) place_toast(); /* a toast that outlives the mode moves to the new slot */
@@ -178,7 +179,11 @@ void ui_go_home(void) { leave_mode(); }
 void ui_go_scroll(void) { enter_mode(MODE_SCROLL); }
 void ui_go_status(void) { enter_mode(MODE_STATUS); }
 void ui_go_watch(void) { enter_mode(MODE_WATCH); }
-void ui_go_voice(void) { enter_mode(MODE_VOICE); }
+void ui_go_voice(uint32_t rid)
+{
+    s_voice_rid = rid;
+    enter_mode(MODE_VOICE);
+}
 void ui_go_keys(void) { enter_mode(MODE_KEYS); }
 uint32_t ui_watched_sid(void) { return s_mode == MODE_WATCH ? ui_watch_sid() : 0; }
 
@@ -290,7 +295,16 @@ void ui_tick(uint32_t now_ms)
     if (s_mode == MODE_SCROLL && ui_scroll_tick(now_ms)) leave_mode(); /* idle: back to WATCH */
     if (s_mode == MODE_STATUS && ui_status_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_WATCH) ui_watch_tick(now_ms);
-    if (s_mode == MODE_VOICE && ui_voice_tick(now_ms)) enter_mode(MODE_HOME); /* sent */
+    if (s_mode == MODE_VOICE && ui_voice_tick(now_ms)) { /* sent */
+        /* an answer to a request goes back to ASK, which shows it pending until the daemon's clear */
+        const attention_t *a = ui_voice_rid() ? model_attention_find(ui_voice_rid()) : NULL;
+        uint32_t sid = a ? a->sid : 0;
+        enter_mode(MODE_HOME);
+        if (sid) {
+            ui_home_select_sid(sid, "voice");
+            enter_mode(MODE_ASK);
+        }
+    }
     if (s_mode == MODE_KEYS) ui_keys_tick(now_ms);
 }
 

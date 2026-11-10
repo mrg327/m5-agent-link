@@ -201,7 +201,7 @@ int nav_agent_items(sess_state_t state, bool typing, bool replies, agent_item_t 
     return k;
 }
 
-int nav_ask_items(const attention_t *a, ask_item_t *out, int cap)
+int nav_ask_items(const attention_t *a, bool voice, ask_item_t *out, int cap)
 {
     int n = 0;
     if (!a || cap < 1) return 0;
@@ -217,6 +217,8 @@ int nav_ask_items(const attention_t *a, ask_item_t *out, int cap)
         if ((a->acts & (1u << ACT_APPROVE)) && n < cap - 1) out[n++] = (ask_item_t){ASK_APPROVE, -1, NAV_HOLD_MS, true};
         if ((a->acts & (1u << ACT_DENY)) && n < cap - 1) out[n++] = (ask_item_t){ASK_DENY, -1, NAV_DENY_HOLD_MS, false};
     }
+    /* opens VOICE on this request; the hold-to-send there is the commit */
+    if (voice && (a->acts & (1u << ACT_DICTATE)) && n < cap - 1) out[n++] = (ask_item_t){ASK_DICTATE, -1, 0, false};
     out[n++] = (ask_item_t){ASK_OPEN_PC, -1, 0, false}; /* always: the escape to the terminal */
     return n;
 }

@@ -45,7 +45,7 @@ pub fn parse_replies(text: &str) -> Vec<String> {
 }
 
 /// `text` for kitty's `send-text`: a backslash would start an escape.
-fn escape(text: &str) -> String {
+pub(crate) fn escape(text: &str) -> String {
     text.replace('\\', "\\\\")
 }
 

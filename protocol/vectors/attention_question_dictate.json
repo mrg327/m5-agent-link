@@ -1,0 +1,20 @@
+{
+  "desc": "Free-text question for session 3: no choices, answered by dictation or on the PC (proto 0.8)",
+  "symbolic": {
+    "t": "attention",
+    "id": 14,
+    "b": {
+      "rid": 9,
+      "sid": 3,
+      "kind": "question",
+      "title": "Your note",
+      "text": "Describe the bug",
+      "acts": [
+        "focus",
+        "dictate"
+      ],
+      "exp": 1793995500
+    }
+  },
+  "cbor_hex": "a30006010e03a70009010302010369596f7572206e6f746504704465736372696265207468652062756706820205071a6aee32ec"
+}

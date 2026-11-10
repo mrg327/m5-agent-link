@@ -164,7 +164,7 @@ static void commit(const wheel_item_t *it)
     dbg_event("ui", "commit", "\"sid\":%u,\"id\":%d", (unsigned)s->sid, it->id);
     if (it->id == DICTATE_ID) {
         g_ui_actions->tick();
-        ui_go_voice();
+        ui_go_voice(0);
         return;
     }
     if (it->id == KEYS_ID) {

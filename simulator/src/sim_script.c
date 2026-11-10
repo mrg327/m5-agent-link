@@ -494,7 +494,7 @@ static int enum_of(const char *s, const char *const *names, int n)
 static void run_attention(char *spec)
 {
     static const char *const kinds[] = {"approval", "question", "error", "done"};
-    static const char *const acts[] = {"approve", "deny", "focus", "reply", "ack"};
+    static const char *const acts[] = {"approve", "deny", "focus", "reply", "ack", "dictate"};
     unsigned rid, sid, grant;
     char kind[12], actl[48];
     int n = 0;
@@ -511,8 +511,8 @@ static void run_attention(char *spec)
     a->attention_uint1uint = sid;
     a->attention_att_kind_m.att_kind_choice = enum_of(kind, kinds, 4);
     for (char *tok = strtok(actl, ","); tok; tok = strtok(NULL, ",")) {
-        int k = enum_of(tok, acts, 5);
-        if (k >= 0 && a->attention_action_m_l_action_m_count < 5)
+        int k = enum_of(tok, acts, 6);
+        if (k >= 0 && a->attention_action_m_l_action_m_count < 6)
             a->attention_action_m_l_action_m[a->attention_action_m_l_action_m_count++].action_choice = k;
     }
     a->attention_uint8uint_present = true;
