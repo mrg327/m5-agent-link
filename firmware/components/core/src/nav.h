@@ -96,7 +96,7 @@ bool nav_long_swipe_down(int y_start, int y_end);
 
 /* ── AGENT: which actions a session offers, in wheel order, default first (UI-V2 §4.2) ── */
 typedef enum {
-    AG_FOCUS, AG_ACK, AG_DISMISS, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_REPLY, AG_INTERRUPT, AG_COUNT
+    AG_FOCUS, AG_DISMISS, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_REPLY, AG_INTERRUPT, AG_COUNT
 } agent_action_t;
 
 typedef struct {

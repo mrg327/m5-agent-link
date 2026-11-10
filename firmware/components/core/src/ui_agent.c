@@ -32,7 +32,7 @@ static char s_header_txt[64];
 
 /* Presentation of the interaction model's action ids. */
 static const char *const s_labels[AG_COUNT] = {
-    [AG_FOCUS] = "Focus terminal", [AG_ACK] = "Mark seen",         [AG_DISMISS] = "Dismiss error",
+    [AG_FOCUS] = "Focus terminal", [AG_DISMISS] = "Dismiss error",
     [AG_SNOOZE] = "Snooze 30 min", [AG_NOTIFY] = "Notify when done", [AG_WATCH] = "Watch",
     [AG_REPLY] = "Reply...",       [AG_INTERRUPT] = "Interrupt",
 };
@@ -130,6 +130,8 @@ void ui_agent_open(uint32_t sid, uint32_t now)
     s_replies = false;
     wheel_set(s_wheel, NULL, 0, 0);
     ui_agent_refresh(now);
+    const session_t *s = session();
+    if (s && s->state == SESS_DONE && !s->seen) g_ui_actions->ack(sid); /* looking at it is seeing it */
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     dbg_event("ui", "agent", "\"sid\":%u,\"items\":%d", (unsigned)sid, wheel_count(s_wheel));
 }
@@ -173,7 +175,6 @@ static void commit(const wheel_item_t *it)
         g_ui_actions->focus(s->sid);
         if (s->state == SESS_DONE) g_ui_actions->ack(s->sid);
         break;
-    case AG_ACK:
     case AG_DISMISS: g_ui_actions->ack(s->sid); g_ui_actions->tick(); break;
     case AG_SNOOZE: g_ui_actions->snooze(s->sid, snoozed(s) ? 0 : 30); break;
     case AG_NOTIFY: g_ui_actions->notify_done(s->sid, !s->ntf); break;

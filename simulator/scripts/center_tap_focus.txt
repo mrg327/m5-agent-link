@@ -11,7 +11,8 @@ shot ring_done.png
 tap 233 233
 wait 200
 expect_screen agent
-expect_label > Mark seen
+expect_label > Watch
+expect_no_label Mark seen
 expect_no_label Focus terminal
 btn B long
 wait 200

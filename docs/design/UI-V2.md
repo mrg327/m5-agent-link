@@ -157,7 +157,7 @@ User decision §9.1: tapping the centre opens a screen where gestures act on tha
 |---|---|---|
 | Working | Watch · Notify when done · Snooze 30 min · *Interrupt* | Interrupt |
 | Question, Permission | *ASK opens instead (§4.3)* | Approve, grants, Deny (in ASK) |
-| Done | *Reply…* · Mark seen · Watch | — |
+| Done | *Reply…* · Watch | — |
 | Error | Dismiss error · *Reply…* · Watch | — |
 | Idle | *Reply…* · Snooze 30 min | — |
 | Input (the session waits, no request listed) | *Reply…* · Focus terminal | — |
@@ -169,7 +169,7 @@ Items in *italics* need a daemon that types into terminals (decision 28: the wel
 - **Interrupt** is a hold item (deny colour, `HOLD` tag, 1.2 s): it sends `cmd_op_cancel` with the measured `hold_ms`, and the daemon sends Esc to the terminal. A tap only says "Hold to confirm".
 
 - **Watch** opens the WATCH monitor for this session (§4.7).
-- **Mark seen** (Done) and **Dismiss error** (Error) both send `ack`. The daemon stores the result: it sets `seen`, tells every device, and moves an acknowledged error session to idle. The device only dims the segment at once.
+- **Dismiss error** (Error) sends `ack`; so does opening the wheel on a Done session that is not yet seen (decision 32). The daemon stores the result: it sets `seen`, tells every device, and moves an acknowledged error session to idle. The device only dims the segment at once.
 - **Snooze 30 min** and **Notify when done** are toggles. While the session is snoozed (`snz` is in the future) the item reads **Unsnooze** and sends `snooze` with 0 minutes (toast "Unsnoozed"). While `ntf` is set, the item reads **Don't notify** and sends `notify_done` with 0 (toast "Won't notify"). Arming sends 1.
 - A snoozed session buzzes, glows and nags for nothing. Its card still appears, and its ring segment is dimmed. The card shows "snoozed" after the time.
 
@@ -405,7 +405,7 @@ Sources of options, in order of precedence:
 
 1. `attention.opts` (≤ 4 × 24 chars): Claude Code `AskUserQuestion` choices, Copilot `elicitation_dialog` choices. Shown verbatim; a 5th or longer option is the daemon's job to shorten or drop (it already enforces the limits). Commit by tap or A → `cmd_op_reply {rid, arg: index}`.
 2. A permission with `acts` containing `approve`/`deny` but no `opts`: the device synthesises `Approve`, `Deny`, `Open on PC`. When the agent's prompt has "allow for this session / don't ask again" variants, the daemon sends them as `opts` with `kind = approval` and a new **required** `attention.grant_mask` (bit per option; set = the option grants something). Every set option is approve-class (hold); the reply is `cmd_op_reply {rid, arg: index}`, which the daemon maps to the agent's own choice. User decision §9.5: these grants are offered on the watch.
-3. Error / Done attentions: no options; `acts` drive AGENT items (Dismiss error, Mark seen).
+3. Error / Done attentions: no options; `acts` drive AGENT items (Dismiss error; a Done session is acknowledged by opening its wheel).
 
 Flow for a question:
 
@@ -445,7 +445,7 @@ Daemon side (Phase 3, `daemon/crates/agentlinkd/src/broker.rs`): the approval br
 |---|---|---|
 | 0 | Review fixes #1–#4 (`2702775`): prompt text on the card, glow first-touch, haptic triple, strict deny | `approve_card`, `approve_after_glow`, `approve_too_soon`, `deny_short_swipe` |
 | 1 | HOME deck: new hierarchy, summary row, time-in-state, index ring with tick and inset error dash, stale/offline, key badges, toast placement. Tap centre stays Focus until Phase 2 | screenshots of every state; `expect_label` on summary and stale |
-| 2 | `ui_wheel.c` + AGENT for Working/Done/Error/Idle (Focus, Mark seen, Dismiss error, Snooze, Notify, Watch, Status…); tap centre and swipe up open it; chord = Home. **Done** (`nav.c` interaction layer, §8a) | `actions_wheel.txt`, `agent_timeout.txt` |
+| 2 | `ui_wheel.c` + AGENT for Working/Done/Error/Idle (Focus, Dismiss error, Snooze, Notify, Watch, Status…); tap centre and swipe up open it; chord = Home. **Done** (`nav.c` interaction layer, §8a) | `actions_wheel.txt`, `agent_timeout.txt` |
 | 3 | ASK on the wheel: options from `opts`, `grant_mask`, `cmd_op_reply`, approve/grants/deny as hold items, answer-pending line; daemon approval broker + blocking Claude Code hooks. **Done** | `ask_reply`, `ask_grant_hold`, `ask_deny_hold`, `ask_tap_never_approves`, `ask_result_error`, `ask_hold_bound_to_rid`; vectors `attention_question_opts`, `attention_permission_grants`, `cmd_reply`; broker and hook unit tests |
 | 4 | SCROLL by drag/flick + `cmd_op_scroll` + `scroll_pos` + kitty and tmux drivers + privacy-gated preview. **Done** (simulator and daemon unit tests; not yet run against a real kitty or tmux, and the BLE interactive interval is still untouched) | `scroll_mode.txt`, `scroll_exit.txt`, `scroll_privacy.txt`, `scroll_unsupported.txt`; `test_gesture` drag/flick cases; vectors `cmd_scroll`, `result_scroll_pos`; daemon tests for kitty/tmux argument building, position parsing, preview tidying, the coalescer and the link-level burst test |
 | 5 | STATUS wheel (swipe down from HOME, "Status…"; quiet cycle, sounds toggle, privacy / counts / firmware rows; quiet holds the alert buzz, glow and nag; the deck's mute glyph); deny removed from the deck; Atlas facts (gesture map from `nav.c`, `status` screen, `quiet_toggled` haptic). **Done** (simulator) | `status.txt` (rows, cycle, every exit path), `quiet_buzz.txt` (no permission buzz while quiet, buzz again after) |
@@ -529,6 +529,10 @@ Replies that fit the question (2026-11-10, user decision):
 Voice dictation (2026-11-10, user decisions, issue 0ea9):
 
 31. **Dictation is local and confirmed.** whisper.cpp with base.en runs on the PC (no cloud), the watch streams IMA ADPCM, and the transcript is typed only after a hold, never automatically. It starts from "Dictate…" in the Reply list; a tap stops the recording.
+
+Wheel cleanup (2026-11-10, user decision, issue 6696):
+
+32. **No "Mark seen" row.** It was pointless: the user has already looked at a session by the time its wheel is open. Opening AGENT on a Done, unseen session sends `ack` once (the segment dims and leaves the attention cycle); button A on a Done session still acknowledges too. The Done wheel is *Reply…* · Watch. Dismiss error stays, since it also moves the session to idle.
 
 ## 10. Decisions that reconcile DESIGN.md and UI-RING.md
 

@@ -896,7 +896,7 @@
     {
       "id": "agent",
       "title": "Agent wheel",
-      "source": "firmware/components/core/src/ui_agent.c:270"
+      "source": "firmware/components/core/src/ui_agent.c:271"
     },
     {
       "id": "ask",
@@ -2203,7 +2203,7 @@
     "ring.underline_w_px": "firmware/components/core/src/ui_ring_internal.h:21",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:35",
     "screens": "firmware/components/core/src/ui_home.c:342",
-    "screens.agent": "firmware/components/core/src/ui_agent.c:270",
+    "screens.agent": "firmware/components/core/src/ui_agent.c:271",
     "screens.ask": "firmware/components/core/src/ui_ask.c:302",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:300",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:57",

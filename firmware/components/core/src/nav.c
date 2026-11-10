@@ -166,7 +166,6 @@ int nav_agent_items(sess_state_t state, bool typing, bool replies, agent_item_t 
     switch (state) {
     case SESS_DONE:
         if (reply) ADD(AG_REPLY, false);
-        ADD(AG_ACK, false);
         ADD(AG_WATCH, false);
         break;
     case SESS_ERROR:
