@@ -37,13 +37,6 @@ static char s_agent_txt[64], s_repo_txt[40], s_state_txt[40], s_summary_txt[88],
     s_link_txt[64];
 static char s_req_title_txt[48], s_req_text_txt[168], s_hint_txt[32];
 
-static void set_txt(lv_obj_t *l, char *cache, size_t cap, const char *t)
-{
-    if (strcmp(cache, t) == 0) return;
-    snprintf(cache, cap, "%s", t);
-    lv_label_set_text(l, t);
-}
-
 /* Fixed height of `lines` rows: LONG_MODE_DOTS only truncates when the height is fixed, otherwise a
  * long text wraps onto the next row and collides with it. */
 static void place_lines(lv_obj_t *l, int y, int w, int lines)
@@ -70,7 +63,7 @@ static void set_repo(const char *t)
     lv_obj_set_style_text_font(s_repo, f, 0);
     int h = lines * lv_font_get_line_height(f);
     place_lines(s_repo, REPO_Y + (REPO_H - h) / 2, REPO_W, lines);
-    set_txt(s_repo, s_repo_txt, sizeof s_repo_txt, t);
+    theme_set_text(s_repo, s_repo_txt, sizeof s_repo_txt, t);
 }
 
 static bool offline(void) { return !ui_link_connected(); }
@@ -114,7 +107,7 @@ static void update_link(void)
     char buf[64];
     uint32_t link_rgb;
     ui_home_link_text(buf, sizeof buf, true, &link_rgb);
-    set_txt(s_link, s_link_txt, sizeof s_link_txt, buf);
+    theme_set_text(s_link, s_link_txt, sizeof s_link_txt, buf);
     theme_set_text_color(s_link, lv_color_hex(link_rgb));
 }
 
@@ -129,7 +122,7 @@ static void update_elapsed(const session_t *s)
         size_t n = strlen(buf);
         snprintf(buf + n, sizeof buf - n, "%ssnoozed", n ? theme_sep() : "");
     }
-    set_txt(s_elapsed, s_elapsed_txt, sizeof s_elapsed_txt, buf);
+    theme_set_text(s_elapsed, s_elapsed_txt, sizeof s_elapsed_txt, buf);
 }
 
 /* One opacity for the card: ambient wins, then offline, else full. */
@@ -167,16 +160,16 @@ void ui_home_card_update(void)
     const session_t *s = ui_home_sel_session();
     int n = ui_home_slot_count();
     if (!s || n == 0) {
-        set_txt(s_agent, s_agent_txt, sizeof s_agent_txt, "");
+        theme_set_text(s_agent, s_agent_txt, sizeof s_agent_txt, "");
         set_repo("No sessions");
         theme_set_text_color(s_repo, COL_TEXT);
-        set_txt(s_state, s_state_txt, sizeof s_state_txt, "");
-        set_txt(s_summary, s_summary_txt, sizeof s_summary_txt, "Waiting for an agent");
-        set_txt(s_elapsed, s_elapsed_txt, sizeof s_elapsed_txt, "");
+        theme_set_text(s_state, s_state_txt, sizeof s_state_txt, "");
+        theme_set_text(s_summary, s_summary_txt, sizeof s_summary_txt, "Waiting for an agent");
+        theme_set_text(s_elapsed, s_elapsed_txt, sizeof s_elapsed_txt, "");
         lv_obj_add_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_pill, LV_OBJ_FLAG_HIDDEN);
-        set_txt(s_hint, s_hint_txt, sizeof s_hint_txt, "swipe down for status"); /* the empty deck's one way onward (UI-V2 §4.5) */
+        theme_set_text(s_hint, s_hint_txt, sizeof s_hint_txt, "swipe down for status"); /* the empty deck's one way onward (UI-V2 §4.5) */
         set_badges(false, false, 0);
         return;
     }
@@ -184,7 +177,7 @@ void ui_home_card_update(void)
     const home_slot_t *sl = ui_home_sel_slot();
     if (sl->n_merged) {
         snprintf(buf, sizeof buf, "%d sessions", sl->n_merged);
-        set_txt(s_agent, s_agent_txt, sizeof s_agent_txt, buf);
+        theme_set_text(s_agent, s_agent_txt, sizeof s_agent_txt, buf);
         set_repo("Done");
     } else {
         /* agent · branch: two sessions on the same folder stay distinguishable */
@@ -192,13 +185,13 @@ void ui_home_card_update(void)
         theme_host_prefix(host, sizeof host, s);
         if (s->branch[0]) snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), s->branch);
         else snprintf(buf, sizeof buf, "%s%s", host, theme_agent_name(s->agent));
-        set_txt(s_agent, s_agent_txt, sizeof s_agent_txt, buf);
+        theme_set_text(s_agent, s_agent_txt, sizeof s_agent_txt, buf);
         const char *base = theme_basename(s->repo);
         set_repo(base[0] ? base : "(no folder)");
     }
     theme_set_text_color(s_repo, COL_TEXT);
     snprintf(buf, sizeof buf, "%s  %s", theme_state_glyph(s), theme_state_word(s));
-    set_txt(s_state, s_state_txt, sizeof s_state_txt, buf);
+    theme_set_text(s_state, s_state_txt, sizeof s_state_txt, buf);
     theme_set_text_color(s_state, lv_color_hex(rgb));
     update_elapsed(s);
 
@@ -207,10 +200,10 @@ void ui_home_card_update(void)
     if (ask) {
         /* Show what is being asked in place of the summary and the time. Fall back to the tool
          * name when the daemon sent no title (privacy: meta). */
-        set_txt(s_req_title, s_req_title_txt, sizeof s_req_title_txt,
+        theme_set_text(s_req_title, s_req_title_txt, sizeof s_req_title_txt,
                 req->title[0] ? req->title : s->tool[0] ? s->tool : req->kind == ATT_APPROVAL ? "Permission request" : "Question");
-        set_txt(s_req_text, s_req_text_txt, sizeof s_req_text_txt, req->text);
-        set_txt(s_summary, s_summary_txt, sizeof s_summary_txt, "");
+        theme_set_text(s_req_text, s_req_text_txt, sizeof s_req_text_txt, req->text);
+        theme_set_text(s_summary, s_summary_txt, sizeof s_summary_txt, "");
         lv_obj_add_flag(s_elapsed, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
         if (req->text[0]) lv_obj_remove_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
@@ -218,19 +211,19 @@ void ui_home_card_update(void)
     } else {
         char sum[sizeof s->summary + 4];
         theme_display_text(sum, sizeof sum, sl->n_merged ? "" : s->summary);
-        set_txt(s_summary, s_summary_txt, sizeof s_summary_txt, sum);
+        theme_set_text(s_summary, s_summary_txt, sizeof s_summary_txt, sum);
         lv_obj_remove_flag(s_elapsed, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_req_title, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
     }
     /* The pill names the centre tap: on a request it opens the options (answering needs a hold there). */
     const char *pill = ask ? "TAP " LV_SYMBOL_RIGHT " ANSWER" : s->state == SESS_DONE ? "FOCUS + ACK" : "FOCUS";
-    set_txt(s_pill_lbl, s_pill_txt, sizeof s_pill_txt, pill);
+    theme_set_text(s_pill_lbl, s_pill_txt, sizeof s_pill_txt, pill);
     lv_color_t pill_col = offline() ? COL_MUTED : lv_color_hex(rgb);
     theme_set_text_color(s_pill_lbl, pill_col);
     theme_set_bg_color(s_pill, pill_col);
     lv_obj_remove_flag(s_pill, LV_OBJ_FLAG_HIDDEN);
-    set_txt(s_hint, s_hint_txt, sizeof s_hint_txt, ""); /* deny lives only in ASK (UI-V2 §3); the deck answers nothing */
+    theme_set_text(s_hint, s_hint_txt, sizeof s_hint_txt, ""); /* deny lives only in ASK (UI-V2 §3); the deck answers nothing */
     set_badges(true, n > 1, rgb);
 }
 

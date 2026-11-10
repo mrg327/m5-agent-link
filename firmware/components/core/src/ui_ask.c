@@ -84,13 +84,6 @@ static void hold_cancel(void)
     ring_set_progress(ui_home_ring(), 0, 0xffffff);
 }
 
-static void set_txt(lv_obj_t *l, char *cache, size_t cap, const char *t)
-{
-    if (strcmp(cache, t) == 0) return;
-    snprintf(cache, cap, "%s", t);
-    lv_label_set_text(l, t);
-}
-
 static void show(lv_obj_t *o, bool on)
 {
     if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
@@ -115,11 +108,11 @@ bool ui_ask_refresh(uint32_t now)
     char host[24];
     theme_host_prefix(host, sizeof host, s);
     snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
-    set_txt(s_header, s_header_txt, sizeof s_header_txt, buf);
+    theme_set_text(s_header, s_header_txt, sizeof s_header_txt, buf);
     bool perm = a->kind == ATT_APPROVAL;
-    set_txt(s_title, s_title_txt, sizeof s_title_txt,
+    theme_set_text(s_title, s_title_txt, sizeof s_title_txt,
             a->title[0] ? a->title : s->tool[0] ? s->tool : perm ? "Permission request" : "Question");
-    set_txt(s_text, s_text_txt, sizeof s_text_txt, a->text);
+    theme_set_text(s_text, s_text_txt, sizeof s_text_txt, a->text);
 
     if (a->answer_sent) {
         uint32_t rgb = RGB_DONE;
@@ -132,12 +125,12 @@ bool ui_ask_refresh(uint32_t now)
         } else {
             snprintf(buf, sizeof buf, "Approved%swaiting for PC", theme_sep());
         }
-        set_txt(s_answer, s_answer_txt, sizeof s_answer_txt, buf);
+        theme_set_text(s_answer, s_answer_txt, sizeof s_answer_txt, buf);
         s_answer_rgb = rgb;
         theme_set_text_color(s_answer, lv_color_hex(rgb));
         show(s_answer, true);
         wheel_set_shown(s_wheel, false);
-        set_txt(s_hint, s_hint_txt, sizeof s_hint_txt, "");
+        theme_set_text(s_hint, s_hint_txt, sizeof s_hint_txt, "");
         hold_cancel();
     } else {
         s_n = nav_ask_items(a, s_items, ASK_MAX_ITEMS);
@@ -147,7 +140,7 @@ bool ui_ask_refresh(uint32_t now)
         wheel_set(s_wheel, w, s_n, sel);
         wheel_set_shown(s_wheel, true);
         show(s_answer, false);
-        set_txt(s_hint, s_hint_txt, sizeof s_hint_txt, perm && (a->acts & (1u << ACT_DENY)) ? "long swipe down to deny" : "");
+        theme_set_text(s_hint, s_hint_txt, sizeof s_hint_txt, perm && (a->acts & (1u << ACT_DENY)) ? "long swipe down to deny" : "");
     }
     theme_set_text_color(s_word[0], lv_color_hex(RGB_ACCENT));
     ring_items(a);

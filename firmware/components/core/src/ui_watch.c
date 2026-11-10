@@ -36,13 +36,6 @@ static char s_header_txt[64], s_tool_txt[48], s_arg_txt[48], s_footer_txt[40];
 static char s_row_txt[ROWS][STEP_TEXT_MAX + 8];
 static const char *s_mark_txt[ROWS];
 
-static void set_txt(lv_obj_t *l, char *cache, size_t cap, const char *t)
-{
-    if (strcmp(cache, t) == 0) return;
-    snprintf(cache, cap, "%s", t);
-    lv_label_set_text(l, t);
-}
-
 static void show(lv_obj_t *o, bool on)
 {
     if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
@@ -59,14 +52,22 @@ static void place_lines(lv_obj_t *l, int x, int y, int w, int lines, lv_text_ali
 static bool working(const session_t *s) { return s->state == SESS_WORK || s->state == SESS_START; }
 
 /* "Tool · argument" (the daemon's sum) split at the first separator; a bare tool name has no argument. */
+/* Copy at most cap - 1 bytes of src[0..len): the labels truncate with dots anyway. */
+static void copy_cut(char *dst, size_t cap, const char *src, size_t len)
+{
+    if (len >= cap) len = cap - 1;
+    memcpy(dst, src, len);
+    dst[len] = 0;
+}
+
 static void split_step(const char *text, char *tool, size_t tcap, char *arg, size_t acap)
 {
     const char *sep = strstr(text, " \xC2\xB7 ");
     if (sep) {
-        snprintf(tool, tcap, "%.*s", (int)(sep - text), text);
-        snprintf(arg, acap, "%s", sep + 4);
+        copy_cut(tool, tcap, text, (size_t)(sep - text));
+        copy_cut(arg, acap, sep + 4, strlen(sep + 4));
     } else {
-        snprintf(tool, tcap, "%s", text);
+        copy_cut(tool, tcap, text, strlen(text));
         arg[0] = 0;
     }
 }
@@ -108,7 +109,7 @@ static void render_footer(const session_t *s)
     } else if (n > 0 || working(s)) {
         snprintf(buf, sizeof buf, "%u step%s", n, n == 1 ? "" : "s");
     }
-    set_txt(s_footer, s_footer_txt, sizeof s_footer_txt, buf);
+    theme_set_text(s_footer, s_footer_txt, sizeof s_footer_txt, buf);
 }
 
 static void render(void)
@@ -119,7 +120,7 @@ static void render(void)
     theme_host_prefix(host, sizeof host, s);
     const char *base = theme_basename(s->repo);
     snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
-    set_txt(s_header, s_header_txt, sizeof s_header_txt, buf);
+    theme_set_text(s_header, s_header_txt, sizeof s_header_txt, buf);
 
     const steps_t *t = &s->steps;
     char tool[48] = "", arg[48] = "";
@@ -154,9 +155,9 @@ static void render(void)
         break;
     default: snprintf(tool, sizeof tool, "%s", theme_state_word(s)); break;
     }
-    set_txt(s_tool, s_tool_txt, sizeof s_tool_txt, tool);
+    theme_set_text(s_tool, s_tool_txt, sizeof s_tool_txt, tool);
     theme_set_text_color(s_tool, lv_color_hex(tool_rgb));
-    set_txt(s_arg, s_arg_txt, sizeof s_arg_txt, arg);
+    theme_set_text(s_arg, s_arg_txt, sizeof s_arg_txt, arg);
 
     /* the rows sit against the centre: with fewer steps the top slots stay empty */
     if (prior > ROWS) prior = ROWS;
@@ -182,7 +183,7 @@ static void render(void)
         }
         char shown[STEP_TEXT_MAX + 8];
         theme_display_text(shown, sizeof shown, st->text);
-        set_txt(s_row[slot], s_row_txt[slot], sizeof s_row_txt[slot], shown);
+        theme_set_text(s_row[slot], s_row_txt[slot], sizeof s_row_txt[slot], shown);
         show(s_mark[slot], true);
         show(s_row[slot], true);
     }

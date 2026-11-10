@@ -48,13 +48,6 @@ static uint32_t s_lit_until, s_stop_ms;
 
 static const session_t *session(void) { return model_find(s_sid); }
 
-static void set_txt(lv_obj_t *l, char *cache, size_t cap, const char *t)
-{
-    if (strcmp(cache, t) == 0) return;
-    snprintf(cache, cap, "%s", t);
-    lv_label_set_text(l, t);
-}
-
 static void show(lv_obj_t *o, bool on)
 {
     if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
@@ -69,12 +62,12 @@ static void render(void)
     uint32_t rgb = s ? theme_session_rgb(s) : RGB_ACCENT;
     char buf[64];
     if (s_at_bottom || s_lines_above == 0) {
-        set_txt(s_count, s_count_txt, sizeof s_count_txt, "Live");
-        set_txt(s_caption, s_caption_txt, sizeof s_caption_txt, "at the bottom");
+        theme_set_text(s_count, s_count_txt, sizeof s_count_txt, "Live");
+        theme_set_text(s_caption, s_caption_txt, sizeof s_caption_txt, "at the bottom");
     } else {
         snprintf(buf, sizeof buf, "-%u lines", (unsigned)s_lines_above);
-        set_txt(s_count, s_count_txt, sizeof s_count_txt, buf);
-        set_txt(s_caption, s_caption_txt, sizeof s_caption_txt, "above the bottom");
+        theme_set_text(s_count, s_count_txt, sizeof s_count_txt, buf);
+        theme_set_text(s_caption, s_caption_txt, sizeof s_caption_txt, "above the bottom");
     }
     bool lit = s_now < s_lit_until;
     theme_set_text_color(s_chev_up, lit && s_last_dir < 0 ? lv_color_hex(rgb) : COL_MUTED);
@@ -101,7 +94,7 @@ bool ui_scroll_refresh(uint32_t now)
     char host[24];
     theme_host_prefix(host, sizeof host, s);
     snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
-    set_txt(s_header, s_header_txt, sizeof s_header_txt, buf);
+    theme_set_text(s_header, s_header_txt, sizeof s_header_txt, buf);
     render();
     return true;
 }
@@ -289,8 +282,8 @@ void ui_scroll_on_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool h
     s_has_total = has_total;
     s_total = total;
     s_have_pos = true;
-    if (preview_allowed()) set_txt(s_preview, s_preview_txt, sizeof s_preview_txt, preview);
-    else if (s_preview_txt[0]) set_txt(s_preview, s_preview_txt, sizeof s_preview_txt, "");
+    if (preview_allowed()) theme_set_text(s_preview, s_preview_txt, sizeof s_preview_txt, preview);
+    else if (s_preview_txt[0]) theme_set_text(s_preview, s_preview_txt, sizeof s_preview_txt, "");
     /* an end reached by this move: the thud (UI-V2 §5), once per arrival at it */
     bool at_top = has_total && total > 0 && lines_above >= total;
     if ((at_bottom && !was_bottom && s_last_dir > 0) || (at_top && s_last_dir < 0)) {

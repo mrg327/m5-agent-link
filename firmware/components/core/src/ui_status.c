@@ -31,13 +31,6 @@ static int s_n;
 static int32_t s_gauge_w = -1;
 static char s_link_txt[64], s_batt_txt[16], s_labels[ST_COUNT][28], s_word_txt[16];
 
-static void set_txt(lv_obj_t *l, char *cache, size_t cap, const char *t)
-{
-    if (strcmp(cache, t) == 0) return;
-    snprintf(cache, cap, "%s", t);
-    lv_label_set_text(l, t);
-}
-
 static void show(lv_obj_t *o, bool on)
 {
     if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
@@ -66,11 +59,12 @@ static void row_label(const status_item_t *it, char *dst, size_t cap)
         snprintf(dst, cap, "Privacy: %s", st->privacy == PRIVACY_META ? "meta" : st->privacy == PRIVACY_FULL ? "full" : "preview");
         break;
     case ST_SESSIONS: {
-        unsigned n = (unsigned)model_count();
         model_counts_t c = model_counts();
+        /* Bounded by MODEL_MAX_SESSIONS; the clamp tells -O2's format check the row fits. */
+        unsigned n = (unsigned)model_count() % 100u, waiting = (unsigned)c.waiting % 100u, error = (unsigned)c.error % 100u;
         if (n == 0) snprintf(dst, cap, "No sessions");
-        else if (c.waiting) snprintf(dst, cap, "%u session%s%s%u waiting", n, n == 1 ? "" : "s", theme_sep(), (unsigned)c.waiting);
-        else if (c.error) snprintf(dst, cap, "%u session%s%s%u error%s", n, n == 1 ? "" : "s", theme_sep(), (unsigned)c.error, c.error == 1 ? "" : "s");
+        else if (waiting) snprintf(dst, cap, "%u session%s%s%u waiting", n, n == 1 ? "" : "s", theme_sep(), waiting);
+        else if (error) snprintf(dst, cap, "%u session%s%s%u error%s", n, n == 1 ? "" : "s", theme_sep(), error, error == 1 ? "" : "s");
         else snprintf(dst, cap, "%u session%s", n, n == 1 ? "" : "s");
         break;
     }
@@ -104,7 +98,7 @@ static void render(void)
     char buf[64];
     uint32_t rgb;
     ui_home_link_text(buf, sizeof buf, false, &rgb); /* the battery has its own row here */
-    set_txt(s_link, s_link_txt, sizeof s_link_txt, buf);
+    theme_set_text(s_link, s_link_txt, sizeof s_link_txt, buf);
     theme_set_text_color(s_link, lv_color_hex(rgb));
 
     hal_battery_t b = hal_battery_read();
@@ -123,7 +117,7 @@ static void render(void)
         snprintf(buf, sizeof buf, "Battery ?");
         show(s_gauge, false);
     }
-    set_txt(s_batt, s_batt_txt, sizeof s_batt_txt, buf);
+    theme_set_text(s_batt, s_batt_txt, sizeof s_batt_txt, buf);
     lv_obj_update_layout(s_batt_row);
     theme_align(s_batt_row, LV_ALIGN_TOP_MID, 0, BATT_Y);
 

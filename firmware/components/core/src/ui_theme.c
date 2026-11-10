@@ -164,6 +164,23 @@ void theme_align(lv_obj_t *o, lv_align_t align, int32_t x, int32_t y)
     lv_obj_align(o, align, x, y);
 }
 
+void theme_set_text(lv_obj_t *l, char *cache, size_t cap, const char *t)
+{
+    size_t n = strlen(t);
+    if (n < cap) {
+        if (!strcmp(cache, t)) return;
+        memcpy(cache, t, n + 1);
+    } else {
+        uint32_t h = 2166136261u; /* FNV-1a */
+        for (size_t i = 0; i < n; i++) h = (h ^ (uint8_t)t[i]) * 16777619u;
+        char key[16];
+        snprintf(key, sizeof key, "\x01%08x%05x", (unsigned)h, (unsigned)(n & 0xfffff)); /* no text starts with 0x01 */
+        if (!strcmp(cache, key)) return;
+        memcpy(cache, key, sizeof key);
+    }
+    lv_label_set_text(l, t);
+}
+
 int theme_chord(int y, int margin)
 {
     float dy = (float)(y - 233);
