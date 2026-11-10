@@ -3339,6 +3339,1120 @@
           "ms": 0,
           "pct": 0
         }
+      },
+      {
+        "id": "done-pokemon",
+        "role": "done",
+        "name": "Healed (Pokémon style)",
+        "tracks": [
+          [
+            {
+              "wave": "sq25",
+              "note": 79,
+              "slide": 0,
+              "vol": 9,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 84,
+              "slide": 0,
+              "vol": 9,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 83,
+              "slide": 0,
+              "vol": 9,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 84,
+              "slide": 0,
+              "vol": 9,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 88,
+              "slide": 0,
+              "vol": 9,
+              "ms": 300,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "sq50",
+              "note": 76,
+              "slide": 0,
+              "vol": 5,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 79,
+              "slide": 0,
+              "vol": 5,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 79,
+              "slide": 0,
+              "vol": 5,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 79,
+              "slide": 0,
+              "vol": 5,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 84,
+              "slide": 0,
+              "vol": 5,
+              "ms": 300,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "tri",
+              "note": 48,
+              "slide": 0,
+              "vol": 10,
+              "ms": 140,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 55,
+              "slide": 0,
+              "vol": 10,
+              "ms": 140,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 48,
+              "slide": 0,
+              "vol": 10,
+              "ms": 300,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "done-zelda",
+        "role": "done",
+        "name": "Discovery (Zelda style)",
+        "tracks": [
+          [
+            {
+              "wave": "sq50",
+              "note": 74,
+              "slide": 0,
+              "vol": 9,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 78,
+              "slide": 0,
+              "vol": 9,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 81,
+              "slide": 0,
+              "vol": 9,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 85,
+              "slide": 0,
+              "vol": 9,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 86,
+              "slide": 0,
+              "vol": 9,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 93,
+              "slide": 0,
+              "vol": 9,
+              "ms": 300,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 120,
+          "pct": 35
+        }
+      },
+      {
+        "id": "done-contra",
+        "role": "done",
+        "name": "Stage cleared (Contra style)",
+        "tracks": [
+          [
+            {
+              "wave": "noise",
+              "note": 36,
+              "slide": 24,
+              "vol": 13,
+              "ms": 500,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "sq50",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 150,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 67,
+              "slide": 0,
+              "vol": 8,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 72,
+              "slide": 0,
+              "vol": 8,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 76,
+              "slide": 0,
+              "vol": 8,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 79,
+              "slide": 0,
+              "vol": 8,
+              "ms": 300,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "done-sf2",
+        "role": "done",
+        "name": "Round won (Street Fighter style)",
+        "tracks": [
+          [
+            {
+              "wave": "noise",
+              "note": 60,
+              "slide": 40,
+              "vol": 14,
+              "ms": 80,
+              "decay": 1
+            },
+            {
+              "wave": "tri",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 40,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 48,
+              "slide": 0,
+              "vol": 9,
+              "ms": 400,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "saw",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 120,
+              "decay": 0
+            },
+            {
+              "wave": "saw",
+              "note": 79,
+              "slide": 0,
+              "vol": 6,
+              "ms": 100,
+              "decay": 0
+            },
+            {
+              "wave": "saw",
+              "note": 84,
+              "slide": 0,
+              "vol": 6,
+              "ms": 400,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "saw",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 120,
+              "decay": 0
+            },
+            {
+              "wave": "saw",
+              "note": 76,
+              "slide": 0,
+              "vol": 5,
+              "ms": 100,
+              "decay": 0
+            },
+            {
+              "wave": "saw",
+              "note": 79,
+              "slide": 0,
+              "vol": 5,
+              "ms": 400,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 90,
+          "pct": 20
+        }
+      },
+      {
+        "id": "done-megaman",
+        "role": "done",
+        "name": "Weapon get (Mega Man style)",
+        "tracks": [
+          [
+            {
+              "wave": "sq25",
+              "note": 69,
+              "slide": 0,
+              "vol": 9,
+              "ms": 45,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 72,
+              "slide": 0,
+              "vol": 9,
+              "ms": 45,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 76,
+              "slide": 0,
+              "vol": 9,
+              "ms": 45,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 71,
+              "slide": 0,
+              "vol": 9,
+              "ms": 45,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 74,
+              "slide": 0,
+              "vol": 9,
+              "ms": 45,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 78,
+              "slide": 0,
+              "vol": 9,
+              "ms": 45,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 72,
+              "slide": 0,
+              "vol": 9,
+              "ms": 45,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 76,
+              "slide": 0,
+              "vol": 9,
+              "ms": 45,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 79,
+              "slide": 0,
+              "vol": 9,
+              "ms": 45,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 84,
+              "slide": 0,
+              "vol": 9,
+              "ms": 300,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "tri",
+              "note": 45,
+              "slide": 0,
+              "vol": 10,
+              "ms": 135,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 47,
+              "slide": 0,
+              "vol": 10,
+              "ms": 135,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 48,
+              "slide": 0,
+              "vol": 10,
+              "ms": 135,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 48,
+              "slide": 0,
+              "vol": 10,
+              "ms": 300,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "done-metroid",
+        "role": "done",
+        "name": "Item found (Metroid style)",
+        "tracks": [
+          [
+            {
+              "wave": "bell",
+              "note": 74,
+              "slide": 0,
+              "vol": 9,
+              "ms": 200,
+              "decay": 1
+            },
+            {
+              "wave": "bell",
+              "note": 77,
+              "slide": 0,
+              "vol": 9,
+              "ms": 200,
+              "decay": 1
+            },
+            {
+              "wave": "bell",
+              "note": 81,
+              "slide": 0,
+              "vol": 9,
+              "ms": 500,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "sine",
+              "note": 50,
+              "slide": 0,
+              "vol": 8,
+              "ms": 900,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 180,
+          "pct": 40
+        }
+      },
+      {
+        "id": "done-ff",
+        "role": "done",
+        "name": "Victory (Final Fantasy style)",
+        "tracks": [
+          [
+            {
+              "wave": "fm",
+              "note": 60,
+              "slide": 0,
+              "vol": 8,
+              "ms": 35,
+              "decay": 1
+            },
+            {
+              "wave": "fm",
+              "note": 64,
+              "slide": 0,
+              "vol": 8,
+              "ms": 35,
+              "decay": 1
+            },
+            {
+              "wave": "fm",
+              "note": 67,
+              "slide": 0,
+              "vol": 8,
+              "ms": 35,
+              "decay": 1
+            },
+            {
+              "wave": "fm",
+              "note": 71,
+              "slide": 0,
+              "vol": 8,
+              "ms": 35,
+              "decay": 1
+            },
+            {
+              "wave": "fm",
+              "note": 74,
+              "slide": 0,
+              "vol": 8,
+              "ms": 35,
+              "decay": 1
+            },
+            {
+              "wave": "fm",
+              "note": 76,
+              "slide": 0,
+              "vol": 8,
+              "ms": 35,
+              "decay": 1
+            },
+            {
+              "wave": "fm",
+              "note": 79,
+              "slide": 0,
+              "vol": 8,
+              "ms": 35,
+              "decay": 1
+            },
+            {
+              "wave": "fm",
+              "note": 83,
+              "slide": 0,
+              "vol": 8,
+              "ms": 35,
+              "decay": 1
+            },
+            {
+              "wave": "fm",
+              "note": 84,
+              "slide": 0,
+              "vol": 8,
+              "ms": 500,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "saw",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 280,
+              "decay": 0
+            },
+            {
+              "wave": "saw",
+              "note": 79,
+              "slide": 0,
+              "vol": 5,
+              "ms": 500,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "tri",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 280,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 48,
+              "slide": 0,
+              "vol": 9,
+              "ms": 500,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 140,
+          "pct": 30
+        }
+      },
+      {
+        "id": "done-sonic",
+        "role": "done",
+        "name": "Rings (Sonic style)",
+        "tracks": [
+          [
+            {
+              "wave": "fm",
+              "note": 84,
+              "slide": 0,
+              "vol": 10,
+              "ms": 40,
+              "decay": 0
+            },
+            {
+              "wave": "fm",
+              "note": 91,
+              "slide": 0,
+              "vol": 10,
+              "ms": 40,
+              "decay": 0
+            },
+            {
+              "wave": "fm",
+              "note": 96,
+              "slide": 0,
+              "vol": 10,
+              "ms": 40,
+              "decay": 0
+            },
+            {
+              "wave": "fm",
+              "note": 100,
+              "slide": 0,
+              "vol": 10,
+              "ms": 300,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 70,
+          "pct": 30
+        }
+      },
+      {
+        "id": "done-pacman",
+        "role": "done",
+        "name": "Maze clear (Pac-Man style)",
+        "tracks": [
+          [
+            {
+              "wave": "tri",
+              "note": 72,
+              "slide": 84,
+              "vol": 13,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 84,
+              "slide": 72,
+              "vol": 13,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 76,
+              "slide": 88,
+              "vol": 13,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 88,
+              "slide": 76,
+              "vol": 13,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 79,
+              "slide": 91,
+              "vol": 13,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 91,
+              "slide": 96,
+              "vol": 13,
+              "ms": 300,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "done-tetris",
+        "role": "done",
+        "name": "Korobeiniki (Tetris style)",
+        "tracks": [
+          [
+            {
+              "wave": "sq25",
+              "note": 76,
+              "slide": 0,
+              "vol": 9,
+              "ms": 150,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 71,
+              "slide": 0,
+              "vol": 9,
+              "ms": 75,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 72,
+              "slide": 0,
+              "vol": 9,
+              "ms": 75,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 74,
+              "slide": 0,
+              "vol": 9,
+              "ms": 150,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 72,
+              "slide": 0,
+              "vol": 9,
+              "ms": 75,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 71,
+              "slide": 0,
+              "vol": 9,
+              "ms": 75,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 69,
+              "slide": 0,
+              "vol": 9,
+              "ms": 300,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "tri",
+              "note": 52,
+              "slide": 0,
+              "vol": 10,
+              "ms": 450,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 57,
+              "slide": 0,
+              "vol": 10,
+              "ms": 450,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-pokemon",
+        "role": "select",
+        "name": "Menu (Pokémon style)",
+        "tracks": [
+          [
+            {
+              "wave": "sq25",
+              "note": 96,
+              "slide": 0,
+              "vol": 8,
+              "ms": 15,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 91,
+              "slide": 0,
+              "vol": 8,
+              "ms": 25,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-zelda",
+        "role": "select",
+        "name": "Sword (Zelda style)",
+        "tracks": [
+          [
+            {
+              "wave": "noise",
+              "note": 100,
+              "slide": 84,
+              "vol": 9,
+              "ms": 80,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "sq12",
+              "note": 84,
+              "slide": 72,
+              "vol": 6,
+              "ms": 60,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-contra",
+        "role": "select",
+        "name": "Shot (Contra style)",
+        "tracks": [
+          [
+            {
+              "wave": "noise",
+              "note": 72,
+              "slide": 48,
+              "vol": 13,
+              "ms": 70,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "sq50",
+              "note": 72,
+              "slide": 55,
+              "vol": 6,
+              "ms": 40,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-sf2",
+        "role": "select",
+        "name": "Hit (Street Fighter style)",
+        "tracks": [
+          [
+            {
+              "wave": "noise",
+              "note": 55,
+              "slide": 40,
+              "vol": 15,
+              "ms": 90,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "sq50",
+              "note": 60,
+              "slide": 43,
+              "vol": 8,
+              "ms": 60,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-megaman",
+        "role": "select",
+        "name": "Buster (Mega Man style)",
+        "tracks": [
+          [
+            {
+              "wave": "sq25",
+              "note": 96,
+              "slide": 84,
+              "vol": 10,
+              "ms": 30,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 91,
+              "slide": 79,
+              "vol": 10,
+              "ms": 40,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-metroid",
+        "role": "select",
+        "name": "Beam (Metroid style)",
+        "tracks": [
+          [
+            {
+              "wave": "tri",
+              "note": 96,
+              "slide": 72,
+              "vol": 13,
+              "ms": 100,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "sq12",
+              "note": 84,
+              "slide": 60,
+              "vol": 5,
+              "ms": 100,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-ff",
+        "role": "select",
+        "name": "Cursor (Final Fantasy style)",
+        "tracks": [
+          [
+            {
+              "wave": "noise",
+              "note": 108,
+              "slide": 0,
+              "vol": 6,
+              "ms": 10,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "sine",
+              "note": 98,
+              "slide": 0,
+              "vol": 10,
+              "ms": 35,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-sonic",
+        "role": "select",
+        "name": "Spin (Sonic style)",
+        "tracks": [
+          [
+            {
+              "wave": "fm",
+              "note": 60,
+              "slide": 84,
+              "vol": 11,
+              "ms": 130,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-pacman",
+        "role": "select",
+        "name": "Wakka (Pac-Man style)",
+        "tracks": [
+          [
+            {
+              "wave": "tri",
+              "note": 67,
+              "slide": 79,
+              "vol": 13,
+              "ms": 50,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 79,
+              "slide": 67,
+              "vol": 13,
+              "ms": 50,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-tetris",
+        "role": "select",
+        "name": "Rotate (Tetris style)",
+        "tracks": [
+          [
+            {
+              "wave": "sq25",
+              "note": 79,
+              "slide": 0,
+              "vol": 9,
+              "ms": 20,
+              "decay": 1
+            },
+            {
+              "wave": "sq25",
+              "note": 86,
+              "slide": 0,
+              "vol": 9,
+              "ms": 25,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       }
     ]
   },
@@ -3505,27 +4619,47 @@
     "sounds.done-bonus": "firmware/components/core/src/sound_bank.c:37",
     "sounds.done-clear": "firmware/components/core/src/sound_bank.c:21",
     "sounds.done-coin": "firmware/components/core/src/sound_bank.c:19",
+    "sounds.done-contra": "firmware/components/core/src/sound_bank.c:105",
     "sounds.done-fanfare": "firmware/components/core/src/sound_bank.c:45",
+    "sounds.done-ff": "firmware/components/core/src/sound_bank.c:121",
     "sounds.done-ko": "firmware/components/core/src/sound_bank.c:64",
     "sounds.done-levelup": "firmware/components/core/src/sound_bank.c:68",
+    "sounds.done-megaman": "firmware/components/core/src/sound_bank.c:112",
+    "sounds.done-metroid": "firmware/components/core/src/sound_bank.c:119",
+    "sounds.done-pacman": "firmware/components/core/src/sound_bank.c:128",
+    "sounds.done-pokemon": "firmware/components/core/src/sound_bank.c:95",
     "sounds.done-powerup": "firmware/components/core/src/sound_bank.c:26",
     "sounds.done-quest": "firmware/components/core/src/sound_bank.c:54",
+    "sounds.done-sf2": "firmware/components/core/src/sound_bank.c:109",
+    "sounds.done-sonic": "firmware/components/core/src/sound_bank.c:126",
     "sounds.done-sparkle": "firmware/components/core/src/sound_bank.c:58",
+    "sounds.done-tetris": "firmware/components/core/src/sound_bank.c:131",
     "sounds.done-treasure": "firmware/components/core/src/sound_bank.c:32",
     "sounds.done-warp": "firmware/components/core/src/sound_bank.c:42",
+    "sounds.done-zelda": "firmware/components/core/src/sound_bank.c:102",
     "sounds.rate": "firmware/components/core/src/sound_bank.h:28",
     "sounds.select-bell": "firmware/components/core/src/sound_bank.c:86",
     "sounds.select-blip": "firmware/components/core/src/sound_bank.c:77",
     "sounds.select-bubble": "firmware/components/core/src/sound_bank.c:85",
     "sounds.select-chk": "firmware/components/core/src/sound_bank.c:81",
     "sounds.select-confirm": "firmware/components/core/src/sound_bank.c:79",
+    "sounds.select-contra": "firmware/components/core/src/sound_bank.c:140",
+    "sounds.select-ff": "firmware/components/core/src/sound_bank.c:147",
     "sounds.select-jump": "firmware/components/core/src/sound_bank.c:82",
     "sounds.select-lock": "firmware/components/core/src/sound_bank.c:87",
+    "sounds.select-megaman": "firmware/components/core/src/sound_bank.c:144",
+    "sounds.select-metroid": "firmware/components/core/src/sound_bank.c:145",
+    "sounds.select-pacman": "firmware/components/core/src/sound_bank.c:150",
     "sounds.select-pew": "firmware/components/core/src/sound_bank.c:84",
+    "sounds.select-pokemon": "firmware/components/core/src/sound_bank.c:137",
     "sounds.select-pop": "firmware/components/core/src/sound_bank.c:80",
+    "sounds.select-sf2": "firmware/components/core/src/sound_bank.c:142",
     "sounds.select-soft": "firmware/components/core/src/sound_bank.c:83",
+    "sounds.select-sonic": "firmware/components/core/src/sound_bank.c:149",
     "sounds.select-swish": "firmware/components/core/src/sound_bank.c:89",
+    "sounds.select-tetris": "firmware/components/core/src/sound_bank.c:151",
     "sounds.select-tick": "firmware/components/core/src/sound_bank.c:78",
+    "sounds.select-zelda": "firmware/components/core/src/sound_bank.c:138",
     "sounds.waves": "firmware/components/core/src/sound_bank.h:30",
     "states": "firmware/components/core/src/ui_theme.c:11",
     "states.input_words": "firmware/components/core/src/ui_theme.c:32",

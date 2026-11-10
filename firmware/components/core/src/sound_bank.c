@@ -88,6 +88,68 @@ static const snd_step_t select_lock_a[] = {S(NOISE, 96, 0, 8, 15, 1)};          
 static const snd_step_t select_lock_b[] = {S(TRI, 0, 0, 0, 12, 0), S(TRI, 91, 0, 13, 55, 1)};    /* ...then G6 */
 static const snd_step_t select_swish[] = {S(NOISE, 96, 88, 5, 40, 0), S(NOISE, 88, 76, 8, 60, 1)}; /* sword */
 
+/* ── homages ──
+ * Original cues in the style of classic games: their sound chips and gestures, not their
+ * audio or melodies. Nothing here is transcribed from a game; the one borrowed tune is
+ * Korobeiniki, a public-domain 19th-century Russian folk song. */
+static const snd_step_t hom_poke_lead[] = {S(SQ25, 79, 0, 9, 70, 0), S(SQ25, 84, 0, 9, 70, 0), /* G5 C6 B5 C6 E6 */
+                                           S(SQ25, 83, 0, 9, 70, 0), S(SQ25, 84, 0, 9, 70, 0),
+                                           S(SQ25, 88, 0, 9, 300, 1)};
+static const snd_step_t hom_poke_harm[] = {S(SQ50, 76, 0, 5, 70, 0), S(SQ50, 79, 0, 5, 70, 0),
+                                           S(SQ50, 79, 0, 5, 70, 0), S(SQ50, 79, 0, 5, 70, 0),
+                                           S(SQ50, 84, 0, 5, 300, 1)};
+static const snd_step_t hom_poke_bass[] = {S(TRI, 48, 0, 10, 140, 0), S(TRI, 55, 0, 10, 140, 0), S(TRI, 48, 0, 10, 300, 1)};
+static const snd_step_t hom_zelda[] = {S(SQ50, 74, 0, 9, 70, 0), S(SQ50, 78, 0, 9, 70, 0), /* D5 F#5 A5 C#6 D6 . A6 */
+                                       S(SQ50, 81, 0, 9, 70, 0), S(SQ50, 85, 0, 9, 70, 0),
+                                       S(SQ50, 86, 0, 9, 70, 0), S(SQ50, 93, 0, 9, 300, 1)};
+static const snd_step_t hom_contra_boom[] = {S(NOISE, 36, 24, 13, 500, 1)};
+static const snd_step_t hom_contra_bugle[] = {S(SQ50, 0, 0, 0, 150, 0), S(SQ50, 67, 0, 8, 60, 0), /* G4 C5 E5 G5 */
+                                              S(SQ50, 72, 0, 8, 60, 0), S(SQ50, 76, 0, 8, 60, 0),
+                                              S(SQ50, 79, 0, 8, 300, 1)};
+static const snd_step_t hom_sf_hit[] = {S(NOISE, 60, 40, 14, 80, 1), S(TRI, 0, 0, 0, 40, 0), S(TRI, 48, 0, 9, 400, 1)};
+static const snd_step_t hom_sf_hi[] = {S(SAW, 0, 0, 0, 120, 0), S(SAW, 79, 0, 6, 100, 0), S(SAW, 84, 0, 6, 400, 1)};
+static const snd_step_t hom_sf_lo[] = {S(SAW, 0, 0, 0, 120, 0), S(SAW, 76, 0, 5, 100, 0), S(SAW, 79, 0, 5, 400, 1)};
+static const snd_step_t hom_mega_lead[] = {S(SQ25, 69, 0, 9, 45, 0), S(SQ25, 72, 0, 9, 45, 0), /* rising triplets */
+                                           S(SQ25, 76, 0, 9, 45, 0), S(SQ25, 71, 0, 9, 45, 0),
+                                           S(SQ25, 74, 0, 9, 45, 0), S(SQ25, 78, 0, 9, 45, 0),
+                                           S(SQ25, 72, 0, 9, 45, 0), S(SQ25, 76, 0, 9, 45, 0),
+                                           S(SQ25, 79, 0, 9, 45, 0), S(SQ25, 84, 0, 9, 300, 1)};
+static const snd_step_t hom_mega_bass[] = {S(TRI, 45, 0, 10, 135, 0), S(TRI, 47, 0, 10, 135, 0),
+                                           S(TRI, 48, 0, 10, 135, 0), S(TRI, 48, 0, 10, 300, 1)};
+static const snd_step_t hom_metroid_bell[] = {S(BELL, 74, 0, 9, 200, 1), S(BELL, 77, 0, 9, 200, 1), S(BELL, 81, 0, 9, 500, 1)};
+static const snd_step_t hom_metroid_drone[] = {S(SINE, 50, 0, 8, 900, 1)};
+static const snd_step_t hom_ff_harp[] = {S(FM, 60, 0, 8, 35, 1), S(FM, 64, 0, 8, 35, 1), S(FM, 67, 0, 8, 35, 1), /* Cmaj9 */
+                                         S(FM, 71, 0, 8, 35, 1), S(FM, 74, 0, 8, 35, 1), S(FM, 76, 0, 8, 35, 1),
+                                         S(FM, 79, 0, 8, 35, 1), S(FM, 83, 0, 8, 35, 1), S(FM, 84, 0, 8, 500, 1)};
+static const snd_step_t hom_ff_brass[] = {S(SAW, 0, 0, 0, 280, 0), S(SAW, 79, 0, 5, 500, 1)};
+static const snd_step_t hom_ff_bass[] = {S(TRI, 0, 0, 0, 280, 0), S(TRI, 48, 0, 9, 500, 1)};
+static const snd_step_t hom_sonic[] = {S(FM, 84, 0, 10, 40, 0), S(FM, 91, 0, 10, 40, 0), /* C6 G6 C7 E7 */
+                                       S(FM, 96, 0, 10, 40, 0), S(FM, 100, 0, 10, 300, 1)};
+static const snd_step_t hom_pac[] = {S(TRI, 72, 84, 13, 60, 0), S(TRI, 84, 72, 13, 60, 0), /* wavetable sweeps */
+                                     S(TRI, 76, 88, 13, 60, 0), S(TRI, 88, 76, 13, 60, 0),
+                                     S(TRI, 79, 91, 13, 60, 0), S(TRI, 91, 96, 13, 300, 1)};
+static const snd_step_t hom_tetris_lead[] = {S(SQ25, 76, 0, 9, 150, 0), S(SQ25, 71, 0, 9, 75, 0), /* Korobeiniki: E B C D C B A */
+                                             S(SQ25, 72, 0, 9, 75, 0),  S(SQ25, 74, 0, 9, 150, 0),
+                                             S(SQ25, 72, 0, 9, 75, 0),  S(SQ25, 71, 0, 9, 75, 0),
+                                             S(SQ25, 69, 0, 9, 300, 1)};
+static const snd_step_t hom_tetris_bass[] = {S(TRI, 52, 0, 10, 450, 0), S(TRI, 57, 0, 10, 450, 1)};
+
+static const snd_step_t hom_poke_sel[] = {S(SQ25, 96, 0, 8, 15, 0), S(SQ25, 91, 0, 8, 25, 1)};
+static const snd_step_t hom_zelda_swish[] = {S(NOISE, 100, 84, 9, 80, 1)};
+static const snd_step_t hom_zelda_ring[] = {S(SQ12, 84, 72, 6, 60, 1)};
+static const snd_step_t hom_contra_shot_n[] = {S(NOISE, 72, 48, 13, 70, 1)};
+static const snd_step_t hom_contra_shot_t[] = {S(SQ50, 72, 55, 6, 40, 1)};
+static const snd_step_t hom_sf_punch_n[] = {S(NOISE, 55, 40, 15, 90, 1)};
+static const snd_step_t hom_sf_punch_t[] = {S(SQ50, 60, 43, 8, 60, 1)};
+static const snd_step_t hom_mega_sel[] = {S(SQ25, 96, 84, 10, 30, 0), S(SQ25, 91, 79, 10, 40, 1)};
+static const snd_step_t hom_metroid_tri[] = {S(TRI, 96, 72, 13, 100, 1)};
+static const snd_step_t hom_metroid_sq[] = {S(SQ12, 84, 60, 5, 100, 1)};
+static const snd_step_t hom_ff_click[] = {S(NOISE, 108, 0, 6, 10, 1)};
+static const snd_step_t hom_ff_tone[] = {S(SINE, 98, 0, 10, 35, 1)};
+static const snd_step_t hom_sonic_sel[] = {S(FM, 60, 84, 11, 130, 1)};
+static const snd_step_t hom_pac_sel[] = {S(TRI, 67, 79, 13, 50, 0), S(TRI, 79, 67, 13, 50, 1)};
+static const snd_step_t hom_tetris_sel[] = {S(SQ25, 79, 0, 9, 20, 1), S(SQ25, 86, 0, 9, 25, 1)};
+
 const snd_sound_t snd_bank[] = {
     {"done-coin", "done", "Coin", {T(done_coin)}, 0, 0},
     {"done-clear", "done", "Stage clear", {T(done_clear)}, 0, 0},
@@ -113,5 +175,25 @@ const snd_sound_t snd_bank[] = {
     {"select-bell", "select", "Bell", {T(select_bell)}, 25, 30},
     {"select-lock", "select", "Lock-on", {T(select_lock_a), T(select_lock_b)}, 0, 0},
     {"select-swish", "select", "Swish", {T(select_swish)}, 0, 0},
+    {"done-pokemon", "done", "Healed (Pokémon style)", {T(hom_poke_lead), T(hom_poke_harm), T(hom_poke_bass)}, 0, 0},
+    {"done-zelda", "done", "Discovery (Zelda style)", {T(hom_zelda)}, 120, 35},
+    {"done-contra", "done", "Stage cleared (Contra style)", {T(hom_contra_boom), T(hom_contra_bugle)}, 0, 0},
+    {"done-sf2", "done", "Round won (Street Fighter style)", {T(hom_sf_hit), T(hom_sf_hi), T(hom_sf_lo)}, 90, 20},
+    {"done-megaman", "done", "Weapon get (Mega Man style)", {T(hom_mega_lead), T(hom_mega_bass)}, 0, 0},
+    {"done-metroid", "done", "Item found (Metroid style)", {T(hom_metroid_bell), T(hom_metroid_drone)}, 180, 40},
+    {"done-ff", "done", "Victory (Final Fantasy style)", {T(hom_ff_harp), T(hom_ff_brass), T(hom_ff_bass)}, 140, 30},
+    {"done-sonic", "done", "Rings (Sonic style)", {T(hom_sonic)}, 70, 30},
+    {"done-pacman", "done", "Maze clear (Pac-Man style)", {T(hom_pac)}, 0, 0},
+    {"done-tetris", "done", "Korobeiniki (Tetris style)", {T(hom_tetris_lead), T(hom_tetris_bass)}, 0, 0},
+    {"select-pokemon", "select", "Menu (Pokémon style)", {T(hom_poke_sel)}, 0, 0},
+    {"select-zelda", "select", "Sword (Zelda style)", {T(hom_zelda_swish), T(hom_zelda_ring)}, 0, 0},
+    {"select-contra", "select", "Shot (Contra style)", {T(hom_contra_shot_n), T(hom_contra_shot_t)}, 0, 0},
+    {"select-sf2", "select", "Hit (Street Fighter style)", {T(hom_sf_punch_n), T(hom_sf_punch_t)}, 0, 0},
+    {"select-megaman", "select", "Buster (Mega Man style)", {T(hom_mega_sel)}, 0, 0},
+    {"select-metroid", "select", "Beam (Metroid style)", {T(hom_metroid_tri), T(hom_metroid_sq)}, 0, 0},
+    {"select-ff", "select", "Cursor (Final Fantasy style)", {T(hom_ff_click), T(hom_ff_tone)}, 0, 0},
+    {"select-sonic", "select", "Spin (Sonic style)", {T(hom_sonic_sel)}, 0, 0},
+    {"select-pacman", "select", "Wakka (Pac-Man style)", {T(hom_pac_sel)}, 0, 0},
+    {"select-tetris", "select", "Rotate (Tetris style)", {T(hom_tetris_sel)}, 0, 0},
 };
 const unsigned snd_bank_count = sizeof snd_bank / sizeof snd_bank[0];
