@@ -1,11 +1,11 @@
 ---
 id: 20261110-0ea9
 title: Voice dictation from the watch (mic -> PC transcription -> hold to send)
-status: open
+status: claimed
 severity: low
 area: firmware
 platforms: esp32
-owner:
+owner: claude-code@linux-dev
 created: 2026-11-10T05:19:05Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -32,3 +32,4 @@ Needs: codec + I2S driver, audio rail, a protocol stream, daemon STT, a confirm 
 ## Log
 
 - 2026-11-10T05:19:05Z · claude-code@linux-dev · linux-x86_64 · 9d39d6d: filed
+- 2026-11-10T05:49:50Z · claude-code@linux-dev · linux-x86_64 · 3f29b0f: claimed
