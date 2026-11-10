@@ -6,6 +6,7 @@ idf_component_register(
         "link.cpp"
         "link_ble.cpp"
         "link_usb.cpp"
+        "mic.cpp"
         "rtc.cpp"
         "touch.cpp"
     INCLUDE_DIRS "."
@@ -17,6 +18,7 @@ idf_component_register(
         esp_driver_usb_serial_jtag
         esp_driver_gpio
         esp_driver_i2c
+        esp_driver_i2s
         esp_timer
         esp_hw_support
         nvs_flash

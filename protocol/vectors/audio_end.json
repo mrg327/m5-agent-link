@@ -1,0 +1,11 @@
+{
+  "desc": "Device stops recording 4",
+  "symbolic": {
+    "t": "audio_end",
+    "id": 14,
+    "b": {
+      "aid": 4
+    }
+  },
+  "cbor_hex": "a30012010e03a10004"
+}

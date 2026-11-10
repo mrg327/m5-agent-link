@@ -23,7 +23,7 @@ static bool send_env(hal_link_kind_t to, const char *what)
         return false;
     }
     bool ok = hal_link_send(to, s_txbuf, len);
-    if (strcmp(what, "screenshot_chunk") != 0)
+    if (strcmp(what, "screenshot_chunk") != 0 && strcmp(what, "audio") != 0)
         dbg_event("link", "tx", "\"msg\":\"%s\",\"id\":%u,\"len\":%u,\"sent\":%s", what, (unsigned)g_link.tx_id,
                   (unsigned)len, ok ? "true" : "false");
     return ok;
@@ -65,11 +65,13 @@ static void fill_caps(struct caps *c, const hal_board_info_t *bi)
     c->caps_uint5bool = bi->has_mic;
     c->caps_uint6bool = bi->has_battery;
     c->caps_uint7uint = LINK_MAX_MSG;
-    /* Only features this firmware implements: no voice or badge yet. */
+    /* Only features this firmware implements: voice when there is a mic, no badge yet. */
     static const int feats[] = {feature_focus_m_c, feature_ack_m_c, feature_approve_m_c, feature_reply_m_c,
                                 feature_debug_m_c, feature_scroll_m_c};
-    for (size_t i = 0; i < sizeof feats / sizeof *feats; i++) c->caps_feature_m_l_feature_m[i].feature_choice = feats[i];
-    c->caps_feature_m_l_feature_m_count = sizeof feats / sizeof *feats;
+    n = 0;
+    for (size_t i = 0; i < sizeof feats / sizeof *feats; i++) c->caps_feature_m_l_feature_m[n++].feature_choice = feats[i];
+    if (bi->has_mic) c->caps_feature_m_l_feature_m[n++].feature_choice = feature_voice_m_c; /* dictation */
+    c->caps_feature_m_l_feature_m_count = n;
 }
 
 bool link_tx_hello(hal_link_kind_t to)
@@ -81,7 +83,7 @@ bool link_tx_hello(hal_link_kind_t to)
     set_hdr(&m->msg_hello_hdr_m, false, 0);
     struct hello *h = &m->msg_hello_hello_m;
     h->hello_major_l_major = 0;
-    h->hello_major_l_minor = 5; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp */
+    h->hello_major_l_minor = 6; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice */
     h->hello_device_info_m.device_info_device_class_m.device_class_choice = device_class(bi);
     h->hello_device_info_m.device_info_uint1tstr = zstr(bi->board);
     h->hello_device_info_m.device_info_uint2tstr = zstr(bi->fw_version);
@@ -92,6 +94,44 @@ bool link_tx_hello(hal_link_kind_t to)
         h->hello_uint3uint.hello_uint3uint = hal_battery_read().percent;
     }
     return send_env(to, "hello");
+}
+
+bool link_send_audio_start(uint32_t aid, uint32_t sid)
+{
+    if (!g_link.welcomed) return false;
+    memset(&g_tx_env, 0, sizeof g_tx_env);
+    g_tx_env.envelope_choice = envelope_msg_audio_start_m_c;
+    struct msg_audio_start *m = &g_tx_env.envelope_msg_audio_start_m;
+    set_hdr(&m->msg_audio_start_hdr_m, false, 0);
+    m->msg_audio_start_audio_start_m.audio_start_uint0uint = aid;
+    m->msg_audio_start_audio_start_m.audio_start_audio_codec_m.audio_codec_choice = audio_codec_adpcm16k_m_c;
+    m->msg_audio_start_audio_start_m.audio_start_uint2uint_present = sid != 0;
+    m->msg_audio_start_audio_start_m.audio_start_uint2uint.audio_start_uint2uint = sid;
+    return send_env(g_link.kind, "audio_start");
+}
+
+bool link_send_audio(uint32_t aid, uint32_t seq, const uint8_t *data, size_t len)
+{
+    if (!g_link.welcomed || len > 240) return false;
+    memset(&g_tx_env, 0, sizeof g_tx_env);
+    g_tx_env.envelope_choice = envelope_msg_audio_m_c;
+    struct msg_audio *m = &g_tx_env.envelope_msg_audio_m;
+    set_hdr(&m->msg_audio_hdr_m, false, 0);
+    m->msg_audio_audio_m.audio_uint0uint = aid;
+    m->msg_audio_audio_m.audio_uint1uint = seq;
+    m->msg_audio_audio_m.audio_uint2bstr = (struct zcbor_string){.value = data, .len = len};
+    return send_env(g_link.kind, "audio");
+}
+
+bool link_send_audio_end(uint32_t aid)
+{
+    if (!g_link.welcomed) return false;
+    memset(&g_tx_env, 0, sizeof g_tx_env);
+    g_tx_env.envelope_choice = envelope_msg_audio_end_m_c;
+    struct msg_audio_end *m = &g_tx_env.envelope_msg_audio_end_m;
+    set_hdr(&m->msg_audio_end_hdr_m, false, 0);
+    m->msg_audio_end_audio_end_m.audio_end_uint0uint = aid;
+    return send_env(g_link.kind, "audio_end");
 }
 
 bool link_tx_pong(uint32_t re)

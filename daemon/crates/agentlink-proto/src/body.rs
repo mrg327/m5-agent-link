@@ -78,6 +78,10 @@ body!(Welcome {
     #[n(4)]
     #[serde(skip_serializing_if = "Option::is_none")]
     replies: Option<Vec<String>>,
+    /// Voice dictation (proto 0.6): this daemon transcribes `audio_*` into a `transcript`.
+    #[n(5)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    voice: Option<bool>,
 });
 body!(HostInfo {
     #[n(0)]

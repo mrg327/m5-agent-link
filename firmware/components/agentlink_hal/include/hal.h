@@ -95,6 +95,16 @@ void hal_haptic_play(const uint16_t *on_off_ms, size_t count);
 typedef enum { HAL_SOUND_CHIME_INPUT = 0, HAL_SOUND_TONE_ERROR = 1, HAL_SOUND_TICK_DONE = 2 } hal_sound_t;
 void hal_sound_play(hal_sound_t sound);   /* non-blocking; no-op without a speaker */
 
+/* ───────────── microphone (voice dictation, issue 0ea9) ───────────── */
+
+#define HAL_MIC_RATE 16000 /* mono, 16-bit signed PCM */
+/* Powers the codec and starts capture; false without a mic (or when it did not answer). */
+bool hal_mic_start(void);
+/* Non-blocking: copies up to `max` samples captured since the last call (about 1 s is buffered). */
+size_t hal_mic_read(int16_t *pcm, size_t max);
+/* Stops capture and powers the codec down. Safe to call when not started. */
+void hal_mic_stop(void);
+
 /* ───────────── power ───────────── */
 
 typedef enum {

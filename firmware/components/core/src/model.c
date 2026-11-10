@@ -50,6 +50,14 @@ int model_reply_count(void) { return s_n_replies; }
 const char *model_reply(int i) { return i >= 0 && i < s_n_replies ? s_replies[i] : ""; }
 bool model_can_type(void) { return s_typing; }
 
+static bool s_voice;
+void model_set_voice(bool on)
+{
+    s_voice = on;
+    s_rev++;
+}
+bool model_voice(void) { return s_voice; }
+
 uint32_t model_rev(void) { return s_rev; }
 
 void model_copy_str(char *dst, size_t cap, const uint8_t *src, size_t len)

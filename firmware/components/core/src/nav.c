@@ -90,6 +90,15 @@ const nav_binding_t nav_bindings[] = {
     {MODE_WATCH, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_NEXT},
     {MODE_WATCH, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_WATCH, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
+    /* VOICE: dictate a reply (issue 0ea9). Tap or A stops the recording (or retries a failed one);
+     * only the hold sends the transcript; a long swipe down or B held discards it. */
+    {MODE_VOICE, G_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_HOLD_PRESS},
+    {MODE_VOICE, G_RELEASE, ZONE_ANY, WHEN_ALWAYS, NAV_HOLD_RELEASE},
+    {MODE_VOICE, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
+    {MODE_VOICE, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* only a long swipe counts */
+    {MODE_VOICE, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_COMMIT},
+    {MODE_VOICE, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
+    {MODE_VOICE, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
 };
 const int nav_n_bindings = (int)(sizeof nav_bindings / sizeof nav_bindings[0]);
 
@@ -111,7 +120,7 @@ nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool
 
 const char *nav_mode_name(nav_mode_t m)
 {
-    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll", "status", "watch"};
+    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll", "status", "watch", "voice"};
     return (unsigned)m < MODE_COUNT ? names[m] : "?";
 }
 

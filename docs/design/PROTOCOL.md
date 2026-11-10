@@ -190,14 +190,19 @@ scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tst
 - `detail`: the daemon replies with `detail { rid|sid, text }`, which holds the full text. This is sent only when privacy ≠ `meta`.
 - `approve`/`deny`/`reply` on a `rid` that has already been cleared returns `err: "stale"`, so a race against the terminal answer is safe. The daemon's approval broker holds the agent's blocking hook for that `rid` (DESIGN §6a); the first of {device answer, terminal answer, timeout} settles it, and only a device answer ever becomes a decision for the agent.
 
-## 6. Audio (v3)
+## 6. Audio: voice dictation (proto 0.6, issue 0ea9)
 ```
-audio_start { aid, codec: "adpcm16k"/"opus16k", sid? }   device → daemon
-audio       { aid, seq, data: bstr }                       device → daemon (≤ 240 B each)
-audio_end   { aid }                                        device → daemon
-transcript  { aid, text, autosend_ms: 3000 }               daemon → device
-cmd { op: "reply", sid, arg: { aid } } / cmd { op: "cancel", arg: { aid } }
+audio_start { aid, codec: "adpcm16k", sid? }   device → daemon
+audio       { aid, seq, data: bstr }             device → daemon (≤ 240 B each)
+audio_end   { aid }                              device → daemon
+transcript  { aid, text, autosend_ms: 0 }        daemon → device
+cmd { op: "dictate", sid, arg: aid, hold_ms }    device → daemon
 ```
+- The daemon offers voice with `welcome.voice: true` (only to devices with proto ≥ 0.6) when whisper.cpp is installed (`AGENTLINK_WHISPER_CLI` / `AGENTLINK_WHISPER_MODEL`, else `~/tools/whisper.cpp` with `ggml-base.en.bin`). A device with a mic advertises `feature_voice`.
+- `adpcm16k`: 16 kHz mono IMA ADPCM in self-contained blocks: 4 header bytes (first sample, int16 LE; step index; 0), then two samples per byte, low nibble first; 240 bytes hold 473 samples (~30 ms). A lost block only loses its 30 ms. The device caps a recording at 15 s; the daemon drops one past 20 s.
+- On `audio_end` the daemon decodes the blocks in `seq` order, runs whisper (the WAV exists only while it runs, 0600 in `~/.agentlink/voice/`), drops whisper's own annotations (`[BLANK_AUDIO]`, `(music)`), and answers `transcript` with `text` ≤ 240 chars, `""` when nothing was heard. `autosend_ms` is always 0: nothing is sent without the user.
+- `dictate` types the transcript of `aid` and Enter into the session's terminal, after a hold (`hold_ms` ≥ 1000, else `denied`), with the same refusals as `type` (an open request, a question or approval waiting, a selection list on screen). A transcript is used once, only for the session it was recorded for, and forgotten after 5 min (`stale`).
+- Speech and transcripts never reach the trace or the audit log (the trace replaces `data` and `text` with `<private>`); the daemon logs only the duration and the word count.
 
 ## 7. Misc
 - `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray.

@@ -11,7 +11,7 @@ use crate::transport::Link;
 use agentlink_proto::*;
 use anyhow::{bail, Result};
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast::error::RecvError;
@@ -32,6 +32,10 @@ pub struct Shared {
     pub term: Arc<dyn Terminal>,
     /// Quick replies offered in the welcome; `CmdOp::Type` names one by index.
     pub replies: Vec<String>,
+    /// Speech to text for voice dictation (voice.rs); None when whisper.cpp is not installed.
+    pub stt: Option<crate::voice::Stt>,
+    /// Transcripts waiting for the user's hold (`CmdOp::Dictate`), by recording id.
+    pub transcripts: Mutex<crate::voice::Transcripts>,
     pub host: HostInfo,
     /// Connected, handshaken devices keyed by device uid, for `agentlink status`.
     pub devices: Mutex<BTreeMap<String, Value>>,
@@ -54,6 +58,8 @@ impl Shared {
             scroll,
             term: Arc::new(SystemTerminal),
             replies: crate::typing::load_replies(&crate::paths::home()),
+            stt: crate::voice::Stt::find(),
+            transcripts: Mutex::default(),
             host: host_info(),
             devices: Mutex::default(),
             next_link: AtomicU64::new(1),
@@ -241,7 +247,10 @@ const ASK_MINOR: u64 = 5;
 /// it, the welcome's fixed replies.
 pub const SESSION_REPLY_BASE: u64 = 100;
 
-fn welcome(host: &HostInfo, replies: Option<Vec<String>>) -> Welcome {
+/// `welcome.voice` and the audio messages need proto 0.6.
+const VOICE_MINOR: u64 = 6;
+
+fn welcome(host: &HostInfo, replies: Option<Vec<String>>, voice: Option<bool>) -> Welcome {
     let tz = chrono::Local::now().offset().local_minus_utc() / 60;
     Welcome {
         proto: PROTO,
@@ -258,6 +267,7 @@ fn welcome(host: &HostInfo, replies: Option<Vec<String>>) -> Welcome {
             badge_handle: None,
         },
         replies,
+        voice,
     }
 }
 
@@ -349,7 +359,8 @@ async fn handshake(
     // Subscribe before taking the snapshot so no update is lost in between.
     let (sessions, updates) = shared.registry.subscribe();
     let replies = (c.peer_minor >= REPLIES_MINOR).then(|| shared.replies.clone());
-    let w = welcome(&shared.host, replies);
+    let voice = (c.peer_minor >= VOICE_MINOR && shared.stt.is_some()).then_some(true);
+    let w = welcome(&shared.host, replies, voice);
     c.privacy = w.cfg.privacy.unwrap_or(Privacy::Meta);
     c.send(Some(hello.0), Message::Welcome(w)).await?;
     c.send(
@@ -392,6 +403,11 @@ async fn serve(
     let mut sc = ScrollState::default();
     // The running scroll batch lives outside `sc` so the select! branches borrow separate things.
     let mut inflight: Option<Inflight> = None;
+    let (vtx, mut vrx) = tokio::sync::mpsc::unbounded_channel();
+    let mut vs = VoiceState {
+        recs: HashMap::new(),
+        done: vtx,
+    };
     loop {
         let deferred_due = sc.deferred_due();
         let deltas_due = c.deltas.next_due();
@@ -403,7 +419,12 @@ async fn serve(
                     *updates = handshake(shared, c, (id, h), link_id, transport, peer, dev_key).await?;
                     tracing::info!("device re-handshake: {peer} ({transport})");
                 }
-                Some(env) => handle(shared, c, env, &mut sc, &mut inflight).await?,
+                Some(env) => handle(shared, c, env, &mut sc, &mut inflight, &mut vs).await?,
+            },
+            Some((aid, sid, text)) = vrx.recv() => {
+                // the transcript waits for the user's hold; the device shows it meanwhile
+                shared.transcripts.lock().unwrap().put(aid, sid, text.clone());
+                c.send(None, Message::Transcript(Transcript { aid, text, autosend_ms: 0 })).await?;
             },
             done = async { inflight.as_mut().expect("guarded by the branch condition").await }, if inflight.is_some() => {
                 inflight = None;
@@ -439,14 +460,59 @@ async fn serve(
     }
 }
 
+/// Recordings being received on one link, and where finished transcripts come back (voice.rs).
+struct VoiceState {
+    recs: HashMap<u64, crate::voice::Recording>,
+    done: tokio::sync::mpsc::UnboundedSender<(u64, Option<u64>, String)>,
+}
+
 async fn handle(
     shared: &Shared,
     c: &mut Conn,
     env: Envelope,
     sc: &mut ScrollState,
     inflight: &mut Option<Inflight>,
+    vs: &mut VoiceState,
 ) -> Result<()> {
     match env.msg {
+        Message::AudioStart(a) if shared.stt.is_some() => {
+            vs.recs.clear(); // one recording at a time per watch
+            vs.recs.insert(a.aid, crate::voice::Recording::new(a.sid));
+            Ok(())
+        }
+        Message::Audio(a) => {
+            if let Some(r) = vs.recs.get_mut(&a.aid) {
+                if !r.push(a.seq, a.data) {
+                    vs.recs.remove(&a.aid); // longer than the watch ever records
+                }
+            }
+            Ok(())
+        }
+        Message::AudioEnd(e) => {
+            let (Some(rec), Some(stt)) = (vs.recs.remove(&e.aid), shared.stt.clone()) else {
+                return Ok(());
+            };
+            let done = vs.done.clone();
+            let dir = crate::paths::home().join("voice");
+            tokio::task::spawn_blocking(move || {
+                let pcm = rec.pcm();
+                let t0 = Instant::now();
+                let text = stt.transcribe(&pcm, &dir, e.aid).unwrap_or_else(|err| {
+                    tracing::warn!("transcription failed: {err}");
+                    String::new()
+                });
+                // the words are the user's: only their count reaches the log
+                tracing::info!(
+                    "recording {} ({:.1} s) transcribed in {} ms: {} words",
+                    e.aid,
+                    pcm.len() as f64 / crate::voice::RATE as f64,
+                    t0.elapsed().as_millis(),
+                    text.split_whitespace().count()
+                );
+                let _ = done.send((e.aid, rec.sid, text));
+            });
+            Ok(())
+        }
         Message::Cmd(cmd) if cmd.op == CmdOp::Scroll => {
             scroll_cmd(shared, c, sc, inflight, env.id, &cmd).await
         }
@@ -690,7 +756,7 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
                 None => fail(ResultErr::Stale, "unknown session"),
             }
         }
-        CmdOp::Type | CmdOp::Cancel => type_cmd(shared, cmd).await,
+        CmdOp::Type | CmdOp::Cancel | CmdOp::Dictate => type_cmd(shared, cmd).await,
         _ => fail(ResultErr::Unsupported, "command not implemented"),
     }
 }
@@ -707,7 +773,23 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         Route::Unknown => return fail(ResultErr::Stale, "unknown session"),
         Route::Unsupported => return fail(ResultErr::Unsupported, "no terminal for this session"),
     };
-    let text = if cmd.op == CmdOp::Type {
+    let text = if cmd.op == CmdOp::Dictate {
+        // a transcript is the user's own words, sent only after a hold, like an approval
+        if cmd.hold_ms.unwrap_or(0) < MIN_APPROVE_HOLD_MS {
+            return fail(ResultErr::Denied, "hold-to-confirm too short");
+        }
+        let aid = match cmd.arg {
+            Some(Arg::Uint(a)) => a,
+            _ => return fail(ResultErr::Denied, "dictate needs a recording id"),
+        };
+        if let Some(why) = crate::typing::refusal(&session, shared.broker.open_for(session.sid)) {
+            return fail(ResultErr::Denied, why);
+        }
+        let Some(text) = shared.transcripts.lock().unwrap().take(aid, session.sid) else {
+            return fail(ResultErr::Stale, "no transcript for that recording");
+        };
+        Some(text)
+    } else if cmd.op == CmdOp::Type {
         let text = match cmd.arg {
             Some(Arg::Uint(i)) if i >= SESSION_REPLY_BASE => {
                 usize::try_from(i - SESSION_REPLY_BASE)
@@ -741,10 +823,10 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
     .unwrap_or_else(|e| Err(e.to_string()));
     // the reply's text is the user's own fixed list, not terminal content: the index is enough
     shared.trace.audit(
-        if cmd.op == CmdOp::Type {
-            "type"
-        } else {
-            "interrupt"
+        match cmd.op {
+            CmdOp::Type => "type",
+            CmdOp::Dictate => "dictate",
+            _ => "interrupt",
         },
         cmd.sid,
         None,

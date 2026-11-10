@@ -33,9 +33,12 @@
 #include "link_internal.h"
 #include "model.h"
 #include "ui_theme.h"
+#include "voice.h"
 #include "sim.h"
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_QUIT } ev_kind_t;
+static char s_script_dir[512] = ".";
+
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -182,6 +185,16 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "result") && arg[0]) {
         add(*t, E_RESULT, 0, 0, 0, arg);
         *t += 50;
+    } else if (!strcmp(cmd, "mic") && arg[0]) {
+        /* a path relative to the script's own directory */
+        char path[700];
+        if (arg[0] == '/') snprintf(path, sizeof path, "%s", arg);
+        else snprintf(path, sizeof path, "%s/%s", s_script_dir, arg);
+        add(*t, E_MIC, 0, 0, 0, path);
+        *t += 50;
+    } else if (!strcmp(cmd, "transcript")) {
+        add(*t, E_TRANSCRIPT, 0, 0, 0, arg); /* answers the device's current recording; "" = nothing heard */
+        *t += 50;
     } else if (!strcmp(cmd, "clear") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_CLEAR, a, 0, 0, arg);
         *t += 50;
@@ -234,6 +247,10 @@ static bool parse_line(char *line, uint32_t *t)
 
 bool sim_script_load(const char *path)
 {
+    snprintf(s_script_dir, sizeof s_script_dir, "%s", path);
+    char *slash = strrchr(s_script_dir, '/');
+    if (slash) *slash = 0;
+    else snprintf(s_script_dir, sizeof s_script_dir, ".");
     FILE *f = fopen(path, "r");
     if (!f) {
         fprintf(stderr, "cannot open script %s\n", path);
@@ -509,6 +526,20 @@ static void run_cfg(const char *spec)
     inject_env(&env, "cfg");
 }
 
+/* The daemon's answer to the device's current recording (voice.c), as it would arrive. */
+static void run_transcript(const char *text)
+{
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_transcript_m_c;
+    env.envelope_msg_transcript_m.msg_transcript_hdr_m.hdr_uint1uint = ++s_rx_id;
+    struct transcript *t = &env.envelope_msg_transcript_m.msg_transcript_transcript_m;
+    t->transcript_uint0uint = voice_aid();
+    t->transcript_uint1tstr = (struct zcbor_string){.value = (const uint8_t *)text, .len = strlen(text)};
+    t->transcript_uint2uint = 0;
+    inject_env(&env, "transcript");
+}
+
 static void run_clear(int rid, const char *spec)
 {
     static const char *const whys[] = {"answered_pc", "answered_dev", "expired", "cancelled"};
@@ -575,6 +606,10 @@ static void run(const ev_t *e)
     case E_ATTENTION: run_attention(e->text); break;
     case E_RESULT: run_result(e->text); break;
     case E_CLEAR: run_clear(e->a, e->text); break;
+    case E_MIC:
+        if (!sim_mic_load(e->text)) fail("cannot load", e->text);
+        break;
+    case E_TRANSCRIPT: run_transcript(e->text); break;
     case E_CFG: run_cfg(e->text); break;
     case E_RTC:
         hal_rtc_set_unix((uint32_t)e->a);

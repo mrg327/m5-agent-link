@@ -10,7 +10,8 @@
 
 typedef enum {
     LINK_OP_FOCUS = 0, LINK_OP_ACK = 1, LINK_OP_SNOOZE = 2, LINK_OP_APPROVE = 3, LINK_OP_DENY = 4,
-    LINK_OP_REPLY = 5, LINK_OP_CANCEL = 6, LINK_OP_NOTIFY_DONE = 8, LINK_OP_SCROLL = 10, LINK_OP_TYPE = 11
+    LINK_OP_REPLY = 5, LINK_OP_CANCEL = 6, LINK_OP_NOTIFY_DONE = 8, LINK_OP_SCROLL = 10, LINK_OP_TYPE = 11,
+    LINK_OP_DICTATE = 12
 } link_op_t;
 #define LINK_OP_UNKNOWN (-1)
 
@@ -26,6 +27,7 @@ typedef struct {
     void (*on_scroll_pos)(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total, uint32_t total,
                           const char *preview);
     void (*on_cfg)(void);
+    void (*on_transcript)(uint32_t aid, const char *text); /* voice: "" when nothing was heard */
 } link_hooks_t;
 
 void link_init(const link_hooks_t *hooks);
@@ -46,6 +48,10 @@ hal_link_kind_t link_active_kind(void);
 /* Returns false unless welcomed. */
 bool link_send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms);
 /* Same, with a uint `arg` (snooze minutes, reply option index). */
+/* Voice dictation (issue 0ea9): one recording is audio_start, audio blocks (<= 240 B of IMA ADPCM), audio_end. */
+bool link_send_audio_start(uint32_t aid, uint32_t sid);
+bool link_send_audio(uint32_t aid, uint32_t seq, const uint8_t *data, size_t len);
+bool link_send_audio_end(uint32_t aid);
 bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg, uint32_t hold_ms);
 /* cmd_op_scroll with scroll_arg {unit, delta, seq}; unit is a nav_scroll_unit_t wire value. */
 bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq);

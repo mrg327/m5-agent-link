@@ -11,6 +11,7 @@
 #include "gesture.h"
 #include "hal.h"
 #include "link.h"
+#include "voice.h"
 #include "power.h"
 #include "ring.h"
 #include "model.h"
@@ -236,6 +237,16 @@ static void act_interrupt(uint32_t sid, uint32_t hold_ms)
     toast_cmd_result(sent, "Interrupting");
 }
 
+/* Voice: type recording aid's transcript, only after the hold (the daemon checks hold_ms too). */
+static void act_dictate(uint32_t sid, uint32_t aid, uint32_t hold_ms)
+{
+    bool sent = link_send_cmd_arg(LINK_OP_DICTATE, sid, 0, aid, hold_ms);
+    if (sent) feedback_approved();
+    else feedback_reject();
+    toast_cmd_result(sent, "Sent");
+    voice_cancel(); /* done with it on the device */
+}
+
 static bool sid_snoozed(uint32_t sid) { return model_session_snoozed(model_find(sid), app_now_unix()); }
 
 /* Entering SCROLL: focus without the "Opening on PC..." toast; the mode-change tick is the feedback. */
@@ -268,6 +279,7 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .notify_done = act_notify_done,
                                        .type_reply = act_type_reply,
                                        .interrupt = act_interrupt,
+                                       .dictate = act_dictate,
                                        .scroll_open = act_scroll_open,
                                        .scroll = act_scroll,
                                        .scroll_stop = feedback_scroll_stop,
@@ -359,7 +371,7 @@ static void on_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bo
 }
 
 static const link_hooks_t s_hooks = {
-    .on_link = on_link, .on_attention = on_attention, .on_result = on_result, .on_scroll_pos = on_scroll_pos};
+    .on_link = on_link, .on_attention = on_attention, .on_result = on_result, .on_scroll_pos = on_scroll_pos, .on_transcript = voice_on_transcript};
 
 /* ── input dispatch ── */
 
@@ -510,6 +522,8 @@ uint32_t core_step(void)
     gesture_evt_t g;
     while (ring_pop(&s_gestures, &g)) dispatch(&g);
     model_attention_expire(app_now_unix());
+    voice_tick(now);
+    if (voice_state() == VOICE_REC || voice_state() == VOICE_WAIT) power_activity(now); /* stay awake while dictating */
     ui_tick(now);
     dbg_tick(now);
 

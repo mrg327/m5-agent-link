@@ -1,0 +1,14 @@
+{
+  "desc": "Device sends recording 4's transcript to session 3 after a hold (proto 0.6)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 11,
+    "b": {
+      "op": "dictate",
+      "sid": 3,
+      "arg": 4,
+      "hold_ms": 1250
+    }
+  },
+  "cbor_hex": "a30008010b03a4000c01030304041904e2"
+}

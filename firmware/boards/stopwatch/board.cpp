@@ -129,7 +129,7 @@ static void info_init(void)
     s_info.has_imu = false;     /* TODO(imu): BMI270 driver */
     s_info.has_haptic = true;
     s_info.has_speaker = false; /* TODO(audio): ES8311 + AW8737A */
-    s_info.has_mic = false;
+    s_info.has_mic = true; /* ES8311 + MEMS mic, mic.cpp */
     s_info.has_battery = true;
     s_info.num_buttons = 2;
 }

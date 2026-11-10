@@ -16,9 +16,12 @@ use std::sync::{Arc, Mutex};
 pub fn redact_sum(v: &mut Value) -> bool {
     let mut hit = false;
     if let Some(o) = v.as_object_mut() {
-        if o.contains_key("sum") {
-            o.insert("sum".into(), "<private>".into());
-            hit = true;
+        // sum: command lines and paths; q / rp: the agent's closing question and its answers
+        for k in ["sum", "q", "rp"] {
+            if o.contains_key(k) {
+                o.insert(k.into(), "<private>".into());
+                hit = true;
+            }
         }
     }
     if let Some(list) = v.get_mut("sessions").and_then(Value::as_array_mut) {
@@ -148,8 +151,17 @@ impl Trace {
     /// Logs a protocol message with its decoded JSON and raw bytes.
     pub fn proto(&self, src: &str, dir: Dir, env: &Envelope, bytes: &[u8]) {
         let mut msg = serde_json::to_value(env).unwrap_or(Value::Null);
-        let private = msg.get_mut("b").is_some_and(redact_sum);
+        let mut private = msg.get_mut("b").is_some_and(redact_sum);
         let kind = msg["t"].as_str().unwrap_or("?").to_owned();
+        // voice: the user's recorded speech and its transcript never reach the logs
+        for (t, key) in [("audio", "data"), ("transcript", "text")] {
+            if kind == t {
+                if let Some(x) = msg.pointer_mut(&format!("/b/{key}")) {
+                    *x = Value::String("<private>".into());
+                    private = true;
+                }
+            }
+        }
         let sid = msg["b"]["sid"].as_u64();
         let rid = msg["b"]["rid"].as_u64();
         self.record(src, dir, &kind, sid, rid, msg, (!private).then_some(bytes));

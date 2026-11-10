@@ -21,6 +21,7 @@ mod trace;
 mod transport;
 mod typing;
 mod usb;
+mod voice;
 mod ws;
 
 use anyhow::Result;

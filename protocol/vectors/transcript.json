@@ -1,0 +1,13 @@
+{
+  "desc": "Daemon answers recording 4 with its transcript; never sent automatically",
+  "symbolic": {
+    "t": "transcript",
+    "id": 20,
+    "b": {
+      "aid": 4,
+      "text": "run the tests again",
+      "autosend_ms": 0
+    }
+  },
+  "cbor_hex": "a30013011403a30004017372756e2074686520746573747320616761696e0200"
+}

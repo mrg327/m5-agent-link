@@ -314,6 +314,16 @@ A live monitor for one running session on the small screen. Opened by the "Watch
 | B long, A+B chord | back to HOME, watching stops |
 | Swipe left, right | ignored |
 
+### 4.8 VOICE (issue 0ea9)
+
+Dictate a reply to one session. "Dictate…" ends the Reply list when the daemon can transcribe (`welcome.voice`).
+
+- **Listening:** `Listening…`, the elapsed time (48 px), the loudness of the last 100 ms as the ring's arc, hint `tap to stop`. Tap or A stops; it stops by itself at 15 s. The display stays on.
+- **Transcribing:** `Transcribing…` until the transcript arrives (20 s at most, then `No transcript`).
+- **Transcript:** the text (20 px, up to 5 lines), hint `hold to send`. Only the 1.2 s hold sends it (`cmd dictate`, the approve ramp and arc in the answer colour; armed 300 ms after the text appears); a tap says "Hold to send". The toast reads `Sent`.
+- **Failed:** the reason (`Nothing heard`, `Offline`, `No microphone`, `No transcript`), hint `tap to try again`.
+- Long swipe down or B held discards, the A+B chord goes HOME, and an arriving request opens ASK; a recording left this way is never sent. The badges read A `STOP` / `HOLD` / `RETRY` and B `BACK`.
+
 ## 5. Haptic vocabulary
 
 ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a detent only. Distinguish by **count and rhythm, never by 10 ms differences**; gaps ≥ 60 ms; at most 3 pulses outside ramps. The approve/deny/reject triple is already in `feedback.c` (`2702775`).
@@ -515,6 +525,10 @@ Scroll from WATCH (2026-11-10, user decision, issue 5cbb):
 Replies that fit the question (2026-11-10, user decision):
 
 30. **Reply answers the agent's actual question.** The fixed defaults (Continue, Yes, Run the tests) "don't correspond to anything specific", so they are gone. The daemon reads the closing question from the turn's last message and offers its answers (ask.rs, no model or network); the watch shows the question above them. The user's own replies.txt entries follow.
+
+Voice dictation (2026-11-10, user decisions, issue 0ea9):
+
+31. **Dictation is local and confirmed.** whisper.cpp with base.en runs on the PC (no cloud), the watch streams IMA ADPCM, and the transcript is typed only after a hold, never automatically. It starts from "Dictate…" in the Reply list; a tap stops the recording.
 
 ## 10. Decisions that reconcile DESIGN.md and UI-RING.md
 

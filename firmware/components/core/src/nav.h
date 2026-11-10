@@ -8,7 +8,7 @@
 #include "gesture.h"
 #include "model.h"
 
-typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_STATUS, MODE_WATCH, MODE_COUNT } nav_mode_t;
+typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_STATUS, MODE_WATCH, MODE_VOICE, MODE_COUNT } nav_mode_t;
 
 /* Where a touch gesture happened, by its press (or swipe start) point. */
 typedef enum { ZONE_ANY, ZONE_CENTRE, ZONE_RIM } nav_zone_t;

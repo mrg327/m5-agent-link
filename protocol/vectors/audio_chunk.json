@@ -1,0 +1,13 @@
+{
+  "desc": "Second block of recording 4: header (predictor 0, index 0) and 4 bytes of nibbles",
+  "symbolic": {
+    "t": "audio",
+    "id": 13,
+    "b": {
+      "aid": 4,
+      "seq": 1,
+      "data": "0000000012345678"
+    }
+  },
+  "cbor_hex": "a30011010d03a30004010102480000000012345678"
+}

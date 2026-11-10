@@ -23,7 +23,7 @@ set(FW ${CMAKE_CURRENT_SOURCE_DIR}/../firmware/components)
 # The simulator's implementation of hal.h. Named `agentlink_hal` so core/ links against it exactly as it
 # does against the real HAL component on the device.
 add_library(agentlink_hal STATIC
-    src/sim_board.c src/sim_display.c src/sim_link.c src/sim_ws.c src/sim_png.c)
+    src/sim_board.c src/sim_display.c src/sim_link.c src/sim_ws.c src/sim_png.c src/sim_mic.c)
 target_include_directories(agentlink_hal PUBLIC ${FW}/agentlink_hal/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(agentlink_hal PUBLIC lvgl::lvgl SDL2::SDL2)
 
@@ -177,6 +177,11 @@ sim_script_test(sim_scroll_unsupported scroll_unsupported.txt FAIL_REGULAR_EXPRE
 sim_script_test(sim_reply_question reply_question.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
   PASS_REGULAR_EXPRESSION "\"op\":11,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":101")
+# Voice dictation (issue 0ea9): Dictate... records, streams ADPCM blocks, shows the transcript; a tap
+# never sends; the hold sends op 12 with hold_ms >= 1000.
+sim_script_test(sim_voice_dictate voice_dictate.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":12,\"sid\":[0-9]+,\"rid\":0,\"hold_ms\":[0-9][0-9]?[0-9]?,"
+  PASS_REGULAR_EXPRESSION "\"msg\":\"audio_start\".*\"msg\":\"audio_end\".*\"ev\":\"stop\",\"aid\":[0-9]+,\"ms\":[0-9]+,\"blocks\":[1-9].*\"op\":12,\"sid\":1,\"rid\":0,\"hold_ms\":1[0-9][0-9][0-9],\"arg\":[0-9]+")
 # Quick replies and interrupt (issue b150): reply 1 goes out as op 11 with arg 1; a tap on Interrupt
 # sends nothing; the hold sends op 6 with hold_ms >= 1000.
 sim_script_test(sim_quick_replies quick_replies.txt

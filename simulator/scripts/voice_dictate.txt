@@ -1,0 +1,65 @@
+# Voice dictation (issue 0ea9). "Dictate..." ends the Reply list when the daemon can transcribe
+# (welcome.voice). VOICE records (the sim mic plays a tone), a tap stops it, the blocks stream as
+# audio_start / audio / audio_end; the daemon's transcript shows; a tap only says "Hold to send";
+# the hold sends cmd dictate (op 12) with the recording id and hold_ms. Nothing heard: the failed
+# state, and B held discards.
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 1 done webapp feat/login Finished the work
+wait 300
+mic audio/tone_1s.wav
+tap 233 233
+wait 300
+expect_screen agent
+expect_label > Reply...
+btn A
+wait 200
+expect_label > Continue
+expect_label Dictate...
+btn B
+wait 150
+expect_label > Dictate...
+btn A
+wait 300
+expect_screen voice
+expect_label Dictate
+expect_label Listening...
+expect_label tap to stop
+shot voice_listening.png
+wait 1200
+tap 233 233
+wait 300
+expect_label Transcribing...
+transcript run the tests again and push
+wait 300
+expect_label (transcript)
+expect_label hold to send
+shot voice_transcript.png
+tap 233 233
+wait 200
+expect_screen voice
+expect_label Hold to send
+hold 233 233 1600
+wait 400
+expect_screen ring
+# again: nothing heard, then discard
+tap 233 233
+wait 300
+btn A
+wait 200
+btn B
+wait 150
+btn A
+wait 300
+expect_screen voice
+wait 600
+tap 233 233
+wait 300
+transcript
+wait 300
+expect_label Nothing heard
+expect_label tap to try again
+btn B long
+wait 300
+expect_screen ring
+quit

@@ -25,7 +25,7 @@ uint_enum!(AttKind { Approval = 0, Question = 1, Error = 2, Done = 3 });
 uint_enum!(Action { Approve = 0, Deny = 1, Focus = 2, Reply = 3, Ack = 4 });
 uint_enum!(CmdOp {
     Focus = 0, Ack = 1, Snooze = 2, Approve = 3, Deny = 4, Reply = 5, Cancel = 6,
-    Detail = 7, NotifyDone = 8, Quiet = 9, Scroll = 10, Type = 11,
+    Detail = 7, NotifyDone = 8, Quiet = 9, Scroll = 10, Type = 11, Dictate = 12,
 });
 uint_enum!(ScrollUnit { Lines = 0, Pages = 1, ToEnd = 2 });
 uint_enum!(ResultErr {

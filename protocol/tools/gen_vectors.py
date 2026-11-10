@@ -25,6 +25,7 @@ OUT = Path(__file__).resolve().parent.parent / "vectors"
 # message type ids (agentlink.cddl mt_*)
 MT = dict(hello=1, welcome=2, snapshot=3, session_upd=4, gone=5, attention=6, clear=7,
           cmd=8, result=9, detail=10, cfg=11, batt=12, ping=13, pong=14, log=15,
+          audio_start=16, audio=17, audio_end=18, transcript=19,
           dbg_ui_state=65, dbg_inject_input=68)
 
 
@@ -68,6 +69,16 @@ VECTORS = {
          "replies": ["Continue", "Yes", "Run the tests"]}},
         env("welcome", 1, {0: [0, 4], 1: {0: bytes.fromhex("a1a2a3a4a5a6a7a8"), 1: "dev-linux", 2: 2},
             2: {0: 1793995200, 1: -480}, 3: {0: 1, 1: 0}, 4: ["Continue", "Yes", "Run the tests"]}, re_=1),
+    ),
+    "welcome_voice": (
+        "Welcome (proto 0.6): quick replies and voice dictation (whisper.cpp installed on the PC)",
+        {"t": "welcome", "id": 1, "re": 1, "b": {"proto": [0, 6],
+         "host": {"id": "a1a2a3a4a5a6a7a8", "name": "dev-linux", "os": "linux"},
+         "time": {"unix": 1793995200, "tz_off": -480},
+         "cfg": {"privacy": "preview", "alert": "full"},
+         "replies": ["Continue"], "voice": True}},
+        env("welcome", 1, {0: [0, 6], 1: {0: bytes.fromhex("a1a2a3a4a5a6a7a8"), 1: "dev-linux", 2: 2},
+            2: {0: 1793995200, 1: -480}, 3: {0: 1, 1: 0}, 4: ["Continue"], 5: True}, re_=1),
     ),
     "snapshot_two": (
         "Snapshot with one working Copilot session and one Claude session needing approval",
@@ -161,6 +172,31 @@ VECTORS = {
         "Device interrupts session 3's running turn after a hold (Esc in its terminal)",
         {"t": "cmd", "id": 10, "b": {"op": "cancel", "sid": 3, "hold_ms": 1250}},
         env("cmd", 10, {0: 6, 1: 3, 4: 1250}),
+    ),
+    "cmd_dictate": (
+        "Device sends recording 4's transcript to session 3 after a hold (proto 0.6)",
+        {"t": "cmd", "id": 11, "b": {"op": "dictate", "sid": 3, "arg": 4, "hold_ms": 1250}},
+        env("cmd", 11, {0: 12, 1: 3, 3: 4, 4: 1250}),
+    ),
+    "audio_start": (
+        "Device starts recording 4 for session 3: IMA ADPCM blocks at 16 kHz (proto 0.6)",
+        {"t": "audio_start", "id": 12, "b": {"aid": 4, "codec": "adpcm16k", "sid": 3}},
+        env("audio_start", 12, {0: 4, 1: 0, 2: 3}),
+    ),
+    "audio_chunk": (
+        "Second block of recording 4: header (predictor 0, index 0) and 4 bytes of nibbles",
+        {"t": "audio", "id": 13, "b": {"aid": 4, "seq": 1, "data": "0000000012345678"}},
+        env("audio", 13, {0: 4, 1: 1, 2: bytes.fromhex("0000000012345678")}),
+    ),
+    "audio_end": (
+        "Device stops recording 4",
+        {"t": "audio_end", "id": 14, "b": {"aid": 4}},
+        env("audio_end", 14, {0: 4}),
+    ),
+    "transcript": (
+        "Daemon answers recording 4 with its transcript; never sent automatically",
+        {"t": "transcript", "id": 20, "b": {"aid": 4, "text": "run the tests again", "autosend_ms": 0}},
+        env("transcript", 20, {0: 4, 1: "run the tests again", 2: 0}),
     ),
     "result_scroll_pos": (
         "Daemon answers a scroll: 142 lines above the live bottom of 1200, with the top visible line (privacy >= preview)",

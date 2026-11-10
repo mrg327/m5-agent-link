@@ -203,6 +203,10 @@ struct welcome_tstr_l_r {
 	size_t welcome_tstr_l_tstr_count;
 };
 
+struct welcome_uint5bool {
+	bool welcome_uint5bool;
+};
+
 struct welcome {
 	uint32_t welcome_major_l_major;
 	uint32_t welcome_major_l_minor;
@@ -211,6 +215,8 @@ struct welcome {
 	struct device_cfg welcome_device_cfg_m;
 	struct welcome_tstr_l_r welcome_tstr_l;
 	bool welcome_tstr_l_present;
+	struct welcome_uint5bool welcome_uint5bool;
+	bool welcome_uint5bool_present;
 };
 
 struct msg_welcome {
@@ -492,6 +498,7 @@ struct cmd_op_r {
 		cmd_op_quiet_m_c = 9,
 		cmd_op_scroll_m_c = 10,
 		cmd_op_type_m_c = 11,
+		cmd_op_dictate_m_c = 12,
 	} cmd_op_choice;
 };
 

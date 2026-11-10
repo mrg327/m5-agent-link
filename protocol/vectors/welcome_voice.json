@@ -1,0 +1,32 @@
+{
+  "desc": "Welcome (proto 0.6): quick replies and voice dictation (whisper.cpp installed on the PC)",
+  "symbolic": {
+    "t": "welcome",
+    "id": 1,
+    "re": 1,
+    "b": {
+      "proto": [
+        0,
+        6
+      ],
+      "host": {
+        "id": "a1a2a3a4a5a6a7a8",
+        "name": "dev-linux",
+        "os": "linux"
+      },
+      "time": {
+        "unix": 1793995200,
+        "tz_off": -480
+      },
+      "cfg": {
+        "privacy": "preview",
+        "alert": "full"
+      },
+      "replies": [
+        "Continue"
+      ],
+      "voice": true
+    }
+  },
+  "cbor_hex": "a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5"
+}

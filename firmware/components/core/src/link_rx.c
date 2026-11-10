@@ -111,6 +111,7 @@ static void on_welcome(const struct welcome *w)
             }
         model_set_replies(list, n, w->welcome_tstr_l_present);
     }
+    model_set_voice(w->welcome_uint5bool_present && w->welcome_uint5bool.welcome_uint5bool);
     /* A welcome starts a new link, possibly with a restarted daemon whose request ids and
        session ids begin again. A card kept from before could then name a different request
        (issue 20261109-1173), so drop them all; the daemon re-sends the open ones next. */
@@ -212,6 +213,14 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
     case envelope_msg_result_m_c: on_result(&e->envelope_msg_result_m, re, has_re); break;
     case envelope_msg_cfg_m_c: apply_cfg(&e->envelope_msg_cfg_m.msg_cfg_device_cfg_m); break;
     case envelope_msg_ping_m_c: link_tx_pong(id); break;
+    case envelope_msg_transcript_m_c: {
+        const struct transcript *t = &e->envelope_msg_transcript_m.msg_transcript_transcript_m;
+        static char text[256]; /* the user's own words: handed to the UI, never logged */
+        STR(t->transcript_uint1tstr, text);
+        dbg_event("link", "transcript", "\"aid\":%u,\"chars\":%u", (unsigned)t->transcript_uint0uint, (unsigned)strlen(text));
+        if (g_link.hooks.on_transcript) g_link.hooks.on_transcript(t->transcript_uint0uint, text);
+        break;
+    }
     case envelope_msg_dbg_ui_state_req_m_c: dbg_on_ui_state_req(id); break;
     case envelope_msg_dbg_screenshot_req_m_c: dbg_on_screenshot_req(id); break;
     case envelope_msg_dbg_inject_input_m_c: {

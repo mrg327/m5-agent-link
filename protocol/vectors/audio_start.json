@@ -1,0 +1,13 @@
+{
+  "desc": "Device starts recording 4 for session 3: IMA ADPCM blocks at 16 kHz (proto 0.6)",
+  "symbolic": {
+    "t": "audio_start",
+    "id": 12,
+    "b": {
+      "aid": 4,
+      "codec": "adpcm16k",
+      "sid": 3
+    }
+  },
+  "cbor_hex": "a30010010c03a3000401000203"
+}

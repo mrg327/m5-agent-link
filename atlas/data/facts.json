@@ -814,6 +814,69 @@
         "nav": "NAV_HOME",
         "action": "A+B chord: straight back to the deck",
         "source": "firmware/components/core/src/nav.c:92"
+      },
+      {
+        "gesture": "G_PRESS",
+        "mode": "voice",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_HOLD_PRESS",
+        "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
+        "source": "firmware/components/core/src/nav.c:95"
+      },
+      {
+        "gesture": "G_RELEASE",
+        "mode": "voice",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_HOLD_RELEASE",
+        "action": "Lifting cancels a hold in progress",
+        "source": "firmware/components/core/src/nav.c:96"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "voice",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_COMMIT",
+        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item answers 'hold to confirm' instead",
+        "source": "firmware/components/core/src/nav.c:97"
+      },
+      {
+        "gesture": "G_SWIPE_DOWN",
+        "mode": "voice",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is; on STATUS a swipe up); a request stays pending",
+        "source": "firmware/components/core/src/nav.c:98"
+      },
+      {
+        "gesture": "G_BTN_A",
+        "mode": "voice",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_COMMIT",
+        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item answers 'hold to confirm' instead",
+        "source": "firmware/components/core/src/nav.c:99"
+      },
+      {
+        "gesture": "G_BTN_B_LONG",
+        "mode": "voice",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is; on STATUS a swipe up); a request stays pending",
+        "source": "firmware/components/core/src/nav.c:100"
+      },
+      {
+        "gesture": "G_CHORD",
+        "mode": "voice",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_HOME",
+        "action": "A+B chord: straight back to the deck",
+        "source": "firmware/components/core/src/nav.c:101"
       }
     ],
     "chord": "A + B held together: Home from any mode (logged on the deck, no action there)",
@@ -823,7 +886,7 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:76"
+      "source": "firmware/components/core/src/ui.c:77"
     },
     {
       "id": "attention",
@@ -833,7 +896,7 @@
     {
       "id": "agent",
       "title": "Agent wheel",
-      "source": "firmware/components/core/src/ui_agent.c:263"
+      "source": "firmware/components/core/src/ui_agent.c:270"
     },
     {
       "id": "ask",
@@ -1205,6 +1268,13 @@
           "type": "[0*6 tstr]",
           "note": "replies  quick replies, each <= 24 chars (proto 0.4); present = the",
           "name": "replies"
+        },
+        {
+          "key": 5,
+          "optional": true,
+          "type": "bool",
+          "note": "voice    the daemon transcribes audio_* and answers with transcript",
+          "name": "voice"
         }
       ],
       "source": "protocol/agentlink.cddl:48"
@@ -1778,14 +1848,14 @@
           "key": 1,
           "optional": false,
           "type": "tstr",
-          "note": "text",
+          "note": "text      \"\" when nothing was heard (or the recording failed)",
           "name": "text"
         },
         {
           "key": 2,
           "optional": false,
           "type": "uint",
-          "note": "autosend_ms",
+          "note": "autosend_ms  0: never; the device sends only on the user's hold (cmd_op_dictate)",
           "name": "autosend_ms"
         }
       ],
@@ -1808,14 +1878,14 @@
           "key": 1,
           "optional": false,
           "type": "tstr",
-          "note": "text",
+          "note": "text      \"\" when nothing was heard (or the recording failed)",
           "name": "text"
         },
         {
           "key": 2,
           "optional": false,
           "type": "uint",
-          "note": "autosend_ms",
+          "note": "autosend_ms  0: never; the device sends only on the user's hold (cmd_op_dictate)",
           "name": "autosend_ms"
         }
       ],
@@ -2046,13 +2116,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:275",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:224",
-    "gesture_map.chord": "firmware/components/core/src/app.c:378",
+    "gesture_map.chord": "firmware/components/core/src/app.c:390",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:187",
-    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:133",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:295",
+    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:142",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:307",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:405",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:417",
     "haptics.approved": "firmware/components/core/src/feedback.c:72",
     "haptics.denied": "firmware/components/core/src/feedback.c:78",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:59",
@@ -2133,7 +2203,7 @@
     "ring.underline_w_px": "firmware/components/core/src/ui_ring_internal.h:21",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:35",
     "screens": "firmware/components/core/src/ui_home.c:342",
-    "screens.agent": "firmware/components/core/src/ui_agent.c:263",
+    "screens.agent": "firmware/components/core/src/ui_agent.c:270",
     "screens.ask": "firmware/components/core/src/ui_ask.c:302",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:300",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:57",
