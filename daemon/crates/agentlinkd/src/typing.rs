@@ -16,18 +16,18 @@ use crate::registry::{clip, HostCtx};
 
 pub const MAX_REPLIES: usize = 6;
 pub const MAX_REPLY_CHARS: usize = 24;
-const DEFAULT_REPLIES: [&str; 3] = ["Continue", "Yes", "Run the tests"];
 /// kitty's `send-text` interprets Python-style escapes.
 const ENTER: &str = "\\r";
 const ESC: &str = "\\x1b";
 
-/// The quick replies: `replies.txt` (one per line, `#` comments), else the defaults. Control
+/// The user's fixed quick replies: `replies.txt` (one per line, `#` comments), else none. There are
+/// no built-in defaults: replies that fit no question ("Continue", "Yes") read as noise on the watch,
+/// whose Reply list leads with the answers to the agent's own closing question (ask.rs). Control
 /// characters are dropped, each is cut at 24 chars, at most six.
 pub fn load_replies(dir: &Path) -> Vec<String> {
-    match std::fs::read_to_string(dir.join("replies.txt")) {
-        Ok(text) => parse_replies(&text),
-        Err(_) => DEFAULT_REPLIES.iter().map(|s| s.to_string()).collect(),
-    }
+    std::fs::read_to_string(dir.join("replies.txt"))
+        .map(|text| parse_replies(&text))
+        .unwrap_or_default()
 }
 
 pub fn parse_replies(text: &str) -> Vec<String> {
@@ -134,9 +134,9 @@ mod tests {
     }
 
     #[test]
-    fn missing_file_gives_the_defaults() {
+    fn missing_file_gives_no_fixed_replies() {
         let dir = std::env::temp_dir().join("agentlink-no-replies-here");
-        assert_eq!(load_replies(&dir), vec!["Continue", "Yes", "Run the tests"]);
+        assert!(load_replies(&dir).is_empty());
     }
 
     #[test]

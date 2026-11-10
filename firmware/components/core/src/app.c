@@ -216,8 +216,10 @@ static void act_type_reply(uint32_t sid, int idx)
     bool sent = idx >= 0 && link_send_cmd_arg(LINK_OP_TYPE, sid, 0, (uint32_t)idx, 0);
     if (sent) {
         feedback_reply_sent();
-        char t[48];
-        snprintf(t, sizeof t, "Sent \"%s\"", model_reply(idx));
+        char t[80];
+        const session_t *s = model_find(sid);
+        const char *text = idx >= 100 ? (s && idx - 100 < s->n_rp ? s->rp[idx - 100] : "") : model_reply(idx);
+        snprintf(t, sizeof t, "Sent \"%s\"", text);
         ui_toast(t, RGB_SUCCESS);
     } else {
         feedback_reject();

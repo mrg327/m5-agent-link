@@ -37,6 +37,8 @@ pub struct SessionPatch {
     pub tool: Option<String>,
     pub summary: Option<String>,
     pub step: Step,
+    /// The closing question and its answers (ask.rs); ("", []) clears them when the agent moves on.
+    pub ask: Option<(String, Vec<String>)>,
 }
 
 /// What a hook line did to the turn's tool-step counter.
@@ -62,6 +64,7 @@ impl SessionPatch {
             branch: None,
             tool: None,
             summary: None,
+            ask: None,
             step: Step::None,
         }
     }
@@ -361,6 +364,10 @@ impl Registry {
         upd!(br, p.branch.map(|v| clip(&v, 32)));
         upd!(tool, p.tool);
         upd!(sum, p.summary.map(|v| clip(&v, 80)));
+        if let Some((q, rp)) = p.ask {
+            upd!(q, Some(q));
+            upd!(rp, Some(rp));
+        }
         match p.step {
             Step::None => {}
             Step::Start => {

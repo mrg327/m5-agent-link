@@ -105,6 +105,11 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
         dst->n = src->n;
     }
     if (present & SF_OK) dst->step = src->step;
+    if (present & SF_Q) memcpy(dst->q, src->q, sizeof dst->q);
+    if (present & SF_RP) {
+        memcpy(dst->rp, src->rp, sizeof dst->rp);
+        dst->n_rp = src->n_rp;
+    }
     if (present & SF_NO_SCROLL) dst->no_scroll = src->no_scroll;
 }
 

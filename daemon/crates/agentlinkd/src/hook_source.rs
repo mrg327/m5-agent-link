@@ -310,6 +310,7 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
         "userpromptsubmitted" | "userpromptsubmit" => {
             p.state = Some(SessState::Work);
             p.step = Step::Reset;
+            p.ask = Some(Default::default()); /* the question was answered (or moved past) */
         }
         "posttooluse" | "posttoolusefailure" => {
             p.state = Some(SessState::Work);
@@ -322,11 +323,18 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
         }
         "pretooluse" => {
             p.state = Some(SessState::Work);
+            p.ask = Some(Default::default());
             p.tool = tool.map(str::to_owned);
             p.summary = tool.map(|t| step_summary(t, payload));
             p.step = Step::Start;
         }
-        "agentstop" | "stop" => p.state = Some(SessState::Done),
+        "agentstop" | "stop" => {
+            p.state = Some(SessState::Done);
+            // Claude Code hands the turn's last message to Stop: its closing question feeds Reply
+            if let Some(text) = payload["last_assistant_message"].as_str() {
+                p.ask = Some(crate::ask::ask_of(text));
+            }
+        }
         "erroroccurred" | "stopfailure" => p.state = Some(SessState::Error),
         "permissionrequest" => {
             p.state = Some(SessState::Input);
@@ -503,6 +511,28 @@ mod tests {
             panic!()
         };
         patch
+    }
+
+    #[test]
+    fn stop_carries_the_closing_question_and_a_new_prompt_clears_it() {
+        let p = patch_of(json!({"agent":"claude","event":"Stop","cwd":"/r",
+            "payload":{"session_id":"s","last_assistant_message":"Built and tested.\n\nShould I flash it now?"}}));
+        assert_eq!(p.state, Some(SessState::Done));
+        assert_eq!(
+            p.ask,
+            Some((
+                "Should I flash it now?".into(),
+                vec!["Yes, go ahead".into(), "No".into()]
+            ))
+        );
+        let p = patch_of(
+            json!({"agent":"claude","event":"UserPromptSubmit","cwd":"/r","payload":{"session_id":"s"}}),
+        );
+        assert_eq!(p.ask, Some((String::new(), vec![])));
+        let p = patch_of(
+            json!({"agent":"claude","event":"Stop","cwd":"/r","payload":{"session_id":"s"}}),
+        );
+        assert_eq!(p.ask, None, "no message: leave whatever was there");
     }
 
     #[test]

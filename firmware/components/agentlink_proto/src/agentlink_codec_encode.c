@@ -72,6 +72,8 @@ static bool encode_repeated_session_uint13uint(zcbor_state_t *state, const struc
 static bool encode_repeated_session_uint14bool(zcbor_state_t *state, const struct session_uint14bool *input);
 static bool encode_repeated_session_uint15uint(zcbor_state_t *state, const struct session_uint15uint *input);
 static bool encode_repeated_session_uint16bool(zcbor_state_t *state, const struct session_uint16bool *input);
+static bool encode_repeated_session_uint17tstr(zcbor_state_t *state, const struct session_uint17tstr *input);
+static bool encode_repeated_session_tstr_l(zcbor_state_t *state, const struct session_tstr_l_r *input);
 static bool encode_session(zcbor_state_t *state, const struct session *input);
 static bool encode_att_kind(zcbor_state_t *state, const struct att_kind_r *input);
 static bool encode_away_event(zcbor_state_t *state, const struct away_event *input);
@@ -807,12 +809,36 @@ static bool encode_repeated_session_uint16bool(
 	return res;
 }
 
+static bool encode_repeated_session_uint17tstr(
+		zcbor_state_t *state, const struct session_uint17tstr *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (17))))
+	&& (zcbor_tstr_encode(state, (&(*input).session_uint17tstr)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_session_tstr_l(
+		zcbor_state_t *state, const struct session_tstr_l_r *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (18))))
+	&& (zcbor_list_start_encode(state, 3) && ((zcbor_multi_encode_minmax(0, 3, &(*input).session_tstr_l_tstr_count, (zcbor_encoder_t *)zcbor_tstr_encode, state, (*&(*input).session_tstr_l_tstr), sizeof(struct zcbor_string))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_list_end_encode(state, 3))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_session(
 		zcbor_state_t *state, const struct session *input)
 {
 	zcbor_log("%s\r\n", __func__);
 
-	bool res = (((zcbor_map_start_encode(state, 17) && (((((zcbor_uint32_put(state, (0))))
+	bool res = (((zcbor_map_start_encode(state, 19) && (((((zcbor_uint32_put(state, (0))))
 	&& (zcbor_uint32_encode(state, (&(*input).session_uint0uint))))
 	&& (!(*input).session_agent_m_present || encode_repeated_session_agent_m(state, (&(*input).session_agent_m)))
 	&& (!(*input).session_sess_state_m_present || encode_repeated_session_sess_state_m(state, (&(*input).session_sess_state_m)))
@@ -829,7 +855,9 @@ static bool encode_session(
 	&& (!(*input).session_uint13uint_present || encode_repeated_session_uint13uint(state, (&(*input).session_uint13uint)))
 	&& (!(*input).session_uint14bool_present || encode_repeated_session_uint14bool(state, (&(*input).session_uint14bool)))
 	&& (!(*input).session_uint15uint_present || encode_repeated_session_uint15uint(state, (&(*input).session_uint15uint)))
-	&& (!(*input).session_uint16bool_present || encode_repeated_session_uint16bool(state, (&(*input).session_uint16bool)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 17))));
+	&& (!(*input).session_uint16bool_present || encode_repeated_session_uint16bool(state, (&(*input).session_uint16bool)))
+	&& (!(*input).session_uint17tstr_present || encode_repeated_session_uint17tstr(state, (&(*input).session_uint17tstr)))
+	&& (!(*input).session_tstr_l_present || encode_repeated_session_tstr_l(state, (&(*input).session_tstr_l)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 19))));
 
 	log_result(state, res, __func__);
 	return res;

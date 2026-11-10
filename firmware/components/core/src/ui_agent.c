@@ -14,14 +14,19 @@
 #define HEADER_Y 80
 #define HINT_Y 364
 
-static lv_obj_t *s_root, *s_header, *s_wheel, *s_hint;
+static lv_obj_t *s_root, *s_header, *s_wheel, *s_hint, *s_question;
+static char s_question_txt[128];
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static uint32_t s_sid, s_opened_ms, s_last_input, s_now;
 static bool s_holding, s_hold_fired, s_ramp_started;
 static uint32_t s_hold_t0, s_hold_ms;
-/* "Reply..." turns the wheel into the quick-reply list (issue b150); its items carry REPLY_ID + index. */
+/* "Reply..." turns the wheel into the quick-reply list (issue b150); its items carry REPLY_ID + the
+ * cmd type argument: the session's own answers to its closing question first (100 + i), then the
+ * daemon's fixed replies (i). The question itself shows above the list. */
 static bool s_replies;
-#define REPLY_ID 100
+#define REPLY_ID 1000
+#define SESSION_REPLY 100
+#define QUESTION_Y 100
 static char s_header_txt[64];
 
 /* Presentation of the interaction model's action ids. */
@@ -90,17 +95,26 @@ bool ui_agent_refresh(uint32_t now)
     wheel_item_t w[WHEEL_MAX_ITEMS];
     int n = 0;
     if (s_replies) {
+        for (int i = 0; i < s->n_rp && n < WHEEL_MAX_ITEMS; i++)
+            w[n++] = (wheel_item_t){s->rp[i], RGB_ASK, false, REPLY_ID + SESSION_REPLY + i};
         for (int i = 0; i < model_reply_count() && n < WHEEL_MAX_ITEMS; i++)
             w[n++] = (wheel_item_t){model_reply(i), RGB_ASK, false, REPLY_ID + i};
     } else {
         agent_item_t items[WHEEL_MAX_ITEMS];
-        n = nav_agent_items(s->state, model_can_type(), model_reply_count() > 0, items, WHEEL_MAX_ITEMS);
+        n = nav_agent_items(s->state, model_can_type(), model_reply_count() > 0 || s->n_rp > 0, items, WHEEL_MAX_ITEMS);
         for (int i = 0; i < n; i++)
             w[i] = (wheel_item_t){label_of(items[i].id, s), items[i].id == AG_INTERRUPT ? RGB_DANGER : rgb, items[i].hold,
                                   (int)items[i].id};
     }
     int sel = wheel_count(s_wheel) == n ? wheel_sel(s_wheel) : 0;
     wheel_set(s_wheel, w, n, sel);
+    const char *q = s_replies ? s->q : "";
+    if (strcmp(q, s_question_txt)) {
+        snprintf(s_question_txt, sizeof s_question_txt, "%s", q);
+        lv_label_set_text(s_question, q);
+    }
+    if (q[0]) lv_obj_remove_flag(s_question, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(s_question, LV_OBJ_FLAG_HIDDEN);
     theme_set_text_color(s_word[0], lv_color_hex(rgb));
     ring_items();
     return true;
@@ -250,6 +264,7 @@ void ui_agent_report(ui_report_t *r)
     r->has_sel_sid = session() != NULL;
     r->sel_sid = s_sid;
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
+    if (s_replies && s_question_txt[0]) ui_report_add(r, "%s", s_question_txt);
     int n = wheel_count(s_wheel), sel = wheel_sel(s_wheel);
     for (int k = 0; k < n && k < 5; k++) {
         const wheel_item_t *it = wheel_item(s_wheel, (sel + k) % n);
@@ -269,6 +284,12 @@ lv_obj_t *ui_agent_init(lv_obj_t *screen)
     lv_obj_set_style_text_align(s_header, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_pos(s_header, UI_CX - 140, HEADER_Y);
     s_wheel = wheel_create(s_root);
+    s_question = theme_label(s_root, 20, COL_TEXT); /* the agent's closing question, in the Reply list */
+    lv_obj_set_size(s_question, 300, 2 * lv_font_get_line_height(theme_font(20)));
+    lv_label_set_long_mode(s_question, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_set_style_text_align(s_question, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_pos(s_question, UI_CX - 150, QUESTION_Y);
+    lv_obj_add_flag(s_question, LV_OBJ_FLAG_HIDDEN);
     s_hint = theme_label(s_root, 16, COL_MUTED);
     lv_obj_set_size(s_hint, 300, lv_font_get_line_height(theme_font(16)));
     lv_obj_set_style_text_align(s_hint, LV_TEXT_ALIGN_CENTER, 0);

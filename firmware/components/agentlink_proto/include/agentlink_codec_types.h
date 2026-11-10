@@ -310,6 +310,15 @@ struct session_uint16bool {
 	bool session_uint16bool;
 };
 
+struct session_uint17tstr {
+	struct zcbor_string session_uint17tstr;
+};
+
+struct session_tstr_l_r {
+	struct zcbor_string session_tstr_l_tstr[3];
+	size_t session_tstr_l_tstr_count;
+};
+
 struct session {
 	uint32_t session_uint0uint;
 	struct session_agent_m session_agent_m;
@@ -344,6 +353,10 @@ struct session {
 	bool session_uint15uint_present;
 	struct session_uint16bool session_uint16bool;
 	bool session_uint16bool_present;
+	struct session_uint17tstr session_uint17tstr;
+	bool session_uint17tstr_present;
+	struct session_tstr_l_r session_tstr_l;
+	bool session_tstr_l_present;
 };
 
 struct att_kind_r {

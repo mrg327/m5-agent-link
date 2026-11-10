@@ -192,7 +192,9 @@ session = {
   ? 13 => uint,             ; snz   snoozed until (unix); 0 = not snoozed. Keys 13-16 only to devices with proto ≥ 0.3
   ? 14 => bool,             ; ntf   "notify when done" armed; the daemon clears it in the delta that enters done/error
   ? 15 => uint,             ; n     tool steps in the current turn (resets on a new prompt)
-  ? 16 => bool              ; ok    result of step n; absent while it runs
+  ? 16 => bool,             ; ok    result of step n; absent while it runs
+  ? 17 => tstr,             ; q     the agent's closing question when its turn ended, <= 120 chars; "" = none (proto 0.5)
+  ? 18 => [0*3 tstr]        ; rp    answers to q for the Reply list, <= 24 chars each; [] = none (proto 0.5)
 }
 agent = agent_copilot / agent_claude / agent_cloud / agent_other
 agent_copilot = 0

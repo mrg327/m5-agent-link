@@ -165,7 +165,7 @@ User decision §9.1: tapping the centre opens a screen where gestures act on tha
 Nothing that has another path takes a row (decision 27, 2026-11-09): **Focus** is button A on HOME and WATCH (on a Done session it also acknowledges), **Status** is the swipe down on HOME. A session that waits for input keeps Focus.
 
 Items in *italics* need a daemon that types into terminals (decision 28: the welcome carries `replies`, proto 0.4):
-- **Reply…** turns the wheel into the quick-reply list (header `Reply · <repo>`, items in the answer colour). Tap or A sends `cmd_op_type` with the reply's index; the daemon types it and Enter. The toast reads `Sent "Continue"`. The device never sends text. The daemon refuses (toast with its reason) while the session has an open request, waits on an approval or question, or shows a numbered selection list.
+- **Reply…** turns the wheel into the reply list (header `Reply · <repo>`, items in the answer colour). When the agent's turn ended on a question (proto 0.5), the question shows above the list in 20 px and its answers come first (`Yes, go ahead` / `No`, or the options of an "A or B?" question); the user's own `~/.agentlink/replies.txt` entries follow. There are no built-in replies, so without a question or a file the item is hidden (decision 30). Tap or A sends `cmd_op_type` with the reply's index; the daemon types it and Enter. The toast reads `Sent "Continue"`. The device never sends text. The daemon refuses (toast with its reason) while the session has an open request, waits on an approval or question, or shows a numbered selection list.
 - **Interrupt** is a hold item (deny colour, `HOLD` tag, 1.2 s): it sends `cmd_op_cancel` with the measured `hold_ms`, and the daemon sends Esc to the terminal. A tap only says "Hold to confirm".
 
 - **Watch** opens the WATCH monitor for this session (§4.7).
@@ -511,6 +511,10 @@ Quick replies and interrupt (2026-11-09, user decision, issue b150):
 Scroll from WATCH (2026-11-10, user decision, issue 5cbb):
 
 29. **Scrolling is always one drag away from a running agent.** After decision 27 removed SCROLL, the user asked for it back ("the user should always be able to scroll"). The Phase 4 SCROLL mode returned unchanged, entered by a vertical drag in the centre of WATCH instead of a wheel item, and leaving it returns to WATCH. WATCH's swipe up no longer goes back (it is the start of a drag); B held or A+B does. The wheel stays as decision 27 left it.
+
+Replies that fit the question (2026-11-10, user decision):
+
+30. **Reply answers the agent's actual question.** The fixed defaults (Continue, Yes, Run the tests) "don't correspond to anything specific", so they are gone. The daemon reads the closing question from the turn's last message and offers its answers (ask.rs, no model or network); the watch shows the question above them. The user's own replies.txt entries follow.
 
 ## 10. Decisions that reconcile DESIGN.md and UI-RING.md
 

@@ -3,6 +3,7 @@
 //! sources (hooks, …) → registry → device links (WebSocket now; BLE/USB later),
 //! with everything traced to `~/.agentlink/trace/`.
 
+mod ask;
 mod ble;
 mod broker;
 mod deltas;

@@ -173,6 +173,10 @@ sim_script_test(sim_scroll_exit scroll_exit.txt FAIL_REGULAR_EXPRESSION "SCRIPT 
 set_tests_properties(sim_scroll_exit PROPERTIES TIMEOUT 60)
 sim_script_test(sim_scroll_privacy scroll_privacy.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_scroll_unsupported scroll_unsupported.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# The Reply list follows the agent's closing question: the session's answers first ("No" = type arg 101).
+sim_script_test(sim_reply_question reply_question.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+  PASS_REGULAR_EXPRESSION "\"op\":11,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":101")
 # Quick replies and interrupt (issue b150): reply 1 goes out as op 11 with arg 1; a tap on Interrupt
 # sends nothing; the hold sends op 6 with hold_ms >= 1000.
 sim_script_test(sim_quick_replies quick_replies.txt

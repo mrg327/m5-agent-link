@@ -101,7 +101,7 @@ welcome = {
   ? replies: [0*6 tstr]       ; quick replies, each ≤ 24 chars (proto 0.4)
 }
 ```
-- `replies` is sent only to a device whose `hello` says proto ≥ 0.4 (an older decoder rejects an unknown key). Its presence means the daemon can type into terminals: `cmd type` and `cmd cancel` (§5). The list comes from `~/.agentlink/replies.txt` (one per line, `#` comments), else `Continue`, `Yes`, `Run the tests`.
+- `replies` is sent only to a device whose `hello` says proto ≥ 0.4 (an older decoder rejects an unknown key). Its presence means the daemon can type into terminals: `cmd type` and `cmd cancel` (§5). The list is the user's own `~/.agentlink/replies.txt` (one per line, `#` comments, ≤ 6 × 24 chars), and empty without one: there are no built-in defaults.
 
 ## 4. State messages (daemon → device)
 
@@ -128,6 +128,7 @@ session = {
   ? ok: bool                 ; result of step n; absent while it runs          ┘
 }
 ```
+- `q` / `rp` (keys 17, 18, proto 0.5): when an agent's turn ends on a question, the daemon reads it from the turn's last message (Claude Code's Stop hook carries `last_assistant_message`) and sends the question (≤ 120 chars) with up to 3 answers (≤ 24 chars): the options of an "A or B?" question, else `Yes, go ahead` / `No` for a yes/no one, else none. The watch lists them first under Reply, with the question above. They are cleared (`""`, `[]`: a delta cannot remove a key) as soon as the agent works again. Agent content: never sent under privacy `meta`, and only to devices with proto ≥ 0.5.
 - `sum` is the current step: `"<tool> · <argument>"` (the shell command's first line, a file's last two
   path components, a URL or a search pattern), ≤ 80 chars. The daemon sends it only when the device's
   privacy is not `meta`; otherwise the device sees `tool` alone.
@@ -176,7 +177,7 @@ scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tst
 ```
 - `focus`: the daemon runs the FocusDriver for that session. On `no_window`, the device shows "Open terminal not found".
 - `scroll` (UI-V2 §6): the daemon moves the session's terminal scrollback (tmux copy mode first, else kitty remote control; other terminals answer `unsupported` and the device hides the item for that session). The daemon sums a burst into one move while the previous one runs, answers at most one `result` per 250 ms and only when the position changed or the move failed, and clamps `delta` to ±500 lines / ±20 pages. `pos.preview` is the terminal's top visible line, ≤ 48 chars, sent only when the device's privacy is `preview` or `full`; it is never written to the audit log or the trace. Scroll is read-only on the PC and is not audited.
-- `type` (proto 0.4, issue b150): `arg` is an index into `welcome.replies`; the daemon types that reply and Enter into the session's terminal (kitty only today, else `unsupported`). The device never sends text. Refused with `denied` while the session has an open request, while it is `input` with `sub` approval or question, or while a numbered selection list is on screen: Enter there would pick the dialog's highlighted option. Audited with the index, not the text.
+- `type` (proto 0.4, issue b150): `arg` is an index into `welcome.replies`, or, from 100 up, into the session's own answers `session.rp` (proto 0.5: `arg` 101 = `rp[1]`); the daemon types that reply and Enter into the session's terminal (kitty only today, else `unsupported`). The device never sends text. Refused with `denied` while the session has an open request, while it is `input` with `sub` approval or question, or while a numbered selection list is on screen: Enter there would pick the dialog's highlighted option. Audited with the index, not the text.
 - `cancel` (proto 0.4): interrupts the session's running turn by sending Esc to its terminal. It needs a hold like `approve` (`hold_ms` ≥ 1000, else `denied`). Audited.
 - `ack`: marks the session seen (all devices). On an `error` session it also dismisses the error: the
   session becomes `idle`.

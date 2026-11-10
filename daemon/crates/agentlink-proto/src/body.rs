@@ -139,6 +139,10 @@ body!(
         #[n(14)] #[serde(skip_serializing_if = "Option::is_none")] ntf: Option<bool>,
         #[n(15)] #[serde(skip_serializing_if = "Option::is_none")] n: Option<u64>,
         #[n(16)] #[serde(skip_serializing_if = "Option::is_none")] ok: Option<bool>,
+        /// The agent's closing question when its turn ended (proto 0.5); "" clears it.
+        #[n(17)] #[serde(skip_serializing_if = "Option::is_none")] q: Option<String>,
+        /// Answers to `q` offered on the watch's Reply list (proto 0.5); empty clears them.
+        #[n(18)] #[serde(skip_serializing_if = "Option::is_none")] rp: Option<Vec<String>>,
     }
 );
 impl Session {
@@ -162,6 +166,8 @@ impl Session {
             ntf: None,
             n: None,
             ok: None,
+            q: None,
+            rp: None,
         }
     }
 

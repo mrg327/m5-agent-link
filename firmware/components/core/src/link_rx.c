@@ -45,6 +45,13 @@ static uint32_t convert_session(const struct session *in, session_t *out)
     if (in->session_uint7uint_present) { out->t0 = in->session_uint7uint.session_uint7uint; p |= SF_T0; }
     if (in->session_uint8uint_present) { out->tst = in->session_uint8uint.session_uint8uint; p |= SF_TST; }
     if (in->session_uint9tstr_present) { STR(in->session_uint9tstr.session_uint9tstr, out->summary); p |= SF_SUMMARY; }
+    if (in->session_uint17tstr_present) { STR(in->session_uint17tstr.session_uint17tstr, out->q); p |= SF_Q; }
+    if (in->session_tstr_l_present) {
+        size_t n = in->session_tstr_l.session_tstr_l_tstr_count;
+        for (size_t i = 0; i < n && i < 3; i++) STR(in->session_tstr_l.session_tstr_l_tstr[i], out->rp[i]);
+        out->n_rp = (uint8_t)(n < 3 ? n : 3);
+        p |= SF_RP;
+    }
     if (in->session_uint10bool_present) { out->seen = in->session_uint10bool.session_uint10bool; p |= SF_SEEN; }
     if (in->session_uint11uint_present) { out->host = (uint8_t)in->session_uint11uint.session_uint11uint; p |= SF_HOST; }
     if (in->session_uint12tstr_present) { STR(in->session_uint12tstr.session_uint12tstr, out->hn); p |= SF_HN; }

@@ -146,6 +146,10 @@ impl Conn {
         if self.peer_minor < 3 {
             (s.snz, s.ntf, s.n, s.ok) = (None, None, None, None);
         }
+        // the closing question and its answers: proto 0.5, and agent content like the summary
+        if self.peer_minor < ASK_MINOR || self.privacy == Privacy::Meta {
+            (s.q, s.rp) = (None, None);
+        }
         if self.privacy == Privacy::Meta {
             s.sum = None;
         }
@@ -231,6 +235,11 @@ impl Conn {
 /// Welcome keys a device must know before it is sent them: `replies` arrived in proto 0.4, and an
 /// older decoder would reject the whole message.
 const REPLIES_MINOR: u64 = 4;
+/// `session.q` / `session.rp` (the agent's closing question for the Reply list) need proto 0.5.
+const ASK_MINOR: u64 = 5;
+/// `cmd type` arguments from this value up name the session's own answers (`session.rp`); below
+/// it, the welcome's fixed replies.
+pub const SESSION_REPLY_BASE: u64 = 100;
 
 fn welcome(host: &HostInfo, replies: Option<Vec<String>>) -> Welcome {
     let tz = chrono::Local::now().offset().local_minus_utc() / 60;
@@ -699,11 +708,18 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         Route::Unsupported => return fail(ResultErr::Unsupported, "no terminal for this session"),
     };
     let text = if cmd.op == CmdOp::Type {
-        let idx = match cmd.arg {
-            Some(Arg::Uint(i)) => usize::try_from(i).ok(),
+        let text = match cmd.arg {
+            Some(Arg::Uint(i)) if i >= SESSION_REPLY_BASE => {
+                usize::try_from(i - SESSION_REPLY_BASE)
+                    .ok()
+                    .and_then(|j| session.rp.as_ref()?.get(j).cloned())
+            }
+            Some(Arg::Uint(i)) => usize::try_from(i)
+                .ok()
+                .and_then(|j| shared.replies.get(j).cloned()),
             _ => None,
         };
-        let Some(text) = idx.and_then(|i| shared.replies.get(i)).cloned() else {
+        let Some(text) = text else {
             return fail(ResultErr::Denied, "no such reply");
         };
         if let Some(why) = crate::typing::refusal(&session, shared.broker.open_for(session.sid)) {
@@ -943,6 +959,72 @@ mod tests {
         assert!(!r.ok && r.err == Some(ResultErr::Denied), "no such reply");
         let r = handle_cmd(&shared, &type_cmd_of(CmdOp::Type, 999, Some(0), None)).await;
         assert!(!r.ok && r.err == Some(ResultErr::Stale));
+    }
+
+    #[tokio::test]
+    async fn quick_reply_from_the_sessions_own_answers() {
+        use crate::registry::{SessionEvent, SessionPatch};
+        let term = Arc::new(FakeTerm::default());
+        let shared = shared_typing(term.clone());
+        let sid = add_session(&shared);
+        let mut p = SessionPatch::new(Agent::Claude);
+        p.state = Some(SessState::Done);
+        p.ask = Some((
+            "Should I flash it?".into(),
+            vec!["Yes, go ahead".into(), "No".into()],
+        ));
+        shared.registry.apply(SessionEvent::Update {
+            key: "claude:s".into(),
+            via: crate::registry::Via::Local,
+            patch: p,
+            ctx: crate::registry::HostCtx::default(),
+        });
+        let r = handle_cmd(
+            &shared,
+            &type_cmd_of(CmdOp::Type, sid, Some(SESSION_REPLY_BASE + 1), None),
+        )
+        .await;
+        assert!(r.ok, "{r:?}");
+        assert_eq!(*term.sent.lock().unwrap(), vec!["No", "\\r"]);
+        let r = handle_cmd(
+            &shared,
+            &type_cmd_of(CmdOp::Type, sid, Some(SESSION_REPLY_BASE + 2), None),
+        )
+        .await;
+        assert!(
+            !r.ok && r.err == Some(ResultErr::Denied),
+            "past the session's answers"
+        );
+    }
+
+    #[test]
+    fn the_closing_question_reaches_only_devices_that_know_it() {
+        let mut s = Session::delta(1);
+        s.q = Some("Should I flash it?".into());
+        s.rp = Some(vec!["Yes, go ahead".into()]);
+        for (minor, privacy, want) in [
+            (4, Privacy::Preview, false),
+            (5, Privacy::Meta, false),
+            (5, Privacy::Preview, true),
+        ] {
+            let (_tx, rx) = mpsc::unbounded_channel();
+            let (tx, _rx) = mpsc::unbounded_channel();
+            let c = Conn {
+                link: Box::new(ChanLink { rx, tx }),
+                trace: Trace::null(),
+                src: "t".into(),
+                next_id: 1,
+                privacy,
+                peer_minor: minor,
+                deltas: DeltaQueue::default(),
+            };
+            let out = c.for_peer(s.clone());
+            assert_eq!(
+                out.q.is_some() && out.rp.is_some(),
+                want,
+                "minor {minor} {privacy:?}"
+            );
+        }
     }
 
     #[tokio::test]

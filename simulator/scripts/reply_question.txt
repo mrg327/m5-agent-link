@@ -1,0 +1,29 @@
+# The Reply list follows the agent's closing question (proto 0.5): the session's own answers come
+# first, under the question, then the daemon's fixed replies. Picking "No" sends cmd type 101
+# (100 + its index among the session's answers), never the text.
+connect
+rx a400020101020103a50082000401a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 1 work webapp feat/login Running the test suite
+wait 300
+rx a30004010603a500010204081a6aee3224117653686f756c64204920666c617368206974206e6f773f12826d5965732c20676f206168656164624e6f
+wait 300
+tap 233 233
+wait 300
+expect_screen agent
+expect_label > Reply...
+btn A
+wait 200
+expect_label Should I flash it now?
+expect_label > Yes, go ahead
+expect_label No
+expect_label Continue
+expect_label 5 items
+shot agent_reply_question.png
+btn B
+wait 150
+expect_label > No
+tap 233 233
+wait 200
+expect_screen ring
+expect_label Sent "No"
+quit

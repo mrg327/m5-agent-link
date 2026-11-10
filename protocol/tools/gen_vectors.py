@@ -95,6 +95,12 @@ VECTORS = {
          "snz": 0, "ntf": True, "n": 12, "ok": True}},
         env("session_upd", 5, {0: 3, 6: "Bash", 9: "Bash · npm test", 13: 0, 14: True, 15: 12, 16: True}),
     ),
+    "session_ask": (
+        "Delta (proto 0.5): session 1 finished on a question; the watch offers its answers under Reply",
+        {"t": "session_upd", "id": 6, "b": {"sid": 1, "st": "done", "tst": 1793995300,
+         "q": "Should I flash it now?", "rp": ["Yes, go ahead", "No"]}},
+        env("session_upd", 6, {0: 1, 2: 4, 8: 1793995300, 17: "Should I flash it now?", 18: ["Yes, go ahead", "No"]}),
+    ),
     "session_delta_done": (
         "Delta: session 1 finished",
         {"t": "session_upd", "id": 3, "b": {"sid": 1, "st": "done", "tst": 1793995300}},

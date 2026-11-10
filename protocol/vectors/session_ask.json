@@ -1,0 +1,18 @@
+{
+  "desc": "Delta (proto 0.5): session 1 finished on a question; the watch offers its answers under Reply",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 6,
+    "b": {
+      "sid": 1,
+      "st": "done",
+      "tst": 1793995300,
+      "q": "Should I flash it now?",
+      "rp": [
+        "Yes, go ahead",
+        "No"
+      ]
+    }
+  },
+  "cbor_hex": "a30004010603a500010204081a6aee3224117653686f756c64204920666c617368206974206e6f773f12826d5965732c20676f206168656164624e6f"
+}
