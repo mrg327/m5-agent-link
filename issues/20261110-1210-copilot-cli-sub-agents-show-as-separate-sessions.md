@@ -2,7 +2,7 @@
 id: 20261110-1210
 title: Copilot CLI sub-agents show as separate sessions on the watch
 status: open
-severity: low
+severity: med
 area: daemon
 platforms: any
 owner:
@@ -40,3 +40,4 @@ chains match. Claude Code sub-agents (SubagentStop) may need the same treatment.
 ## Log
 
 - 2026-11-10T18:30:59Z · copilot-cli/opus@mac-work · macos-arm64 · 9c5bd1c: filed
+- 2026-11-10T18:44:18Z · copilot-cli/opus@mac-work · macos-arm64 · 17020b3+dirty: User report: every sub-agent adds an extra agent to the HOME deck, but selecting it does nothing useful (it has no terminal of its own, so Focus/Reply/Watch don't apply), which is confusing. Acceptance: sub-agents never appear as their own HOME entries; at most their activity shows inside the parent's timeline. Raising severity to med.
