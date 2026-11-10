@@ -148,14 +148,6 @@ static void on_result(const struct msg_result *m, uint32_t re_id, bool has_re)
     dbg_event("link", "result", "\"ok\":%s,\"err\":%d,\"op\":%d,\"msg\":%s", r->result_uint0bool ? "true" : "false",
               err, op, dbg_q(msg));
     if (g_link.hooks.on_result) g_link.hooks.on_result(op, sid, rid, r->result_uint0bool, err, msg);
-    if (r->result_scroll_pos_m_present && g_link.hooks.on_scroll_pos) {
-        /* terminal content: handed to the UI, never logged */
-        const struct scroll_pos *p = &r->result_scroll_pos_m.result_scroll_pos_m;
-        char preview[64] = "";
-        if (p->scroll_pos_uint3tstr_present) STR(p->scroll_pos_uint3tstr.scroll_pos_uint3tstr, preview);
-        g_link.hooks.on_scroll_pos(sid, p->scroll_pos_uint0uint, p->scroll_pos_uint1bool, p->scroll_pos_uint2uint_present,
-                                   p->scroll_pos_uint2uint.scroll_pos_uint2uint, preview);
-    }
 }
 
 void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)

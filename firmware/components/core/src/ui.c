@@ -12,7 +12,7 @@
 #define TOAST_MS 1800
 
 const ui_actions_t *g_ui_actions;
-static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch;
+static lv_obj_t *s_home, *s_agent, *s_ask, *s_status, *s_watch;
 static nav_mode_t s_mode = MODE_HOME;
 static int s_rel_y;
 static bool s_link_up, s_animate = true;
@@ -67,7 +67,6 @@ void ui_init(const ui_actions_t *actions)
     s_home = ui_home_init();
     s_agent = ui_agent_init(s_home);
     s_ask = ui_ask_init(s_home);
-    s_scroll = ui_scroll_init(s_home);
     s_status = ui_status_init(s_home);
     s_watch = ui_watch_init(s_home);
     create_overlays();
@@ -132,14 +131,12 @@ static void enter_mode(nav_mode_t m)
     if (m == s_mode) return;
     if (s_mode == MODE_AGENT) ui_agent_close();
     if (s_mode == MODE_ASK) ui_ask_close();
-    if (s_mode == MODE_SCROLL) ui_scroll_close();
     if (s_mode == MODE_STATUS) ui_status_close();
     if (s_mode == MODE_WATCH) ui_watch_close();
     s_mode = m;
     ui_home_set_card_shown(m == MODE_HOME);
     if (m == MODE_AGENT) ui_agent_open(ui_home_sel_sid(), s_now_ms);
     else if (m == MODE_ASK) ui_ask_open(ui_home_sel_sid(), s_now_ms);
-    else if (m == MODE_SCROLL) ui_scroll_open(ui_home_sel_sid(), s_now_ms);
     else if (m == MODE_STATUS) {
         ui_home_refresh(s_now_ms); /* the ring shows sessions again, e.g. after AGENT -> Status */
         ui_status_open(s_now_ms);
@@ -169,15 +166,8 @@ static void open_ask(void)
 }
 
 void ui_go_home(void) { leave_mode(); }
-void ui_go_scroll(void) { enter_mode(MODE_SCROLL); }
-void ui_go_status(void) { enter_mode(MODE_STATUS); }
 void ui_go_watch(void) { enter_mode(MODE_WATCH); }
 uint32_t ui_watched_sid(void) { return s_mode == MODE_WATCH ? ui_watch_sid() : 0; }
-
-void ui_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total, uint32_t total, const char *preview)
-{
-    if (s_mode == MODE_SCROLL) ui_scroll_on_pos(sid, lines_above, at_bottom, has_total, total, preview);
-}
 
 /* An attention always lands on the deck, whatever was open. */
 void ui_show_session(uint32_t sid)
@@ -219,7 +209,6 @@ void ui_report(ui_report_t *r)
     if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", lv_label_get_text(s_toast_label));
     if (s_mode == MODE_AGENT) ui_agent_report(r);
     else if (s_mode == MODE_ASK) ui_ask_report(r);
-    else if (s_mode == MODE_SCROLL) ui_scroll_report(r);
     else if (s_mode == MODE_STATUS) ui_status_report(r);
     else if (s_mode == MODE_WATCH) ui_watch_report(r);
     else ui_home_report(r);
@@ -260,7 +249,6 @@ void ui_tick(uint32_t now_ms)
         ui_home_refresh(now_ms);
         if (s_mode == MODE_AGENT && !ui_agent_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_ASK && !ui_ask_refresh(now_ms)) leave_mode();
-        if (s_mode == MODE_SCROLL && !ui_scroll_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_STATUS) ui_status_refresh(now_ms);
         if (s_mode == MODE_WATCH && !ui_watch_refresh(now_ms)) {
             enter_mode(MODE_HOME);
@@ -270,7 +258,6 @@ void ui_tick(uint32_t now_ms)
     ui_home_tick(now_ms);
     if (s_mode == MODE_AGENT && ui_agent_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_ASK && ui_ask_tick(now_ms)) leave_mode();
-    if (s_mode == MODE_SCROLL && ui_scroll_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_STATUS && ui_status_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_WATCH) ui_watch_tick(now_ms);
 }
@@ -311,7 +298,6 @@ bool ui_on_gesture(const gesture_evt_t *g)
         return true;
     case NAV_BACK:
         if (g->kind == G_SWIPE_DOWN && !nav_long_swipe_down(g->y, s_rel_y)) return true; /* too short: ignored */
-        if (s_mode == MODE_SCROLL && g->kind == G_TAP && ui_scroll_caught()) return true; /* it stopped a glide */
         leave_mode();
         g_ui_actions->tick();
         return true;
@@ -327,10 +313,6 @@ bool ui_on_gesture(const gesture_evt_t *g)
     if (s_mode == MODE_ASK) {
         ui_home_note_input();
         return ui_ask_act(a, g);
-    }
-    if (s_mode == MODE_SCROLL) {
-        ui_home_note_input();
-        return ui_scroll_act(a, g);
     }
     if (s_mode == MODE_STATUS) {
         ui_home_note_input();

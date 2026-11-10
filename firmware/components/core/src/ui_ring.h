@@ -32,9 +32,6 @@ lv_obj_t *ring_create(lv_obj_t *parent);
 void ring_set(lv_obj_t *ring, const ring_seg_t *segs, int n, uint32_t now_ms);
 /* A static, unanimated full ring in one colour (display-off attention glow). */
 void ring_set_solid(lv_obj_t *ring, lv_color_t color);
-/* SCROLL position track (UI-V2 §4.4): one thin grey ring plus one coloured arc from 12 o'clock whose
- * length is `permille` of the turn. Replaces the segments until the next ring_set(). */
-void ring_set_track(lv_obj_t *ring, int permille, uint32_t rgb);
 /* Hold-to-confirm fill, 0..1000 permille clockwise from 12 o'clock; 0 hides it. */
 void ring_set_progress(lv_obj_t *ring, int permille, uint32_t rgb);
 /* Ambient mode: ring at about 20 % and still, to limit burn-in. */

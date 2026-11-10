@@ -1,4 +1,6 @@
-# AGENT item lists per state (UI-V2 §4.2) and the Snooze / Notify toggles driven by snz and ntf deltas.
+# AGENT item lists per state (UI-V2 §4.2, pared down 2026-11-09, issue 71da) and the Snooze / Notify
+# toggles driven by snz and ntf deltas. Never on the wheel: Scroll (removed), Status (swipe down),
+# Focus (button A), except for a session that waits for input, where Focus is the only action.
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 rtc 1800000000
@@ -7,93 +9,75 @@ wait 300
 tap 233 233
 wait 300
 expect_screen agent
-expect_label 6 items
-expect_label > Focus terminal
-btn B
-wait 150
+# Working: Watch, Notify when done, Snooze
+expect_label 3 items
 expect_label > Watch
-btn B
-wait 150
-expect_label > Scroll terminal
+expect_no_label Focus terminal
 btn B
 wait 150
 expect_label > Notify when done
 btn B
 wait 150
 expect_label > Snooze 30 min
-btn B
-wait 150
-expect_label > Status...
 # toggles: ntf armed and snoozed deltas flip the labels
 notify 1 on
 snooze 1 1800003600
 wait 200
-btn B
-wait 150
-btn B
-wait 150
+expect_label > Unsnooze
 btn B
 wait 150
 btn B
 wait 150
 expect_label > Don't notify
-btn B
-wait 150
-expect_label > Unsnooze
 shot agent_toggles.png
 notify 1 off
 snooze 1 off
 wait 200
-expect_label > Snooze 30 min
+expect_label > Notify when done
 btn B long
 wait 300
 expect_screen ring
-# Done: Focus, Mark seen, Scroll, Watch, Status
+# Done: Mark seen, Watch
 session 1 done webapp feat/login Finished the work
 wait 300
 tap 233 233
 wait 300
-expect_label 5 items
-btn B
-wait 150
+expect_label 2 items
 expect_label > Mark seen
-btn B
-wait 150
 btn B
 wait 150
 expect_label > Watch
 btn B long
 wait 300
-# Error: Focus, Dismiss error, Scroll, Watch, Status
+# Error: Dismiss error, Watch
 session 1 error webapp feat/login Build failed
 wait 300
 tap 233 233
 wait 300
-expect_label 5 items
+expect_label 2 items
+expect_label > Dismiss error
 btn B
 wait 150
-expect_label > Dismiss error
+expect_label > Watch
 btn B long
 wait 300
-# Idle: Focus, Watch, Snooze, Status
+# Idle: Snooze
 session 1 idle webapp feat/login
 wait 300
 tap 233 233
 wait 300
-expect_label 4 items
-btn B
-wait 150
-btn B
-wait 150
+expect_label 1 items
 expect_label > Snooze 30 min
 btn B long
 wait 300
-# Input: Focus, Scroll, Watch, Status
+# Input (waits, no request listed): Focus
 session 1 input webapp feat/login
 wait 300
 tap 233 233
 wait 300
 expect_screen agent
+expect_label 1 items
+expect_label > Focus terminal
 expect_no_label Snooze
 expect_no_label Notify
 quit

@@ -24,8 +24,7 @@ static char s_header_txt[64];
 /* Presentation of the interaction model's action ids. */
 static const char *const s_labels[AG_COUNT] = {
     [AG_FOCUS] = "Focus terminal", [AG_ACK] = "Mark seen",         [AG_DISMISS] = "Dismiss error",
-    [AG_SCROLL] = "Scroll terminal", [AG_SNOOZE] = "Snooze 30 min", [AG_NOTIFY] = "Notify when done",
-    [AG_WATCH] = "Watch",          [AG_STATUS] = "Status...",
+    [AG_SNOOZE] = "Snooze 30 min", [AG_NOTIFY] = "Notify when done", [AG_WATCH] = "Watch",
 };
 
 static const session_t *session(void) { return model_find(s_sid); }
@@ -83,7 +82,7 @@ bool ui_agent_refresh(uint32_t now)
         lv_label_set_text(s_header, buf);
     }
     agent_item_t items[WHEEL_MAX_ITEMS];
-    int n = nav_agent_items(s->state, !s->no_scroll, items, WHEEL_MAX_ITEMS);
+    int n = nav_agent_items(s->state, items, WHEEL_MAX_ITEMS);
     uint32_t rgb = theme_session_rgb(s);
     wheel_item_t w[WHEEL_MAX_ITEMS];
     for (int i = 0; i < n; i++) w[i] = (wheel_item_t){label_of(items[i].id, s), rgb, items[i].hold, (int)items[i].id};
@@ -138,17 +137,9 @@ static void commit(const wheel_item_t *it)
     case AG_DISMISS: g_ui_actions->ack(s->sid); g_ui_actions->tick(); break;
     case AG_SNOOZE: g_ui_actions->snooze(s->sid, snoozed(s) ? 0 : 30); break;
     case AG_NOTIFY: g_ui_actions->notify_done(s->sid, !s->ntf); break;
-    case AG_SCROLL: /* the terminal comes to the front first, then the drag stream drives it (UI-V2 §4.4) */
-        g_ui_actions->scroll_open(s->sid);
-        ui_go_scroll();
-        return;
     case AG_WATCH: /* the monitor for this session (UI-V2 §4.7) */
         g_ui_actions->tick();
         ui_go_watch();
-        return;
-    case AG_STATUS: /* the watch's own screen (UI-V2 §4.5) */
-        g_ui_actions->tick();
-        ui_go_status();
         return;
     default: break;
     }

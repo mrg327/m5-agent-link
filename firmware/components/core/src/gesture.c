@@ -119,7 +119,7 @@ static void release_vel(const gesture_t *g, uint32_t t_ms, float *vx, float *vy)
     *vy = (float)(g->y - g->hist[best].y) * 1000.0f / (float)dt;
 }
 
-/* Drag stream (SCROLL): every GESTURE_DRAG_STEP_PX of vertical travel from a press inside the rim,
+/* Drag stream (unused since SCROLL was removed, kept as a gesture primitive): every GESTURE_DRAG_STEP_PX of vertical travel from a press inside the rim,
  * counted from where the finger left the tap slop. */
 static void drag_track(gesture_t *g, int y, uint32_t t_ms)
 {

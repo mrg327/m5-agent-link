@@ -92,14 +92,6 @@ void feedback_reject(void)
     haptic(no, 5);
 }
 
-/* SCROLL hit an end of the scrollback: one thud, firmer than a detent, shorter than a tick pair. */
-void feedback_scroll_stop(void)
-{
-    static const uint16_t stop[] = {40};
-    if (model_settings()->alert == ALERT_SILENT) return;
-    haptic(stop, 1);
-}
-
 /* Quiet mode toggled (UI-V2 §5): two spaced pulses, unlike the tick (one) and the reject (three). */
 void feedback_quiet_toggled(void)
 {

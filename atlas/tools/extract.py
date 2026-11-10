@@ -236,13 +236,10 @@ def extract_gesture():
     g["long_swipe_px"] = int(find(nav, r"#define NAV_LONG_SWIPE_PX\s+(\d+)", "gesture.long_swipe_px").group(1))
     g["deny_hold_ms"] = int(find(nav, r"#define NAV_DENY_HOLD_MS\s+(\d+)", "gesture.deny_hold_ms").group(1))
     g["agent_timeout_ms"] = int(find(nav, r"#define NAV_AGENT_TIMEOUT_MS\s+(\d+)", "gesture.agent_timeout_ms").group(1))
-    # SCROLL (UI-V2 §4.4): the drag stream and the flick come from the recogniser, the rate from nav.h
+    # The drag stream and the flick come from the recogniser (no screen binds them since SCROLL went, issue 71da)
     g["drag_step_px"] = int(find(rel, r"#define GESTURE_DRAG_STEP_PX\s+(\d+)", "gesture.drag_step_px").group(1))
     g["flick_px_per_s"] = int(find(rel, r"#define GESTURE_FLICK_PX_PER_S\s+(\d+)", "gesture.flick_px_per_s").group(1))
     g["flick_window_ms"] = int(find(rel, r"#define GESTURE_FLICK_WINDOW_MS\s+(\d+)", "gesture.flick_window_ms").group(1))
-    g["scroll_lines_per_step"] = int(find(nav, r"#define NAV_SCROLL_LINES_PER_STEP\s+(\d+)", "gesture.scroll_lines_per_step").group(1))
-    g["scroll_coalesce_ms"] = int(find(nav, r"#define NAV_SCROLL_COALESCE_MS\s+(\d+)", "gesture.scroll_coalesce_ms").group(1))
-    g["scroll_timeout_ms"] = int(find(nav, r"#define NAV_SCROLL_TIMEOUT_MS\s+(\d+)", "gesture.scroll_timeout_ms").group(1))
     # STATUS (UI-V2 §4.5): its idle timeout and the quiet cycle's two steps
     g["status_timeout_ms"] = int(find(nav, r"#define NAV_STATUS_TIMEOUT_MS\s+(\d+)", "gesture.status_timeout_ms").group(1))
     g["quiet_step1_s"] = 60 * int(find(nav, r"#define NAV_QUIET_STEP1_S \((\d+)u \* 60u\)", "gesture.quiet_step1_s").group(1))
@@ -309,13 +306,8 @@ ACTION_TEXT = {
     "NAV_NEXT": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
     "NAV_PREV": "Previous session",
     "NAV_COMMIT": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item answers 'hold to confirm' instead",
-    "NAV_BACK": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is; on STATUS a swipe up); a request stays pending",
+    "NAV_BACK": "Back to the deck (a long swipe down, or B held; on STATUS a swipe up); a request stays pending",
     "NAV_HOME": "A+B chord: straight back to the deck",
-    "NAV_SCROLL_DRAG": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms",
-    "NAV_SCROLL_FLING": "SCROLL: lifting off a fast drag keeps scrolling (a glide that slows down, like a trackpad)",
-    "NAV_SCROLL_CATCH": "SCROLL: any new touch stops a glide; a tap that stopped one does not leave",
-    "NAV_PAGE_NEWER": "SCROLL: button B moves one page toward newer output",
-    "NAV_TO_BOTTOM": "SCROLL: button A jumps back to the live bottom and leaves the mode",
 }
 WHEN_TEXT = {"WHEN_ALWAYS": "", "WHEN_REQUEST": "with an approvable request on screen", "WHEN_NO_REQUEST": "without an approvable request",
              "WHEN_ASKABLE": "with a permission or question pending", "WHEN_NOT_ASKABLE": "with nothing to answer"}
@@ -372,21 +364,15 @@ def extract_screens():
     vals["agent"] = f"{CORE}ui_agent.c:{line_of(CORE + 'ui_agent.c', ag.start())}"
     ask = find(CORE + "ui_ask.c", r'snprintf\(r->screen, sizeof r->screen, "ask"\)', "screens.ask")
     vals["ask"] = f"{CORE}ui_ask.c:{line_of(CORE + 'ui_ask.c', ask.start())}"
-    sc = find(CORE + "ui_scroll.c", r'snprintf\(r->screen, sizeof r->screen, "scroll"\)', "screens.scroll")
-    vals["scroll"] = f"{CORE}ui_scroll.c:{line_of(CORE + 'ui_scroll.c', sc.start())}"
     stt = find(CORE + "ui_status.c", r'snprintf\(r->screen, sizeof r->screen, "status"\)', "screens.status")
     vals["status"] = f"{CORE}ui_status.c:{line_of(CORE + 'ui_status.c', stt.start())}"
-    if set(vals) != {"ring", "attention", "agent", "ask", "scroll", "status"}:
+    if set(vals) != {"ring", "attention", "agent", "ask", "status"}:
         raise Drift(f"unexpected screen values {sorted(vals)}")
-    # the preview line is terminal content: it is only drawn when the privacy setting allows it
-    find(CORE + "ui_scroll.c", r"static bool preview_allowed\(void\) \{ return model_settings\(\)->privacy != PRIVACY_META; \}",
-         "screens.scroll_preview_privacy")
     SOURCES["screens"] = vals["attention"]
     return [{"id": "ring", "title": "Deck", "source": vals["ring"]},
             {"id": "attention", "title": "Deck · a request is waiting", "source": vals["attention"]},
             {"id": "agent", "title": "Agent wheel", "source": vals["agent"]},
             {"id": "ask", "title": "Ask · the request and its options", "source": vals["ask"]},
-            {"id": "scroll", "title": "Scroll · the terminal's scrollback", "source": vals["scroll"]},
             {"id": "status", "title": "Status · link, battery, quiet mode", "source": vals["status"]}]
 
 
@@ -406,7 +392,6 @@ HAPTIC_MEANING = {
     "error": ("error", "An agent hit an error"),
     "question": ("question", "An agent is asking a question"),
     "permission": ("permission", "An agent needs approval"),
-    "scroll_stop": ("stop", "SCROLL reached the bottom or the top of the scrollback: one thud"),
     "quiet_toggled": ("quiet", "Quiet mode turned on, extended or off: two spaced pulses"),
 }
 

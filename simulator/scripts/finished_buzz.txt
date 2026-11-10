@@ -13,11 +13,9 @@ session 2 done api main Finished quietly
 wait 300
 session 2 work api main
 wait 300
-# watch session 1
+# watch session 1 (Watch is the default item)
 tap 233 233
 wait 300
-btn B
-wait 150
 btn A
 wait 300
 expect_screen watch

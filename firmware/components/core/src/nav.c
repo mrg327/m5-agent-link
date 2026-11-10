@@ -52,16 +52,6 @@ const nav_binding_t nav_bindings[] = {
     {MODE_ASK, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_NEXT},
     {MODE_ASK, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_ASK, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
-    /* SCROLL: the centre is a trackpad for the terminal (UI-V2 §4.4). The rim is unused, so nothing
-     * here is a scrub, and a swipe is only its drag steps plus the glide, never deny or back. */
-    {MODE_SCROLL, G_PRESS, ZONE_ANY, WHEN_ALWAYS, NAV_SCROLL_CATCH},
-    {MODE_SCROLL, G_DRAG, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_DRAG},
-    {MODE_SCROLL, G_DRAG_END, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_FLING},
-    {MODE_SCROLL, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* leaves the terminal where it is; a tap that caught a glide only stops it */
-    {MODE_SCROLL, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_TO_BOTTOM},
-    {MODE_SCROLL, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_PAGE_NEWER},
-    {MODE_SCROLL, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
-    {MODE_SCROLL, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
     /* STATUS: the watch's own rows on the wheel (UI-V2 §4.5). Nothing here is destructive, so a tap
      * commits like A does; swipe up (the opposite of the swipe that opened it) goes back; swipe down
      * is ignored, so it can never read as deny. */
@@ -111,7 +101,7 @@ nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool
 
 const char *nav_mode_name(nav_mode_t m)
 {
-    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll", "status", "watch"};
+    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "status", "watch"};
     return (unsigned)m < MODE_COUNT ? names[m] : "?";
 }
 
@@ -119,8 +109,7 @@ const char *nav_action_name(nav_action_t a)
 {
     static const char *const names[NAV_COUNT] = {
         "none", "focus", "open_agent", "open_ask", "open_status", "back", "home", "next", "prev", "next_attention", "pick_rim",
-        "scrub", "commit", "deny", "hold_press", "hold_release", "hold_long", "scroll_drag", "scroll_fling",
-        "scroll_catch", "page_newer", "to_bottom"};
+        "scrub", "commit", "deny", "hold_press", "hold_release", "hold_long"};
     return (unsigned)a < NAV_COUNT ? names[a] : "?";
 }
 
@@ -140,33 +129,26 @@ bool nav_long_swipe_down(int y_start, int y_end)
     return y_start < GESTURE_CY && y_end - y_start >= NAV_LONG_SWIPE_PX;
 }
 
-int nav_scroll_lines(int dy_px)
+int nav_agent_items(sess_state_t state, agent_item_t *out, int cap)
 {
-    return dy_px / GESTURE_DRAG_STEP_PX * NAV_SCROLL_LINES_PER_STEP;
-}
-
-int nav_agent_items(sess_state_t state, bool scroll_ok, agent_item_t *out, int cap)
-{
-    static const agent_item_t work[] = {{AG_FOCUS, false}, {AG_WATCH, false}, {AG_SCROLL, false},
-                                        {AG_NOTIFY, false}, {AG_SNOOZE, false}, {AG_STATUS, false}};
-    static const agent_item_t done[] = {{AG_FOCUS, false}, {AG_ACK, false}, {AG_SCROLL, false}, {AG_WATCH, false}, {AG_STATUS, false}};
-    static const agent_item_t error[] = {{AG_FOCUS, false}, {AG_DISMISS, false}, {AG_SCROLL, false}, {AG_WATCH, false}, {AG_STATUS, false}};
-    static const agent_item_t idle[] = {{AG_FOCUS, false}, {AG_WATCH, false}, {AG_SNOOZE, false}, {AG_STATUS, false}};
-    static const agent_item_t input[] = {{AG_FOCUS, false}, {AG_SCROLL, false}, {AG_WATCH, false}, {AG_STATUS, false}}; /* ASK takes over in Phase 3 */
+    /* At most three each (UI-V2 §4.2): Focus is button A on HOME and WATCH, Status the swipe down on
+     * HOME, so neither takes a row; a session that waits for input keeps Focus, its only action. */
+    static const agent_item_t work[] = {{AG_WATCH, false}, {AG_NOTIFY, false}, {AG_SNOOZE, false}};
+    static const agent_item_t done[] = {{AG_ACK, false}, {AG_WATCH, false}};
+    static const agent_item_t error[] = {{AG_DISMISS, false}, {AG_WATCH, false}};
+    static const agent_item_t idle[] = {{AG_SNOOZE, false}};
+    static const agent_item_t input[] = {{AG_FOCUS, false}};
     const agent_item_t *src;
     int n;
     switch (state) {
-    case SESS_DONE: src = done; n = 5; break;
-    case SESS_ERROR: src = error; n = 5; break;
-    case SESS_IDLE: src = idle; n = 4; break;
-    case SESS_INPUT: src = input; n = 4; break;
-    default: src = work; n = 6; break;
+    case SESS_DONE: src = done; n = 2; break;
+    case SESS_ERROR: src = error; n = 2; break;
+    case SESS_IDLE: src = idle; n = 1; break;
+    case SESS_INPUT: src = input; n = 1; break;
+    default: src = work; n = 3; break;
     }
     int k = 0;
-    for (int i = 0; i < n && k < cap; i++) {
-        if (src[i].id == AG_SCROLL && !scroll_ok) continue;
-        out[k++] = src[i];
-    }
+    for (int i = 0; i < n && k < cap; i++) out[k++] = src[i];
     return k;
 }
 

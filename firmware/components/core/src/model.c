@@ -87,7 +87,6 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
         dst->n = src->n;
     }
     if (present & SF_OK) dst->step = src->step;
-    if (present & SF_NO_SCROLL) dst->no_scroll = src->no_scroll;
 }
 
 void model_upsert(const session_t *delta, uint32_t present)

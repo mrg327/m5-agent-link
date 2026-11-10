@@ -98,8 +98,6 @@ expect_screen ring
 tap 233 233
 wait 300
 expect_screen agent
-btn B
-wait 150
 expect_label > Watch
 btn A
 wait 400

@@ -27,8 +27,7 @@
       "ring_scrub": "Rim scrub"
     }},
     { "id": "agent", "title": "AGENT · wheel", "shots": {
-      "agent_wheel": "Wheel: Focus terminal",
-      "agent_wheel_scroll": "Wheel: Scroll terminal",
+      "agent_wheel": "Wheel: Watch",
       "agent_commit_toast": "After commit: toast"
     }},
     { "id": "ask", "title": "ASK · approvals and questions", "shots": {
@@ -41,13 +40,6 @@
       "ask_error": "Reply failed",
       "ask_question": "Question with options",
       "ask_sent": "Answer sent"
-    }},
-    { "id": "scroll", "title": "SCROLL · terminal", "shots": {
-      "scroll_live": "Live",
-      "scroll_preview": "Scrolled, preview line",
-      "scroll_scrolled": "Scrolled far",
-      "scroll_private": "Privacy: no preview",
-      "scroll_unsupported": "Terminal not supported"
     }},
     { "id": "status", "title": "STATUS · quick settings", "shots": {
       "status": "Status rows",

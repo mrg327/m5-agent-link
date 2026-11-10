@@ -10,7 +10,7 @@
 #define GESTURE_TAP_SLOP_PX 18
 /* Button A waits this long after a release to see whether a second press follows. */
 #define GESTURE_BTN_DOUBLE_MS 300
-/* Vertical drag in the centre (SCROLL, UI-V2 §4.4): one G_DRAG per this much travel, once the
+/* Vertical drag in the centre (no screen uses it since SCROLL was removed): one G_DRAG per this much travel, once the
  * finger has left the tap slop (the stream starts where it crossed, so a tap never scrolls). */
 #define GESTURE_DRAG_STEP_PX 10
 /* A swipe released faster than this is a flick (measured over the last GESTURE_FLICK_WINDOW_MS). */

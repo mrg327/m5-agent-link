@@ -173,17 +173,3 @@ bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg, u
     return finish_cmd(op, sid, rid, hold_ms, (int)arg);
 }
 
-bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq)
-{
-    struct cmd *c = begin_cmd(LINK_OP_SCROLL, sid, 0, 0);
-    if (!c) return false;
-    c->cmd_arg_m_present = true;
-    struct cmd_arg_r *a = &c->cmd_arg_m.cmd_arg_m;
-    a->cmd_arg_choice = cmd_arg_scroll_arg_m_c;
-    a->cmd_arg_scroll_arg_m.scroll_arg_scroll_unit_m.scroll_unit_choice = unit;
-    a->cmd_arg_scroll_arg_m.scroll_arg_uint1int = delta;
-    a->cmd_arg_scroll_arg_m.scroll_arg_uint2uint_present = true;
-    a->cmd_arg_scroll_arg_m.scroll_arg_uint2uint.scroll_arg_uint2uint = seq;
-    dbg_event("link", "tx_scroll", "\"unit\":%d,\"delta\":%d,\"seq\":%u", unit, delta, (unsigned)seq);
-    return finish_cmd(LINK_OP_SCROLL, sid, 0, 0, -1);
-}

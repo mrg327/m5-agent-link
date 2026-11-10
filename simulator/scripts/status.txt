@@ -1,6 +1,6 @@
 # STATUS (UI-V2 §4.5): swipe down from HOME opens it; link, battery and the rows are shown; A or a tap
 # commits the selected row (Quiet cycles off → 30 min → 1 h → off, Sounds toggles); information rows
-# do nothing; every exit path (swipe up, B long, chord, timeout, "Status..." round trip) returns to HOME.
+# do nothing; every exit path (swipe up, B long, chord, timeout) returns to HOME.
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 session 1 work webapp feat/login Running the test suite
@@ -59,23 +59,16 @@ wait 300
 expect_screen ring
 expect_label quiet
 shot deck_quiet.png
-# "Status..." on the AGENT wheel opens STATUS too; B long goes back
+# the AGENT wheel no longer lists "Status..." (issue 71da): the swipe down is the way in; B long goes back
 tap 233 233
 wait 300
 expect_screen agent
-btn B
-wait 150
-btn B
-wait 150
-btn B
-wait 150
-btn B
-wait 150
-btn B
-wait 150
-expect_label > Status...
-btn A
-wait 200
+expect_no_label Status...
+chord
+wait 300
+expect_screen ring
+swipe 233 150 233 330 200
+wait 300
 expect_screen status
 btn B long
 wait 300

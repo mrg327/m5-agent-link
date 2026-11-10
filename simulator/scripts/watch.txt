@@ -8,8 +8,6 @@ session 2 work api main
 wait 300
 tap 233 233
 wait 300
-btn B
-wait 150
 expect_label > Watch
 btn A
 wait 300
@@ -50,11 +48,9 @@ drop 2
 wait 300
 expect_screen ring
 expect_label Session ended
-# watch again, then swipe up leaves
+# watch again (the default item), then swipe up leaves
 tap 233 233
 wait 300
-btn B
-wait 150
 btn A
 wait 300
 expect_screen watch

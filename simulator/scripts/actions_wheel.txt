@@ -1,4 +1,6 @@
-# The AGENT wheel: open with a tap, move with B and the rim, commit with A, placeholders toast.
+# The AGENT wheel (UI-V2 §4.2, pared down 2026-11-09, issue 71da): at most three items, nothing that
+# has another path (Focus is button A, Status the swipe down). Open with a tap, move with B and the
+# rim, commit with A or a tap.
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 session 1 work webapp feat/login Running the test suite
@@ -8,24 +10,35 @@ tap 233 233
 wait 300
 expect_screen agent
 expect_label Claude Code
-expect_label > Focus terminal
-expect_label 6 items
+expect_label > Watch
+expect_label 3 items
+expect_no_label Focus terminal
+expect_no_label Scroll terminal
+expect_no_label Status...
 shot agent_wheel.png
 btn B
 wait 150
-expect_label > Watch
+expect_label > Notify when done
 btn B
 wait 150
-expect_label > Scroll terminal
-shot agent_wheel_scroll.png
+expect_label > Snooze 30 min
+btn B
+wait 150
+expect_label > Watch
+scrub 300 250 400
+wait 150
+expect_screen agent
+chord
+wait 300
+expect_screen ring
+# Snooze commits by tap and goes back to the deck with a toast
+tap 233 233
+wait 300
 btn B
 wait 150
 btn B
 wait 150
 expect_label > Snooze 30 min
-scrub 300 250 400
-wait 150
-expect_screen agent
 tap 233 233
 wait 200
 expect_screen ring
@@ -40,45 +53,24 @@ expect_screen agent
 swipe 233 150 233 330 200
 wait 300
 expect_screen ring
-# chord = Home
+# Watch (the default) opens WATCH; swipe up goes back
 tap 233 233
 wait 300
-expect_screen agent
-chord
-wait 300
-expect_screen ring
-# "Scroll terminal" opens SCROLL (Phase 4); a long B goes back
-tap 233 233
-wait 300
-btn B
-wait 150
-btn B
-wait 150
-expect_label > Scroll terminal
 btn A
 wait 200
-expect_screen scroll
-btn B long
-wait 300
-expect_screen ring
-# "Status..." opens STATUS (Phase 5); swipe up goes back to the deck
-tap 233 233
-wait 300
-btn B
-wait 150
-btn B
-wait 150
-btn B
-wait 150
-btn B
-wait 150
-btn B
-wait 150
-expect_label > Status...
-btn A
-wait 200
-expect_screen status
+expect_screen watch
 swipe 233 300 233 180 160
 wait 300
 expect_screen ring
+# A done session: Mark seen first, then Watch
+btn B
+wait 200
+tap 233 233
+wait 300
+expect_screen agent
+expect_label > Mark seen
+expect_label 2 items
+btn B
+wait 150
+expect_label > Watch
 quit

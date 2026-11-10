@@ -9,8 +9,6 @@ session 2 work api main
 wait 300
 tap 233 233
 wait 300
-btn B
-wait 150
 expect_label > Watch
 btn A
 wait 300

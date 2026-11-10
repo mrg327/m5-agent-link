@@ -67,7 +67,7 @@ static void fill_caps(struct caps *c, const hal_board_info_t *bi)
     c->caps_uint7uint = LINK_MAX_MSG;
     /* Only features this firmware implements: no voice or badge yet. */
     static const int feats[] = {feature_focus_m_c, feature_ack_m_c, feature_approve_m_c, feature_reply_m_c,
-                                feature_debug_m_c, feature_scroll_m_c};
+                                feature_debug_m_c};
     for (size_t i = 0; i < sizeof feats / sizeof *feats; i++) c->caps_feature_m_l_feature_m[i].feature_choice = feats[i];
     c->caps_feature_m_l_feature_m_count = sizeof feats / sizeof *feats;
 }
