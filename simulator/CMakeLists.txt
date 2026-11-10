@@ -50,6 +50,11 @@ add_executable(test_steps tests/test_steps.c ${FW}/core/src/steps.c)
 target_include_directories(test_steps PRIVATE ${FW}/core/src)
 add_test(NAME step_timeline COMMAND test_steps)
 
+add_executable(test_sound tests/test_sound.c ${FW}/core/src/sound.c ${FW}/core/src/sound_bank.c)
+target_include_directories(test_sound PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_sound PRIVATE lvgl::lvgl m)
+add_test(NAME sound_render COMMAND test_sound)
+
 add_test(NAME sim_headless_selftest
          COMMAND agentlink_sim --headless --no-ws --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/selftest.txt)
 set_tests_properties(sim_headless_selftest PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30)

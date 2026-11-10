@@ -1,6 +1,7 @@
 /* Board-level hal.h functions for the simulator: info, time, buttons, motion, haptics, power, debug. */
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 
 #include "sim.h"
@@ -69,7 +70,8 @@ void hal_haptic_play(const uint16_t *on_off_ms, size_t count)
     sim_log("haptic", "\"pattern_ms\":[%s]", list);
 }
 
-void hal_sound_play(hal_sound_t sound) { sim_log("sound", "\"id\":%d", (int)sound); }
+void hal_audio_play(const int16_t *pcm, size_t n) { (void)pcm; sim_log("sound", "\"samples\":%u", (unsigned)n); }
+void *hal_audio_alloc(size_t bytes) { return malloc(bytes); }
 
 hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
 {

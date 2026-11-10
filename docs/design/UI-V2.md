@@ -362,7 +362,7 @@ ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a deten
 
 The finished buzz needs: the session just entered Done or Error, and (its `ntf` was set, or it is the watched session), and it is not snoozed, and quiet mode is not running. A snoozed session's attentions do not buzz, glow or nag either.
 
-Three controls (§4.5): the alert mode `silent` suppresses every haptic but `hello`; the alert mode `quiet` ("Sounds: off") suppresses sound only (sound is still a stub); the timed **Quiet** (`quiet_until`) suppresses the *alerts* (attention arrival, glow, nag) while leaving the detents, ticks and commit haptics, which answer the user's own input.
+Three controls (§4.5): the alert mode `silent` suppresses every haptic but `hello`; the alert mode `quiet` ("Sounds: off") suppresses sound only (the speaker plays the sound bank's `done` and `select` picks, `core/src/sound.c`); the timed **Quiet** (`quiet_until`) suppresses the *alerts* (attention arrival, glow, nag) while leaving the detents, ticks and commit haptics, which answer the user's own input.
 
 ## 6. Terminal scroll mode: protocol and daemon
 

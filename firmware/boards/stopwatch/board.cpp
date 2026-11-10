@@ -148,7 +148,7 @@ static void info_init(void)
     s_info.has_touch = true;
     s_info.has_imu = false;     /* TODO(imu): BMI270 driver */
     s_info.has_haptic = true;
-    s_info.has_speaker = false; /* TODO(audio): ES8311 + AW8737A */
+    s_info.has_speaker = true; /* ES8311 + AW8737A, audio.cpp */
     s_info.has_mic = true; /* ES8311 + MEMS mic, mic.cpp */
     s_info.has_battery = true;
     s_info.num_buttons = 2;
@@ -255,7 +255,7 @@ hal_battery_t hal_battery_read(void)
     return cached;
 }
 
-/* ───────────── sound & motion (TODO) ───────────── */
+/* ───────────── motion (TODO) ───────────── */
 
 static hal_motion_cb_t s_motion_cb;
 
@@ -268,10 +268,4 @@ void hal_motion_set_callback(hal_motion_cb_t cb)
 void hal_motion_stream_tilt(bool enable)
 {
     (void)enable;
-}
-
-void hal_sound_play(hal_sound_t sound)
-{
-    /* TODO(audio): ES8311 over I2S + PYG3 audio rail + PYG10 amp. */
-    (void)sound;
 }

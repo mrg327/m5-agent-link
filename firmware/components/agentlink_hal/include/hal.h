@@ -92,8 +92,13 @@ void hal_motion_stream_tilt(bool enable);
  * Non-blocking; a new pattern replaces the current one. */
 void hal_haptic_play(const uint16_t *on_off_ms, size_t count);
 
-typedef enum { HAL_SOUND_CHIME_INPUT = 0, HAL_SOUND_TONE_ERROR = 1, HAL_SOUND_TICK_DONE = 2 } hal_sound_t;
-void hal_sound_play(hal_sound_t sound);   /* non-blocking; no-op without a speaker */
+/* Speaker: 16-bit signed mono PCM at HAL_AUDIO_RATE. Non-blocking; `pcm` must stay valid until
+ * it has played (the core keeps rendered sounds for the life of the app). A new sound replaces one
+ * in progress. No-op without a speaker, and while the microphone records. */
+#define HAL_AUDIO_RATE 16000
+void hal_audio_play(const int16_t *pcm, size_t n);
+/* Long-lived memory for rendered sounds (PSRAM on the watch); NULL when there is none. */
+void *hal_audio_alloc(size_t bytes);
 
 /* ───────────── microphone (voice dictation, issue 0ea9) ───────────── */
 

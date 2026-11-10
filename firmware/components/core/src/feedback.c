@@ -1,6 +1,7 @@
 #include "feedback.h"
 
 #include "hal.h"
+#include "sound.h"
 
 #define DETENT_MIN_GAP_MS 45
 
@@ -9,9 +10,10 @@ static void haptic(const uint16_t *p, size_t n)
     if (model_settings()->alert != ALERT_SILENT) hal_haptic_play(p, n);
 }
 
-static void sound(hal_sound_t s)
+/* Speaker cues (roles in sound_bank.c); only in the full alert mode ("Sounds: on"). */
+static void sound(const char *role)
 {
-    if (model_settings()->alert == ALERT_FULL) hal_sound_play(s);
+    if (model_settings()->alert == ALERT_FULL) sound_play(role);
 }
 
 /* Entry haptics follow docs/design/UI-RING.md §4. Normal pulses stay >= 35 ms: shorter ones do not spin the motor. */
@@ -22,10 +24,10 @@ void feedback_attention(att_kind_t kind)
     static const uint16_t error[] = {500};
     static const uint16_t done[] = {35};
     switch (kind) {
-    case ATT_APPROVAL: haptic(permission, 3); sound(HAL_SOUND_CHIME_INPUT); break;
-    case ATT_QUESTION: haptic(question, 3); sound(HAL_SOUND_CHIME_INPUT); break;
-    case ATT_ERROR: haptic(error, 1); sound(HAL_SOUND_TONE_ERROR); break;
-    case ATT_DONE: haptic(done, 1); sound(HAL_SOUND_TICK_DONE); break;
+    case ATT_APPROVAL: haptic(permission, 3); break;
+    case ATT_QUESTION: haptic(question, 3); break;
+    case ATT_ERROR: haptic(error, 1); break;
+    case ATT_DONE: haptic(done, 1); sound("done"); break;
     }
 }
 
@@ -33,6 +35,7 @@ void feedback_tick(void)
 {
     static const uint16_t tick[] = {35};
     haptic(tick, 1);
+    sound("select");
 }
 
 /* The board plays a pulse of at most 15 ms at the 100 % kick level only, which feels like a click. */
@@ -114,10 +117,9 @@ void feedback_finished(bool error)
     static const uint16_t fail[] = {120, 90, 120, 90, 120};
     if (error) {
         haptic(fail, 5);
-        sound(HAL_SOUND_TONE_ERROR);
     } else {
         haptic(done, 3);
-        sound(HAL_SOUND_TICK_DONE);
+        sound("done");
     }
 }
 

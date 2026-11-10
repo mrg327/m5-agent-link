@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "driver/i2c_master.h"
+#include "driver/i2s_types.h"
 #include "sdkconfig.h"
 #include "sw_power.h"
 #include "hal.h"
@@ -46,6 +47,13 @@ bool sw_usb_link_send(const uint8_t *frame, size_t len);
 void sw_ble_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state); /* link_ble.cpp */
 void sw_ble_link_interactive(bool on);                                         /* link_ble.cpp */
 bool sw_ble_link_send(const uint8_t *frame, size_t len);
+
+/* Codec and I2S0 shared by the mic and the speaker (audio.cpp); reference counted. */
+bool sw_audio_on(void);
+void sw_audio_off(void);
+i2s_chan_handle_t sw_audio_rx(void);
+const char *sw_audio_error(void);
+bool sw_mic_active(void); /* mic.cpp: dictation is recording */
 
 #ifdef __cplusplus
 }

@@ -1,11 +1,11 @@
 ---
 id: 20261110-f718
 title: Speaker playback: render the sound bank on the watch and play the picked cues
-status: open
+status: claimed
 severity: low
 area: firmware
 platforms: any
-owner:
+owner: copilot-cli/opus@mac-work
 created: 2026-11-10T21:24:56Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
@@ -29,3 +29,5 @@ Implement hal_sound_play on the StopWatch (ES8311 DAC + AW8737A amp: PYG3 rail, 
 ## Log
 
 - 2026-11-10T21:24:56Z · copilot-cli/opus@mac-work · macos-arm64 · 7a3a33a: filed
+- 2026-11-10T21:26:16Z · copilot-cli/opus@mac-work · macos-arm64 · b84fdea: claimed
+- 2026-11-10T21:41:06Z · copilot-cli/opus@mac-work · macos-arm64 · b84fdea+dirty: Implemented: hal_audio_play/hal_audio_alloc replace hal_sound_play; core/src/sound.c renders the bank (C twin of synth.js, parity within 1-2 pulse-edge samples on 3/44 sounds) and plays done (feedback_finished, ATT_DONE) and select (feedback_tick) in ALERT_FULL; boards/stopwatch/audio.cpp shares codec+I2S0 full duplex (refcounted) with mic.cpp, speaker task with amp PYG10+G14, 2.5 s idle power-down. Sim 69/69 (new sound_render), atlas 135/135, firmware builds, DRAM free 128529 B. Flashed; awaiting listening test on the watch.

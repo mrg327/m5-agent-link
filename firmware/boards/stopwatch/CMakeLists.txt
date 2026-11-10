@@ -1,5 +1,6 @@
 idf_component_register(
     SRCS
+        "audio.cpp"
         "board.cpp"
         "display.cpp"
         "input.cpp"

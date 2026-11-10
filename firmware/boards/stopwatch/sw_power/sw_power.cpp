@@ -104,7 +104,7 @@ static void ioe_init(i2c_master_bus_handle_t s_bus)
     s_ioe->digitalWrite(SW_IOE_SPK_EN, 0);
     s_ioe->digitalWrite(SW_IOE_OLED_RST, 1);
     s_ioe->digitalWrite(SW_IOE_MUX, 0);
-    s_ioe->digitalWrite(SW_IOE_AUDIO_EN, 0); /* TODO(audio): enable together with the ES8311 driver */
+    s_ioe->digitalWrite(SW_IOE_AUDIO_EN, 0); /* audio.cpp powers it while the mic or speaker is in use */
     s_ioe->setPwmFrequency(5000);
     s_ioe->setPwmDuty(SW_IOE_PWM_CH_MOTOR, 0, false, true);
 

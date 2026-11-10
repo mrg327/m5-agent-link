@@ -178,7 +178,8 @@ void web_motion(int kind)
 /* ── haptics, power, battery, debug ── */
 
 void hal_haptic_play(const uint16_t *on_off_ms, size_t count) { js_haptic(on_off_ms, (int)count); }
-void hal_sound_play(hal_sound_t sound) { (void)sound; }
+void hal_audio_play(const int16_t *pcm, size_t n) { (void)pcm; (void)n; }
+void *hal_audio_alloc(size_t bytes) { (void)bytes; return NULL; }
 hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
 {
     (void)wake_after_s;
