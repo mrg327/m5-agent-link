@@ -29,6 +29,7 @@ const CHAPTER_MODULES = {
   intro, glance, build,
   flow: () => import('./flow/chapter.js'),
   touch: () => import('./gestures/chapter.js'),
+  sound: () => import('./sound/chapter.js'),
   replay: () => import('./replay/chapter.js'),
 };
 

@@ -29,6 +29,7 @@ order, each a `<section data-chapter="id">`:
 | `glance` | What the watch shows: the ring anatomy, states, colours | shell |
 | `flow` | How data travels: agent → hook → daemon → USB/BLE/WS → watch | flow (`js/flow/*`) |
 | `touch` | How you talk to it: gestures, timing, haptics, focus-on-PC | gestures (`js/gestures/*`) |
+| `sound` | How it sounds: audition the notification cues from the firmware sound bank | sound (`js/sound/*`) |
 | `replay` | Your own data: drop a trace file and replay real sessions | gestures (`js/replay/*`) |
 | `build` | Under the hood: firmware/daemon/protocol map, links to docs | shell |
 
@@ -112,6 +113,7 @@ and mirrors it on `body[data-layout]`. A chapter may override it in `onEnter`.
 | wasm | `atlas/wasm/**`, `atlas/js/watch-runtime.js`, `atlas/vendor/watch.*` |
 | flow | `atlas/js/flow/**`, `atlas/js/proto/**`, `atlas/css/flow.css`, `atlas/test/proto_*.test.mjs` |
 | gestures | `atlas/js/gestures/**`, `atlas/js/replay/**`, `atlas/css/touch.css`, `atlas/tools/**`, `atlas/data/**`, `atlas/css/tokens.generated.css`, `atlas/test/facts_*.test.mjs`, `.github/workflows/atlas.yml` |
+| sound | `atlas/js/sound/**`, `atlas/css/sound.css`, `atlas/test/sound_*.test.mjs`, `firmware/components/core/src/sound_bank.*` |
 | main agent | this file, `README.md` link |
 
 `atlas/css/tokens.generated.css` is written by `extract.py` and holds the firmware's real

@@ -498,6 +498,34 @@ def extract_display():
             "shape": "round"}
 
 
+# ───────────────────────── sounds ─────────────────────────
+def extract_sounds():
+    hdr, src = CORE + "sound_bank.h", CORE + "sound_bank.c"
+    waves = [w.lower() for w in re.findall(
+        r"SND_(\w+)", find(hdr, r"typedef enum \{([^}]*)\} snd_wave_t", "sounds.waves").group(1))]
+    rate = int(find(hdr, r"#define SND_RATE\s+(\d+)", "sounds.rate").group(1))
+    body = text(src)
+    roles = [{"id": m.group(1), "when": m.group(2)}
+             for m in re.finditer(r'\{"(\w+)",\s*"([^"]+)"\}', body.split("snd_roles[] = {", 1)[1].split("};", 1)[0])]
+    if not roles:
+        raise Drift(f"{src}: no snd_roles")
+    step_re = r"S\((\w+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)"
+    arrays = {}
+    for m in re.finditer(r"static const snd_step_t (\w+)\[\] = \{(.*?)\};", body, re.S):
+        arrays[m.group(1)] = [{"wave": w.lower(), "note": int(n), "slide": int(sl), "vol": int(v), "ms": int(ms),
+                               "decay": int(d)} for w, n, sl, v, ms, d in re.findall(step_re, m.group(2))]
+    sounds = []
+    for m in re.finditer(r'\{"([\w-]+)",\s*"(\w+)",\s*"([^"]+)",\s*(\w+),\s*N_OF\(\4\)\}', body):
+        sid, role, name, arr = m.groups()
+        if arr not in arrays or role not in {r["id"] for r in roles}:
+            raise Drift(f"{src}: sound {sid} refers to unknown steps or role")
+        SOURCES[f"sounds.{sid}"] = f"{src}:{line_of(src, body.index('static const snd_step_t ' + arr))}"
+        sounds.append({"id": sid, "role": role, "name": name, "steps": arrays[arr]})
+    if not sounds:
+        raise Drift(f"{src}: no snd_bank entries")
+    return {"rate": rate, "waves": waves, "roles": roles, "bank": sounds}
+
+
 # ───────────────────────── output ─────────────────────────
 def build():
     SOURCES.clear()
@@ -516,6 +544,7 @@ def build():
         "ble": extract_ble(),
         "display": extract_display(),
         "messages": extract_messages(),
+        "sounds": extract_sounds(),
     }
     h = extract_haptics()
     facts["haptics"] = h["patterns"]

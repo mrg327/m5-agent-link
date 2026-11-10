@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="atlas/css/chapters.css">
 <link rel="stylesheet" href="atlas/css/flow.css">
 <link rel="stylesheet" href="atlas/css/touch.css">
+<link rel="stylesheet" href="atlas/css/sound.css">
 <script>
   // Browsers block ES modules and WASM on file://; tell people how to run it.
   if (location.protocol === 'file:') document.documentElement.classList.add('is-file');
@@ -43,8 +44,9 @@
       <li><a href="#glance" data-nav="glance"><b>01</b><span>Glance</span></a></li>
       <li><a href="#flow" data-nav="flow"><b>02</b><span>Flow</span></a></li>
       <li><a href="#touch" data-nav="touch"><b>03</b><span>Touch</span></a></li>
-      <li><a href="#replay" data-nav="replay"><b>04</b><span>Replay</span></a></li>
-      <li><a href="#build" data-nav="build"><b>05</b><span>Build</span></a></li>
+      <li><a href="#sound" data-nav="sound"><b>04</b><span>Sound</span></a></li>
+      <li><a href="#replay" data-nav="replay"><b>05</b><span>Replay</span></a></li>
+      <li><a href="#build" data-nav="build"><b>06</b><span>Build</span></a></li>
     </ol>
   </nav>
   <div class="topbar__progress" id="progress" aria-hidden="true"></div>
@@ -111,10 +113,20 @@
     </div>
   </section>
 
+  <section class="chapter" data-chapter="sound" data-layout="wide" id="sound" aria-labelledby="sound-title">
+    <div class="chapter__inner" data-mount="sound">
+      <header class="chapter__head">
+        <p class="chapter__eyebrow"><b class="mono">04</b> How it sounds</p>
+        <h2 class="chapter__title" id="sound-title">Blips, coins and fanfares</h2>
+      </header>
+      <div class="chapter__body" data-slot="body"></div>
+    </div>
+  </section>
+
   <section class="chapter" data-chapter="replay" data-layout="wide" id="replay" aria-labelledby="replay-title">
     <div class="chapter__inner" data-mount="replay">
       <header class="chapter__head">
-        <p class="chapter__eyebrow"><b class="mono">04</b> Your own data</p>
+        <p class="chapter__eyebrow"><b class="mono">05</b> Your own data</p>
         <h2 class="chapter__title" id="replay-title">Replay a real session</h2>
       </header>
       <div class="chapter__body" data-slot="body"></div>
@@ -124,7 +136,7 @@
   <section class="chapter" data-chapter="build" data-layout="side" id="build" aria-labelledby="build-title">
     <div class="chapter__inner" data-mount="build">
       <header class="chapter__head">
-        <p class="chapter__eyebrow"><b class="mono">05</b> Under the hood</p>
+        <p class="chapter__eyebrow"><b class="mono">06</b> Under the hood</p>
         <h2 class="chapter__title" id="build-title">Eight layers, four codebases</h2>
         <p class="chapter__lede">A 15.5 mm puck. Scroll to pull it apart; hover a layer to find it.</p>
       </header>

@@ -1,0 +1,33 @@
+/* "sound" chapter: audition cards for the firmware sound bank. */
+.snd { display: grid; gap: var(--s-5); max-width: 72rem; }
+.snd__lede { color: var(--paper-2); max-width: 46rem; }
+.snd__bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-4); }
+.snd__toggle { appearance: none; cursor: pointer; padding: .45rem 1rem; border-radius: 999px; border: 1px solid var(--line-2); background: none; color: var(--muted); font-size: var(--t-sm); transition: background var(--dur-1), color var(--dur-1); }
+.snd__toggle[aria-pressed="true"] { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+.snd__vol { display: flex; align-items: center; gap: var(--s-2); color: var(--muted); font-size: var(--t-sm); }
+.snd__vol input { accent-color: var(--c-accent); }
+.snd__role-t { font: 400 var(--t-lg)/1.3 var(--font-sans); color: var(--paper-2); margin-bottom: var(--s-3); }
+.snd__role-t .mono { color: var(--paper); text-transform: uppercase; letter-spacing: .08em; font-size: var(--t-sm); margin-right: .4rem; }
+.snd__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: var(--s-3); }
+.snd__card { position: relative; display: grid; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--ink-2); overflow: hidden; transition: border-color var(--dur-1); }
+.snd__card:has(input:checked) { border-color: var(--c); box-shadow: 0 0 0 1px var(--c) inset; }
+.snd__play { appearance: none; display: grid; gap: .2rem; text-align: left; padding: var(--s-3) var(--s-3) var(--s-2); border: 0; background: none; color: var(--paper); cursor: pointer; }
+.snd__play:hover { background: rgba(255, 255, 255, .04); }
+.snd__play:focus-visible { outline: 2px solid var(--c); outline-offset: -2px; border-radius: var(--radius); }
+.snd__roll { width: 100%; height: 3.2rem; margin-bottom: var(--s-2); fill: var(--c); overflow: visible; }
+.snd__roll [data-noise] { fill: var(--muted); }
+.snd__name { font-weight: 600; }
+.snd__meta { color: var(--muted); font-size: var(--t-xs); }
+.snd__pick { display: flex; align-items: center; gap: .4rem; padding: 0 var(--s-3) var(--s-3); color: var(--muted); font-size: var(--t-xs); cursor: pointer; }
+.snd__pick input { accent-color: var(--c); }
+.snd__card::after { content: ""; position: absolute; top: var(--s-3); bottom: auto; left: var(--s-3); height: 3.2rem; width: 2px; background: var(--paper); opacity: 0; pointer-events: none; }
+.snd__card[data-playing="1"]::after { animation: snd-head var(--dur, 500ms) linear forwards; }
+@keyframes snd-head { from { opacity: .9; left: var(--s-3); } to { opacity: .9; left: calc(100% - var(--s-3)); } }
+.snd__card[data-playing="1"] { border-color: var(--c); }
+.snd__summary { color: var(--paper-2); font-size: var(--t-sm); }
+.snd__summary b { text-transform: uppercase; letter-spacing: .06em; font: 500 var(--t-xs) var(--font-mono); color: var(--muted); }
+.snd__note { color: var(--muted); font-size: var(--t-sm); }
+
+@media (prefers-reduced-motion: reduce) {
+  .snd__card[data-playing="1"]::after { animation: none; }
+}
