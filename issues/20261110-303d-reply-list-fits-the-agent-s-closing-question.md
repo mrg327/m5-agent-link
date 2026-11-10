@@ -40,3 +40,4 @@ the Reply list, and drop the built-in defaults (replies.txt only).
     - os: Ubuntu 24.04.4 LTS (kernel 7.0.0-42-generic)
     - git: e990260+dirty main
     - toolchains: cc 13.3.0-6ubuntu2~24.04.1, cmake 3.28.3, ninja 1.11.1, node 18.19.1, python 3.12.3, rustc 1.95.0, cargo 1.95.0, sdl2 2.30.0
+- 2026-11-10T16:12:44Z · claude-code@linux-dev · linux-x86_64 · 19d2ec6+dirty: Regression found on the device after closing: session_t grew by q[128] + rp[3][64], and two 32-session tables in internal DRAM took ~20 KB the BLE controller needs at boot (BLE_INIT Malloc failed, assert in emi.c, boot loop). The simulator has no such limit, so ctest passed. Fixed in the next commit: CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY and EXT_RAM_BSS_ATTR on the model and snapshot tables (48 KB now in PSRAM, 138 KB DIRAM free). Verified on the watch: clean boot, BLE up, USB takeover from BLE in 7 ms.

@@ -20,6 +20,15 @@ typedef enum { ACT_APPROVE = 0, ACT_DENY = 1, ACT_FOCUS = 2, ACT_REPLY = 3, ACT_
 typedef enum { PRIVACY_META = 0, PRIVACY_PREVIEW = 1, PRIVACY_FULL = 2 } privacy_t;
 typedef enum { ALERT_FULL = 0, ALERT_QUIET = 1, ALERT_SILENT = 2 } alert_mode_t;
 
+/* Large static tables go to PSRAM on the device (internal DRAM is what BLE needs at boot); a no-op in
+ * the simulator. */
+#ifdef ESP_PLATFORM
+#include "esp_attr.h"
+#define MODEL_EXT_BSS EXT_RAM_BSS_ATTR
+#else
+#define MODEL_EXT_BSS
+#endif
+
 typedef struct {
     uint32_t sid;
     agent_t agent;

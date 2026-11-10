@@ -60,3 +60,6 @@ CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=247
 CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_2M_PHY=y
 CONFIG_BT_NIMBLE_PINNED_TO_CORE_0=y
 CONFIG_BT_CTRL_BLE_MAX_ACT=3
+# Big static tables (the session model, the snapshot buffer) live in PSRAM: internal DRAM is
+# what the BLE controller needs at boot.
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y

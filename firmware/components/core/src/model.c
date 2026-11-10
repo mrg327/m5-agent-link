@@ -5,7 +5,7 @@
 
 #include "debug.h"
 
-static session_t s_sessions[MODEL_MAX_SESSIONS];
+MODEL_EXT_BSS static session_t s_sessions[MODEL_MAX_SESSIONS];
 static bool s_used[MODEL_MAX_SESSIONS];
 static attention_t s_att[MODEL_MAX_ATTENTION];
 static bool s_att_used[MODEL_MAX_ATTENTION];

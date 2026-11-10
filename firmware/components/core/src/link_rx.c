@@ -120,7 +120,7 @@ static void on_welcome(const struct welcome *w)
 
 static void on_snapshot(const struct snapshot *s)
 {
-    static session_t list[MODEL_MAX_SESSIONS];
+    MODEL_EXT_BSS static session_t list[MODEL_MAX_SESSIONS];
     size_t n = s->snapshot_session_m_l_session_m_count;
     if (n > MODEL_MAX_SESSIONS) n = MODEL_MAX_SESSIONS;
     for (size_t i = 0; i < n; i++) convert_session(&s->snapshot_session_m_l_session_m[i], &list[i]);
