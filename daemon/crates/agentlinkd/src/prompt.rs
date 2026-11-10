@@ -317,6 +317,9 @@ pub fn ask_request(sid: u64, key: String, tool_args: &Value) -> (Request, Option
             .filter_map(|v| v["title"].as_str().or(v["const"].as_str()))
             .map(str::to_owned)
             .collect()
+    } else if field["type"].as_str() == Some("boolean") {
+        // drawn as `Yes` / `No` (cursor on the default), then `Other`
+        vec!["Yes".to_owned(), "No".to_owned()]
     } else {
         Vec::new()
     };
@@ -570,6 +573,11 @@ mod tests {
         assert_eq!(s.opts, ["red", "green", "blue", OTHER]);
         assert_eq!(s.cursor, Some(0));
         assert_eq!(s.body.last().unwrap(), "Color:");
+        // a boolean field (captured from v1.0.106)
+        let yes_no = FORM
+            .replace("Color:", "Restart the daemon after the fix?:")
+            .replace("❯ red\n   green\n   blue", "❯ Yes\n   No");
+        assert_eq!(parse(&yes_no).unwrap().opts, ["Yes", "No", OTHER]);
     }
 
     #[test]
@@ -615,6 +623,17 @@ mod tests {
         let one_of = json!({"message": "m", "requestedSchema": {"properties": {"x": {"type": "string",
             "oneOf": [{"const": "a", "title": "Alpha"}, {"const": "b", "title": "Beta"}]}}}});
         assert_eq!(ask_request(1, "k".into(), &one_of).0.opts[1].0, "Beta");
+        let yes_no = json!({"message": "m", "requestedSchema": {"properties": {"ok": {"type": "boolean",
+            "title": "Restart?", "default": true}}}});
+        let (req, expect) = ask_request(1, "k".into(), &yes_no);
+        assert!(!req.focus_only);
+        assert_eq!(req.title.as_deref(), Some("Restart?"));
+        assert_eq!(
+            expect,
+            Some(Expect::Choice {
+                labels: vec!["Yes".into(), "No".into()]
+            })
+        );
         // as a JSON string, two fields, and free text: Focus only
         let two = json!({"message": "m", "requestedSchema": {"properties": {
             "a": {"type": "string", "enum": ["x"]}, "b": {"type": "string"}}}});
