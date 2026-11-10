@@ -16,4 +16,37 @@ menu "Agent Link StopWatch display"
             Logs flushes, pixels, CPU time spent in the flush callback and time spent waiting
             for the previous DMA transfer (ESP_LOGI, tag sw-display).
 
+    config AGENTLINK_DISPLAY_TE
+        bool "Start each frame on the CO5300 tearing-effect pulse (experimental)"
+        depends on AGENTLINK_DISPLAY_DIRECT_DMA
+        default n
+        help
+            The panel pulses TE (G38) when its scan reaches line 466 (35h/44h in the init list).
+            The first band of every refresh waits for that pulse (20 ms timeout) so the write
+            starts in vertical blanking. Only areas that finish before the scan reaches them are
+            tear-free; a full-screen redraw slower than one scan still tears, and the wait costs
+            up to one frame (avg ~8 ms) per refresh. Three timeouts in a row turn it off.
+
+endmenu
+
+menu "Agent Link StopWatch I2C and touch"
+
+    config AGENTLINK_I2C_FAST
+        bool "Touch and RTC at 400 kHz I2C (fast mode)"
+        default y
+        help
+            Runs the CST820 touch controller and the RX8130CE RTC at 400 kHz instead of 100 kHz,
+            cutting a touch poll from ~1 ms to ~0.3 ms of bus time. Both datasheets allow 400 kHz,
+            SYS_SDA/SCL have 2.2 kOhm pull-ups, and the M5IOE1 on the same bus already runs at
+            400 kHz. The M5PM1 stays at its library default (100 kHz): it is read every 2 s only.
+
+    config AGENTLINK_TOUCH_INT
+        bool "Read the touch controller only after its INT line toggles"
+        default y
+        help
+            The CST820 pulses TP_INT (G13) when it has a report. While no finger is down, a poll
+            with no INT edge since the last read skips the I2C read; with a finger down every poll
+            reads, as before. A read is still forced every 250 ms; if one of those finds a finger
+            with no INT edge (twice), gating turns itself off until reboot.
+
 endmenu

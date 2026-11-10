@@ -71,7 +71,7 @@ bool sw_rtc_init(void)
     i2c_device_config_t cfg = {};
     cfg.dev_addr_length = I2C_ADDR_BIT_LEN_7;
     cfg.device_address = RX8130_ADDR;
-    cfg.scl_speed_hz = 100000;
+    cfg.scl_speed_hz = SW_I2C_DEV_HZ;
     if (i2c_master_bus_add_device(sw_i2c_bus(), &cfg, &s_dev) != ESP_OK) {
         ESP_LOGE(TAG, "add device failed");
         s_dev = nullptr;

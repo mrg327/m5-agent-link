@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "driver/i2c_master.h"
+#include "sdkconfig.h"
 #include "sw_power.h"
 #include "hal.h"
 
@@ -14,6 +15,13 @@
 #define SW_PIN_TOUCH_INT 13
 #define SW_PIN_BTN_A 2 /* KEYA, yellow */
 #define SW_PIN_BTN_B 1 /* KEYB, blue */
+
+/* SCL for the CST820 and RX8130CE (both rated to 400 kHz; 2.2k pull-ups on SYS_SDA/SCL). */
+#ifdef CONFIG_AGENTLINK_I2C_FAST
+#define SW_I2C_DEV_HZ 400000
+#else
+#define SW_I2C_DEV_HZ 100000
+#endif
 
 #define SW_PANEL_W 466
 #define SW_PANEL_H 466

@@ -4,6 +4,8 @@
 #include <string.h>
 
 #include "sdkconfig.h"
+#include "driver/gpio.h"
+#include "esp_attr.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -143,14 +145,14 @@ static uint32_t tick_cb(void)
 }
 
 #ifdef CONFIG_AGENTLINK_DISPLAY_STATS
-static struct { uint32_t n, px; int64_t cpu_us, wait_us, t0; } s_st;
+static struct { uint32_t n, px; int64_t cpu_us, wait_us, te_us, t0; } s_st;
 static void stats_tick(void)
 {
     int64_t now = esp_timer_get_time();
     if (!s_st.t0) s_st.t0 = now;
     if (now - s_st.t0 < 5000000) return;
-    ESP_LOGI(TAG, "flush %u x, %u px, cpu %lld us, dma wait %lld us in %lld ms", (unsigned)s_st.n,
-             (unsigned)s_st.px, s_st.cpu_us, s_st.wait_us, (now - s_st.t0) / 1000);
+    ESP_LOGI(TAG, "flush %u x, %u px, cpu %lld us, dma wait %lld us, te wait %lld us in %lld ms", (unsigned)s_st.n,
+             (unsigned)s_st.px, s_st.cpu_us, s_st.wait_us, s_st.te_us, (now - s_st.t0) / 1000);
     s_st = {};
     s_st.t0 = now;
 }
@@ -166,6 +168,59 @@ static bool s_dma_ok;  /* draw buffers are internal DMA-capable RAM (a PSRAM fal
 static bool s_pending; /* a band is still on the wire and its bus transaction is open */
 static uint16_t *s_shot; /* hal_display_snapshot capture (PSRAM), filled by flush_cb while s_capture */
 static bool s_capture;
+
+#ifdef CONFIG_AGENTLINK_DISPLAY_TE
+/* The init list sets TE mode 3 at line 466 (35h M=0, 44h N=0x1D2): one pulse per scan as it leaves
+ * the visible area. The first band of a refresh starts on that pulse, i.e. in vertical blanking. */
+#define TE_TIMEOUT_MS 20 /* > one 60 Hz scan */
+#define TE_MAX_MISSES 3
+static SemaphoreHandle_t s_te_sem;
+static bool s_te_on;
+static uint8_t s_te_misses;
+static bool s_in_frame; /* a band of this refresh is already out: only the first one waits */
+
+static void IRAM_ATTR te_isr(void *arg)
+{
+    (void)arg;
+    BaseType_t woken = pdFALSE;
+    xSemaphoreGiveFromISR(s_te_sem, &woken);
+    portYIELD_FROM_ISR(woken);
+}
+
+static void te_init(void)
+{
+    s_te_sem = xSemaphoreCreateBinary();
+    esp_err_t err = s_te_sem ? gpio_set_intr_type(PIN_TE, GPIO_INTR_POSEDGE) : ESP_ERR_NO_MEM;
+    if (err == ESP_OK) {
+        err = gpio_install_isr_service(0);
+        err = err == ESP_ERR_INVALID_STATE ? ESP_OK : err;
+    }
+    if (err == ESP_OK) {
+        err = gpio_isr_handler_add(PIN_TE, te_isr, nullptr);
+    }
+    if (err == ESP_OK) {
+        gpio_intr_disable(PIN_TE); /* armed only while a frame waits */
+    }
+    s_te_on = err == ESP_OK;
+    ESP_LOGI(TAG, "TE sync %s", s_te_on ? "on" : "off");
+}
+
+static void te_wait(void)
+{
+    ST_T0();
+    xSemaphoreTake(s_te_sem, 0);
+    gpio_intr_enable(PIN_TE);
+    bool ok = xSemaphoreTake(s_te_sem, pdMS_TO_TICKS(TE_TIMEOUT_MS)) == pdTRUE;
+    gpio_intr_disable(PIN_TE);
+    if (ok) {
+        s_te_misses = 0;
+    } else if (++s_te_misses >= TE_MAX_MISSES) {
+        s_te_on = false;
+        ESP_LOGW(TAG, "no TE pulse from the panel: TE sync off");
+    }
+    ST_ADD(te_us);
+}
+#endif
 
 /* Caller holds s_gfx_mtx. endWrite waits for the DMA, raises CS and releases the SPI bus. */
 static void dma_finish_locked(void)
@@ -188,6 +243,12 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
     }
     lv_draw_sw_rgb565_swap(px_map, (uint32_t)(w * h)); /* the CO5300 takes big-endian RGB565 */
 
+#ifdef CONFIG_AGENTLINK_DISPLAY_TE
+    if (s_te_on && !s_in_frame && s_powered && !s_capture) { /* nobody sees a tear while dark */
+        te_wait();
+    }
+    s_in_frame = !lv_display_flush_is_last(disp);
+#endif
     xSemaphoreTake(s_gfx_mtx, portMAX_DELAY);
     dma_finish_locked(); /* LVGL already waited via flush_wait_cb; this only guards a direct call */
     s_gfx->startWrite(); /* held open past pushImageDMA so its endWrite does not wait for the bus */
@@ -308,6 +369,9 @@ lv_display_t *hal_display_create(void)
 #endif
     lv_display_set_buffers(s_disp, b1, b2, buf_bytes, LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_add_event_cb(s_disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, nullptr);
+#ifdef CONFIG_AGENTLINK_DISPLAY_TE
+    te_init();
+#endif
 
     hal_display_set_brightness(s_brightness);
     return s_disp;

@@ -23,7 +23,11 @@
 static const char *TAG = "link_ble";
 
 #define BLE_MSG_MAX 4096
-#define BLE_PREFERRED_MTU 247
+#define BLE_PREFERRED_MTU 247 /* 247 + 4 (L2CAP) = 251: one ATT PDU per max-length LL PDU */
+/* LE Data Length Extension: 251-octet LL payloads (2120 us covers them on the 1M PHY) so a full
+ * MTU-sized write/notification goes in one LL PDU instead of ten 27-octet ones. 0 disables. */
+#define BLE_DATA_LEN_OCTETS 251
+#define BLE_DATA_LEN_TIME_US 2120
 #define BLE_HDR_FIRST 0x80
 #define BLE_HDR_LAST 0x40
 #define BLE_HDR_SEQ 0x3f
@@ -57,6 +61,7 @@ static uint8_t s_rasm[BLE_MSG_MAX];
 static size_t s_rasm_len;
 static bool s_rasm_active;
 static uint8_t s_rasm_next;
+static uint16_t s_rx_frag_max; /* largest write this connection, logged when it grows */
 
 static void rasm_reset(void)
 {
@@ -163,8 +168,13 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
         if (ev->connect.status == 0) {
             s_conn = ev->connect.conn_handle;
             s_subscribed = false;
+            s_rx_frag_max = 0;
             ESP_LOGI(TAG, "central connected (handle %u)", ev->connect.conn_handle);
             ble_gap_set_prefered_le_phy(s_conn, BLE_GAP_LE_PHY_2M_MASK, BLE_GAP_LE_PHY_2M_MASK, 0);
+            if (BLE_DATA_LEN_OCTETS) {
+                int rc = ble_gap_set_data_len(s_conn, BLE_DATA_LEN_OCTETS, BLE_DATA_LEN_TIME_US);
+                if (rc != 0) ESP_LOGW(TAG, "data length request rc=%d", rc);
+            }
             s_req_pending = s_applied_fast = false;
             conn_params("connected", true);
             if (s_fast) request_interval(true);
@@ -198,7 +208,13 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
         if (ev->conn_update.status == 0 && s_applied_fast != s_fast) request_interval(s_fast); /* changed meanwhile */
         break;
     }
-    case BLE_GAP_EVENT_MTU: ESP_LOGI(TAG, "mtu = %u", ev->mtu.value); break;
+    case BLE_GAP_EVENT_MTU:
+        ESP_LOGI(TAG, "mtu = %u (fragments up to %u B)", ev->mtu.value, ev->mtu.value - 3);
+        break;
+    case BLE_GAP_EVENT_DATA_LEN_CHG:
+        ESP_LOGI(TAG, "data length: tx %u B / %u us, rx %u B / %u us", ev->data_len_chg.max_tx_octets,
+                 ev->data_len_chg.max_tx_time, ev->data_len_chg.max_rx_octets, ev->data_len_chg.max_rx_time);
+        break;
     case BLE_GAP_EVENT_ADV_COMPLETE: advertise(); break;
     default: break;
     }
@@ -234,13 +250,17 @@ static void advertise(void)
 
 /* ── GATT ── */
 
-static int rx_access(uint16_t, uint16_t, struct ble_gatt_access_ctxt *ctxt, void *)
+static int rx_access(uint16_t conn_handle, uint16_t, struct ble_gatt_access_ctxt *ctxt, void *)
 {
     if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
     uint8_t buf[BLE_ATT_MTU_MAX + 8];
     uint16_t len = OS_MBUF_PKTLEN(ctxt->om);
     if (len > sizeof buf) return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
     if (ble_hs_mbuf_to_flat(ctxt->om, buf, sizeof buf, &len) != 0) return BLE_ATT_ERR_UNLIKELY;
+    if (len > s_rx_frag_max) {
+        s_rx_frag_max = len;
+        ESP_LOGI(TAG, "rx fragment %u B (mtu %u)", len, ble_att_mtu(conn_handle));
+    }
     rasm_feed(buf, len);
     return 0;
 }
