@@ -30,6 +30,9 @@ const MAX_WRITE_LEN: usize = 244;
 
 const SCAN_POLL: Duration = Duration::from_secs(1);
 const UNAVAILABLE_RETRY: Duration = Duration::from_secs(15);
+/// btleplug (CoreBluetooth) drops the scan for good when the adapter reports powered off, e.g.
+/// across Mac sleep; restarting it is idempotent, so redo it while nothing is found.
+const RESCAN: Duration = Duration::from_secs(10);
 const CONNECT_COOLDOWN: Duration = Duration::from_secs(5);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const LIVENESS_POLL: Duration = Duration::from_secs(2);
@@ -122,6 +125,7 @@ impl Transport for BleTransport {
     /// Bluetooth can be switched on or granted later without restarting the daemon.
     async fn accept(&mut self) -> anyhow::Result<Box<dyn Link>> {
         let mut unavailable_logged = false;
+        let mut last_scan = Instant::now();
         loop {
             let adapter = match self.adapter().await {
                 Ok(a) => a,
@@ -161,6 +165,17 @@ impl Transport for BleTransport {
                     }
                     // `guard` was moved into `open`, so the failed attempt already freed `active`.
                     self.cooldown.insert(key, Instant::now());
+                }
+                Ok(None) if last_scan.elapsed() >= RESCAN => {
+                    last_scan = Instant::now();
+                    if let Err(e) = adapter
+                        .start_scan(ScanFilter {
+                            services: vec![SERVICE_UUID],
+                        })
+                        .await
+                    {
+                        tracing::debug!("ble rescan: {e:#}");
+                    }
                 }
                 Ok(None) => {}
                 Err(e) => tracing::debug!("ble scan poll: {e:#}"),
