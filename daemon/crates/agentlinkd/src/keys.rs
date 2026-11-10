@@ -127,6 +127,11 @@ struct Comp {
     taps: Vec<Point>,
     /// The last word typed came from `taps` and the next tap extends it.
     tap_open: bool,
+    /// The symbols and words glued before the decoded part of the last word (`check_dram.` in
+    /// `check_dram.py`); a pick replaces only what follows it.
+    prefix: String,
+    /// The last tap was a symbol: the next word joins the last one without a space.
+    glue: bool,
 }
 
 impl Comp {
@@ -144,6 +149,11 @@ impl Comp {
     fn end_tap_run(&mut self) {
         self.taps.clear();
         self.tap_open = false;
+    }
+
+    fn reset_glue(&mut self) {
+        self.prefix.clear();
+        self.glue = false;
     }
 }
 
@@ -302,6 +312,8 @@ impl KeysLink {
             last_cands: Vec::new(),
             taps: Vec::new(),
             tap_open: false,
+            prefix: String::new(),
+            glue: false,
         });
         true
     }
@@ -335,11 +347,43 @@ impl KeysLink {
             match cp {
                 Some(CP_SPACE) => {
                     comp.end_tap_run();
+                    comp.glue = false;
                     return cands_reply(kid, seq, comp.last_cands.clone(), None, None);
                 }
                 Some(CP_BACKSPACE) => {
                     let res = self.del(term, t).await;
                     return cands_reply(kid, seq, Vec::new(), None, res.err);
+                }
+                Some(c)
+                    if char::from_u32(c)
+                        .is_some_and(|c| c.is_ascii_graphic() && !c.is_alphabetic()) =>
+                {
+                    let sym = char::from_u32(c).expect("checked in the guard");
+                    let joined = match comp.words.0.last() {
+                        Some(last) => format!("{last}{sym}"),
+                        None => sym.to_string(),
+                    };
+                    let edit = if comp.words.0.is_empty() {
+                        comp.words.push(&joined)
+                    } else {
+                        comp.words.replace_last(&joined)
+                    };
+                    if let Some(why) = t.refusal {
+                        tracing::info!("keyboard typing refused: {why}");
+                        return cands_reply(kid, seq, Vec::new(), None, Some(ResultErr::Denied));
+                    }
+                    if let Err(e) = apply(term, t, &edit).await {
+                        return cands_reply(kid, seq, Vec::new(), None, Some(e.0));
+                    }
+                    match comp.words.0.last_mut() {
+                        Some(last) => *last = joined.clone(),
+                        None => comp.words.0.push(joined.clone()),
+                    }
+                    comp.end_tap_run();
+                    comp.prefix = joined;
+                    comp.glue = true;
+                    comp.last_cands.clear();
+                    return cands_reply(kid, seq, Vec::new(), None, None);
                 }
                 Some(c) if char::from_u32(c).is_some_and(|c| c.is_alphabetic()) => {
                     taps = comp.taps.clone();
@@ -388,19 +432,27 @@ impl KeysLink {
             tracing::info!("keyboard typing refused: {why}");
             return cands_reply(kid, seq, cands, None, Some(ResultErr::Denied));
         }
-        let edit = if replace {
-            comp.words.replace_last(&word)
+        let joins = replace || comp.glue;
+        let full = if joins {
+            format!("{}{word}", comp.prefix)
         } else {
-            comp.words.push(&word)
+            word.clone()
+        };
+        let edit = if joins {
+            comp.words.replace_last(&full)
+        } else {
+            comp.words.push(&full)
         };
         if let Err(e) = apply(term, t, &edit).await {
             return cands_reply(kid, seq, cands, None, Some(e.0));
         }
-        if replace {
-            *comp.words.0.last_mut().expect("replace needs a word") = word;
+        if joins {
+            *comp.words.0.last_mut().expect("a join needs a word") = full;
         } else {
-            comp.words.0.push(word);
+            comp.prefix.clear();
+            comp.words.0.push(full);
         }
+        comp.glue = false;
         if tap {
             comp.taps.push(first);
             comp.tap_open = true;
@@ -442,6 +494,7 @@ impl KeysLink {
                 if comp.words.0.is_empty() {
                     return fail(ResultErr::Stale, "nothing to replace");
                 }
+                let word = format!("{}{word}", comp.prefix);
                 let edit = comp.words.replace_last(&word);
                 match apply_checked(term, t, &edit).await {
                     Ok(()) => {
@@ -475,6 +528,7 @@ impl KeysLink {
                 let words = std::mem::take(&mut comp.words.0);
                 tracing::info!("keyboard send: {} words", words.len());
                 comp.end_tap_run();
+                comp.reset_glue();
                 comp.last_cands.clear();
                 self.remember(&words).await;
                 CmdResult::ok()
@@ -510,6 +564,7 @@ impl KeysLink {
             Ok(()) => {
                 comp.words.0.pop();
                 comp.end_tap_run();
+                comp.reset_glue();
                 comp.last_cands.clear();
                 CmdResult::ok()
             }
@@ -694,6 +749,64 @@ mod tests {
         assert_eq!(keys[2], last[0]);
         assert!(k.cmd(&term, &t, CmdOp::KbDel, None, None).await.ok);
         assert_eq!(sent(&fake), vec!["\\x7f".repeat(last[0].chars().count())]);
+    }
+
+    #[tokio::test]
+    async fn a_symbol_glues_the_words_around_it_and_a_pick_keeps_it() {
+        let fake = Arc::new(Fake::default());
+        let term: Arc<dyn Terminal> = fake.clone();
+        let mut keys = Layout::stopwatch_qwerty().keys().to_vec();
+        keys.push(agentlink_keys::Key {
+            cp: '.' as u32,
+            x: 200,
+            y: 400,
+            w: 40,
+            h: 40,
+        });
+        let layout = Layout::new(keys);
+        let mut k = KeysLink::default();
+        let t = target(None);
+        let start = KbStart {
+            kid: 1,
+            sid: 7,
+            keys: layout.to_packed(),
+        };
+        assert!(k.start(&term, &t, &start).await);
+
+        let a = k.stroke(&term, &t, &swipe(&layout, "check", 1)).await.cands[0].clone();
+        let dot = KbStroke {
+            kid: 1,
+            seq: 2,
+            pts: pack_points(&[Point {
+                x: 220,
+                y: 420,
+                t_ms: 0,
+            }]),
+        };
+        assert_eq!(k.stroke(&term, &t, &dot).await.err, None);
+        let r = k.stroke(&term, &t, &swipe(&layout, "dram", 3)).await;
+        let b = r.cands[0].clone();
+        let back = |n: usize| "\\x7f".repeat(n);
+        assert_eq!(
+            sent(&fake),
+            vec![
+                a.clone(),
+                back(a.len()),
+                format!("{a}."),
+                back(a.len() + 1),
+                format!("{a}.{b}")
+            ]
+        );
+        assert!(
+            k.cmd(&term, &t, CmdOp::KbPick, Some(Arg::Uint(1)), None)
+                .await
+                .ok
+        );
+        let c = &r.cands[1];
+        assert_eq!(
+            sent(&fake),
+            vec![back(a.len() + 1 + b.len()), format!("{a}.{c}")]
+        );
     }
 
     #[tokio::test]
