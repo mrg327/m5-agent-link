@@ -156,6 +156,15 @@ where
             // A notification is not a move: it may be the very prompt the card is about.
             if let Some(key) = &key {
                 let tool = v["payload"]["tool_name"].as_str();
+                if parent_of(&v).is_some() {
+                    // A sub-agent moving on says nothing about the parent's open cards; its own
+                    // tool ending answers only a card for that tool.
+                    let tool = tool.or_else(|| v["payload"]["toolName"].as_str());
+                    if event.to_ascii_lowercase().starts_with("posttooluse") && tool.is_some() {
+                        broker.cancel_session(key, tool);
+                    }
+                    continue;
+                }
                 if !event.eq_ignore_ascii_case("notification") {
                     broker.cancel_session(
                         key,
@@ -251,7 +260,17 @@ async fn await_decision(
     }
 }
 
+/// A Copilot sub-agent's (the `task` tool) parent session id. Its hooks carry their own
+/// `sessionId` plus `parentAgentId`; it runs inside the parent's process and terminal, so the
+/// watch shows it as part of the parent, never as a session of its own (issue 1210).
+fn parent_of(v: &Value) -> Option<&str> {
+    let p = &v["payload"];
+    let parent = p["parentAgentId"].as_str().filter(|s| !s.is_empty())?;
+    (p["sessionId"].as_str() != Some(parent)).then_some(parent)
+}
+
 /// `agent:session` key of a hook line (prefixed for remote ones), as `to_session_event` derives it.
+/// A sub-agent's lines get its parent's key.
 pub fn session_key(v: &Value, via: &Via) -> Option<String> {
     let agent_name = v["agent"].as_str()?;
     let payload = &v["payload"];
@@ -259,8 +278,8 @@ pub fn session_key(v: &Value, via: &Via) -> Option<String> {
         .as_str()
         .or_else(|| v["cwd"].as_str())
         .filter(|c| !c.is_empty());
-    let sid = payload["sessionId"]
-        .as_str()
+    let sid = parent_of(v)
+        .or_else(|| payload["sessionId"].as_str())
         .or_else(|| payload["session_id"].as_str())
         .map(str::to_owned)
         .unwrap_or_else(|| format!("{}#{}", cwd.unwrap_or("?"), v["ppid"].as_u64().unwrap_or(0)));
@@ -297,6 +316,21 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
         .filter(|c| !c.is_empty())
         .map(str::to_owned);
     let key = session_key(v, via)?;
+    // A sub-agent's own lifecycle (prompt, stop, idle, end, error) is not its parent's: only its
+    // tool steps and anything that needs the user reach the parent.
+    let sub_agent = parent_of(v).map(|_| payload["agentType"].as_str().unwrap_or("agent"));
+    if sub_agent.is_some()
+        && !matches!(
+            event.as_str(),
+            "pretooluse"
+                | "posttooluse"
+                | "posttoolusefailure"
+                | "permissionrequest"
+                | "notification"
+        )
+    {
+        return None;
+    }
     if event == "sessionend" {
         return Some(SessionEvent::End { key });
     }
@@ -358,6 +392,18 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
             }
         }
         _ => return None,
+    }
+    if let Some(name) = sub_agent {
+        match p.state {
+            // the parent's own state and closing question stay as they are
+            Some(SessState::Work) => {
+                p.state = None;
+                p.ask = None;
+            }
+            Some(SessState::Idle | SessState::Done) => return None,
+            _ => {}
+        }
+        p.summary = p.summary.map(|s| format!("{name}: {s}"));
     }
     if let Some(c) = &cwd {
         p.repo = repo_of(c);
@@ -511,6 +557,58 @@ mod tests {
             panic!()
         };
         patch
+    }
+
+    #[test]
+    fn copilot_sub_agents_fold_into_their_parent() {
+        let sub = |event: &str, extra: Value| {
+            let mut payload = json!({"sessionId":"child","parentAgentId":"parent",
+                "agentId":"child","agentType":"explore","cwd":"/r"});
+            payload
+                .as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            json!({"agent":"copilot","event":event,"payload":payload})
+        };
+        let pre = sub(
+            "preToolUse",
+            json!({"toolName":"bash","toolArgs":{"command":"ls"}}),
+        );
+        assert_eq!(
+            session_key(&pre, &Via::Local).as_deref(),
+            Some("copilot:parent")
+        );
+        let Some(SessionEvent::Update { key, patch, .. }) = to_session_event(&pre, &Via::Local)
+        else {
+            panic!()
+        };
+        assert_eq!(key, "copilot:parent");
+        assert_eq!(patch.state, None, "the parent's state is its own");
+        assert!(patch.ask.is_none(), "nor is its closing question cleared");
+        assert_eq!(patch.step, Step::Start);
+        assert_eq!(patch.summary.as_deref(), Some("explore: bash · ls"));
+        let post = sub("postToolUse", json!({"toolName":"bash"}));
+        assert_eq!(patch_of(post).step, Step::Result(true));
+        for e in [
+            "sessionStart",
+            "userPromptSubmitted",
+            "agentStop",
+            "sessionEnd",
+            "errorOccurred",
+        ] {
+            assert!(
+                to_session_event(&sub(e, json!({})), &Via::Local).is_none(),
+                "{e}"
+            );
+        }
+        let idle = sub("notification", json!({"notification_type":"agent_idle"}));
+        assert!(to_session_event(&idle, &Via::Local).is_none());
+        let perm = sub("permissionRequest", json!({"toolName":"bash"}));
+        assert_eq!(patch_of(perm).state, Some(SessState::Input));
+        // a parent (no parentAgentId, or one naming itself) keeps its own key
+        let own = json!({"agent":"copilot","event":"agentStop",
+            "payload":{"sessionId":"parent","parentAgentId":"parent"}});
+        assert_eq!(patch_of(own).state, Some(SessState::Done));
     }
 
     #[test]

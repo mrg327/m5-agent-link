@@ -111,7 +111,7 @@ The **transport is a framing layer.** The same protocol (§5) runs over BLE GATT
 
 | Agent | Status source | Notes |
 |---|---|---|
-| Copilot CLI | **Hooks** in `~/.copilot/hooks/*.json` → `agentlink-hook` (via `exec`+`args`, no shell). The useful events are `sessionStart/End`, `userPromptSubmitted`, `preToolUse`, `postToolUse`, `permissionRequest`, `notification` (`permission_prompt`, `elicitation_dialog`, `agent_idle`, `agent_completed`), `agentStop`, and `errorOccurred` | Cross-check `~/.copilot/session-state/<id>/events.jsonl` and `inuse.<PID>.lock` (internal, unversioned) |
+| Copilot CLI | **Hooks** in `~/.copilot/hooks/*.json` → `agentlink-hook` (via `exec`+`args`, no shell). The useful events are `sessionStart/End`, `userPromptSubmitted`, `preToolUse`, `postToolUse`, `permissionRequest`, `notification` (`permission_prompt`, `elicitation_dialog`, `agent_idle`, `agent_completed`), `agentStop`, and `errorOccurred`. Sub-agents (the `task` tool) fire the same hooks with their own `sessionId` plus `parentAgentId`: the daemon files them under the parent session, keeping only their tool steps (labelled `agentType: …`) and anything that needs the user; their prompt, stop, idle and error events are dropped (issue 1210) | Cross-check `~/.copilot/session-state/<id>/events.jsonl` and `inuse.<PID>.lock` (internal, unversioned) |
 | Claude Code | Hooks: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `Notification`, `Stop`, `SessionEnd` | Notification does not fire in the VS Code panel |
 | Copilot coding agent (cloud) | Daemon polls GitHub (`gh` auth token / GraphQL): open PRs assigned to Copilot, their agent session status, and requested reviews | Cannot be "focused" as a terminal. Instead, open the PR in the browser on the PC |
 
