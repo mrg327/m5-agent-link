@@ -250,7 +250,19 @@ pub const SESSION_REPLY_BASE: u64 = 100;
 /// `welcome.voice` and the audio messages need proto 0.6.
 const VOICE_MINOR: u64 = 6;
 
-fn welcome(host: &HostInfo, replies: Option<Vec<String>>, voice: Option<bool>) -> Welcome {
+/// `welcome.keys` and the keyboard messages need proto 0.7 and the device's `feature_keys`.
+const KEYS_MINOR: u64 = 7;
+
+fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
+    (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
+}
+
+fn welcome(
+    host: &HostInfo,
+    replies: Option<Vec<String>>,
+    voice: Option<bool>,
+    keys: Option<bool>,
+) -> Welcome {
     let tz = chrono::Local::now().offset().local_minus_utc() / 60;
     Welcome {
         proto: PROTO,
@@ -268,7 +280,7 @@ fn welcome(host: &HostInfo, replies: Option<Vec<String>>, voice: Option<bool>) -
         },
         replies,
         voice,
-        keys: None,
+        keys,
     }
 }
 
@@ -361,7 +373,8 @@ async fn handshake(
     let (sessions, updates) = shared.registry.subscribe();
     let replies = (c.peer_minor >= REPLIES_MINOR).then(|| shared.replies.clone());
     let voice = (c.peer_minor >= VOICE_MINOR && shared.stt.is_some()).then_some(true);
-    let w = welcome(&shared.host, replies, voice);
+    let keys = keys_offered(c.peer_minor, &hello.1.caps.feats);
+    let w = welcome(&shared.host, replies, voice, keys);
     c.privacy = w.cfg.privacy.unwrap_or(Privacy::Meta);
     c.send(Some(hello.0), Message::Welcome(w)).await?;
     c.send(
@@ -408,6 +421,7 @@ async fn serve(
     let mut vs = VoiceState {
         recs: HashMap::new(),
         done: vtx,
+        keys: crate::keys::KeysLink::default(),
     };
     loop {
         let deferred_due = sc.deferred_due();
@@ -465,6 +479,27 @@ async fn serve(
 struct VoiceState {
     recs: HashMap<u64, crate::voice::Recording>,
     done: tokio::sync::mpsc::UnboundedSender<(u64, Option<u64>, String)>,
+    /// The swipe keyboard open on this link (keys.rs); dropped with it.
+    keys: crate::keys::KeysLink,
+}
+
+/// The session a keyboard action types into, with the refusals of quick replies (typing.rs).
+fn keys_target(
+    shared: &Shared,
+    sid: Option<u64>,
+) -> std::result::Result<crate::keys::Target, ResultErr> {
+    match sid.map_or(Route::Unknown, |sid| shared.registry.route(sid)) {
+        Route::Ready(session, ctx) => {
+            let refusal = crate::typing::refusal(&session, shared.broker.open_for(session.sid));
+            Ok(crate::keys::Target {
+                session,
+                ctx,
+                refusal,
+            })
+        }
+        Route::Unknown => Err(ResultErr::Stale),
+        Route::Unsupported => Err(ResultErr::Unsupported),
+    }
 }
 
 async fn handle(
@@ -513,6 +548,42 @@ async fn handle(
                 let _ = done.send((e.aid, rec.sid, text));
             });
             Ok(())
+        }
+        Message::KbStart(kb) => {
+            // an unusable layout or session: later strokes are answered `stale`
+            if let Ok(t) = keys_target(shared, Some(kb.sid)) {
+                vs.keys.start(&shared.term, &t, &kb).await;
+            }
+            Ok(())
+        }
+        Message::KbStroke(kb) => {
+            let reply = match keys_target(shared, vs.keys.sid_of(kb.kid)) {
+                Ok(t) => vs.keys.stroke(&shared.term, &t, &kb).await,
+                Err(e) => KbCands {
+                    kid: kb.kid,
+                    seq: kb.seq,
+                    cands: Vec::new(),
+                    typed: None,
+                    err: Some(e),
+                },
+            };
+            c.send(None, Message::KbCands(reply)).await
+        }
+        Message::Cmd(cmd)
+            if matches!(
+                cmd.op,
+                CmdOp::KbPick | CmdOp::KbDel | CmdOp::KbSend | CmdOp::KbEnd
+            ) =>
+        {
+            let res = match keys_target(shared, cmd.sid) {
+                Ok(t) => {
+                    vs.keys
+                        .cmd(&shared.term, &t, cmd.op, cmd.arg, cmd.hold_ms)
+                        .await
+                }
+                Err(e) => fail(e, "no terminal for this session"),
+            };
+            c.send(Some(env.id), Message::Result(res)).await
         }
         Message::Cmd(cmd) if cmd.op == CmdOp::Scroll => {
             scroll_cmd(shared, c, sc, inflight, env.id, &cmd).await
@@ -1028,6 +1099,20 @@ mod tests {
             arg: arg.map(Arg::Uint),
             hold_ms,
         }
+    }
+
+    #[test]
+    fn keys_are_offered_only_to_devices_that_ask_for_them() {
+        assert_eq!(
+            keys_offered(7, &[Feature::Scroll, Feature::Keys]),
+            Some(true)
+        );
+        assert_eq!(keys_offered(6, &[Feature::Keys]), None, "protocol too old");
+        assert_eq!(
+            keys_offered(7, &[Feature::Voice]),
+            None,
+            "feature not advertised"
+        );
     }
 
     #[tokio::test]

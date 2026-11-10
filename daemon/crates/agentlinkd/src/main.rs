@@ -11,6 +11,7 @@ mod device;
 mod focus;
 mod hook_source;
 mod ipc;
+mod keys;
 mod paths;
 mod prompt;
 mod registry;

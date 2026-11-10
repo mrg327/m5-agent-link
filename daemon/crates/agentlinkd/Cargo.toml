@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 agentlink-proto.workspace = true
+agentlink-keys = { path = "../agentlink-keys" }
 anyhow.workspace = true
 async-trait.workspace = true
 chrono.workspace = true

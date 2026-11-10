@@ -19,6 +19,7 @@ pub const MAX_REPLY_CHARS: usize = 24;
 /// kitty's `send-text` interprets Python-style escapes.
 const ENTER: &str = "\\r";
 const ESC: &str = "\\x1b";
+const DEL: &str = "\\x7f";
 
 /// The user's fixed quick replies: `replies.txt` (one per line, `#` comments), else none. There are
 /// no built-in defaults: replies that fit no question ("Continue", "Yes") read as noise on the watch,
@@ -95,6 +96,36 @@ pub fn type_reply(term: &dyn Terminal, ctx: &HostCtx, text: &str) -> Result<(), 
         return Err("A prompt is on screen".into());
     }
     term.send_keys(ctx, &escape(text)).map_err(err)?;
+    term.send_keys(ctx, ENTER).map_err(err)
+}
+
+/// Keyboard composition (keys.rs): `erase` backspaces, then `text`, no Enter. The same screen check
+/// as a quick reply.
+pub fn edit_text(
+    term: &dyn Terminal,
+    ctx: &HostCtx,
+    erase: usize,
+    text: &str,
+) -> Result<(), String> {
+    let screen = term.read_screen(ctx).map_err(err)?;
+    if choice_on_screen(&screen) {
+        return Err("A prompt is on screen".into());
+    }
+    if erase > 0 {
+        term.send_keys(ctx, &DEL.repeat(erase)).map_err(err)?;
+    }
+    if !text.is_empty() {
+        term.send_keys(ctx, &escape(text)).map_err(err)?;
+    }
+    Ok(())
+}
+
+/// Enter alone, for `kb_send`: the composed words are already in the prompt.
+pub fn press_enter(term: &dyn Terminal, ctx: &HostCtx) -> Result<(), String> {
+    let screen = term.read_screen(ctx).map_err(err)?;
+    if choice_on_screen(&screen) {
+        return Err("A prompt is on screen".into());
+    }
     term.send_keys(ctx, ENTER).map_err(err)
 }
 

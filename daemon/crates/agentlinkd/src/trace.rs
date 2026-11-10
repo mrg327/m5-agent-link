@@ -32,6 +32,25 @@ pub fn redact_sum(v: &mut Value) -> bool {
     hit
 }
 
+/// Keyboard messages carry the user's touch strokes and the words decoded from them
+/// (issue 20261110-1e57): replaced like speech. Returns whether anything was replaced.
+pub fn redact_keys(kind: &str, msg: &mut Value) -> bool {
+    let keys: &[&str] = match kind {
+        "kb_start" => &["keys"],
+        "kb_stroke" => &["pts"],
+        "kb_cands" => &["cands"],
+        _ => return false,
+    };
+    let mut hit = false;
+    for k in keys {
+        if let Some(x) = msg.pointer_mut(&format!("/b/{k}")) {
+            *x = Value::String("<private>".into());
+            hit = true;
+        }
+    }
+    hit
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum Dir {
     In,
@@ -162,6 +181,7 @@ impl Trace {
                 }
             }
         }
+        private |= redact_keys(&kind, &mut msg);
         let sid = msg["b"]["sid"].as_u64();
         let rid = msg["b"]["rid"].as_u64();
         self.record(src, dir, &kind, sid, rid, msg, (!private).then_some(bytes));
@@ -189,5 +209,26 @@ impl Trace {
             }
         }
         self.record("audit", Dir::Internal, kind, sid, rid, msg, None);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keyboard_strokes_keys_and_candidates_are_private() {
+        for (kind, key) in [
+            ("kb_start", "keys"),
+            ("kb_stroke", "pts"),
+            ("kb_cands", "cands"),
+        ] {
+            let mut m = json!({"t": kind, "b": {"kid": 1, "seq": 2, key: ["secret"]}});
+            assert!(redact_keys(kind, &mut m));
+            assert_eq!(m["b"][key], "<private>");
+            assert_eq!(m["b"]["kid"], 1);
+        }
+        let mut other = json!({"t": "ping", "b": {"pts": 1}});
+        assert!(!redact_keys("ping", &mut other));
     }
 }
