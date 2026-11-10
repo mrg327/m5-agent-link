@@ -112,6 +112,13 @@ bool model_quiet_active(uint32_t now_unix);
 /* PC host name from the welcome message (empty when unknown); cleared with model_init(). */
 void model_set_host(const char *host);
 const char *model_host(void);
+/* Quick replies from the welcome (proto 0.4, issue b150). `typing` is true when the daemon sent the
+ * list at all: it can then type into terminals (quick replies and interrupt). Reset by each welcome. */
+#define MODEL_MAX_REPLIES 6
+void model_set_replies(const char *const *replies, int n, bool typing);
+int model_reply_count(void);
+const char *model_reply(int i);
+bool model_can_type(void);
 
 const char *sess_state_name(sess_state_t s);
 const char *agent_name(agent_t a);

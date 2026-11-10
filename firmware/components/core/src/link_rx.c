@@ -91,6 +91,19 @@ static void on_welcome(const struct welcome *w)
     dbg_event("link", "welcome", "\"host\":%s,\"unix\":%u,\"tz_off\":%d", dbg_q(host),
               (unsigned)w->welcome_time_sync_m.time_sync_uint0uint, (int)w->welcome_time_sync_m.time_sync_uint1int);
     apply_cfg(&w->welcome_device_cfg_m);
+    /* Quick replies (proto 0.4): their presence means the daemon can type into terminals. */
+    {
+        static char buf[MODEL_MAX_REPLIES][64];
+        const char *list[MODEL_MAX_REPLIES];
+        int n = 0;
+        if (w->welcome_tstr_l_present)
+            for (size_t i = 0; i < w->welcome_tstr_l.welcome_tstr_l_tstr_count && n < MODEL_MAX_REPLIES; i++) {
+                STR(w->welcome_tstr_l.welcome_tstr_l_tstr[i], buf[n]);
+                list[n] = buf[n];
+                n++;
+            }
+        model_set_replies(list, n, w->welcome_tstr_l_present);
+    }
     /* A welcome starts a new link, possibly with a restarted daemon whose request ids and
        session ids begin again. A card kept from before could then name a different request
        (issue 20261109-1173), so drop them all; the daemon re-sends the open ones next. */

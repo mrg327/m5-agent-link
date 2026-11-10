@@ -51,7 +51,7 @@ fn escape(text: &str) -> String {
 /// Why the session must not be typed into now, if anything.
 pub fn refusal(session: &Session, request_open: bool) -> Option<&'static str> {
     if request_open {
-        return Some("answer the open request first");
+        return Some("Answer the request first");
     }
     if session.st == Some(SessState::Input)
         && matches!(
@@ -59,7 +59,7 @@ pub fn refusal(session: &Session, request_open: bool) -> Option<&'static str> {
             Some(InputSub::Approval) | Some(InputSub::Question)
         )
     {
-        return Some("the agent is asking something; answer it first");
+        return Some("Answer the agent first");
     }
     None
 }
@@ -92,7 +92,7 @@ fn err(e: FocusError) -> String {
 pub fn type_reply(term: &dyn Terminal, ctx: &HostCtx, text: &str) -> Result<(), String> {
     let screen = term.read_screen(ctx).map_err(err)?;
     if choice_on_screen(&screen) {
-        return Err("a prompt is on screen; answer it first".into());
+        return Err("A prompt is on screen".into());
     }
     term.send_keys(ctx, &escape(text)).map_err(err)?;
     term.send_keys(ctx, ENTER).map_err(err)

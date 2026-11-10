@@ -129,26 +129,44 @@ bool nav_long_swipe_down(int y_start, int y_end)
     return y_start < GESTURE_CY && y_end - y_start >= NAV_LONG_SWIPE_PX;
 }
 
-int nav_agent_items(sess_state_t state, agent_item_t *out, int cap)
+int nav_agent_items(sess_state_t state, bool typing, bool replies, agent_item_t *out, int cap)
 {
-    /* At most three each (UI-V2 §4.2): Focus is button A on HOME and WATCH, Status the swipe down on
-     * HOME, so neither takes a row; a session that waits for input keeps Focus, its only action. */
-    static const agent_item_t work[] = {{AG_WATCH, false}, {AG_NOTIFY, false}, {AG_SNOOZE, false}};
-    static const agent_item_t done[] = {{AG_ACK, false}, {AG_WATCH, false}};
-    static const agent_item_t error[] = {{AG_DISMISS, false}, {AG_WATCH, false}};
-    static const agent_item_t idle[] = {{AG_SNOOZE, false}};
-    static const agent_item_t input[] = {{AG_FOCUS, false}};
-    const agent_item_t *src;
-    int n;
+    /* UI-V2 §4.2: Focus is button A on HOME and WATCH, Status the swipe down on HOME, so neither takes
+     * a row; a session that waits for input keeps Focus. Quick replies and Interrupt need a daemon that
+     * types into terminals (issue b150). */
+    agent_item_t list[5];
+    int n = 0;
+    bool reply = typing && replies;
+#define ADD(id, hold) list[n++] = (agent_item_t){(id), (hold)}
     switch (state) {
-    case SESS_DONE: src = done; n = 2; break;
-    case SESS_ERROR: src = error; n = 2; break;
-    case SESS_IDLE: src = idle; n = 1; break;
-    case SESS_INPUT: src = input; n = 1; break;
-    default: src = work; n = 3; break;
+    case SESS_DONE:
+        if (reply) ADD(AG_REPLY, false);
+        ADD(AG_ACK, false);
+        ADD(AG_WATCH, false);
+        break;
+    case SESS_ERROR:
+        ADD(AG_DISMISS, false);
+        if (reply) ADD(AG_REPLY, false);
+        ADD(AG_WATCH, false);
+        break;
+    case SESS_IDLE:
+        if (reply) ADD(AG_REPLY, false);
+        ADD(AG_SNOOZE, false);
+        break;
+    case SESS_INPUT:
+        if (reply) ADD(AG_REPLY, false);
+        ADD(AG_FOCUS, false);
+        break;
+    default:
+        ADD(AG_WATCH, false);
+        ADD(AG_NOTIFY, false);
+        ADD(AG_SNOOZE, false);
+        if (typing) ADD(AG_INTERRUPT, true);
+        break;
     }
+#undef ADD
     int k = 0;
-    for (int i = 0; i < n && k < cap; i++) out[k++] = src[i];
+    for (int i = 0; i < n && k < cap; i++) out[k++] = list[i];
     return k;
 }
 

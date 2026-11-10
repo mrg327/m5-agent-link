@@ -18,13 +18,17 @@ static lv_obj_t *s_root, *s_header, *s_wheel, *s_hint;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static uint32_t s_sid, s_opened_ms, s_last_input, s_now;
 static bool s_holding, s_hold_fired, s_ramp_started;
-static uint32_t s_hold_t0;
+static uint32_t s_hold_t0, s_hold_ms;
+/* "Reply..." turns the wheel into the quick-reply list (issue b150); its items carry REPLY_ID + index. */
+static bool s_replies;
+#define REPLY_ID 100
 static char s_header_txt[64];
 
 /* Presentation of the interaction model's action ids. */
 static const char *const s_labels[AG_COUNT] = {
     [AG_FOCUS] = "Focus terminal", [AG_ACK] = "Mark seen",         [AG_DISMISS] = "Dismiss error",
     [AG_SNOOZE] = "Snooze 30 min", [AG_NOTIFY] = "Notify when done", [AG_WATCH] = "Watch",
+    [AG_REPLY] = "Reply...",       [AG_INTERRUPT] = "Interrupt",
 };
 
 static const session_t *session(void) { return model_find(s_sid); }
@@ -76,16 +80,25 @@ bool ui_agent_refresh(uint32_t now)
     const char *base = theme_basename(s->repo);
     char host[24];
     theme_host_prefix(host, sizeof host, s);
-    snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
+    if (s_replies) snprintf(buf, sizeof buf, "Reply%s%s", theme_sep(), base[0] ? base : "(no folder)");
+    else snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
     if (strcmp(buf, s_header_txt)) {
         snprintf(s_header_txt, sizeof s_header_txt, "%s", buf);
         lv_label_set_text(s_header, buf);
     }
-    agent_item_t items[WHEEL_MAX_ITEMS];
-    int n = nav_agent_items(s->state, items, WHEEL_MAX_ITEMS);
     uint32_t rgb = theme_session_rgb(s);
     wheel_item_t w[WHEEL_MAX_ITEMS];
-    for (int i = 0; i < n; i++) w[i] = (wheel_item_t){label_of(items[i].id, s), rgb, items[i].hold, (int)items[i].id};
+    int n = 0;
+    if (s_replies) {
+        for (int i = 0; i < model_reply_count() && n < WHEEL_MAX_ITEMS; i++)
+            w[n++] = (wheel_item_t){model_reply(i), RGB_ASK, false, REPLY_ID + i};
+    } else {
+        agent_item_t items[WHEEL_MAX_ITEMS];
+        n = nav_agent_items(s->state, model_can_type(), model_reply_count() > 0, items, WHEEL_MAX_ITEMS);
+        for (int i = 0; i < n; i++)
+            w[i] = (wheel_item_t){label_of(items[i].id, s), items[i].id == AG_INTERRUPT ? RGB_DANGER : rgb, items[i].hold,
+                                  (int)items[i].id};
+    }
     int sel = wheel_count(s_wheel) == n ? wheel_sel(s_wheel) : 0;
     wheel_set(s_wheel, w, n, sel);
     theme_set_text_color(s_word[0], lv_color_hex(rgb));
@@ -98,6 +111,7 @@ void ui_agent_open(uint32_t sid, uint32_t now)
     s_sid = sid;
     s_opened_ms = s_last_input = s_now = now;
     s_holding = s_hold_fired = s_ramp_started = false;
+    s_replies = false;
     wheel_set(s_wheel, NULL, 0, 0);
     ui_agent_refresh(now);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_HIDDEN);
@@ -128,6 +142,11 @@ static void commit(const wheel_item_t *it)
     const session_t *s = session();
     if (!s) return;
     dbg_event("ui", "commit", "\"sid\":%u,\"id\":%d", (unsigned)s->sid, it->id);
+    if (it->id >= REPLY_ID) { /* a quick reply: the daemon types it (it never takes text from here) */
+        g_ui_actions->type_reply(s->sid, it->id - REPLY_ID);
+        ui_go_home();
+        return;
+    }
     switch ((agent_action_t)it->id) {
     case AG_FOCUS:
         g_ui_actions->focus(s->sid);
@@ -137,6 +156,14 @@ static void commit(const wheel_item_t *it)
     case AG_DISMISS: g_ui_actions->ack(s->sid); g_ui_actions->tick(); break;
     case AG_SNOOZE: g_ui_actions->snooze(s->sid, snoozed(s) ? 0 : 30); break;
     case AG_NOTIFY: g_ui_actions->notify_done(s->sid, !s->ntf); break;
+    case AG_REPLY: /* the same wheel, now listing the quick replies */
+        s_replies = true;
+        wheel_set(s_wheel, NULL, 0, 0);
+        ui_agent_refresh(s_now);
+        g_ui_actions->tick();
+        dbg_event("ui", "replies", "\"sid\":%u,\"n\":%d", (unsigned)s->sid, model_reply_count());
+        return;
+    case AG_INTERRUPT: g_ui_actions->interrupt(s->sid, s_hold_ms); break; /* only ever after the hold */
     case AG_WATCH: /* the monitor for this session (UI-V2 §4.7) */
         g_ui_actions->tick();
         ui_go_watch();
@@ -203,6 +230,7 @@ bool ui_agent_tick(uint32_t now)
                 ring_set_progress(ui_home_ring(), (int)(el * 1000 / NAV_HOLD_MS), it->rgb);
             }
             if (el >= NAV_HOLD_MS) {
+                s_hold_ms = el;
                 s_hold_fired = true;
                 s_holding = false;
                 s_ramp_started = false;

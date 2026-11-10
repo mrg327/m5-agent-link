@@ -758,7 +758,7 @@
     {
       "id": "agent",
       "title": "Agent wheel",
-      "source": "firmware/components/core/src/ui_agent.c:221"
+      "source": "firmware/components/core/src/ui_agent.c:249"
     },
     {
       "id": "ask",
@@ -1109,6 +1109,13 @@
           "type": "device_cfg",
           "note": "cfg",
           "name": "cfg"
+        },
+        {
+          "key": 4,
+          "optional": true,
+          "type": "[0*6 tstr]",
+          "note": "replies  quick replies, each <= 24 chars (proto 0.4); present = the",
+          "name": "replies"
         }
       ],
       "source": "protocol/agentlink.cddl:48"
@@ -1917,8 +1924,8 @@
     "gesture.hold_show_ms": "firmware/components/core/src/nav.h:62",
     "gesture.long_press_ms": "firmware/components/core/src/gesture.h:7",
     "gesture.long_swipe_px": "firmware/components/core/src/nav.h:64",
-    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:119",
-    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:120",
+    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:121",
+    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:122",
     "gesture.rim_in_px": "firmware/components/core/src/gesture.h:24",
     "gesture.rim_out_px": "firmware/components/core/src/gesture.h:25",
     "gesture.rim_track_in_px": "firmware/components/core/src/gesture.h:26",
@@ -1932,13 +1939,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:275",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:224",
-    "gesture_map.chord": "firmware/components/core/src/app.c:318",
+    "gesture_map.chord": "firmware/components/core/src/app.c:346",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:187",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:122",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:251",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:277",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:345",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:373",
     "haptics.approved": "firmware/components/core/src/feedback.c:72",
     "haptics.denied": "firmware/components/core/src/feedback.c:78",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:59",
@@ -2018,7 +2025,7 @@
     "ring.underline_w_px": "firmware/components/core/src/ui_ring_internal.h:21",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:34",
     "screens": "firmware/components/core/src/ui_home.c:342",
-    "screens.agent": "firmware/components/core/src/ui_agent.c:221",
+    "screens.agent": "firmware/components/core/src/ui_agent.c:249",
     "screens.ask": "firmware/components/core/src/ui_ask.c:302",
     "screens.status": "firmware/components/core/src/ui_status.c:225",
     "states": "firmware/components/core/src/ui_theme.c:11",

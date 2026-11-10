@@ -149,14 +149,18 @@ User decision §9.1: tapping the centre opens a screen where gestures act on tha
 
 | State | Items (default first) | Destructive (hold) |
 |---|---|---|
-| Working | Watch · Notify when done · Snooze 30 min | — |
+| Working | Watch · Notify when done · Snooze 30 min · *Interrupt* | Interrupt |
 | Question, Permission | *ASK opens instead (§4.3)* | Approve, grants, Deny (in ASK) |
-| Done | Mark seen · Watch | — |
-| Error | Dismiss error · Watch | — |
-| Idle | Snooze 30 min | — |
-| Input (the session waits, no request listed) | Focus terminal | — |
+| Done | *Reply…* · Mark seen · Watch | — |
+| Error | Dismiss error · *Reply…* · Watch | — |
+| Idle | *Reply…* · Snooze 30 min | — |
+| Input (the session waits, no request listed) | *Reply…* · Focus terminal | — |
 
-Nothing that has another path takes a row (decision 27, 2026-11-09): **Focus** is button A on HOME and WATCH (on a Done session it also acknowledges), **Status** is the swipe down on HOME. A session that waits for input keeps Focus, its only action, until quick replies land (issue b150).
+Nothing that has another path takes a row (decision 27, 2026-11-09): **Focus** is button A on HOME and WATCH (on a Done session it also acknowledges), **Status** is the swipe down on HOME. A session that waits for input keeps Focus.
+
+Items in *italics* need a daemon that types into terminals (decision 28: the welcome carries `replies`, proto 0.4):
+- **Reply…** turns the wheel into the quick-reply list (header `Reply · <repo>`, items in the answer colour). Tap or A sends `cmd_op_type` with the reply's index; the daemon types it and Enter. The toast reads `Sent "Continue"`. The device never sends text. The daemon refuses (toast with its reason) while the session has an open request, waits on an approval or question, or shows a numbered selection list.
+- **Interrupt** is a hold item (deny colour, `HOLD` tag, 1.2 s): it sends `cmd_op_cancel` with the measured `hold_ms`, and the daemon sends Esc to the terminal. A tap only says "Hold to confirm".
 
 - **Watch** opens the WATCH monitor for this session (§4.7).
 - **Mark seen** (Done) and **Dismiss error** (Error) both send `ack`. The daemon stores the result: it sets `seen`, tells every device, and moves an acknowledged error session to idle. The device only dims the segment at once.
@@ -462,6 +466,10 @@ Phase 5 decisions (2026-11-08, implementation):
 Pared down (2026-11-09, user decision, issue 71da):
 
 27. **The AGENT wheel holds at most three items, and SCROLL is gone.** WATCH made "Scroll terminal" redundant, so the SCROLL mode left the firmware (the daemon keeps its scroll support). "Status…" left the wheel (swipe down on HOME) and "Focus terminal" too (button A on HOME and WATCH), except on a session that waits for input. This supersedes decisions 3, 4, 8 and 14–18 on the device side, and the "Status…" item of decisions 7 and 25. The next input work is quick replies and interrupt (issue b150), then voice (issue 0ea9).
+
+Quick replies and interrupt (2026-11-09, user decision, issue b150):
+
+28. **The watch's first text input is a fixed list.** The daemon owns the replies (`~/.agentlink/replies.txt`, default Continue · Yes · Run the tests) and sends them in the welcome; the device answers with an index, so it can never inject arbitrary text (DESIGN §9). Interrupt is Esc after a hold. A working session's wheel has four items because of it; the three-item rule of decision 27 applies to everything else. Voice (issue 0ea9) is next.
 
 ## 10. Decisions that reconcile DESIGN.md and UI-RING.md
 

@@ -1,0 +1,54 @@
+# Quick replies and interrupt (issue b150). A daemon that can type into terminals sends its replies
+# in the welcome (proto 0.4). "Reply..." on a session that waits for you lists them, and picking one
+# sends cmd_op_type with its index (never the text). Interrupt is a hold item on a working session:
+# a tap only says "Hold to confirm"; the hold sends cmd_op_cancel with the measured hold_ms.
+connect
+rx a400020101020103a50082000401a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 1 input webapp feat/login
+session 2 work api main
+wait 300
+tap 233 233
+wait 300
+expect_screen agent
+expect_label > Reply...
+expect_label Focus terminal
+expect_label 2 items
+btn A
+wait 200
+expect_screen agent
+expect_label Reply
+expect_label > Continue
+expect_label 3 items
+shot agent_replies.png
+btn B
+wait 150
+expect_label > Yes
+tap 233 233
+wait 200
+expect_screen ring
+expect_label Sent "Yes"
+wait 2500
+# the working session: Watch, Notify, Snooze, then Interrupt (hold)
+btn B
+wait 300
+tap 233 233
+wait 300
+expect_screen agent
+expect_label > Watch
+expect_label 4 items
+btn B
+wait 150
+btn B
+wait 150
+btn B
+wait 150
+expect_label > Interrupt
+shot agent_interrupt.png
+tap 233 233
+wait 200
+expect_screen agent
+expect_label Hold to confirm
+hold 233 233 1600
+wait 300
+expect_screen ring
+quit

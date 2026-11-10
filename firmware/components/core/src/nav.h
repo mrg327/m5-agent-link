@@ -75,7 +75,7 @@ bool nav_long_swipe_down(int y_start, int y_end);
 
 /* ── AGENT: which actions a session offers, in wheel order, default first (UI-V2 §4.2) ── */
 typedef enum {
-    AG_FOCUS, AG_ACK, AG_DISMISS, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_COUNT
+    AG_FOCUS, AG_ACK, AG_DISMISS, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_REPLY, AG_INTERRUPT, AG_COUNT
 } agent_action_t;
 
 typedef struct {
@@ -83,8 +83,10 @@ typedef struct {
     bool hold; /* destructive: commits only by a hold, never by a tap or button A */
 } agent_item_t;
 
-/* At most three items: anything with another path (Focus on button A, Status on swipe down) stays off the wheel. */
-int nav_agent_items(sess_state_t state, agent_item_t *out, int cap);
+/* Few items: anything with another path (Focus on button A, Status on swipe down) stays off the wheel.
+ * typing: the daemon can type into terminals (welcome.replies present): Interrupt on a working
+ * session (a hold), and "Reply..." where the agent waits for you when there are replies to offer. */
+int nav_agent_items(sess_state_t state, bool typing, bool replies, agent_item_t *out, int cap);
 
 /* ── ASK: the answer options of a request, in wheel order, default first (UI-V2 §4.3, §7) ──
  * Options come from attention.opts verbatim; a bare permission synthesises Approve / Deny; "Open on

@@ -13,6 +13,9 @@ static settings_t s_settings;
 static uint32_t s_rev;
 
 static char s_host[33];
+static char s_replies[MODEL_MAX_REPLIES][64]; /* 24 characters, UTF-8 */
+static int s_n_replies;
+static bool s_typing;
 static model_session_hook_t s_hook;
 
 void model_init(void)
@@ -21,6 +24,8 @@ void model_init(void)
     memset(s_att_used, 0, sizeof s_att_used);
     memset(&s_settings, 0, sizeof s_settings);
     s_host[0] = 0;
+    s_n_replies = 0;
+    s_typing = false;
     s_settings.privacy = PRIVACY_PREVIEW;
     s_rev = 1;
 }
@@ -31,6 +36,19 @@ void model_set_host(const char *host)
     s_rev++;
 }
 const char *model_host(void) { return s_host; }
+
+void model_set_replies(const char *const *replies, int n, bool typing)
+{
+    s_typing = typing;
+    s_n_replies = 0;
+    for (int i = 0; i < n && i < MODEL_MAX_REPLIES; i++)
+        snprintf(s_replies[s_n_replies++], sizeof s_replies[0], "%s", replies[i]);
+    s_rev++;
+}
+
+int model_reply_count(void) { return s_n_replies; }
+const char *model_reply(int i) { return i >= 0 && i < s_n_replies ? s_replies[i] : ""; }
+bool model_can_type(void) { return s_typing; }
 
 uint32_t model_rev(void) { return s_rev; }
 

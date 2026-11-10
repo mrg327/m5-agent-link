@@ -210,6 +210,30 @@ static void act_notify_done(uint32_t sid, bool arm)
     toast_cmd_result(sent, arm ? "Will buzz when done" : "Won't notify");
 }
 
+/* Quick reply (issue b150): the device names the reply by index; the daemon holds the text. */
+static void act_type_reply(uint32_t sid, int idx)
+{
+    bool sent = idx >= 0 && link_send_cmd_arg(LINK_OP_TYPE, sid, 0, (uint32_t)idx, 0);
+    if (sent) {
+        feedback_reply_sent();
+        char t[48];
+        snprintf(t, sizeof t, "Sent \"%s\"", model_reply(idx));
+        ui_toast(t, RGB_SUCCESS);
+    } else {
+        feedback_reject();
+        ui_toast("Offline", RGB_AMBER);
+    }
+}
+
+/* Interrupt: Esc in the session's terminal, only after the hold (the daemon checks hold_ms). */
+static void act_interrupt(uint32_t sid, uint32_t hold_ms)
+{
+    bool sent = link_send_cmd(LINK_OP_CANCEL, sid, 0, hold_ms);
+    if (sent) feedback_denied();
+    else feedback_reject();
+    toast_cmd_result(sent, "Interrupting");
+}
+
 static bool sid_snoozed(uint32_t sid) { return model_session_snoozed(model_find(sid), app_now_unix()); }
 
 /* The nag is an alert too: quiet mode holds it as it holds the arrival buzz. */
@@ -227,6 +251,8 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .ack = act_ack,
                                        .snooze = act_snooze,
                                        .notify_done = act_notify_done,
+                                       .type_reply = act_type_reply,
+                                       .interrupt = act_interrupt,
                                        .quiet_toggled = feedback_quiet_toggled,
                                        .tick = feedback_tick,
                                        .detent = feedback_detent,
@@ -295,6 +321,8 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
         model_attention_set_answer(rid, ATT_ANSWER_NONE, 0);
     static const char *const errs[] = {"Out of date", "Denied", "Not supported", "No window", "Timed out", "Failed"};
     const char *text = err >= 0 && err < 6 ? errs[err] : msg[0] ? msg : "Failed";
+    /* typing refusals say what to do ("Answer the agent first") */
+    if ((op == LINK_OP_TYPE || op == LINK_OP_CANCEL) && err == 1 && msg[0]) text = msg;
     ui_toast(text, err == 3 ? RGB_AMBER : RGB_DANGER);
     feedback_reject();
 }

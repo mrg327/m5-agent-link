@@ -30,6 +30,8 @@ typedef struct {
     void (*ack)(uint32_t sid);
     void (*snooze)(uint32_t sid, uint32_t minutes); /* AGENT: snooze this session (0 cancels) */
     void (*notify_done)(uint32_t sid, bool arm);    /* AGENT: buzz when this session finishes (false disarms) */
+    void (*type_reply)(uint32_t sid, int idx);       /* AGENT: type quick reply idx into the terminal */
+    void (*interrupt)(uint32_t sid, uint32_t hold_ms); /* AGENT: stop the running turn (Esc), after a hold */
     void (*quiet_toggled)(void); /* STATUS: quiet mode turned on, extended or off */
     void (*tick)(void);   /* light haptic tick: selection by tap or button */
     void (*detent)(void); /* rim-scrub segment crossed */

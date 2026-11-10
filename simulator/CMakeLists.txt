@@ -153,6 +153,11 @@ sim_script_test(sim_ask_hold_bound_to_rid ask_hold_bound_to_rid.txt FAIL_REGULAR
 # A welcome (a new link, maybe a restarted daemon) drops every card: rids may begin again (issue 1173).
 sim_script_test(sim_ask_cleared_on_new_link ask_cleared_on_new_link.txt
   PASS_REGULAR_EXPRESSION "attention_clear_all" FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# Quick replies and interrupt (issue b150): reply 1 goes out as op 11 with arg 1; a tap on Interrupt
+# sends nothing; the hold sends op 6 with hold_ms >= 1000.
+sim_script_test(sim_quick_replies quick_replies.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,\"sid\":[0-9]+,\"rid\":0,\"hold_ms\":[0-9][0-9]?[0-9]?,"
+  PASS_REGULAR_EXPRESSION "\"op\":11,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":1.*\"op\":6,\"sid\":2,\"rid\":0,\"hold_ms\":1[0-9][0-9][0-9],")
 # UI-V2 Phase 5: STATUS. Swipe down from HOME (never deny there), the rows, the quiet cycle and every
 # exit path; quiet mode holds the permission buzz until it is turned off again, then it buzzes.
 sim_script_test(sim_status status.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4")
