@@ -5,7 +5,8 @@ import { render, hold, durationMs } from './synth.js';
 
 const PICKS_KEY = 'atlas.sound.picks';
 const ROLE_COLOR = { done: 'var(--c-success)', select: 'var(--c-accent)' };
-const WAVE_LABEL = { sq12: 'pulse 12%', sq25: 'pulse 25%', sq50: 'square', tri: 'triangle', saw: 'saw', noise: 'noise' };
+const WAVE_LABEL = { sq12: 'pulse 12%', sq25: 'pulse 25%', sq50: 'square', tri: 'triangle', saw: 'saw', noise: 'noise', sine: 'sine', fm: 'FM piano', bell: 'FM bell' };
+const steps = (s) => s.tracks.flat();
 
 let audio = null;
 function ctxAudio() {
@@ -20,23 +21,27 @@ function loadPicks() {
   try { return JSON.parse(localStorage.getItem(PICKS_KEY)) || {}; } catch { return {}; }
 }
 
-// Note roll: time across, pitch up; slides drawn as ramps, rests as gaps.
+// Note roll: time across, pitch up; slides drawn as ramps, rests as gaps, echo as a fading tail.
 function roll(sound, lo, hi) {
   const total = durationMs(sound);
   const y = (n) => 90 - (Math.min(hi, Math.max(lo, n)) - lo) / Math.max(1, hi - lo) * 80;
   const shapes = [];
-  let t = 0;
-  for (const s of sound.steps) {
-    if (s.note && s.vol) {
-      const a = s.vol / 15;
-      const end = s.slide || s.note;
-      shapes.push(svg('polygon', {
-        points: `${t},${y(s.note) - 4} ${t + s.ms},${y(end) - 4} ${t + s.ms},${y(end) + 4} ${t},${y(s.note) + 4}`,
-        'fill-opacity': s.decay ? a * 0.55 : a,
-        'data-noise': s.wave === 'noise' ? '1' : null,
-      }));
+  const echo = sound.echo?.ms ? sound.echo : null;
+  for (const track of sound.tracks) {
+    let t = 0;
+    for (const s of track) {
+      if (s.note && s.vol) {
+        const end = s.slide || s.note;
+        const pts = (dt) => `${t + dt},${y(s.note) - 4} ${t + s.ms + dt},${y(end) - 4} ${t + s.ms + dt},${y(end) + 4} ${t + dt},${y(s.note) + 4}`;
+        const a = (s.vol / 15) * (s.decay ? 0.55 : 1);
+        const noise = s.wave === 'noise' ? '1' : null;
+        shapes.push(svg('polygon', { points: pts(0), 'fill-opacity': a, 'data-noise': noise }));
+        for (let k = 1; echo && k <= 3; k++) {
+          shapes.push(svg('polygon', { points: pts(k * echo.ms), 'fill-opacity': a * (echo.pct / 100) ** k, 'data-noise': noise }));
+        }
+      }
+      t += s.ms;
     }
-    t += s.ms;
   }
   return svg('svg', { class: 'snd__roll', viewBox: `0 0 ${total} 100`, preserveAspectRatio: 'none', 'aria-hidden': 'true' }, shapes);
 }
@@ -50,7 +55,7 @@ export function mount(section, ctx) {
     return;
   }
 
-  const notes = bank.bank.flatMap((s) => s.steps.filter((x) => x.wave !== 'noise').flatMap((x) => [x.note, x.slide])).filter(Boolean);
+  const notes = bank.bank.flatMap((s) => steps(s).filter((x) => x.wave !== 'noise').flatMap((x) => [x.note, x.slide])).filter(Boolean);
   const lo = Math.min(...notes) - 2, hi = Math.max(...notes) + 2;
   const picks = loadPicks();
   let small = true, volume = 0.8, playing = null;
@@ -98,8 +103,9 @@ export function mount(section, ctx) {
   vol.addEventListener('input', () => { volume = Number(vol.value); });
 
   root.append(
-    h('p', { class: 'snd__lede' }, 'Short chip-tune cues, made like an 8-bit console makes them: one voice, square, triangle and noise waves, ',
-      `${bank.rate / 1000} kHz. Press a card to hear it and pick one for each moment. `,
+    h('p', { class: 'snd__lede' }, 'Short game cues, from 8-bit blips to FM chimes and layered fanfares: square, triangle, saw, ',
+      `noise, sine and FM voices, up to ${Math.max(...bank.bank.map((s) => s.tracks.length))} at once, with echo, at ${bank.rate / 1000} kHz. `,
+      'Press a card to hear it and pick one for each moment. ',
       h('i', { text: 'Watch speaker' }), ' approximates the little speaker; turn it off to hear the raw synth.'),
     h('div', { class: 'snd__bar' }, smallBtn, h('label', { class: 'snd__vol' }, 'Volume ', vol)),
   );
@@ -108,12 +114,13 @@ export function mount(section, ctx) {
     const sounds = bank.bank.filter((s) => s.role === role.id);
     const grid = h('div', { class: 'snd__grid', role: 'radiogroup', 'aria-label': `Pick the ${role.id} sound` });
     for (const s of sounds) {
-      const waves = [...new Set(s.steps.filter((x) => x.note).map((x) => WAVE_LABEL[x.wave]))].join(', ');
+      const waves = [...new Set(steps(s).filter((x) => x.note).map((x) => WAVE_LABEL[x.wave] || x.wave))].join(', ');
+      const extra = [s.tracks.length > 1 && `${s.tracks.length} voices`, s.echo?.ms && 'echo'].filter(Boolean);
       const card = h('div', { class: 'snd__card', style: { '--c': ROLE_COLOR[role.id] || 'var(--c-amber)' } });
       const btn = h('button', { type: 'button', class: 'snd__play', 'aria-label': `Play ${s.name}` },
         roll(s, lo, hi),
         h('span', { class: 'snd__name', text: s.name }),
-        h('span', { class: 'snd__meta mono', text: `${durationMs(s)} ms · ${waves}` }));
+        h('span', { class: 'snd__meta mono', text: [`${durationMs(s)} ms`, waves, ...extra].join(' · ') }));
       btn.addEventListener('click', () => play(s, card));
       const radio = h('input', { type: 'radio', name: `snd-pick-${role.id}`, value: s.id, checked: picks[role.id] === s.id });
       radio.addEventListener('change', () => {

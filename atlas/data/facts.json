@@ -2222,7 +2222,10 @@
       "sq50",
       "tri",
       "saw",
-      "noise"
+      "noise",
+      "sine",
+      "fm",
+      "bell"
     ],
     "roles": [
       {
@@ -2239,421 +2242,1103 @@
         "id": "done-coin",
         "role": "done",
         "name": "Coin",
-        "steps": [
-          {
-            "wave": "sq25",
-            "note": 83,
-            "slide": 0,
-            "vol": 12,
-            "ms": 75,
-            "decay": 0
-          },
-          {
-            "wave": "sq25",
-            "note": 88,
-            "slide": 0,
-            "vol": 12,
-            "ms": 420,
-            "decay": 1
-          }
-        ]
+        "tracks": [
+          [
+            {
+              "wave": "sq25",
+              "note": 83,
+              "slide": 0,
+              "vol": 12,
+              "ms": 75,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 88,
+              "slide": 0,
+              "vol": 12,
+              "ms": 420,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       },
       {
         "id": "done-clear",
         "role": "done",
         "name": "Stage clear",
-        "steps": [
-          {
-            "wave": "sq50",
-            "note": 72,
-            "slide": 0,
-            "vol": 10,
-            "ms": 70,
-            "decay": 0
-          },
-          {
-            "wave": "sq50",
-            "note": 76,
-            "slide": 0,
-            "vol": 10,
-            "ms": 70,
-            "decay": 0
-          },
-          {
-            "wave": "sq50",
-            "note": 79,
-            "slide": 0,
-            "vol": 10,
-            "ms": 70,
-            "decay": 0
-          },
-          {
-            "wave": "sq50",
-            "note": 84,
-            "slide": 0,
-            "vol": 10,
-            "ms": 90,
-            "decay": 0
-          },
-          {
-            "wave": "sq50",
-            "note": 0,
-            "slide": 0,
-            "vol": 0,
-            "ms": 50,
-            "decay": 0
-          },
-          {
-            "wave": "sq50",
-            "note": 79,
-            "slide": 0,
-            "vol": 10,
-            "ms": 70,
-            "decay": 0
-          },
-          {
-            "wave": "sq50",
-            "note": 84,
-            "slide": 0,
-            "vol": 10,
-            "ms": 380,
-            "decay": 1
-          }
-        ]
+        "tracks": [
+          [
+            {
+              "wave": "sq50",
+              "note": 72,
+              "slide": 0,
+              "vol": 10,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 76,
+              "slide": 0,
+              "vol": 10,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 79,
+              "slide": 0,
+              "vol": 10,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 84,
+              "slide": 0,
+              "vol": 10,
+              "ms": 90,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 50,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 79,
+              "slide": 0,
+              "vol": 10,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 84,
+              "slide": 0,
+              "vol": 10,
+              "ms": 380,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       },
       {
         "id": "done-powerup",
         "role": "done",
         "name": "Power-up",
-        "steps": [
-          {
-            "wave": "sq12",
-            "note": 67,
-            "slide": 0,
-            "vol": 11,
-            "ms": 35,
-            "decay": 0
-          },
-          {
-            "wave": "sq12",
-            "note": 71,
-            "slide": 0,
-            "vol": 11,
-            "ms": 35,
-            "decay": 0
-          },
-          {
-            "wave": "sq12",
-            "note": 74,
-            "slide": 0,
-            "vol": 11,
-            "ms": 35,
-            "decay": 0
-          },
-          {
-            "wave": "sq12",
-            "note": 79,
-            "slide": 0,
-            "vol": 11,
-            "ms": 35,
-            "decay": 0
-          },
-          {
-            "wave": "sq12",
-            "note": 83,
-            "slide": 0,
-            "vol": 11,
-            "ms": 35,
-            "decay": 0
-          },
-          {
-            "wave": "sq12",
-            "note": 86,
-            "slide": 0,
-            "vol": 11,
-            "ms": 35,
-            "decay": 0
-          },
-          {
-            "wave": "sq12",
-            "note": 91,
-            "slide": 0,
-            "vol": 11,
-            "ms": 35,
-            "decay": 0
-          },
-          {
-            "wave": "sq12",
-            "note": 83,
-            "slide": 0,
-            "vol": 11,
-            "ms": 35,
-            "decay": 0
-          },
-          {
-            "wave": "sq12",
-            "note": 86,
-            "slide": 0,
-            "vol": 11,
-            "ms": 35,
-            "decay": 0
-          },
-          {
-            "wave": "sq12",
-            "note": 91,
-            "slide": 0,
-            "vol": 11,
-            "ms": 300,
-            "decay": 1
-          }
-        ]
+        "tracks": [
+          [
+            {
+              "wave": "sq12",
+              "note": 67,
+              "slide": 0,
+              "vol": 11,
+              "ms": 35,
+              "decay": 0
+            },
+            {
+              "wave": "sq12",
+              "note": 71,
+              "slide": 0,
+              "vol": 11,
+              "ms": 35,
+              "decay": 0
+            },
+            {
+              "wave": "sq12",
+              "note": 74,
+              "slide": 0,
+              "vol": 11,
+              "ms": 35,
+              "decay": 0
+            },
+            {
+              "wave": "sq12",
+              "note": 79,
+              "slide": 0,
+              "vol": 11,
+              "ms": 35,
+              "decay": 0
+            },
+            {
+              "wave": "sq12",
+              "note": 83,
+              "slide": 0,
+              "vol": 11,
+              "ms": 35,
+              "decay": 0
+            },
+            {
+              "wave": "sq12",
+              "note": 86,
+              "slide": 0,
+              "vol": 11,
+              "ms": 35,
+              "decay": 0
+            },
+            {
+              "wave": "sq12",
+              "note": 91,
+              "slide": 0,
+              "vol": 11,
+              "ms": 35,
+              "decay": 0
+            },
+            {
+              "wave": "sq12",
+              "note": 83,
+              "slide": 0,
+              "vol": 11,
+              "ms": 35,
+              "decay": 0
+            },
+            {
+              "wave": "sq12",
+              "note": 86,
+              "slide": 0,
+              "vol": 11,
+              "ms": 35,
+              "decay": 0
+            },
+            {
+              "wave": "sq12",
+              "note": 91,
+              "slide": 0,
+              "vol": 11,
+              "ms": 300,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       },
       {
         "id": "done-treasure",
         "role": "done",
         "name": "Treasure",
-        "steps": [
-          {
-            "wave": "sq50",
-            "note": 74,
-            "slide": 0,
-            "vol": 10,
-            "ms": 100,
-            "decay": 0
-          },
-          {
-            "wave": "sq50",
-            "note": 0,
-            "slide": 0,
-            "vol": 0,
-            "ms": 20,
-            "decay": 0
-          },
-          {
-            "wave": "sq50",
-            "note": 78,
-            "slide": 0,
-            "vol": 10,
-            "ms": 100,
-            "decay": 0
-          },
-          {
-            "wave": "sq50",
-            "note": 0,
-            "slide": 0,
-            "vol": 0,
-            "ms": 20,
-            "decay": 0
-          },
-          {
-            "wave": "sq50",
-            "note": 81,
-            "slide": 0,
-            "vol": 10,
-            "ms": 100,
-            "decay": 0
-          },
-          {
-            "wave": "sq50",
-            "note": 0,
-            "slide": 0,
-            "vol": 0,
-            "ms": 20,
-            "decay": 0
-          },
-          {
-            "wave": "sq50",
-            "note": 86,
-            "slide": 0,
-            "vol": 10,
-            "ms": 450,
-            "decay": 1
-          }
-        ]
+        "tracks": [
+          [
+            {
+              "wave": "sq50",
+              "note": 74,
+              "slide": 0,
+              "vol": 10,
+              "ms": 100,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 20,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 78,
+              "slide": 0,
+              "vol": 10,
+              "ms": 100,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 20,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 81,
+              "slide": 0,
+              "vol": 10,
+              "ms": 100,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 20,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 86,
+              "slide": 0,
+              "vol": 10,
+              "ms": 450,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       },
       {
         "id": "done-bonus",
         "role": "done",
         "name": "Bonus",
-        "steps": [
-          {
-            "wave": "tri",
-            "note": 84,
-            "slide": 0,
-            "vol": 15,
-            "ms": 60,
-            "decay": 0
-          },
-          {
-            "wave": "tri",
-            "note": 81,
-            "slide": 0,
-            "vol": 15,
-            "ms": 60,
-            "decay": 0
-          },
-          {
-            "wave": "tri",
-            "note": 84,
-            "slide": 0,
-            "vol": 15,
-            "ms": 60,
-            "decay": 0
-          },
-          {
-            "wave": "tri",
-            "note": 89,
-            "slide": 0,
-            "vol": 15,
-            "ms": 120,
-            "decay": 0
-          },
-          {
-            "wave": "tri",
-            "note": 0,
-            "slide": 0,
-            "vol": 0,
-            "ms": 30,
-            "decay": 0
-          },
-          {
-            "wave": "tri",
-            "note": 89,
-            "slide": 0,
-            "vol": 15,
-            "ms": 60,
-            "decay": 0
-          },
-          {
-            "wave": "tri",
-            "note": 93,
-            "slide": 0,
-            "vol": 15,
-            "ms": 400,
-            "decay": 1
-          }
-        ]
+        "tracks": [
+          [
+            {
+              "wave": "tri",
+              "note": 84,
+              "slide": 0,
+              "vol": 15,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 81,
+              "slide": 0,
+              "vol": 15,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 84,
+              "slide": 0,
+              "vol": 15,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 89,
+              "slide": 0,
+              "vol": 15,
+              "ms": 120,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 30,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 89,
+              "slide": 0,
+              "vol": 15,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 93,
+              "slide": 0,
+              "vol": 15,
+              "ms": 400,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       },
       {
         "id": "done-warp",
         "role": "done",
         "name": "Warp",
-        "steps": [
-          {
-            "wave": "sq50",
-            "note": 72,
-            "slide": 96,
-            "vol": 10,
-            "ms": 260,
-            "decay": 0
-          },
-          {
-            "wave": "sq50",
-            "note": 96,
-            "slide": 0,
-            "vol": 10,
-            "ms": 220,
-            "decay": 1
-          }
-        ]
+        "tracks": [
+          [
+            {
+              "wave": "sq50",
+              "note": 72,
+              "slide": 96,
+              "vol": 10,
+              "ms": 260,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 96,
+              "slide": 0,
+              "vol": 10,
+              "ms": 220,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "done-fanfare",
+        "role": "done",
+        "name": "Fanfare",
+        "tracks": [
+          [
+            {
+              "wave": "saw",
+              "note": 67,
+              "slide": 0,
+              "vol": 6,
+              "ms": 90,
+              "decay": 0
+            },
+            {
+              "wave": "saw",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 20,
+              "decay": 0
+            },
+            {
+              "wave": "saw",
+              "note": 67,
+              "slide": 0,
+              "vol": 6,
+              "ms": 90,
+              "decay": 0
+            },
+            {
+              "wave": "saw",
+              "note": 72,
+              "slide": 0,
+              "vol": 6,
+              "ms": 480,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "saw",
+              "note": 64,
+              "slide": 0,
+              "vol": 5,
+              "ms": 90,
+              "decay": 0
+            },
+            {
+              "wave": "saw",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 20,
+              "decay": 0
+            },
+            {
+              "wave": "saw",
+              "note": 64,
+              "slide": 0,
+              "vol": 5,
+              "ms": 90,
+              "decay": 0
+            },
+            {
+              "wave": "saw",
+              "note": 67,
+              "slide": 0,
+              "vol": 5,
+              "ms": 480,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "tri",
+              "note": 48,
+              "slide": 0,
+              "vol": 8,
+              "ms": 90,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 20,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 48,
+              "slide": 0,
+              "vol": 8,
+              "ms": 90,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 48,
+              "slide": 0,
+              "vol": 8,
+              "ms": 480,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 110,
+          "pct": 25
+        }
+      },
+      {
+        "id": "done-achieve",
+        "role": "done",
+        "name": "Achievement",
+        "tracks": [
+          [
+            {
+              "wave": "bell",
+              "note": 88,
+              "slide": 0,
+              "vol": 11,
+              "ms": 120,
+              "decay": 1
+            },
+            {
+              "wave": "bell",
+              "note": 95,
+              "slide": 0,
+              "vol": 11,
+              "ms": 500,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 140,
+          "pct": 35
+        }
+      },
+      {
+        "id": "done-quest",
+        "role": "done",
+        "name": "Quest complete",
+        "tracks": [
+          [
+            {
+              "wave": "fm",
+              "note": 81,
+              "slide": 0,
+              "vol": 6,
+              "ms": 220,
+              "decay": 1
+            },
+            {
+              "wave": "fm",
+              "note": 79,
+              "slide": 0,
+              "vol": 6,
+              "ms": 500,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "fm",
+              "note": 77,
+              "slide": 0,
+              "vol": 6,
+              "ms": 220,
+              "decay": 1
+            },
+            {
+              "wave": "fm",
+              "note": 76,
+              "slide": 0,
+              "vol": 6,
+              "ms": 500,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "tri",
+              "note": 53,
+              "slide": 0,
+              "vol": 8,
+              "ms": 220,
+              "decay": 1
+            },
+            {
+              "wave": "tri",
+              "note": 48,
+              "slide": 0,
+              "vol": 8,
+              "ms": 500,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 160,
+          "pct": 30
+        }
+      },
+      {
+        "id": "done-sparkle",
+        "role": "done",
+        "name": "Sparkle",
+        "tracks": [
+          [
+            {
+              "wave": "sine",
+              "note": 103,
+              "slide": 0,
+              "vol": 11,
+              "ms": 45,
+              "decay": 1
+            },
+            {
+              "wave": "sine",
+              "note": 98,
+              "slide": 0,
+              "vol": 11,
+              "ms": 45,
+              "decay": 1
+            },
+            {
+              "wave": "sine",
+              "note": 100,
+              "slide": 0,
+              "vol": 11,
+              "ms": 45,
+              "decay": 1
+            },
+            {
+              "wave": "sine",
+              "note": 95,
+              "slide": 0,
+              "vol": 11,
+              "ms": 45,
+              "decay": 1
+            },
+            {
+              "wave": "sine",
+              "note": 96,
+              "slide": 0,
+              "vol": 11,
+              "ms": 45,
+              "decay": 1
+            },
+            {
+              "wave": "sine",
+              "note": 91,
+              "slide": 0,
+              "vol": 11,
+              "ms": 45,
+              "decay": 1
+            },
+            {
+              "wave": "sine",
+              "note": 93,
+              "slide": 0,
+              "vol": 11,
+              "ms": 45,
+              "decay": 1
+            },
+            {
+              "wave": "sine",
+              "note": 88,
+              "slide": 0,
+              "vol": 11,
+              "ms": 45,
+              "decay": 1
+            },
+            {
+              "wave": "sine",
+              "note": 96,
+              "slide": 0,
+              "vol": 11,
+              "ms": 220,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 90,
+          "pct": 45
+        }
+      },
+      {
+        "id": "done-ko",
+        "role": "done",
+        "name": "K.O.",
+        "tracks": [
+          [
+            {
+              "wave": "noise",
+              "note": 40,
+              "slide": 28,
+              "vol": 12,
+              "ms": 600,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "sq50",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 250,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 72,
+              "slide": 84,
+              "vol": 8,
+              "ms": 120,
+              "decay": 0
+            },
+            {
+              "wave": "sq50",
+              "note": 84,
+              "slide": 0,
+              "vol": 8,
+              "ms": 300,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "done-levelup",
+        "role": "done",
+        "name": "Level up",
+        "tracks": [
+          [
+            {
+              "wave": "sq25",
+              "note": 72,
+              "slide": 0,
+              "vol": 9,
+              "ms": 40,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 74,
+              "slide": 0,
+              "vol": 9,
+              "ms": 40,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 76,
+              "slide": 0,
+              "vol": 9,
+              "ms": 40,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 77,
+              "slide": 0,
+              "vol": 9,
+              "ms": 40,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 79,
+              "slide": 0,
+              "vol": 9,
+              "ms": 40,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 81,
+              "slide": 0,
+              "vol": 9,
+              "ms": 40,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 83,
+              "slide": 0,
+              "vol": 9,
+              "ms": 40,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 84,
+              "slide": 0,
+              "vol": 9,
+              "ms": 90,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 30,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 84,
+              "slide": 0,
+              "vol": 9,
+              "ms": 350,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "tri",
+              "note": 60,
+              "slide": 0,
+              "vol": 12,
+              "ms": 280,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 55,
+              "slide": 0,
+              "vol": 12,
+              "ms": 120,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 48,
+              "slide": 0,
+              "vol": 12,
+              "ms": 350,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       },
       {
         "id": "select-blip",
         "role": "select",
         "name": "Blip",
-        "steps": [
-          {
-            "wave": "sq50",
-            "note": 81,
-            "slide": 0,
-            "vol": 10,
-            "ms": 40,
-            "decay": 1
-          }
-        ]
+        "tracks": [
+          [
+            {
+              "wave": "sq50",
+              "note": 81,
+              "slide": 0,
+              "vol": 10,
+              "ms": 40,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       },
       {
         "id": "select-tick",
         "role": "select",
         "name": "Tick",
-        "steps": [
-          {
-            "wave": "sq25",
-            "note": 88,
-            "slide": 0,
-            "vol": 8,
-            "ms": 22,
-            "decay": 1
-          }
-        ]
+        "tracks": [
+          [
+            {
+              "wave": "sq25",
+              "note": 88,
+              "slide": 0,
+              "vol": 8,
+              "ms": 22,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       },
       {
         "id": "select-confirm",
         "role": "select",
         "name": "Confirm",
-        "steps": [
-          {
-            "wave": "sq25",
-            "note": 84,
-            "slide": 0,
-            "vol": 10,
-            "ms": 45,
-            "decay": 0
-          },
-          {
-            "wave": "sq25",
-            "note": 91,
-            "slide": 0,
-            "vol": 10,
-            "ms": 90,
-            "decay": 1
-          }
-        ]
+        "tracks": [
+          [
+            {
+              "wave": "sq25",
+              "note": 84,
+              "slide": 0,
+              "vol": 10,
+              "ms": 45,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 91,
+              "slide": 0,
+              "vol": 10,
+              "ms": 90,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       },
       {
         "id": "select-pop",
         "role": "select",
         "name": "Pop",
-        "steps": [
-          {
-            "wave": "sq50",
-            "note": 72,
-            "slide": 96,
-            "vol": 10,
-            "ms": 70,
-            "decay": 1
-          }
-        ]
+        "tracks": [
+          [
+            {
+              "wave": "sq50",
+              "note": 72,
+              "slide": 96,
+              "vol": 10,
+              "ms": 70,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       },
       {
         "id": "select-chk",
         "role": "select",
         "name": "Chk",
-        "steps": [
-          {
-            "wave": "noise",
-            "note": 96,
-            "slide": 0,
-            "vol": 9,
-            "ms": 30,
-            "decay": 1
-          }
-        ]
+        "tracks": [
+          [
+            {
+              "wave": "noise",
+              "note": 96,
+              "slide": 0,
+              "vol": 9,
+              "ms": 30,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       },
       {
         "id": "select-jump",
         "role": "select",
         "name": "Jump",
-        "steps": [
-          {
-            "wave": "sq12",
-            "note": 76,
-            "slide": 88,
-            "vol": 10,
-            "ms": 110,
-            "decay": 1
-          }
-        ]
+        "tracks": [
+          [
+            {
+              "wave": "sq12",
+              "note": 76,
+              "slide": 88,
+              "vol": 10,
+              "ms": 110,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-soft",
+        "role": "select",
+        "name": "Soft tap",
+        "tracks": [
+          [
+            {
+              "wave": "sine",
+              "note": 88,
+              "slide": 0,
+              "vol": 12,
+              "ms": 25,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-pew",
+        "role": "select",
+        "name": "Pew",
+        "tracks": [
+          [
+            {
+              "wave": "sq50",
+              "note": 96,
+              "slide": 64,
+              "vol": 9,
+              "ms": 80,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-bubble",
+        "role": "select",
+        "name": "Bubble",
+        "tracks": [
+          [
+            {
+              "wave": "sine",
+              "note": 64,
+              "slide": 88,
+              "vol": 13,
+              "ms": 60,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-bell",
+        "role": "select",
+        "name": "Bell",
+        "tracks": [
+          [
+            {
+              "wave": "bell",
+              "note": 93,
+              "slide": 0,
+              "vol": 10,
+              "ms": 60,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 25,
+          "pct": 30
+        }
+      },
+      {
+        "id": "select-lock",
+        "role": "select",
+        "name": "Lock-on",
+        "tracks": [
+          [
+            {
+              "wave": "noise",
+              "note": 96,
+              "slide": 0,
+              "vol": 8,
+              "ms": 15,
+              "decay": 1
+            }
+          ],
+          [
+            {
+              "wave": "tri",
+              "note": 0,
+              "slide": 0,
+              "vol": 0,
+              "ms": 12,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 91,
+              "slide": 0,
+              "vol": 13,
+              "ms": 55,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "select-swish",
+        "role": "select",
+        "name": "Swish",
+        "tracks": [
+          [
+            {
+              "wave": "noise",
+              "note": 96,
+              "slide": 88,
+              "vol": 5,
+              "ms": 40,
+              "decay": 0
+            },
+            {
+              "wave": "noise",
+              "note": 88,
+              "slide": 76,
+              "vol": 8,
+              "ms": 60,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       }
     ]
   },
@@ -2816,20 +3501,32 @@
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:300",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:57",
     "screens.status": "firmware/components/core/src/ui_status.c:225",
-    "sounds.done-bonus": "firmware/components/core/src/sound_bank.c:35",
-    "sounds.done-clear": "firmware/components/core/src/sound_bank.c:19",
-    "sounds.done-coin": "firmware/components/core/src/sound_bank.c:17",
-    "sounds.done-powerup": "firmware/components/core/src/sound_bank.c:24",
-    "sounds.done-treasure": "firmware/components/core/src/sound_bank.c:30",
-    "sounds.done-warp": "firmware/components/core/src/sound_bank.c:40",
-    "sounds.rate": "firmware/components/core/src/sound_bank.h:21",
-    "sounds.select-blip": "firmware/components/core/src/sound_bank.c:44",
-    "sounds.select-chk": "firmware/components/core/src/sound_bank.c:48",
-    "sounds.select-confirm": "firmware/components/core/src/sound_bank.c:46",
-    "sounds.select-jump": "firmware/components/core/src/sound_bank.c:49",
-    "sounds.select-pop": "firmware/components/core/src/sound_bank.c:47",
-    "sounds.select-tick": "firmware/components/core/src/sound_bank.c:45",
-    "sounds.waves": "firmware/components/core/src/sound_bank.h:23",
+    "sounds.done-achieve": "firmware/components/core/src/sound_bank.c:52",
+    "sounds.done-bonus": "firmware/components/core/src/sound_bank.c:37",
+    "sounds.done-clear": "firmware/components/core/src/sound_bank.c:21",
+    "sounds.done-coin": "firmware/components/core/src/sound_bank.c:19",
+    "sounds.done-fanfare": "firmware/components/core/src/sound_bank.c:45",
+    "sounds.done-ko": "firmware/components/core/src/sound_bank.c:64",
+    "sounds.done-levelup": "firmware/components/core/src/sound_bank.c:68",
+    "sounds.done-powerup": "firmware/components/core/src/sound_bank.c:26",
+    "sounds.done-quest": "firmware/components/core/src/sound_bank.c:54",
+    "sounds.done-sparkle": "firmware/components/core/src/sound_bank.c:58",
+    "sounds.done-treasure": "firmware/components/core/src/sound_bank.c:32",
+    "sounds.done-warp": "firmware/components/core/src/sound_bank.c:42",
+    "sounds.rate": "firmware/components/core/src/sound_bank.h:28",
+    "sounds.select-bell": "firmware/components/core/src/sound_bank.c:86",
+    "sounds.select-blip": "firmware/components/core/src/sound_bank.c:77",
+    "sounds.select-bubble": "firmware/components/core/src/sound_bank.c:85",
+    "sounds.select-chk": "firmware/components/core/src/sound_bank.c:81",
+    "sounds.select-confirm": "firmware/components/core/src/sound_bank.c:79",
+    "sounds.select-jump": "firmware/components/core/src/sound_bank.c:82",
+    "sounds.select-lock": "firmware/components/core/src/sound_bank.c:87",
+    "sounds.select-pew": "firmware/components/core/src/sound_bank.c:84",
+    "sounds.select-pop": "firmware/components/core/src/sound_bank.c:80",
+    "sounds.select-soft": "firmware/components/core/src/sound_bank.c:83",
+    "sounds.select-swish": "firmware/components/core/src/sound_bank.c:89",
+    "sounds.select-tick": "firmware/components/core/src/sound_bank.c:78",
+    "sounds.waves": "firmware/components/core/src/sound_bank.h:30",
     "states": "firmware/components/core/src/ui_theme.c:11",
     "states.input_words": "firmware/components/core/src/ui_theme.c:32",
     "states.permission_colour": "firmware/components/core/src/ui_theme.c:24",

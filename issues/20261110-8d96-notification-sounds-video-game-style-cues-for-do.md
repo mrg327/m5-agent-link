@@ -31,3 +31,4 @@ Sound bank as data in firmware core (sound_bank.c), a chip synth spec both the w
 - 2026-11-10T20:59:03Z · copilot-cli/opus@mac-work · macos-arm64 · 6eaa32d+dirty: filed
 - 2026-11-10T20:59:05Z · copilot-cli/opus@mac-work · macos-arm64 · 6eaa32d+dirty: claimed
 - 2026-11-10T21:03:11Z · copilot-cli/opus@mac-work · macos-arm64 · 6eaa32d+dirty: Sound bank (sound_bank.c/h, 6 done + 6 select candidates), extract.py -> facts.sounds, atlas chapter 04 Sound with synth.js audition. Checks: extract --check, node tests 134/134, sim ctest, idf build (DRAM free 128777). Awaiting user's picks; board playback still TODO.
+- 2026-11-10T21:10:38Z · copilot-cli/opus@mac-work · macos-arm64 · 24a605d+dirty: Doubled to 24 candidates. Synth gains SINE/FM/BELL waves, up to 3 layered tracks and feedback echo (contract in sound_bank.h). Checks: extract --check, node 135/135, sim ctest 68, idf build.

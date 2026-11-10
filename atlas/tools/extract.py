@@ -515,12 +515,15 @@ def extract_sounds():
         arrays[m.group(1)] = [{"wave": w.lower(), "note": int(n), "slide": int(sl), "vol": int(v), "ms": int(ms),
                                "decay": int(d)} for w, n, sl, v, ms, d in re.findall(step_re, m.group(2))]
     sounds = []
-    for m in re.finditer(r'\{"([\w-]+)",\s*"(\w+)",\s*"([^"]+)",\s*(\w+),\s*N_OF\(\4\)\}', body):
-        sid, role, name, arr = m.groups()
-        if arr not in arrays or role not in {r["id"] for r in roles}:
+    bank_re = r'\{"([\w-]+)",\s*"(\w+)",\s*"([^"]+)",\s*\{([^{}]*)\},\s*(\d+),\s*(\d+)\}'
+    for m in re.finditer(bank_re, body):
+        sid, role, name, trk, echo_ms, echo_pct = m.groups()
+        names = re.findall(r"T\((\w+)\)", trk)
+        if not names or any(a not in arrays for a in names) or role not in {r["id"] for r in roles}:
             raise Drift(f"{src}: sound {sid} refers to unknown steps or role")
-        SOURCES[f"sounds.{sid}"] = f"{src}:{line_of(src, body.index('static const snd_step_t ' + arr))}"
-        sounds.append({"id": sid, "role": role, "name": name, "steps": arrays[arr]})
+        SOURCES[f"sounds.{sid}"] = f"{src}:{line_of(src, body.index('static const snd_step_t ' + names[0]))}"
+        sounds.append({"id": sid, "role": role, "name": name, "tracks": [arrays[a] for a in names],
+                       "echo": {"ms": int(echo_ms), "pct": int(echo_pct)}})
     if not sounds:
         raise Drift(f"{src}: no snd_bank entries")
     return {"rate": rate, "waves": waves, "roles": roles, "bank": sounds}
