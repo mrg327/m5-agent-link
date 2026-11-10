@@ -319,6 +319,7 @@ ACTION_TEXT = {
     "NAV_SCROLL_CATCH": "SCROLL: any new touch stops a glide; a tap that stopped one does not leave",
     "NAV_PAGE_NEWER": "SCROLL: button B moves one page toward newer output",
     "NAV_TO_BOTTOM": "SCROLL: button A jumps back to the live bottom and leaves the mode",
+    "NAV_ERASE": "KEYS: button B deletes the last typed word",
 }
 WHEN_TEXT = {"WHEN_ALWAYS": "", "WHEN_REQUEST": "with an approvable request on screen", "WHEN_NO_REQUEST": "without an approvable request",
              "WHEN_ASKABLE": "with a permission or question pending", "WHEN_NOT_ASKABLE": "with nothing to answer"}

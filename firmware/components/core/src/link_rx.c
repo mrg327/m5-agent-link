@@ -13,7 +13,7 @@ static const struct hdr_r *env_hdr(const struct envelope_r *e)
     H(msg_clear) H(msg_cmd) H(msg_result) H(msg_detail) H(msg_cfg) H(msg_batt) H(msg_ping) H(msg_pong)
     H(msg_log) H(msg_audio_start) H(msg_audio) H(msg_audio_end) H(msg_transcript)
     H(msg_dbg_ui_state_req) H(msg_dbg_ui_state) H(msg_dbg_screenshot_req) H(msg_dbg_screenshot_chunk)
-    H(msg_dbg_inject_input) H(msg_dbg_set_log_level)
+    H(msg_dbg_inject_input) H(msg_dbg_set_log_level) H(msg_kb_start) H(msg_kb_stroke) H(msg_kb_cands)
     }
 #undef H
     return NULL;
@@ -112,6 +112,7 @@ static void on_welcome(const struct welcome *w)
         model_set_replies(list, n, w->welcome_tstr_l_present);
     }
     model_set_voice(w->welcome_uint5bool_present && w->welcome_uint5bool.welcome_uint5bool);
+    model_set_keys(w->welcome_uint6bool_present && w->welcome_uint6bool.welcome_uint6bool);
     /* A welcome starts a new link, possibly with a restarted daemon whose request ids and
        session ids begin again. A card kept from before could then name a different request
        (issue 20261109-1173), so drop them all; the daemon re-sends the open ones next. */
@@ -219,6 +220,23 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
         STR(t->transcript_uint1tstr, text);
         dbg_event("link", "transcript", "\"aid\":%u,\"chars\":%u", (unsigned)t->transcript_uint0uint, (unsigned)strlen(text));
         if (g_link.hooks.on_transcript) g_link.hooks.on_transcript(t->transcript_uint0uint, text);
+        break;
+    }
+    case envelope_msg_kb_cands_m_c: {
+        const struct kb_cands *k = &e->envelope_msg_kb_cands_m.msg_kb_cands_kb_cands_m;
+        static char words[4][32]; /* what the user wrote: handed to the UI, never logged */
+        const char *list[4];
+        int n = 0;
+        for (size_t i = 0; i < k->kb_cands_tstr_l_tstr_count && i < 4; i++) {
+            STR(k->kb_cands_tstr_l_tstr[i], words[n]);
+            list[n] = words[n];
+            n++;
+        }
+        int typed = k->kb_cands_uint3uint_present ? (int)k->kb_cands_uint3uint.kb_cands_uint3uint : -1;
+        int err = k->kb_cands_result_err_m_present ? (int)k->kb_cands_result_err_m.kb_cands_result_err_m.result_err_choice : -1;
+        dbg_event("link", "kb_cands", "\"kid\":%u,\"seq\":%u,\"n\":%d,\"typed\":%d,\"err\":%d", (unsigned)k->kb_cands_uint0uint,
+                  (unsigned)k->kb_cands_uint1uint, n, typed, err);
+        if (g_link.hooks.on_kb_cands) g_link.hooks.on_kb_cands(k->kb_cands_uint0uint, k->kb_cands_uint1uint, list, n, typed, err);
         break;
     }
     case envelope_msg_dbg_ui_state_req_m_c: dbg_on_ui_state_req(id); break;

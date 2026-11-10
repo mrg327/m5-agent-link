@@ -1,0 +1,54 @@
+# KEYS swipe keyboard (issue 1e57). "Type..." ends the Reply list when the daemon decodes strokes
+# (welcome.keys). Opening sends kb_start; a swipe is sent as kb_stroke (seq 0, 1, ...) and a tap too
+# (the daemon decides); the layer key is local and resends kb_start with the same kid; B deletes the
+# last word (cmd kb_del, op 14); A held 1.2 s sends (cmd kb_send, op 15, hold_ms >= 1000) and the
+# keyboard stays open; a short A only says "Hold to send"; B held leaves with kb_end arg 1 (op 16).
+connect
+rx a400020101020103a70082000701a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f506f5
+session 1 done webapp feat/login Finished the work
+wait 300
+tap 233 233
+wait 300
+expect_screen agent
+btn A
+wait 200
+expect_label > Continue
+expect_label Type...
+btn B
+wait 150
+btn B
+wait 150
+expect_label > Type...
+btn A
+wait 300
+expect_screen keys
+expect_label Swipe the letters
+shot keys_open.png
+word hello
+wait 200
+cands 0 hello hells jello
+wait 300
+expect_label > hello
+expect_label jello
+shot keys_cands.png
+key a
+wait 200
+key layer
+wait 200
+shot keys_symbols.png
+key 7
+wait 200
+key layer
+wait 200
+btn B
+wait 300
+btn A
+wait 300
+expect_label Hold to send
+btn A held
+wait 300
+expect_screen keys
+btn B long
+wait 300
+expect_screen ring
+quit

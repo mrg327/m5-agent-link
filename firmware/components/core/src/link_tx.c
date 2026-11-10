@@ -65,12 +65,13 @@ static void fill_caps(struct caps *c, const hal_board_info_t *bi)
     c->caps_uint5bool = bi->has_mic;
     c->caps_uint6bool = bi->has_battery;
     c->caps_uint7uint = LINK_MAX_MSG;
-    /* Only features this firmware implements: voice when there is a mic, no badge yet. */
+    /* Only features this firmware implements: voice when there is a mic, keys when there is a touch screen, no badge yet. */
     static const int feats[] = {feature_focus_m_c, feature_ack_m_c, feature_approve_m_c, feature_reply_m_c,
                                 feature_debug_m_c, feature_scroll_m_c};
     n = 0;
     for (size_t i = 0; i < sizeof feats / sizeof *feats; i++) c->caps_feature_m_l_feature_m[n++].feature_choice = feats[i];
     if (bi->has_mic) c->caps_feature_m_l_feature_m[n++].feature_choice = feature_voice_m_c; /* dictation */
+    if (bi->has_touch && bi->has_display) c->caps_feature_m_l_feature_m[n++].feature_choice = feature_keys_m_c; /* KEYS swipe keyboard */
     c->caps_feature_m_l_feature_m_count = n;
 }
 
@@ -83,7 +84,7 @@ bool link_tx_hello(hal_link_kind_t to)
     set_hdr(&m->msg_hello_hdr_m, false, 0);
     struct hello *h = &m->msg_hello_hello_m;
     h->hello_major_l_major = 0;
-    h->hello_major_l_minor = 6; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice */
+    h->hello_major_l_minor = 7; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice; 0.7: keys */
     h->hello_device_info_m.device_info_device_class_m.device_class_choice = device_class(bi);
     h->hello_device_info_m.device_info_uint1tstr = zstr(bi->board);
     h->hello_device_info_m.device_info_uint2tstr = zstr(bi->fw_version);
@@ -132,6 +133,32 @@ bool link_send_audio_end(uint32_t aid)
     set_hdr(&m->msg_audio_end_hdr_m, false, 0);
     m->msg_audio_end_audio_end_m.audio_end_uint0uint = aid;
     return send_env(g_link.kind, "audio_end");
+}
+
+bool link_send_kb_start(uint32_t kid, uint32_t sid, const uint8_t *keys, size_t len)
+{
+    if (!g_link.welcomed || len > 640) return false;
+    memset(&g_tx_env, 0, sizeof g_tx_env);
+    g_tx_env.envelope_choice = envelope_msg_kb_start_m_c;
+    struct msg_kb_start *m = &g_tx_env.envelope_msg_kb_start_m;
+    set_hdr(&m->msg_kb_start_hdr_m, false, 0);
+    m->msg_kb_start_kb_start_m.kb_start_uint0uint = kid;
+    m->msg_kb_start_kb_start_m.kb_start_uint1uint = sid;
+    m->msg_kb_start_kb_start_m.kb_start_uint2bstr = (struct zcbor_string){.value = keys, .len = len};
+    return send_env(g_link.kind, "kb_start");
+}
+
+bool link_send_kb_stroke(uint32_t kid, uint32_t seq, const uint8_t *pts, size_t len)
+{
+    if (!g_link.welcomed || len > 1200) return false;
+    memset(&g_tx_env, 0, sizeof g_tx_env);
+    g_tx_env.envelope_choice = envelope_msg_kb_stroke_m_c;
+    struct msg_kb_stroke *m = &g_tx_env.envelope_msg_kb_stroke_m;
+    set_hdr(&m->msg_kb_stroke_hdr_m, false, 0);
+    m->msg_kb_stroke_kb_stroke_m.kb_stroke_uint0uint = kid;
+    m->msg_kb_stroke_kb_stroke_m.kb_stroke_uint1uint = seq;
+    m->msg_kb_stroke_kb_stroke_m.kb_stroke_uint2bstr = (struct zcbor_string){.value = pts, .len = len};
+    return send_env(g_link.kind, "kb_stroke");
 }
 
 bool link_tx_pong(uint32_t re)

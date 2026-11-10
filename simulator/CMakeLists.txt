@@ -182,6 +182,21 @@ sim_script_test(sim_reply_question reply_question.txt
 sim_script_test(sim_voice_dictate voice_dictate.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":12,\"sid\":[0-9]+,\"rid\":0,\"hold_ms\":[0-9][0-9]?[0-9]?,"
   PASS_REGULAR_EXPRESSION "\"msg\":\"audio_start\".*\"msg\":\"audio_end\".*\"ev\":\"stop\",\"aid\":[0-9]+,\"ms\":[0-9]+,\"blocks\":[1-9].*\"op\":12,\"sid\":1,\"rid\":0,\"hold_ms\":1[0-9][0-9][0-9],\"arg\":[0-9]+")
+# KEYS swipe keyboard (issue 1e57): kb_start on open, swipes and taps as kb_stroke with counting seq, the
+# layer key resends kb_start with the same kid, B deletes (op 14), only the A hold sends (op 15,
+# hold_ms >= 1000), B held leaves with kb_end arg 1 (op 16).
+sim_script_test(sim_keys_basic keys_basic.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":15,\"sid\":[0-9]+,\"rid\":0,\"hold_ms\":[0-9][0-9]?[0-9]?,"
+  PASS_REGULAR_EXPRESSION "\"msg\":\"kb_start\".*\"seq\":0,.*\"seq\":1,.*\"msg\":\"kb_start\".*\"msg\":\"kb_start\".*\"op\":14,\"sid\":1.*\"op\":15,\"sid\":1,\"rid\":0,\"hold_ms\":1[0-9][0-9][0-9].*\"op\":16,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":1")
+# KEYS candidates: a tap on a candidate is kb_pick (op 13) with its index, never a stroke; the chord
+# leaves with kb_end arg 1.
+sim_script_test(sim_keys_pick keys_pick.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"seq\":1,"
+  PASS_REGULAR_EXPRESSION "\"op\":13,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":1.*\"arg\":2.*\"arg\":0.*\"op\":16,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":1")
+# KEYS refusals show as short reasons; an arriving request closes the keyboard (kb_end arg 1) into ASK.
+sim_script_test(sim_keys_refusal keys_refusal.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+  PASS_REGULAR_EXPRESSION "\"op\":16,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":1.*\"mode\":\"home\".*\"mode\":\"ask\"")
 # Quick replies and interrupt (issue b150): reply 1 goes out as op 11 with arg 1; a tap on Interrupt
 # sends nothing; the hold sends op 6 with hold_ms >= 1000.
 sim_script_test(sim_quick_replies quick_replies.txt

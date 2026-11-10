@@ -99,6 +99,14 @@ const nav_binding_t nav_bindings[] = {
     {MODE_VOICE, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_COMMIT},
     {MODE_VOICE, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_VOICE, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
+    /* KEYS: the swipe keyboard (issue 1e57). Touch belongs to the stroke recorder, so only buttons
+     * are bound: A held 1.2 s sends (the hold starts at the 0.6 s long-press event), B deletes the
+     * last word, B held leaves and erases what was not sent. */
+    {MODE_KEYS, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_COMMIT},
+    {MODE_KEYS, G_BTN_A_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_HOLD_PRESS},
+    {MODE_KEYS, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_ERASE},
+    {MODE_KEYS, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
+    {MODE_KEYS, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
 };
 const int nav_n_bindings = (int)(sizeof nav_bindings / sizeof nav_bindings[0]);
 
@@ -120,7 +128,7 @@ nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool
 
 const char *nav_mode_name(nav_mode_t m)
 {
-    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll", "status", "watch", "voice"};
+    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll", "status", "watch", "voice", "keys"};
     return (unsigned)m < MODE_COUNT ? names[m] : "?";
 }
 
@@ -129,7 +137,7 @@ const char *nav_action_name(nav_action_t a)
     static const char *const names[NAV_COUNT] = {
         "none", "focus", "open_agent", "open_ask", "open_status", "back", "home", "next", "prev", "next_attention", "pick_rim",
         "scrub", "commit", "deny", "hold_press", "hold_release", "hold_long", "scroll_drag", "scroll_fling",
-        "scroll_catch", "page_newer", "to_bottom"};
+        "scroll_catch", "page_newer", "to_bottom", "erase"};
     return (unsigned)a < NAV_COUNT ? names[a] : "?";
 }
 

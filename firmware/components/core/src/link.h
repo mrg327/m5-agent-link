@@ -11,7 +11,7 @@
 typedef enum {
     LINK_OP_FOCUS = 0, LINK_OP_ACK = 1, LINK_OP_SNOOZE = 2, LINK_OP_APPROVE = 3, LINK_OP_DENY = 4,
     LINK_OP_REPLY = 5, LINK_OP_CANCEL = 6, LINK_OP_NOTIFY_DONE = 8, LINK_OP_SCROLL = 10, LINK_OP_TYPE = 11,
-    LINK_OP_DICTATE = 12
+    LINK_OP_DICTATE = 12, LINK_OP_KB_PICK = 13, LINK_OP_KB_DEL = 14, LINK_OP_KB_SEND = 15, LINK_OP_KB_END = 16
 } link_op_t;
 #define LINK_OP_UNKNOWN (-1)
 
@@ -28,6 +28,8 @@ typedef struct {
                           const char *preview);
     void (*on_cfg)(void);
     void (*on_transcript)(uint32_t aid, const char *text); /* voice: "" when nothing was heard */
+    /* KEYS (proto 0.7): candidates for a stroke; typed -1 when none was typed, err -1 when none (else a result_err value) */
+    void (*on_kb_cands)(uint32_t kid, uint32_t seq, const char *const *words, int n, int typed, int err);
 } link_hooks_t;
 
 void link_init(const link_hooks_t *hooks);
@@ -52,6 +54,9 @@ bool link_send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms);
 bool link_send_audio_start(uint32_t aid, uint32_t sid);
 bool link_send_audio(uint32_t aid, uint32_t seq, const uint8_t *data, size_t len);
 bool link_send_audio_end(uint32_t aid);
+/* KEYS (issue 1e57): kb_start {kid, sid, keys} and kb_stroke {kid, seq, pts}; the byte layouts are PROTOCOL.md 6a. */
+bool link_send_kb_start(uint32_t kid, uint32_t sid, const uint8_t *keys, size_t len);
+bool link_send_kb_stroke(uint32_t kid, uint32_t seq, const uint8_t *pts, size_t len);
 bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg, uint32_t hold_ms);
 /* cmd_op_scroll with scroll_arg {unit, delta, seq}; unit is a nav_scroll_unit_t wire value. */
 bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq);

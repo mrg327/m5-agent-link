@@ -8,7 +8,7 @@
 #include "gesture.h"
 #include "model.h"
 
-typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_STATUS, MODE_WATCH, MODE_VOICE, MODE_COUNT } nav_mode_t;
+typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_STATUS, MODE_WATCH, MODE_VOICE, MODE_KEYS, MODE_COUNT } nav_mode_t;
 
 /* Where a touch gesture happened, by its press (or swipe start) point. */
 typedef enum { ZONE_ANY, ZONE_CENTRE, ZONE_RIM } nav_zone_t;
@@ -41,6 +41,7 @@ typedef enum {
     NAV_SCROLL_CATCH,   /* SCROLL: any new touch stops the glide */
     NAV_PAGE_NEWER,     /* SCROLL: a page toward newer output (button B) */
     NAV_TO_BOTTOM,      /* SCROLL: button A: back to the live bottom, then leave */
+    NAV_ERASE,          /* KEYS: button B: delete the last typed word */
     NAV_COUNT
 } nav_action_t;
 

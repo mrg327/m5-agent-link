@@ -11,6 +11,7 @@
 #include "gesture.h"
 #include "hal.h"
 #include "link.h"
+#include "keys.h"
 #include "voice.h"
 #include "power.h"
 #include "ring.h"
@@ -115,6 +116,7 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 {
     s_hal_touch_read(indev, data);
     bool down = data->state == LV_INDEV_STATE_PRESSED;
+    if (keys_touch(down, data->point.x, data->point.y, app_now_ms())) return; /* KEYS owns the finger: strokes, not gestures */
     if (!down && !s_gesture.pressed) return;
     gesture_touch(&s_gesture, down, data->point.x, data->point.y, app_now_ms());
 }
@@ -247,6 +249,8 @@ static void act_dictate(uint32_t sid, uint32_t aid, uint32_t hold_ms)
     voice_cancel(); /* done with it on the device */
 }
 
+static bool act_button_down(int btn) { return btn >= 0 && btn < 2 && s_gesture.btn[btn].down; }
+
 static bool sid_snoozed(uint32_t sid) { return model_session_snoozed(model_find(sid), app_now_unix()); }
 
 /* Entering SCROLL: focus without the "Opening on PC..." toast; the mode-change tick is the feedback. */
@@ -291,6 +295,8 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .hold_stop = feedback_hold_stop,
                                        .reject = feedback_reject,
                                        .nag = act_nag,
+                                       .sent = feedback_approved,
+                                       .button_down = act_button_down,
                                        .sectors = app_set_sectors};
 
 /* ── link → app ── */
@@ -359,7 +365,7 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
     static const char *const errs[] = {"Out of date", "Denied", "Not supported", "No window", "Timed out", "Failed"};
     const char *text = err >= 0 && err < 6 ? errs[err] : msg[0] ? msg : "Failed";
     /* typing refusals say what to do ("Answer the agent first") */
-    if ((op == LINK_OP_TYPE || op == LINK_OP_CANCEL) && err == 1 && msg[0]) text = msg;
+    if ((op == LINK_OP_TYPE || op == LINK_OP_CANCEL || (op >= LINK_OP_KB_PICK && op <= LINK_OP_KB_END)) && err == 1 && msg[0]) text = msg;
     ui_toast(text, err == 3 ? RGB_AMBER : RGB_DANGER);
     feedback_reject();
 }
@@ -371,7 +377,8 @@ static void on_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bo
 }
 
 static const link_hooks_t s_hooks = {
-    .on_link = on_link, .on_attention = on_attention, .on_result = on_result, .on_scroll_pos = on_scroll_pos, .on_transcript = voice_on_transcript};
+    .on_link = on_link, .on_attention = on_attention, .on_result = on_result, .on_scroll_pos = on_scroll_pos, .on_transcript = voice_on_transcript,
+    .on_kb_cands = keys_on_cands};
 
 /* ── input dispatch ── */
 
@@ -523,6 +530,8 @@ uint32_t core_step(void)
     while (ring_pop(&s_gestures, &g)) dispatch(&g);
     model_attention_expire(app_now_unix());
     voice_tick(now);
+    keys_tick(now);
+    if (keys_active()) power_activity(now); /* the keyboard keeps the display on */
     if (voice_state() == VOICE_REC || voice_state() == VOICE_WAIT) power_activity(now); /* stay awake while dictating */
     ui_tick(now);
     dbg_tick(now);

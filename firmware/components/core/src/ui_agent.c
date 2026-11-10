@@ -26,6 +26,7 @@ static uint32_t s_hold_t0, s_hold_ms;
 static bool s_replies;
 #define REPLY_ID 1000
 #define SESSION_REPLY 100
+#define KEYS_ID 998 /* "Type..." after "Dictate...": opens KEYS (issue 1e57) */
 #define DICTATE_ID 999 /* "Dictate..." at the end of the Reply list: opens VOICE (issue 0ea9) */
 #define QUESTION_Y 100
 static char s_header_txt[64];
@@ -101,9 +102,10 @@ bool ui_agent_refresh(uint32_t now)
         for (int i = 0; i < model_reply_count() && n < WHEEL_MAX_ITEMS; i++)
             w[n++] = (wheel_item_t){model_reply(i), RGB_ASK, false, REPLY_ID + i};
         if (model_voice() && n < WHEEL_MAX_ITEMS) w[n++] = (wheel_item_t){"Dictate...", RGB_ASK, false, DICTATE_ID};
+        if (model_keys() && n < WHEEL_MAX_ITEMS) w[n++] = (wheel_item_t){"Type...", RGB_ASK, false, KEYS_ID};
     } else {
         agent_item_t items[WHEEL_MAX_ITEMS];
-        n = nav_agent_items(s->state, model_can_type(), model_reply_count() > 0 || s->n_rp > 0 || model_voice(), items, WHEEL_MAX_ITEMS);
+        n = nav_agent_items(s->state, model_can_type(), model_reply_count() > 0 || s->n_rp > 0 || model_voice() || model_keys(), items, WHEEL_MAX_ITEMS);
         for (int i = 0; i < n; i++)
             w[i] = (wheel_item_t){label_of(items[i].id, s), items[i].id == AG_INTERRUPT ? RGB_DANGER : rgb, items[i].hold,
                                   (int)items[i].id};
@@ -163,6 +165,11 @@ static void commit(const wheel_item_t *it)
     if (it->id == DICTATE_ID) {
         g_ui_actions->tick();
         ui_go_voice();
+        return;
+    }
+    if (it->id == KEYS_ID) {
+        g_ui_actions->tick();
+        ui_go_keys();
         return;
     }
     if (it->id >= REPLY_ID) { /* a quick reply: the daemon types it (it never takes text from here) */

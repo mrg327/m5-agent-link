@@ -58,6 +58,14 @@ void model_set_voice(bool on)
 }
 bool model_voice(void) { return s_voice; }
 
+static bool s_keys;
+void model_set_keys(bool on)
+{
+    s_keys = on;
+    s_rev++;
+}
+bool model_keys(void) { return s_keys; }
+
 uint32_t model_rev(void) { return s_rev; }
 
 void model_copy_str(char *dst, size_t cap, const uint8_t *src, size_t len)

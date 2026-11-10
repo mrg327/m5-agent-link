@@ -1,7 +1,11 @@
 /* Scripted input. A script is expanded up front into a timeline of primitive events (mouse, keys,
  * IMU, frames, checks) that are replayed in real time through the same paths as real input.
  *
- *   wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double] | chord
+ *   wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double|held] | chord
+ *   stroke X,Y X,Y ...              KEYS: one finger stroke through the points, a sample every 33 ms, then lifted
+ *   word LETTERS                    KEYS: a swipe through the centres of those layer-0 letters
+ *   key CHAR|space|bksp|layer       KEYS: a tap on that key (layer 0, then the symbols layer)
+ *   cands TYPED|- [err CODE] WORD...   KEYS: a daemon kb_cands for the open keyboard (TYPED = index of the typed word)
  *   scrub DEG0 DEG1 [MS [RADIUS]]   drag along the rim, degrees clockwise from 12 o'clock
  *   drag X Y DY [MS]                a slow vertical drag in the centre (default 500 ms: steps, no swipe); a flick is a fast `swipe`
  *   session SID work|input|ask|error|done|idle|doneseen REPO   add or update a session (input = permission, ask = question)
@@ -30,6 +34,7 @@
 #include "agentlink_codec_encode.h"
 #include "app.h"
 #include "core.h"
+#include "keys.h"
 #include "link_internal.h"
 #include "model.h"
 #include "ui_theme.h"
@@ -38,7 +43,7 @@
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -103,6 +108,56 @@ static void scrub(uint32_t *t, int d0, int d1, int ms, int radius)
     *t += (uint32_t)ms + 150;
 }
 
+#define STROKE_MAX 200
+
+/* One finger stroke: down on the first point, one sample per 33 ms (the LVGL read rate), up on the last. */
+static void stroke(uint32_t *t, const int (*p)[2], int n)
+{
+    for (int i = 0; i < n; i++) add(*t + 33u * (uint32_t)i, E_PTR, 1, p[i][0], p[i][1], NULL);
+    add(*t + 33u * (uint32_t)n, E_PTR, 0, p[n - 1][0], p[n - 1][1], NULL);
+    *t += 33u * (uint32_t)n + 150;
+}
+
+static bool key_centre(int cp, int *x, int *y)
+{
+    for (int layer = 0; layer < 2; layer++) {
+        keys_key_t k[KEYS_MAX_KEYS];
+        int n = keys_layout(layer, k, KEYS_MAX_KEYS);
+        for (int i = 0; i < n; i++)
+            if (k[i].cp == cp) {
+                *x = k[i].x + k[i].w / 2;
+                *y = k[i].y + k[i].h / 2;
+                return true;
+            }
+    }
+    return false;
+}
+
+/* A swipe through the layer-0 letters of a word, three samples between neighbouring keys. */
+static bool word_stroke(uint32_t *t, const char *w)
+{
+    static int p[STROKE_MAX][2];
+    int n = 0, px = 0, py = 0;
+    for (; *w && *w != ' ' && *w != '\r' && *w != '\n'; w++) {
+        int x, y;
+        if (!key_centre((unsigned char)*w, &x, &y)) return false;
+        if (n)
+            for (int j = 1; j <= 3 && n < STROKE_MAX; j++) {
+                p[n][0] = px + (x - px) * j / 4;
+                p[n++][1] = py + (y - py) * j / 4;
+            }
+        if (n < STROKE_MAX) {
+            p[n][0] = x;
+            p[n++][1] = y;
+        }
+        px = x;
+        py = y;
+    }
+    if (n < 1) return false;
+    stroke(t, (const int (*)[2])p, n);
+    return true;
+}
+
 static void btn(uint32_t *t, int b, uint32_t down_at, uint32_t up_at)
 {
     add(*t + down_at, E_BTN, b, 1, 0, NULL);
@@ -140,16 +195,36 @@ static bool parse_line(char *line, uint32_t *t)
         if (n < 4) return false;
         swipe(t, a, b, c, d, n == 5 ? e : 160);
     } else if (!strcmp(cmd, "btn") && (rest[0] == 'A' || rest[0] == 'B')) {
-        bool lng = strstr(rest, "long") != NULL, dbl = strstr(rest, "double") != NULL;
+        bool held = strstr(rest, "held") != NULL; /* past the 1.2 s hold-to-send */
+        bool lng = strstr(rest, "long") != NULL || held, dbl = strstr(rest, "double") != NULL;
         int bi = rest[0] == 'B';
         if (dbl) {
             btn(t, bi, 0, 60);
             btn(t, bi, 160, 220);
             *t += 220 + 600; /* a double press settles at once; leave room for a stray single */
         } else {
-            btn(t, bi, 0, lng ? 900u : 60u);
-            *t += (lng ? 900u : 60u) + 450; /* a single A is delayed by the double-press window */
+            uint32_t ms = held ? 1500u : lng ? 900u : 60u;
+            btn(t, bi, 0, ms);
+            *t += ms + 450; /* a single A is delayed by the double-press window */
         }
+    } else if (!strcmp(cmd, "stroke") && arg[0]) {
+        static int p[STROKE_MAX][2];
+        int n = 0, off = 0;
+        while (n < STROKE_MAX && sscanf(rest + off, " %d,%d%n", &p[n][0], &p[n][1], &c) == 2) {
+            off += c;
+            n++;
+        }
+        if (n < 1) return false;
+        stroke(t, (const int (*)[2])p, n);
+    } else if (!strcmp(cmd, "word") && arg[0]) {
+        if (!word_stroke(t, arg)) return false;
+    } else if (!strcmp(cmd, "key") && arg[0]) {
+        int cp = !strcmp(arg, "space") ? 0x20 : !strcmp(arg, "bksp") ? 0x08 : !strcmp(arg, "layer") ? 0x0e : (unsigned char)arg[0];
+        if (!key_centre(cp, &a, &b)) return false;
+        tap(t, a, b);
+    } else if (!strcmp(cmd, "cands") && arg[0]) {
+        add(*t, E_CANDS, 0, 0, 0, arg);
+        *t += 50;
     } else if (!strcmp(cmd, "chord")) {
         btn(t, 0, 0, 200);
         btn(t, 1, 40, 220);
@@ -540,6 +615,38 @@ static void run_transcript(const char *text)
     inject_env(&env, "transcript");
 }
 
+/* cands TYPED|- [err CODE] WORD...: what the daemon's decoder answered for the open keyboard */
+static void run_cands(char *spec)
+{
+    static const char *const errs[] = {"stale", "denied", "unsupported", "no_window", "timeout", "internal"};
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_kb_cands_m_c;
+    env.envelope_msg_kb_cands_m.msg_kb_cands_hdr_m.hdr_uint1uint = ++s_rx_id;
+    struct kb_cands *k = &env.envelope_msg_kb_cands_m.msg_kb_cands_kb_cands_m;
+    k->kb_cands_uint0uint = keys_kid();
+    k->kb_cands_uint1uint = keys_seq() ? keys_seq() - 1 : 0;
+    char *save = NULL, *tok = strtok_r(spec, " ", &save);
+    if (!tok) {
+        fail("bad cands", spec);
+        return;
+    }
+    if (strcmp(tok, "-")) {
+        k->kb_cands_uint3uint_present = true;
+        k->kb_cands_uint3uint.kb_cands_uint3uint = (uint32_t)atoi(tok);
+    }
+    for (tok = strtok_r(NULL, " ", &save); tok; tok = strtok_r(NULL, " ", &save)) {
+        if (!strcmp(tok, "err") && (tok = strtok_r(NULL, " ", &save)) != NULL) {
+            int e = enum_of(tok, errs, 6);
+            k->kb_cands_result_err_m_present = e >= 0;
+            k->kb_cands_result_err_m.kb_cands_result_err_m.result_err_choice = e < 0 ? 0 : e;
+        } else if (k->kb_cands_tstr_l_tstr_count < 4) {
+            k->kb_cands_tstr_l_tstr[k->kb_cands_tstr_l_tstr_count++] = zs(tok);
+        }
+    }
+    inject_env(&env, "kb_cands");
+}
+
 static void run_clear(int rid, const char *spec)
 {
     static const char *const whys[] = {"answered_pc", "answered_dev", "expired", "cancelled"};
@@ -610,6 +717,7 @@ static void run(const ev_t *e)
         if (!sim_mic_load(e->text)) fail("cannot load", e->text);
         break;
     case E_TRANSCRIPT: run_transcript(e->text); break;
+    case E_CANDS: run_cands(e->text); break;
     case E_CFG: run_cfg(e->text); break;
     case E_RTC:
         hal_rtc_set_unix((uint32_t)e->a);

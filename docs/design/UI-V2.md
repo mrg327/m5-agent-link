@@ -332,7 +332,8 @@ A swipe keyboard for one session, for fine edits or when speaking is not possibl
 - **Writing:** draw one word per stroke through its letters; lift to finish. A short tap types a single letter. The trail of the current stroke is drawn on the keys.
 - **Candidates:** tapping one replaces the last word (`kb_pick`). Backspace or B erases the last word (`kb_del`).
 - **Sending:** A held 1.2 s presses Enter (`kb_send`, the approve ramp in the answer colour). The toast reads `Sent`.
-- B held leaves and erases unsent text (`kb_end` 1); the A+B chord goes HOME and also erases; an arriving request opens ASK. Touch gestures (swipe, scrub) are off in this mode. The badges read A `SEND` and B `DEL`.
+- B held leaves and erases unsent text (`kb_end` 1); the A+B chord goes HOME and also erases; an arriving request opens ASK. Touch gestures (swipe, scrub) are off in this mode. The badges read A `SEND` and B `DEL`; they sit at radius 188 (220° / 140°) instead of the usual 158, because the usual spot overlaps the bottom row.
+- **Device details:** the layer key (`cp` 0x0E, "123"/"abc") is local: it swaps in a digits-and-symbols layer (`1234567890`, `-_./:~=+@`, `#%&*?!'`) and resends `kb_start` with the same `kid`. Strokes are sampled at ≥ 30 ms, at most 200 points, `seq` from 0 per keyboard. A tap on a candidate sends `kb_pick`, never a stroke. Every exit sends `kb_end` with arg 1; the keyboard stays open after `kb_send`. Only three candidates are shown.
 
 ## 5. Haptic vocabulary
 

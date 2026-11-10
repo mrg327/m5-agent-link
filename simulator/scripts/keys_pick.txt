@@ -1,0 +1,43 @@
+# KEYS candidates (issue 1e57): a tap on a candidate in the top cap sends cmd kb_pick (op 13) with its
+# index and is NOT a stroke; a tap on an empty slot or above the keys sends nothing; the chord
+# leaves with kb_end arg 1 and goes HOME.
+connect
+rx a400020101020103a70082000701a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f506f5
+session 1 done webapp feat/login Finished the work
+wait 300
+tap 233 233
+wait 300
+btn A
+wait 200
+btn B
+wait 150
+btn B
+wait 150
+btn A
+wait 300
+expect_screen keys
+word hello
+wait 200
+cands 0 hello hells jello
+wait 300
+expect_label > hello
+tap 233 142
+wait 300
+tap 365 142
+wait 300
+cands 2 hello hells jello
+wait 300
+expect_label > jello
+tap 38 140
+wait 300
+cands - hi
+wait 300
+tap 365 142
+wait 300
+tap 233 100
+wait 300
+expect_screen keys
+chord
+wait 300
+expect_screen ring
+quit

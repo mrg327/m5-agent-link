@@ -141,6 +141,9 @@ bool model_can_type(void);
 /* The daemon transcribes speech (welcome.voice, proto 0.5); reset by each welcome. */
 void model_set_voice(bool on);
 bool model_voice(void);
+/* The daemon decodes swipe strokes (welcome.keys, proto 0.7); reset by each welcome. */
+void model_set_keys(bool on);
+bool model_keys(void);
 
 const char *sess_state_name(sess_state_t s);
 const char *agent_name(agent_t a);
