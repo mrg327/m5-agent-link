@@ -1,7 +1,8 @@
-/* The VOICE screen (issue 0ea9): dictate a reply to one session. Opened by "Dictate..." at the end of
- * the Reply list, or on ASK for a request that takes free text (rid != 0: the transcript answers it). Listening (tap or A stops; 15 s at most), Transcribing, then the transcript with
- * "hold to send": only the 1.2 s hold sends it (cmd dictate names the recording; the daemon holds
- * the text and types it). Long swipe down or B held discards. voice.c does the recording. */
+/* The VOICE screen (issue 0ea9; looks per UI-V3 §4.7): dictate a reply to one session. Opened by "Dictate"
+ * at the end of the Reply list, or on ASK for a request that takes free text (rid != 0: the transcript
+ * answers it). Listening (tap or A stops; 15 s at most), Transcribing, then the transcript with a hold
+ * button: only the 1.2 s hold sends it (cmd dictate names the recording; the daemon holds the text and
+ * types it). Long swipe down or B held discards. voice.c does the recording. */
 #include <stdio.h>
 #include <string.h>
 
@@ -10,26 +11,41 @@
 #include "ui_internal.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
+#include "ui_wheel.h"
 #include "voice.h"
 
-#define HEADER_Y 80
-#define BIG_Y 170
-#define TEXT_Y 130
-#define TEXT_W 330
-#define HINT_Y 364
+#define DISC_Y 186
+#define DISC_D 96
+#define HALO_R_MIN 48
+#define HALO_R_MAX 88
+#define HALO_STEP 4 /* radius quantum: a repaint only when the loudness moves this far */
+#define LOW_Y 292   /* timer / "Transcribing…" */
+#define TEXT_CY 170
+#define TEXT_W 310
+#define TEXT_LINES 4
+#define ERR_ICON_Y 176
+#define REASON_Y 236
+#define BUTTON_Y 300
 
-static lv_obj_t *s_root, *s_header, *s_big, *s_text, *s_hint;
+static lv_obj_t *s_root, *s_header, *s_halo, *s_disc, *s_mic, *s_low, *s_text, *s_err, *s_reason, *s_btn;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
-static char s_header_txt[64], s_big_txt[32], s_text_txt[256], s_hint_txt[64], s_word_txt[16];
+static char s_header_txt[64], s_low_txt[32], s_text_txt[256], s_reason_txt[96], s_word_txt[16];
 static uint32_t s_sid, s_rid, s_now, s_text_since;
 static voice_state_t s_shown = (voice_state_t)-1;
 static bool s_holding, s_ramp_started;
 static uint32_t s_hold_t0;
+static int s_halo_r;
 
 static void show(lv_obj_t *o, bool on)
 {
     if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void hold_progress(int permille)
+{
+    wheel_set_progress(s_btn, permille);
+    ring_set_progress(ui_home_ring(), permille, RGB_ASK);
 }
 
 static void hold_cancel(void)
@@ -38,7 +54,42 @@ static void hold_cancel(void)
     s_holding = false;
     if (s_ramp_started) g_ui_actions->hold_stop();
     s_ramp_started = false;
-    ring_set_progress(ui_home_ring(), 0, RGB_ASK);
+    hold_progress(0);
+}
+
+/* Halo radius follows the loudness (0..100), quantised so a quiet room does not repaint. */
+static void set_halo(int level)
+{
+    level = level < 0 ? 0 : level > 100 ? 100 : level;
+    int root = 0; /* square-root curve: speech sits at 10..30 of 100 and should still move the halo */
+    while ((root + 1) * (root + 1) <= level * 100) root++;
+    int r = HALO_R_MIN + (HALO_R_MAX - HALO_R_MIN) * root / 100;
+    r = r / HALO_STEP * HALO_STEP;
+    if (r == s_halo_r) return;
+    s_halo_r = r;
+    lv_obj_set_size(s_halo, 2 * r, 2 * r);
+    lv_obj_set_pos(s_halo, UI_CX - r, DISC_Y - r);
+}
+
+/* The transcript, centred on y 170: the box is as tall as the text (at most four lines). */
+static void set_transcript(const char *t)
+{
+    if (!strcmp(t, s_text_txt)) return;
+    const lv_font_t *f = FONT_HEAD;
+    int lh = lv_font_get_line_height(f);
+    lv_point_t sz;
+    lv_text_get_size(&sz, t, f, 0, 0, TEXT_W, LV_TEXT_FLAG_NONE);
+    int lines = sz.y / lh < 1 ? 1 : sz.y / lh > TEXT_LINES ? TEXT_LINES : sz.y / lh;
+    lv_obj_set_height(s_text, lines * lh);
+    lv_obj_set_y(s_text, TEXT_CY - lines * lh / 2);
+    theme_set_text(s_text, s_text_txt, sizeof s_text_txt, t);
+}
+
+static void set_button(voice_state_t st)
+{
+    static const wheel_item_t send = {"Send", RGB_ASK, true, 1, NULL}, retry = {"Try again", 0, false, 2, NULL};
+    wheel_set(s_btn, st == VOICE_TEXT ? &send : &retry, 1, 0);
+    wheel_set_shown(s_btn, true);
 }
 
 static void render(void)
@@ -47,48 +98,51 @@ static void render(void)
     const session_t *s = model_find(s_sid);
     char buf[64];
     const char *base = s ? theme_basename(s->repo) : "";
-    snprintf(buf, sizeof buf, "Dictate%s%s", theme_sep(), base[0] ? base : "(no folder)");
+    snprintf(buf, sizeof buf, "Reply to %s", base[0] ? base : "(no folder)");
     theme_set_text(s_header, s_header_txt, sizeof s_header_txt, buf);
     if (st != s_shown) {
         if (st == VOICE_TEXT) s_text_since = s_now;
         if (st != VOICE_TEXT) hold_cancel();
         s_shown = st;
+        bool rec = st == VOICE_REC, wait = st == VOICE_WAIT, text = st == VOICE_TEXT;
+        show(s_halo, rec);
+        show(s_disc, rec || wait);
+        theme_set_bg_color(s_disc, rec ? lv_color_hex(RGB_ASK) : COL_FILL2);
+        theme_set_text_color(s_mic, rec ? COL_ON_ACCENT : COL_TEXT);
+        show(s_low, rec || wait);
+        show(s_text, text);
+        show(s_err, !rec && !wait && !text);
+        show(s_reason, !rec && !wait && !text);
+        if (text || st == VOICE_FAILED) set_button(st);
+        else wheel_set_shown(s_btn, false);
+        if (rec) set_halo(0);
     }
-    const char *word = "STOP", *hint = "";
+    const char *word = "Stop";
     switch (st) {
     case VOICE_REC: {
         uint32_t ms = voice_elapsed_ms(s_now);
         snprintf(buf, sizeof buf, "%u:%02u", (unsigned)(ms / 60000), (unsigned)(ms / 1000 % 60));
-        theme_set_text(s_big, s_big_txt, sizeof s_big_txt, buf);
-        theme_set_text(s_text, s_text_txt, sizeof s_text_txt, "Listening...");
-        hint = "tap to stop";
-        if (!s_holding) ring_set_progress(ui_home_ring(), voice_level() * 10, RGB_ASK); /* loudness */
+        theme_set_text(s_low, s_low_txt, sizeof s_low_txt, buf);
+        set_halo(voice_level());
         break;
     }
     case VOICE_WAIT:
-        theme_set_text(s_big, s_big_txt, sizeof s_big_txt, "");
-        theme_set_text(s_text, s_text_txt, sizeof s_text_txt, "Transcribing...");
-        ring_set_progress(ui_home_ring(), 0, RGB_ASK);
-        word = "WAIT";
+        theme_set_text(s_low, s_low_txt, sizeof s_low_txt, "Transcribing\xe2\x80\xa6");
+        word = ""; /* A does nothing while waiting */
         break;
     case VOICE_TEXT:
-        theme_set_text(s_big, s_big_txt, sizeof s_big_txt, "");
-        theme_set_text(s_text, s_text_txt, sizeof s_text_txt, voice_text());
-        hint = "hold to send";
-        word = "HOLD";
+        set_transcript(voice_text());
+        word = "";
         break;
     case VOICE_FAILED:
     default:
-        theme_set_text(s_big, s_big_txt, sizeof s_big_txt, "");
-        theme_set_text(s_text, s_text_txt, sizeof s_text_txt, voice_error()[0] ? voice_error() : "Not sent");
-        ring_set_progress(ui_home_ring(), 0, RGB_ASK);
-        hint = "tap to try again";
-        word = "RETRY";
+        theme_set_text(s_reason, s_reason_txt, sizeof s_reason_txt, voice_error()[0] ? voice_error() : "Not sent");
+        word = "";
         break;
     }
-    show(s_big, s_big_txt[0] != 0);
-    theme_set_text(s_hint, s_hint_txt, sizeof s_hint_txt, hint);
-    if (strcmp(word, s_word_txt)) {
+    /* Stop names A only while listening (the hold button and Try again are touch / hold). */
+    show(s_badge[0], word[0] != 0);
+    if (word[0] && strcmp(word, s_word_txt)) {
         snprintf(s_word_txt, sizeof s_word_txt, "%s", word);
         theme_key_badge_set_word(s_badge[0], s_word[0], word, UI_BADGE_A_DEG, UI_BADGE_R);
     }
@@ -100,6 +154,7 @@ void ui_voice_open(uint32_t sid, uint32_t rid, uint32_t now)
     s_rid = rid;
     s_now = now;
     s_shown = (voice_state_t)-1;
+    s_halo_r = 0;
     s_holding = s_ramp_started = false;
     ring_set_still(ui_home_ring(), true);
     voice_start(sid, now); /* a refusal shows as the failed state with its reason */
@@ -114,7 +169,7 @@ void ui_voice_close(void)
 {
     hold_cancel();
     voice_cancel(); /* nothing is ever sent for a recording left here */
-    ring_set_progress(ui_home_ring(), 0, RGB_ASK);
+    hold_progress(0);
     ring_set_still(ui_home_ring(), !ui_animations_allowed());
     show(s_root, false);
 }
@@ -171,11 +226,11 @@ bool ui_voice_tick(uint32_t now)
                 s_ramp_started = true;
                 g_ui_actions->hold_start();
             }
-            ring_set_progress(ui_home_ring(), (int)(el * 1000 / NAV_HOLD_MS), RGB_ASK);
+            hold_progress((int)(el * 1000 / NAV_HOLD_MS));
         }
         if (el >= NAV_HOLD_MS) {
             s_holding = s_ramp_started = false;
-            ring_set_progress(ui_home_ring(), 0, RGB_ASK);
+            hold_progress(0);
             g_ui_actions->dictate(s_sid, s_rid, voice_aid(), el);
             return true;
         }
@@ -190,9 +245,37 @@ void ui_voice_report(ui_report_t *r)
     r->has_sel_sid = true;
     r->sel_sid = s_sid;
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
-    if (s_big_txt[0]) ui_report_add(r, "%s", s_big_txt);
-    if (s_text_txt[0]) ui_report_add(r, "%s", voice_state() == VOICE_TEXT ? "(transcript)" : s_text_txt);
-    if (s_hint_txt[0]) ui_report_add(r, "%s", s_hint_txt);
+    voice_state_t st = voice_state();
+    if (s_low_txt[0] && (st == VOICE_REC || st == VOICE_WAIT)) ui_report_add(r, "%s", s_low_txt);
+    if (st == VOICE_TEXT) ui_report_add(r, "(transcript)");
+    if (st == VOICE_FAILED) ui_report_add(r, "%s", s_reason_txt);
+    if (st == VOICE_TEXT || st == VOICE_FAILED) ui_report_add(r, "%s", st == VOICE_TEXT ? "Send" : "Try again"); /* the button */
+}
+
+static lv_obj_t *label(lv_obj_t *parent, const lv_font_t *f, lv_color_t col, int cy, int w, int lines)
+{
+    lv_obj_t *l = lv_label_create(parent);
+    lv_obj_set_style_text_font(l, f, 0);
+    lv_obj_set_style_text_color(l, col, 0);
+    lv_obj_set_size(l, w, lines * lv_font_get_line_height(f));
+    lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_set_pos(l, UI_CX - w / 2, cy - lv_font_get_line_height(f) / 2);
+    lv_label_set_text(l, "");
+    return l;
+}
+
+static lv_obj_t *disc(lv_obj_t *parent, int d, lv_color_t col)
+{
+    lv_obj_t *o = lv_obj_create(parent);
+    lv_obj_remove_style_all(o);
+    lv_obj_set_size(o, d, d);
+    lv_obj_set_pos(o, UI_CX - d / 2, DISC_Y - d / 2);
+    lv_obj_set_style_radius(o, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(o, col, 0);
+    lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    return o;
 }
 
 lv_obj_t *ui_voice_init(lv_obj_t *screen)
@@ -201,28 +284,28 @@ lv_obj_t *ui_voice_init(lv_obj_t *screen)
     lv_obj_remove_style_all(s_root);
     lv_obj_set_size(s_root, UI_SIZE, UI_SIZE);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    s_header = theme_label(s_root, 16, COL_MUTED);
-    lv_obj_set_size(s_header, 280, lv_font_get_line_height(theme_font(16)));
-    lv_obj_set_style_text_align(s_header, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_pos(s_header, UI_CX - 140, HEADER_Y);
-    s_big = theme_label(s_root, 48, COL_TEXT);
-    lv_obj_set_size(s_big, 300, lv_font_get_line_height(theme_font(48)));
-    lv_obj_set_style_text_align(s_big, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_pos(s_big, UI_CX - 150, BIG_Y);
-    s_text = theme_label(s_root, 20, COL_TEXT);
-    lv_obj_set_size(s_text, TEXT_W, 5 * lv_font_get_line_height(theme_font(20)));
-    lv_label_set_long_mode(s_text, LV_LABEL_LONG_MODE_DOTS);
-    lv_obj_set_style_text_align(s_text, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_pos(s_text, UI_CX - TEXT_W / 2, TEXT_Y);
-    s_hint = theme_label(s_root, 16, COL_MUTED);
-    lv_obj_set_size(s_hint, 300, lv_font_get_line_height(theme_font(16)));
-    lv_obj_set_style_text_align(s_hint, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_pos(s_hint, UI_CX - 150, HINT_Y);
-    static const char *const words[2] = {"STOP", "BACK"};
+    s_header = label(s_root, FONT_CAPTION, COL_TEXT2, UI_Y_CAPTION, 280, 1);
+    s_halo = disc(s_root, 2 * HALO_R_MIN, lv_color_hex(RGB_ASK));
+    lv_obj_set_style_bg_opa(s_halo, (LV_OPA_COVER / 4), 0);
+    s_disc = disc(s_root, DISC_D, lv_color_hex(RGB_ASK));
+    s_mic = lv_label_create(s_disc);
+    lv_obj_set_style_text_font(s_mic, FONT_ICON_L, 0);
+    lv_label_set_text(s_mic, ICON_MIC);
+    lv_obj_center(s_mic);
+    s_low = label(s_root, FONT_TITLE, COL_TEXT, LOW_Y, 300, 1);
+    s_text = label(s_root, FONT_HEAD, COL_TEXT, TEXT_CY, TEXT_W, TEXT_LINES);
+    s_err = lv_label_create(s_root);
+    lv_obj_set_style_text_font(s_err, FONT_ICON_L, 0);
+    lv_obj_set_style_text_color(s_err, lv_color_hex(RGB_ERROR), 0);
+    lv_label_set_text(s_err, ICON_ERROR);
+    lv_obj_align(s_err, LV_ALIGN_TOP_MID, 0, ERR_ICON_Y - 22);
+    s_reason = label(s_root, FONT_HEAD, COL_TEXT, REASON_Y, 320, 2);
+    s_btn = wheel_create_at(s_root, WHEEL_LAYOUT_BUTTON(BUTTON_Y));
+    static const char *const words[2] = {"Stop", "Back"};
     for (int i = 0; i < 2; i++)
         s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,
                                      UI_BADGE_R, &s_key[i], &s_word[i]);
-    snprintf(s_word_txt, sizeof s_word_txt, "STOP");
+    snprintf(s_word_txt, sizeof s_word_txt, "Stop");
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     return s_root;
 }

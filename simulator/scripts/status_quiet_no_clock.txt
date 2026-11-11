@@ -12,4 +12,11 @@ btn A
 wait 200
 expect_label Set the clock first
 expect_label > Quiet: off
+# clock unset: the host name stands in for the time; a down link shows the amber offline chip
+shot status_no_clock.png
+expect_label dev-mac
+disconnect
+wait 3000
+expect_label Offline
+shot status_offline.png
 quit

@@ -24,23 +24,32 @@ expect_label > Dictate...
 btn A
 wait 300
 expect_screen voice
-expect_label Dictate
-expect_label Listening...
-expect_label tap to stop
+expect_label Reply to webapp
+expect_label 0:0
 shot voice_listening.png
-wait 1200
+wait 200
+shot voice_listening_level.png
+wait 1000
 tap 233 233
 wait 300
-expect_label Transcribing...
+expect_label Transcribing…
+shot voice_transcribing.png
 transcript run the tests again and push
 wait 300
 expect_label (transcript)
-expect_label hold to send
+expect_label Send
 shot voice_transcript.png
 tap 233 233
 wait 200
 expect_screen voice
 expect_label Hold to send
+shot voice_hold_toast.png
+press 233 300
+wait 900
+shot voice_hold.png
+release
+wait 200
+expect_screen voice
 hold 233 233 1600
 wait 400
 expect_screen ring
@@ -62,7 +71,8 @@ wait 300
 transcript
 wait 300
 expect_label Nothing heard
-expect_label tap to try again
+expect_label Try again
+shot voice_failed.png
 btn B long
 wait 300
 expect_screen ring
