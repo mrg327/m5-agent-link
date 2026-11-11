@@ -1,5 +1,5 @@
 # Dictating an answer (issue 7941). A question with a free-text field comes without options and with
-# acts focus,dictate; with welcome.voice the ASK wheel is "Dictate..." then "Open on PC". A tap opens
+# acts focus,dictate; with welcome.voice the ASK wheel is "Dictate" then "Open on PC". A tap opens
 # VOICE on that request; the hold sends cmd dictate (op 12) with the request's rid and the recording
 # id; ASK shows the answer pending until the daemon's clear returns to the deck.
 connect
@@ -16,7 +16,7 @@ expect_label > Dictate
 expect_label Open on PC
 expect_label 2 options
 shot ask_dictate.png
-tap 233 233
+tap 233 282
 wait 300
 expect_screen voice
 expect_label 0:0
@@ -30,10 +30,10 @@ expect_label Send
 hold 233 233 1600
 wait 400
 expect_screen ask
-expect_label Sent dictation
+expect_label Sent
 result ok
 wait 200
-expect_label Sent dictation
+expect_label Sent
 clear 8 answered_dev
 wait 300
 expect_screen ring

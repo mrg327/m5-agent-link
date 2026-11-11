@@ -1,0 +1,17 @@
+# UI-V3 §3.3: a tap on a neighbour row that is safe to commit (a question's option) selects it and sends
+# it in the same touch: cmd_op_reply (op 5) with that option's index (Vue = 1), nothing else.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 ask dashboard main
+wait 300
+attention 8 2 question reply,focus 0 Which framework?|Pick the UI library for the new dashboard|React|Vue|Keep vanilla
+wait 400
+expect_screen ask
+expect_label > React
+tap 233 330
+wait 300
+expect_screen ask
+expect_label "Vue"
+expect_label Waiting for your computer
+shot ask_sent_option.png
+quit

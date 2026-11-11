@@ -20,9 +20,9 @@ attention 8 1 question reply,focus 0 Which framework?|Pick the UI library|React|
 wait 400
 expect_screen ask
 expect_label > React
-tap 233 233
+tap 233 282
 wait 300
-expect_label Sent "React"
+expect_label "React"
 result ok
 clear 8 answered_dev
 session 1 work webapp feat/login

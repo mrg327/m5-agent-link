@@ -14,15 +14,15 @@ shot ask_grants.png
 btn B
 wait 150
 expect_label > Yes, don't ask again HOLD
-tap 233 233
+tap 233 282
 wait 300
 expect_screen ask
-expect_label Hold to confirm
+expect_label Hold to approve
 hold 233 233 700
 wait 300
 expect_screen ask
 expect_label > Yes, don't ask again HOLD
 hold 233 233 1500
 wait 400
-expect_label waiting for PC
+expect_label Waiting for your computer
 quit

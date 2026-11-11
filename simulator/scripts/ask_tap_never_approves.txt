@@ -8,16 +8,16 @@ attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watc
 wait 400
 expect_screen ask
 expect_label > Approve HOLD
-tap 233 233
+tap 233 282
 wait 300
 expect_screen ask
-expect_label Hold to confirm
+expect_label Hold to approve
 shot ask_toast_hold.png
-tap 233 233
-tap 233 233
+tap 233 282
+tap 233 282
 wait 300
 expect_screen ask
-hold 233 233 400
+hold 233 282 400
 wait 300
 expect_screen ask
 expect_label > Approve HOLD

@@ -11,9 +11,9 @@ shot ask_permission.png
 btn B
 wait 150
 expect_label > Deny HOLD
-tap 233 233
+tap 233 282
 wait 300
-expect_label Hold to confirm
+expect_label Hold to deny
 expect_screen ask
 hold 233 233 1100
 wait 400

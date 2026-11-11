@@ -122,10 +122,10 @@ static void rebuild(void)
         if (s_slots[i].sid == s_sel_sid) s_sel = i;
     if (s_n != old_n && g_ui_actions->sectors) g_ui_actions->sectors(s_n);
 
-    /* AGENT, ASK and SCROLL draw their own items or track on the ring; writing sessions there would
+    /* AGENT and SCROLL draw their own items or track on the ring; writing sessions there would
      * repaint it twice per delta. Their exit refreshes the deck (enter_mode). */
     nav_mode_t mode = ui_mode();
-    if (mode == MODE_AGENT || mode == MODE_ASK || mode == MODE_SCROLL) return;
+    if (mode == MODE_AGENT || mode == MODE_SCROLL) return;
     ring_seg_t segs[RING_MAX_SEGMENTS];
     for (int i = 0; i < s_n; i++) {
         const session_t *s = model_find(s_slots[i].sid);

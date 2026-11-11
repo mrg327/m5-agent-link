@@ -162,6 +162,13 @@ sim_script_test(sim_ask_deny_hold ask_deny_hold.txt
 sim_script_test(sim_ask_tap_never_approves ask_tap_never_approves.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"op\":5"
                 PASS_REGULAR_EXPRESSION "\"op\":0,\"sid\":2")
+# UI-V3 §3.3: tapping any ASK row (selected or neighbour) never approves, denies or answers a hold item;
+# tapping a neighbour question option sends that option's reply.
+sim_script_test(sim_ask_tap_rows ask_tap_rows.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
+sim_script_test(sim_ask_tap_option_row ask_tap_option_row.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4"
+                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":8,\"hold_ms\":0,\"arg\":1")
 # UI-V3: swipe right goes back from AGENT, STATUS, VOICE, WATCH, SCROLL and ASK; in ASK it never answers
 # (no approve, deny or reply op), the request stays and a tap reopens it.
 sim_script_test(sim_back_swipe_right back_swipe_right.txt
