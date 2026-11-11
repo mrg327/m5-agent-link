@@ -44,4 +44,4 @@ jobs:
       - name: Build
         run: cmake --build build/sim
       - name: Test
-        run: ctest --test-dir build/sim --output-on-failure
+        run: ctest --test-dir build/sim -j 16 --output-on-failure

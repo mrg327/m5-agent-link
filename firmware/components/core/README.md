@@ -17,4 +17,4 @@ Single-threaded by design: HAL callbacks (buttons, motion, link) only push into 
 | `debug.c` | JSON debug lines, `ui_state`, screenshot streaming, injected input |
 | `ui*.c` | LVGL screens: glance, list, detail (+ attention card), theme, ring widget |
 
-Test: `ctest --test-dir build/sim` (gesture recognizer; protocol round trip lives in `agentlink_proto`).
+Test: `ctest --test-dir build/sim -j 16` (gesture recognizer; protocol round trip lives in `agentlink_proto`).

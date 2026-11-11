@@ -10,7 +10,7 @@ brew install sdl2 ninja                                 # macOS (sdl2-compat is 
 sudo apt-get install -y libsdl2-dev ninja-build         # Debian/Ubuntu
 cmake -S simulator -B build/sim -G Ninja
 cmake --build build/sim
-ctest --test-dir build/sim   # 12 protocol vectors, gesture recognizer, scripted headless UI run
+ctest --test-dir build/sim -j 16   # protocol vectors, unit tests, scripted headless UI runs (about 35 s; the scripts replay in real time, so run them in parallel)
 ```
 
 LVGL v9.5.0 is fetched with FetchContent (config: `simulator/lv_conf.h`).
