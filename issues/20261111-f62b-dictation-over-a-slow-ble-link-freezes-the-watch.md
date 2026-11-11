@@ -48,3 +48,4 @@ run; request the fast interval during VOICE_REC; if the link still falls behind,
 ## Log
 
 - 2026-11-11T03:38:57Z · claude-code@linux-dev · linux-x86_64 · e479b43: filed
+- 2026-11-11T03:39:51Z · claude-code@linux-dev · linux-x86_64 · b8174a9: Not started: the user deferred the fix (2026-11-10). Workaround: dictate over USB, or hold power to restart the watch if it freezes. Related gap: the daemon logs the watch's non-'#' console lines (panics, ESP_LOG output such as 'notify back-pressure timeout') only at debug, so they don't reach the journal; run with RUST_LOG=info,device_log=debug when reproducing.
