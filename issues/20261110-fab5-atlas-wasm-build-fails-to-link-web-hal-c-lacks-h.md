@@ -1,11 +1,11 @@
 ---
 id: 20261110-fab5
 title: Atlas wasm build fails to link: web_hal.c lacks hal_mic_* and hal_reset_reason
-status: open
+status: claimed
 severity: low
 area: atlas
 platforms: any
-owner:
+owner: claude-code@linux-dev
 created: 2026-11-10T21:41:15Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
@@ -29,3 +29,4 @@ gh:
 ## Log
 
 - 2026-11-10T21:41:16Z · copilot-cli/opus@mac-work · macos-arm64 · b84fdea+dirty: filed
+- 2026-11-11T01:07:46Z · claude-code@linux-dev · linux-x86_64 · 2719b23: claimed
