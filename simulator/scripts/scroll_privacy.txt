@@ -17,7 +17,7 @@ drag 233 260 -96
 wait 200
 result pos 142 0 1200 $ secret-command --token=abc
 wait 200
-expect_label -142 lines
+expect_label [142] lines up
 expect_no_label secret
 shot scroll_private.png
 cfg privacy preview

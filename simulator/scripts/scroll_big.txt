@@ -1,0 +1,19 @@
+# SCROLL with a four-digit count (UI-V3 §4.5): the number font must fit and clear the ring.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite
+wait 300
+tap 233 233
+wait 300
+btn A
+wait 300
+expect_screen watch
+# a drag on WATCH opens SCROLL over it, and moves the terminal one line
+drag 233 260 -30
+wait 300
+expect_screen scroll
+result pos 1234 0 5000 $ npm test -- --watch=false
+wait 200
+expect_label [1234] lines up
+shot scroll_4digit.png
+quit

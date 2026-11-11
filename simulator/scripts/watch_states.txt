@@ -1,0 +1,42 @@
+# WATCH in every state (UI-V3 §4.4): looks only; the shots are the point. A failed step, a long
+# argument, then the not-working states with their icon, word, caption and the Answer button.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login
+wait 300
+tap 233 233
+wait 300
+btn A
+wait 300
+expect_screen watch
+shot watch_empty.png
+step 1 1 Read · src/main.c
+step 1 1 ok
+step 1 2 Bash · npm test -- --watch=false
+step 1 2 fail
+step 1 3 Edit · src/app.c
+wait 200
+shot watch_failed.png
+step 1 3 ok
+step 1 4 Edit · src/components/authentication/LoginForm.tsx
+step 1 4 ok
+step 1 5 Grep · a very long pattern that goes on and on and on and on and on and on and on and on and on and on and on
+wait 200
+expect_label Grep
+shot watch_long_arg.png
+session 1 input webapp feat/login
+wait 300
+expect_label Answer
+shot watch_needs_you.png
+session 1 error webapp feat/login
+wait 300
+shot watch_error.png
+session 1 done webapp feat/login
+wait 300
+expect_label Finished
+shot watch_done.png
+session 1 idle webapp feat/login
+wait 300
+shot watch_idle.png
+quit

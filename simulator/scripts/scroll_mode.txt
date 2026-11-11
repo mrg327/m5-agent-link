@@ -15,7 +15,7 @@ drag 233 260 -30
 wait 300
 expect_screen scroll
 expect_label Claude Code
-expect_label -1 lines
+expect_label [1] lines up
 # the daemon reports the live bottom (a terminal with no scrollback yet)
 result pos 0 1 1200
 wait 200
@@ -24,15 +24,15 @@ shot scroll_live.png
 # 96 px up: the first 18 px are tap slop, then one line per 10 px = 7 lines
 drag 233 260 -96
 wait 200
-expect_label -7 lines
+expect_label [7] lines up
 result pos 12 0 1200 $ npm test -- --watch=false
 wait 200
-expect_label -12 lines
+expect_label [12] lines up
 expect_label npm test
 shot scroll_preview.png
 result pos 142 0 1200 $ npm test -- --watch=false
 wait 200
-expect_label -142 lines
+expect_label [142] lines up
 shot scroll_scrolled.png
 # a flick up is lines and a glide, not a page; B is a page toward newer
 swipe 233 300 233 150 120
