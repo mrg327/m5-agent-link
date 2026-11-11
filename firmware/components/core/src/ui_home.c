@@ -22,7 +22,7 @@ static home_slot_t s_slots[RING_MAX_SEGMENTS];
 static int s_n, s_sel;
 static uint32_t s_sel_sid;
 static bool s_has_sel;
-static bool s_scrubbing, s_freeze_expand;
+static bool s_scrubbing, s_freeze_expand, s_rim_dial;
 static uint32_t s_now, s_last_input, s_last_elapsed;
 static bool s_ambient;
 
@@ -120,7 +120,7 @@ static void rebuild(void)
     s_sel = 0;
     for (int i = 0; i < s_n; i++)
         if (s_slots[i].sid == s_sel_sid) s_sel = i;
-    if (s_n != old_n && g_ui_actions->sectors) g_ui_actions->sectors(s_n);
+    if (s_n != old_n && !s_rim_dial && g_ui_actions->sectors) g_ui_actions->sectors(s_n);
 
     /* AGENT and SCROLL draw their own items or track on the ring; writing sessions there would
      * repaint it twice per delta. Their exit refreshes the deck (enter_mode). */
@@ -224,12 +224,18 @@ void ui_home_note_input(void) { noted_input(); }
 const session_t *ui_home_sel_session(void) { return sel_session(); }
 const home_slot_t *ui_home_sel_slot(void) { return s_n > 0 ? &s_slots[s_sel] : NULL; }
 int ui_home_slot_count(void) { return s_n; }
+/* What a rim drag means now: a dial through a list's items (AGENT, ASK, STATUS), or the session segments. */
+void ui_home_rim_mode(bool dial)
+{
+    s_rim_dial = dial;
+    if (g_ui_actions->sectors) g_ui_actions->sectors(dial ? NAV_LIST_SECTORS : s_n);
+}
 const attention_t *ui_home_askable_of(const session_t *s) { return askable(s); }
 void ui_home_set_card_shown(bool shown)
 {
     if (shown) {
         lv_obj_remove_flag(s_centre, LV_OBJ_FLAG_HIDDEN);
-        if (g_ui_actions->sectors) g_ui_actions->sectors(s_n); /* the rim counts sessions again */
+        ui_home_rim_mode(false); /* the rim counts sessions again */
     } else {
         lv_obj_add_flag(s_centre, LV_OBJ_FLAG_HIDDEN);
     }

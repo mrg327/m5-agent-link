@@ -263,6 +263,8 @@ sim_script_test(sim_agent_hold_neighbour_row agent_hold_neighbour_row.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,|\"op\":8,")
 sim_script_test(sim_agent_hold_cancel_on_select agent_hold_cancel_on_select.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,")
+sim_script_test(sim_list_rim_dial list_rim_dial.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_ask_second_tap ask_second_tap.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_ask_tap_open_row ask_tap_open_row.txt

@@ -206,6 +206,7 @@ void ui_ask_open(uint32_t sid, uint32_t now)
     s_keeping = false;
     wheel_set(s_wheel, NULL, 0, 0);
     ui_ask_refresh(now);
+    ui_home_rim_mode(true); /* a rim drag dials through the items */
     ring_set_still(ui_home_ring(), true); /* the sessions stay on the ring, settled: no comet behind a decision */
     show(s_root, true);
     dbg_event("ui", "ask", "\"sid\":%u,\"rid\":%u,\"items\":%d", (unsigned)sid, (unsigned)s_rid, s_n);
@@ -225,6 +226,8 @@ static bool press_on_selected(const gesture_evt_t *g)
     int hit = wheel_hit(s_wheel, g->x, g->y);
     return hit < 0 || hit == wheel_sel(s_wheel);
 }
+
+static int s_scrub_last;
 
 static void select_item(int i, const char *via, void (*haptic)(void))
 {
@@ -320,9 +323,11 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
         g_ui_actions->deny(s_sid, a->rid);
         return true;
     }
-    case NAV_SCRUB:
-        if (g->kind != G_SCRUB_END && it) select_item(g->x, "scrub", g_ui_actions->detent);
+    case NAV_SCRUB: {
+        int d = nav_list_scrub(&s_scrub_last, g->kind, g->x);
+        if (d && it) select_item(sel + d, "scrub", g_ui_actions->detent);
         return true;
+    }
     case NAV_NEXT: select_item(sel + 1, "btn", g_ui_actions->tick); return true;
     case NAV_PREV: select_item(sel - 1, "btn", g_ui_actions->tick); return true;
     default: return false;

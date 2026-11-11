@@ -57,6 +57,7 @@ bool ui_home_request_pending(void); /* the selected session has an unanswered ap
 bool ui_home_askable(void);         /* the selected session has an unanswered permission or question */
 uint32_t ui_home_sel_sid(void);
 lv_obj_t *ui_home_ring(void);
+void ui_home_rim_mode(bool dial); /* true: a rim drag dials through a list; false: it picks session segments */
 void ui_home_set_card_shown(bool shown);
 void ui_home_select_sid(uint32_t sid, const char *via);
 void ui_home_report(ui_report_t *r);
