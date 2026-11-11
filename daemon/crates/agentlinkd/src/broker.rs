@@ -94,6 +94,9 @@ pub struct Request {
     pub focus_only: bool,
     /// Takes a dictated answer (`answer_text`): the device offers Dictate.
     pub dictate: bool,
+    /// Shown only: the hook is released at once (the terminal shows the prompt now) and the card
+    /// stays until the session moves on, e.g. a question the wheel cannot answer.
+    pub notice: bool,
 }
 
 struct Pending {
@@ -357,6 +360,10 @@ impl Broker {
 
 /// Builds the request a blocking hook line describes, or `None` when the watch cannot answer
 /// it (then the hook gets `none` at once and the agent prompts as usual).
+/// How long a notice card (a question only the terminal can answer) may stay up if the session
+/// never moves on; normally the next hook event clears it.
+pub const NOTICE_TTL: Duration = Duration::from_secs(600);
+
 pub fn request_of(
     sid: u64,
     key: String,
@@ -371,6 +378,10 @@ pub fn request_of(
     let tool = payload["tool_name"].as_str().map(str::to_owned);
     let input = &payload["tool_input"];
     match event.to_ascii_lowercase().as_str() {
+        // Claude Code also asks permission to *show* a question (AskUserQuestion) once the
+        // PreToolUse hook gave no answer. That is not a tool to approve: the question was already
+        // offered on the watch, so no card and no wait; the terminal shows the question at once.
+        "permissionrequest" if tool.as_deref() == Some("AskUserQuestion") => None,
         "permissionrequest" => {
             let tool_name = tool.as_deref().unwrap_or("Tool");
             let (title, text) = describe_tool(tool_name, input);
@@ -397,26 +408,65 @@ pub fn request_of(
                 ttl,
                 focus_only: false,
                 dictate: false,
+                notice: false,
             })
         }
         "pretooluse" if tool.as_deref() == Some("AskUserQuestion") => {
             let qs = input["questions"].as_array()?;
-            // One question with single-select options is what a wheel can answer.
+            // One question with single-select options is what a wheel can answer. Anything else
+            // (several questions, multi-select, no options) is shown as a notice: the question
+            // and Focus, while the terminal shows it at once.
+            let notice = |q: &Value| {
+                let header = q["header"]
+                    .as_str()
+                    .filter(|h| !h.is_empty())
+                    .unwrap_or("Question");
+                let multi = q["multiSelect"].as_bool() == Some(true);
+                let text = q["question"].as_str().map(|t| {
+                    format!(
+                        "{t} ({})",
+                        if multi {
+                            "pick on the PC"
+                        } else {
+                            "answer on the PC"
+                        }
+                    )
+                });
+                Request {
+                    sid,
+                    key: key.clone(),
+                    tool: tool.clone(),
+                    kind: AttKind::Question,
+                    title: Some(if qs.len() > 1 {
+                        format!("{} questions", qs.len())
+                    } else {
+                        header.to_owned()
+                    }),
+                    text,
+                    opts: Vec::new(),
+                    ttl: NOTICE_TTL,
+                    focus_only: true,
+                    dictate: false,
+                    notice: true,
+                }
+            };
             let [q] = qs.as_slice() else {
-                return None;
+                return qs.first().map(notice);
             };
             if q["multiSelect"].as_bool() == Some(true) {
-                return None;
+                return Some(notice(q));
             }
             let opts: Vec<(String, Meaning)> = q["options"]
-                .as_array()?
+                .as_array()
+                .map(|a| a.as_slice())
+                .unwrap_or(&[])
                 .iter()
                 .filter_map(|o| o["label"].as_str())
                 .take(4)
                 .map(|l| (l.to_owned(), Meaning::Answer(l.to_owned())))
                 .collect();
             if opts.is_empty() {
-                return None;
+                return Some(notice(q));
             }
             Some(Request {
                 sid,
@@ -435,6 +485,7 @@ pub fn request_of(
                 ttl,
                 focus_only: false,
                 dictate: false,
+                notice: false,
             })
         }
         _ => None,
@@ -509,6 +560,35 @@ mod tests {
             Err((ResultErr::Stale, _))
         ));
         assert_eq!(new.pending().len(), 1, "the new request is untouched");
+    }
+
+    #[test]
+    fn showing_a_question_is_not_an_approval() {
+        let payload = json!({"tool_name": "AskUserQuestion",
+            "tool_input": {"questions": [{"question": "Which?", "header": "Pick", "multiSelect": false,
+                "options": [{"label": "A"}, {"label": "B"}]}]}});
+        let r = request_of(
+            2,
+            "claude:s".into(),
+            "claude",
+            "PermissionRequest",
+            &payload,
+            Duration::from_secs(15),
+        );
+        assert!(r.is_none(), "no approval card for the question tool");
+        let r = request_of(
+            2,
+            "claude:s".into(),
+            "claude",
+            "PreToolUse",
+            &payload,
+            Duration::from_secs(15),
+        );
+        assert_eq!(
+            r.map(|r| r.kind),
+            Some(AttKind::Question),
+            "the question itself is still offered"
+        );
     }
 
     #[tokio::test]
@@ -614,39 +694,40 @@ mod tests {
     }
 
     #[test]
-    fn requests_the_watch_cannot_answer_are_none() {
+    fn questions_the_wheel_cannot_answer_become_notices() {
+        let ask = |v: Value| {
+            request_of(
+                1,
+                "k".into(),
+                "claude",
+                "PreToolUse",
+                &v,
+                Duration::from_secs(15),
+            )
+        };
+        // two questions, or a multi-select one: shown with Focus only, and the hook is not held
         let two = json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
             {"question": "a", "options": [{"label": "x"}]}, {"question": "b", "options": [{"label": "y"}]}]}});
-        assert!(request_of(
-            1,
-            "k".into(),
-            "claude",
-            "PreToolUse",
-            &two,
-            Duration::from_secs(1)
-        )
-        .is_none());
+        let r = ask(two).expect("a notice");
+        assert!(r.notice && r.focus_only && r.opts.is_empty());
+        assert_eq!(
+            (r.title.as_deref(), r.ttl),
+            (Some("2 questions"), NOTICE_TTL)
+        );
         let multi = json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
-            {"question": "a", "multiSelect": true, "options": [{"label": "x"}]}]}});
-        assert!(request_of(
-            1,
-            "k".into(),
-            "claude",
-            "PreToolUse",
-            &multi,
-            Duration::from_secs(1)
-        )
-        .is_none());
+            {"question": "Which parts?", "header": "Parts", "multiSelect": true, "options": [{"label": "x"}]}]}});
+        let r = ask(multi).expect("a notice");
+        assert!(r.notice && r.focus_only);
+        assert_eq!(r.title.as_deref(), Some("Parts"));
+        assert_eq!(r.text.as_deref(), Some("Which parts? (pick on the PC)"));
+        // a single-select question is still answered on the watch
+        let one = json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
+            {"question": "a", "options": [{"label": "x"}, {"label": "y"}]}]}});
+        let r = ask(one).expect("a question");
+        assert!(!r.notice && !r.focus_only && r.opts.len() == 2);
+        // nothing for other tools' PreToolUse, or for agents without a decision path
         let other_tool = json!({"tool_name": "Bash", "tool_input": {}});
-        assert!(request_of(
-            1,
-            "k".into(),
-            "claude",
-            "PreToolUse",
-            &other_tool,
-            Duration::from_secs(1)
-        )
-        .is_none());
+        assert!(ask(other_tool.clone()).is_none());
         assert!(request_of(
             1,
             "k".into(),
@@ -774,6 +855,7 @@ mod tests {
             ttl: Duration::from_secs(5),
             focus_only: !dictate,
             dictate,
+            notice: false,
         };
         let (plain, _w1) = b.open(card(false));
         let (text, w2) = b.open(card(true));
@@ -813,6 +895,7 @@ mod tests {
             ttl: Duration::from_secs(5),
             focus_only: true,
             dictate: false,
+            notice: false,
         };
         let (ask, _w1) = b.open(card(Some("ask_user")));
         let (screen, w2) = b.open(card(None));

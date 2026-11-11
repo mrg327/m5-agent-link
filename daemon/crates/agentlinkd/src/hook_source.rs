@@ -228,6 +228,20 @@ async fn await_decision(
         );
         return Outcome::NONE;
     };
+    if req.notice {
+        // shown on the watch until the session moves on; the terminal takes the prompt now
+        let (rid, _rx) = broker.open(req);
+        trace.record(
+            "hook",
+            Dir::Internal,
+            "notice",
+            Some(sid),
+            Some(rid),
+            json!({"event": event}),
+            None,
+        );
+        return Outcome::NONE;
+    }
     let (rid, rx) = broker.open(req);
     match tokio::time::timeout(wait, rx).await {
         Ok(Ok(outcome)) => {
@@ -374,7 +388,12 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
         "erroroccurred" | "stopfailure" => p.state = Some(SessState::Error),
         "permissionrequest" => {
             p.state = Some(SessState::Input);
-            p.sub = Some(InputSub::Approval);
+            // the permission to show a question (AskUserQuestion) means the question is on screen
+            p.sub = Some(if tool == Some("AskUserQuestion") {
+                InputSub::Question
+            } else {
+                InputSub::Approval
+            });
             p.tool = tool.map(str::to_owned);
         }
         "notification" => {

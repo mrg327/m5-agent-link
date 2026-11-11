@@ -1443,6 +1443,7 @@ mod tests {
             ttl: Duration::from_secs(15),
             focus_only: false,
             dictate: false,
+            notice: false,
         };
         let (rid, wait) = shared.broker.open(req(vec![]));
         let mut d = spawn_link(&shared);

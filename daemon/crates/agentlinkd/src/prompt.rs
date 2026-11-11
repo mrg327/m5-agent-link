@@ -304,6 +304,7 @@ pub fn permission_request(
         ttl: CARD_TTL,
         focus_only: true,
         dictate: false,
+        notice: false,
     };
     let Some(s) = screen.filter(|s| s.kind == Kind::Permission && s.opts.len() <= 9) else {
         return (req, None);
@@ -393,6 +394,7 @@ pub fn ask_requests(sid: u64, key: String, tool_args: &Value) -> Vec<(Request, O
         ttl: CARD_TTL,
         focus_only: true,
         dictate: false,
+        notice: false,
     };
     let fields: Vec<(Option<String>, Vec<String>, bool)> = args["requestedSchema"]["properties"]
         .as_object()
