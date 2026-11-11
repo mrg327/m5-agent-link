@@ -19,7 +19,7 @@ test('states cover the seven CDDL states with palette colours', () => {
     assert.match(s.source, /:\d+$/);
   }
   assert.equal(facts.states.input.sub_colors['0'], facts.palette.permission);
-  assert.equal(facts.states.input.sub_labels['0'], 'Approve?');
+  assert.equal(facts.states.input.sub_labels['0'], 'Needs approval');
 });
 
 test('gesture thresholds describe the ring recogniser, with no tap deferral', () => {
@@ -37,7 +37,7 @@ test('ring facts: screens, per-kind shapes, pills and the gesture cases', () => 
   assert.deepEqual(facts.screens.map((s) => s.id), ['ring', 'attention', 'agent', 'ask', 'scroll', 'status']);
   assert.deepEqual(Object.keys(facts.ring.kinds), ['work', 'ask', 'perm', 'done', 'error', 'idle']);
   assert.ok(facts.ring.merge_at >= 2 && facts.ring.max_segments >= facts.ring.merge_at);
-  assert.equal(facts.ring.pills.approve, 'TAP › ANSWER'); // a request's tap opens ASK; approving is a hold there
+  assert.equal(facts.ring.pills.approve, 'Review / Answer'); // the slot's button opens ASK; approving is a hold there
   const cases = facts.gesture_map.cases.map((c) => c.gesture);
   for (const c of ['G_TAP', 'G_LONG_PRESS', 'G_SWIPE_DOWN', 'G_SCRUB', 'G_BTN_A', 'G_BTN_A_DOUBLE', 'G_BTN_B', 'G_DRAG']) assert.ok(cases.includes(c), c);
   // SCROLL: the drag stream binds only SCROLL and WATCH (a drag there opens SCROLL, issue 5cbb); the deck has no press binding

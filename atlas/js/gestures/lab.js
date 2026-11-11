@@ -326,29 +326,25 @@ export function createLab(root, ctx) {
         c.beginPath(); c.arc(cx, cy, radius, rad(d0), rad(d1)); c.stroke();
       };
       const anim = ctx.reducedMotion ? 0 : now;
-      if (on) { c.shadowColor = col; c.shadowBlur = 14; }
+      // UI-V3 §3.1: selected and needs-you segments at full brightness, the rest at 40 %; a pulse for
+      // ask / perm, one comet for working; a pip (10 px, r 205) marks an unselected segment that needs you
+      const needs = r.kind === 'ask' || r.kind === 'perm' || r.kind === 'error';
+      const rest = on || needs ? 1 : ring.others_pct / 100;
       switch (r.kind) {
         case 'work': {
-          arc(a0, a1, rr, wd, 0.3);
+          arc(a0, a1, rr, wd, on ? 0.6 : rest);
           const p = a0 + ((anim % ring.work_period_ms) / ring.work_period_ms) * (span - 14);
           arc(p, p + 14, rr, wd, 1);
           break;
         }
-        case 'ask': arc(a0, a1, rr, wd, 0.5 + 0.5 * tri(anim, ring.ask_period_ms)); break;
-        case 'perm': {
-          const al = 0.55 + 0.45 * tri(anim, ring.perm_period_ms);
-          arc(a0, a1, rr - wd * 0.27 * kk, wd * 0.34, al);
-          arc(a0, a1, rr + wd * 0.27 * kk, wd * 0.34, al);
-          break;
-        }
-        case 'error': arc(a0, a1, rr, wd, 1, [10 * kk, 6 * kk]); break;
-        case 'idle': arc(a0, a1, rr, wd * 0.4, 0.5); break;
-        default: arc(a0, a1, rr, wd, 1);
+        case 'ask': arc(a0, a1, rr, wd, 0.55 + 0.45 * tri(anim, ring.ask_period_ms)); break;
+        case 'perm': arc(a0, a1, rr, wd, 0.55 + 0.45 * tri(anim, ring.perm_period_ms)); break;
+        default: arc(a0, a1, rr, wd, rest);
       }
-      c.shadowBlur = 0; c.setLineDash([]);
-      if (on) { // thin white underline just inside the selected capsule (UI-V2 §4.1)
-        c.strokeStyle = hexA('#ffffff', 1); c.lineWidth = ring.underline_w_px * kk;
-        c.beginPath(); c.arc(cx, cy, (ring.sel_out_px - ring.sel_w_px - ring.underline_gap_px) * kk, rad(a0), rad(a1)); c.stroke();
+      if (needs && !on) {
+        const m = rad((a0 + a1) / 2);
+        c.fillStyle = hexA(col, 1);
+        c.beginPath(); c.arc(cx + 205 * kk * Math.cos(m), cy + 205 * kk * Math.sin(m), 5 * kk, 0, 7); c.fill();
       }
     });
   }

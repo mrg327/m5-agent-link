@@ -38,7 +38,7 @@ export const STATE_ROWS = [
     },
   },
   {
-    id: 'perm', kind: 'perm', palette: 'permission', label: 'Approve?', icon: '🔔',
+    id: 'perm', kind: 'perm', palette: 'permission', label: 'Needs approval', icon: '🔔',
     cells: {
       tap: { fx: 'focus', text: 'Focus, to review the request first. A tap never approves' },
       long_press: NOTHING('Ignored: the approve hold must run the full time'),

@@ -70,7 +70,7 @@ def extract_palette():
         return "#" + m.group(1).lower() if m.group(1) else col(m.group(2).lower())
 
     # UI-V3 names (text2, text3, fill1, fill2) come with the old ones, which are aliases now
-    for k in ("bg", "surface", "surface2", "border", "text", "muted", "text2", "text3", "fill1", "fill2"):
+    for k in ("bg", "surface", "surface2", "text", "muted", "text2", "text3", "fill1", "fill2"):
         pal[k] = col(k)
     # State colours (Okabe-Ito). The old Primer names are aliases of them, e.g. `RGB_AMBER RGB_PERMISSION`.
     for k in ("working", "ask", "permission", "done", "error", "idle"):
@@ -271,9 +271,11 @@ def extract_ring():
     for key, macro in [("merge_at", "MERGE_AT"), ("ambient_ms", "AMBIENT_MS"), ("nag_ms", "NAG_MS"), ("nag_max", "NAG_MAX")]:
         r[key] = int(find(home, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
     # key badges beside the buttons (UI-V2 §4.1); the fact keys keep their old names for the Atlas
-    for key, macro in [("repo_w_px", "REPO_W"), ("repo_px", "REPO_PX"), ("repo_small_px", "REPO_SMALL_PX"),
-                       ("summary_w_px", "SUMMARY_W")]:
-        r[key] = int(find(card, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
+    # the subject line (UI-V3 §4.1): FONT_TITLE when it fits TITLE_W, else FONT_HEAD on two lines
+    r["repo_w_px"] = int(find(card, r"#define TITLE_W\s+(\d+)", "ring.repo_w_px").group(1))
+    r["summary_w_px"] = int(find(card, r"#define SUMMARY_W\s+(\d+)", "ring.summary_w_px").group(1))
+    for key, tok in [("repo_px", "FONT_TITLE"), ("repo_small_px", "FONT_HEAD")]:
+        r[key] = int(find(CORE + "ui_theme.h", rf"#define {tok} \(&font_figtree_(\d+)_", f"ring.{key}").group(1))
     for key, macro in [("hint_a_deg", "UI_BADGE_A_DEG"), ("hint_b_deg", "UI_BADGE_B_DEG"), ("hint_r_px", "UI_BADGE_R")]:
         r[key] = int(find(CORE + "ui_theme.h", rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
     for key, macro in [("band_out_px", "BAND_OUT"), ("band_w_px", "BAND_W"), ("sel_out_px", "SEL_OUT"), ("sel_w_px", "SEL_W"),
@@ -297,12 +299,11 @@ def extract_ring():
         kinds[m.group(1).lower()] = m.group(2)
     SOURCES["ring.kinds"] = f"{CORE}ui_ring.h:{line_of(CORE + 'ui_ring.h', find(CORE + 'ui_ring.h', r'RING_WORK,').start())}"
     r["kinds"] = kinds
-    find(card, r'"TAP (?:" LV_SYMBOL_RIGHT " |> )ANSWER"', "ring.pill_approve")
-    find(card, r'"FOCUS \+ ACK"', "ring.pill_done")
-    find(CORE + "ui_ask.c", r'"long swipe down to deny"', "ring.deny_hint") # deny lives only in ASK (UI-V2 §3)
-    find(card, r'"swipe down for status"', "ring.status_hint")
-    # a request's pill opens ASK (UI-V2 §4.3); approving is a hold on that screen, never on the deck
-    r["pills"] = {"approve": "TAP › ANSWER", "done": "FOCUS + ACK", "default": "FOCUS"}
+    # v3 has no action pill (UI-V3 §4.1): the exception slot's Answer / Review button opens ASK, and
+    # the A legend says "Open". The `pills` fact keeps its key for the Atlas.
+    find(card, r'"Review" : "Answer"', "ring.pill_approve")
+    find(card, r'static const char \*const words\[2\] = \{"Open", "Next"\};', "ring.pill_done")
+    r["pills"] = {"approve": "Review / Answer", "done": "Open", "default": "Open"}
     words = find(card, r'static const char \*const words\[2\] = \{"(\w+)", "(\w+)"\};', "ring.edge_hint_a")
     SOURCES["ring.edge_hint_b"] = SOURCES["ring.edge_hint_a"]
     r["edge_hints"] = {"a": words.group(1), "b": words.group(2)}
@@ -319,15 +320,15 @@ ACTION_TEXT = {
     "NAV_OPEN_AGENT": "Open the per-agent wheel for the selected session",
     "NAV_OPEN_ASK": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
     "NAV_OPEN_STATUS": "Open STATUS (swipe down on the deck): link, battery, quiet mode, sounds",
-    "NAV_PICK_RIM": "Select the segment (HOME) or item (AGENT, ASK) under the finger",
+    "NAV_PICK_RIM": "Select the segment under the finger on the HOME ring (AGENT and ASK rows are tapped directly)",
     "NAV_HOLD_LONG": "An injected long press that already covers the selected hold item's time commits it directly",
     "NAV_DENY": "Deny a permission request: a long swipe down that started above the centre",
     "NAV_SCRUB": "A drag around the rim moves the selection with a detent per step",
     "NAV_NEXT_ATTENTION": "Jump to the next session that needs attention",
     "NAV_NEXT": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
     "NAV_PREV": "Previous session",
-    "NAV_COMMIT": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item answers 'hold to confirm' instead",
-    "NAV_BACK": "Back to the deck (a long swipe down, or B held; on SCROLL a tap, keeping the terminal where it is; on STATUS a swipe up); a request stays pending",
+    "NAV_COMMIT": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+    "NAV_BACK": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
     "NAV_HOME": "A+B chord: straight back to the deck",
     "NAV_SCROLL_DRAG": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
     "NAV_SCROLL_FLING": "SCROLL: lifting off a fast drag keeps scrolling (a glide that slows down, like a trackpad)",
