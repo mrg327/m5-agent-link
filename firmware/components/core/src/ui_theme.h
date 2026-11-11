@@ -79,7 +79,7 @@ uint32_t theme_state_rgb(sess_state_t s);
 uint32_t theme_session_rgb(const session_t *s);
 /* Words as well as colour, so state never depends on colour alone. */
 const char *theme_state_label(const session_t *s);
-/* Title-case state word for the deck ("Working", "Question", "Approve?", ...). */
+/* Title-case state word for the deck ("Working", "Has a question", "Needs approval", ...). */
 const char *theme_state_word(const session_t *s);
 /* ICON_* drawn beside the state word. */
 const char *theme_state_glyph(const session_t *s);

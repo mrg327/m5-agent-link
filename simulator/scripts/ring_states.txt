@@ -10,7 +10,7 @@ wait 1000
 expect_label Error
 shot ring_error.png
 btn B
-expect_label Question
+expect_label Waiting
 shot ring_ask.png
 btn B
 expect_label Working

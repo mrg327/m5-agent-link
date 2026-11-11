@@ -1,19 +1,22 @@
 # USB is preferred when plugged in: welcomed over BLE, the device still offers a hello on USB when it
 # comes up and every 5 s after; a USB daemon's welcome takes the link over (BLE is ignored from then
-# on); unplugging USB falls back to a BLE handshake.
+# on); unplugging USB falls back to a BLE handshake. HOME no longer names the transport (UI-V3 §4.1): the
+# deck shows no chip while welcomed and `Connecting` during the handshake; the daemon-side order is
+# asserted by the log pattern in CMakeLists.txt.
 connect ble
 wait 200
 rx ble a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 wait 200
-expect_label BLE
+expect_no_label Offline
+expect_no_label Connecting
 connect usb
 wait 200
 wait 5500
 rx usb a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 wait 300
-expect_label USB
-expect_no_label BLE
+expect_no_label Offline
+expect_no_label Connecting
 disconnect usb
 wait 300
-expect_no_label USB
+expect_label Connecting
 quit
