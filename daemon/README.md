@@ -44,6 +44,20 @@ Environment: `AGENTLINK_HOME` (default `~/.agentlink`), `AGENTLINK_WAIT_MS` (how
 
 BLE write size: each write-without-response carries ATT MTU − 3 bytes (fragment header included), read per frame from btleplug's negotiated MTU (CoreBluetooth: `maximumWriteValueLength(.withoutResponse)` + 3, sampled after service discovery; BlueZ: the characteristic's `MTU`; WinRT: `GattSession.MaxPduSize`). It is clamped to 20…244 B: 244 matches the firmware's MTU of 247, and a backend that has not seen the MTU exchange reports 23, which gives the old 20 B. If a larger write fails, the frame is resent at 20 B and the link stays at 20 B. Older firmware is unaffected: fragments are reassembled by header, not size, and every firmware build negotiates MTU 247. `AGENTLINK_BLE_WRITE_LEN=<2..244>` pins the size and disables the fallback. With MTU 247, a 1.5 KB frame takes 7 writes instead of 79. `RUST_LOG=agentlinkd=debug` logs `ble tx N B in K writes of <= C B` per frame and `ble rx N B in K notifications`.
 
+## Jobs
+
+Commands typed into a terminal that are still running after 10 s get a card on the watch (docs/design/JOBS.md). Setup is one line in the shell's rc file, with `agentlink-hook` on PATH:
+
+```sh
+eval "$(agentlink shell-init zsh)"     # or bash
+```
+
+The snippet calls `agentlink-hook shell start|end|exit --pid <shell> …` in the background (the shim never reads stdin and never delays a command). `agentlinkd` tracks every command per shell (`shell:<pid>`) and shows it as a session only past the threshold, with `AGENTLINK_JOB_MIN_S` (default 10, fractions allowed). Ends: exit 0 is `done`, other is `error` with `exit`, 130 (Ctrl-C) removes the card silently. A card goes on `ack` (Dismiss or Button A), 10 minutes after the job ended, when the shell exits (also when its pid disappears, checked every 5 s) or when the same shell starts another long job. `cancel` (hold) sends SIGINT to the terminal's foreground process group; `rerun` (hold) types the command line again through the kitty typing driver.
+
+- `~/.agentlink/jobs-ignore.txt`: extra program names never shown, one per line, `#` comments. Built in: editors, pagers, `ssh`, `tmux`, `top`, `watch`, `fg`, the agent CLIs, and REPLs or shells started without arguments. A terminal that already hosts an agent session is skipped too.
+- `~/.agentlink/job-history.json`: for the ETA only. Key = hash of directory + command line, value = the last 5 successful run times in seconds (runs of 5 s or more), at most 500 keys. No command text. The ETA is the median once there are 2 runs.
+- The trace and the audit log never hold the command line (`payload.cmd` of the hook line and `sum` are replaced by `<private>`; `rerun` is audited without its text). Devices below proto 0.9 get neither job sessions nor `eta` / `exit`.
+
 ## Files written
 
 - `~/.agentlink/trace/YYYY-MM-DD.jsonl`: `{ts_us, ts, src, dir, kind, sid?, rid?, msg, bytes?}` for every hook event, registry transition and protocol message (decoded JSON plus raw hex).

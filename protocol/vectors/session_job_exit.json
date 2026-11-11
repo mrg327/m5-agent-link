@@ -1,0 +1,15 @@
+{
+  "desc": "Delta: session 4's job failed with exit status 101 (proto 0.9)",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 16,
+    "b": {
+      "sid": 4,
+      "st": "error",
+      "tst": 1793995242,
+      "seen": false,
+      "exit": 101
+    }
+  },
+  "cbor_hex": "a30004011003a500040203081a6aee31ea0af4141865"
+}

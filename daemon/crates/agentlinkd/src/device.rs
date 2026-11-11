@@ -11,7 +11,7 @@ use crate::transport::Link;
 use agentlink_proto::*;
 use anyhow::{bail, Result};
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast::error::RecvError;
@@ -37,6 +37,8 @@ pub struct Shared {
     /// Transcripts waiting for the user's hold (`CmdOp::Dictate`), by recording id.
     pub transcripts: Mutex<crate::voice::Transcripts>,
     pub host: HostInfo,
+    /// Terminal commands shown as sessions (jobs.rs).
+    pub jobs: Arc<crate::jobs::Jobs>,
     /// Connected, handshaken devices keyed by device uid, for `agentlink status`.
     pub devices: Mutex<BTreeMap<String, Value>>,
     next_link: AtomicU64,
@@ -51,6 +53,10 @@ impl Shared {
         scroll: Arc<dyn ScrollDriver>,
     ) -> Self {
         Shared {
+            jobs: Arc::new(crate::jobs::Jobs::new(
+                registry.clone(),
+                crate::jobs::Config::from_env(),
+            )),
             registry,
             broker,
             trace,
@@ -106,6 +112,8 @@ struct Conn {
     dictate: bool,
     /// `session_upd` deltas waiting for the coalescing window.
     deltas: DeltaQueue,
+    /// Job sessions (proto 0.9) withheld from a device that cannot decode them.
+    hidden: HashSet<u64>,
 }
 
 /// Terminal content leaves the daemon only when the device may show it (UI-V2 §4.4).
@@ -158,14 +166,41 @@ impl Conn {
         if self.peer_minor < ASK_MINOR || self.privacy == Privacy::Meta {
             (s.q, s.rp) = (None, None);
         }
+        // a job's estimate and exit status: proto 0.9
+        if self.peer_minor < JOBS_MINOR {
+            (s.eta, s.exit) = (None, None);
+        }
         if self.privacy == Privacy::Meta {
             s.sum = None;
         }
         s
     }
 
-    fn sessions_for_peer(&self, v: Vec<Session>) -> Vec<Session> {
-        v.into_iter().map(|s| self.for_peer(s)).collect()
+    /// A full replacement: the job sessions an old device cannot decode are left out.
+    fn sessions_for_peer(&mut self, v: Vec<Session>) -> Vec<Session> {
+        self.hidden.clear();
+        let old = self.peer_minor < JOBS_MINOR;
+        let mut out = Vec::with_capacity(v.len());
+        for s in v {
+            if old && s.ag == Some(Agent::Shell) {
+                self.hidden.insert(s.sid);
+            } else {
+                out.push(self.for_peer(s));
+            }
+        }
+        out
+    }
+
+    /// Whether a delta or `gone` for `sid` is withheld (it names a job session this device
+    /// cannot decode: its first full object carries `ag`, later deltas do not).
+    fn withheld(&mut self, s: &Session) -> bool {
+        if self.peer_minor >= JOBS_MINOR {
+            return false;
+        }
+        if s.ag == Some(Agent::Shell) {
+            self.hidden.insert(s.sid);
+        }
+        self.hidden.contains(&s.sid)
     }
 
     /// Sends `msg`, after the held deltas so the device sees everything in order.
@@ -185,6 +220,9 @@ impl Conn {
 
     /// Holds a session delta for coalescing; sends what it cannot be merged with.
     async fn send_delta(&mut self, s: Session) -> Result<()> {
+        if self.withheld(&s) {
+            return Ok(());
+        }
         let s = self.for_peer(s);
         if s == Session::delta(s.sid) {
             return Ok(()); // every key it had is one this device does not take
@@ -263,6 +301,9 @@ const KEYS_MINOR: u64 = 7;
 /// `action_dictate` on an attention, and `dictate` naming its `rid`, need proto 0.8.
 const DICTATE_MINOR: u64 = 8;
 
+/// Job sessions (`ag` = shell), `session.eta` / `session.exit` and `cmd rerun` need proto 0.9.
+const JOBS_MINOR: u64 = 9;
+
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
 }
@@ -309,6 +350,7 @@ pub async fn run_link(
         peer_minor: 0,
         dictate: false,
         deltas: DeltaQueue::default(),
+        hidden: HashSet::new(),
     };
 
     let hello = loop {
@@ -379,6 +421,7 @@ async fn handshake(
     c.next_id = 1;
     c.peer_minor = hello.1.proto.1;
     c.deltas.clear(); // the snapshot below carries them
+    c.hidden.clear();
 
     // Subscribe before taking the snapshot so no update is lost in between.
     let (sessions, updates) = shared.registry.subscribe();
@@ -391,10 +434,11 @@ async fn handshake(
     let w = welcome(&shared.host, replies, voice, keys);
     c.privacy = w.cfg.privacy.unwrap_or(Privacy::Meta);
     c.send(Some(hello.0), Message::Welcome(w)).await?;
+    let sessions = c.sessions_for_peer(sessions);
     c.send(
         None,
         Message::Snapshot(Snapshot {
-            sessions: c.sessions_for_peer(sessions),
+            sessions,
             away: None,
         }),
     )
@@ -471,7 +515,11 @@ async fn serve(
             },
             u = updates.recv() => match u {
                 Ok(Update::Upsert(s)) => c.send_delta(s).await?,
-                Ok(Update::Gone(sid)) => c.send(None, Message::Gone(Gone { sid })).await?,
+                Ok(Update::Gone(sid)) => {
+                    if !c.hidden.remove(&sid) {
+                        c.send(None, Message::Gone(Gone { sid })).await?
+                    }
+                }
                 Ok(Update::Attention(a)) => c.send(None, Message::Attention(a)).await?,
                 Ok(Update::Clear(cl)) => c.send(None, Message::Clear(cl)).await?,
                 // Missed updates: the device has drifted, so send a full replacement.
@@ -833,6 +881,12 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
             );
             res
         }
+        CmdOp::Rerun => rerun_cmd(shared, cmd).await,
+        CmdOp::Cancel if is_job(shared, cmd.sid) => cancel_job(shared, cmd).await,
+        // a job is not a conversation: nothing to type a reply or a transcript into
+        CmdOp::Type | CmdOp::Dictate if is_job(shared, cmd.sid) => {
+            fail(ResultErr::Denied, "not for terminal jobs")
+        }
         CmdOp::Ack | CmdOp::Snooze | CmdOp::NotifyDone => {
             let reg = &shared.registry;
             let arg = match cmd.arg {
@@ -840,6 +894,8 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
                 _ => None,
             };
             let done = cmd.sid.and_then(|sid| match cmd.op {
+                // a finished job's card is removed, not just marked seen
+                CmdOp::Ack if shared.jobs.dismiss(sid) => Some(()),
                 CmdOp::Ack => reg.ack(sid),
                 CmdOp::Snooze => reg.snooze(sid, arg.unwrap_or(30)),
                 _ => reg.notify_done(sid, arg != Some(0)),
@@ -954,12 +1010,87 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         None,
         json!({"cmd": detail, "ok": res.is_ok()}),
     );
+    typing_result(res)
+}
+
+fn typing_result(res: std::result::Result<(), String>) -> CmdResult {
     match res {
         Ok(()) => CmdResult::ok(),
         Err(m) if m.contains("cannot be typed") => fail(ResultErr::Unsupported, &m),
         Err(m) if m.contains("no window") => fail(ResultErr::NoWindow, &m),
         Err(m) => fail(ResultErr::Denied, &m),
     }
+}
+
+fn is_job(shared: &Shared, sid: Option<u64>) -> bool {
+    sid.and_then(|s| shared.registry.agent_of(s)) == Some(Agent::Shell)
+}
+
+/// `Cancel` on a job: Ctrl-C for the shell's terminal (SIGINT to its foreground process group),
+/// only after a hold.
+async fn cancel_job(shared: &Shared, cmd: &Cmd) -> CmdResult {
+    if cmd.hold_ms.unwrap_or(0) < MIN_APPROVE_HOLD_MS {
+        return fail(ResultErr::Denied, "hold-to-confirm too short");
+    }
+    let Some(pid) = cmd.sid.and_then(|sid| shared.jobs.shell_pid(sid)) else {
+        return fail(ResultErr::Stale, "unknown job");
+    };
+    let res = tokio::task::spawn_blocking(move || crate::jobs::interrupt_foreground(pid))
+        .await
+        .unwrap_or_else(|e| Err(crate::jobs::CancelErr::Failed(e.to_string())));
+    shared.trace.audit(
+        "interrupt",
+        cmd.sid,
+        None,
+        json!({"cmd": serde_json::to_value(cmd).unwrap_or_default(), "ok": res.is_ok()}),
+    );
+    use crate::jobs::CancelErr;
+    match res {
+        Ok(()) => CmdResult::ok(),
+        Err(CancelErr::Stale) => fail(ResultErr::Stale, "nothing runs in that terminal"),
+        Err(CancelErr::Unsupported) => fail(ResultErr::Unsupported, "stop unsupported here"),
+        Err(CancelErr::Failed(m)) => fail(ResultErr::Internal, &m),
+    }
+}
+
+/// `Rerun`: a finished job's command line typed into its terminal again, after a hold. The
+/// audit line names the command like `type` does (the op and sid), never the text.
+async fn rerun_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
+    use crate::jobs::RerunErr;
+    if cmd.hold_ms.unwrap_or(0) < MIN_APPROVE_HOLD_MS {
+        return fail(ResultErr::Denied, "hold-to-confirm too short");
+    }
+    let route = cmd
+        .sid
+        .map_or(Route::Unknown, |sid| shared.registry.route(sid));
+    let (session, ctx) = match route {
+        Route::Ready(s, ctx) => (s, ctx),
+        Route::Unknown => return fail(ResultErr::Stale, "unknown session"),
+        Route::Unsupported => return fail(ResultErr::Unsupported, "no terminal for this session"),
+    };
+    if session.ag != Some(Agent::Shell) {
+        return fail(ResultErr::Denied, "only a finished job can run again");
+    }
+    let text = match shared.jobs.rerun_text(session.sid) {
+        Ok(t) => t,
+        Err(RerunErr::Stale) => return fail(ResultErr::Stale, "no finished job"),
+        Err(RerunErr::Busy) => return fail(ResultErr::Denied, "the terminal is busy"),
+        Err(RerunErr::Untypable) => {
+            return fail(ResultErr::Denied, "that command cannot be typed again")
+        }
+    };
+    let term = shared.term.clone();
+    let res =
+        tokio::task::spawn_blocking(move || crate::typing::type_reply(term.as_ref(), &ctx, &text))
+            .await
+            .unwrap_or_else(|e| Err(e.to_string()));
+    shared.trace.audit(
+        "rerun",
+        cmd.sid,
+        None,
+        json!({"cmd": serde_json::to_value(cmd).unwrap_or_default(), "ok": res.is_ok()}),
+    );
+    typing_result(res)
 }
 
 #[cfg(test)]
@@ -1236,6 +1367,7 @@ mod tests {
                 peer_minor: minor,
                 dictate: false,
                 deltas: DeltaQueue::default(),
+                hidden: HashSet::new(),
             };
             let out = c.for_peer(s.clone());
             assert_eq!(
@@ -1656,6 +1788,7 @@ mod tests {
             peer_minor: 2,
             dictate: false,
             deltas: DeltaQueue::default(),
+            hidden: HashSet::new(),
         };
         let mut s = Session::delta(1);
         (s.snz, s.ntf, s.n, s.ok, s.sum) = (
@@ -1673,6 +1806,194 @@ mod tests {
         assert_eq!((out.snz, out.n, out.ok), (Some(5), Some(2), Some(true)));
         c.privacy = Privacy::Meta;
         assert_eq!(c.for_peer(s).sum, None);
+    }
+
+    /// A shell whose job ran (and ended, when `exit` is given) in a `Shared` with a fake terminal.
+    fn job_shared(term: Arc<FakeTerm>, exit: Option<u64>) -> (Arc<Shared>, u64) {
+        use crate::jobs::{Config, Jobs};
+        let trace = Trace::null();
+        let registry = Arc::new(Registry::new(trace.clone()));
+        let mut s = Shared::new(
+            registry.clone(),
+            Arc::new(Broker::new(registry)),
+            trace,
+            Arc::new(NoFocus),
+            Arc::new(FakeScroll::default()),
+        );
+        s.term = term;
+        s.jobs = Arc::new(Jobs::new(
+            s.registry.clone(),
+            Config {
+                min: std::time::Duration::ZERO,
+                ..Default::default()
+            },
+        ));
+        let now = std::time::Instant::now();
+        s.jobs.start(
+            now,
+            1000,
+            4321,
+            "cargo test -- --nocapture",
+            Default::default(),
+        );
+        s.jobs.tick(now);
+        if let Some(code) = exit {
+            s.jobs.end(now, 4321, code);
+        }
+        let sid = s.registry.sid_of("shell:4321").unwrap();
+        (Arc::new(s), sid)
+    }
+
+    #[tokio::test]
+    async fn rerun_types_a_finished_jobs_line_and_refuses_the_rest() {
+        let term = Arc::new(FakeTerm::default());
+        let (shared, sid) = job_shared(term.clone(), Some(1));
+        let rerun = |sid, hold| type_cmd_of(CmdOp::Rerun, sid, None, hold);
+        let r = handle_cmd(&shared, &rerun(sid, Some(300))).await;
+        assert_eq!(
+            (r.ok, r.err),
+            (false, Some(ResultErr::Denied)),
+            "needs a hold"
+        );
+        let r = handle_cmd(&shared, &rerun(999, Some(1250))).await;
+        assert_eq!(r.err, Some(ResultErr::Stale));
+        assert!(term.sent.lock().unwrap().is_empty());
+        let agent = add_session(&shared);
+        let r = handle_cmd(&shared, &rerun(agent, Some(1250))).await;
+        assert_eq!(r.err, Some(ResultErr::Denied), "not a job");
+
+        let r = handle_cmd(&shared, &rerun(sid, Some(1250))).await;
+        assert!(r.ok, "{r:?}");
+        assert_eq!(
+            *term.sent.lock().unwrap(),
+            vec!["cargo test -- --nocapture", "\\r"]
+        );
+
+        // the shell is running something again: refused
+        shared
+            .jobs
+            .start(std::time::Instant::now(), 1, 4321, "ls", Default::default());
+        let r = handle_cmd(&shared, &rerun(sid, Some(1250))).await;
+        assert_eq!(r.err, Some(ResultErr::Denied));
+        assert_eq!(term.sent.lock().unwrap().len(), 2);
+
+        // a job still running (no finished one) is not a finished job
+        let (running, sid) = job_shared(Arc::new(FakeTerm::default()), None);
+        let r = handle_cmd(&running, &rerun(sid, Some(1250))).await;
+        assert_eq!(r.err, Some(ResultErr::Stale));
+        // no quick replies or transcripts for a job
+        let r = handle_cmd(&running, &type_cmd_of(CmdOp::Type, sid, Some(0), None)).await;
+        assert_eq!(r.err, Some(ResultErr::Denied));
+    }
+
+    #[tokio::test]
+    async fn stop_needs_a_hold_and_a_running_foreground_job() {
+        let term = Arc::new(FakeTerm::default());
+        let (shared, sid) = job_shared(term.clone(), None);
+        let stop = |sid, hold| type_cmd_of(CmdOp::Cancel, sid, None, hold);
+        let r = handle_cmd(&shared, &stop(sid, Some(300))).await;
+        assert_eq!(r.err, Some(ResultErr::Denied));
+        // shell pid 4321 is not a process of this machine's tty: nothing to interrupt
+        let r = handle_cmd(&shared, &stop(sid, Some(1250))).await;
+        assert!(!r.ok);
+        assert!(
+            term.sent.lock().unwrap().is_empty(),
+            "a job is stopped with SIGINT, never Esc"
+        );
+    }
+
+    #[tokio::test]
+    async fn ack_removes_a_finished_job_but_only_marks_a_running_one() {
+        let (shared, sid) = job_shared(Arc::new(FakeTerm::default()), None);
+        let ack = type_cmd_of(CmdOp::Ack, sid, None, None);
+        assert!(handle_cmd(&shared, &ack).await.ok);
+        assert_eq!(
+            shared.registry.snapshot()[0].seen,
+            Some(true),
+            "still there"
+        );
+        shared.jobs.end(std::time::Instant::now(), 4321, 0);
+        assert!(handle_cmd(&shared, &ack).await.ok);
+        assert!(shared.registry.snapshot().is_empty());
+        assert_eq!(handle_cmd(&shared, &ack).await.err, Some(ResultErr::Stale));
+    }
+
+    #[tokio::test]
+    async fn jobs_reach_only_devices_speaking_proto_0_9() {
+        let (shared, sid) = job_shared(Arc::new(FakeTerm::default()), None);
+        let agent = add_session(&shared);
+        for (minor, sees) in [(8, false), (9, true)] {
+            let mut d = spawn_link(&shared);
+            d.to_daemon.send(hello_with_minor("1.0.0", minor)).unwrap();
+            d.next().await;
+            let Message::Snapshot(s) = d.next().await.msg else {
+                panic!("snapshot")
+            };
+            let sids: Vec<u64> = s.sessions.iter().map(|s| s.sid).collect();
+            assert_eq!(sids.contains(&sid), sees, "minor {minor}");
+            assert!(sids.contains(&agent));
+            let job = s.sessions.iter().find(|s| s.sid == sid);
+            assert_eq!(job.map(|s| s.eta), sees.then_some(Some(0)));
+
+            // a delta, the finish with its exit status, and the card's removal
+            shared.jobs.end(std::time::Instant::now(), 4321, 2);
+            shared.registry.publish(Update::Gone(sid));
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+            let ping = Envelope {
+                id: 99,
+                re: None,
+                msg: Message::Ping(Empty {}),
+            };
+            d.to_daemon.send(ping.to_bytes().unwrap()).unwrap();
+            let mut seen = Vec::new();
+            loop {
+                match d.next().await.msg {
+                    Message::Pong(_) => break,
+                    m => seen.push(m),
+                }
+            }
+            if sees {
+                assert!(
+                    matches!(&seen[0], Message::SessionUpd(u) if u.exit == Some(2)),
+                    "{seen:?}"
+                );
+                assert!(matches!(seen.last(), Some(Message::Gone(g)) if g.sid == sid));
+            } else {
+                assert!(seen.is_empty(), "nothing for an old device: {seen:?}");
+            }
+            // the next round starts from a fresh job
+            if minor == 8 {
+                let now = std::time::Instant::now();
+                shared
+                    .jobs
+                    .start(now, 1000, 4321, "cargo test", Default::default());
+                shared.jobs.tick(now);
+            }
+        }
+    }
+
+    #[test]
+    fn job_estimate_and_exit_are_stripped_for_old_devices() {
+        let (_tx, rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let mut c = Conn {
+            link: Box::new(ChanLink { rx, tx }),
+            trace: Trace::null(),
+            src: "t".into(),
+            next_id: 1,
+            privacy: Privacy::Preview,
+            peer_minor: 8,
+            dictate: false,
+            deltas: DeltaQueue::default(),
+            hidden: HashSet::new(),
+        };
+        let mut s = Session::delta(1);
+        (s.eta, s.exit) = (Some(60), Some(1));
+        let out = c.for_peer(s.clone());
+        assert_eq!((out.eta, out.exit), (None, None));
+        c.peer_minor = 9;
+        let out = c.for_peer(s);
+        assert_eq!((out.eta, out.exit), (Some(60), Some(1)));
     }
 
     #[tokio::test]

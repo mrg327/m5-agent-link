@@ -118,6 +118,23 @@ VECTORS = {
         {"t": "session_upd", "id": 3, "b": {"sid": 1, "st": "done", "tst": 1793995300}},
         env("session_upd", 3, {0: 1, 2: 4, 8: 1793995300}),
     ),
+    "session_job_eta": (
+        "Delta: session 4 (a shell job, agent shell) enters work with a 120 s estimate (proto 0.9)",
+        {"t": "session_upd", "id": 15, "b": {"sid": 4, "ag": "shell", "st": "work", "tool": "cargo",
+         "t0": 1793995200, "tst": 1793995200, "sum": "cargo build --release", "eta": 120}},
+        env("session_upd", 15, {0: 4, 1: 3, 2: 1, 6: "cargo", 7: 1793995200, 8: 1793995200,
+            9: "cargo build --release", 19: 120}),
+    ),
+    "session_job_exit": (
+        "Delta: session 4's job failed with exit status 101 (proto 0.9)",
+        {"t": "session_upd", "id": 16, "b": {"sid": 4, "st": "error", "tst": 1793995242, "seen": False, "exit": 101}},
+        env("session_upd", 16, {0: 4, 2: 3, 8: 1793995242, 10: False, 20: 101}),
+    ),
+    "cmd_rerun": (
+        "Device runs session 4's finished job again after a hold (proto 0.9)",
+        {"t": "cmd", "id": 17, "b": {"op": "rerun", "sid": 4, "hold_ms": 1250}},
+        env("cmd", 17, {0: 17, 1: 4, 4: 1250}),
+    ),
     "attention_approval": (
         "Approval request for session 2 (agent-raised prompt)",
         {"t": "attention", "id": 4, "b": {"rid": 7, "sid": 2, "kind": "approval",

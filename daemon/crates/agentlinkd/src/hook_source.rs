@@ -17,6 +17,7 @@
 
 use crate::broker::{request_of, Broker, Outcome};
 use crate::ipc;
+use crate::jobs::Jobs;
 use crate::prompt;
 use crate::registry::{clip, HostCtx, Registry, SessionEvent, SessionPatch, Step, Via};
 use crate::remote;
@@ -45,6 +46,7 @@ pub struct HookSource {
     pub trace: Trace,
     pub status: StatusFn,
     pub broker: Arc<Broker>,
+    pub jobs: Arc<Jobs>,
 }
 
 /// What every connection handler needs.
@@ -55,6 +57,7 @@ pub struct ConnEnv {
     pub status: StatusFn,
     pub token_file: PathBuf,
     pub home: PathBuf,
+    pub jobs: Arc<Jobs>,
 }
 
 /// Which socket a connection came in on.
@@ -83,6 +86,7 @@ impl AgentSource for HookSource {
             status: self.status,
             token_file: self.token_file,
             home: self.home,
+            jobs: self.jobs,
         });
         remote::spawn_remote_socket(&self.remote_socket, env.clone());
         loop {
@@ -101,6 +105,7 @@ where
         broker,
         trace,
         status,
+        jobs,
         ..
     } = &*env;
     let (r, mut w) = tokio::io::split(stream);
@@ -117,6 +122,12 @@ where
     let mut attach_guard = None;
     while let Ok(Some(line)) = lines.next_line().await {
         let Ok(v) = serde_json::from_str::<Value>(&line) else {
+            // a malformed shell line may still hold the command line
+            let line = if line.contains("\"shell\"") {
+                "<private>".into()
+            } else {
+                line
+            };
             trace.record(
                 src,
                 Dir::In,
@@ -146,7 +157,16 @@ where
             continue;
         }
         let event = v["event"].as_str().unwrap_or("?").to_owned();
-        trace.record(src, Dir::In, &event, None, None, v.clone(), None);
+        let mut traced = v.clone();
+        crate::trace::redact_hook(&mut traced);
+        trace.record(src, Dir::In, &event, None, None, traced, None);
+        if v["agent"].as_str() == Some("shell") {
+            // Jobs (jobs.rs) are this machine's own shells; a remote host's are not offered.
+            if via == Via::Local {
+                jobs.on_line(&v);
+            }
+            continue;
+        }
         let key = session_key(&v, &via);
         if let Some(ev) = to_session_event(&v, &via) {
             registry.apply(ev);
@@ -311,7 +331,7 @@ fn agent_of(name: &str) -> Agent {
     }
 }
 
-fn branch_of(cwd: &str) -> Option<String> {
+pub(crate) fn branch_of(cwd: &str) -> Option<String> {
     let head = std::path::Path::new(cwd)
         .ancestors()
         .find_map(|d| std::fs::read_to_string(d.join(".git/HEAD")).ok())?;
@@ -501,7 +521,7 @@ fn step_summary(tool: &str, payload: &Value) -> String {
 }
 
 /// Last path component, splitting on both separators (remote paths may be Windows ones).
-fn repo_of(cwd: &str) -> Option<String> {
+pub(crate) fn repo_of(cwd: &str) -> Option<String> {
     let name = cwd.rsplit(['/', '\\']).find(|c| !c.is_empty())?;
     Some(name.to_owned())
 }

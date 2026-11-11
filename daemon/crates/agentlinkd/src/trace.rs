@@ -32,6 +32,21 @@ pub fn redact_sum(v: &mut Value) -> bool {
     hit
 }
 
+/// A shell job's hook line carries the command line the user typed (`payload.cmd`): replaced
+/// before it is traced, like `sum`. Returns whether anything was replaced.
+pub fn redact_hook(v: &mut Value) -> bool {
+    if v["agent"].as_str() != Some("shell") {
+        return false;
+    }
+    match v.pointer_mut("/payload/cmd") {
+        Some(c) => {
+            *c = Value::String("<private>".into());
+            true
+        }
+        None => false,
+    }
+}
+
 /// Keyboard messages carry the user's touch strokes and the words decoded from them
 /// (issue 20261110-1e57): replaced like speech. Returns whether anything was replaced.
 pub fn redact_keys(kind: &str, msg: &mut Value) -> bool {
@@ -215,6 +230,18 @@ impl Trace {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shell_hook_lines_lose_the_command() {
+        let mut v = json!({"agent": "shell", "event": "start", "payload": {"cmd": "psql -W secret", "pid": 7}});
+        assert!(redact_hook(&mut v));
+        assert_eq!(v["payload"]["cmd"], "<private>");
+        assert_eq!(v["payload"]["pid"], 7);
+        assert!(!v.to_string().contains("secret"));
+        let mut other = json!({"agent": "claude", "payload": {"cmd": "x"}});
+        assert!(!redact_hook(&mut other));
+        assert_eq!(other["payload"]["cmd"], "x");
+    }
 
     #[test]
     fn keyboard_strokes_keys_and_candidates_are_private() {

@@ -3,6 +3,7 @@
 mod hooks;
 mod remote;
 mod remotes;
+mod shell_init;
 mod ssh;
 mod status;
 mod trace;
@@ -63,6 +64,12 @@ enum Cmd {
         /// Extra arguments passed to ssh unchanged.
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
+    },
+    /// Print the shell integration that shows long-running commands on the watch.
+    /// Add `eval "$(agentlink shell-init zsh)"` (or bash) to the shell's rc file.
+    ShellInit {
+        /// zsh or bash.
+        shell: String,
     },
     /// Inspect or drive the connected device.
     Device {
@@ -189,6 +196,7 @@ fn main() -> Result<()> {
             }
             None => ssh::run(port.unwrap_or(remotes::DEFAULT_PORT), &dest, &[], &args),
         },
+        Cmd::ShellInit { shell } => shell_init::run(&shell),
         Cmd::Device { cmd } => {
             let name = match cmd {
                 DeviceCmd::State => "state",

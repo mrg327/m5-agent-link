@@ -151,6 +151,10 @@ body!(
         #[n(17)] #[serde(skip_serializing_if = "Option::is_none")] q: Option<String>,
         /// Answers to `q` offered on the watch's Reply list (proto 0.5); empty clears them.
         #[n(18)] #[serde(skip_serializing_if = "Option::is_none")] rp: Option<Vec<String>>,
+        /// A job's expected total run time in seconds (proto 0.9); 0 = unknown.
+        #[n(19)] #[serde(skip_serializing_if = "Option::is_none")] eta: Option<u64>,
+        /// A job's exit status, sent with the delta that enters done / error (proto 0.9).
+        #[n(20)] #[serde(skip_serializing_if = "Option::is_none")] exit: Option<u64>,
     }
 );
 impl Session {
@@ -176,13 +180,15 @@ impl Session {
             ok: None,
             q: None,
             rp: None,
+            eta: None,
+            exit: None,
         }
     }
 
     /// Applies a delta: keys present in `d` overwrite, absent keys are kept.
     pub fn merge(&mut self, d: &Session) {
         macro_rules! m { ($($f:ident),*) => { $(if d.$f.is_some() { self.$f = d.$f.clone(); })* }; }
-        m!(ag, st, sub, repo, br, tool, t0, tst, sum, seen, host, hn, snz, ntf, n, ok);
+        m!(ag, st, sub, repo, br, tool, t0, tst, sum, seen, host, hn, snz, ntf, n, ok, eta, exit);
     }
 }
 body!(Gone {

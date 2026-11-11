@@ -5,6 +5,10 @@
 //! hard deadline, every failure is swallowed, the exit code is always 0, and stdout stays
 //! empty unless the daemon returns a decision.
 //!
+//! `agentlink-hook shell start|end|exit --pid <shellpid> [--exit <status>] [-- <command line>]` is
+//! the shell integration's call (`agentlink shell-init`, docs/design/JOBS.md). It runs in the
+//! background of an interactive shell, so it never reads stdin; otherwise the same rules.
+//!
 //! Two Claude Code hooks block for the watch (UI-V2 §7, DESIGN §6a "first answer wins"):
 //! `PermissionRequest` (fires when Claude Code is about to show its permission prompt) and
 //! `PreToolUse` for `AskUserQuestion`. The hook holds the prompt back for `AGENTLINK_WAIT_MS`
@@ -472,7 +476,107 @@ fn send_local(_lines: &[String], _reply_wait: Option<Duration>) -> Option<String
     None
 }
 
+/// What `agentlink-hook shell …` was asked.
+#[derive(Debug, PartialEq)]
+struct ShellArgs {
+    event: String,
+    pid: u32,
+    exit: Option<u64>,
+    seq: Option<u64>,
+    cmd: Option<String>,
+}
+
+/// `start|end|exit --pid N [--exit S] [-- command words…]`; `None` when the pid or event is missing.
+fn parse_shell_args(args: &[String]) -> Option<ShellArgs> {
+    let event = args
+        .first()
+        .filter(|e| ["start", "end", "exit"].contains(&e.as_str()))?;
+    let (mut pid, mut exit, mut seq, mut cmd) = (None, None, None, None);
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--pid" => {
+                pid = args.get(i + 1).and_then(|v| v.parse().ok());
+                i += 2;
+            }
+            "--exit" => {
+                exit = args.get(i + 1).and_then(|v| v.parse().ok());
+                i += 2;
+            }
+            "--seq" => {
+                seq = args.get(i + 1).and_then(|v| v.parse().ok());
+                i += 2;
+            }
+            "--" => {
+                cmd = Some(args[i + 1..].join(" ")).filter(|c| !c.trim().is_empty());
+                break;
+            }
+            _ => i += 1,
+        }
+    }
+    Some(ShellArgs {
+        event: event.clone(),
+        pid: pid?,
+        exit,
+        seq,
+        cmd,
+    })
+}
+
+/// The daemon line of a shell event: shaped like an agent's, with the shell identified by
+/// `--pid` (the shim's own parent is a throwaway subshell).
+fn shell_line(a: &ShellArgs) -> String {
+    let mut payload = json!({"pid": a.pid});
+    if let Some(cmd) = &a.cmd {
+        payload["cmd"] = json!(cmd);
+    }
+    if let Some(exit) = a.exit {
+        payload["exit"] = json!(exit);
+    }
+    if let Some(seq) = a.seq {
+        payload["seq"] = json!(seq);
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        payload["cwd"] = json!(cwd.to_string_lossy());
+    }
+    let (line, ..) = build_line("shell", &a.event, &payload.to_string(), false);
+    #[cfg(unix)]
+    {
+        let mut v: Value = serde_json::from_str(&line).unwrap_or(Value::Null);
+        if v["tty"].is_null() {
+            // the chain from the shim's parent found no tty: ask about the shell itself
+            let (pids, tty) = process_identity(a.pid);
+            if let Some(t) = tty {
+                v["tty"] = json!(t);
+                v["pids"] = json!(pids);
+            }
+        }
+        if !v.is_null() {
+            return v.to_string();
+        }
+    }
+    line
+}
+
+/// Sends one shell event under the usual hard deadline; nothing is printed and nothing waits.
+fn shell_run(args: &[String]) {
+    let Some(a) = parse_shell_args(args) else {
+        return;
+    };
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        send(&[shell_line(&a)], None);
+        let _ = tx.send(());
+    });
+    let _ = rx.recv_timeout(DEADLINE);
+}
+
 fn main() {
+    let mut args = std::env::args().skip(1);
+    if args.next().as_deref() == Some("shell") {
+        shell_run(&args.collect::<Vec<_>>());
+        std::process::exit(0);
+    }
     let mut args = std::env::args().skip(1);
     let agent = args.next().unwrap_or_else(|| "other".into());
     let event = args.next().unwrap_or_default();
@@ -519,6 +623,76 @@ mod tests {
         assert_eq!(tty.as_deref(), Some("/dev/ttys003"));
         assert_eq!(walk_chain(ps, 800, 2).0, vec![800, 700]);
         assert_eq!(walk_chain("", 42, 8), (vec![42], None));
+    }
+
+    fn argv(a: &[&str]) -> Vec<String> {
+        a.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn shell_arguments() {
+        let p = |a: &[&str]| parse_shell_args(&argv(a));
+        assert_eq!(
+            p(&["start", "--pid", "42", "--", "cargo", "build", "--", "-x"]),
+            Some(ShellArgs {
+                event: "start".into(),
+                pid: 42,
+                exit: None,
+                seq: None,
+                cmd: Some("cargo build -- -x".into())
+            })
+        );
+        let end = p(&["end", "--pid", "42", "--seq", "9", "--exit", "101"]).unwrap();
+        assert_eq!((end.exit, end.seq, end.cmd), (Some(101), Some(9), None));
+        assert!(p(&["exit", "--pid", "7"]).is_some());
+        assert_eq!(p(&["start", "--pid", "x", "--", "ls"]), None);
+        assert_eq!(p(&["start", "--", "ls"]), None);
+        assert_eq!(p(&["bogus", "--pid", "1"]), None);
+        assert_eq!(p(&[]), None);
+        assert_eq!(p(&["start", "--pid", "1", "--", " "]).unwrap().cmd, None);
+    }
+
+    #[test]
+    fn shell_line_has_the_agent_shape() {
+        let a = parse_shell_args(&argv(&["start", "--pid", "42", "--", "make", "test"])).unwrap();
+        let v: Value = serde_json::from_str(&shell_line(&a)).unwrap();
+        assert_eq!(
+            (v["agent"].as_str(), v["event"].as_str()),
+            (Some("shell"), Some("start"))
+        );
+        assert_eq!(v["payload"]["cmd"], "make test");
+        assert_eq!(v["payload"]["pid"], 42);
+        assert!(v["payload"].get("exit").is_none());
+        assert_eq!(v["payload"]["cwd"], v["cwd"]);
+        assert!(v["pids"].is_array() && v["env"].is_object());
+        let a = parse_shell_args(&argv(&["end", "--pid", "42", "--exit", "0"])).unwrap();
+        let v: Value = serde_json::from_str(&shell_line(&a)).unwrap();
+        assert_eq!(
+            (v["event"].as_str(), v["payload"]["exit"].as_u64()),
+            (Some("end"), Some(0))
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn shell_event_reaches_the_socket_without_stdin_or_output() {
+        let d = scratch("shell-send");
+        std::env::set_var("AGENTLINK_HOME", &d);
+        let l = std::os::unix::net::UnixListener::bind(d.join("hook.sock")).unwrap();
+        let srv = std::thread::spawn(move || {
+            let (s, _) = l.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(s).read_line(&mut line).unwrap();
+            line
+        });
+        // no daemon or a dead pid must not matter either: errors are swallowed
+        shell_run(&argv(&["end", "--pid", "999999", "--exit", "3"]));
+        let v: Value = serde_json::from_str(&srv.join().unwrap()).unwrap();
+        assert_eq!(v["payload"]["exit"], 3);
+        std::env::remove_var("AGENTLINK_HOME");
+        shell_run(&argv(&["start", "--pid", "1", "--", "x"])); // no socket now
+        shell_run(&argv(&["nonsense"]));
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]

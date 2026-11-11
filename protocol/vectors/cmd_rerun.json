@@ -1,0 +1,13 @@
+{
+  "desc": "Device runs session 4's finished job again after a hold (proto 0.9)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 17,
+    "b": {
+      "op": "rerun",
+      "sid": 4,
+      "hold_ms": 1250
+    }
+  },
+  "cbor_hex": "a30008011103a300110104041904e2"
+}

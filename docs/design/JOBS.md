@@ -111,3 +111,13 @@ A job is a session like any other: same ring, same card, same gestures. Differen
   prompt).
 - Jobs on remote hosts (`agentlink ssh`).
 - fish and PowerShell snippets.
+
+## 7. Checks
+
+- `cargo test --workspace` in `daemon/`: the job tracker (ordering, threshold, end states, history, proto
+  gating, refusals) and the bash snippet driven through a real interactive bash.
+- `daemon/tools/jobs_e2e.py`: a real bash in a pty, the shim, a scratch daemon and a fake 0.9 device. It
+  found the out-of-order bug in §4; run it after any change to the snippets or `jobs.rs`.
+- Simulator: `jobs_card`, `jobs_wire`, `jobs_menu`, `jobs_rerun`, `jobs_dismiss`.
+- Not yet run anywhere: the zsh snippet (no zsh on the build machine), macOS, and `Run again` against a
+  real kitty.

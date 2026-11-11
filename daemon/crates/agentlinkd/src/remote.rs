@@ -277,6 +277,7 @@ mod tests {
         let registry = Arc::new(Registry::new(trace.clone()));
         Arc::new(ConnEnv {
             broker: Arc::new(Broker::new(registry.clone())),
+            jobs: Arc::new(crate::jobs::Jobs::new(registry.clone(), Default::default())),
             registry,
             trace,
             status: Arc::new(|| json!({})),

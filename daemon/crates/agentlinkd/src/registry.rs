@@ -39,6 +39,12 @@ pub struct SessionPatch {
     pub step: Step,
     /// The closing question and its answers (ask.rs); ("", []) clears them when the agent moves on.
     pub ask: Option<(String, Vec<String>)>,
+    /// A job's start (jobs.rs): the session's `t0`, which a hook-fed session sets itself at creation.
+    pub t0: Option<u64>,
+    /// A job's expected run time (0 = unknown) and exit status. Sent as given, even when equal
+    /// to the last value: a reused session's new job must restate them.
+    pub eta: Option<u64>,
+    pub exit: Option<u64>,
 }
 
 /// What a hook line did to the turn's tool-step counter.
@@ -65,6 +71,9 @@ impl SessionPatch {
             tool: None,
             summary: None,
             ask: None,
+            t0: None,
+            eta: None,
+            exit: None,
             step: Step::None,
         }
     }
@@ -364,6 +373,16 @@ impl Registry {
         upd!(br, p.branch.map(|v| clip(&v, 32)));
         upd!(tool, p.tool);
         upd!(sum, p.summary.map(|v| clip(&v, 80)));
+        if d.st == Some(SessState::Work) && p.exit.is_none() {
+            s.exit = None; // a new run: the last one's status must not reach a new device
+        }
+        if let Some(t0) = p.t0 {
+            (s.t0, d.t0, changed) = (Some(t0), Some(t0), true);
+        }
+        if let Some(eta) = p.eta {
+            (s.eta, d.eta, changed) = (Some(eta), Some(eta), true);
+        }
+        upd!(exit, p.exit);
         if let Some((q, rp)) = p.ask {
             upd!(q, Some(q));
             upd!(rp, Some(rp));
@@ -508,6 +527,22 @@ impl Registry {
             Origin::Remote { attach: None, .. } => return Route::Unsupported,
         };
         Route::Ready(rec.session.clone(), ctx)
+    }
+
+    /// The agent kind of a session.
+    pub fn agent_of(&self, sid: u64) -> Option<Agent> {
+        self.state.lock().unwrap().sessions.get(&sid)?.session.ag
+    }
+
+    /// Whether a local non-job session runs in the terminal with this tty: its own card covers
+    /// whatever the shell runs there (jobs.rs).
+    pub fn tty_hosts_agent(&self, tty: &str) -> bool {
+        let st = self.state.lock().unwrap();
+        st.sessions.values().any(|r| {
+            r.origin == Origin::Local
+                && r.session.ag != Some(Agent::Shell)
+                && r.ctx.tty.as_deref() == Some(tty)
+        })
     }
 
     /// Host index of a session (0 = local), for audit lines.

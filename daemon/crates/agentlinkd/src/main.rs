@@ -11,6 +11,7 @@ mod device;
 mod focus;
 mod hook_source;
 mod ipc;
+mod jobs;
 mod keys;
 mod paths;
 mod prompt;
@@ -56,6 +57,7 @@ async fn main() -> Result<()> {
     if let Some(stt) = &shared.stt {
         stt.warm();
     }
+    shared.jobs.spawn_ticker();
     let started = registry::now_unix();
 
     let status: hook_source::StatusFn = {
@@ -83,6 +85,7 @@ async fn main() -> Result<()> {
         trace: trace.clone(),
         status,
         broker,
+        jobs: shared.jobs.clone(),
     })];
     for s in sources {
         let reg = registry.clone();
