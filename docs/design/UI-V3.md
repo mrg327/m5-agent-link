@@ -236,6 +236,25 @@ centred on y 246. Legends: A `Select`, B `Next`.
   shows its text as the caption's first line (`"Vue"`).
 - Legends: A `Open on PC`, B `Next` (hidden with one option).
 
+#### 4.3a Read before you approve (issue f6fc)
+
+A permission can only be approved when all of its text has been on screen.
+
+- A text of up to three lines is shown whole, as above, and nothing changes.
+- A longer text shows two lines and `Read all` (`FONT_CAPTION`, the request's colour) inside the platter.
+  A tap on the platter opens the **reader**: caption and title stay, and the text fills a window 320 wide
+  and seven lines tall from y 118, with `2 of 3` under it when there is more than one page.
+- In the reader: tap, swipe up or B is the next page, and on the last page returns to the picker (B reads
+  `More`, then `Done`). Swipe down is the previous page. Swipe right or B held closes the reader and stays
+  on ASK. A is still `Open on PC`. Nothing in the reader answers the request: a swipe down is never the
+  deny swipe there and holds do nothing. A tap within 300 ms of a page appearing is ignored.
+- Until the last page has been shown for this request and this text, an item that grants permission
+  cannot be held. A tap on it opens the reader; a hold says `Read it first`. Deny and `Open on PC` are
+  never locked.
+- A text the daemon cut (it ends in `…`, or it fills the model's buffer) can never be shown whole. It can
+  be read and denied on the watch; Approve answers `Too long to approve here`. (`ASK_BLOCK_CUT_TEXT` in
+  `ui_ask.c`.) The fix for that limit is the `detail` request, which is not built yet.
+
 ### 4.4 WATCH (shown to the user as "Activity")
 
 Caption y 72. Up to three earlier steps from y 108, pitch 26, `FONT_CAPTION` `COL_TEXT2`, each led

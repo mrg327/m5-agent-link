@@ -90,6 +90,7 @@ void ui_ask_open(uint32_t sid, uint32_t now_ms);
 void ui_ask_close(void);
 bool ui_ask_refresh(uint32_t now_ms); /* false: nothing left to ask */
 bool ui_ask_act(nav_action_t a, const gesture_evt_t *g);
+bool ui_ask_back(void);               /* true: the reader was open and is now closed */
 bool ui_ask_tick(uint32_t now_ms);    /* true: wants to close */
 void ui_ask_report(ui_report_t *r);
 

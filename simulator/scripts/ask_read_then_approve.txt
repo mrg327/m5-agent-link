@@ -1,0 +1,27 @@
+# Read before you approve: a tap on the text opens the reader, a tap on its last page returns to the picker,
+# and then the usual 1.2 s hold approves (op 3). Swipe right closes the reader without leaving ASK.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention 7 2 approval approve,deny,focus 0 Run shell command|cd packages/frontend && npm run test -- --watch=false --coverage --runInBand && git push --force origin main
+wait 400
+expect_label Read all
+tap 233 150
+wait 400
+expect_label Reading 1 of 1
+swipe 150 233 330 233
+wait 300
+expect_screen ask
+expect_label > Approve HOLD
+tap 233 150
+wait 400
+expect_label Reading 1 of 1
+tap 233 233
+wait 300
+expect_label > Approve HOLD
+hold 233 282 1500
+wait 400
+expect_label Approved
+shot ask_read_approved.png
+quit

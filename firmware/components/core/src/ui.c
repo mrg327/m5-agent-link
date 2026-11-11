@@ -390,6 +390,10 @@ bool ui_on_gesture(const gesture_evt_t *g)
         return true;
     case NAV_BACK:
         if (g->kind == G_SWIPE_DOWN && !nav_long_swipe_down(g->y, s_rel_y)) return true; /* too short: ignored */
+        if (s_mode == MODE_ASK && ui_ask_back()) { /* the reader closes first; the request stays on screen */
+            g_ui_actions->tick();
+            return true;
+        }
         if (s_mode == MODE_SCROLL && g->kind == G_TAP && ui_scroll_caught()) return true; /* it stopped a glide */
         if (s_mode == MODE_SCROLL && g->kind == G_SWIPE_RIGHT && ui_scroll_dragged()) return true; /* a flick that scrolled */
         leave_mode();
