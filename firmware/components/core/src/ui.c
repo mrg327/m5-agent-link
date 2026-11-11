@@ -19,7 +19,11 @@ static bool s_link_up, s_animate = true;
 static uint32_t s_seen_rev;
 static uint32_t s_now_ms;
 
-static lv_obj_t *s_toast, *s_toast_label;
+#define TOAST_H 40
+#define TOAST_MAX_W 290
+#define TOAST_DOT 10
+#define TOAST_MASK_H 26 /* covers the 22 px legends */
+static lv_obj_t *s_toast, *s_toast_label, *s_toast_dot, *s_toast_mask;
 static uint32_t s_toast_until_ms;
 static lv_obj_t *s_glow, *s_glow_ring;
 
@@ -37,19 +41,39 @@ lv_obj_t *ui_new_screen(void)
 static void create_overlays(void)
 {
     lv_obj_t *top = lv_layer_top();
+    /* The legends share the toast's row: a black strip under the toast covers them cleanly while it shows. */
+    s_toast_mask = lv_obj_create(top);
+    lv_obj_remove_style_all(s_toast_mask);
+    lv_obj_set_size(s_toast_mask, UI_SIZE, TOAST_MASK_H);
+    lv_obj_set_pos(s_toast_mask, 0, UI_Y_TOAST - TOAST_MASK_H / 2);
+    lv_obj_set_style_bg_color(s_toast_mask, COL_BG, 0);
+    lv_obj_set_style_bg_opa(s_toast_mask, LV_OPA_COVER, 0);
+    lv_obj_add_flag(s_toast_mask, LV_OBJ_FLAG_HIDDEN);
+
+    /* One slot (UI-V3 §2.5): a neutral capsule with a dot in the toast's colour; the text is always white. */
     s_toast = lv_obj_create(top);
     lv_obj_remove_style_all(s_toast);
-    lv_obj_set_style_bg_color(s_toast, COL_SURFACE2, 0);
+    lv_obj_set_style_bg_color(s_toast, COL_FILL2, 0);
     lv_obj_set_style_bg_opa(s_toast, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(s_toast, LV_RADIUS_CIRCLE, 0); /* a tinted pill, no border */
+    lv_obj_set_style_radius(s_toast, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_pad_hor(s_toast, 18, 0);
-    lv_obj_set_style_pad_ver(s_toast, 8, 0);
-    lv_obj_set_size(s_toast, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    s_toast_label = theme_label(s_toast, 20, COL_TEXT);
+    lv_obj_set_style_pad_column(s_toast, 10, 0);
+    lv_obj_set_size(s_toast, LV_SIZE_CONTENT, TOAST_H);
+    lv_obj_set_style_max_width(s_toast, TOAST_MAX_W, 0);
+    lv_obj_set_flex_flow(s_toast, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(s_toast, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_remove_flag(s_toast, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    s_toast_dot = lv_obj_create(s_toast);
+    lv_obj_remove_style_all(s_toast_dot);
+    lv_obj_set_size(s_toast_dot, TOAST_DOT, TOAST_DOT);
+    lv_obj_set_style_radius(s_toast_dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(s_toast_dot, LV_OPA_COVER, 0);
+    s_toast_label = lv_label_create(s_toast);
+    lv_obj_set_style_text_font(s_toast_label, FONT_BODY_STRONG, 0);
+    lv_obj_set_style_text_color(s_toast_label, COL_TEXT, 0);
     lv_label_set_long_mode(s_toast_label, LV_LABEL_LONG_MODE_DOTS);
-    lv_obj_set_style_max_width(s_toast, 280, 0);
     lv_obj_set_width(s_toast_label, LV_SIZE_CONTENT);
-    lv_obj_set_style_max_width(s_toast_label, 240, 0);
+    lv_obj_set_style_max_width(s_toast_label, TOAST_MAX_W - 36 - TOAST_DOT - 10, 0);
     lv_obj_add_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
 
     s_glow = lv_obj_create(top);
@@ -113,14 +137,11 @@ void ui_set_link_transport(int kind)
 nav_mode_t ui_mode(void) { return s_mode; }
 int ui_last_release_y(void) { return s_rel_y; }
 
-/* Where the toast sits: over the action pill on the deck, but on the wheel screens whose rows reach
- * that height (ASK, STATUS) it takes the hint line below the key badges, so the selected row stays
- * readable while it shows. */
+/* The toast has one slot on every screen: centred on the legend row, replacing the legends while it shows. */
 static void place_toast(void)
 {
-    bool low = s_mode == MODE_ASK || s_mode == MODE_STATUS || s_mode == MODE_WATCH || s_mode == MODE_KEYS;
     lv_obj_update_layout(s_toast);
-    lv_obj_align(s_toast, LV_ALIGN_TOP_MID, 0, low ? UI_TOAST_LOW_Y : UI_ACTION_Y - 4);
+    lv_obj_align(s_toast, LV_ALIGN_TOP_MID, 0, UI_Y_TOAST - TOAST_H / 2);
 }
 
 bool ui_toast_active(void) { return !lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN); }
@@ -153,7 +174,10 @@ static void enter_mode(nav_mode_t m)
     else if (m == MODE_VOICE) ui_voice_open(ui_home_sel_sid(), s_voice_rid, s_now_ms);
     else if (m == MODE_KEYS) ui_keys_open(ui_home_sel_sid(), s_now_ms);
     else ui_home_refresh(s_now_ms); /* the ring shows sessions again */
-    if (ui_toast_active()) place_toast(); /* a toast that outlives the mode moves to the new slot */
+    if (m != MODE_HOME && m != MODE_KEYS) { /* deeper modes rise into place; KEYS records strokes at once */
+        lv_obj_t *const roots[MODE_COUNT] = {NULL, s_agent, s_ask, s_scroll, s_status, s_watch, s_voice, s_keys};
+        ui_motion_enter(roots[m]);
+    }
     dbg_event("ui", "mode", "\"mode\":\"%s\"", nav_mode_name(m));
 }
 
@@ -247,13 +271,35 @@ void ui_report(ui_report_t *r)
 
 /* ───────── toast & glow ───────── */
 
+static void anim_translate_y(void *o, int32_t v) { lv_obj_set_style_translate_y(o, v, 0); }
+
+static void rise(lv_obj_t *o, int px)
+{
+    lv_anim_delete(o, anim_translate_y);
+    if (!ui_animations_allowed()) {
+        lv_obj_set_style_translate_y(o, 0, 0);
+        return;
+    }
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, o);
+    lv_anim_set_exec_cb(&a, anim_translate_y);
+    lv_anim_set_values(&a, px, 0);
+    lv_anim_set_duration(&a, UI_MOTION_MS);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    lv_anim_start(&a);
+}
+
+void ui_motion_enter(lv_obj_t *content) { rise(content, UI_MOTION_RISE); }
+
 void ui_toast(const char *text, uint32_t rgb)
 {
     lv_label_set_text(s_toast_label, text);
-    lv_obj_set_style_text_color(s_toast_label, COL_TEXT, 0);
-    lv_obj_set_style_bg_color(s_toast, lv_color_mix(lv_color_hex(rgb), COL_BG, UI_TOAST_TINT_MIX), 0);
+    lv_obj_set_style_bg_color(s_toast_dot, lv_color_hex(rgb), 0);
     place_toast();
     lv_obj_remove_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(s_toast_mask, LV_OBJ_FLAG_HIDDEN);
+    rise(s_toast, UI_TOAST_RISE);
     s_toast_until_ms = s_now_ms + TOAST_MS;
     dbg_event("ui", "toast", "\"text\":%s", dbg_q(text));
 }
@@ -273,8 +319,10 @@ bool ui_glow_active(void) { return !lv_obj_has_flag(s_glow, LV_OBJ_FLAG_HIDDEN);
 void ui_tick(uint32_t now_ms)
 {
     s_now_ms = now_ms;
-    if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN) && (int32_t)(now_ms - s_toast_until_ms) >= 0)
+    if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN) && (int32_t)(now_ms - s_toast_until_ms) >= 0) {
         lv_obj_add_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(s_toast_mask, LV_OBJ_FLAG_HIDDEN);
+    }
     if (model_rev() != s_seen_rev) {
         s_seen_rev = model_rev();
         ui_home_refresh(now_ms);

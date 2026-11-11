@@ -64,9 +64,14 @@ def find_all(rel, pattern, flags=0):
 def extract_palette():
     rel = CORE + "ui_theme.h"
     pal = {}
-    for k in ("bg", "surface", "surface2", "border", "text", "muted"):
-        m = find(rel, rf"COL_{k.upper()}\s+lv_color_hex\(0x([0-9a-fA-F]{{6}})\)", f"palette.{k}")
-        pal[k] = "#" + m.group(1).lower()
+    def col(k):
+        """COL_K as a hex colour; an alias (`COL_MUTED COL_TEXT2`) is followed."""
+        m = find(rel, rf"#define COL_{k.upper()}\s+(?:lv_color_hex\(0x([0-9a-fA-F]{{6}})\)|COL_(\w+))", f"palette.{k}")
+        return "#" + m.group(1).lower() if m.group(1) else col(m.group(2).lower())
+
+    # UI-V3 names (text2, text3, fill1, fill2) come with the old ones, which are aliases now
+    for k in ("bg", "surface", "surface2", "border", "text", "muted", "text2", "text3", "fill1", "fill2"):
+        pal[k] = col(k)
     # State colours (Okabe-Ito). The old Primer names are aliases of them, e.g. `RGB_AMBER RGB_PERMISSION`.
     for k in ("working", "ask", "permission", "done", "error", "idle"):
         m = find(rel, rf"#define RGB_{k.upper()}\s+0x([0-9a-fA-F]{{6}})", f"palette.{k}")
@@ -254,6 +259,10 @@ def extract_gesture():
     return g
 
 
+# Ring constants UI-V3 §3.1 removed (the underline, the error dots, the permission tracks).
+REMOVED_IN_V3 = {"UNDERLINE_W", "UNDERLINE_GAP", "DOT_STEP_DEG", "TRACK_W"}
+
+
 def extract_ring():
     # the deck is two files: ui_home.c (slots, selection, timers) and ui_home_card.c (the centre card);
     # the ring's constants live in its private header, shared by ui_ring.c and ui_ring_draw.c
@@ -274,7 +283,13 @@ def extract_ring():
                        ("work_period_ms", "WORK_PERIOD_MS"), ("ask_period_ms", "ASK_PERIOD_MS"),
                        ("perm_period_ms", "PERM_PERIOD_MS"), ("done_sweep_ms", "DONE_SWEEP_MS"),
                        ("error_flicker_ms", "ERROR_FLICKER_MS")]:
-        r[key] = int(find(ring, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
+        m = re.search(rf"#define {macro}\s+(\d+)", text(ring))
+        if not m and macro in REMOVED_IN_V3:
+            r[key] = 0 # no such element any more; the Atlas lab still reads the key (restyled in UI-V3 stage C)
+        elif not m and macro == "OTHERS_PCT":
+            r[key] = int(find(ring, r"#define REST_PCT\s+(\d+)", f"ring.{key}").group(1))
+        else:
+            r[key] = int(find(ring, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
     r["max_segments"] = int(find(CORE + "ui_ring.h", r"#define RING_MAX_SEGMENTS\s+(\d+)", "ring.max_segments").group(1))
     # shape + motion per kind, from the comments on ring_kind_t
     kinds = {}
@@ -282,7 +297,7 @@ def extract_ring():
         kinds[m.group(1).lower()] = m.group(2)
     SOURCES["ring.kinds"] = f"{CORE}ui_ring.h:{line_of(CORE + 'ui_ring.h', find(CORE + 'ui_ring.h', r'RING_WORK,').start())}"
     r["kinds"] = kinds
-    find(card, r'"TAP " LV_SYMBOL_RIGHT " ANSWER"', "ring.pill_approve")
+    find(card, r'"TAP (?:" LV_SYMBOL_RIGHT " |> )ANSWER"', "ring.pill_approve")
     find(card, r'"FOCUS \+ ACK"', "ring.pill_done")
     find(CORE + "ui_ask.c", r'"long swipe down to deny"', "ring.deny_hint") # deny lives only in ASK (UI-V2 §3)
     find(card, r'"swipe down for status"', "ring.status_hint")

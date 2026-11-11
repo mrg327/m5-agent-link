@@ -73,19 +73,19 @@ static bool offline(void) { return !ui_link_connected(); }
 void ui_home_link_text(char *dst, size_t cap, bool with_battery, uint32_t *rgb)
 {
     bool quiet = model_quiet_active(theme_now_unix());
-    const char *q = quiet ? LV_SYMBOL_MUTE "  " : "";
+    const char *q = quiet ? ICON_QUIET "  " : "";
     s_quiet_shown = quiet;
     int k = ui_link_transport();
-    const char *sym = k == HAL_LINK_USB ? LV_SYMBOL_USB : k == HAL_LINK_BLE ? LV_SYMBOL_BLUETOOTH : LV_SYMBOL_WIFI;
+    const char *sym = k == HAL_LINK_USB ? ICON_USB : k == HAL_LINK_BLE ? ICON_BLUETOOTH : ICON_LINK;
     const char *name = k == HAL_LINK_USB ? "USB" : k == HAL_LINK_BLE ? "BLE" : "PC";
     uint32_t down = ui_link_down_ms();
     if (!ui_link_connected() && down && model_count() > 0) {
         char age[16];
         theme_elapsed(age, sizeof age, down / 1000);
-        snprintf(dst, cap, "%s%s Offline %s stale %s", q, LV_SYMBOL_WARNING, theme_sep(), age);
+        snprintf(dst, cap, "%s%s Offline %s stale %s", q, ICON_OFFLINE, theme_sep(), age);
         *rgb = RGB_AMBER;
     } else if (k < 0) {
-        snprintf(dst, cap, "%s%s Offline", q, LV_SYMBOL_WARNING);
+        snprintf(dst, cap, "%s%s Offline", q, ICON_OFFLINE);
         *rgb = RGB_AMBER;
     } else if (!ui_link_connected()) {
         snprintf(dst, cap, "%s%s %s...", q, sym, name);
@@ -95,7 +95,7 @@ void ui_home_link_text(char *dst, size_t cap, bool with_battery, uint32_t *rgb)
         hal_battery_t b = hal_battery_read();
         char batt[16] = "";
         if (with_battery && b.percent <= 100)
-            snprintf(batt, sizeof batt, "%s%s%u%%", theme_sep(), b.charging ? LV_SYMBOL_CHARGE " " : "", b.percent);
+            snprintf(batt, sizeof batt, "%s%s%u%%", theme_sep(), b.charging ? ICON_BATTERY_CHARGING " " : "", b.percent);
         if (host[0]) snprintf(dst, cap, "%s%s %s%s%.12s%s", q, sym, name, theme_sep(), host, batt);
         else snprintf(dst, cap, "%s%s %s%s", q, sym, name, batt);
         *rgb = RGB_SUCCESS;
@@ -217,7 +217,7 @@ void ui_home_card_update(void)
         lv_obj_add_flag(s_req_text, LV_OBJ_FLAG_HIDDEN);
     }
     /* The pill names the centre tap: on a request it opens the options (answering needs a hold there). */
-    const char *pill = ask ? "TAP " LV_SYMBOL_RIGHT " ANSWER" : s->state == SESS_DONE ? "FOCUS + ACK" : "FOCUS";
+    const char *pill = ask ? "TAP > ANSWER" : s->state == SESS_DONE ? "FOCUS + ACK" : "FOCUS";
     theme_set_text(s_pill_lbl, s_pill_txt, sizeof s_pill_txt, pill);
     lv_color_t pill_col = offline() ? COL_MUTED : lv_color_hex(rgb);
     theme_set_text_color(s_pill_lbl, pill_col);

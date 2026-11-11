@@ -19,7 +19,7 @@
 #define TEXT_LINES 3
 #define DIVIDER_Y 190
 #define HINT_Y 364
-#define ASK_WHEEL ((wheel_layout_t){272, 40, 0}) /* three rows in the bottom half */
+#define ASK_WHEEL WHEEL_LAYOUT_BUTTON(282) /* the picker: three rows in the bottom half (UI-V3 §4.3) */
 
 static lv_obj_t *s_root, *s_header, *s_title, *s_text, *s_divider, *s_wheel, *s_answer, *s_hint;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
@@ -59,6 +59,9 @@ static uint32_t rgb_of(const ask_item_t *it)
     return it->id == ASK_OPEN_PC ? RGB_ACCENT : RGB_ASK;
 }
 
+/* The wheel's fill: the same colours, except that "Open on PC" is a neutral button. */
+static uint32_t fill_of(const ask_item_t *it) { return it->id == ASK_OPEN_PC ? 0 : rgb_of(it); }
+
 static void ring_items(const attention_t *a)
 {
     lv_obj_t *ring = ui_home_ring();
@@ -83,6 +86,7 @@ static void hold_cancel(void)
     if (s_ramp_started) g_ui_actions->hold_stop();
     s_ramp_started = false;
     ring_set_progress(ui_home_ring(), 0, 0xffffff);
+    wheel_set_progress(s_wheel, 0);
 }
 
 static void show(lv_obj_t *o, bool on)
@@ -139,7 +143,7 @@ bool ui_ask_refresh(uint32_t now)
     } else {
         s_n = nav_ask_items(a, model_voice(), s_items, ASK_MAX_ITEMS);
         wheel_item_t w[ASK_MAX_ITEMS];
-        for (int i = 0; i < s_n; i++) w[i] = (wheel_item_t){label_of(&s_items[i], a), rgb_of(&s_items[i]), s_items[i].hold_ms > 0, i};
+        for (int i = 0; i < s_n; i++) w[i] = (wheel_item_t){label_of(&s_items[i], a), fill_of(&s_items[i]), s_items[i].hold_ms > 0, i, NULL};
         int sel = wheel_count(s_wheel) == s_n ? wheel_sel(s_wheel) : 0;
         wheel_set(s_wheel, w, s_n, sel);
         wheel_set_shown(s_wheel, true);
@@ -273,7 +277,7 @@ bool ui_ask_tick(uint32_t now)
     s_now = now;
     const attention_t *a = req();
     if (!a || !model_find(s_sid)) return true;
-    show(s_hint, !ui_toast_active()); /* the toast takes the hint's line (UI_TOAST_LOW_Y) */
+    show(s_hint, !ui_toast_active()); /* the toast takes the hint's line (the toast slot) */
     if (s_holding && !s_hold_fired) {
         uint32_t el = now - s_hold_t0;
         const ask_item_t *it = s_hold_idx < s_n ? &s_items[s_hold_idx] : NULL;
@@ -289,12 +293,14 @@ bool ui_ask_tick(uint32_t now)
                 else g_ui_actions->deny_hold_start();
             }
             ring_set_progress(ui_home_ring(), (int)(el * 1000 / it->hold_ms), rgb);
+            wheel_set_progress(s_wheel, (int)(el * 1000 / it->hold_ms));
         }
         if (el >= it->hold_ms) {
             s_hold_fired = true;
             s_holding = false;
             s_ramp_started = false;
             ring_set_progress(ui_home_ring(), 0, rgb);
+            wheel_set_progress(s_wheel, 0);
             commit(a, s_hold_idx, el);
         }
     }

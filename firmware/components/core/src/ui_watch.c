@@ -91,9 +91,9 @@ static bool time_in_state(const session_t *s, uint32_t *secs)
 static void step_mark(const step_t *st, const char **sym, uint32_t *rgb)
 {
     switch (st->state) {
-    case STEP_OK: *sym = LV_SYMBOL_OK; *rgb = RGB_DONE; break;
-    case STEP_FAIL: *sym = LV_SYMBOL_CLOSE; *rgb = RGB_ERROR; break;
-    default: *sym = LV_SYMBOL_PLAY; *rgb = RGB_ACCENT; break;
+    case STEP_OK: *sym = ICON_CHECK; *rgb = RGB_DONE; break;
+    case STEP_FAIL: *sym = ICON_X; *rgb = RGB_ERROR; break;
+    default: *sym = ICON_WORKING; *rgb = RGB_ACCENT; break;
     }
 }
 

@@ -37,14 +37,8 @@ CONFIG_LV_DRAW_SW_CIRCLE_CACHE_SIZE=12
 CONFIG_LV_USE_CLIB_MALLOC=y
 CONFIG_LV_USE_CLIB_STRING=y
 CONFIG_LV_USE_CLIB_SPRINTF=y
-CONFIG_LV_FONT_MONTSERRAT_14=y
-CONFIG_LV_FONT_MONTSERRAT_16=y
-CONFIG_LV_FONT_MONTSERRAT_20=y
-CONFIG_LV_FONT_MONTSERRAT_22=y
-CONFIG_LV_FONT_MONTSERRAT_24=y
-CONFIG_LV_FONT_MONTSERRAT_32=y
-CONFIG_LV_FONT_MONTSERRAT_48=y
-CONFIG_LV_FONT_MONTSERRAT_28=y
+# Fonts are the generated Figtree/Phosphor sources in core/src/fonts. Kconfig offers no custom choice for
+# LV_FONT_DEFAULT, so LVGL's own default (Montserrat 14, enabled by it) stays as the font of a label that names none.
 
 # BLE: NimBLE peripheral (+ central API for MTU exchange), one connection, host memory in PSRAM
 CONFIG_BT_ENABLED=y

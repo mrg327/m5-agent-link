@@ -38,6 +38,11 @@ static const char *const s_labels[AG_COUNT] = {
     [AG_REPLY] = "Reply...",       [AG_INTERRUPT] = "Interrupt",
 };
 
+static const char *const s_icons[AG_COUNT] = {
+    [AG_FOCUS] = ICON_OPEN,   [AG_DISMISS] = ICON_DENIED, [AG_SNOOZE] = ICON_IDLE,  [AG_NOTIFY] = ICON_BELL,
+    [AG_WATCH] = ICON_ACTIVITY, [AG_REPLY] = ICON_REPLY,  [AG_INTERRUPT] = ICON_STOP,
+};
+
 static const session_t *session(void) { return model_find(s_sid); }
 
 /* Snooze and Notify are toggles: the label says what a commit will do now. */
@@ -76,6 +81,7 @@ static void hold_cancel(void)
     if (s_ramp_started) g_ui_actions->hold_stop();
     s_ramp_started = false;
     ring_set_progress(ui_home_ring(), 0, 0xffffff);
+    wheel_set_progress(s_wheel, 0);
 }
 
 bool ui_agent_refresh(uint32_t now)
@@ -98,17 +104,17 @@ bool ui_agent_refresh(uint32_t now)
     int n = 0;
     if (s_replies) {
         for (int i = 0; i < s->n_rp && n < WHEEL_MAX_ITEMS; i++)
-            w[n++] = (wheel_item_t){s->rp[i], RGB_ASK, false, REPLY_ID + SESSION_REPLY + i};
+            w[n++] = (wheel_item_t){s->rp[i], RGB_ASK, false, REPLY_ID + SESSION_REPLY + i, ICON_REPLY};
         for (int i = 0; i < model_reply_count() && n < WHEEL_MAX_ITEMS; i++)
-            w[n++] = (wheel_item_t){model_reply(i), RGB_ASK, false, REPLY_ID + i};
-        if (model_voice() && n < WHEEL_MAX_ITEMS) w[n++] = (wheel_item_t){"Dictate...", RGB_ASK, false, DICTATE_ID};
-        if (model_keys() && n < WHEEL_MAX_ITEMS) w[n++] = (wheel_item_t){"Type...", RGB_ASK, false, KEYS_ID};
+            w[n++] = (wheel_item_t){model_reply(i), RGB_ASK, false, REPLY_ID + i, ICON_REPLY};
+        if (model_voice() && n < WHEEL_MAX_ITEMS) w[n++] = (wheel_item_t){"Dictate...", RGB_ASK, false, DICTATE_ID, ICON_MIC};
+        if (model_keys() && n < WHEEL_MAX_ITEMS) w[n++] = (wheel_item_t){"Type...", RGB_ASK, false, KEYS_ID, ICON_KEYBOARD};
     } else {
         agent_item_t items[WHEEL_MAX_ITEMS];
         n = nav_agent_items(s->state, model_can_type(), model_reply_count() > 0 || s->n_rp > 0 || model_voice() || model_keys(), items, WHEEL_MAX_ITEMS);
         for (int i = 0; i < n; i++)
             w[i] = (wheel_item_t){label_of(items[i].id, s), items[i].id == AG_INTERRUPT ? RGB_DANGER : rgb, items[i].hold,
-                                  (int)items[i].id};
+                                  (int)items[i].id, s_icons[items[i].id]};
     }
     int sel = wheel_count(s_wheel) == n ? wheel_sel(s_wheel) : 0;
     wheel_set(s_wheel, w, n, sel);
@@ -257,6 +263,7 @@ bool ui_agent_tick(uint32_t now)
                     g_ui_actions->hold_start();
                 }
                 ring_set_progress(ui_home_ring(), (int)(el * 1000 / NAV_HOLD_MS), it->rgb);
+                wheel_set_progress(s_wheel, (int)(el * 1000 / NAV_HOLD_MS));
             }
             if (el >= NAV_HOLD_MS) {
                 s_hold_ms = el;
@@ -264,6 +271,7 @@ bool ui_agent_tick(uint32_t now)
                 s_holding = false;
                 s_ramp_started = false;
                 ring_set_progress(ui_home_ring(), 0, it->rgb);
+                wheel_set_progress(s_wheel, 0);
                 commit(it);
                 return false;
             }

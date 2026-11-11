@@ -8,33 +8,31 @@
 
 #define CX 233
 #define CY 233
-/* Index ring (UI-V2 §4.1, "capsules"): every segment is a round-capped capsule on a thin band at the
- * rim with a clear gap to its neighbours. The selected one is a wider capsule grown both ways around
- * the same centre line, with a thin white underline, and the others recede a little. Error is a row
- * of round dots and permission two thin round tracks, so the two never read alike beside each other. */
-#define BAND_OUT 226 /* outer radius of a normal capsule */
-#define BAND_W 8
-#define SEL_OUT 229 /* the selected capsule: wider, centred on the same line (229 - 14/2 == 226 - 8/2) */
-#define SEL_W 14
-#define SEG_GAP_DEG 9   /* gap between capsules (shrinks when sectors get narrow) */
-#define OTHERS_PCT 70   /* brightness of the non-selected capsules */
-#define UNDERLINE_W 2   /* selection underline, just inside the selected capsule */
-#define UNDERLINE_GAP 3
-#define DOT_STEP_DEG 7  /* error: one round dot every this many degrees */
-#define TRACK_W 3       /* permission: two thin tracks on the capsule's outer and inner edge */
-#define SEL_TRACK_W 4
-#define IDLE_W 4
-#define GLOW_W 14     /* ring_set_solid: the display-off alert glow is wider than the index band */
-#define TRACK_RING_W 6 /* ring_set_track: the grey track and the position arc share this width */
-#define PROG_OUT 212  /* hold-to-confirm fill, just inside the band */
-#define PROG_W 8
-#define INV_R_IN (PROG_OUT - PROG_W) /* every invalidated chunk covers this radius band: all the ring draws */
+/* Index ring (UI-V3 §3.1): one round-capped capsule per session on a centre line at r 225, 8 degrees
+ * apart. 6 px wide at rest, 12 px when selected (grown both ways around the same line). The selected
+ * session and any that needs you are at full brightness, the rest at 40 %. A session that needs you
+ * also carries a pip just inside its capsule, so it never depends on colour alone. */
+#define BAND_OUT 228 /* outer radius of a normal capsule: centre line 225, width 6 */
+#define BAND_W 6
+#define SEL_OUT 231 /* the selected capsule: width 12 around the same centre line */
+#define SEL_W 12
+#define SEG_GAP_DEG 8  /* gap between capsules (shrinks when sectors get narrow) */
+#define CAP_DEG 1      /* a round cap reaches about this far past its arc's end: spans are inset by it */
+#define REST_PCT 40    /* brightness of a session that does not need you */
+#define HOLD_DIM_PCT 20 /* the selected capsule while a hold arc is drawn over it */
+#define PIP_R 207      /* needs-you pip: centre radius and diameter */
+#define PIP_D 5
+#define GLOW_W 14      /* ring_set_solid: the display-off alert glow is wider than the index band */
+#define TRACK_RING_W 4 /* ring_set_track: the grey track and the position arc share this width */
+#define PROG_OUT 230   /* hold arc: 10 px over the selected capsule */
+#define PROG_W 10
+#define INV_R_IN (PIP_R - PIP_D / 2 - 1) /* every invalidated chunk covers this radius band: all the ring draws */
 #define INV_R_OUT SEL_OUT
 #define TICK_MS 30
 
 #define WORK_PERIOD_MS 1400
-#define ASK_PERIOD_MS 1400
-#define PERM_PERIOD_MS 900
+#define ASK_PERIOD_MS 1000 /* needs-you pulse: 1 Hz */
+#define PERM_PERIOD_MS 1000
 #define DONE_SWEEP_MS 700
 #define ERROR_FLICKER_MS 600
 #define COMET_DEG 14

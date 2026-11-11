@@ -1,18 +1,14 @@
-/* How the index ring paints (UI-V2 §4.1, "capsules"): one arc primitive with round caps, a round dot,
- * and one segment per kind: a dim capsule with a comet (working), a pulsing capsule (question), two
- * thin tracks (permission), a sweep then solid (done), a row of dots (error), a thin still line
- * (idle). The object, its segments and the animation clock live in ui_ring.c. */
+/* How the index ring paints (UI-V3 §3.1): one arc primitive with round caps, a round dot (the pip), and
+ * one capsule per session whose motion tells the kind: a comet on a dim capsule (working), a 1 Hz pulse
+ * (question, permission), a flicker then solid (error), one sweep then solid (done), still (idle). The
+ * object, its segments and the animation clock live in ui_ring.c. */
 #include "ui_ring_internal.h"
 
 #include <math.h>
 
-lv_color_t ring_mix(uint32_t rgb, int pct)
-{
-    return lv_color_mix(lv_color_hex(rgb), lv_color_black(), (uint8_t)(255 * pct / 100));
-}
+#include "ui_theme.h"
 
-/* ring_mix() scaled by k percent: the non-selected capsules recede without losing their hue. */
-static lv_color_t mixk(int k, uint32_t rgb, int pct) { return ring_mix(rgb, pct * k / 100); }
+lv_color_t ring_mix(uint32_t rgb, int pct) { return theme_dim(rgb, pct); }
 
 void ring_arc(lv_layer_t *l, int r_out, int w, int a0, int a1, lv_color_t c)
 {
@@ -82,10 +78,7 @@ static void dot(lv_layer_t *l, int r_mid, int diam, int deg, lv_color_t c)
     lv_draw_rect(l, &d, &a);
 }
 
-static void draw_dotted(lv_layer_t *l, int r_mid, int diam, int a0, int a1, lv_color_t c)
-{
-    for (int a = a0 + 3; a <= a1 - 3; a += DOT_STEP_DEG) dot(l, r_mid, diam, a, c);
-}
+static bool needs_you(uint8_t kind) { return kind == RING_ASK || kind == RING_PERM || kind == RING_ERROR; }
 
 void ring_draw_slot(lv_layer_t *l, const ring_data_t *d, int i)
 {
@@ -95,46 +88,44 @@ void ring_draw_slot(lv_layer_t *l, const ring_data_t *d, int i)
     int span = a1 - a0;
     bool sel = s->s.selected && d->n > 1;
     int out = sel ? SEL_OUT : BAND_OUT, w = sel ? SEL_W : BAND_W;
-    int k = d->n > 1 && !s->s.selected ? OTHERS_PCT : 100;
+    bool needs = needs_you(s->s.kind), holding = s->s.selected && d->prog > 0;
     int lvl = s->lvl;
-    int base = s->s.dim ? 30 : 100;
-    if (d->ambient) base = 20;
+    /* Full brightness for the selected session and any that needs you; the rest recede to 40 %. */
+    int rest = s->s.selected || needs ? 100 : REST_PCT;
+    if (s->s.dim && rest > 25) rest = 25;
+    if (holding) rest = HOLD_DIM_PCT;
+    if (d->ambient) rest = 20;
+    bool still = holding || d->ambient;
     uint32_t rgb = s->s.rgb;
 
     switch (s->s.kind) {
     case RING_WORK: {
-        ring_arc(l, out, w, a0, a1, mixk(k, rgb, d->ambient ? 20 : 38));
-        if (!d->ambient) {
+        ring_arc(l, out, w, a0, a1, theme_dim(rgb, still ? rest : s->s.selected ? 60 : REST_PCT));
+        if (!still) {
             int c0, c1;
             ring_comet_span(a0, a1, lvl, &c0, &c1);
-            ring_arc(l, out, w, c0, c1, mixk(k, rgb, 100));
+            ring_arc(l, out, w, c0, c1, theme_dim(rgb, 100));
         }
         break;
     }
     case RING_ASK:
-        ring_arc(l, out, w, a0, a1, mixk(k, rgb, d->ambient ? 20 : 55 + lvl * 45 / PULSE_LEVELS));
+    case RING_PERM:
+        ring_arc(l, out, w, a0, a1, theme_dim(rgb, still ? rest : 55 + lvl * 45 / PULSE_LEVELS));
         break;
-    case RING_PERM: { /* two thin round tracks on the outer and inner edge of the capsule */
-        int tw = sel ? SEL_TRACK_W : TRACK_W;
-        lv_color_t c = mixk(k, rgb, d->ambient ? 20 : 55 + lvl * 45 / PULSE_LEVELS);
-        ring_arc(l, out, tw, a0, a1, c);
-        ring_arc(l, out - w + tw, tw, a0, a1, c);
+    case RING_ERROR: /* one quick flicker, then solid */
+        ring_arc(l, out, w, a0, a1, theme_dim(rgb, still ? rest : (lvl == 0 ? 35 : 100)));
         break;
-    }
     case RING_DONE:
-        if (lvl < DONE_STEPS) {
-            ring_arc(l, out, w, a0, a1, mixk(k, rgb, 25));
-            ring_arc(l, out, w, a0, a0 + span * lvl / DONE_STEPS, mixk(k, rgb, 100));
+        if (lvl < DONE_STEPS && !still) {
+            ring_arc(l, out, w, a0, a1, theme_dim(rgb, 25));
+            ring_arc(l, out, w, a0, a0 + span * lvl / DONE_STEPS, theme_dim(rgb, 100));
         } else {
-            ring_arc(l, out, w, a0, a1, mixk(k, rgb, base));
+            ring_arc(l, out, w, a0, a1, theme_dim(rgb, rest));
         }
         break;
-    case RING_ERROR: /* a row of round dots along the capsule's centre line */
-        draw_dotted(l, out - w / 2, w, a0, a1, mixk(k, rgb, d->ambient ? 20 : (lvl == 0 ? 35 : 100)));
-        break;
     default:
-        ring_arc(l, out - w / 2 + IDLE_W / 2, IDLE_W, a0, a1, mixk(k, rgb, d->ambient ? 15 : 60));
+        ring_arc(l, out, w, a0, a1, theme_dim(rgb, rest));
         break;
     }
-    if (sel) ring_arc(l, out - w - UNDERLINE_GAP, UNDERLINE_W, a0, a1, ring_mix(0xe6edf3, d->ambient ? 25 : 100));
+    if (needs && !d->ambient) dot(l, PIP_R, PIP_D, (a0 + a1) / 2, theme_dim(rgb, 100));
 }

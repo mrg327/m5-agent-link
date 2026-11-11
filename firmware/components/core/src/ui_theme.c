@@ -37,16 +37,15 @@ const char *theme_state_word(const session_t *s)
     }
 }
 
-/* Centre glyph per state (UI-V2 §4): a shape beside the word, so state never depends on colour alone.
- * The permission glyph is a bell until a custom "!" in a circle exists; never a square. */
+/* Centre glyph per state: a shape beside the word, so state never depends on colour alone. */
 const char *theme_state_glyph(const session_t *s)
 {
     switch (s->state) {
-    case SESS_INPUT: return s->sub == 0 ? LV_SYMBOL_BELL : "?";
-    case SESS_ERROR: return LV_SYMBOL_WARNING;
-    case SESS_DONE: return LV_SYMBOL_OK;
-    case SESS_IDLE: return LV_SYMBOL_PAUSE;
-    default: return LV_SYMBOL_REFRESH;
+    case SESS_INPUT: return s->sub == 0 ? ICON_PERMISSION : ICON_QUESTION;
+    case SESS_ERROR: return ICON_ERROR;
+    case SESS_DONE: return ICON_DONE;
+    case SESS_IDLE: return ICON_IDLE;
+    default: return ICON_WORKING;
     }
 }
 
@@ -73,12 +72,8 @@ const char *theme_state_label(const session_t *s)
 
 const char *theme_agent_symbol(agent_t a)
 {
-    switch (a) {
-    case AGENT_COPILOT: return LV_SYMBOL_KEYBOARD;
-    case AGENT_CLAUDE: return LV_SYMBOL_EDIT;
-    case AGENT_CLOUD: return LV_SYMBOL_UPLOAD;
-    default: return LV_SYMBOL_FILE;
-    }
+    (void)a; /* no per-agent art: the name says which agent it is */
+    return ICON_ACTIVITY;
 }
 
 const char *theme_agent_name(agent_t a)
@@ -93,31 +88,16 @@ const char *theme_agent_name(agent_t a)
 
 const lv_font_t *theme_font(int px)
 {
-    if (px >= 48) {
-#if LV_FONT_MONTSERRAT_48
-        return &lv_font_montserrat_48;
-#endif
-    }
-    if (px >= 32) {
-#if LV_FONT_MONTSERRAT_32
-        return &lv_font_montserrat_32;
-#endif
-    }
-    if (px >= 24) {
-#if LV_FONT_MONTSERRAT_24
-        return &lv_font_montserrat_24;
-#endif
-    }
-    if (px >= 20) {
-#if LV_FONT_MONTSERRAT_20
-        return &lv_font_montserrat_20;
-#endif
-    }
-#if LV_FONT_MONTSERRAT_16
-    return &lv_font_montserrat_16;
-#else
-    return LV_FONT_DEFAULT;
-#endif
+    if (px <= 17) return FONT_CAPTION;
+    if (px <= 21) return FONT_BODY;
+    if (px <= 28) return FONT_HEAD;
+    if (px <= 40) return FONT_TITLE;
+    return FONT_NUM;
+}
+
+lv_color_t theme_dim(uint32_t rgb, int pct)
+{
+    return lv_color_mix(lv_color_hex(rgb), lv_color_black(), (uint8_t)(255 * pct / 100));
 }
 
 lv_obj_t *theme_label(lv_obj_t *parent, int px, lv_color_t color)
@@ -189,7 +169,7 @@ int theme_chord(int y, int margin)
     return w > 0 ? w : 0;
 }
 
-/* The built-in Montserrat fonts cover ASCII plus LV_SYMBOL_*; U+00B7 is usually missing there. */
+/* Figtree has U+00B7; the fallbacks keep a font without it (a test build, a new face) readable. */
 const char *theme_sep(void)
 {
     static const char *sep;
@@ -239,9 +219,14 @@ void theme_elapsed_long(char *dst, size_t cap, uint32_t secs)
     else snprintf(dst, cap, "%uh %02um", (unsigned)(secs / 3600), (unsigned)(secs / 60 % 60));
 }
 
+#define LEGEND_H UI_KEYCAP_PX
+#define LEGEND_R 212 /* the farthest corner of a legend: inside the ring (r 218), not on it */
+
 lv_obj_t *theme_key_badge(lv_obj_t *parent, const char *key, const char *word, bool key_left, int deg, int r,
                           lv_obj_t **key_out, lv_obj_t **word_out)
 {
+    (void)deg;
+    (void)r;
     lv_obj_t *b = lv_obj_create(parent);
     lv_obj_remove_style_all(b);
     lv_obj_set_size(b, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -249,22 +234,24 @@ lv_obj_t *theme_key_badge(lv_obj_t *parent, const char *key, const char *word, b
     lv_obj_set_flex_align(b, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(b, 6, 0);
     lv_obj_remove_flag(b, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_user_data(b, (void *)(intptr_t)(key_left ? 1 : 0)); /* which side of the row it hugs */
     lv_obj_t *cap = lv_obj_create(b);
     lv_obj_remove_style_all(cap);
     lv_obj_set_size(cap, UI_KEYCAP_PX, UI_KEYCAP_PX);
     lv_obj_set_style_radius(cap, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_opa(cap, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(cap, COL_SURFACE2, 0);
-    lv_obj_set_style_border_width(cap, 1, 0);
-    lv_obj_set_style_border_color(cap, COL_BORDER, 0);
+    lv_obj_set_style_border_width(cap, 2, 0); /* the spec's 1.5 px: LVGL borders are whole pixels */
+    lv_obj_set_style_border_color(cap, COL_TEXT3, 0);
     lv_obj_remove_flag(cap, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_t *k = theme_label(cap, 16, COL_TEXT);
+    lv_obj_t *k = lv_label_create(cap);
+    lv_obj_set_style_text_font(k, FONT_CAPTION, 0);
+    lv_obj_set_style_text_color(k, COL_TEXT2, 0);
     lv_label_set_text(k, key);
     lv_obj_center(k);
-    lv_obj_t *w = theme_label(b, 16, key_left ? COL_TEXT : COL_MUTED);
+    lv_obj_t *w = theme_label(b, 16, COL_TEXT2);
+    lv_label_set_long_mode(w, LV_LABEL_LONG_MODE_CLIP);
     lv_label_set_text(w, word);
     if (!key_left) lv_obj_move_to_index(cap, 1); /* word first, cap on the button side */
-    theme_key_badge_set_word(b, w, word, deg, r);
+    theme_key_badge_set_word(b, w, word, 0, 0);
     if (key_out) *key_out = k;
     if (word_out) *word_out = w;
     return b;
@@ -272,9 +259,13 @@ lv_obj_t *theme_key_badge(lv_obj_t *parent, const char *key, const char *word, b
 
 void theme_key_badge_set_word(lv_obj_t *b, lv_obj_t *word_lbl, const char *word, int deg, int r)
 {
+    (void)deg;
+    (void)r;
     lv_label_set_text(word_lbl, word);
-    float rad = (float)deg * 3.14159265f / 180.0f;
     lv_obj_update_layout(b);
     int bw = lv_obj_get_width(b), bh = lv_obj_get_height(b);
-    lv_obj_set_pos(b, 233 + (int)((float)r * sinf(rad)) - bw / 2, 233 - (int)((float)r * cosf(rad)) - bh / 2);
+    int dy = UI_Y_LEGEND + LEGEND_H / 2 - 233; /* the lower corner is the one nearest the ring */
+    int edge = (int)sqrtf((float)(LEGEND_R * LEGEND_R - dy * dy));
+    int x = lv_obj_get_user_data(b) ? 233 - edge : 233 + edge - bw;
+    lv_obj_set_pos(b, x, UI_Y_LEGEND - bh / 2);
 }

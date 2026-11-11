@@ -324,12 +324,12 @@ lv_obj_t *ui_scroll_init(lv_obj_t *screen)
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     s_header = line(s_root, 16, COL_MUTED, HEADER_Y, 280);
     s_chev_up = line(s_root, 24, COL_MUTED, CHEV_UP_Y, 60);
-    lv_label_set_text(s_chev_up, LV_SYMBOL_UP);
+    lv_label_set_text(s_chev_up, "^");
     s_count = line(s_root, 32, COL_TEXT, COUNT_Y, 300);
     s_caption = line(s_root, 16, COL_MUTED, CAPTION_Y, 300);
     s_preview = line(s_root, 20, COL_MUTED, PREVIEW_Y, theme_chord(PREVIEW_Y + 12, 28));
     s_chev_dn = line(s_root, 24, COL_MUTED, CHEV_DN_Y, 60);
-    lv_label_set_text(s_chev_dn, LV_SYMBOL_DOWN);
+    lv_label_set_text(s_chev_dn, "v");
     s_hint = line(s_root, 16, COL_MUTED, HINT_Y, 300);
     lv_label_set_text(s_hint, "drag like a trackpad");
     static const char *const words[2] = {"TO BOTTOM", "PAGE DOWN"};

@@ -1,0 +1,10 @@
+{
+  "name": "agentlink-fonts",
+  "private": true,
+  "description": "Generates the LVGL C fonts in firmware/components/core/src/fonts (see gen.sh)",
+  "devDependencies": {
+    "@fontsource/figtree": "5.3.0",
+    "@phosphor-icons/web": "2.1.2",
+    "lv_font_conv": "1.5.3"
+  }
+}

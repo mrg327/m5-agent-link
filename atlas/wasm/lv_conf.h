@@ -8,8 +8,8 @@
 #define LV_MEM_SIZE (384 * 1024)
 #define LV_DEF_REFR_PERIOD 33
 /* Per-frame cache of anti-aliased circle edges (LVGL flushes it after every refresh): the ring alone
- * needs 9 radii in one frame (capsule 226/218 + cap 4, selected 229/215 + cap 7, underline 212/210 + cap 1),
- * the deck adds a few small ones. With the default 4 the large ones are recomputed several times a frame. */
+ * needs about 9 radii in one frame (capsule 228/222 + cap 3, selected 231/219 + cap 6, hold arc 230/220 + cap 5,
+ * pip), the deck adds a few small ones. With the default 4 the large ones are recomputed several times a frame. */
 #define LV_DRAW_SW_CIRCLE_CACHE_SIZE 12
 
 #define LV_USE_OS LV_OS_NONE
@@ -17,13 +17,10 @@
 #define LV_USE_ASSERT_NULL 1
 #define LV_USE_ASSERT_MALLOC 1
 
-/* Only the sizes the UI uses (ui_theme.c falls back to the default font when one is missing). */
-#define LV_FONT_MONTSERRAT_16 1
-#define LV_FONT_MONTSERRAT_20 1
-#define LV_FONT_MONTSERRAT_24 1
-#define LV_FONT_MONTSERRAT_32 1
-#define LV_FONT_MONTSERRAT_48 1
-#define LV_FONT_DEFAULT &lv_font_montserrat_20
+/* No built-in Montserrat: the UI's fonts are the generated Figtree and Phosphor sources in
+ * core/src/fonts (UI-V3 §2.1). The default font, for a label that names none, is Figtree 20. */
+#define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(font_figtree_20_400)
+#define LV_FONT_DEFAULT &font_figtree_20_400
 
 #define LV_USE_DEMO_WIDGETS 0
 #define LV_BUILD_EXAMPLES 0

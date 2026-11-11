@@ -6,6 +6,7 @@
 #include "ui_ring_internal.h"
 
 #include "power.h"
+#include "ui_theme.h"
 
 #include <math.h>
 #include <string.h>
@@ -19,8 +20,9 @@ void ring_seg_span(int n, int i, int *a0, int *a1)
     }
     int seg = 360 * 100 / n;
     int gap = SEG_GAP_DEG < seg / 300 ? SEG_GAP_DEG : seg / 300;
-    *a0 = i * seg / 100 + gap / 2;
-    *a1 = (i + 1) * seg / 100 - gap / 2;
+    int inset = gap / 2 + CAP_DEG; /* the arc itself; its round caps reach into the gap */
+    *a0 = i * seg / 100 + inset;
+    *a1 = (i + 1) * seg / 100 - inset;
 }
 
 void ring_comet_span(int a0, int a1, int lvl, int *c0, int *c1)
@@ -130,13 +132,13 @@ static void on_draw(lv_event_t *e)
         return;
     }
     if (d->track) {
-        ring_arc(l, BAND_OUT, TRACK_RING_W, 0, 360, ring_mix(0x8b949e, 45)); /* muted grey: visible against the bezel */
+        ring_arc(l, BAND_OUT - 1, TRACK_RING_W, 0, 360, COL_FILL2);
         int span = d->track_permille * 360 / 1000;
-        if (span > 0) ring_arc(l, BAND_OUT, TRACK_RING_W, 0, span < 360 ? span : 360, lv_color_hex(d->track_rgb));
+        if (span > 0) ring_arc(l, BAND_OUT - 1, TRACK_RING_W, 0, span < 360 ? span : 360, lv_color_hex(d->track_rgb));
         return;
     }
     if (d->n == 0) {
-        ring_arc(l, BAND_OUT, 3, 0, 360, ring_mix(0x30363d, d->ambient ? 40 : 100));
+        ring_arc(l, BAND_OUT - 2, 3, 0, 360, COL_FILL2);
     }
     for (int i = 0; i < d->n; i++) {
         int a0, a1;
@@ -227,9 +229,13 @@ void ring_set_progress(lv_obj_t *ring, int permille, uint32_t rgb)
     if (permille == d->prog && rgb == d->prog_rgb) return;
     int lo = d->prog < permille ? d->prog : permille, hi = d->prog < permille ? permille : d->prog;
     if (rgb != d->prog_rgb) lo = 0, hi = d->prog > permille ? d->prog : permille;
+    bool edge = (permille > 0) != (d->prog > 0);
     d->prog = permille;
     d->prog_rgb = rgb;
     inval_arc(ring, lo * 360 / 1000 - 1, hi * 360 / 1000 + 2);
+    if (edge) /* the selected capsule dims for the hold and recovers after it */
+        for (int i = 0; i < d->n; i++)
+            if (d->seg[i].s.selected) inval_seg(ring, d->n, i);
 }
 
 /* Re-quantise every slot's animation state for the current look (still or ambient), then repaint. */

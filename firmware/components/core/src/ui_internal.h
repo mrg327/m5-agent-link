@@ -10,8 +10,7 @@
 #define UI_CX 233
 #define UI_CY 233
 #define UI_R 233
-#define UI_ACTION_Y 292 /* top of the action pill row; toasts replace the pill at the same height */
-#define UI_TOAST_LOW_Y 358 /* toast slot on the wheel screens (ASK, STATUS): over the hint line, below the key badges */
+#define UI_ACTION_Y 292 /* top of the action pill row (HOME, until B1 restyles it) */
 
 extern const ui_actions_t *g_ui_actions;
 
@@ -22,6 +21,9 @@ int ui_link_transport(void); /* -1 none, else hal_link_kind_t */
 bool ui_animations_allowed(void);
 void ui_report_add(ui_report_t *r, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 lv_obj_t *ui_new_screen(void);
+/* Slides a mode's content up UI_MOTION_RISE px into place over UI_MOTION_MS (ease-out). No-op when
+ * ui_animations_allowed() is false. Only a translate: no opacity fade, so the cost is the moved pixels. */
+void ui_motion_enter(lv_obj_t *content);
 
 /* Mode plumbing (ui.c): the interaction layer decides, the screens draw. */
 nav_mode_t ui_mode(void);

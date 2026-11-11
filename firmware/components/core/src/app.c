@@ -354,7 +354,7 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
 {
     if (ok) {
         /* the focus that opens SCROLL stays quiet: the screen itself is the confirmation */
-        if (op == LINK_OP_FOCUS && strcmp(core_screen_name(), "scroll") != 0) ui_toast(LV_SYMBOL_OK " Focused", RGB_SUCCESS);
+        if (op == LINK_OP_FOCUS && strcmp(core_screen_name(), "scroll") != 0) ui_toast("Focused", RGB_SUCCESS);
         return;
     }
     /* The daemon refused an answer: the request is unanswered again, so ASK restores its options. */

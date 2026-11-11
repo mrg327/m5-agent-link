@@ -21,7 +21,7 @@
 #define DIVIDER_Y 152
 #define HINT_Y 364
 #define RENDER_MS 1000 /* the battery and the quiet clock are re-read this often while open */
-#define STATUS_WHEEL ((wheel_layout_t){246, 34, 66}) /* five rows, clear of the divider and the badges */
+#define STATUS_WHEEL WHEEL_LAYOUT_LIST(246) /* three rows, clear of the divider and the legends */
 
 static lv_obj_t *s_root, *s_link, *s_batt_row, *s_batt, *s_gauge, *s_gauge_fill, *s_divider, *s_wheel, *s_hint;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
@@ -103,7 +103,7 @@ static void render(void)
 
     hal_battery_t b = hal_battery_read();
     if (b.percent <= 100) {
-        snprintf(buf, sizeof buf, "%u %%%s", b.percent, b.charging ? "  " LV_SYMBOL_CHARGE : "");
+        snprintf(buf, sizeof buf, "%u %%%s", b.percent, b.charging ? "  " ICON_BATTERY_CHARGING : "");
         uint32_t c = b.charging ? RGB_ACCENT : b.percent <= 15 ? RGB_ERROR : b.percent <= 30 ? RGB_AMBER : RGB_SUCCESS;
         int w = GAUGE_W * b.percent / 100;
         w = w < GAUGE_H ? (b.percent ? GAUGE_H : 0) : w;
@@ -124,7 +124,7 @@ static void render(void)
     wheel_item_t w[ST_COUNT];
     for (int i = 0; i < s_n; i++) {
         row_label(&s_items[i], s_labels[i], sizeof s_labels[i]);
-        w[i] = (wheel_item_t){s_labels[i], s_items[i].actionable ? RGB_ACCENT : RGB_IDLE, false, (int)s_items[i].id};
+        w[i] = (wheel_item_t){s_labels[i], s_items[i].actionable ? RGB_ACCENT : RGB_IDLE, false, (int)s_items[i].id, NULL};
     }
     wheel_set(s_wheel, w, s_n, wheel_count(s_wheel) == s_n ? wheel_sel(s_wheel) : 0);
     update_badge();
@@ -215,7 +215,7 @@ bool ui_status_act(nav_action_t a, const gesture_evt_t *g)
 bool ui_status_tick(uint32_t now)
 {
     s_now = now;
-    show(s_hint, !ui_toast_active()); /* the toast takes the hint's line (UI_TOAST_LOW_Y) */
+    show(s_hint, !ui_toast_active()); /* the toast takes the hint's line (the toast slot) */
     if (now - s_last_render >= RENDER_MS) render();
     return now - s_last_input > NAV_STATUS_TIMEOUT_MS;
 }
