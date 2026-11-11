@@ -9,6 +9,7 @@
  *   scrub DEG0 DEG1 [MS [RADIUS]]   drag along the rim, degrees clockwise from 12 o'clock
  *   drag X Y DY [MS]                a slow vertical drag in the centre (default 500 ms: steps, no swipe); a flick is a fast `swipe`
  *   session SID work|input|ask|error|done|idle|doneseen REPO   add or update a session (input = permission, ask = question)
+ *   job SID run|done|fail REPO ELAPSED_S ETA_S EXIT [command line...]   a terminal job (JOBS.md); ETA_S 0 = no estimate
  *   remote SID HOST [NAME]          set host / host name on a session (host 0 = local)
  *   drop SID | lift | shake | connect [usb|ble] | disconnect [usb|ble] | rx [usb|ble] HEX | ui | shot FILE.png
  *   attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OPT...
@@ -43,7 +44,7 @@
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -243,6 +244,9 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "session") && arg[0]) {
         add(*t, E_SESSION, 0, 0, 0, arg);
         *t += 50;
+    } else if (!strcmp(cmd, "job") && arg[0]) {
+        add(*t, E_JOB, 0, 0, 0, arg);
+        *t += 50;
     } else if ((!strcmp(cmd, "step") || !strcmp(cmd, "snooze") || !strcmp(cmd, "notify")) && arg[0]) {
         char line[160];
         snprintf(line, sizeof line, "%s %s", cmd, arg);
@@ -395,6 +399,36 @@ static void run_session(const char *spec)
         d.seen = st[4] == 's';
     } else if (!strcmp(st, "idle")) d.state = SESS_IDLE;
     snprintf(d.repo, sizeof d.repo, "%s", repo);
+    model_upsert(&d, present);
+}
+
+/* job SID run|done|fail REPO ELAPSED_S ETA_S EXIT [command line...]: a terminal job (JOBS.md, proto 0.9).
+ * ELAPSED_S is how long it has run (or ran: a done / fail job ended 5 s ago); ETA_S 0 = no estimate. */
+static void run_job(const char *spec)
+{
+    unsigned sid, el, eta, code;
+    char st[8], repo[33];
+    int n = 0;
+    if (sscanf(spec, "%u %7s %32s %u %u %u %n", &sid, st, repo, &el, &eta, &code, &n) < 6) {
+        fprintf(stderr, "SCRIPT FAIL: bad job '%s'\n", spec);
+        s_failed = true;
+        return;
+    }
+    uint32_t now = theme_now_unix();
+    bool ended = strcmp(st, "run") != 0;
+    session_t d = {.sid = sid, .agent = AGENT_SHELL, .state = !ended ? SESS_WORK : !strcmp(st, "done") ? SESS_DONE : SESS_ERROR,
+                   .eta = eta, .exit_code = (uint8_t)code};
+    d.tst = ended ? now - 5 : now - el;
+    d.t0 = d.tst - (ended ? el : 0);
+    uint32_t present = SF_AGENT | SF_STATE | SF_REPO | SF_T0 | SF_TST | SF_SEEN | SF_ETA | SF_TOOL | SF_BRANCH;
+    if (ended) present |= SF_EXIT;
+    snprintf(d.repo, sizeof d.repo, "%s", repo);
+    snprintf(d.branch, sizeof d.branch, "main");
+    if (n > 0 && spec[n]) {
+        snprintf(d.summary, sizeof d.summary, "%s", spec + n);
+        sscanf(spec + n, "%24s", d.tool);
+        present |= SF_SUMMARY;
+    }
     model_upsert(&d, present);
 }
 
@@ -707,6 +741,7 @@ static void run(const ev_t *e)
         break;
     }
     case E_SESSION: run_session(e->text); break;
+    case E_JOB: run_job(e->text); break;
     case E_DELTA: run_delta(e->text); break;
     case E_REMOTE: run_remote(e->text); break;
     case E_DROP: model_remove((uint32_t)e->a); break;

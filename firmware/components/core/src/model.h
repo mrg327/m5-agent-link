@@ -10,7 +10,8 @@
 #define MODEL_MAX_SESSIONS 32
 #define MODEL_MAX_ATTENTION 4
 
-typedef enum { AGENT_COPILOT = 0, AGENT_CLAUDE = 1, AGENT_CLOUD = 2, AGENT_OTHER = 15 } agent_t;
+/* AGENT_SHELL is a job: a command the user started in a terminal (JOBS.md, proto 0.9). */
+typedef enum { AGENT_COPILOT = 0, AGENT_CLAUDE = 1, AGENT_CLOUD = 2, AGENT_SHELL = 3, AGENT_OTHER = 15 } agent_t;
 typedef enum {
     SESS_START = 0, SESS_WORK = 1, SESS_INPUT = 2, SESS_ERROR = 3,
     SESS_DONE = 4, SESS_IDLE = 5, SESS_ENDED = 6
@@ -52,6 +53,9 @@ typedef struct {
     char q[128];
     char rp[3][64];
     uint8_t n_rp;
+    /* A job (AGENT_SHELL): the expected total run time, 0 = unknown, and the exit status once it ended. */
+    uint32_t eta;
+    uint8_t exit_code;
 } session_t;
 
 /* Which fields of a session delta were present on the wire. */
@@ -61,7 +65,7 @@ enum {
     SF_NO_SCROLL = 1 << 10, /* not on the wire: set by the device itself */
     SF_HOST = 1 << 11, SF_HN = 1 << 12, SF_SNZ = 1 << 13, SF_NTF = 1 << 14, SF_N = 1 << 15,
     SF_OK = 1 << 16, /* with SF_OK, `step` is STEP_OK or STEP_FAIL */
-    SF_Q = 1 << 17, SF_RP = 1 << 18
+    SF_Q = 1 << 17, SF_RP = 1 << 18, SF_ETA = 1 << 19, SF_EXIT = 1 << 20
 };
 
 typedef struct {

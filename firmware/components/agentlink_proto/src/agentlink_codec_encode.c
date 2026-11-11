@@ -76,6 +76,8 @@ static bool encode_repeated_session_uint15uint(zcbor_state_t *state, const struc
 static bool encode_repeated_session_uint16bool(zcbor_state_t *state, const struct session_uint16bool *input);
 static bool encode_repeated_session_uint17tstr(zcbor_state_t *state, const struct session_uint17tstr *input);
 static bool encode_repeated_session_tstr_l(zcbor_state_t *state, const struct session_tstr_l_r *input);
+static bool encode_repeated_session_uint19uint(zcbor_state_t *state, const struct session_uint19uint *input);
+static bool encode_repeated_session_uint20uint(zcbor_state_t *state, const struct session_uint20uint *input);
 static bool encode_session(zcbor_state_t *state, const struct session *input);
 static bool encode_att_kind(zcbor_state_t *state, const struct att_kind_r *input);
 static bool encode_away_event(zcbor_state_t *state, const struct away_event *input);
@@ -616,8 +618,9 @@ static bool encode_agent(
 	bool res = (((((*input).agent_choice == agent_copilot_m_c) ? ((zcbor_uint32_put(state, (0))))
 	: (((*input).agent_choice == agent_claude_m_c) ? ((zcbor_uint32_put(state, (1))))
 	: (((*input).agent_choice == agent_cloud_m_c) ? ((zcbor_uint32_put(state, (2))))
+	: (((*input).agent_choice == agent_shell_m_c) ? ((zcbor_uint32_put(state, (3))))
 	: (((*input).agent_choice == agent_other_m_c) ? ((zcbor_uint32_put(state, (15))))
-	: false))))));
+	: false)))))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -870,12 +873,36 @@ static bool encode_repeated_session_tstr_l(
 	return res;
 }
 
+static bool encode_repeated_session_uint19uint(
+		zcbor_state_t *state, const struct session_uint19uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (19))))
+	&& (zcbor_uint32_encode(state, (&(*input).session_uint19uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_session_uint20uint(
+		zcbor_state_t *state, const struct session_uint20uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (20))))
+	&& (zcbor_uint32_encode(state, (&(*input).session_uint20uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_session(
 		zcbor_state_t *state, const struct session *input)
 {
 	zcbor_log("%s\r\n", __func__);
 
-	bool res = (((zcbor_map_start_encode(state, 19) && (((((zcbor_uint32_put(state, (0))))
+	bool res = (((zcbor_map_start_encode(state, 21) && (((((zcbor_uint32_put(state, (0))))
 	&& (zcbor_uint32_encode(state, (&(*input).session_uint0uint))))
 	&& (!(*input).session_agent_m_present || encode_repeated_session_agent_m(state, (&(*input).session_agent_m)))
 	&& (!(*input).session_sess_state_m_present || encode_repeated_session_sess_state_m(state, (&(*input).session_sess_state_m)))
@@ -894,7 +921,9 @@ static bool encode_session(
 	&& (!(*input).session_uint15uint_present || encode_repeated_session_uint15uint(state, (&(*input).session_uint15uint)))
 	&& (!(*input).session_uint16bool_present || encode_repeated_session_uint16bool(state, (&(*input).session_uint16bool)))
 	&& (!(*input).session_uint17tstr_present || encode_repeated_session_uint17tstr(state, (&(*input).session_uint17tstr)))
-	&& (!(*input).session_tstr_l_present || encode_repeated_session_tstr_l(state, (&(*input).session_tstr_l)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 19))));
+	&& (!(*input).session_tstr_l_present || encode_repeated_session_tstr_l(state, (&(*input).session_tstr_l)))
+	&& (!(*input).session_uint19uint_present || encode_repeated_session_uint19uint(state, (&(*input).session_uint19uint)))
+	&& (!(*input).session_uint20uint_present || encode_repeated_session_uint20uint(state, (&(*input).session_uint20uint)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 21))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1194,7 +1223,8 @@ static bool encode_cmd_op(
 	: (((*input).cmd_op_choice == cmd_op_kb_del_m_c) ? ((zcbor_uint32_put(state, (14))))
 	: (((*input).cmd_op_choice == cmd_op_kb_send_m_c) ? ((zcbor_uint32_put(state, (15))))
 	: (((*input).cmd_op_choice == cmd_op_kb_end_m_c) ? ((zcbor_uint32_put(state, (16))))
-	: false)))))))))))))))))));
+	: (((*input).cmd_op_choice == cmd_op_rerun_m_c) ? ((zcbor_uint32_put(state, (17))))
+	: false))))))))))))))))))));
 
 	log_result(state, res, __func__);
 	return res;

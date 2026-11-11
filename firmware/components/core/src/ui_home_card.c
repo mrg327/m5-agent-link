@@ -15,6 +15,9 @@
 #define TITLE_W 320
 #define STATE_Y 196
 #define SUMMARY_TOP 232 /* top of the first line */
+#define BAR_Y 219 /* a job's progress capsule: between the state row and the summary (JOBS.md §5) */
+#define BAR_W 160
+#define BAR_H 4
 #define SUMMARY_W 320
 #define SLOT_Y 320 /* spec 318: two px lower so a 3-line request clears the button */
 #define REQ_TOP 220 /* a request is one title line and two text lines, 75 px: it starts higher than a summary */
@@ -29,7 +32,8 @@ typedef enum { LOOK_CARD, LOOK_EMPTY, LOOK_AMBIENT } look_t;
 
 static lv_obj_t *s_centre, *s_cap, *s_title, *s_srow, *s_sicon, *s_sword, *s_stime, *s_sum, *s_req_title, *s_req_text;
 static lv_obj_t *s_chip, *s_chip_icon, *s_chip_txt, *s_btn, *s_btn_lbl, *s_quiet;
-static lv_obj_t *s_clock, *s_ready, *s_sub;
+static lv_obj_t *s_clock, *s_ready, *s_sub, *s_bar, *s_bar_fill;
+static int s_bar_w = -1;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2]; /* [0] = A, [1] = B */
 
 static bool s_ambient, s_offline_dim, s_quiet_shown, s_clock_set;
@@ -150,7 +154,21 @@ static void update_time(const session_t *s, bool merged)
 {
     uint32_t now = theme_now_unix() - ui_link_down_ms() / 1000, from = s->tst ? s->tst : s->t0;
     char buf[40] = "";
-    if (!merged && from && now >= from) theme_elapsed_long(buf, sizeof buf, now - from);
+    bool job = !merged && theme_is_job(s);
+    /* a job's estimate: a capsule that fills, in the state colour; change-only, a pixel at a time */
+    int pm = job ? theme_job_progress(s, now) : -1;
+    show(s_bar, pm >= 0);
+    if (pm >= 0) {
+        int w = BAR_W * pm / 1000;
+        if (w < BAR_H) w = BAR_H;
+        if (w != s_bar_w) {
+            s_bar_w = w;
+            lv_obj_set_width(s_bar_fill, w);
+        }
+        theme_set_bg_color(s_bar_fill, offline() ? COL_TEXT2 : lv_color_hex(theme_session_rgb(s)));
+    }
+    if (job) theme_job_time(buf, sizeof buf, s, now);
+    else if (!merged && from && now >= from) theme_elapsed_long(buf, sizeof buf, now - from);
     if (!merged && model_session_snoozed(s, theme_now_unix())) {
         size_t n = strlen(buf);
         snprintf(buf + n, sizeof buf - n, "%ssnoozed", n ? theme_sep() : "");
@@ -187,6 +205,7 @@ static void set_looks(look_t look)
         show(s_sum, false);
         show(s_req_title, false);
         show(s_req_text, false);
+        show(s_bar, false);
     }
 }
 
@@ -275,7 +294,8 @@ void ui_home_card_update(void)
         show(s_req_text, req->text[0] != 0);
     } else {
         char sum[sizeof s->summary + 4];
-        theme_display_text(sum, sizeof sum, sl->n_merged ? "" : s->summary);
+        /* a job says what runs: its command line, or just the program when the daemon withholds that */
+        theme_display_text(sum, sizeof sum, sl->n_merged ? "" : theme_is_job(s) && !s->summary[0] ? s->tool : s->summary);
         theme_set_text(s_sum, s_sum_txt, sizeof s_sum_txt, sum);
         show(s_sum, true);
         show(s_req_title, false);
@@ -319,6 +339,7 @@ void ui_home_card_report(ui_report_t *r)
         ui_report_add(r, "%s", s_title_txt);
         ui_report_add(r, "%s", s_sword_txt);
         if (s_stime_txt[0]) ui_report_add(r, "%s", s_stime_txt);
+        if (!lv_obj_has_flag(s_bar, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "progress %d%%", s_bar_w * 100 / BAR_W);
         if (!lv_obj_has_flag(s_sum, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_sum_txt);
         if (!lv_obj_has_flag(s_req_title, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_req_title_txt);
         if (!lv_obj_has_flag(s_req_text, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_req_text_txt);
@@ -367,6 +388,21 @@ void ui_home_card_create(lv_obj_t *centre)
     content_label(s_sword);
     content_label(s_stime);
 
+    s_bar = lv_obj_create(s_centre);
+    lv_obj_remove_style_all(s_bar);
+    lv_obj_set_size(s_bar, BAR_W, BAR_H);
+    lv_obj_set_pos(s_bar, UI_CX - BAR_W / 2, BAR_Y);
+    lv_obj_set_style_radius(s_bar, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(s_bar, LV_OPA_COVER, 0);
+    theme_set_bg_color(s_bar, COL_FILL2);
+    lv_obj_remove_flag(s_bar, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    s_bar_fill = lv_obj_create(s_bar);
+    lv_obj_remove_style_all(s_bar_fill);
+    lv_obj_set_size(s_bar_fill, BAR_H, BAR_H);
+    lv_obj_set_style_radius(s_bar_fill, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(s_bar_fill, LV_OPA_COVER, 0);
+    lv_obj_remove_flag(s_bar_fill, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+
     s_sum = mk(s_centre, FONT_BODY, COL_TEXT2);
     put_top(s_sum, SUMMARY_TOP, SUMMARY_W, 2);
     int lh_s = lv_font_get_line_height(FONT_BODY_STRONG);
@@ -409,6 +445,6 @@ void ui_home_card_create(lv_obj_t *centre)
     static const char *const words[2] = {"Open", "Next"};
     for (int i = 0; i < 2; i++)
         s_badge[i] = theme_key_badge(s_centre, i == 0 ? "A" : "B", words[i], i == 0, 0, 0, &s_key[i], &s_word[i]);
-    lv_obj_t *hide[] = {s_chip, s_btn, s_quiet, s_clock, s_ready, s_sub, s_req_title, s_req_text};
+    lv_obj_t *hide[] = {s_chip, s_btn, s_quiet, s_clock, s_ready, s_sub, s_req_title, s_req_text, s_bar};
     for (size_t i = 0; i < sizeof hide / sizeof hide[0]; i++) lv_obj_add_flag(hide[i], LV_OBJ_FLAG_HIDDEN);
 }

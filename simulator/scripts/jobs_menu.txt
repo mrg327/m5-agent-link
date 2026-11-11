@@ -1,0 +1,22 @@
+# Jobs menu: Stop while it runs; a tap never stops (Hold to stop), the hold sends cancel (op 6). No rerun (op 17),
+# no ack (op 1), no focus (op 0).
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+job 5 run webapp 30 0 0 npm run build
+wait 400
+tap 233 233
+wait 400
+expect_screen agent
+expect_label > Stop
+expect_label 1 items
+expect_no_label Activity
+expect_no_label Notify
+shot job_menu_running.png
+tap 233 226
+wait 300
+expect_label Hold to stop
+expect_screen agent
+hold 233 226 1500
+wait 400
+expect_screen ring
+quit

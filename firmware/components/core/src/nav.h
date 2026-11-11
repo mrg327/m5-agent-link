@@ -98,7 +98,7 @@ bool nav_long_swipe_down(int y_start, int y_end);
 
 /* ── AGENT: which actions a session offers, in wheel order, default first (UI-V2 §4.2) ── */
 typedef enum {
-    AG_FOCUS, AG_DISMISS, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_REPLY, AG_INTERRUPT, AG_COUNT
+    AG_FOCUS, AG_DISMISS, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_REPLY, AG_INTERRUPT, AG_RERUN, AG_COUNT
 } agent_action_t;
 
 typedef struct {
@@ -110,6 +110,9 @@ typedef struct {
  * typing: the daemon can type into terminals (welcome.replies present): Interrupt on a working
  * session (a hold), and "Reply..." where the agent waits for you when there are replies to offer. */
 int nav_agent_items(sess_state_t state, bool typing, bool replies, agent_item_t *out, int cap);
+/* A job's menu (JOBS.md §5): Stop while it runs; Run again and Dismiss once it ended. Stop and Run again are
+ * hold items: one interrupts a process, the other starts one. */
+int nav_job_items(sess_state_t state, agent_item_t *out, int cap);
 
 /* ── ASK: the answer options of a request, in wheel order, default first (UI-V2 §4.3, §7) ──
  * Options come from attention.opts verbatim; a bare permission synthesises Approve / Deny; "Open on

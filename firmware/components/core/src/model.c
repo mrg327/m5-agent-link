@@ -126,6 +126,8 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
         memcpy(dst->rp, src->rp, sizeof dst->rp);
         dst->n_rp = src->n_rp;
     }
+    if (present & SF_ETA) dst->eta = src->eta;
+    if (present & SF_EXIT) dst->exit_code = src->exit_code;
     if (present & SF_NO_SCROLL) dst->no_scroll = src->no_scroll;
 }
 

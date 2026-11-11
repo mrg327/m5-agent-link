@@ -201,6 +201,27 @@ anywhere else in the centre behaves as in v2. A tap still never commits a hold i
   dimmed card. The whole face drifts 1 px each minute round a 2 × 2 square (burn-in guard; new in v3,
   the v2 card had its own shift).
 
+### 4.1b A job on the deck (2026-11-11, [JOBS.md](JOBS.md))
+
+A terminal command that runs longer than ten seconds is a session like an agent's: same ring, same card.
+
+```
+            y 72    Terminal · main                   caption
+            y 146   webapp                            subject
+            y 196   ⟳ Running  about 2m left          state row; the time is the job's own (below)
+            y 219   ━━━━━━━━━────                     160 × 4 capsule, state colour on COL_FILL2: only with an estimate
+            y 232…  cargo test --workspace            the command line (the program under privacy meta)
+```
+
+- Words: `Running`, `Finished`, `Failed`. Time: the elapsed run time; `about 2m left` under an estimate
+  (10 s steps below a minute, whole minutes above, rounded up); `in 3m 12s` when finished;
+  `exit 101 · 42s` when failed. Past the estimate the bar stays full and the elapsed time returns.
+- The bar changes a pixel at a time and only when its width changes (redraw discipline, UI-V2 §8a).
+- A job that ends always buzzes (unless snoozed or quiet).
+- Menu (`nav_job_items`): `Stop` (hold, danger) while it runs; `Run again` (hold, sky) and `Dismiss` after.
+  Opening the menu does not acknowledge a job: its ack is `Dismiss`, which removes the card. A one-item
+  menu hides the B legend.
+
 ### 4.2 AGENT
 
 Caption y 72: the project (host first when remote). The list (§3.2) centred on y 226. Items and

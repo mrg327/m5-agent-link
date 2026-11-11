@@ -271,6 +271,18 @@ sim_script_test(sim_ask_read_then_approve ask_read_then_approve.txt
 sim_script_test(sim_ask_cut_text ask_cut_text.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":5"
                 PASS_REGULAR_EXPRESSION "\"op\":4,\"sid\":2,\"rid\":7")
+# Jobs (JOBS.md): terminal commands as cards; Stop and Run again only by a hold; Dismiss is the ack.
+sim_script_test(sim_jobs_card jobs_card.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_jobs_wire jobs_wire.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_jobs_menu jobs_menu.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0,|\"op\":1,|\"op\":17,"
+                PASS_REGULAR_EXPRESSION "\"op\":6,\"sid\":5")
+sim_script_test(sim_jobs_rerun jobs_rerun.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0,|\"op\":1,|\"op\":6,"
+                PASS_REGULAR_EXPRESSION "\"op\":17,\"sid\":5")
+sim_script_test(sim_jobs_dismiss jobs_dismiss.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,|\"op\":17,"
+                PASS_REGULAR_EXPRESSION "\"op\":1,\"sid\":5")
 sim_script_test(sim_list_centre_drag list_centre_drag.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_list_rim_dial list_rim_dial.txt

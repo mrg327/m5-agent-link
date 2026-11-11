@@ -206,12 +206,16 @@ session = {
   ? 15 => uint,             ; n     tool steps in the current turn (resets on a new prompt)
   ? 16 => bool,             ; ok    result of step n; absent while it runs
   ? 17 => tstr,             ; q     the agent's closing question when its turn ended, <= 120 chars; "" = none (proto 0.5)
-  ? 18 => [0*3 tstr]        ; rp    answers to q for the Reply list, <= 24 chars each; [] = none (proto 0.5)
+  ? 18 => [0*3 tstr],       ; rp    answers to q for the Reply list, <= 24 chars each; [] = none (proto 0.5)
+  ? 19 => uint,             ; eta   a job's expected total run time in seconds (median of its earlier runs);
+                            ;       0 = unknown. Keys 19-20 and agent_shell only to devices with proto ≥ 0.9
+  ? 20 => uint              ; exit  a job's exit status (0-255), sent with the delta that enters done / error
 }
-agent = agent_copilot / agent_claude / agent_cloud / agent_other
+agent = agent_copilot / agent_claude / agent_cloud / agent_shell / agent_other
 agent_copilot = 0
 agent_claude = 1
 agent_cloud = 2
+agent_shell = 3      ; a job: a command the user started in a terminal (proto 0.9, JOBS.md)
 agent_other = 15
 
 sess_state = sess_state_start / sess_state_work / sess_state_input / sess_state_error /
@@ -272,7 +276,8 @@ cmd = {
 cmd_arg = uint / tstr / scroll_arg
 cmd_op = cmd_op_focus / cmd_op_ack / cmd_op_snooze / cmd_op_approve / cmd_op_deny /
   cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet / cmd_op_scroll /
-  cmd_op_type / cmd_op_dictate / cmd_op_kb_pick / cmd_op_kb_del / cmd_op_kb_send / cmd_op_kb_end
+  cmd_op_type / cmd_op_dictate / cmd_op_kb_pick / cmd_op_kb_del / cmd_op_kb_send / cmd_op_kb_end /
+  cmd_op_rerun
 cmd_op_focus = 0
 cmd_op_ack = 1
 cmd_op_snooze = 2
@@ -290,6 +295,7 @@ cmd_op_kb_pick = 13 ; KEYS: replace the last typed word with candidate `arg` of 
 cmd_op_kb_del = 14  ; KEYS: erase the last word typed from the watch
 cmd_op_kb_send = 15 ; KEYS: press Enter (hold_ms >= 1000); the composition is sent to the agent
 cmd_op_kb_end = 16  ; KEYS: the keyboard closed; `arg` 1 erases what it typed and was not sent, 0 keeps it
+cmd_op_rerun = 17   ; JOBS: run a finished job's command again in its own terminal (hold_ms >= 1000; proto 0.9)
 
 ; cmd_op_scroll argument (UI-V2 §6.1): move the session's terminal scrollback.
 scroll_arg = {

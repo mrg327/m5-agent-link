@@ -236,6 +236,7 @@ struct agent_r {
 		agent_copilot_m_c = 0,
 		agent_claude_m_c = 1,
 		agent_cloud_m_c = 2,
+		agent_shell_m_c = 3,
 		agent_other_m_c = 15,
 	} agent_choice;
 };
@@ -332,6 +333,14 @@ struct session_tstr_l_r {
 	size_t session_tstr_l_tstr_count;
 };
 
+struct session_uint19uint {
+	uint32_t session_uint19uint;
+};
+
+struct session_uint20uint {
+	uint32_t session_uint20uint;
+};
+
 struct session {
 	uint32_t session_uint0uint;
 	struct session_agent_m session_agent_m;
@@ -370,6 +379,10 @@ struct session {
 	bool session_uint17tstr_present;
 	struct session_tstr_l_r session_tstr_l;
 	bool session_tstr_l_present;
+	struct session_uint19uint session_uint19uint;
+	bool session_uint19uint_present;
+	struct session_uint20uint session_uint20uint;
+	bool session_uint20uint_present;
 };
 
 struct att_kind_r {
@@ -511,6 +524,7 @@ struct cmd_op_r {
 		cmd_op_kb_del_m_c = 14,
 		cmd_op_kb_send_m_c = 15,
 		cmd_op_kb_end_m_c = 16,
+		cmd_op_rerun_m_c = 17,
 	} cmd_op_choice;
 };
 

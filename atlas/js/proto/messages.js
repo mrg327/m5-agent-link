@@ -9,12 +9,12 @@ const ENUMS = {
   feature: { focus: 0, ack: 1, approve: 2, reply: 3, voice: 4, badge: 5, debug: 6, scroll: 7, keys: 8 },
   privacy: { meta: 0, preview: 1, full: 2 },
   alert_mode: { full: 0, quiet: 1, silent: 2 },
-  agent: { copilot: 0, claude: 1, cloud: 2, other: 15 },
+  agent: { copilot: 0, claude: 1, cloud: 2, shell: 3, other: 15 },
   sess_state: { start: 0, work: 1, input: 2, error: 3, done: 4, idle: 5, ended: 6 },
   input_sub: { approval: 0, question: 1 },
   att_kind: { approval: 0, question: 1, error: 2, done: 3 },
   action: { approve: 0, deny: 1, focus: 2, reply: 3, ack: 4, dictate: 5 },
-  cmd_op: { focus: 0, ack: 1, snooze: 2, approve: 3, deny: 4, reply: 5, cancel: 6, detail: 7, notify_done: 8, quiet: 9, scroll: 10, type: 11, dictate: 12, kb_pick: 13, kb_del: 14, kb_send: 15, kb_end: 16 },
+  cmd_op: { focus: 0, ack: 1, snooze: 2, approve: 3, deny: 4, reply: 5, cancel: 6, detail: 7, notify_done: 8, quiet: 9, scroll: 10, type: 11, dictate: 12, kb_pick: 13, kb_del: 14, kb_send: 15, kb_end: 16, rerun: 17 },
   scroll_unit: { lines: 0, pages: 1, to_end: 2 },
   disp_shape: { round: 0, rect: 1 },
   host_os: { mac: 0, win: 1, linux: 2 },
@@ -54,7 +54,7 @@ const SPECS = {
     sid: [0, 'uint'], ag: [1, 'enum:agent'], st: [2, 'enum:sess_state'], sub: [3, 'enum:input_sub'],
     repo: [4, 'tstr'], br: [5, 'tstr'], tool: [6, 'tstr'], t0: [7, 'uint'], tst: [8, 'uint'],
     sum: [9, 'tstr'], seen: [10, 'bool'], host: [11, 'uint'], hn: [12, 'tstr'],
-    snz: [13, 'uint'], ntf: [14, 'bool'], n: [15, 'uint'], ok: [16, 'bool'], q: [17, 'tstr'], rp: [18, 'tstrs'],
+    snz: [13, 'uint'], ntf: [14, 'bool'], n: [15, 'uint'], ok: [16, 'bool'], q: [17, 'tstr'], rp: [18, 'tstrs'], eta: [19, 'uint'], exit: [20, 'uint'],
   },
   snapshot: { sessions: [0, 'objs:session'], away: [1, 'objs:away_event'] },
   gone: { sid: [0, 'uint'] },
@@ -190,7 +190,7 @@ export const pong = (id, re) => ({ t: 'pong', id, re, b: {} });
 
 // ───────────── description ─────────────
 const STATE_WORD = { start: 'starting', work: 'working', input: 'waiting for you', error: 'in error', done: 'Done', idle: 'idle', ended: 'ended' };
-const AGENT_NAME = { copilot: 'Copilot CLI', claude: 'Claude Code', cloud: 'a cloud agent', other: 'an agent' };
+const AGENT_NAME = { copilot: 'Copilot CLI', claude: 'Claude Code', cloud: 'a cloud agent', shell: 'a terminal job', other: 'an agent' };
 const DEVICE_SENT = new Set(['hello', 'cmd', 'ping', 'batt', 'log', 'dbg_ui_state', 'dbg_screenshot_chunk', 'audio_start', 'audio', 'audio_end', 'kb_start', 'kb_stroke']);
 
 /** Short human sentence for a decoded message. dir: 'tx' (watch sent) | 'rx' (watch received). */

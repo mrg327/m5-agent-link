@@ -206,6 +206,18 @@ int nav_agent_items(sess_state_t state, bool typing, bool replies, agent_item_t 
     return k;
 }
 
+int nav_job_items(sess_state_t state, agent_item_t *out, int cap)
+{
+    int n = 0;
+    if (state == SESS_START || state == SESS_WORK) {
+        if (n < cap) out[n++] = (agent_item_t){AG_INTERRUPT, true};
+    } else {
+        if ((state == SESS_DONE || state == SESS_ERROR) && n < cap) out[n++] = (agent_item_t){AG_RERUN, true};
+        if (n < cap) out[n++] = (agent_item_t){AG_DISMISS, false};
+    }
+    return n;
+}
+
 int nav_ask_items(const attention_t *a, bool voice, ask_item_t *out, int cap)
 {
     int n = 0;

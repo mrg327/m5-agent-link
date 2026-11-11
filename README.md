@@ -54,6 +54,12 @@ allow_remote_control socket-only
 listen_on unix:/tmp/kitty
 ```
 
+**Terminal jobs:** to see builds, tests and other long commands on the watch (run time, an estimate, how
+they ended; [docs/design/JOBS.md](docs/design/JOBS.md)), add one line to `~/.zshrc` or `~/.bashrc`:
+```sh
+eval "$(agentlink shell-init zsh)"   # or: bash
+```
+
 **Daemon environment**
 
 | Variable | Effect |

@@ -236,7 +236,17 @@ static void act_interrupt(uint32_t sid, uint32_t hold_ms)
     bool sent = link_send_cmd(LINK_OP_CANCEL, sid, 0, hold_ms);
     if (sent) feedback_denied();
     else feedback_reject();
-    toast_cmd_result(sent, "Interrupting");
+    const session_t *s = model_find(sid);
+    toast_cmd_result(sent, s && s->agent == AGENT_SHELL ? "Stopping" : "Interrupting");
+}
+
+/* Run again: the daemon types the job's own command into its terminal, only after the hold. */
+static void act_rerun(uint32_t sid, uint32_t hold_ms)
+{
+    bool sent = link_send_cmd(LINK_OP_RERUN, sid, 0, hold_ms);
+    if (sent) feedback_approved();
+    else feedback_reject();
+    toast_cmd_result(sent, "Running again");
 }
 
 /* Voice: type recording aid's transcript, only after the hold (the daemon checks hold_ms too). With a
@@ -288,6 +298,7 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .notify_done = act_notify_done,
                                        .type_reply = act_type_reply,
                                        .interrupt = act_interrupt,
+                                       .rerun = act_rerun,
                                        .dictate = act_dictate,
                                        .scroll_open = act_scroll_open,
                                        .scroll = act_scroll,
@@ -344,7 +355,8 @@ static void on_session(const session_t *before, const session_t *now, uint32_t p
     if (now->state != SESS_DONE && now->state != SESS_ERROR) return;
     if (before && before->state == now->state) return;
     bool armed = before && before->ntf;
-    if (!armed && now->sid != ui_watched_sid()) return;
+    bool job = now->agent == AGENT_SHELL; /* a job is on the watch to say when it ends (JOBS.md) */
+    if (!armed && !job && now->sid != ui_watched_sid()) return;
     uint32_t unix_now = app_now_unix();
     if (model_session_snoozed(now, unix_now) || model_quiet_active(unix_now)) return;
     feedback_finished(now->state == SESS_ERROR);
@@ -370,7 +382,7 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
     static const char *const errs[] = {"Out of date", "Denied", "Not supported", "No window", "Timed out", "Failed"};
     const char *text = err >= 0 && err < 6 ? errs[err] : msg[0] ? msg : "Failed";
     /* typing refusals say what to do ("Answer the agent first") */
-    if ((op == LINK_OP_TYPE || op == LINK_OP_CANCEL || (op >= LINK_OP_KB_PICK && op <= LINK_OP_KB_END)) && err == 1 && msg[0]) text = msg;
+    if ((op == LINK_OP_TYPE || op == LINK_OP_CANCEL || op == LINK_OP_RERUN || (op >= LINK_OP_KB_PICK && op <= LINK_OP_KB_END)) && err == 1 && msg[0]) text = msg;
     ui_toast(text, err == 3 ? RGB_AMBER : RGB_DANGER);
     feedback_reject();
 }

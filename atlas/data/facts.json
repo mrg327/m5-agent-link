@@ -70,14 +70,14 @@
       "color": "#999999",
       "palette": "idle",
       "label": "Idle",
-      "source": "firmware/components/core/src/ui_theme.c:35"
+      "source": "firmware/components/core/src/ui_theme.c:42"
     },
     "ended": {
       "id": 6,
       "color": "#999999",
       "palette": "idle",
       "label": "Ended",
-      "source": "firmware/components/core/src/ui_theme.c:36"
+      "source": "firmware/components/core/src/ui_theme.c:43"
     }
   },
   "gesture": {
@@ -998,7 +998,7 @@
     {
       "id": "agent",
       "title": "Agent wheel",
-      "source": "firmware/components/core/src/ui_agent.c:303"
+      "source": "firmware/components/core/src/ui_agent.c:308"
     },
     {
       "id": "ask",
@@ -1549,6 +1549,20 @@
           "type": "[0*3 tstr]",
           "note": "rp    answers to q for the Reply list, <= 24 chars each; [] = none (proto 0.5)",
           "name": "rp"
+        },
+        {
+          "key": 19,
+          "optional": true,
+          "type": "uint",
+          "note": "eta   a job's expected total run time in seconds (median of its earlier runs);",
+          "name": "eta"
+        },
+        {
+          "key": 20,
+          "optional": true,
+          "type": "uint",
+          "note": "exit  a job's exit status (0-255), sent with the delta that enters done / error",
+          "name": "exit"
         }
       ],
       "source": "protocol/agentlink.cddl:54"
@@ -4559,8 +4573,8 @@
     "gesture.hold_show_ms": "firmware/components/core/src/nav.h:67",
     "gesture.long_press_ms": "firmware/components/core/src/gesture.h:7",
     "gesture.long_swipe_px": "firmware/components/core/src/nav.h:71",
-    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:145",
-    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:146",
+    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:148",
+    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:149",
     "gesture.rim_in_px": "firmware/components/core/src/gesture.h:24",
     "gesture.rim_out_px": "firmware/components/core/src/gesture.h:25",
     "gesture.rim_track_in_px": "firmware/components/core/src/gesture.h:26",
@@ -4577,13 +4591,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:534",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:484",
-    "gesture_map.chord": "firmware/components/core/src/app.c:402",
+    "gesture_map.chord": "firmware/components/core/src/app.c:414",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:187",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:156",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:318",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:329",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:429",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:441",
     "haptics.approved": "firmware/components/core/src/feedback.c:74",
     "haptics.denied": "firmware/components/core/src/feedback.c:80",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:61",
@@ -4634,8 +4648,8 @@
     "ring.band_out_px": "firmware/components/core/src/ui_ring_internal.h:15",
     "ring.band_w_px": "firmware/components/core/src/ui_ring_internal.h:16",
     "ring.done_sweep_ms": "firmware/components/core/src/ui_ring_internal.h:36",
-    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:409",
-    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:409",
+    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:445",
+    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:445",
     "ring.error_flicker_ms": "firmware/components/core/src/ui_ring_internal.h:37",
     "ring.hint_a_deg": "firmware/components/core/src/ui_theme.h:67",
     "ring.hint_b_deg": "firmware/components/core/src/ui_theme.h:68",
@@ -4648,8 +4662,8 @@
     "ring.nothing_else": "firmware/components/core/src/ui_home.c:205",
     "ring.others_pct": "firmware/components/core/src/ui_ring_internal.h:21",
     "ring.perm_period_ms": "firmware/components/core/src/ui_ring_internal.h:35",
-    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:284",
-    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:409",
+    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:304",
+    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:445",
     "ring.prog_out_px": "firmware/components/core/src/ui_ring_internal.h:27",
     "ring.prog_w_px": "firmware/components/core/src/ui_ring_internal.h:28",
     "ring.repo_px": "firmware/components/core/src/ui_theme.h:22",
@@ -4658,10 +4672,10 @@
     "ring.seg_gap_deg": "firmware/components/core/src/ui_ring_internal.h:19",
     "ring.sel_out_px": "firmware/components/core/src/ui_ring_internal.h:17",
     "ring.sel_w_px": "firmware/components/core/src/ui_ring_internal.h:18",
-    "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:18",
+    "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:21",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:33",
     "screens": "firmware/components/core/src/ui_home.c:348",
-    "screens.agent": "firmware/components/core/src/ui_agent.c:303",
+    "screens.agent": "firmware/components/core/src/ui_agent.c:308",
     "screens.ask": "firmware/components/core/src/ui_ask.c:564",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:299",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:55",
@@ -4713,7 +4727,7 @@
     "sounds.rate": "firmware/components/core/src/sound_bank.h:28",
     "sounds.waves": "firmware/components/core/src/sound_bank.h:30",
     "states": "firmware/components/core/src/ui_theme.c:11",
-    "states.input_words": "firmware/components/core/src/ui_theme.c:32",
+    "states.input_words": "firmware/components/core/src/ui_theme.c:39",
     "states.permission_colour": "firmware/components/core/src/ui_theme.c:24",
     "usb.baud": "daemon/crates/agentlinkd/src/usb.rs:23",
     "usb.crc": "daemon/crates/agentlinkd/src/usb/frame.rs:11",

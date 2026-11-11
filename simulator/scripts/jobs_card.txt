@@ -1,0 +1,36 @@
+# Jobs (JOBS.md): a terminal command is a card like an agent's. Running shows the elapsed time; with an
+# estimate, a progress bar and the time left; then Finished with the run time, or Failed with the exit status.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+job 5 run webapp 134 0 0 cargo test --workspace
+wait 400
+expect_screen ring
+expect_label Terminal
+expect_label webapp
+expect_label Running
+expect_label 2m 1
+expect_label cargo test --workspace
+expect_no_label progress
+shot job_running.png
+job 5 run webapp 134 200 0 cargo test --workspace
+wait 700
+expect_label about 2m left
+expect_label progress 6
+shot job_eta.png
+job 5 run webapp 260 200 0 cargo test --workspace
+wait 700
+expect_label 4m 2
+expect_label progress 100%
+job 5 done webapp 192 200 0 cargo test --workspace
+wait 400
+expect_label Finished
+expect_label in 3m 12s
+expect_no_label progress
+shot job_finished.png
+job 5 fail webapp 42 200 101 cargo test --workspace
+wait 400
+expect_label Failed
+expect_label exit 101
+expect_label 42s
+shot job_failed.png
+quit

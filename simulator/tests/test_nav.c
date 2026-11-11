@@ -62,6 +62,15 @@ int main(void)
     EXPECT(nav_lookup(MODE_ASK, G_SWIPE_DOWN, ZONE_CENTRE, true, true) == NAV_NONE, "no swipe denies: deny is only its hold");
     EXPECT(nav_lookup(MODE_AGENT, G_SWIPE_DOWN, ZONE_CENTRE, false, false) == NAV_NONE, "swipe down no longer goes back: the centre drag moves the list");
     EXPECT(nav_lookup(MODE_HOME, G_SWIPE_RIGHT, ZONE_CENTRE, false, false) == NAV_NONE, "HOME has no swipe-right binding");
+    {
+        /* a job's menu (JOBS.md): Stop while it runs, Run again and Dismiss after; both actions need a hold */
+        agent_item_t it[4];
+        EXPECT(nav_job_items(SESS_WORK, it, 4) == 1 && it[0].id == AG_INTERRUPT && it[0].hold, "a running job: Stop, by a hold");
+        EXPECT(nav_job_items(SESS_ERROR, it, 4) == 2 && it[0].id == AG_RERUN && it[0].hold && it[1].id == AG_DISMISS && !it[1].hold,
+               "a failed job: Run again by a hold, Dismiss by a tap");
+        EXPECT(nav_job_items(SESS_DONE, it, 4) == 2 && it[0].id == AG_RERUN && it[0].hold, "a finished job: Run again by a hold");
+        EXPECT(nav_job_items(SESS_IDLE, it, 4) == 1 && it[0].id == AG_DISMISS, "anything else can only be dismissed");
+    }
     EXPECT(nav_lookup(MODE_KEYS, G_SWIPE_RIGHT, ZONE_CENTRE, false, false) == NAV_NONE, "KEYS keeps touch for strokes");
 
     printf("%s\n", failures ? "nav: FAILED" : "nav: ok");

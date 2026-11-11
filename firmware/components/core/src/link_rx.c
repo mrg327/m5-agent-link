@@ -63,6 +63,8 @@ static uint32_t convert_session(const struct session *in, session_t *out)
         out->step = in->session_uint16bool.session_uint16bool ? STEP_OK : STEP_FAIL;
         p |= SF_OK;
     }
+    if (in->session_uint19uint_present) { out->eta = in->session_uint19uint.session_uint19uint; p |= SF_ETA; }
+    if (in->session_uint20uint_present) { out->exit_code = (uint8_t)in->session_uint20uint.session_uint20uint; p |= SF_EXIT; }
     return p;
 }
 

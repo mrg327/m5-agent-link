@@ -72,7 +72,7 @@ device                                 daemon
 ### `hello` (device → daemon)
 ```cddl
 hello = {
-  proto: [uint, uint],             ; [major, minor] = [0, 3]
+  proto: [uint, uint],             ; [major, minor] = [0, 9]
   dev: { class: tstr,              ; "watch" | "desk" | "pad" | "sim" | ...
          board: tstr,              ; "m5stopwatch"
          fw: tstr,                 ; semver
@@ -109,7 +109,7 @@ welcome = {
 ```cddl
 session = {
   sid: uint,                 ; short id assigned by daemon (stable for the session lifetime)
-  ag: "copilot"/"claude"/"cloud"/tstr,
+  ag: "copilot"/"claude"/"cloud"/"shell"/tstr,   ; "shell" = a job, a terminal command (proto 0.9, JOBS.md)
   st: "start"/"work"/"input"/"error"/"done"/"idle"/"ended",
   ? sub: "approval"/"question",      ; when st = input
   repo?: tstr,               ; ≤ 32 chars, ellipsized by daemon
@@ -125,7 +125,9 @@ session = {
   ? snz: uint,               ; snoozed until (unix), 0 = not snoozed          ┐ sent only to devices
   ? ntf: bool,               ; "notify when done" armed                        │ whose hello proto
   ? n: uint,                 ; tool steps in the current turn                  │ is ≥ 0.3
-  ? ok: bool                 ; result of step n; absent while it runs          ┘
+  ? ok: bool,                ; result of step n; absent while it runs          ┘
+  ? eta: uint,               ; a job's expected total run time in s; 0 = unknown  ┐ proto ≥ 0.9
+  ? exit: uint               ; a job's exit status, with the delta into done/error ┘
 }
 ```
 - `q` / `rp` (keys 17, 18, proto 0.5): when an agent's turn ends on a question, the daemon reads it from the turn's last message (Claude Code's Stop hook carries `last_assistant_message`) and sends the question (≤ 120 chars) with up to 3 answers (≤ 24 chars): the options of an "A or B?" question, else `Yes, go ahead` / `No` for a yes/no one, else none. The watch lists them first under Reply, with the question above. They are cleared (`""`, `[]`: a delta cannot remove a key) as soon as the agent works again. Agent content: never sent under privacy `meta`, and only to devices with proto ≥ 0.5.
@@ -137,6 +139,10 @@ session = {
 - `n` counts `pretooluse` events since the last prompt; `ok` arrives with the matching `posttooluse`
   (false for a failed, denied or rejected tool). The device builds its step timeline (UI-V2 §4.5) from
   these two keys and `sum`.
+- **Jobs (proto 0.9, [JOBS.md](JOBS.md)).** A command the user started in a terminal and that has run for
+  ten seconds is a session with `ag: "shell"`: `work` while it runs, `done` for exit 0, `error` otherwise.
+  `t0` is the command's start and `tst` its end; `tool` is the program, `sum` the command line. `eta` is the
+  median of its earlier runs. The daemon sends shell sessions only to devices with proto ≥ 0.9.
 - `snapshot { sessions: [* session], away?: [* event] }`: a full replacement. It is sent on connect and whenever the daemon thinks the device has drifted. The `away` list holds the events the device missed while disconnected; the device shows them as "while you were away".
 - `session { session }`: an upsert. The daemon sends only the changed keys plus `sid` (a delta).
 - `gone { sid }`: the session has been removed.
@@ -164,7 +170,7 @@ The device must show approve/deny **only if** they are in `acts`. The daemon inc
 
 ```cddl
 cmd = {
-  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end",
+  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end"/"rerun",
   ? sid: uint,
   ? rid: uint,               ; required for approve/deny/reply
   ? arg: uint / tstr / scroll_arg,  ; snooze minutes (the watch sends 30), reply option index, quiet duration,
@@ -179,6 +185,12 @@ scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tst
 - `scroll` (UI-V2 §6): the daemon moves the session's terminal scrollback (tmux copy mode first, else kitty remote control; other terminals answer `unsupported` and the device hides the item for that session). The daemon sums a burst into one move while the previous one runs, answers at most one `result` per 250 ms and only when the position changed or the move failed, and clamps `delta` to ±500 lines / ±20 pages. `pos.preview` is the terminal's top visible line, ≤ 48 chars, sent only when the device's privacy is `preview` or `full`; it is never written to the audit log or the trace. Scroll is read-only on the PC and is not audited.
 - `type` (proto 0.4, issue b150): `arg` is an index into `welcome.replies`, or, from 100 up, into the session's own answers `session.rp` (proto 0.5: `arg` 101 = `rp[1]`); the daemon types that reply and Enter into the session's terminal (kitty only today, else `unsupported`). The device never sends text. Refused with `denied` while the session has an open request, while it is `input` with `sub` approval or question, or while a numbered selection list is on screen: Enter there would pick the dialog's highlighted option. Audited with the index, not the text.
 - `cancel` (proto 0.4): interrupts the session's running turn by sending Esc to its terminal. It needs a hold like `approve` (`hold_ms` ≥ 1000, else `denied`). Audited.
+- `cancel` on a job (`ag: "shell"`) sends SIGINT to the foreground process group of the shell's tty instead of
+  Esc; `stale` when nothing runs there.
+- `rerun` (proto 0.9): types a finished job's command line and Enter into its terminal, after a hold
+  (`hold_ms` ≥ 1000, else `denied`). `denied` while that shell runs anything, `stale` when the session is not a
+  finished job, `unsupported` without a typing driver. Audited without the command text.
+- `ack` on a job removes its card (`gone`).
 - `ack`: marks the session seen (all devices). On an `error` session it also dismisses the error: the
   session becomes `idle`.
 - `snooze`: `arg` minutes (the watch sends 30); `0` cancels. The daemon stores `snz` and sends it to
