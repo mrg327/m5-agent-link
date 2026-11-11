@@ -40,3 +40,4 @@ are never shown. Command text is privacy-gated like `sum` and never written to t
 
 - 2026-11-11T20:24:48Z · claude-code@linux-dev · linux-x86_64 · 3ae24c0: filed
 - 2026-11-11T20:24:48Z · claude-code@linux-dev · linux-x86_64 · 3ae24c0: claimed
+- 2026-11-11T20:53:48Z · claude-code@linux-dev · linux-x86_64 · 670f4a8: Built on branch jobs (own worktree), 3 commits: device side + protocol 0.9, daemon + shell integration + CLI, spec docs/design/JOBS.md. Checks on linux-x86_64: ctest 97/97, atlas 146/146, cargo test 208 pass (keys gate flaky under load, issue 5617), clippy/fmt clean, vectors 42/42, firmware builds with check_dram 127281 B free, daemon/tools/jobs_e2e.py 18/18 against a real bash (it found and now guards an out-of-order start/end bug). Not run: zsh snippet (no zsh here), macOS paths, Run again against a real kitty, anything on the glass. Not flashed, not pushed, not merged.
