@@ -3,7 +3,7 @@
  * bottom. The first step on an idle link goes out at once, later ones are summed into one
  * cmd_op_scroll per NAV_SCROLL_COALESCE_MS; the daemon's scroll_pos corrects the counter, fills the
  * index ring's position track and (privacy ≥ preview) the one-line preview.
- * Capsules look: one big number, two chevrons, a muted line of terminal text, circular key caps. */
+ * v3 look: a big line count (or the Live icon and word), a muted line of terminal text, no chevrons. */
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -15,21 +15,18 @@
 #include "ui_ring.h"
 #include "ui_theme.h"
 
-#define HEADER_Y 80
-#define CHEV_UP_Y 120
-#define COUNT_Y 174
-#define CAPTION_Y 222
-#define PREVIEW_Y 258
-#define CHEV_DN_Y 296 /* clear of the key badges at ~333 */
-#define HINT_Y 364
-#define CHEVRON_LIT_MS 350  /* a chevron glows this long after a move in its direction */
+#define ICON_Y 176
+#define LIVE_Y 236
+#define COUNT_Y 196
+#define CAPTION_Y 246
+#define PREVIEW_Y 296
 #define STOP_GAP_MS 400     /* the end-of-scrollback thud repeats at most this often */
 #define UNKNOWN_TOTAL_SOFT 100 /* total unknown: the track arc is lines/(lines+this), so 100 lines = half */
 
-static lv_obj_t *s_root, *s_header, *s_chev_up, *s_chev_dn, *s_count, *s_caption, *s_preview, *s_hint;
+static lv_obj_t *s_root, *s_header, *s_icon, *s_live, *s_count, *s_caption, *s_preview;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static uint32_t s_sid, s_now, s_last_input;
-static char s_header_txt[64], s_count_txt[24], s_caption_txt[32], s_preview_txt[64];
+static char s_header_txt[64], s_count_txt[24], s_preview_txt[64];
 
 /* position: the daemon's last word, nudged locally by what we sent since */
 static uint32_t s_lines_above, s_total;
@@ -43,8 +40,8 @@ static int s_detent_lines; /* finger-driven lines since the last detent */
 static float s_glide_v, s_glide_px;
 static uint32_t s_glide_ms, s_glide_t0;
 static bool s_caught; /* the current touch stopped a glide: its tap must not leave */
-static int s_last_dir; /* -1 up (older), +1 down (newer): which chevron and which end can "stop" */
-static uint32_t s_lit_until, s_stop_ms;
+static int s_last_dir; /* -1 up (older), +1 down (newer): which end can "stop" */
+static uint32_t s_stop_ms;
 
 static const session_t *session(void) { return model_find(s_sid); }
 
@@ -60,18 +57,19 @@ static void render(void)
 {
     const session_t *s = session();
     uint32_t rgb = s ? theme_session_rgb(s) : RGB_ACCENT;
-    char buf[64];
-    if (s_at_bottom || s_lines_above == 0) {
-        theme_set_text(s_count, s_count_txt, sizeof s_count_txt, "Live");
-        theme_set_text(s_caption, s_caption_txt, sizeof s_caption_txt, "at the bottom");
+    char buf[24];
+    bool live = s_at_bottom || s_lines_above == 0;
+    show(s_icon, live);
+    show(s_live, live);
+    show(s_count, !live);
+    show(s_caption, !live);
+    if (live) {
+        theme_set_text_color(s_icon, lv_color_hex(rgb));
+        s_count_txt[0] = 0;
     } else {
-        snprintf(buf, sizeof buf, "-%u lines", (unsigned)s_lines_above);
+        snprintf(buf, sizeof buf, "%u", (unsigned)s_lines_above);
         theme_set_text(s_count, s_count_txt, sizeof s_count_txt, buf);
-        theme_set_text(s_caption, s_caption_txt, sizeof s_caption_txt, "above the bottom");
     }
-    bool lit = s_now < s_lit_until;
-    theme_set_text_color(s_chev_up, lit && s_last_dir < 0 ? lv_color_hex(rgb) : COL_MUTED);
-    theme_set_text_color(s_chev_dn, lit && s_last_dir > 0 ? lv_color_hex(rgb) : COL_MUTED);
     bool prev = preview_allowed() && s_preview_txt[0];
     show(s_preview, prev);
     /* the track: a thin grey ring with an arc for how far above the bottom the view sits */
@@ -81,7 +79,6 @@ static void render(void)
         else permille = (int)((uint64_t)s_lines_above * 1000 / (s_lines_above + UNKNOWN_TOTAL_SOFT));
     }
     ring_set_track(ui_home_ring(), permille, RGB_ACCENT);
-    theme_set_text_color(s_word[0], lv_color_hex(rgb));
 }
 
 bool ui_scroll_refresh(uint32_t now)
@@ -111,7 +108,7 @@ void ui_scroll_open(uint32_t sid, uint32_t now)
     s_detent_lines = 0;
     s_glide_v = 0;
     s_last_dir = 0;
-    s_lit_until = s_stop_ms = 0;
+    s_stop_ms = 0;
     s_preview_txt[0] = 0;
     lv_label_set_text(s_preview, "");
     if (g_ui_actions->sectors) g_ui_actions->sectors(0); /* the rim is unused here */
@@ -149,7 +146,6 @@ static void maybe_flush(void)
 static void moved(int dir)
 {
     s_last_dir = dir;
-    s_lit_until = s_now + CHEVRON_LIT_MS;
     s_last_input = s_now;
 }
 
@@ -265,10 +261,6 @@ bool ui_scroll_tick(uint32_t now)
     if (!session()) return true;
     glide();
     if (s_pend_lines || s_pend_pages) maybe_flush();
-    if (s_lit_until && now >= s_lit_until) {
-        s_lit_until = 0;
-        render();
-    }
     return now - s_last_input > NAV_SCROLL_TIMEOUT_MS;
 }
 
@@ -301,15 +293,17 @@ void ui_scroll_report(ui_report_t *r)
     r->has_sel_sid = session() != NULL;
     r->sel_sid = s_sid;
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
-    ui_report_add(r, "%s", s_count_txt);
-    ui_report_add(r, "%s", s_caption_txt);
+    if (s_count_txt[0]) ui_report_add(r, "[%s] lines up", s_count_txt); /* the number brackets keep "1" apart from "11" */
+    else ui_report_add(r, "Live");
     if (!lv_obj_has_flag(s_preview, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_preview_txt);
 }
 
-static lv_obj_t *line(lv_obj_t *parent, int px, lv_color_t col, int y, int w)
+static lv_obj_t *line(lv_obj_t *parent, const lv_font_t *f, lv_color_t col, int y, int w)
 {
-    lv_obj_t *l = theme_label(parent, px, col);
-    lv_obj_set_size(l, w, lv_font_get_line_height(theme_font(px)));
+    lv_obj_t *l = lv_label_create(parent);
+    lv_obj_set_style_text_font(l, f, 0);
+    lv_obj_set_style_text_color(l, col, 0);
+    lv_obj_set_size(l, w, lv_font_get_line_height(f));
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_pos(l, UI_CX - w / 2, y);
@@ -322,17 +316,16 @@ lv_obj_t *ui_scroll_init(lv_obj_t *screen)
     lv_obj_remove_style_all(s_root);
     lv_obj_set_size(s_root, UI_SIZE, UI_SIZE);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    s_header = line(s_root, 16, COL_MUTED, HEADER_Y, 280);
-    s_chev_up = line(s_root, 24, COL_MUTED, CHEV_UP_Y, 60);
-    lv_label_set_text(s_chev_up, "^");
-    s_count = line(s_root, 32, COL_TEXT, COUNT_Y, 300);
-    s_caption = line(s_root, 16, COL_MUTED, CAPTION_Y, 300);
-    s_preview = line(s_root, 20, COL_MUTED, PREVIEW_Y, theme_chord(PREVIEW_Y + 12, 28));
-    s_chev_dn = line(s_root, 24, COL_MUTED, CHEV_DN_Y, 60);
-    lv_label_set_text(s_chev_dn, "v");
-    s_hint = line(s_root, 16, COL_MUTED, HINT_Y, 300);
-    lv_label_set_text(s_hint, "drag like a trackpad");
-    static const char *const words[2] = {"TO BOTTOM", "PAGE DOWN"};
+    s_header = line(s_root, FONT_CAPTION, COL_TEXT2, UI_Y_CAPTION, 280);
+    s_icon = line(s_root, FONT_ICON_L, COL_TEXT, ICON_Y, 80);
+    lv_label_set_text(s_icon, ICON_LIVE);
+    s_live = line(s_root, FONT_TITLE, COL_TEXT, LIVE_Y, 200);
+    lv_label_set_text(s_live, "Live");
+    s_count = line(s_root, FONT_NUM, COL_TEXT, COUNT_Y, 300);
+    s_caption = line(s_root, FONT_BODY, COL_TEXT2, CAPTION_Y, 300);
+    lv_label_set_text(s_caption, "lines up");
+    s_preview = line(s_root, FONT_BODY, COL_TEXT2, PREVIEW_Y, theme_chord(PREVIEW_Y + 12, 28));
+    static const char *const words[2] = {"Bottom", "Page"};
     for (int i = 0; i < 2; i++)
         s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,
                                      UI_BADGE_R, &s_key[i], &s_word[i]);

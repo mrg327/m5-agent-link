@@ -1,7 +1,7 @@
 /* The WATCH screen (UI-V2 §4.7): a live monitor for one session on the round display. Header, the
  * previous steps as muted rows with a status mark, the current step in the centre (tool large,
- * argument below), a footer with the step count and the time in the working state. When the session
- * is not working the centre says what state it is in instead.
+ * argument below), a footer with the step and the time in the working state. When the session is not
+ * working the centre says what state it is in (icon, word, caption, Answer button) instead.
  *
  * The screen follows the deck's selection: the rim and B move the deck's selection through
  * ui_home_act(), and the watched session follows it. The index ring keeps showing the sessions, with
@@ -15,24 +15,26 @@
 #include "ui_home_internal.h"
 #include "ui_theme.h"
 
-#define HEADER_Y 80
 #define ROWS 3
-#define ROW_Y0 118
-#define ROW_DY 24
-#define ROW_X 78
-#define ROW_W 310
-#define MARK_W 22
-#define TOOL_Y 200
-#define ARG_Y 236
-#define ARG_W 330
-#define FOOTER_Y 306
-#define HINT_Y 364
+#define ROW_Y0 108
+#define ROW_DY 26
+#define MARK_W 24
+#define TOOL_Y 222
+#define ARG_Y 256
+#define FOOTER_Y 322
+#define ICON_Y 176
+#define WORD_Y 236
+#define SUB_Y 278
+#define BTN_Y 318
+#define BTN_W 156
+#define BTN_H 36
 
-static lv_obj_t *s_root, *s_header, *s_tool, *s_arg, *s_footer, *s_hint;
+static lv_obj_t *s_root, *s_header, *s_tool, *s_arg, *s_footer, *s_icon, *s_word_l, *s_sub, *s_btn, *s_btn_l;
 static lv_obj_t *s_mark[ROWS], *s_row[ROWS];
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static uint32_t s_sid, s_now;
-static char s_header_txt[64], s_tool_txt[48], s_arg_txt[48], s_footer_txt[40];
+static int s_blockx = -1, s_blockw;
+static char s_header_txt[64], s_tool_txt[48], s_arg_txt[48], s_footer_txt[40], s_word_txt[24], s_sub_txt[32];
 static char s_row_txt[ROWS][STEP_TEXT_MAX + 8];
 static const char *s_mark_txt[ROWS];
 
@@ -42,16 +44,8 @@ static void show(lv_obj_t *o, bool on)
     else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
 }
 
-static void place_lines(lv_obj_t *l, int x, int y, int w, int lines, lv_text_align_t align)
-{
-    lv_obj_set_size(l, w, lines * lv_font_get_line_height(lv_obj_get_style_text_font(l, 0)));
-    lv_obj_set_style_text_align(l, align, 0);
-    lv_obj_set_pos(l, x, y);
-}
-
 static bool working(const session_t *s) { return s->state == SESS_WORK || s->state == SESS_START; }
 
-/* "Tool · argument" (the daemon's sum) split at the first separator; a bare tool name has no argument. */
 /* Copy at most cap - 1 bytes of src[0..len): the labels truncate with dots anyway. */
 static void copy_cut(char *dst, size_t cap, const char *src, size_t len)
 {
@@ -60,6 +54,7 @@ static void copy_cut(char *dst, size_t cap, const char *src, size_t len)
     dst[len] = 0;
 }
 
+/* "Tool · argument" (the daemon's sum) split at the first separator; a bare tool name has no argument. */
 static void split_step(const char *text, char *tool, size_t tcap, char *arg, size_t acap)
 {
     const char *sep = strstr(text, " \xC2\xB7 ");
@@ -103,13 +98,56 @@ static void render_footer(const session_t *s)
     uint32_t secs;
     unsigned n = (unsigned)s->n;
     buf[0] = 0;
-    if (working(s) && time_in_state(s, &secs)) {
-        clock_text(t, sizeof t, secs);
-        snprintf(buf, sizeof buf, "%u step%s%s%s", n, n == 1 ? "" : "s", theme_sep(), t);
-    } else if (n > 0 || working(s)) {
-        snprintf(buf, sizeof buf, "%u step%s", n, n == 1 ? "" : "s");
+    if (working(s)) {
+        if (time_in_state(s, &secs)) {
+            clock_text(t, sizeof t, secs);
+            if (n) snprintf(buf, sizeof buf, "Step %u%s%s", n, theme_sep(), t);
+            else snprintf(buf, sizeof buf, "%s", t);
+        } else if (n) {
+            snprintf(buf, sizeof buf, "Step %u", n);
+        }
     }
     theme_set_text(s_footer, s_footer_txt, sizeof s_footer_txt, buf);
+}
+
+/* The caption under the state word: how long ago it happened, in the words of the state. */
+static void state_caption(const session_t *s, char *dst, size_t cap)
+{
+    uint32_t secs;
+    char t[16];
+    dst[0] = 0;
+    const char *lead = s->state == SESS_DONE ? "Finished" : s->state == SESS_ERROR ? "Stopped"
+                       : s->state == SESS_INPUT ? "Waiting" : s->state == SESS_IDLE ? "No activity for" : "";
+    if (!lead[0]) return;
+    if (!time_in_state(s, &secs)) {
+        if (s->state == SESS_DONE || s->state == SESS_ERROR) snprintf(dst, cap, "%s", lead);
+        return;
+    }
+    theme_elapsed(t, sizeof t, secs);
+    if (s->state == SESS_DONE || s->state == SESS_ERROR) snprintf(dst, cap, "%s %s ago", lead, t);
+    else snprintf(dst, cap, "%s %s", lead, t);
+}
+
+/* The earlier steps are one left-aligned block, centred as a whole on its widest row. */
+static void place_rows(int prior)
+{
+    int maxw = 0;
+    for (int i = 0; i < prior; i++) {
+        lv_point_t sz;
+        lv_text_get_size(&sz, s_row_txt[i], FONT_CAPTION, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+        if (sz.x > maxw) maxw = sz.x;
+    }
+    int cap = theme_chord(ROW_Y0, 46) - MARK_W; /* the top row is the narrowest */
+    if (maxw > cap) maxw = cap;
+    int w = maxw + MARK_W, x = UI_CX - w / 2;
+    if (x == s_blockx && w == s_blockw) return;
+    s_blockx = x;
+    s_blockw = w;
+    for (int i = 0; i < ROWS; i++) {
+        lv_obj_set_x(s_mark[i], x);
+        lv_obj_set_x(s_row[i], x + MARK_W);
+        lv_obj_set_width(s_row[i], maxw + 2);
+    }
 }
 
 static void render(void)
@@ -123,48 +161,26 @@ static void render(void)
     theme_set_text(s_header, s_header_txt, sizeof s_header_txt, buf);
 
     const steps_t *t = &s->steps;
+    bool work = working(s);
     char tool[48] = "", arg[48] = "";
-    uint32_t rgb = theme_session_rgb(s);
-    uint32_t tool_rgb = rgb;
-    int prior = t->count; /* how many timeline rows precede the centre */
-    switch (s->state) {
-    case SESS_WORK:
-    case SESS_START: {
+    int prior = work ? t->count : 0; /* timeline rows that precede the centre */
+    if (work) {
         const char *cur = s->summary[0] ? s->summary : s->tool[0] ? s->tool : t->count ? t->s[t->count - 1].text : "";
         if (cur[0]) split_step(cur, tool, sizeof tool, arg, sizeof arg);
         else snprintf(tool, sizeof tool, "%s", theme_state_word(s));
-        tool_rgb = cur[0] ? 0xe6edf3 : rgb;
         if (prior > 0) prior--; /* the newest step is the centre */
-        break;
-    }
-    case SESS_DONE: {
-        uint32_t secs;
-        char ago[16] = "";
-        if (time_in_state(s, &secs)) {
-            theme_elapsed(ago, sizeof ago, secs);
-            snprintf(tool, sizeof tool, "Finished%s%s ago", theme_sep(), ago);
-        } else {
-            snprintf(tool, sizeof tool, "Finished");
-        }
-        break;
-    }
-    case SESS_ERROR: snprintf(tool, sizeof tool, "Error"); break;
-    case SESS_INPUT:
-        snprintf(tool, sizeof tool, "Waiting for you");
-        snprintf(arg, sizeof arg, "tap to answer");
-        break;
-    default: snprintf(tool, sizeof tool, "%s", theme_state_word(s)); break;
     }
     theme_set_text(s_tool, s_tool_txt, sizeof s_tool_txt, tool);
-    theme_set_text_color(s_tool, lv_color_hex(tool_rgb));
     theme_set_text(s_arg, s_arg_txt, sizeof s_arg_txt, arg);
+    show(s_tool, work);
+    show(s_arg, work);
 
-    /* the rows sit against the centre: with fewer steps the top slots stay empty */
+    /* the rows start at y 108; with fewer steps the lower slots stay empty */
     if (prior > ROWS) prior = ROWS;
-    int first = t->count - (working(s) ? 1 : 0) - prior;
+    int first = t->count - (work ? 1 : 0) - prior;
     for (int slot = 0; slot < ROWS; slot++) {
-        int k = slot - (ROWS - prior);
-        if (k < 0) {
+        int k = slot; /* from y 108 down, in order */
+        if (k >= prior) {
             show(s_mark[slot], false);
             show(s_row[slot], false);
             s_row_txt[slot][0] = 0;
@@ -187,11 +203,26 @@ static void render(void)
         show(s_mark[slot], true);
         show(s_row[slot], true);
     }
+    if (prior) place_rows(prior);
     render_footer(s);
 
-    int n_sessions = ui_home_slot_count();
-    show(s_badge[1], n_sessions > 1);
-    show(s_hint, !ui_toast_active());
+    /* not working: the state's icon, its word, how long ago, and the Answer button when it needs you */
+    uint32_t rgb = theme_session_rgb(s);
+    char sub[32];
+    state_caption(s, sub, sizeof sub);
+    show(s_icon, !work);
+    show(s_word_l, !work);
+    show(s_sub, !work && sub[0]);
+    bool needs = !work && s->state == SESS_INPUT;
+    show(s_btn, needs);
+    if (!work) {
+        lv_label_set_text(s_icon, theme_state_glyph(s));
+        theme_set_text_color(s_icon, lv_color_hex(rgb));
+        theme_set_text(s_word_l, s_word_txt, sizeof s_word_txt, theme_state_word(s));
+        theme_set_text(s_sub, s_sub_txt, sizeof s_sub_txt, sub);
+        theme_set_bg_color(s_btn, lv_color_hex(rgb));
+    }
+    show(s_badge[1], ui_home_slot_count() > 1);
 }
 
 uint32_t ui_watch_sid(void) { return s_sid; }
@@ -211,7 +242,8 @@ void ui_watch_open(uint32_t sid, uint32_t now)
 {
     s_sid = sid;
     s_now = now;
-    s_header_txt[0] = s_tool_txt[0] = s_arg_txt[0] = s_footer_txt[0] = 0;
+    s_header_txt[0] = s_tool_txt[0] = s_arg_txt[0] = s_footer_txt[0] = s_word_txt[0] = s_sub_txt[0] = 0;
+    s_blockx = -1;
     ui_home_refresh(now); /* the index ring shows the sessions again, the watched one selected */
     if (g_ui_actions->sectors) g_ui_actions->sectors(ui_home_slot_count());
     render();
@@ -258,7 +290,6 @@ void ui_watch_tick(uint32_t now)
     const session_t *s = model_find(s_sid);
     if (!s) return;
     render_footer(s);
-    show(s_hint, !ui_toast_active());
 }
 
 void ui_watch_report(ui_report_t *r)
@@ -269,9 +300,25 @@ void ui_watch_report(ui_report_t *r)
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
     for (int i = 0; i < ROWS; i++)
         if (!lv_obj_has_flag(s_row[i], LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "[%s] %s", s_mark_txt[i], s_row_txt[i]);
-    if (s_tool_txt[0]) ui_report_add(r, "%s", s_tool_txt);
-    if (s_arg_txt[0]) ui_report_add(r, "%s", s_arg_txt);
+    if (!lv_obj_has_flag(s_tool, LV_OBJ_FLAG_HIDDEN) && s_tool_txt[0]) ui_report_add(r, "%s", s_tool_txt);
+    if (!lv_obj_has_flag(s_arg, LV_OBJ_FLAG_HIDDEN) && s_arg_txt[0]) ui_report_add(r, "%s", s_arg_txt);
+    if (!lv_obj_has_flag(s_word_l, LV_OBJ_FLAG_HIDDEN) && s_word_txt[0]) ui_report_add(r, "%s", s_word_txt);
+    if (!lv_obj_has_flag(s_sub, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_sub_txt);
+    if (!lv_obj_has_flag(s_btn, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "Answer");
     if (s_footer_txt[0]) ui_report_add(r, "%s", s_footer_txt);
+}
+
+/* A one-font label at a fixed place; long text ends in dots, never on the ring. */
+static lv_obj_t *label(lv_obj_t *parent, const lv_font_t *f, lv_color_t col, int y, int w, int lines, lv_text_align_t al)
+{
+    lv_obj_t *l = lv_label_create(parent);
+    lv_obj_set_style_text_font(l, f, 0);
+    lv_obj_set_style_text_color(l, col, 0);
+    lv_obj_set_style_text_align(l, al, 0);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_set_size(l, w, lines * lv_font_get_line_height(f));
+    lv_obj_set_pos(l, UI_CX - w / 2, y);
+    return l;
 }
 
 lv_obj_t *ui_watch_init(lv_obj_t *screen)
@@ -281,28 +328,36 @@ lv_obj_t *ui_watch_init(lv_obj_t *screen)
     lv_obj_set_size(s_root, UI_SIZE, UI_SIZE);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
 
-    s_header = theme_label(s_root, 16, COL_MUTED);
-    place_lines(s_header, UI_CX - 140, HEADER_Y, 280, 1, LV_TEXT_ALIGN_CENTER);
+    s_header = label(s_root, FONT_CAPTION, COL_TEXT2, UI_Y_CAPTION, 280, 1, LV_TEXT_ALIGN_CENTER);
     for (int i = 0; i < ROWS; i++) {
         int y = ROW_Y0 + i * ROW_DY;
-        s_mark[i] = theme_label(s_root, 16, COL_MUTED);
-        lv_label_set_long_mode(s_mark[i], LV_LABEL_LONG_MODE_CLIP);
-        place_lines(s_mark[i], ROW_X, y, MARK_W, 1, LV_TEXT_ALIGN_LEFT);
-        s_row[i] = theme_label(s_root, 16, COL_MUTED);
-        place_lines(s_row[i], ROW_X + MARK_W, y, ROW_W - MARK_W, 1, LV_TEXT_ALIGN_LEFT);
+        s_mark[i] = label(s_root, FONT_ICON_S, COL_TEXT2, y, MARK_W, 1, LV_TEXT_ALIGN_LEFT);
+        lv_obj_set_y(s_mark[i], y);
+        s_row[i] = label(s_root, FONT_CAPTION, COL_TEXT2, y + 2, 250, 1, LV_TEXT_ALIGN_LEFT);
         show(s_mark[i], false);
         show(s_row[i], false);
     }
-    s_tool = theme_label(s_root, 24, COL_TEXT);
-    place_lines(s_tool, UI_CX - 165, TOOL_Y, 330, 1, LV_TEXT_ALIGN_CENTER);
-    s_arg = theme_label(s_root, 20, COL_MUTED);
-    place_lines(s_arg, UI_CX - ARG_W / 2, ARG_Y, ARG_W, 2, LV_TEXT_ALIGN_CENTER);
-    s_footer = theme_label(s_root, 20, COL_MUTED);
-    place_lines(s_footer, UI_CX - 125, FOOTER_Y, 250, 1, LV_TEXT_ALIGN_CENTER);
-    s_hint = theme_label(s_root, 16, COL_MUTED);
-    place_lines(s_hint, UI_CX - 150, HINT_Y, 300, 1, LV_TEXT_ALIGN_CENTER);
-    lv_label_set_text_fmt(s_hint, "drag to scroll%shold to go back", theme_sep());
-    static const char *const words[2] = {"FOCUS", "NEXT"};
+    s_tool = label(s_root, FONT_TITLE, COL_TEXT, TOOL_Y, theme_chord(TOOL_Y + 20, 24), 1, LV_TEXT_ALIGN_CENTER);
+    s_arg = label(s_root, FONT_BODY, COL_TEXT2, ARG_Y, theme_chord(ARG_Y + 50, 24), 2, LV_TEXT_ALIGN_CENTER);
+    s_footer = label(s_root, FONT_CAPTION, COL_TEXT3, FOOTER_Y, 250, 1, LV_TEXT_ALIGN_CENTER);
+    s_icon = label(s_root, FONT_ICON_L, COL_TEXT, ICON_Y, 80, 1, LV_TEXT_ALIGN_CENTER);
+    s_word_l = label(s_root, FONT_TITLE, COL_TEXT, WORD_Y, theme_chord(WORD_Y + 20, 24), 1, LV_TEXT_ALIGN_CENTER);
+    s_sub = label(s_root, FONT_CAPTION, COL_TEXT2, SUB_Y, 280, 1, LV_TEXT_ALIGN_CENTER);
+    /* the button is only the affordance: the tap on the centre already opens ASK */
+    s_btn = lv_obj_create(s_root);
+    lv_obj_remove_style_all(s_btn);
+    lv_obj_set_size(s_btn, BTN_W, BTN_H);
+    lv_obj_set_pos(s_btn, UI_CX - BTN_W / 2, BTN_Y);
+    lv_obj_set_style_radius(s_btn, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(s_btn, LV_OPA_COVER, 0);
+    lv_obj_remove_flag(s_btn, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    s_btn_l = lv_label_create(s_btn);
+    lv_obj_set_style_text_font(s_btn_l, FONT_BODY_STRONG, 0);
+    lv_obj_set_style_text_color(s_btn_l, COL_ON_ACCENT, 0);
+    lv_label_set_text(s_btn_l, "Answer");
+    lv_obj_center(s_btn_l);
+    show(s_btn, false);
+    static const char *const words[2] = {"Open", "Next"};
     for (int i = 0; i < 2; i++)
         s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,
                                      UI_BADGE_R, &s_key[i], &s_word[i]);

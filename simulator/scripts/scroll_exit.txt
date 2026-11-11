@@ -18,7 +18,7 @@ wait 200
 expect_screen scroll
 result pos 9 0 1200
 wait 200
-expect_label -9 lines
+expect_label [9] lines up
 scrub 300 250 400
 wait 200
 expect_screen scroll
