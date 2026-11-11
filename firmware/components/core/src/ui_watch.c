@@ -34,7 +34,7 @@ static lv_obj_t *s_mark[ROWS], *s_row[ROWS];
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static uint32_t s_sid, s_now;
 static int s_blockx = -1, s_blockw;
-static char s_header_txt[64], s_tool_txt[48], s_arg_txt[48], s_footer_txt[40], s_word_txt[24], s_sub_txt[32];
+static char s_header_txt[64], s_tool_txt[48], s_arg_txt[48], s_footer_txt[40], s_word_txt[24], s_sub_txt[48];
 static char s_row_txt[ROWS][STEP_TEXT_MAX + 8];
 static const char *s_mark_txt[ROWS];
 
@@ -208,7 +208,7 @@ static void render(void)
 
     /* not working: the state's icon, its word, how long ago, and the Answer button when it needs you */
     uint32_t rgb = theme_session_rgb(s);
-    char sub[32];
+    char sub[48];
     state_caption(s, sub, sizeof sub);
     show(s_icon, !work);
     show(s_word_l, !work);
