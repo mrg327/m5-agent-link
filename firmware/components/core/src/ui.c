@@ -200,6 +200,12 @@ static void open_ask(void)
 }
 
 void ui_go_home(void) { leave_mode(); }
+/* Back, as a screen asks for it (hold still off the rows): the ASK reader closes first. */
+void ui_go_back(void)
+{
+    if (!(s_mode == MODE_ASK && ui_ask_back())) leave_mode();
+    g_ui_actions->tick();
+}
 void ui_go_watch(void) { enter_mode(MODE_WATCH); }
 void ui_go_voice(uint32_t rid)
 {

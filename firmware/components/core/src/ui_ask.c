@@ -304,13 +304,10 @@ void ui_ask_close(void)
 
 /* A hold acts on the row under the finger: it arms only when the press is on the selected row, or on no row
  * at all (a finger resting beside the button). A press on a neighbour is the start of a tap on that row. */
-static bool press_on_selected(const gesture_evt_t *g)
-{
-    int hit = wheel_hit(s_wheel, g->x, g->y);
-    return hit < 0 || hit == wheel_sel(s_wheel);
-}
+static bool press_on_selected(const gesture_evt_t *g) { return wheel_hit(s_wheel, g->x, g->y) == wheel_sel(s_wheel); }
 
-static int s_scrub_last;
+static int s_scrub_last, s_drag_acc;
+static bool s_drag_paged; /* the reader turns one page per touch */
 
 static void select_item(int i, const char *via, void (*haptic)(void))
 {
@@ -380,7 +377,6 @@ static bool read_act(nav_action_t act, const gesture_evt_t *g)
         if (g->kind == G_TAP && s_now - s_read_ms < NAV_CARD_ARM_MS) return true; /* the tap that opened it, doubled */
         /* fallthrough */
     case NAV_NEXT:
-    case NAV_PAGE_NEWER:
         if (s_page_i < s_pages - 1) {
             s_page_i++;
             reader_page();
@@ -389,7 +385,6 @@ static bool read_act(nav_action_t act, const gesture_evt_t *g)
         }
         g_ui_actions->tick();
         return true;
-    case NAV_DENY:
     case NAV_PREV:
         if (s_page_i > 0) {
             s_page_i--;
@@ -397,9 +392,23 @@ static bool read_act(nav_action_t act, const gesture_evt_t *g)
             g_ui_actions->tick();
         }
         return true;
+    case NAV_SCROLL_DRAG: { /* the page follows the finger: up is the next page, down the one before */
+        int d = nav_list_drag(&s_drag_acc, g->dy);
+        int to = s_page_i + (d > 0) - (d < 0);
+        if (d && !s_drag_paged && to >= 0 && to < s_pages) {
+            s_drag_paged = true;
+            s_page_i = to;
+            reader_page();
+            g_ui_actions->tick();
+        }
+        return true;
+    }
     case NAV_HOLD_PRESS:
+        s_drag_acc = 0;
+        s_drag_paged = false;
+        return true;
+    case NAV_HOLD_LONG: ui_go_back(); return true; /* held still: closes the reader */
     case NAV_HOLD_RELEASE:
-    case NAV_HOLD_LONG:
     case NAV_SCRUB: return true;
     default: return false;
     }
@@ -407,14 +416,25 @@ static bool read_act(nav_action_t act, const gesture_evt_t *g)
 
 bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
 {
-    if (s_reading && act != NAV_FOCUS) return read_act(act, g);
-    if (act == NAV_PAGE_NEWER) return true; /* a swipe up only means something in the reader */
     const attention_t *a = req();
+    if (s_reading && act != NAV_FOCUS) return read_act(act, g);
+    if (act == NAV_SCROLL_DRAG) { /* the list follows the finger; a moving finger holds nothing */
+        s_gate_press = false;
+        hold_cancel();
+        int d = nav_list_drag(&s_drag_acc, g->dy);
+        if (d && a && !a->answer_sent && s_n) select_item(wheel_sel(s_wheel) + d, "drag", g_ui_actions->detent);
+        return true;
+    }
+    if (act == NAV_HOLD_LONG && wheel_hit(s_wheel, g->x, g->y) < 0) { /* held still off the rows: back */
+        ui_go_back();
+        return true;
+    }
     int sel = wheel_sel(s_wheel);
     const ask_item_t *it = a && !a->answer_sent && sel < s_n ? &s_items[sel] : NULL;
     switch (act) {
     case NAV_HOLD_PRESS:
         s_hold_fired = false;
+        s_drag_acc = 0;
         if (it && it->hold_ms && grant_locked(it) && press_on_selected(g)) { /* locked: never arms */
             s_gate_press = true;
             s_gate_t0 = s_now;
@@ -481,13 +501,6 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
         g_ui_actions->focus(s_sid);
         ui_go_home();
         return true;
-    case NAV_DENY: {
-        if (!a || a->answer_sent || !(a->acts & (1u << ACT_DENY))) return false;
-        if (!nav_long_swipe_down(g->y, ui_last_release_y())) return true; /* too short: ignored, but consumed */
-        hold_cancel();
-        g_ui_actions->deny(s_sid, a->rid);
-        return true;
-    }
     case NAV_SCRUB: {
         int d = nav_list_scrub(&s_scrub_last, g->kind, g->x);
         if (d && it) select_item(sel + d, "scrub", g_ui_actions->detent);

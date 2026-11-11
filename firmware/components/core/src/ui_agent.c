@@ -147,14 +147,11 @@ void ui_agent_close(void)
     ring_set_still(ui_home_ring(), !ui_animations_allowed());
 }
 
-/* A hold acts on the row under the finger: it arms only when the press is on the selected row, or on no row. */
-static bool press_on_selected(const gesture_evt_t *g)
-{
-    int hit = wheel_hit(s_wheel, g->x, g->y);
-    return hit < 0 || hit == wheel_sel(s_wheel);
-}
+/* A hold acts on the row under the finger: it arms only when the press is on the selected row. A finger held
+ * still anywhere off the rows goes back. */
+static bool press_on_selected(const gesture_evt_t *g) { return wheel_hit(s_wheel, g->x, g->y) == wheel_sel(s_wheel); }
 
-static int s_scrub_last;
+static int s_scrub_last, s_drag_acc;
 
 static void select_item(int i, const char *via, void (*haptic)(void))
 {
@@ -220,6 +217,7 @@ bool ui_agent_act(nav_action_t a, const gesture_evt_t *g)
     switch (a) {
     case NAV_HOLD_PRESS:
         s_hold_fired = false;
+        s_drag_acc = 0;
         /* only a destructive item arms a hold, and only once the wheel has been on screen a moment */
         if (it && it->hold && press_on_selected(g) && s_now - s_opened_ms >= NAV_CARD_ARM_MS) {
             s_holding = true;
@@ -228,6 +226,15 @@ bool ui_agent_act(nav_action_t a, const gesture_evt_t *g)
         }
         return true;
     case NAV_HOLD_RELEASE: hold_cancel(); return true;
+    case NAV_HOLD_LONG:
+        if (wheel_hit(s_wheel, g->x, g->y) < 0) ui_go_back();
+        return true;
+    case NAV_SCROLL_DRAG: {
+        hold_cancel(); /* a moving finger is not holding anything */
+        int d = nav_list_drag(&s_drag_acc, g->dy);
+        if (d) select_item(wheel_sel(s_wheel) + d, "drag", g_ui_actions->detent);
+        return true;
+    }
     case NAV_COMMIT:
         if (!it) return false;
         if (g->kind == G_TAP && s_now - s_opened_ms < NAV_CARD_ARM_MS) return true; /* too soon after opening */

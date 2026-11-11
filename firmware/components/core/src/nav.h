@@ -32,7 +32,6 @@ typedef enum {
     NAV_PICK_RIM,       /* tap on the rim: select the segment or item under the finger */
     NAV_SCRUB,          /* rim drag; the gesture kind says start / move / end */
     NAV_COMMIT,         /* AGENT: commit the selected item (safe items only; hold items need a hold) */
-    NAV_DENY,           /* ASK with a request: the strict deny swipe */
     NAV_HOLD_PRESS,     /* raw finger down in the centre: may arm a hold */
     NAV_HOLD_RELEASE,   /* raw finger up: cancels a hold in progress */
     NAV_HOLD_LONG,      /* a long press whose duration already covers the hold (injected input) */
@@ -66,7 +65,8 @@ const char *nav_action_name(nav_action_t a);
 #define NAV_HOLD_MS 1200     /* hold-to-approve duration; the daemon's floor is 1000 ms */
 #define NAV_DENY_HOLD_MS 800 /* hold-to-deny: shorter, since a deny only sends the agent back to the prompt */
 #define NAV_HOLD_SHOW_MS 250 /* the arc and the haptic ramp only start after this, so a tap never flashes them */
-#define NAV_LIST_SECTORS 24  /* a rim drag in a list is a dial: one item per 15 degrees, clockwise = next */
+#define NAV_LIST_SECTORS 9   /* a rim drag in a list is a dial: one item per 40 degrees, clockwise = next */
+#define NAV_LIST_DRAG_PX 40  /* a vertical drag in the centre of a list: one item per 40 px (the first also pays the 18 px tap slop) */
 #define NAV_CARD_ARM_MS 300  /* a hold only starts once the request has been on screen this long */
 #define NAV_LONG_SWIPE_PX 120 /* deny, and back-from-AGENT: a deliberate swipe, at least this long */
 #define NAV_AGENT_TIMEOUT_MS 8000
@@ -153,4 +153,7 @@ int nav_quiet_step(uint32_t quiet_until, uint32_t now_unix);
  * NAV_LIST_SECTORS rim sectors on opening; this returns how many items to move for one scrub event (clockwise
  * positive) and keeps the last sector in *last. */
 int nav_list_scrub(int *last, gesture_kind_t kind, int sector);
+/* A vertical drag in the centre of a list moves the list with the finger: dragging up brings the next item
+ * in. Feed each G_DRAG step's dy; returns the items to move (next positive) and keeps the remainder in *acc. */
+int nav_list_drag(int *acc, int dy);
 

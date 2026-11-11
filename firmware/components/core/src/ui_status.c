@@ -265,6 +265,9 @@ bool ui_status_act(nav_action_t a, const gesture_evt_t *g)
         commit(hit >= 0 ? hit : s_sel);
         return true;
     }
+    case NAV_HOLD_LONG:
+        if (toggle_at(g->x, g->y) < 0) ui_go_back();
+        return true;
     case NAV_SCRUB: {
         int d = nav_list_scrub(&s_scrub_last, g->kind, g->x);
         if (d) select_item(s_sel + d, "scrub", g_ui_actions->detent);

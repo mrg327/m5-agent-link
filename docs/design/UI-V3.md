@@ -329,6 +329,23 @@ Finding L2 is logged on that issue.
 Nothing else in the gesture table changes. HOME keeps left/right for sessions; KEYS keeps touch for
 strokes and B held for back.
 
+### 5.1 Moving through a list, and back (2026-11-11)
+
+Touch is the main input, so a list (AGENT, ASK, the STATUS toggles) moves three ways without a button:
+
+- **Drag up or down in the centre**: the list follows the finger, one item per 40 px (`NAV_LIST_DRAG_PX`);
+  dragging up brings the next item in. A moving finger cancels any hold in progress.
+- **Slide along the bezel**: a dial, one item per 40° (`NAV_LIST_SECTORS` 9), clockwise = next, anywhere on
+  the rim. (Before, the rim was divided by the number of sessions, so with one session it did nothing.)
+- **Tap a row** (§3.3).
+
+Because a vertical drag now moves the list, **no swipe denies and swipe down no longer goes back** in AGENT
+and ASK. Deny is only its 0.8 s hold; `NAV_DENY` is gone from `nav.c` and `extract.py` fails if it returns.
+
+**Back** is swipe right, B held, or **a finger held still for 600 ms anywhere off the rows** (AGENT, ASK,
+STATUS; in the ASK reader it closes the reader). As a consequence a hold item arms only when the press is
+on its own row: a press beside the button no longer arms Approve.
+
 ## 6. Words
 
 | v2 | v3 |

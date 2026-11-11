@@ -322,7 +322,6 @@ ACTION_TEXT = {
     "NAV_OPEN_STATUS": "Open STATUS (swipe down on the deck): link, battery, quiet mode, sounds",
     "NAV_PICK_RIM": "Select the segment under the finger on the HOME ring (AGENT and ASK rows are tapped directly)",
     "NAV_HOLD_LONG": "An injected long press that already covers the selected hold item's time commits it directly",
-    "NAV_DENY": "Deny a permission request: a long swipe down that started above the centre",
     "NAV_SCRUB": "A drag around the rim moves the selection with a detent per step",
     "NAV_NEXT_ATTENTION": "Jump to the next session that needs attention",
     "NAV_NEXT": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
@@ -368,8 +367,8 @@ def extract_gesture_map():
     find(rel, r"\{MODE_HOME, G_TAP, ZONE_CENTRE, WHEN_ASKABLE, NAV_OPEN_ASK\}", "gesture_map.tap_never_approves")
     if re.search(r"\{MODE_HOME, G_PRESS,", text(rel)):
         raise Drift(f"{rel}: the deck must not arm holds (UI-V2 §3)")
-    if re.search(r"\{MODE_HOME, \w+, \w+, \w+, NAV_DENY\}", text(rel)):
-        raise Drift(f"{rel}: deny lives only in ASK (UI-V2 §3)")
+    if re.search(r"\bNAV_DENY\b", text(rel)):
+        raise Drift(f"{rel}: no swipe denies; deny is only its hold (UI-V3 §5)")
     find(rel, r"\{MODE_HOME, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_ALWAYS, NAV_OPEN_STATUS\}", "gesture_map.swipe_down_status")
     # quiet mode holds the arrival buzz and glow, and the nag, in app.c
     find(CORE + "app.c", r"if \(model_quiet_active\(hal_rtc_get_unix\(\)\)\) \{", "gesture_map.quiet_holds_alerts")

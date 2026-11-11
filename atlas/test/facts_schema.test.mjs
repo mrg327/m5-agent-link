@@ -40,11 +40,12 @@ test('ring facts: screens, per-kind shapes, pills and the gesture cases', () => 
   assert.equal(facts.ring.pills.approve, 'Review / Answer'); // the slot's button opens ASK; approving is a hold there
   const cases = facts.gesture_map.cases.map((c) => c.gesture);
   for (const c of ['G_TAP', 'G_LONG_PRESS', 'G_SWIPE_DOWN', 'G_SCRUB', 'G_BTN_A', 'G_BTN_A_DOUBLE', 'G_BTN_B', 'G_DRAG']) assert.ok(cases.includes(c), c);
-  // SCROLL: the drag stream binds only SCROLL and WATCH (a drag there opens SCROLL, issue 5cbb); the deck has no press binding
-  assert.deepEqual(facts.gesture_map.cases.filter((c) => c.gesture === 'G_DRAG').map((c) => c.mode), ['scroll', 'watch']);
+  // the drag stream scrolls the terminal (SCROLL, and WATCH where it opens SCROLL, issue 5cbb) and moves the lists
+  // (AGENT, ASK: UI-V3 §5.1); the deck has no press binding
+  assert.deepEqual(facts.gesture_map.cases.filter((c) => c.gesture === 'G_DRAG').map((c) => c.mode), ['agent', 'ask', 'scroll', 'watch']);
   assert.ok(!facts.gesture_map.cases.some((c) => c.mode === 'home' && c.gesture === 'G_PRESS'));
-  // deny lives only in ASK; the deck's swipe down opens STATUS, which has its own timeout and the quiet steps
-  assert.deepEqual(facts.gesture_map.cases.filter((c) => c.nav === 'NAV_DENY').map((c) => c.mode), ['ask']);
+  // no swipe denies anywhere; the deck's swipe down opens STATUS, which has its own timeout and the quiet steps
+  assert.deepEqual(facts.gesture_map.cases.filter((c) => c.nav === 'NAV_DENY').map((c) => c.mode), []); // no swipe denies: deny is only its hold
   assert.ok(facts.gesture_map.cases.some((c) => c.mode === 'home' && c.gesture === 'G_SWIPE_DOWN' && c.nav === 'NAV_OPEN_STATUS'));
   assert.ok(facts.gesture_map.cases.some((c) => c.mode === 'status'));
   assert.ok(facts.gesture.status_timeout_ms > 0 && facts.gesture.quiet_step1_s < facts.gesture.quiet_step2_s);

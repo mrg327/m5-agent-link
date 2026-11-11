@@ -1,5 +1,5 @@
 # A rim drag in a list is a dial: with ONE session (the old absolute mapping had a single sector, so the drag
-# did nothing) a short clockwise slide along the bezel steps to the next item and the same slide back returns.
+# did nothing) a clockwise slide of about 40 degrees along the bezel steps to the next item and the same slide back returns.
 # Works anywhere on the rim. In ASK the dial only selects: no approve (op 3), deny (op 4) or focus (op 0).
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
@@ -9,13 +9,13 @@ tap 233 233
 wait 400
 expect_screen agent
 expect_label > Activity
-scrub 62 92 400
+scrub 50 110 500
 wait 200
 expect_label > Notify when done
-scrub 92 62 400
+scrub 110 50 500
 wait 200
 expect_label > Activity
-scrub 248 218 400
+scrub 235 185 500
 wait 200
 expect_label > Snooze 30 min
 chord
@@ -25,10 +25,10 @@ attention 7 2 approval approve,deny,focus 0 Run shell command|npm test
 wait 500
 expect_screen ask
 expect_label > Approve HOLD
-scrub 62 92 400
+scrub 50 110 500
 wait 200
 expect_label > Deny HOLD
-scrub 92 62 400
+scrub 110 50 500
 wait 200
 expect_label > Approve HOLD
 expect_screen ask

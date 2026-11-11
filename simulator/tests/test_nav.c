@@ -58,9 +58,9 @@ int main(void)
             EXPECT(nav_lookup(m, G_SWIPE_RIGHT, ZONE_CENTRE, req, req) == NAV_BACK, "swipe right in the centre goes back");
         EXPECT(nav_lookup(m, G_SWIPE_RIGHT, ZONE_RIM, false, false) != NAV_BACK, "a rim swipe is not back");
     }
-    EXPECT(nav_lookup(MODE_ASK, G_SWIPE_RIGHT, ZONE_CENTRE, true, true) != NAV_DENY, "swipe right never denies");
-    EXPECT(nav_lookup(MODE_ASK, G_SWIPE_DOWN, ZONE_CENTRE, true, true) == NAV_DENY, "the strict swipe down still denies");
-    EXPECT(nav_lookup(MODE_AGENT, G_SWIPE_DOWN, ZONE_CENTRE, false, false) == NAV_BACK, "the long swipe down still goes back");
+    EXPECT(nav_lookup(MODE_ASK, G_SWIPE_RIGHT, ZONE_CENTRE, true, true) == NAV_BACK, "swipe right is back, never an answer");
+    EXPECT(nav_lookup(MODE_ASK, G_SWIPE_DOWN, ZONE_CENTRE, true, true) == NAV_NONE, "no swipe denies: deny is only its hold");
+    EXPECT(nav_lookup(MODE_AGENT, G_SWIPE_DOWN, ZONE_CENTRE, false, false) == NAV_NONE, "swipe down no longer goes back: the centre drag moves the list");
     EXPECT(nav_lookup(MODE_HOME, G_SWIPE_RIGHT, ZONE_CENTRE, false, false) == NAV_NONE, "HOME has no swipe-right binding");
     EXPECT(nav_lookup(MODE_KEYS, G_SWIPE_RIGHT, ZONE_CENTRE, false, false) == NAV_NONE, "KEYS keeps touch for strokes");
 

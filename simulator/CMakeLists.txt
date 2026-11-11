@@ -89,9 +89,7 @@ sim_script_test(sim_center_tap_focus center_tap_focus.txt
 sim_script_test(sim_approve_hold approve_hold.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"op\":3")
-sim_script_test(sim_deny_swipe deny_swipe.txt
-                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
-                PASS_REGULAR_EXPRESSION "\"op\":4")
+sim_script_test(sim_deny_swipe deny_swipe.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4")
 sim_script_test(sim_button_jump button_jump.txt)
 # Approval safety: the card shows the request; a short or low swipe never denies; a hold before
 # the card has been visible never approves.
@@ -273,6 +271,8 @@ sim_script_test(sim_ask_read_then_approve ask_read_then_approve.txt
 sim_script_test(sim_ask_cut_text ask_cut_text.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":5"
                 PASS_REGULAR_EXPRESSION "\"op\":4,\"sid\":2,\"rid\":7")
+sim_script_test(sim_list_centre_drag list_centre_drag.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_list_rim_dial list_rim_dial.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_ask_second_tap ask_second_tap.txt

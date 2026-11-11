@@ -1,6 +1,6 @@
 # Safety (read before you approve): a permission text that does not fit shows "Read all". Until the reader's
 # last page has been on screen, a hold on Approve does nothing and says why; in the reader a long swipe down
-# is not the deny swipe and a hold answers nothing. No approve (op 3), deny (op 4), reply (op 5) or focus (op 0).
+# denies nothing and a hold only closes the reader. No approve (op 3), deny (op 4), reply (op 5) or focus (op 0).
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 session 2 input webapp feat/login
@@ -28,7 +28,9 @@ expect_screen ask
 expect_label Reading 1 of 1
 hold 233 282 1500
 wait 300
-expect_label Reading 1 of 1
+# a finger held still in the reader closes it (back); it answers nothing
+expect_screen ask
+expect_label > Approve HOLD
 expect_no_label Approved
 expect_no_label Denied
 quit

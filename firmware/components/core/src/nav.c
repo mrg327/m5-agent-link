@@ -26,7 +26,8 @@ const nav_binding_t nav_bindings[] = {
     {MODE_AGENT, G_RELEASE, ZONE_ANY, WHEN_ALWAYS, NAV_HOLD_RELEASE},
     {MODE_AGENT, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
     {MODE_AGENT, G_DOUBLE_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
-    {MODE_AGENT, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* only a long swipe counts */
+    {MODE_AGENT, G_DRAG, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_DRAG}, /* the list follows the finger */
+    {MODE_AGENT, G_LONG_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_HOLD_LONG}, /* held still off the rows: back */
     {MODE_AGENT, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* UI-V3 §5: swipe right goes back */
     {MODE_AGENT, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_AGENT, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
@@ -41,11 +42,9 @@ const nav_binding_t nav_bindings[] = {
     {MODE_ASK, G_RELEASE, ZONE_ANY, WHEN_ALWAYS, NAV_HOLD_RELEASE},
     {MODE_ASK, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT}, /* hold items answer "hold to confirm" */
     {MODE_ASK, G_DOUBLE_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
-    {MODE_ASK, G_LONG_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_HOLD_LONG}, /* injected input only: must cover the hold */
-    {MODE_ASK, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_REQUEST, NAV_DENY}, /* strict: long, from above the centre */
-    {MODE_ASK, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_NO_REQUEST, NAV_BACK}, /* a question: back, request stays */
+    {MODE_ASK, G_LONG_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_HOLD_LONG}, /* off the rows: back; on a row: injected input covering the hold */
+    {MODE_ASK, G_DRAG, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_DRAG}, /* the list follows the finger; no swipe denies */
     {MODE_ASK, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* UI-V3 §5: back; the request stays pending, never deny */
-    {MODE_ASK, G_SWIPE_UP, ZONE_CENTRE, WHEN_ALWAYS, NAV_PAGE_NEWER}, /* the reader's next page; nothing elsewhere */
     {MODE_ASK, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_ASK, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_ASK, G_SCRUB_END, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
@@ -70,6 +69,7 @@ const nav_binding_t nav_bindings[] = {
     {MODE_STATUS, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
     {MODE_STATUS, G_DOUBLE_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
     {MODE_STATUS, G_SWIPE_UP, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK},
+    {MODE_STATUS, G_LONG_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_HOLD_LONG}, /* held still off the toggles: back */
     {MODE_STATUS, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* UI-V3 §5: swipe right goes back */
     {MODE_STATUS, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_STATUS, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
@@ -142,7 +142,7 @@ const char *nav_action_name(nav_action_t a)
 {
     static const char *const names[NAV_COUNT] = {
         "none", "focus", "open_agent", "open_ask", "open_status", "back", "home", "next", "prev", "next_attention", "pick_rim",
-        "scrub", "commit", "deny", "hold_press", "hold_release", "hold_long", "scroll_drag", "scroll_fling",
+        "scrub", "commit", "hold_press", "hold_release", "hold_long", "scroll_drag", "scroll_fling",
         "scroll_catch", "page_newer", "to_bottom", "erase"};
     return (unsigned)a < NAV_COUNT ? names[a] : "?";
 }
@@ -264,4 +264,12 @@ int nav_list_scrub(int *last, gesture_kind_t kind, int sector)
     else if (d < -NAV_LIST_SECTORS / 2) d += NAV_LIST_SECTORS;
     *last = sector;
     return d;
+}
+
+int nav_list_drag(int *acc, int dy)
+{
+    *acc += dy;
+    int n = -(*acc / NAV_LIST_DRAG_PX); /* C division truncates toward zero, so both directions keep a remainder */
+    *acc += n * NAV_LIST_DRAG_PX;
+    return n;
 }

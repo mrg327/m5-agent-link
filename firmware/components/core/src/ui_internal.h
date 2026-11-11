@@ -24,6 +24,7 @@ void ui_motion_enter(lv_obj_t *content);
 
 /* Mode plumbing (ui.c): the interaction layer decides, the screens draw. */
 nav_mode_t ui_mode(void);
+void ui_go_back(void);          /* one level back; the ASK reader closes first */
 void ui_go_home(void);          /* leave AGENT (commit, back, chord, timeout) */
 void ui_go_watch(void);
 void ui_go_keys(void);  /* the Reply list's "Type...": open KEYS on the selected session */
