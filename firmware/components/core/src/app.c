@@ -28,7 +28,10 @@ typedef struct { uint8_t btn; bool down; uint32_t t_ms; } btn_evt_t;
 static gesture_t s_gesture;
 static ring_t s_frames, s_link_evts, s_btn_evts, s_motion_evts, s_gestures;
 #define FRAME_SLOTS 8
-static frame_t s_frame_buf[FRAME_SLOTS]; /* 32 KiB .bss */
+/* The frame queue and the two staging frames are 41 KB of plain data, filled by the transports' tasks (never
+ * an ISR) and read by core_step: they live in PSRAM, so internal RAM stays for what must be there (BLE). */
+MODEL_EXT_BSS static frame_t s_frame_buf[FRAME_SLOTS];
+static size_t frame_used(const void *stored) { return offsetof(frame_t, data) + ((const frame_t *)stored)->len; }
 static atomic_flag s_rx_lock = ATOMIC_FLAG_INIT; /* transports may deliver from different tasks */
 static atomic_uint s_frames_dropped;
 static link_evt_t s_link_buf[8];
@@ -77,14 +80,15 @@ void app_set_sectors(int n) { gesture_set_sectors(&s_gesture, n); }
 
 static void on_rx(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 {
-    static frame_t f;
+    MODEL_EXT_BSS static frame_t f;
     if (len > FRAME_MAX) return;
     while (atomic_flag_test_and_set_explicit(&s_rx_lock, memory_order_acquire)) {
     }
     f.kind = kind;
     f.len = (uint16_t)len;
     memcpy(f.data, frame, len);
-    if (!ring_push(&s_frames, &f)) atomic_fetch_add(&s_frames_dropped, 1);
+    /* only the message itself is copied, not the 4 KB slot */
+    if (!ring_push_n(&s_frames, &f, frame_used(&f))) atomic_fetch_add(&s_frames_dropped, 1);
     atomic_flag_clear_explicit(&s_rx_lock, memory_order_release);
 }
 
@@ -464,8 +468,8 @@ static void drain_link(uint32_t now)
 {
     link_evt_t e;
     while (ring_pop(&s_link_evts, &e)) link_on_state(e.kind, e.connected);
-    static frame_t f;
-    while (ring_pop(&s_frames, &f)) link_on_frame_from(f.kind, f.data, f.len);
+    MODEL_EXT_BSS static frame_t f;
+    while (ring_pop_n(&s_frames, &f, frame_used)) link_on_frame_from(f.kind, f.data, f.len);
     unsigned dropped = atomic_exchange(&s_frames_dropped, 0);
     if (dropped) dbg_event_at(DBG_DEBUG, "link", "rx_drop", "\"n\":%u", dropped);
     link_tick(now);

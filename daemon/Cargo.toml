@@ -32,3 +32,13 @@ btleplug = "0.13"
 uuid = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# The daemon on a development machine runs the dev build as a service (README). Our own crates stay
+# unoptimised and debuggable; what is hot or not ours is optimised: the swipe decoder is ~20x slower at
+# opt-level 0 (its accuracy gate took 10-30 s and timed out under load, issue 5617), and CBOR, BLE and
+# the async runtime are third-party code nobody steps through.
+[profile.dev.package.agentlink-keys]
+opt-level = 3
+
+[profile.dev.package."*"]
+opt-level = 2

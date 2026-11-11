@@ -758,7 +758,14 @@ static void run(const ev_t *e)
         hal_rtc_set_unix((uint32_t)e->a);
         app_clock_resync();
         break;
-    case E_QUIT: s_next = s_n; break;
+    case E_QUIT: {
+        /* LVGL's heap at the end of the script: on the device these are internal-RAM allocations */
+        lv_mem_monitor_t m;
+        lv_mem_monitor(&m);
+        sim_log("mem", "\"lvgl_used\":%u,\"lvgl_peak\":%u", (unsigned)(m.total_size - m.free_size), (unsigned)m.max_used);
+        s_next = s_n;
+        break;
+    }
     }
 }
 

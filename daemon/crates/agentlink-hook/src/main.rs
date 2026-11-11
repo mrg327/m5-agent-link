@@ -178,10 +178,58 @@ fn walk_chain(ps: &str, start: u32, max: usize) -> (Vec<u32>, Option<String>) {
     (chain, tty)
 }
 
+/// `(ppid, tty)` of one process from `/proc/<pid>/stat`, with the tty in `ps` form (`pts/3`, `tty2`,
+/// `?` for none). `None` when the file is missing or the tty is a device this cannot name, so the
+/// caller falls back to `ps`. The command name (field 2) may hold spaces and parentheses: fields are
+/// counted from the last `)`.
+#[cfg(target_os = "linux")]
+fn proc_stat_row(stat: &str) -> Option<(u32, String)> {
+    let rest = &stat[stat.rfind(')')? + 1..];
+    let mut f = rest.split_whitespace();
+    let ppid: u32 = f.nth(1)?.parse().ok()?; // state, ppid
+    let tty_nr: u32 = f.nth(2)?.parse::<i64>().ok()? as u32; // pgrp, session, tty_nr
+    let (major, minor) = (
+        (tty_nr >> 8) & 0xfff,
+        (tty_nr & 0xff) | ((tty_nr >> 12) & 0xfff00),
+    );
+    let tty = match major {
+        0 => "?".to_owned(),
+        136..=143 => format!("pts/{}", (major - 136) * 256 + minor),
+        4 if minor < 64 => format!("tty{minor}"),
+        4 => format!("ttyS{}", minor - 64),
+        _ => return None,
+    };
+    Some((ppid, tty))
+}
+
+/// The ancestors of `start` as `pid ppid tty` rows read straight from `/proc`: at most `max` small
+/// files instead of a `ps -A` over every process (10 ms per hook call, on every tool use and every
+/// shell command). `None` when anything is unreadable or unknown; `ps` then answers.
+#[cfg(target_os = "linux")]
+fn proc_rows(start: u32, max: usize) -> Option<String> {
+    use std::fmt::Write;
+    let mut out = String::new();
+    let mut pid = start;
+    for _ in 0..max {
+        if pid <= 1 {
+            break;
+        }
+        let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+        let (ppid, tty) = proc_stat_row(&stat)?;
+        let _ = writeln!(out, "{pid} {ppid} {tty}");
+        pid = ppid;
+    }
+    (!out.is_empty()).then_some(out)
+}
+
 /// Parent pid chain and controlling tty of the agent. Our own stdio is piped, so the tty
-/// is found on the ancestors. One short `ps` call, bounded by a timeout.
+/// is found on the ancestors: from `/proc` on Linux, else one short `ps` call, bounded by a timeout.
 #[cfg(unix)]
 fn process_identity(ppid: u32) -> (Vec<u32>, Option<String>) {
+    #[cfg(target_os = "linux")]
+    if let Some(rows) = proc_rows(ppid, 8) {
+        return walk_chain(&rows, ppid, 8);
+    }
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let out = std::process::Command::new("ps")
@@ -614,6 +662,39 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn proc_stat_gives_ppid_and_tty_like_ps() {
+        // pid (comm) state ppid pgrp session tty_nr ...; comm may hold spaces and parentheses
+        let row =
+            |tty_nr: u32| format!("700 (my (odd) cmd) S 600 700 600 {tty_nr} 700 4194304 1 0");
+        assert_eq!(proc_stat_row(&row(34819)), Some((600, "pts/3".into()))); // 136:3
+        assert_eq!(proc_stat_row(&row(0)), Some((600, "?".into())));
+        assert_eq!(proc_stat_row(&row(1026)), Some((600, "tty2".into()))); // 4:2
+        assert_eq!(proc_stat_row(&row(1088)), Some((600, "ttyS0".into()))); // 4:64
+        assert_eq!(
+            proc_stat_row(&row(136 << 8 | 0x100000 | 5)),
+            Some((600, "pts/261".into()))
+        );
+        assert_eq!(
+            proc_stat_row(&row(5 << 8)),
+            None,
+            "an unknown device falls back to ps"
+        );
+        assert_eq!(proc_stat_row("garbage"), None);
+        // our own chain: the same pids and tty as `ps` reports
+        let me = std::process::id();
+        let rows = proc_rows(me, 8).expect("/proc is readable");
+        let (chain, tty) = walk_chain(&rows, me, 8);
+        assert_eq!(chain[0], me);
+        let ps = std::process::Command::new("ps")
+            .args(["-A", "-o", "pid=,ppid=,tty="])
+            .output()
+            .unwrap();
+        let (ps_chain, ps_tty) = walk_chain(&String::from_utf8_lossy(&ps.stdout), me, 8);
+        assert_eq!((chain, tty), (ps_chain, ps_tty));
+    }
 
     #[test]
     fn chain_finds_first_tty_and_stops_at_init() {

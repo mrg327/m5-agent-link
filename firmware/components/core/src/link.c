@@ -3,7 +3,9 @@
 #include "link_internal.h"
 
 link_state_t g_link;
-struct envelope_r g_rx_env, g_tx_env;
+/* The decoded and the to-be-encoded message: 6 KB each, only touched from core_step. PSRAM. */
+MODEL_EXT_BSS struct envelope_r g_rx_env;
+MODEL_EXT_BSS struct envelope_r g_tx_env;
 
 #define HELLO_RETRY_MS 3000
 /* While welcomed on another transport with USB plugged in, offer a hello on USB this often: a daemon

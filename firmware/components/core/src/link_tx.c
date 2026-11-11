@@ -3,7 +3,7 @@
 
 #include "link_internal.h"
 
-static uint8_t s_txbuf[LINK_MAX_MSG];
+MODEL_EXT_BSS static uint8_t s_txbuf[LINK_MAX_MSG]; /* encoded here, then copied by the transport: PSRAM */
 
 static uint32_t set_hdr(struct hdr_r *h, bool has_re, uint32_t re)
 {

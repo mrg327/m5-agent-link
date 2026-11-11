@@ -50,6 +50,10 @@ add_executable(test_steps tests/test_steps.c ${FW}/core/src/steps.c)
 target_include_directories(test_steps PRIVATE ${FW}/core/src)
 add_test(NAME step_timeline COMMAND test_steps)
 
+add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
+target_include_directories(test_ring PRIVATE ${FW}/core/src)
+add_test(NAME ring_fifo COMMAND test_ring)
+
 add_executable(test_nav tests/test_nav.c ${FW}/core/src/nav.c)
 target_include_directories(test_nav PRIVATE ${FW}/core/src)
 add_test(NAME nav_model COMMAND test_nav)
