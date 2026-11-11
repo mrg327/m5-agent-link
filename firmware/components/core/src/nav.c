@@ -251,3 +251,17 @@ uint32_t nav_quiet_next(uint32_t quiet_until, uint32_t now_unix)
     default: return 0;
     }
 }
+
+int nav_list_scrub(int *last, gesture_kind_t kind, int sector)
+{
+    if (kind == G_SCRUB_START) {
+        *last = sector;
+        return 0;
+    }
+    if (kind != G_SCRUB) return 0;
+    int d = sector - *last;
+    if (d > NAV_LIST_SECTORS / 2) d -= NAV_LIST_SECTORS;
+    else if (d < -NAV_LIST_SECTORS / 2) d += NAV_LIST_SECTORS;
+    *last = sector;
+    return d;
+}

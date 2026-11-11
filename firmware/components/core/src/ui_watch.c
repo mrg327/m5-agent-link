@@ -245,7 +245,7 @@ void ui_watch_open(uint32_t sid, uint32_t now)
     s_header_txt[0] = s_tool_txt[0] = s_arg_txt[0] = s_footer_txt[0] = s_word_txt[0] = s_sub_txt[0] = 0;
     s_blockx = -1;
     ui_home_refresh(now); /* the index ring shows the sessions again, the watched one selected */
-    if (g_ui_actions->sectors) g_ui_actions->sectors(ui_home_slot_count());
+    ui_home_rim_mode(false);
     render();
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     dbg_event("ui", "watch", "\"sid\":%u,\"via\":\"open\"", (unsigned)sid);

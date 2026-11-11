@@ -273,6 +273,8 @@ sim_script_test(sim_ask_read_then_approve ask_read_then_approve.txt
 sim_script_test(sim_ask_cut_text ask_cut_text.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":5"
                 PASS_REGULAR_EXPRESSION "\"op\":4,\"sid\":2,\"rid\":7")
+sim_script_test(sim_list_rim_dial list_rim_dial.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_ask_second_tap ask_second_tap.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_ask_tap_open_row ask_tap_open_row.txt

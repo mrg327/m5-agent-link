@@ -66,6 +66,7 @@ const char *nav_action_name(nav_action_t a);
 #define NAV_HOLD_MS 1200     /* hold-to-approve duration; the daemon's floor is 1000 ms */
 #define NAV_DENY_HOLD_MS 800 /* hold-to-deny: shorter, since a deny only sends the agent back to the prompt */
 #define NAV_HOLD_SHOW_MS 250 /* the arc and the haptic ramp only start after this, so a tap never flashes them */
+#define NAV_LIST_SECTORS 24  /* a rim drag in a list is a dial: one item per 15 degrees, clockwise = next */
 #define NAV_CARD_ARM_MS 300  /* a hold only starts once the request has been on screen this long */
 #define NAV_LONG_SWIPE_PX 120 /* deny, and back-from-AGENT: a deliberate swipe, at least this long */
 #define NAV_AGENT_TIMEOUT_MS 8000
@@ -147,3 +148,9 @@ int nav_status_items(status_item_t *out, int cap);
 uint32_t nav_quiet_next(uint32_t quiet_until, uint32_t now_unix);
 /* Which step nav_quiet_next() would take: 1 = 30 min, 2 = 1 h, 0 = off. */
 int nav_quiet_step(uint32_t quiet_until, uint32_t now_unix);
+/* A rim drag in a list (AGENT, ASK, STATUS) steps through the items like a dial, wherever on the rim the
+ * finger is: the list is not drawn on the ring, so the finger's absolute angle means nothing. The screen sets
+ * NAV_LIST_SECTORS rim sectors on opening; this returns how many items to move for one scrub event (clockwise
+ * positive) and keeps the last sector in *last. */
+int nav_list_scrub(int *last, gesture_kind_t kind, int sector);
+
