@@ -44,3 +44,4 @@ User request 2026-11-10: wireless between the watch and the Linux dev box, whose
     - os: Ubuntu 24.04.4 LTS (kernel 7.0.0-42-generic)
     - git: 173bdd3+dirty main
     - toolchains: cc 13.3.0-6ubuntu2~24.04.1, cmake 3.28.3, ninja 1.11.1, node 18.19.1, python 3.12.3, rustc 1.95.0, cargo 1.95.0, sdl2 2.30.0
+- 2026-11-11T03:37:01Z · claude-code@linux-dev · linux-x86_64 · 4fbb4c6: DKMS install done (tools/linux/bcm4350c0-le-fix/install.sh): hci_uart now loads from updates/dkms; daemon reconnected over BLE after it ('device connected: AgentLink-XXXX (ble)', first attempt timed out, second linked at mtu 247). A reboot with the DKMS module in place has not been tried yet.
