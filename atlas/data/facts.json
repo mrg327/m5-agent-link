@@ -989,17 +989,17 @@
     {
       "id": "agent",
       "title": "Agent wheel",
-      "source": "firmware/components/core/src/ui_agent.c:282"
+      "source": "firmware/components/core/src/ui_agent.c:291"
     },
     {
       "id": "ask",
       "title": "Ask · the request and its options",
-      "source": "firmware/components/core/src/ui_ask.c:344"
+      "source": "firmware/components/core/src/ui_ask.c:372"
     },
     {
       "id": "scroll",
       "title": "Scroll · the terminal's scrollback",
-      "source": "firmware/components/core/src/ui_scroll.c:293"
+      "source": "firmware/components/core/src/ui_scroll.c:299"
     },
     {
       "id": "status",
@@ -4566,8 +4566,8 @@
     "gesture.swipe_max_ms": "firmware/components/core/src/gesture.h:9",
     "gesture.swipe_min_px": "firmware/components/core/src/gesture.h:8",
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
-    "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:315",
-    "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:269",
+    "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:343",
+    "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:296",
     "gesture_map.chord": "firmware/components/core/src/app.c:402",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:187",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:155",
@@ -4652,10 +4652,10 @@
     "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:18",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:33",
     "screens": "firmware/components/core/src/ui_home.c:342",
-    "screens.agent": "firmware/components/core/src/ui_agent.c:282",
-    "screens.ask": "firmware/components/core/src/ui_ask.c:344",
-    "screens.scroll": "firmware/components/core/src/ui_scroll.c:293",
-    "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:54",
+    "screens.agent": "firmware/components/core/src/ui_agent.c:291",
+    "screens.ask": "firmware/components/core/src/ui_ask.c:372",
+    "screens.scroll": "firmware/components/core/src/ui_scroll.c:299",
+    "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:55",
     "screens.status": "firmware/components/core/src/ui_status.c:285",
     "sounds.done-achieve": "firmware/components/core/src/sound_bank.c:54",
     "sounds.done-bonus": "firmware/components/core/src/sound_bank.c:39",

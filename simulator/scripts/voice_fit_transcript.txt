@@ -1,0 +1,40 @@
+# VOICE: a transcript that fits its box (about 100 characters, four lines) is shown in full and still sends.
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 1 done webapp feat/login Finished the work
+wait 300
+mic audio/tone_1s.wav
+tap 233 233
+wait 300
+expect_screen agent
+btn B
+wait 150
+expect_label > Reply
+btn A
+wait 200
+expect_label > Continue
+expect_label Dictate
+btn B
+wait 150
+expect_label > Dictate
+btn A
+wait 300
+expect_screen voice
+expect_label Reply to webapp
+expect_label 0:0
+shot voice_listening.png
+wait 200
+shot voice_listening_level.png
+wait 1000
+tap 233 233
+wait 300
+expect_label Transcribing…
+shot voice_transcribing.png
+transcript run the tests again, fix whatever fails in the login flow, and push the branch when it is green
+wait 300
+expect_label (transcript)
+shot voice_fit_transcript.png
+hold 233 300 1600
+wait 400
+expect_screen ring
+quit

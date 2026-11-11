@@ -160,6 +160,11 @@ Three rows, pitch 48. Selected: a button (§2.5), 280 wide, label centred; fille
 colour, or neutral for "Open on PC". Neighbours: `FONT_BODY` `COL_TEXT2`, centred. A hold item has
 the hold ring; there is no `HOLD` tag.
 
+**A hold acts on the row under the finger.** A press arms the hold only when it lands on the selected
+row or on no row at all (a finger resting beside the button); a press on a neighbour row arms nothing, it
+is the start of a tap on that row. In ASK and AGENT, taps are ignored until the screen has been open
+`NAV_CARD_ARM_MS` (300 ms), so the tap that opened it, or a second one behind it, cannot land on a row.
+
 **Tapping a row acts on that row** (X3): `wheel_hit(w, x, y)` returns the row under the point. A tap
 on a neighbour selects it and, if it is safe, commits it; if it is a hold item it only selects it
 and the toast says `Hold to approve` / `Hold to deny` / `Hold to stop`. A tap on the selected row or
@@ -226,7 +231,8 @@ centred on y 246. Legends: A `Select`, B `Next`.
 - After the answer (M3), positions are top edges: `ICON_DONE` / `ICON_DENIED` / `ICON_SENT` at 44 px in
   the answer's colour at y 154, the word (`Approved`, `Denied`, `Sent`) in `FONT_TITLE` white at y 215,
   and `Waiting for your computer` in `FONT_CAPTION` `COL_TEXT2` at y 266 (y 256 with the option's text
-  above it). The request platter is hidden to make room. No second pill. A sent option
+  above it). The request platter is hidden to make room. The answered state stays at least 900 ms after the
+  answer was sent, even if the daemon clears the request sooner; a new request or any input takes over at once. No second pill. A sent option
   shows its text as the caption's first line (`"Vue"`).
 - Legends: A `Open on PC`, B `Next` (hidden with one option).
 
@@ -279,8 +285,11 @@ square-root curve (speech sits at 10–30 of 100 and must still move it), 48 →
 stays clear of the timer; the elapsed time in `FONT_TITLE` white on y 292. Legend A `Stop`.
 **Transcribing**: the disc in `COL_FILL2`, `Transcribing…` in `FONT_HEAD` on y 292. Only A (`Stop`,
 listening) has a legend: a short B press does nothing here (B held is back), so no `Back` legend.
-**Transcript**: the text in `FONT_HEAD` white, up to four lines, centred on y 170; a prominent
-yellow hold button `Send` (§2.5) on y 300. A tap answers with the toast `Hold to send`.
+**Transcript**: the text in `FONT_BODY` white, up to five lines, as wide as the chord allows (at most
+330 px), centred on y 170; a prominent yellow hold button `Send` (§2.5) on y 300. A tap answers with the
+toast `Hold to send`. **A transcript that does not fit the five-line box is never sent from here**: it
+would be cut with dots on glass while the hold sent all of it. A tap or a press on `Send` then toasts
+`Too long to send from here` (amber) and nothing is sent; the hold never arms.
 **Failed**: `ICON_ERROR` 44 px on y 176, the reason in `FONT_HEAD` on y 236, a neutral button
 `Try again` on y 300.
 
@@ -293,7 +302,7 @@ Finding L2 is logged on that issue.
 
 | Change | Rows | Why |
 |---|---|---|
-| **Swipe right in the centre = back** in AGENT, ASK, WATCH, SCROLL, STATUS and VOICE | `{MODE_x, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}` | X2. In ASK it leaves the request pending, exactly like B held. It is never deny. |
+| **Swipe right in the centre = back** in AGENT, ASK, WATCH, SCROLL, STATUS and VOICE | `{MODE_x, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}` | X2. In ASK it leaves the request pending, exactly like B held. It is never deny. In SCROLL it is ignored when the same touch already scrolled (a sideways flick is not a back). |
 | Every v2 way back stays as an alias | none removed | principle 6 |
 | A tap on a list row acts on that row | handled in the screen via `wheel_hit`; the binding stays `NAV_COMMIT` | X3 |
 | `NAV_PICK_RIM` leaves AGENT and ASK | two rows removed | the rim no longer shows rows (§3.1) |

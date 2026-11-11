@@ -1,0 +1,24 @@
+# Safety (UI-V3 §3.3): a hold acts on the row under the finger. Rows of a working session: Activity
+# (selected, y 226), Stop above it (y 164, a hold item), Notify when done below (y 288). Holding 1.5 s on the
+# neighbour Stop row while Activity is selected must not stop the session (op 6); with Stop selected, a hold
+# on the Notify row below must not stop it either.
+connect
+rx a400020101020103a50082000401a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 1 work webapp feat/login Running the test suite
+wait 300
+tap 233 233
+wait 400
+expect_screen agent
+expect_label > Activity
+hold 233 164 1500
+wait 300
+expect_screen agent
+expect_label > Activity
+tap 233 164
+wait 300
+expect_label > Stop
+hold 233 288 1500
+wait 300
+expect_screen agent
+expect_label > Stop
+quit

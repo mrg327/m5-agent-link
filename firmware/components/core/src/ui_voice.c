@@ -21,8 +21,8 @@
 #define HALO_STEP 4 /* radius quantum: a repaint only when the loudness moves this far */
 #define LOW_Y 292   /* timer / "Transcribing…" */
 #define TEXT_CY 170
-#define TEXT_W 310
-#define TEXT_LINES 4
+#define TEXT_W_MAX 330 /* as wide as the chord allows, at most this */
+#define TEXT_LINES 5
 #define ERR_ICON_Y 176
 #define REASON_Y 236
 #define BUTTON_Y 300
@@ -35,6 +35,7 @@ static voice_state_t s_shown = (voice_state_t)-1;
 static bool s_holding, s_ramp_started;
 static uint32_t s_hold_t0;
 static int s_halo_r;
+static bool s_too_long; /* the transcript does not fit its box: the user could not read all of what a hold would send */
 
 static void show(lv_obj_t *o, bool on)
 {
@@ -81,15 +82,21 @@ static void set_halo(int level)
     lv_obj_set_pos(s_halo, UI_CX - r, DISC_Y - r);
 }
 
-/* The transcript, centred on y 170: the box is as tall as the text (at most four lines). */
+/* The transcript, centred on y 170: FONT_BODY, the box as tall as the text (at most five lines). Text that
+ * does not fit is cut with dots on glass, so it must not be sent from here (s_too_long). */
 static void set_transcript(const char *t)
 {
-    if (!strcmp(t, s_text_txt)) return;
-    const lv_font_t *f = FONT_HEAD;
+    const lv_font_t *f = FONT_BODY;
     int lh = lv_font_get_line_height(f);
+    int w = theme_chord(TEXT_CY - TEXT_LINES * lh / 2, 12); /* the narrowest row is the top one */
+    if (w > TEXT_W_MAX) w = TEXT_W_MAX;
     lv_point_t sz;
-    lv_text_get_size(&sz, t, f, 0, 0, TEXT_W, LV_TEXT_FLAG_NONE);
+    lv_text_get_size(&sz, t, f, 0, 0, w, LV_TEXT_FLAG_NONE);
+    s_too_long = sz.y / lh > TEXT_LINES;
+    if (!strcmp(t, s_text_txt)) return;
     int lines = sz.y / lh < 1 ? 1 : sz.y / lh > TEXT_LINES ? TEXT_LINES : sz.y / lh;
+    lv_obj_set_width(s_text, w);
+    lv_obj_set_x(s_text, UI_CX - w / 2);
     lv_obj_set_height(s_text, lines * lh);
     lv_obj_set_y(s_text, TEXT_CY - lines * lh / 2);
     theme_set_text(s_text, s_text_txt, sizeof s_text_txt, t);
@@ -167,6 +174,7 @@ void ui_voice_open(uint32_t sid, uint32_t rid, uint32_t now)
     s_now = now;
     s_shown = (voice_state_t)-1;
     s_halo_r = 0;
+    s_too_long = false;
     s_holding = s_ramp_started = false;
     ring_set_still(ui_home_ring(), true);
     voice_start(sid, now); /* a refusal shows as the failed state with its reason */
@@ -209,14 +217,18 @@ bool ui_voice_act(nav_action_t a, const gesture_evt_t *g)
             voice_start(s_sid, s_now);
             g_ui_actions->tick();
         } else if (st == VOICE_TEXT) {
-            ui_toast("Hold to send", RGB_ASK);
+            if (s_too_long) ui_toast("Too long to send from here", RGB_AMBER);
+            else ui_toast("Hold to send", RGB_ASK);
             g_ui_actions->reject();
         }
         render();
         return true;
     case NAV_HOLD_PRESS:
         /* only the transcript arms a hold, and only once it has been readable for a moment */
-        if (st == VOICE_TEXT && s_now - s_text_since >= NAV_CARD_ARM_MS) {
+        if (st == VOICE_TEXT && s_too_long) {
+            ui_toast("Too long to send from here", RGB_AMBER);
+            g_ui_actions->reject();
+        } else if (st == VOICE_TEXT && s_now - s_text_since >= NAV_CARD_ARM_MS) {
             s_holding = true;
             s_ramp_started = false;
             s_hold_t0 = s_now;
@@ -231,7 +243,7 @@ bool ui_voice_act(nav_action_t a, const gesture_evt_t *g)
 bool ui_voice_tick(uint32_t now)
 {
     s_now = now;
-    if (s_holding && voice_state() == VOICE_TEXT) {
+    if (s_holding && voice_state() == VOICE_TEXT && !s_too_long) {
         uint32_t el = now - s_hold_t0;
         if (el >= NAV_HOLD_SHOW_MS) {
             if (!s_ramp_started) {
@@ -305,7 +317,7 @@ lv_obj_t *ui_voice_init(lv_obj_t *screen)
     lv_label_set_text(s_mic, ICON_MIC);
     lv_obj_center(s_mic);
     s_low = label(s_root, FONT_TITLE, COL_TEXT, LOW_Y, 300, 1);
-    s_text = label(s_root, FONT_HEAD, COL_TEXT, TEXT_CY, TEXT_W, TEXT_LINES);
+    s_text = label(s_root, FONT_BODY, COL_TEXT, TEXT_CY, TEXT_W_MAX, TEXT_LINES);
     s_err = lv_label_create(s_root);
     lv_obj_set_style_text_font(s_err, FONT_ICON_L, 0);
     lv_obj_set_style_text_color(s_err, lv_color_hex(RGB_ERROR), 0);

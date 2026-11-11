@@ -1,0 +1,22 @@
+# Safety: moving the selection (button B) cancels a hold in progress on AGENT, even if the finger stays
+# down past 1.2 s: the hold belongs to the row it started on. No stop (op 6).
+connect
+rx a400020101020103a50082000401a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 1 work webapp feat/login Running the test suite
+wait 300
+tap 233 233
+wait 400
+expect_screen agent
+tap 233 164
+wait 300
+expect_label > Stop
+press 233 226
+wait 500
+btn B
+wait 150
+expect_label > Activity
+wait 1500
+release
+wait 300
+expect_screen agent
+quit

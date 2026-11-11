@@ -36,6 +36,9 @@ static char s_header_txt[64], s_title_txt[48], s_text_txt[168], s_word_txt[16], 
 static const char *s_icon_txt;
 static int s_layout_key;
 static const char *s_icon_shown;
+#define ANSWERED_MIN_MS 900 /* the answered state stays this long, so a quick clear cannot make it flash */
+static uint32_t s_answered_ms; /* when the answered state first showed; 0 = not showing */
+static bool s_keeping;         /* the request is gone but the answered state is still held on screen */
 
 /* The request this screen is about: the selected session's unanswered permission or question. */
 static const attention_t *req(void)
@@ -116,7 +119,16 @@ bool ui_ask_refresh(uint32_t now)
     s_now = now;
     const session_t *s = model_find(s_sid);
     const attention_t *a = req();
-    if (!s || s->state == SESS_ENDED || !a) return false;
+    if (!s || s->state == SESS_ENDED) return false;
+    if (!a) {
+        /* cleared: hold the answered state on screen for a moment (a new request or input still takes over) */
+        if (s_answered_ms && now - s_answered_ms < ANSWERED_MIN_MS) {
+            s_keeping = true;
+            return true;
+        }
+        return false;
+    }
+    s_keeping = false;
     if (a->rid != s_rid) { /* a different request: re-arm, start at the default, drop any hold */
         hold_cancel();
         s_rid = a->rid;
@@ -134,6 +146,8 @@ bool ui_ask_refresh(uint32_t now)
             a->title[0] ? a->title : s->tool[0] ? s->tool : perm ? "Permission request" : "Question");
     layout_text(perm, a->text);
 
+    if (!a->answer_sent) s_answered_ms = 0;
+    else if (!s_answered_ms) s_answered_ms = now ? now : 1;
     if (a->answer_sent) {
         uint32_t rgb = RGB_DONE;
         s_icon_txt = ICON_DONE;
@@ -188,6 +202,8 @@ void ui_ask_open(uint32_t sid, uint32_t now)
     s_rid = 0;
     s_now = now;
     s_holding = s_hold_fired = s_ramp_started = false;
+    s_answered_ms = 0;
+    s_keeping = false;
     wheel_set(s_wheel, NULL, 0, 0);
     ui_ask_refresh(now);
     ring_set_still(ui_home_ring(), true); /* the sessions stay on the ring, settled: no comet behind a decision */
@@ -200,6 +216,14 @@ void ui_ask_close(void)
     hold_cancel();
     show(s_root, false);
     ring_set_still(ui_home_ring(), !ui_animations_allowed());
+}
+
+/* A hold acts on the row under the finger: it arms only when the press is on the selected row, or on no row
+ * at all (a finger resting beside the button). A press on a neighbour is the start of a tap on that row. */
+static bool press_on_selected(const gesture_evt_t *g)
+{
+    int hit = wheel_hit(s_wheel, g->x, g->y);
+    return hit < 0 || hit == wheel_sel(s_wheel);
 }
 
 static void select_item(int i, const char *via, void (*haptic)(void))
@@ -242,7 +266,7 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
     case NAV_HOLD_PRESS:
         s_hold_fired = false;
         /* only a hold item arms a hold, only for the request on screen, and only once it is armed */
-        if (it && it->hold_ms && nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now)) {
+        if (it && it->hold_ms && press_on_selected(g) && nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now)) {
             s_holding = true;
             s_ramp_started = false;
             s_hold_t0 = s_now;
@@ -252,6 +276,9 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
         return true;
     case NAV_HOLD_RELEASE: hold_cancel(); return true;
     case NAV_COMMIT: {
+        /* the card must have been on screen a moment before a tap means anything: the tap that opened it, or
+         * a second one right behind it, would otherwise land on a neighbour row */
+        if (g->kind == G_TAP && s_now - s_shown_ms < NAV_CARD_ARM_MS) return true;
         /* A tap acts on the row it lands on (UI-V3 §3.3), but never approves or denies: a neighbour that
          * needs a hold is only selected, and the toast says which hold it needs. */
         int hit = it ? wheel_hit(s_wheel, g->x, g->y) : -1;
@@ -275,7 +302,7 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
         return true;
     }
     case NAV_HOLD_LONG: /* injected input whose duration already covers the hold */
-        if (it && it->hold_ms && g->dur_ms >= it->hold_ms && !s_hold_fired &&
+        if (it && it->hold_ms && g->dur_ms >= it->hold_ms && !s_hold_fired && press_on_selected(g) &&
             nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now)) {
             hold_cancel();
             s_hold_fired = true;
@@ -308,7 +335,8 @@ bool ui_ask_tick(uint32_t now)
 {
     s_now = now;
     const attention_t *a = req();
-    if (!a || !model_find(s_sid)) return true;
+    if (!model_find(s_sid)) return true;
+    if (!a) return !(s_answered_ms && now - s_answered_ms < ANSWERED_MIN_MS);
     if (s_holding && !s_hold_fired) {
         uint32_t el = now - s_hold_t0;
         const ask_item_t *it = s_hold_idx < s_n ? &s_items[s_hold_idx] : NULL;
@@ -351,7 +379,7 @@ void ui_ask_report(ui_report_t *r)
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
     if (s_title_txt[0]) ui_report_add(r, "%s", s_title_txt);
     if (s_text_txt[0]) ui_report_add(r, "%s", s_text_txt);
-    if (a && a->answer_sent) {
+    if ((a && a->answer_sent) || s_keeping) {
         ui_report_add(r, "%s", s_word_txt);
         if (s_opt_txt[0]) ui_report_add(r, "%s", s_opt_txt);
         ui_report_add(r, "Waiting for your computer");

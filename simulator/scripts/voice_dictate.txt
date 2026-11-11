@@ -50,7 +50,7 @@ shot voice_hold.png
 release
 wait 200
 expect_screen voice
-hold 233 233 1600
+hold 233 300 1600
 wait 400
 expect_screen ring
 # again: nothing heard, then discard

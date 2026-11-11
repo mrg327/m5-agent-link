@@ -18,11 +18,11 @@ tap 233 282
 wait 300
 expect_screen ask
 expect_label Hold to approve
-hold 233 233 700
+hold 233 282 700
 wait 300
 expect_screen ask
 expect_label > Yes, don't ask again HOLD
-hold 233 233 1500
+hold 233 282 1500
 wait 400
 expect_label Waiting for your computer
 quit

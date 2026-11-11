@@ -68,6 +68,10 @@ expect_screen watch
 drag 233 260 -30
 wait 300
 expect_screen scroll
+# a sideways flick that also scrolled (vertical steps in the same touch) is not a back
+swipe 140 290 330 190 160
+wait 300
+expect_screen scroll
 swipe 140 233 330 233 160
 wait 300
 expect_screen watch

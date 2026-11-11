@@ -11,6 +11,6 @@ shot ring_permission.png
 hold 233 282 500
 wait 200
 expect_screen ask
-hold 233 233 1500
+hold 233 282 1500
 wait 400
 shot ask_approved.png

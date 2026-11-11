@@ -30,6 +30,7 @@ static char s_header_txt[64], s_count_txt[24], s_preview_txt[64];
 
 /* position: the daemon's last word, nudged locally by what we sent since */
 static uint32_t s_lines_above, s_total;
+static bool s_dragged; /* a drag step went out during the current touch */
 static bool s_at_bottom = true, s_has_total, s_have_pos;
 /* coalescer: pending lines or pages (pages win); one command per NAV_SCROLL_COALESCE_MS */
 static int s_pend_lines, s_pend_pages;
@@ -101,6 +102,7 @@ void ui_scroll_open(uint32_t sid, uint32_t now)
 {
     s_sid = sid;
     s_now = s_last_input = now;
+    s_dragged = false;
     s_lines_above = s_total = 0;
     s_at_bottom = true;
     s_has_total = s_have_pos = false;
@@ -233,6 +235,7 @@ static void glide(void)
 }
 
 bool ui_scroll_caught(void) { return s_caught; }
+bool ui_scroll_dragged(void) { return s_dragged; }
 
 bool ui_scroll_act(nav_action_t a, const gesture_evt_t *g)
 {
@@ -240,9 +243,12 @@ bool ui_scroll_act(nav_action_t a, const gesture_evt_t *g)
     switch (a) {
     case NAV_SCROLL_CATCH:
         s_caught = s_glide_v != 0;
+        s_dragged = false;
         glide_stop();
         return true;
-    case NAV_SCROLL_DRAG: push(nav_scroll_lines(g->dy), true); return true;
+    case NAV_SCROLL_DRAG:
+        s_dragged = true;
+        push(nav_scroll_lines(g->dy), true); return true;
     case NAV_SCROLL_FLING: fling(g->vy); return true;
     case NAV_PAGE_NEWER: page(1); return true;
     case NAV_TO_BOTTOM:

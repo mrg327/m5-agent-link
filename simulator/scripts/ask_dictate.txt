@@ -27,7 +27,7 @@ expect_label Transcribing…
 transcript fix the login redirect
 wait 300
 expect_label Send
-hold 233 233 1600
+hold 233 300 1600
 wait 400
 expect_screen ask
 expect_label Sent

@@ -7,7 +7,7 @@ attention 9 2 approval approve,deny,focus,reply 3 Run shell command|npm test -- 
 wait 400
 btn B
 wait 150
-press 233 233
+press 233 282
 wait 800
 shot ask_hold_progress.png
 release

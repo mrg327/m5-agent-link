@@ -1,0 +1,44 @@
+# VOICE: a transcript that does not fit its five-line box is cut with dots on glass, so it can never be
+# sent from here: a tap, a press and a hold all say so and nothing reaches the daemon (no dictate, op 12).
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 1 done webapp feat/login Finished the work
+wait 300
+mic audio/tone_1s.wav
+tap 233 233
+wait 300
+expect_screen agent
+btn B
+wait 150
+expect_label > Reply
+btn A
+wait 200
+expect_label > Continue
+expect_label Dictate
+btn B
+wait 150
+expect_label > Dictate
+btn A
+wait 300
+expect_screen voice
+expect_label Reply to webapp
+expect_label 0:0
+shot voice_listening.png
+wait 200
+shot voice_listening_level.png
+wait 1000
+tap 233 233
+wait 300
+expect_label Transcribing…
+shot voice_transcribing.png
+transcript please run the full test suite again, then fix every failing case you find in the login flow, update the snapshots that changed on purpose, rebase on main, resolve the conflicts in the settings screen, push the branch and open a pull request that explains each of the changes in plain words for the reviewers
+wait 300
+expect_label (transcript)
+shot voice_long_transcript.png
+tap 233 233
+wait 200
+expect_label Too long to send from here
+hold 233 300 1600
+wait 400
+expect_screen voice
+quit

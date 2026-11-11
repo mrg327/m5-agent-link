@@ -6,7 +6,7 @@ wait 300
 attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
 wait 400
 expect_screen ask
-hold 233 233 1500
+hold 233 282 1500
 wait 300
 expect_label Approved
 result err stale

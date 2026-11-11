@@ -1,0 +1,28 @@
+# Safety (UI-V3 §3.3): a hold acts on the row under the finger. With Approve selected, a 1.5 s hold on the
+# Deny row or on the Open on PC row above arms nothing: no approve (3), deny (4), reply (5) and no focus (0).
+# A tap on a neighbour is a different gesture (ask_tap_rows.txt); here the finger stays down.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+expect_label > Approve HOLD
+hold 233 330 1500
+wait 300
+expect_screen ask
+expect_label > Approve HOLD
+hold 233 234 1500
+wait 300
+expect_screen ask
+expect_label > Approve HOLD
+# with Deny selected, a hold on the Approve row above (y 234 after the wrap) does not deny either
+tap 233 330
+wait 300
+expect_label > Deny HOLD
+hold 233 234 1500
+wait 300
+expect_screen ask
+expect_label > Deny HOLD
+quit

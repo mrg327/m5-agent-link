@@ -146,6 +146,13 @@ void ui_agent_close(void)
     ring_set_still(ui_home_ring(), !ui_animations_allowed());
 }
 
+/* A hold acts on the row under the finger: it arms only when the press is on the selected row, or on no row. */
+static bool press_on_selected(const gesture_evt_t *g)
+{
+    int hit = wheel_hit(s_wheel, g->x, g->y);
+    return hit < 0 || hit == wheel_sel(s_wheel);
+}
+
 static void select_item(int i, const char *via, void (*haptic)(void))
 {
     int n = wheel_count(s_wheel);
@@ -153,6 +160,7 @@ static void select_item(int i, const char *via, void (*haptic)(void))
     i = ((i % n) + n) % n;
     if (i == wheel_sel(s_wheel)) return;
     wheel_select(s_wheel, i);
+    hold_cancel(); /* the hold belongs to the item it started on */
     dbg_event("ui", "item", "\"idx\":%d,\"id\":%d,\"via\":\"%s\"", i, wheel_item(s_wheel, i)->id, via);
     if (haptic) haptic();
 }
@@ -210,7 +218,7 @@ bool ui_agent_act(nav_action_t a, const gesture_evt_t *g)
     case NAV_HOLD_PRESS:
         s_hold_fired = false;
         /* only a destructive item arms a hold, and only once the wheel has been on screen a moment */
-        if (it && it->hold && s_now - s_opened_ms >= NAV_CARD_ARM_MS) {
+        if (it && it->hold && press_on_selected(g) && s_now - s_opened_ms >= NAV_CARD_ARM_MS) {
             s_holding = true;
             s_ramp_started = false;
             s_hold_t0 = s_now;
@@ -219,6 +227,7 @@ bool ui_agent_act(nav_action_t a, const gesture_evt_t *g)
     case NAV_HOLD_RELEASE: hold_cancel(); return true;
     case NAV_COMMIT:
         if (!it) return false;
+        if (g->kind == G_TAP && s_now - s_opened_ms < NAV_CARD_ARM_MS) return true; /* too soon after opening */
         if (g->kind == G_TAP) { /* the row you touch is the row you get (UI-V3 §3.3) */
             int i = wheel_hit(s_wheel, g->x, g->y);
             if (i >= 0 && i != wheel_sel(s_wheel)) {

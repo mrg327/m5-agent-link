@@ -1,0 +1,21 @@
+# The answered state stays on screen for at least 900 ms after the answer was sent, even when the daemon's
+# clear arrives 100 ms later: the word is still visible 500 ms after the clear, then ASK closes.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+press 233 282
+wait 1350
+expect_label Approved
+clear 7 answered_dev
+wait 500
+expect_screen ask
+expect_label Approved
+shot ask_answered_after_clear.png
+release
+wait 700
+expect_no_label Approved
+quit

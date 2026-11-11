@@ -255,8 +255,27 @@ sim_script_test(sim_watch_ask_return watch_ask_return.txt FAIL_REGULAR_EXPRESSIO
 set_tests_properties(sim_watch_ask_return PROPERTIES TIMEOUT 60)
 sim_script_test(sim_watch_states watch_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_watch_states PROPERTIES TIMEOUT 60)
+# UI-V3 second safety pass: a hold acts on the row under the finger; early taps after opening are ignored;
+# a moved selection cancels a hold; the answered state lingers; a long transcript cannot be sent.
+sim_script_test(sim_ask_hold_neighbour_row ask_hold_neighbour_row.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
+sim_script_test(sim_agent_hold_neighbour_row agent_hold_neighbour_row.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,|\"op\":8,")
+sim_script_test(sim_agent_hold_cancel_on_select agent_hold_cancel_on_select.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,")
+sim_script_test(sim_ask_second_tap ask_second_tap.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
+sim_script_test(sim_ask_tap_open_row ask_tap_open_row.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"op\":5"
+                PASS_REGULAR_EXPRESSION "\"op\":0,\"sid\":2")
+sim_script_test(sim_ask_answered_stays ask_answered_stays.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_voice_long_transcript voice_long_transcript.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":12,")
+sim_script_test(sim_voice_fit_transcript voice_fit_transcript.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"op\":12,\"sid\":1")
 sim_script_test(sim_deck_v3_states deck_v3_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
-set_tests_properties(sim_deck_v3_states PROPERTIES TIMEOUT 90)
+sim_script_test(sim_deck_v3_ambient deck_v3_ambient.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+set_tests_properties(sim_deck_v3_ambient PROPERTIES TIMEOUT 60)
 sim_script_test(sim_scroll_big scroll_big.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_scroll_big PROPERTIES TIMEOUT 60)
 sim_script_test(sim_perf_four_agents perf_four_agents.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")

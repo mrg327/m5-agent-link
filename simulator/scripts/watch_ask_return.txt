@@ -26,7 +26,7 @@ expect_label "React"
 result ok
 clear 8 answered_dev
 session 1 work webapp feat/login
-wait 300
+wait 700 # the answered state stays 900 ms after the answer
 expect_screen watch
 expect_label webapp
 # a question on another session: B long leaves ASK, WATCH is back on the watched session

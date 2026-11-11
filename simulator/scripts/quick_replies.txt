@@ -50,7 +50,7 @@ tap 233 233
 wait 200
 expect_screen agent
 expect_label Hold to stop
-hold 233 233 1600
+hold 233 226 1600
 wait 300
 expect_screen ring
 quit

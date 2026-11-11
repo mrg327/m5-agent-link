@@ -15,7 +15,7 @@ tap 233 282
 wait 300
 expect_label Hold to deny
 expect_screen ask
-hold 233 233 1100
+hold 233 282 1100
 wait 400
 expect_label Denied
 shot ask_denied.png

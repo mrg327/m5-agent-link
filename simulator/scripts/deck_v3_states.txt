@@ -1,6 +1,6 @@
 # UI-V3 §4.1: every look of HOME for screenshots. One session (no Next legend, no chip), a permission
 # (Review button), a question (Answer button), the Offline chip, the empty deck with the clock,
-# and the ambient face with the clock.
+# (the ambient face is in deck_v3_ambient.txt).
 connect
 rtc 1800000000
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
@@ -41,12 +41,4 @@ drop 2
 wait 400
 expect_label No agents running
 shot home_empty.png
-wait 31000
-shot home_empty_ambient.png
-session 1 work webapp feat/login Running tests
-wait 100
-btn B
-wait 31000
-expect_label webapp
-shot home_ambient.png
 quit
