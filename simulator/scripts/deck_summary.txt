@@ -8,14 +8,12 @@ wait 400
 expect_label webapp
 expect_label Working
 expect_label Running the test suite
-expect_label 80%
 shot deck_work.png
 btn B
 wait 100
 expect_label api
 expect_label Done
 expect_label Fixed the flaky retry test
-expect_label FOCUS + ACK
 shot deck_done.png
 btn B
 wait 100

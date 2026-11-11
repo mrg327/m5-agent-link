@@ -6,7 +6,7 @@ session 2 done fjord
 session 1 work ember
 wait 300
 expect_label fjord
-expect_label FOCUS + ACK
+expect_label Done
 shot ring_done.png
 tap 233 233
 wait 200

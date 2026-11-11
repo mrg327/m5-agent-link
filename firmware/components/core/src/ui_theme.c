@@ -29,7 +29,7 @@ const char *theme_state_word(const session_t *s)
     switch (s->state) {
     case SESS_START: return "Starting";
     case SESS_WORK: return "Working";
-    case SESS_INPUT: return s->sub == 1 ? "Question" : "Approve?";
+    case SESS_INPUT: return s->sub == 1 ? "Has a question" : "Needs approval";
     case SESS_ERROR: return "Error";
     case SESS_DONE: return "Done";
     case SESS_IDLE: return "Idle";

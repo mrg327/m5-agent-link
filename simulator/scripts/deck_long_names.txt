@@ -8,7 +8,7 @@ expect_label customer-portal-frontend
 shot deck_long_work.png
 btn B
 wait 100
-expect_label Question
+expect_label Waiting
 expect_label Which database
 shot deck_long_ask.png
 quit

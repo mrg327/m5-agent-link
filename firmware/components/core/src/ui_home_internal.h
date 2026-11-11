@@ -22,6 +22,6 @@ const attention_t *ui_home_askable_of(const session_t *s);
 /* ── the card (ui_home_card.c) ── */
 void ui_home_card_create(lv_obj_t *centre);
 void ui_home_card_update(void);          /* redraw from the model and the selection */
-void ui_home_card_tick(void);            /* the 500 ms clock: time in state, stale age, quiet glyph */
+void ui_home_card_tick(void);            /* the 500 ms clock: time in state, offline age, the minute, quiet glyph */
 void ui_home_card_set_ambient(bool ambient);
 void ui_home_card_report(ui_report_t *r);

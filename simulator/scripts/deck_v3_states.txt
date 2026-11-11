@@ -1,0 +1,52 @@
+# UI-V3 §4.1: every look of HOME for screenshots. One session (no Next legend, no chip), a permission
+# (Review button), a question (Answer button), the Offline chip, the empty deck with the clock,
+# and the ambient face with the clock.
+connect
+rtc 1800000000
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite after the login refactor
+wait 400
+expect_label Working
+expect_no_label Review
+shot home_one.png
+session 2 ask api main
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+btn B long
+wait 300
+expect_screen attention
+expect_label Needs approval
+expect_label Review
+shot home_review.png
+clear 7
+attention 8 2 question reply,focus 0 Which framework?|Pick the UI library for the new dashboard|React|Vue|Keep vanilla
+wait 400
+btn B long
+wait 300
+expect_label Has a question
+expect_label Answer
+shot home_answer.png
+clear 8
+wait 200
+disconnect
+wait 1500
+expect_label Offline
+shot home_offline.png
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+wait 200
+drop 1
+drop 2
+wait 400
+expect_label No agents running
+shot home_empty.png
+wait 31000
+shot home_empty_ambient.png
+session 1 work webapp feat/login Running tests
+wait 100
+btn B
+wait 31000
+expect_label webapp
+shot home_ambient.png
+quit

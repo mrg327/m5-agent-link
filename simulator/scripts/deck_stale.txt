@@ -4,11 +4,11 @@ rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a20
 session 1 work webapp feat/login Running the test suite
 session 2 ask api main
 wait 300
-expect_label dev-mac
+expect_label webapp
 disconnect
 wait 1200
 expect_label Offline
-expect_label stale 1s
+expect_label 1s
 shot deck_stale.png
 btn A
 wait 200
