@@ -255,6 +255,8 @@ sim_script_test(sim_watch_ask_return watch_ask_return.txt FAIL_REGULAR_EXPRESSIO
 set_tests_properties(sim_watch_ask_return PROPERTIES TIMEOUT 60)
 sim_script_test(sim_watch_states watch_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_watch_states PROPERTIES TIMEOUT 60)
+sim_script_test(sim_deck_v3_states deck_v3_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+set_tests_properties(sim_deck_v3_states PROPERTIES TIMEOUT 90)
 sim_script_test(sim_scroll_big scroll_big.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_scroll_big PROPERTIES TIMEOUT 60)
 sim_script_test(sim_perf_four_agents perf_four_agents.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
