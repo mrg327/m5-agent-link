@@ -50,6 +50,20 @@ int main(void)
     n = nav_ask_items(&a, true, it, 3);
     EXPECT(n == 3 && it[2].id == ASK_OPEN_PC, "short list keeps Open on PC last");
 
+    /* UI-V3 §5: a swipe right in the centre goes back from every deeper mode except KEYS, never deny */
+    static const nav_mode_t deeper[] = {MODE_AGENT, MODE_ASK, MODE_WATCH, MODE_SCROLL, MODE_STATUS, MODE_VOICE};
+    for (unsigned i = 0; i < sizeof deeper / sizeof deeper[0]; i++) {
+        nav_mode_t m = deeper[i];
+        for (int req = 0; req < 2; req++)
+            EXPECT(nav_lookup(m, G_SWIPE_RIGHT, ZONE_CENTRE, req, req) == NAV_BACK, "swipe right in the centre goes back");
+        EXPECT(nav_lookup(m, G_SWIPE_RIGHT, ZONE_RIM, false, false) != NAV_BACK, "a rim swipe is not back");
+    }
+    EXPECT(nav_lookup(MODE_ASK, G_SWIPE_RIGHT, ZONE_CENTRE, true, true) != NAV_DENY, "swipe right never denies");
+    EXPECT(nav_lookup(MODE_ASK, G_SWIPE_DOWN, ZONE_CENTRE, true, true) == NAV_DENY, "the strict swipe down still denies");
+    EXPECT(nav_lookup(MODE_AGENT, G_SWIPE_DOWN, ZONE_CENTRE, false, false) == NAV_BACK, "the long swipe down still goes back");
+    EXPECT(nav_lookup(MODE_HOME, G_SWIPE_RIGHT, ZONE_CENTRE, false, false) == NAV_NONE, "HOME has no swipe-right binding");
+    EXPECT(nav_lookup(MODE_KEYS, G_SWIPE_RIGHT, ZONE_CENTRE, false, false) == NAV_NONE, "KEYS keeps touch for strokes");
+
     printf("%s\n", failures ? "nav: FAILED" : "nav: ok");
     return failures ? 1 : 0;
 }

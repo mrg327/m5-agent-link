@@ -28,6 +28,7 @@ const nav_binding_t nav_bindings[] = {
     {MODE_AGENT, G_DOUBLE_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
     {MODE_AGENT, G_TAP, ZONE_RIM, WHEN_ALWAYS, NAV_PICK_RIM},
     {MODE_AGENT, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* only a long swipe counts */
+    {MODE_AGENT, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* UI-V3 §5: swipe right goes back */
     {MODE_AGENT, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_AGENT, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_AGENT, G_SCRUB_END, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
@@ -45,6 +46,7 @@ const nav_binding_t nav_bindings[] = {
     {MODE_ASK, G_LONG_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_HOLD_LONG}, /* injected input only: must cover the hold */
     {MODE_ASK, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_REQUEST, NAV_DENY}, /* strict: long, from above the centre */
     {MODE_ASK, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_NO_REQUEST, NAV_BACK}, /* a question: back, request stays */
+    {MODE_ASK, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* UI-V3 §5: back; the request stays pending, never deny */
     {MODE_ASK, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_ASK, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_ASK, G_SCRUB_END, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
@@ -58,6 +60,7 @@ const nav_binding_t nav_bindings[] = {
     {MODE_SCROLL, G_DRAG, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_DRAG},
     {MODE_SCROLL, G_DRAG_END, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_FLING},
     {MODE_SCROLL, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* leaves the terminal where it is; a tap that caught a glide only stops it */
+    {MODE_SCROLL, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* UI-V3 §5: swipe right goes back */
     {MODE_SCROLL, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_TO_BOTTOM},
     {MODE_SCROLL, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_PAGE_NEWER},
     {MODE_SCROLL, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
@@ -68,6 +71,7 @@ const nav_binding_t nav_bindings[] = {
     {MODE_STATUS, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
     {MODE_STATUS, G_DOUBLE_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
     {MODE_STATUS, G_SWIPE_UP, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK},
+    {MODE_STATUS, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* UI-V3 §5: swipe right goes back */
     {MODE_STATUS, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_STATUS, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_STATUS, G_SCRUB_END, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
@@ -90,6 +94,7 @@ const nav_binding_t nav_bindings[] = {
     {MODE_WATCH, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_NEXT},
     {MODE_WATCH, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_WATCH, G_LONG_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* hold still 600 ms: back (issue dd44) */
+    {MODE_WATCH, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* UI-V3 §5: swipe right goes back */
     {MODE_WATCH, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
     /* VOICE: dictate a reply (issue 0ea9). Tap or A stops the recording (or retries a failed one);
      * only the hold sends the transcript; a long swipe down or B held discards it. */
@@ -97,6 +102,7 @@ const nav_binding_t nav_bindings[] = {
     {MODE_VOICE, G_RELEASE, ZONE_ANY, WHEN_ALWAYS, NAV_HOLD_RELEASE},
     {MODE_VOICE, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
     {MODE_VOICE, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* only a long swipe counts */
+    {MODE_VOICE, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* UI-V3 §5: swipe right goes back */
     {MODE_VOICE, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_COMMIT},
     {MODE_VOICE, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_VOICE, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},

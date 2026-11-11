@@ -162,6 +162,12 @@ sim_script_test(sim_ask_deny_hold ask_deny_hold.txt
 sim_script_test(sim_ask_tap_never_approves ask_tap_never_approves.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"op\":5"
                 PASS_REGULAR_EXPRESSION "\"op\":0,\"sid\":2")
+# UI-V3: swipe right goes back from AGENT, STATUS, VOICE, WATCH, SCROLL and ASK; in ASK it never answers
+# (no approve, deny or reply op), the request stays and a tap reopens it.
+sim_script_test(sim_back_swipe_right back_swipe_right.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"op\":5"
+                PASS_REGULAR_EXPRESSION "\"mode\":\"agent\",\"gesture\":\"swipe_right\".*\"mode\":\"status\",\"gesture\":\"swipe_right\".*\"mode\":\"voice\",\"gesture\":\"swipe_right\".*\"mode\":\"watch\",\"gesture\":\"swipe_right\".*\"mode\":\"scroll\",\"gesture\":\"swipe_right\".*\"mode\":\"ask\",\"gesture\":\"swipe_right\",\"action\":\"back\"")
+set_tests_properties(sim_back_swipe_right PROPERTIES TIMEOUT 60)
 sim_script_test(sim_ask_result_error ask_result_error.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_ask_hold_bound_to_rid ask_hold_bound_to_rid.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"tx_cmd\"")
 # A welcome (a new link, maybe a restarted daemon) drops every card: rids may begin again (issue 1173).

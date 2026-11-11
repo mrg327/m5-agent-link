@@ -24,7 +24,7 @@ typedef enum {
     NAV_OPEN_AGENT,     /* HOME → AGENT for the selected session */
     NAV_OPEN_ASK,       /* HOME → ASK: the pending request with its options; opening never answers */
     NAV_OPEN_STATUS,    /* HOME → STATUS (swipe down): link, battery, quiet mode */
-    NAV_BACK,           /* leave the current mode for HOME; from a swipe it must be a long one */
+    NAV_BACK,           /* leave the current mode for HOME; a swipe down must be a long one, a swipe right any */
     NAV_HOME,           /* A+B chord: straight back to HOME */
     NAV_NEXT,           /* next session (HOME) or next item (AGENT) */
     NAV_PREV,

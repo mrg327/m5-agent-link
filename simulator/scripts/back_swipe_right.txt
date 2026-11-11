@@ -1,0 +1,90 @@
+# UI-V3 §5: a swipe right in the centre goes back from AGENT, STATUS, WATCH, SCROLL, VOICE and ASK.
+# A short swipe down still does not leave AGENT or VOICE. In ASK it leaves the request pending (a tap
+# on the deck reopens it) and never approves or denies: the ctest fails on any approve, deny or reply op.
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 1 work webapp feat/login Running the test suite
+session 2 done api main Finished the work
+wait 400
+mic audio/tone_1s.wav
+# AGENT: a short swipe down is ignored, a swipe right leaves
+btn B
+wait 200
+tap 233 233
+wait 300
+expect_screen agent
+swipe 233 200 233 280 160
+wait 300
+expect_screen agent
+swipe 140 233 330 233 160
+wait 300
+expect_screen ring
+# STATUS
+swipe 233 150 233 330 200
+wait 300
+expect_screen status
+swipe 140 233 330 233 160
+wait 300
+expect_screen ring
+# VOICE: reached through Reply > Dictate on the done session; a short swipe down is ignored
+tap 233 233
+wait 300
+expect_screen agent
+btn B
+wait 150
+expect_label > Reply...
+btn A
+wait 200
+btn B
+wait 150
+expect_label > Dictate...
+btn A
+wait 300
+expect_screen voice
+swipe 233 200 233 280 160
+wait 300
+expect_screen voice
+swipe 140 233 330 233 160
+wait 300
+expect_screen ring
+# WATCH and SCROLL on the working session
+btn B
+wait 200
+tap 233 233
+wait 300
+expect_screen agent
+expect_label > Watch
+btn A
+wait 300
+expect_screen watch
+swipe 140 233 330 233 160
+wait 300
+expect_screen ring
+tap 233 233
+wait 300
+btn A
+wait 300
+expect_screen watch
+drag 233 260 -30
+wait 300
+expect_screen scroll
+swipe 140 233 330 233 160
+wait 300
+expect_screen watch
+btn B long
+wait 300
+expect_screen ring
+# ASK: back leaves the request pending
+session 3 input web feat/login
+wait 200
+attention 7 3 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+swipe 140 233 330 233 160
+wait 300
+expect_screen attention
+tap 233 233
+wait 300
+expect_screen ask
+expect_label > Approve
+quit
