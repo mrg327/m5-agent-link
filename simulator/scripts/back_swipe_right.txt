@@ -32,12 +32,12 @@ wait 300
 expect_screen agent
 btn B
 wait 150
-expect_label > Reply...
+expect_label > Reply
 btn A
 wait 200
 btn B
 wait 150
-expect_label > Dictate...
+expect_label > Dictate
 btn A
 wait 300
 expect_screen voice
@@ -53,7 +53,7 @@ wait 200
 tap 233 233
 wait 300
 expect_screen agent
-expect_label > Watch
+expect_label > Activity
 btn A
 wait 300
 expect_screen watch

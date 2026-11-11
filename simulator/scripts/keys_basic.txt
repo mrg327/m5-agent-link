@@ -15,12 +15,12 @@ wait 150
 btn A
 wait 200
 expect_label > Continue
-expect_label Type...
+expect_label Keyboard
 btn B
 wait 150
 btn B
 wait 150
-expect_label > Type...
+expect_label > Keyboard
 btn A
 wait 300
 expect_screen keys

@@ -1,0 +1,40 @@
+# A tap on a list row acts on that row (UI-V3 §3.3, X3). Rows of a working session, selected row on
+# y 226 and neighbours at 164 / 288: Activity, Notify when done, Snooze 30 min, Stop (hold). The list wraps,
+# so the row above Activity is Stop.
+connect
+rx a400020101020103a50082000401a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 1 work webapp feat/login Running the test suite
+wait 300
+tap 233 233
+wait 300
+expect_screen agent
+expect_label > Activity
+shot agent_row_tap_open.png
+# the neighbour above is Stop, a hold item: the tap selects it and says why it did nothing more
+tap 233 164
+wait 200
+expect_screen agent
+expect_label > Stop
+expect_label Hold to stop
+shot agent_row_tap_stop.png
+# tapping the selected hold row does not send it either
+tap 233 226
+wait 200
+expect_screen agent
+expect_label > Stop
+wait 2500
+# a hold in progress fills the row and the bezel; letting go early sends nothing
+press 233 226
+wait 700
+shot agent_row_hold.png
+release
+wait 300
+expect_screen agent
+# a safe neighbour is selected and committed at once (Notify when done: op 8)
+btn B
+wait 150
+expect_label > Activity
+tap 233 288
+wait 300
+expect_screen ring
+quit

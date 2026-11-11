@@ -11,9 +11,9 @@ shot ring_done.png
 tap 233 233
 wait 200
 expect_screen agent
-expect_label > Watch
+expect_label > Activity
 expect_no_label Mark seen
-expect_no_label Focus terminal
+expect_no_label Open on PC
 btn B long
 wait 200
 expect_screen ring
