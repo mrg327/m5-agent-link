@@ -9,10 +9,10 @@ wait 300
 tap 233 233
 wait 300
 expect_screen agent
-expect_label Claude Code
-expect_label > Watch
+expect_label webapp
+expect_label > Activity
 expect_label 3 items
-expect_no_label Focus terminal
+expect_no_label Open on PC
 expect_no_label Scroll terminal
 expect_no_label Status...
 shot agent_wheel.png
@@ -24,7 +24,7 @@ wait 150
 expect_label > Snooze 30 min
 btn B
 wait 150
-expect_label > Watch
+expect_label > Activity
 scrub 300 250 400
 wait 150
 expect_screen agent
@@ -68,7 +68,7 @@ wait 200
 tap 233 233
 wait 300
 expect_screen agent
-expect_label > Watch
+expect_label > Activity
 expect_label 1 items
 expect_no_label Mark seen
 quit

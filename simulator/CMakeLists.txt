@@ -226,6 +226,10 @@ sim_script_test(sim_keys_refusal keys_refusal.txt
 sim_script_test(sim_quick_replies quick_replies.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,\"sid\":[0-9]+,\"rid\":0,\"hold_ms\":[0-9][0-9]?[0-9]?,"
   PASS_REGULAR_EXPRESSION "\"op\":11,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":1.*\"op\":6,\"sid\":2,\"rid\":0,\"hold_ms\":1[0-9][0-9][0-9],")
+# A tap on a list row acts on that row (UI-V3 §3.3): a safe neighbour commits (op 8), Stop only selects.
+sim_script_test(sim_agent_row_tap agent_row_tap.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,"
+  PASS_REGULAR_EXPRESSION "\"op\":8,\"sid\":1,")
 # UI-V2 Phase 5: STATUS. Swipe down from HOME (never deny there), the rows, the quiet cycle and every
 # exit path; quiet mode holds the permission buzz until it is turned off again, then it buzzes.
 sim_script_test(sim_status status.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4")

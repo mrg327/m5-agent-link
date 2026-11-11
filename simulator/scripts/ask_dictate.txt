@@ -12,7 +12,7 @@ attention 8 2 question focus,dictate 0 Commit message|What should the commit mes
 wait 400
 expect_screen ask
 expect_label Commit message
-expect_label > Dictate...
+expect_label > Dictate
 expect_label Open on PC
 expect_label 2 options
 shot ask_dictate.png

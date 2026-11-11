@@ -86,7 +86,7 @@ wait 300
 expect_screen ring
 tap 233 233
 wait 300
-expect_label > Watch
+expect_label > Activity
 btn A
 wait 300
 expect_screen watch

@@ -13,14 +13,14 @@ wait 300
 expect_screen agent
 btn B
 wait 150
-expect_label > Reply...
+expect_label > Reply
 btn A
 wait 200
 expect_label > Continue
-expect_label Dictate...
+expect_label Dictate
 btn B
 wait 150
-expect_label > Dictate...
+expect_label > Dictate
 btn A
 wait 300
 expect_screen voice
