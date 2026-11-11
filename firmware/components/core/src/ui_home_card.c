@@ -236,7 +236,7 @@ void ui_home_card_update(void)
 
     if (!s || n == 0) {
         set_looks(LOOK_EMPTY);
-        theme_set_text(s_sub, s_sub_txt, sizeof s_sub_txt, "No agents running");
+        theme_set_text(s_sub, s_sub_txt, sizeof s_sub_txt, "Nothing running");
         theme_set_text_color(s_sub, sub_col);
         theme_set_text_color(s_clock, dark ? sub_col : COL_TEXT);
         theme_set_text_color(s_ready, dark ? sub_col : COL_TEXT);

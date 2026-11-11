@@ -194,7 +194,7 @@ anywhere else in the centre behaves as in v2. A tap still never commits a hold i
   when the session needs you › a lone `ICON_QUIET` in `COL_TEXT3` while quiet runs › nothing.
 - Legends: A `Open`, B `Next` (hidden with one session).
 - Offline: the card drops to 50 % as in v2.
-- **Empty**: the time in `FONT_NUM` at y 200 and `No agents running` in `FONT_BODY` `COL_TEXT2` at
+- **Empty**: the time in `FONT_NUM` at y 200 and `Nothing running` in `FONT_BODY` `COL_TEXT2` at
   y 262; before the clock is set, `Ready` in `FONT_TITLE`. No "swipe down for status" (M1).
 - **Ambient** (30 s idle, nothing needs you): the ring at 20 %, the time in `FONT_NUM` at 45 %
   white, and one caption `webapp · Working` at the same level; before the clock is set, the v2

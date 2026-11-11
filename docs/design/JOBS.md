@@ -74,10 +74,19 @@ Commands on a shell session:
 command is never delayed:
 
 ```
-agentlink-hook shell start --pid $$ -- "<command line>"     # preexec
-agentlink-hook shell end   --pid $$ --exit <status>          # precmd
-agentlink-hook shell exit  --pid $$                          # the shell exits
+agentlink-hook shell start --pid $$ --seq N -- "<command line>"     # preexec
+agentlink-hook shell end   --pid $$ --seq N --exit <status>          # precmd
+agentlink-hook shell exit  --pid $$                                  # the shell exits
 ```
+
+The calls are detached, so they can reach the daemon out of order: a quick command's `end` before its
+`start`, or two starts swapped. `seq` counts the shell's command lines; the daemon ignores a `start` whose
+`seq` has already ended or is older than the command it tracks, and an `end` closes everything up to its
+`seq`. (Found by the end-to-end run: without it the watch showed `true` while `sleep 30` ran.)
+
+A command line that the shell keeps out of its own history is never reported: a leading space under zsh's
+`HIST_IGNORE_SPACE` or bash's `HISTCONTROL=ignorespace`. What you hide from your history does not go to
+your wrist either.
 
 The shim adds the working directory and the terminal identity it already collects for agents, and
 writes one line to the hook socket. With no daemon it fails silently in a few milliseconds.

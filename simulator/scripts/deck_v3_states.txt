@@ -39,6 +39,6 @@ wait 200
 drop 1
 drop 2
 wait 400
-expect_label No agents running
+expect_label Nothing running
 shot home_empty.png
 quit
