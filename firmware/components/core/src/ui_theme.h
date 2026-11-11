@@ -37,7 +37,6 @@ LV_FONT_DECLARE(font_phosphor_44)
 #define COL_MUTED COL_TEXT2
 #define COL_SURFACE COL_FILL1
 #define COL_SURFACE2 COL_FILL2
-#define COL_BORDER lv_color_hex(0x3a3a3c)
 
 /* ui_keys.c (another issue's file) still draws the built-in backspace symbol, which only Montserrat had. */
 #undef LV_SYMBOL_BACKSPACE
@@ -69,7 +68,6 @@ LV_FONT_DECLARE(font_phosphor_44)
 #define UI_BADGE_B_DEG 135
 #define UI_BADGE_R 158
 #define UI_KEYCAP_PX 22
-#define UI_PILL_TINT_OPA LV_OPA_20 /* pill background: state colour at this opacity over black */
 
 /* rgb mixed toward black: pct % of its brightness (ring segments at rest are 40). */
 lv_color_t theme_dim(uint32_t rgb, int pct);
@@ -77,15 +75,12 @@ lv_color_t theme_dim(uint32_t rgb, int pct);
 uint32_t theme_state_rgb(sess_state_t s);
 /* Colour of a session: like theme_state_rgb, but approval requests (orange) differ from questions (yellow). */
 uint32_t theme_session_rgb(const session_t *s);
-/* Words as well as colour, so state never depends on colour alone. */
-const char *theme_state_label(const session_t *s);
 /* Title-case state word for the deck ("Working", "Has a question", "Needs approval", ...). */
 const char *theme_state_word(const session_t *s);
 /* ICON_* drawn beside the state word. */
 const char *theme_state_glyph(const session_t *s);
 /* Last path component of a working directory or repo name. */
 const char *theme_basename(const char *path);
-const char *theme_agent_symbol(agent_t a); /* generic glyphs, no logos */
 const char *theme_agent_name(agent_t a);
 /* Compatibility shim for screens that still ask for a pixel size: <=17 caption, <=21 body, <=28 head,
  * <=40 title, else the number font (digits only: never use it for words). */
@@ -105,8 +100,6 @@ int theme_chord(int y, int margin);
 /* Separator the font can draw (" · " when available). */
 const char *theme_sep(void);
 void theme_display_text(char *dst, size_t cap, const char *text); /* sum with its separator made displayable */
-/* "repo · branch"; `display` picks a separator the font can draw, otherwise the canonical " · ". */
-void theme_session_label(char *dst, size_t cap, const session_t *s, bool display);
 /* "HOST · " in front of the muted line of a remote session (host != 0); "" for local ones. */
 void theme_host_prefix(char *dst, size_t cap, const session_t *s);
 void theme_elapsed(char *dst, size_t cap, uint32_t secs);

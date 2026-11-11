@@ -127,5 +127,5 @@ void ring_draw_slot(lv_layer_t *l, const ring_data_t *d, int i)
         ring_arc(l, out, w, a0, a1, theme_dim(rgb, rest));
         break;
     }
-    if (needs && !d->ambient) dot(l, PIP_R, PIP_D, (a0 + a1) / 2, theme_dim(rgb, 100));
+    if (needs && !s->s.selected && !d->ambient) dot(l, PIP_R, PIP_D, (a0 + a1) / 2, theme_dim(rgb, 100));
 }

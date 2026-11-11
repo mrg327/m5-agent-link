@@ -17,7 +17,7 @@
 #define DISC_Y 186
 #define DISC_D 96
 #define HALO_R_MIN 48
-#define HALO_R_MAX 88
+#define HALO_R_MAX 80 /* the halo's lowest edge (y 266) stays above the timer (top at y 271) */
 #define HALO_STEP 4 /* radius quantum: a repaint only when the loudness moves this far */
 #define LOW_Y 292   /* timer / "Transcribing…" */
 #define TEXT_CY 170
@@ -55,6 +55,16 @@ static void hold_cancel(void)
     if (s_ramp_started) g_ui_actions->hold_stop();
     s_ramp_started = false;
     hold_progress(0);
+}
+
+/* LVGL invalidates on every style write, so the font is written only when it changes. */
+static void set_low_font(const lv_font_t *f)
+{
+    if (lv_obj_get_style_text_font(s_low, 0) == f) return;
+    int lh = lv_font_get_line_height(f);
+    lv_obj_set_style_text_font(s_low, f, 0);
+    lv_obj_set_height(s_low, lh);
+    lv_obj_set_y(s_low, LOW_Y - lh / 2);
 }
 
 /* Halo radius follows the loudness (0..100), quantised so a quiet room does not repaint. */
@@ -121,12 +131,14 @@ static void render(void)
     switch (st) {
     case VOICE_REC: {
         uint32_t ms = voice_elapsed_ms(s_now);
+        set_low_font(FONT_TITLE);
         snprintf(buf, sizeof buf, "%u:%02u", (unsigned)(ms / 60000), (unsigned)(ms / 1000 % 60));
         theme_set_text(s_low, s_low_txt, sizeof s_low_txt, buf);
         set_halo(voice_level());
         break;
     }
     case VOICE_WAIT:
+        set_low_font(FONT_HEAD);
         theme_set_text(s_low, s_low_txt, sizeof s_low_txt, "Transcribing\xe2\x80\xa6");
         word = ""; /* A does nothing while waiting */
         break;
@@ -301,11 +313,12 @@ lv_obj_t *ui_voice_init(lv_obj_t *screen)
     lv_obj_align(s_err, LV_ALIGN_TOP_MID, 0, ERR_ICON_Y - 22);
     s_reason = label(s_root, FONT_HEAD, COL_TEXT, REASON_Y, 320, 2);
     s_btn = wheel_create_at(s_root, WHEEL_LAYOUT_BUTTON(BUTTON_Y));
-    static const char *const words[2] = {"Stop", "Back"};
+    static const char *const words[2] = {"Stop", "Back"}; /* B has no legend here: a short press does nothing */
     for (int i = 0; i < 2; i++)
         s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,
                                      UI_BADGE_R, &s_key[i], &s_word[i]);
     snprintf(s_word_txt, sizeof s_word_txt, "Stop");
+    show(s_badge[1], false);
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     return s_root;
 }

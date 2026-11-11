@@ -34,7 +34,6 @@ typedef struct {
 #define WHEEL_LAYOUT_LIST(cy) ((wheel_layout_t){(cy), 0, 0, WHEEL_STYLE_LIST})
 #define WHEEL_LAYOUT_BUTTON(cy) ((wheel_layout_t){(cy), 0, 0, WHEEL_STYLE_BUTTON})
 
-lv_obj_t *wheel_create(lv_obj_t *parent);
 lv_obj_t *wheel_create_at(lv_obj_t *parent, wheel_layout_t layout);
 void wheel_set(lv_obj_t *w, const wheel_item_t *items, int n, int sel);
 void wheel_set_shown(lv_obj_t *w, bool shown);

@@ -19,8 +19,8 @@
 #define ROW_Y0 108
 #define ROW_DY 26
 #define MARK_W 24
-#define TOOL_Y 222
-#define ARG_Y 256
+#define TOOL_Y 210
+#define ARG_Y 252
 #define FOOTER_Y 322
 #define ICON_Y 176
 #define WORD_Y 236
@@ -86,8 +86,8 @@ static bool time_in_state(const session_t *s, uint32_t *secs)
 static void step_mark(const step_t *st, const char **sym, uint32_t *rgb)
 {
     switch (st->state) {
-    case STEP_OK: *sym = ICON_CHECK; *rgb = RGB_DONE; break;
-    case STEP_FAIL: *sym = ICON_X; *rgb = RGB_ERROR; break;
+    case STEP_OK: *sym = ICON_DONE; *rgb = RGB_DONE; break;
+    case STEP_FAIL: *sym = ICON_DENIED; *rgb = RGB_ERROR; break;
     default: *sym = ICON_WORKING; *rgb = RGB_ACCENT; break;
     }
 }

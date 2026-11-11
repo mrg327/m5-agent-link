@@ -299,7 +299,9 @@ lv_obj_t *ui_agent_init(lv_obj_t *screen)
     lv_obj_set_size(s_root, UI_SIZE, UI_SIZE);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     int lh = lv_font_get_line_height(FONT_CAPTION), cw = theme_chord(UI_Y_CAPTION, 24);
-    s_header = theme_label(s_root, 16, COL_TEXT2);
+    s_header = lv_label_create(s_root);
+    lv_obj_set_style_text_font(s_header, FONT_CAPTION, 0);
+    lv_obj_set_style_text_color(s_header, COL_TEXT2, 0);
     lv_label_set_long_mode(s_header, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_size(s_header, cw, lh);
     lv_obj_set_style_text_align(s_header, LV_TEXT_ALIGN_CENTER, 0);

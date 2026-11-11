@@ -63,6 +63,7 @@ static void render(void)
     show(s_live, live);
     show(s_count, !live);
     show(s_caption, !live);
+    for (int i = 0; i < 2; i++) show(s_badge[i], !(live && s_have_pos)); /* at the bottom neither Bottom nor Page does anything */
     if (live) {
         theme_set_text_color(s_icon, lv_color_hex(rgb));
         s_count_txt[0] = 0;

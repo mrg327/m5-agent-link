@@ -11,7 +11,7 @@
 /* Index ring (UI-V3 §3.1): one round-capped capsule per session on a centre line at r 225, 8 degrees
  * apart. 6 px wide at rest, 12 px when selected (grown both ways around the same line). The selected
  * session and any that needs you are at full brightness, the rest at 40 %. A session that needs you
- * also carries a pip just inside its capsule, so it never depends on colour alone. */
+ * also carries a pip just inside its capsule (when it is not the selected one), so it never depends on colour alone. */
 #define BAND_OUT 228 /* outer radius of a normal capsule: centre line 225, width 6 */
 #define BAND_W 6
 #define SEL_OUT 231 /* the selected capsule: width 12 around the same centre line */
@@ -20,8 +20,8 @@
 #define CAP_DEG 1      /* a round cap reaches about this far past its arc's end: spans are inset by it */
 #define REST_PCT 40    /* brightness of a session that does not need you */
 #define HOLD_DIM_PCT 20 /* the selected capsule while a hold arc is drawn over it */
-#define PIP_R 207      /* needs-you pip: centre radius and diameter */
-#define PIP_D 5
+#define PIP_R 205      /* needs-you pip: centre radius and diameter (10 px across); drawn on unselected segments only */
+#define PIP_D 10
 #define GLOW_W 14      /* ring_set_solid: the display-off alert glow is wider than the index band */
 #define TRACK_RING_W 4 /* ring_set_track: the grey track and the position arc share this width */
 #define PROG_OUT 230   /* hold arc: 10 px over the selected capsule */

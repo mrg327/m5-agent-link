@@ -117,7 +117,7 @@ static void render_chips(void)
 {
     char buf[64];
     int k = ui_link_transport();
-    const char *sym = k == HAL_LINK_USB ? ICON_USB : k == HAL_LINK_BLE ? ICON_BLUETOOTH : ICON_LINK;
+    const char *sym = k == HAL_LINK_USB ? ICON_USB : k == HAL_LINK_BLE ? ICON_BLUETOOTH : ICON_COMPUTER;
     uint32_t down = ui_link_down_ms(), rgb = 0;
     if (!ui_link_connected() && down && model_count() > 0) {
         char age[16];
@@ -132,7 +132,10 @@ static void render_chips(void)
         rgb = RGB_AMBER;
     } else {
         const char *host = model_host();
-        snprintf(buf, sizeof buf, "%s %.16s", sym, host[0] ? host : k == HAL_LINK_USB ? "USB" : k == HAL_LINK_BLE ? "BLE" : "PC");
+        if (theme_now_unix() > 100000) /* with the clock unset the title already is the host name: icon only */
+            snprintf(buf, sizeof buf, "%s %.16s", sym, host[0] ? host : k == HAL_LINK_USB ? "USB" : k == HAL_LINK_BLE ? "BLE" : "PC");
+        else
+            snprintf(buf, sizeof buf, "%s", sym);
     }
     theme_set_text(s_link, s_link_txt, sizeof s_link_txt, buf);
     theme_set_text_color(s_link, rgb ? lv_color_hex(rgb) : COL_TEXT2);

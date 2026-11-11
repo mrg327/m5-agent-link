@@ -84,40 +84,6 @@ static bool local_clock(unsigned *h, unsigned *m, uint32_t *minute)
     return true;
 }
 
-/* Link row: transport · host · battery while connected; otherwise how stale the snapshot is. A
- * leading mute glyph says quiet mode is on (STATUS has the details). */
-void ui_home_link_text(char *dst, size_t cap, bool with_battery, uint32_t *rgb)
-{
-    bool quiet = model_quiet_active(theme_now_unix());
-    const char *q = quiet ? ICON_QUIET "  " : "";
-    int k = ui_link_transport();
-    const char *sym = k == HAL_LINK_USB ? ICON_USB : k == HAL_LINK_BLE ? ICON_BLUETOOTH : ICON_LINK;
-    const char *name = k == HAL_LINK_USB ? "USB" : k == HAL_LINK_BLE ? "BLE" : "PC";
-    uint32_t down = ui_link_down_ms();
-    if (!ui_link_connected() && down && model_count() > 0) {
-        char age[16];
-        theme_elapsed(age, sizeof age, down / 1000);
-        snprintf(dst, cap, "%s%s Offline %s stale %s", q, ICON_OFFLINE, theme_sep(), age);
-        *rgb = RGB_AMBER;
-    } else if (k < 0) {
-        snprintf(dst, cap, "%s%s Offline", q, ICON_OFFLINE);
-        *rgb = RGB_AMBER;
-    } else if (!ui_link_connected()) {
-        snprintf(dst, cap, "%s%s %s...", q, sym, name);
-        *rgb = RGB_AMBER;
-    } else {
-        const char *host = model_host();
-        hal_battery_t b = hal_battery_read();
-        char batt[16] = "";
-        if (with_battery && b.percent <= 100)
-            snprintf(batt, sizeof batt, "%s%s%u%%", theme_sep(), b.charging ? ICON_BATTERY_CHARGING " " : "", b.percent);
-        if (host[0]) snprintf(dst, cap, "%s%s %s%s%.12s%s", q, sym, name, theme_sep(), host, batt);
-        else snprintf(dst, cap, "%s%s %s%s", q, sym, name, batt);
-        *rgb = RGB_SUCCESS;
-    }
-}
-
-
 /* One-line subject: FONT_TITLE when it fits, else FONT_HEAD on two lines, centred on TITLE_Y. */
 static void set_title(const char *t)
 {
@@ -149,7 +115,7 @@ static void update_slot(const char *btn, uint32_t btn_rgb)
         } else if (k < 0) {
             snprintf(txt, sizeof txt, "Offline");
         } else {
-            icon = k == HAL_LINK_USB ? ICON_USB : k == HAL_LINK_BLE ? ICON_BLUETOOTH : ICON_LINK;
+            icon = k == HAL_LINK_USB ? ICON_USB : k == HAL_LINK_BLE ? ICON_BLUETOOTH : ICON_COMPUTER;
             snprintf(txt, sizeof txt, "Connecting" "\xE2\x80\xA6");
         }
     } else {

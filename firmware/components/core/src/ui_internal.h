@@ -8,9 +8,6 @@
 
 #define UI_SIZE 466
 #define UI_CX 233
-#define UI_CY 233
-#define UI_R 233
-#define UI_ACTION_Y 292 /* top of the action pill row (HOME, until B1 restyles it) */
 
 extern const ui_actions_t *g_ui_actions;
 
@@ -28,8 +25,6 @@ void ui_motion_enter(lv_obj_t *content);
 /* Mode plumbing (ui.c): the interaction layer decides, the screens draw. */
 nav_mode_t ui_mode(void);
 void ui_go_home(void);          /* leave AGENT (commit, back, chord, timeout) */
-void ui_go_scroll(void);        /* AGENT's "Scroll terminal": open SCROLL on the selected session */
-void ui_go_status(void);        /* AGENT's "Status...": open STATUS */
 void ui_go_watch(void);
 void ui_go_keys(void);  /* the Reply list's "Type...": open KEYS on the selected session */
 void ui_go_voice(uint32_t rid); /* "Dictate...": open VOICE on the selected session; rid != 0 answers that request */
@@ -49,9 +44,8 @@ void ui_voice_close(void);
 bool ui_voice_refresh(uint32_t now_ms); /* false: the session is gone */
 bool ui_voice_act(nav_action_t a, const gesture_evt_t *g);
 bool ui_voice_tick(uint32_t now_ms);    /* true: the transcript was sent, close */
-void ui_voice_report(ui_report_t *r);         /* AGENT's "Watch": open WATCH on the selected session */
+void ui_voice_report(ui_report_t *r);
 int ui_last_release_y(void);    /* where the last touch lifted, for the long-swipe rules */
-bool ui_toast_active(void);     /* a toast is showing: ASK and STATUS hide their hint line under it */
 
 /* The HOME deck (ui_home.c). */
 lv_obj_t *ui_home_init(void);
@@ -63,9 +57,6 @@ bool ui_home_request_pending(void); /* the selected session has an unanswered ap
 bool ui_home_askable(void);         /* the selected session has an unanswered permission or question */
 uint32_t ui_home_sel_sid(void);
 lv_obj_t *ui_home_ring(void);
-/* "USB · dev-mac · 82%" while linked (battery only if asked), else how stale the snapshot is;
- * rgb = the row's colour. */
-void ui_home_link_text(char *dst, size_t cap, bool with_battery, uint32_t *rgb);
 void ui_home_set_card_shown(bool shown);
 void ui_home_select_sid(uint32_t sid, const char *via);
 void ui_home_report(ui_report_t *r);

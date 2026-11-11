@@ -365,10 +365,12 @@ void ui_ask_report(ui_report_t *r)
     ui_report_add(r, "%d options", n);
 }
 
-static lv_obj_t *line(lv_obj_t *parent, int px, lv_color_t col, int y, int w, int lines)
+static lv_obj_t *line(lv_obj_t *parent, const lv_font_t *f, lv_color_t col, int y, int w, int lines)
 {
-    lv_obj_t *l = theme_label(parent, px, col);
-    lv_obj_set_size(l, w, lines * lv_font_get_line_height(theme_font(px)));
+    lv_obj_t *l = lv_label_create(parent);
+    lv_obj_set_style_text_font(l, f, 0);
+    lv_obj_set_style_text_color(l, col, 0);
+    lv_obj_set_size(l, w, lines * lv_font_get_line_height(f));
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_pos(l, UI_CX - w / 2, y);
@@ -382,22 +384,24 @@ lv_obj_t *ui_ask_init(lv_obj_t *screen)
     lv_obj_remove_style_all(s_root);
     lv_obj_set_size(s_root, UI_SIZE, UI_SIZE);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    s_header = line(s_root, 16, COL_TEXT2, CAPTION_Y, theme_chord(CAPTION_Y + 10, 20), 1);
-    s_title = line(s_root, 24, COL_TEXT, TITLE_Y, theme_chord(TITLE_Y + 15, 20), 1);
+    s_header = line(s_root, FONT_CAPTION, COL_TEXT2, CAPTION_Y, theme_chord(CAPTION_Y + 10, 20), 1);
+    s_title = line(s_root, FONT_HEAD, COL_TEXT, TITLE_Y, theme_chord(TITLE_Y + 15, 20), 1);
     s_plat = lv_obj_create(s_root); /* the platter for a permission's text; transparent for a question's */
     lv_obj_remove_style_all(s_plat);
     lv_obj_remove_flag(s_plat, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_radius(s_plat, UI_PLATTER_R, 0);
     theme_set_bg_color(s_plat, COL_FILL1);
-    s_text = theme_label(s_plat, 20, COL_TEXT);
+    s_text = lv_label_create(s_plat);
+    lv_obj_set_style_text_font(s_text, FONT_BODY, 0);
+    lv_obj_set_style_text_color(s_text, COL_TEXT, 0);
     lv_obj_set_style_text_align(s_text, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(s_text, LV_LABEL_LONG_MODE_DOTS);
     s_wheel = wheel_create_at(s_root, ASK_WHEEL);
-    s_icon = line(s_root, 34, COL_TEXT, ICON_Y, 80, 1);
+    s_icon = line(s_root, FONT_TITLE, COL_TEXT, ICON_Y, 80, 1);
     lv_obj_set_style_text_font(s_icon, FONT_ICON_L, 0);
     lv_obj_set_height(s_icon, 44);
-    s_word = line(s_root, 34, COL_TEXT, WORD_Y, 340, 1);
-    s_cap = line(s_root, 16, COL_TEXT2, CAP_Y, 300, 2);
+    s_word = line(s_root, FONT_TITLE, COL_TEXT, WORD_Y, 340, 1);
+    s_cap = line(s_root, FONT_CAPTION, COL_TEXT2, CAP_Y, 300, 2);
     show(s_icon, false);
     show(s_word, false);
     show(s_cap, false);

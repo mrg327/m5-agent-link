@@ -124,7 +124,6 @@ static void render(lv_obj_t *w)
     }
 }
 
-lv_obj_t *wheel_create(lv_obj_t *parent) { return wheel_create_at(parent, WHEEL_LAYOUT_CENTRE); }
 
 lv_obj_t *wheel_create_at(lv_obj_t *parent, wheel_layout_t lay)
 {

@@ -9,13 +9,11 @@
 #define ICON_DONE "\xEE\x86\x84"       /* check-circle e184 */
 #define ICON_ERROR "\xEE\x93\xA2"      /* warning-circle e4e2 */
 #define ICON_IDLE "\xEE\x8C\xB0"       /* moon e330 */
-#define ICON_CHECK "\xEE\x86\x82"      /* check e182 */
-#define ICON_X "\xEE\x93\xB6"          /* x e4f6 */
 #define ICON_DENIED "\xEE\x93\xB8"     /* x-circle e4f8 */
-#define ICON_OFFLINE "\xEE\x93\xB2"    /* wifi-slash e4f2 */
+#define ICON_OFFLINE "\xEE\xAD\x96"    /* plugs eb56: reads as "unplugged" at 20 px */
 #define ICON_BLUETOOTH "\xEE\x83\x9A"  /* bluetooth e0da */
 #define ICON_USB "\xEE\xA5\x96"        /* usb e956 */
-#define ICON_LINK "\xEE\xAD\x9A"       /* plugs-connected eb5a */
+#define ICON_COMPUTER "\xEE\x95\xA0"   /* desktop e560: your computer (link kind unknown) */
 #define ICON_BATTERY_FULL "\xEE\x83\x80"     /* battery-full e0c0 */
 #define ICON_BATTERY_HIGH "\xEE\x83\x82"     /* battery-high e0c2 */
 #define ICON_BATTERY_MED "\xEE\x83\x86"      /* battery-medium e0c6 */

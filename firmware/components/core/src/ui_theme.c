@@ -57,25 +57,6 @@ const char *theme_basename(const char *path)
     return base;
 }
 
-const char *theme_state_label(const session_t *s)
-{
-    switch (s->state) {
-    case SESS_START: return "starting";
-    case SESS_WORK: return "working";
-    case SESS_INPUT: return s->sub == 1 ? "question" : "needs approval";
-    case SESS_ERROR: return "error";
-    case SESS_DONE: return "done";
-    case SESS_IDLE: return "idle";
-    default: return "ended";
-    }
-}
-
-const char *theme_agent_symbol(agent_t a)
-{
-    (void)a; /* no per-agent art: the name says which agent it is */
-    return ICON_ACTIVITY;
-}
-
 const char *theme_agent_name(agent_t a)
 {
     switch (a) {
@@ -187,14 +168,6 @@ void theme_display_text(char *dst, size_t cap, const char *text)
     const char *sep = strstr(text, " \xC2\xB7 ");
     if (sep) snprintf(dst, cap, "%.*s%s%s", (int)(sep - text), text, theme_sep(), sep + 4);
     else snprintf(dst, cap, "%s", text);
-}
-
-void theme_session_label(char *dst, size_t cap, const session_t *s, bool display)
-{
-    const char *sep = display ? theme_sep() : " \xC2\xB7 ";
-    if (s->repo[0] && s->branch[0]) snprintf(dst, cap, "%s%s%s", s->repo, sep, s->branch);
-    else if (s->repo[0]) snprintf(dst, cap, "%s", s->repo);
-    else snprintf(dst, cap, "%s", theme_agent_name(s->agent));
 }
 
 void theme_host_prefix(char *dst, size_t cap, const session_t *s)

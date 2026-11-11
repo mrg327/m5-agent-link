@@ -20,8 +20,8 @@ const NUM_RANGE = "0x20,0x25,0x2D,0x2E,0x30-0x3A"; // space % - . 0-9 :
 // Phosphor name -> code point (UI-V3 §2.2). Checked against the package's own stylesheet.
 const ICONS = {
   "arrows-clockwise": 0xe094, "chat-circle-dots": 0xe16c, "hand-palm": 0xe57e, "check-circle": 0xe184,
-  "warning-circle": 0xe4e2, moon: 0xe330, check: 0xe182, x: 0xe4f6, "x-circle": 0xe4f8, "wifi-slash": 0xe4f2,
-  bluetooth: 0xe0da, usb: 0xe956, "plugs-connected": 0xeb5a, "battery-full": 0xe0c0, "battery-high": 0xe0c2,
+  "warning-circle": 0xe4e2, moon: 0xe330, "x-circle": 0xe4f8, plugs: 0xeb56,
+  bluetooth: 0xe0da, usb: 0xe956, desktop: 0xe560, "battery-full": 0xe0c0, "battery-high": 0xe0c2,
   "battery-medium": 0xe0c6, "battery-low": 0xe0c4, "battery-warning": 0xe0c8, "battery-charging": 0xe0ba,
   microphone: 0xe326, keyboard: 0xe2d8, bell: 0xe0ce, "bell-slash": 0xe0d4, "speaker-high": 0xe44a,
   "speaker-slash": 0xe45a, "arrow-square-out": 0xe5de, pulse: 0xe000, "stop-circle": 0xe46e,

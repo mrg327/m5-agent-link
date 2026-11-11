@@ -23,6 +23,7 @@ static uint32_t s_now_ms;
 #define TOAST_MAX_W 290
 #define TOAST_DOT 10
 #define TOAST_MASK_H 26 /* covers the 22 px legends */
+#define TOAST_MASK_W 314 /* a pill: its outer point at the row centre stays inside r 205, so the ring is never touched */
 static lv_obj_t *s_toast, *s_toast_label, *s_toast_dot, *s_toast_mask;
 static uint32_t s_toast_until_ms;
 static lv_obj_t *s_glow, *s_glow_ring;
@@ -41,11 +42,12 @@ lv_obj_t *ui_new_screen(void)
 static void create_overlays(void)
 {
     lv_obj_t *top = lv_layer_top();
-    /* The legends share the toast's row: a black strip under the toast covers them cleanly while it shows. */
+    /* The legends share the toast's row: a black pill under the toast covers them cleanly while it shows. */
     s_toast_mask = lv_obj_create(top);
     lv_obj_remove_style_all(s_toast_mask);
-    lv_obj_set_size(s_toast_mask, UI_SIZE, TOAST_MASK_H);
-    lv_obj_set_pos(s_toast_mask, 0, UI_Y_TOAST - TOAST_MASK_H / 2);
+    lv_obj_set_size(s_toast_mask, TOAST_MASK_W, TOAST_MASK_H);
+    lv_obj_set_style_radius(s_toast_mask, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_pos(s_toast_mask, (UI_SIZE - TOAST_MASK_W) / 2, UI_Y_TOAST - TOAST_MASK_H / 2);
     lv_obj_set_style_bg_color(s_toast_mask, COL_BG, 0);
     lv_obj_set_style_bg_opa(s_toast_mask, LV_OPA_COVER, 0);
     lv_obj_add_flag(s_toast_mask, LV_OBJ_FLAG_HIDDEN);
@@ -144,8 +146,6 @@ static void place_toast(void)
     lv_obj_align(s_toast, LV_ALIGN_TOP_MID, 0, UI_Y_TOAST - TOAST_H / 2);
 }
 
-bool ui_toast_active(void) { return !lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN); }
-
 /* The session WATCH was on when ASK or SCROLL took over; they return there instead of HOME. */
 static uint32_t s_resume_watch_sid;
 static uint32_t s_voice_rid; /* the request VOICE answers (ui_go_voice) */
@@ -200,8 +200,6 @@ static void open_ask(void)
 }
 
 void ui_go_home(void) { leave_mode(); }
-void ui_go_scroll(void) { enter_mode(MODE_SCROLL); }
-void ui_go_status(void) { enter_mode(MODE_STATUS); }
 void ui_go_watch(void) { enter_mode(MODE_WATCH); }
 void ui_go_voice(uint32_t rid)
 {
