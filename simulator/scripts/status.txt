@@ -1,6 +1,6 @@
 # STATUS (UI-V2 §4.5): swipe down from HOME opens it; link, battery and the rows are shown; A or a tap
-# commits the selected row (Quiet cycles off → 30 min → 1 h → off, Sounds toggles); information rows
-# do nothing; every exit path (swipe up, B long, chord, timeout) returns to HOME.
+# commits the selected toggle (Quiet cycles off → 30 min → 1 h → off, Mute toggles); About does
+# nothing; every exit path (swipe up, B long, chord, timeout) returns to HOME.
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 session 1 work webapp feat/login Running the test suite
@@ -11,48 +11,73 @@ swipe 233 180 233 300 160
 wait 300
 expect_screen status
 expect_label dev-mac
-expect_label 80 %
+expect_label 80%
 expect_label > Quiet: off
-expect_label Sounds: on
-expect_label Privacy: preview
-expect_label 2 sessions
-expect_label 1 waiting
-expect_label Firmware 0.1.0-sim
 shot status.png
-# A on the Quiet row: 30 min, then 1 h, then off; a tap commits too
+# the selection walks Quiet, Mute, About; the description names the selected toggle
+btn B
+wait 150
+expect_label > Sounds: on
+shot status_mute.png
+btn B
+wait 150
+expect_label > 2 sessions
+expect_label Privacy: preview
+expect_label 0.1.0-sim
+shot status_about.png
+btn B
+wait 150
+expect_label > Quiet: off
+# A on the Quiet toggle: 30 min, then 1 h, then off; a tap on its disc commits too, and so does a tap
+# elsewhere in the centre (it commits the selected toggle)
 btn A
 wait 200
 expect_label > Quiet until
 shot status_quiet.png
-tap 233 233
+tap 143 246
 wait 200
 expect_label > Quiet until
-tap 233 233
+tap 233 300
 wait 200
 expect_label > Quiet: off
 btn A
 wait 200
 expect_label > Quiet until
-# Sounds toggles; the rim scrubs the rows; information rows commit to nothing
+# Mute toggles; the rim scrubs the toggles; About commits to nothing
 btn B
 wait 150
 expect_label > Sounds: on
 btn A
 wait 200
 expect_label > Sounds: off
+shot status_muted.png
 btn A
 wait 200
 expect_label > Sounds: on
 btn B
 wait 150
-expect_label > Privacy: preview
+expect_label > 2 sessions
 btn A
 wait 200
 expect_screen status
-expect_label > Privacy: preview
+expect_label > 2 sessions
 scrub 300 250 400
 wait 150
 expect_screen status
+# a tap on a disc selects and commits it: Mute on, then off; a tap on Quiet's disc cycles it (30 min to 1 h)
+tap 233 246
+wait 200
+expect_label > Sounds: off
+tap 233 246
+wait 200
+expect_label > Sounds: on
+tap 143 246
+wait 200
+expect_label > Quiet until
+shot status_quiet_on.png
+tap 323 246
+wait 200
+expect_label > 2 sessions
 # swipe up goes back; the deck shows quiet mode subtly
 swipe 233 300 233 180 160
 wait 300
