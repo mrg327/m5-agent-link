@@ -1,3 +1,5 @@
+> **[UI-V3.md](UI-V3.md) supersedes this document's look, wording and back gesture** (swipe right goes back); the interaction model and safety rules below still stand.
+
 # UI v2: "Deck": switch context, pick from a list, answer from the watch
 
 Status: **decided; Phases 1–5 (HOME deck, AGENT wheel, ASK with the approval broker, SCROLL with the kitty and tmux drivers, STATUS with quiet mode) implemented in the simulator**. SCROLL left the wheel on 2026-11-09 (decision 27) and is entered by a drag on WATCH since 2026-11-10 (decision 29) (branch `ui-v2`, not yet validated on the device). Supersedes the Ring UI ([UI-RING.md](UI-RING.md)) and DESIGN.md §6, §6a (device side) and §8 (palette). Inputs: the Ring UX review (simulator pass, 2026-11-07), the user's v2 brief and answers (§9), and `docs/research/{stopwatch-interaction-capabilities,wearable-glance-gestures,minimal-peripherals}.md`.
