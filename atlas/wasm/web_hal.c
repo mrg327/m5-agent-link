@@ -188,6 +188,18 @@ hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s
 hal_wake_t hal_wake_reason(void) { return HAL_WAKE_POWER_ON; }
 uint32_t hal_retained_get(void) { return 0; }
 void hal_retained_set(uint32_t v) { (void)v; }
+const char *hal_reset_reason(void) { return "poweron"; }
+
+/* No microphone in the browser (has_mic is false): voice dictation reports "No microphone". */
+bool hal_mic_start(void) { return false; }
+const char *hal_mic_error(void) { return "no microphone in the browser"; }
+size_t hal_mic_read(int16_t *pcm, size_t max)
+{
+    (void)pcm;
+    (void)max;
+    return 0;
+}
+void hal_mic_stop(void) {}
 hal_battery_t hal_battery_read(void) { return (hal_battery_t){.percent = 80, .charging = false, .usb_present = true}; }
 void hal_debug_line(const char *json) { js_debug(json); }
 
