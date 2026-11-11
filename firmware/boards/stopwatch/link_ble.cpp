@@ -8,6 +8,7 @@
 
 #include "board_priv.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -184,7 +185,12 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
         }
         break;
     case BLE_GAP_EVENT_DISCONNECT:
-        ESP_LOGI(TAG, "central disconnected (reason 0x%x)", ev->disconnect.reason);
+        ESP_LOGI(TAG, "central disconnected (handle %u, reason 0x%x)", ev->disconnect.conn.conn_handle,
+                 ev->disconnect.reason);
+        if (s_conn != BLE_HS_CONN_HANDLE_NONE && ev->disconnect.conn.conn_handle != s_conn) {
+            ESP_LOGW(TAG, "disconnect of handle %u ignored: the link is on %u", ev->disconnect.conn.conn_handle, s_conn);
+            break; /* a late event for an older connection must not drop the current one */
+        }
         s_conn = BLE_HS_CONN_HANDLE_NONE;
         s_subscribed = false;
         s_base_itvl = 0;
@@ -193,6 +199,10 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
         break;
     case BLE_GAP_EVENT_SUBSCRIBE:
         if (ev->subscribe.attr_handle == s_tx_handle) {
+            if (ev->subscribe.cur_notify && ev->subscribe.conn_handle != s_conn) {
+                ESP_LOGW(TAG, "subscribe on handle %u while tracking %u: adopting it", ev->subscribe.conn_handle, s_conn);
+                s_conn = ev->subscribe.conn_handle;
+            }
             s_subscribed = ev->subscribe.cur_notify;
             ESP_LOGI(TAG, "tx notify %s (mtu %u)", s_subscribed ? "on" : "off",
                      ble_att_mtu(ev->subscribe.conn_handle));
@@ -361,16 +371,32 @@ void sw_ble_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state)
     nimble_port_freertos_init(host_task);
 }
 
+/* Why a send failed, at most every 5 s: a silent failure here once cost a long hunt. */
+static void send_failed(const char *why, int a, int b)
+{
+    static uint32_t last_ms;
+    uint32_t now = (uint32_t)(esp_timer_get_time() / 1000);
+    if (last_ms && now - last_ms < 5000) return;
+    last_ms = now;
+    ESP_LOGW(TAG, "send failed: %s (%d, %d)", why, a, b);
+}
+
 bool sw_ble_link_send(const uint8_t *frame, size_t len)
 {
     if (!frame || len == 0 || len > BLE_MSG_MAX) return false;
-    if (!s_send_lock || !s_subscribed || s_conn == BLE_HS_CONN_HANDLE_NONE) return false;
+    if (!s_send_lock || !s_subscribed || s_conn == BLE_HS_CONN_HANDLE_NONE) {
+        send_failed("not linked (subscribed, conn)", s_subscribed, s_conn);
+        return false;
+    }
     xSemaphoreTake(s_send_lock, portMAX_DELAY);
     bool ok = true;
     uint16_t conn = s_conn;
     size_t chunk = ble_att_mtu(conn);
     chunk = chunk > 4 ? chunk - 4 : 0; /* ATT header (3) + fragment header (1) */
-    if (chunk == 0) ok = false;
+    if (chunk == 0) {
+        send_failed("no ATT MTU for the tracked connection (conn, mtu)", conn, (int)ble_att_mtu(conn));
+        ok = false;
+    }
     size_t off = 0;
     uint8_t seq = 0;
     uint8_t pkt[BLE_ATT_MTU_MAX + 8];
@@ -382,6 +408,7 @@ bool sw_ble_link_send(const uint8_t *frame, size_t len)
         TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(BLE_NOTIFY_TIMEOUT_MS);
         for (;;) {
             if (!s_subscribed || s_conn != conn) {
+                send_failed("link changed mid-message (subscribed, conn)", s_subscribed, s_conn);
                 ok = false;
                 break;
             }

@@ -1,0 +1,5 @@
+# hci_uart with the BCM4350C0 LE advertising-report fix. Same objects as the in-tree module on a
+# kernel where every CONFIG_BT_HCIUART_* protocol is built in (Ubuntu's generic kernels).
+obj-m := hci_uart.o
+hci_uart-y := hci_ldisc.o hci_serdev.o hci_h4.o hci_bcsp.o hci_ll.o hci_ath.o hci_h5.o hci_intel.o \
+              hci_bcm.o hci_qca.o hci_ag6xx.o hci_mrvl.o hci_aml.o
