@@ -1,0 +1,20 @@
+# Look: a 3-line permission text ellipsizes inside its platter, a long title and option labels stay clear of
+# the ring, and a question with no options (Open on PC only) hides the B legend.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention 7 2 approval approve,deny,focus,reply 3 Run a very long shell command in the sandbox|cd packages/frontend-dashboard && npm run test -- --watch=false --coverage --runInBand --reporters=default --testPathPattern=components/charts && git status --short|Yes|Yes, and don't ask again for npm commands in this project|No
+wait 400
+expect_screen ask
+shot ask_long_perm.png
+btn B
+wait 200
+shot ask_long_perm_opt.png
+clear 7
+wait 300
+attention 8 2 question focus 0 Which of the available deployment environments should the release go to?|A very long explanation of the choices that the agent wants answered before it carries on with the deploy, going over three lines of text on the watch face
+wait 400
+expect_screen ask
+shot ask_single_option.png
+quit

@@ -1,8 +1,7 @@
-/* The ASK screen (UI-V2 §4.3, §7): the request's title and text in the top half, its answer options
- * on the wheel in the bottom half, and the answer-pending line once an answer is out. The item list
- * and the hold rules come from nav.c (interaction model); this file only names, colours and places
- * the items and runs the one the user commits. A hold is bound to the request id it started on and
- * cancels when that request changes, clears or is answered. */
+/* The ASK screen (UI-V3 §4.3, UI-V2 §7): caption, title and the request text above, the picker below,
+ * and the answered state once an answer is out. The item list and the hold rules come from nav.c; this
+ * file names, colours and places the items and runs the one the user commits. A hold is bound to the
+ * request id it started on and cancels when that request changes, clears or is answered. */
 #include <stdio.h>
 #include <string.h>
 
@@ -13,24 +12,30 @@
 #include "ui_theme.h"
 #include "ui_wheel.h"
 
-#define HEADER_Y 50
-#define TITLE_Y 78
-#define TEXT_Y 108
+#define CAPTION_Y 62 /* UI-V3 §4.3: context caption, title, platter, then the picker */
+#define TITLE_Y 84
+#define PLATTER_Y 118
+#define PLATTER_W 320
+#define PLATTER_PAD_X 14
+#define PLATTER_PAD_Y 10
 #define TEXT_LINES 3
-#define DIVIDER_Y 190
-#define HINT_Y 364
-#define ASK_WHEEL WHEEL_LAYOUT_BUTTON(282) /* the picker: three rows in the bottom half (UI-V3 §4.3) */
+#define ICON_Y 154 /* answered state: 44 px icon, word, caption (top edges) */
+#define WORD_Y 215
+#define CAP_Y 266
+#define ASK_WHEEL WHEEL_LAYOUT_BUTTON(282) /* the picker: rows at 234 / 282 / 330 */
 
-static lv_obj_t *s_root, *s_header, *s_title, *s_text, *s_divider, *s_wheel, *s_answer, *s_hint;
-static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
+static lv_obj_t *s_root, *s_header, *s_title, *s_plat, *s_text, *s_wheel, *s_icon, *s_word, *s_cap;
+static lv_obj_t *s_badge[2], *s_key[2], *s_wlbl[2];
 static uint32_t s_sid, s_rid, s_shown_ms, s_now;
 static ask_item_t s_items[ASK_MAX_ITEMS];
 static int s_n;
 static bool s_holding, s_hold_fired, s_ramp_started;
 static uint32_t s_hold_t0, s_hold_rid;
 static int s_hold_idx;
-static char s_header_txt[64], s_title_txt[48], s_text_txt[168], s_answer_txt[64], s_hint_txt[40];
-static uint32_t s_answer_rgb;
+static char s_header_txt[64], s_title_txt[48], s_text_txt[168], s_word_txt[16], s_opt_txt[48], s_cap_txt[72];
+static const char *s_icon_txt;
+static int s_layout_key;
+static const char *s_icon_shown;
 
 /* The request this screen is about: the selected session's unanswered permission or question. */
 static const attention_t *req(void)
@@ -45,39 +50,22 @@ static const char *label_of(const ask_item_t *it, const attention_t *a)
     case ASK_OPT: return a->opts[it->opt];
     case ASK_APPROVE: return "Approve";
     case ASK_DENY: return "Deny";
-    case ASK_DICTATE: return "Dictate...";
+    case ASK_DICTATE: return "Dictate";
     default: return "Open on PC";
     }
 }
 
 /* Colour says what the item does: orange grants, vermillion denies, yellow answers a question,
- * sky blue goes to the PC. Never the only cue: hold items also carry the HOLD tag. */
+ * the neutral button goes to the PC. Never the only cue: hold items show the hold ring. */
 static uint32_t rgb_of(const ask_item_t *it)
 {
     if (it->grants) return RGB_PERMISSION;
     if (it->hold_ms) return RGB_ERROR;
-    return it->id == ASK_OPEN_PC ? RGB_ACCENT : RGB_ASK;
+    return it->id == ASK_OPEN_PC ? RGB_IDLE : RGB_ASK;
 }
 
 /* The wheel's fill: the same colours, except that "Open on PC" is a neutral button. */
 static uint32_t fill_of(const ask_item_t *it) { return it->id == ASK_OPEN_PC ? 0 : rgb_of(it); }
-
-static void ring_items(const attention_t *a)
-{
-    lv_obj_t *ring = ui_home_ring();
-    ring_seg_t segs[WHEEL_MAX_ITEMS];
-    int n = wheel_count(s_wheel), sel = wheel_sel(s_wheel);
-    if (a->answer_sent) { /* one settled, dim capsule in the answer's colour: nothing left to pick */
-        segs[0] = (ring_seg_t){0x40000000u, s_answer_rgb, RING_DONE, false, true};
-        n = 1;
-    } else {
-        for (int i = 0; i < n; i++)
-            segs[i] = (ring_seg_t){0x40000000u | (uint32_t)i, wheel_item(s_wheel, i)->rgb, RING_DONE, i == sel, false};
-    }
-    ring_set(ring, segs, n, s_now);
-    ring_set_still(ring, true);
-    if (g_ui_actions->sectors) g_ui_actions->sectors(n);
-}
 
 static void hold_cancel(void)
 {
@@ -91,8 +79,35 @@ static void hold_cancel(void)
 
 static void show(lv_obj_t *o, bool on)
 {
+    if (on == !lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN)) return; /* LVGL invalidates even on a no-op */
     if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+}
+
+/* The request text sits in a platter for a permission and bare, secondary-coloured, for a question. */
+static void layout_text(bool perm, const char *text)
+{
+    const lv_font_t *f = FONT_BODY;
+    int lh = lv_font_get_line_height(f);
+    int pw = perm ? PLATTER_W : theme_chord(PLATTER_Y, 12);
+    int px = perm ? PLATTER_PAD_X : 0, py = perm ? PLATTER_PAD_Y : 0;
+    if (pw > 360) pw = 360;
+    lv_point_t sz;
+    lv_text_get_size(&sz, text, f, 0, 0, pw - 2 * px, LV_TEXT_FLAG_NONE);
+    int lines = sz.y / lh;
+    lines = lines < 1 ? 1 : lines > TEXT_LINES ? TEXT_LINES : lines;
+    /* every style or size write invalidates, and refresh runs on each session delta: change-only */
+    int key = (perm << 20) | (pw << 8) | lines;
+    if (key != s_layout_key) {
+        s_layout_key = key;
+        lv_obj_set_style_bg_opa(s_plat, perm ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+        lv_obj_set_size(s_plat, pw, lines * lh + 2 * py);
+        lv_obj_set_pos(s_plat, UI_CX - pw / 2, PLATTER_Y);
+        lv_obj_set_size(s_text, pw - 2 * px, lines * lh);
+        lv_obj_set_pos(s_text, px, py);
+        theme_set_text_color(s_text, perm ? COL_TEXT : COL_TEXT2);
+    }
+    theme_set_text(s_text, s_text_txt, sizeof s_text_txt, text);
 }
 
 /* Returns false when there is nothing left to ask (request cleared or session gone). */
@@ -117,29 +132,40 @@ bool ui_ask_refresh(uint32_t now)
     bool perm = a->kind == ATT_APPROVAL;
     theme_set_text(s_title, s_title_txt, sizeof s_title_txt,
             a->title[0] ? a->title : s->tool[0] ? s->tool : perm ? "Permission request" : "Question");
-    theme_set_text(s_text, s_text_txt, sizeof s_text_txt, a->text);
+    layout_text(perm, a->text);
 
     if (a->answer_sent) {
         uint32_t rgb = RGB_DONE;
+        s_icon_txt = ICON_DONE;
+        const char *word = "Approved";
+        s_opt_txt[0] = 0;
         if (a->answer == ATT_ANSWER_DENY) {
-            snprintf(buf, sizeof buf, "Denied");
+            word = "Denied";
+            s_icon_txt = ICON_DENIED;
             rgb = RGB_ERROR;
-        } else if (a->answer == ATT_ANSWER_REPLY) {
-            snprintf(buf, sizeof buf, "Sent \"%s\"%swaiting for PC", a->opts[a->answer_opt % 4], theme_sep());
+        } else if (a->answer == ATT_ANSWER_REPLY || a->answer == ATT_ANSWER_DICTATE) {
+            word = "Sent";
+            s_icon_txt = ICON_SENT;
             rgb = RGB_ASK;
-        } else if (a->answer == ATT_ANSWER_DICTATE) {
-            snprintf(buf, sizeof buf, "Sent dictation%swaiting for PC", theme_sep());
-            rgb = RGB_ASK;
-        } else {
-            snprintf(buf, sizeof buf, "Approved%swaiting for PC", theme_sep());
+            if (a->answer == ATT_ANSWER_REPLY) snprintf(s_opt_txt, sizeof s_opt_txt, "\"%s\"", a->opts[a->answer_opt % 4]);
         }
-        theme_set_text(s_answer, s_answer_txt, sizeof s_answer_txt, buf);
-        s_answer_rgb = rgb;
-        theme_set_text_color(s_answer, lv_color_hex(rgb));
-        show(s_answer, true);
+        snprintf(buf, sizeof buf, "%s%sWaiting for your computer", s_opt_txt, s_opt_txt[0] ? "\n" : "");
+        theme_set_text(s_cap, s_cap_txt, sizeof s_cap_txt, buf);
+        int cap_y = s_opt_txt[0] ? CAP_Y - 10 : CAP_Y;
+        if (lv_obj_get_y(s_cap) != cap_y) lv_obj_set_y(s_cap, cap_y);
+        theme_set_text(s_word, s_word_txt, sizeof s_word_txt, word);
+        if (s_icon_txt != s_icon_shown) {
+            s_icon_shown = s_icon_txt;
+            lv_label_set_text(s_icon, s_icon_txt);
+        }
+        theme_set_text_color(s_icon, lv_color_hex(rgb));
+        show(s_plat, false); /* the request text makes room for the answer */
+        show(s_icon, true);
+        show(s_word, true);
+        show(s_cap, true);
         wheel_set_shown(s_wheel, false);
-        theme_set_text(s_hint, s_hint_txt, sizeof s_hint_txt, "");
         hold_cancel();
+        s_n = 0;
     } else {
         s_n = nav_ask_items(a, model_voice(), s_items, ASK_MAX_ITEMS);
         wheel_item_t w[ASK_MAX_ITEMS];
@@ -147,11 +173,12 @@ bool ui_ask_refresh(uint32_t now)
         int sel = wheel_count(s_wheel) == s_n ? wheel_sel(s_wheel) : 0;
         wheel_set(s_wheel, w, s_n, sel);
         wheel_set_shown(s_wheel, true);
-        show(s_answer, false);
-        theme_set_text(s_hint, s_hint_txt, sizeof s_hint_txt, perm && (a->acts & (1u << ACT_DENY)) ? "long swipe down to deny" : "");
+        show(s_plat, true);
+        show(s_icon, false);
+        show(s_word, false);
+        show(s_cap, false);
     }
-    theme_set_text_color(s_word[0], lv_color_hex(RGB_ACCENT));
-    ring_items(a);
+    show(s_badge[1], s_n > 1); /* B steps through the options: nothing to step through with one */
     return true;
 }
 
@@ -163,6 +190,7 @@ void ui_ask_open(uint32_t sid, uint32_t now)
     s_holding = s_hold_fired = s_ramp_started = false;
     wheel_set(s_wheel, NULL, 0, 0);
     ui_ask_refresh(now);
+    ring_set_still(ui_home_ring(), true); /* the sessions stay on the ring, settled: no comet behind a decision */
     show(s_root, true);
     dbg_event("ui", "ask", "\"sid\":%u,\"rid\":%u,\"items\":%d", (unsigned)sid, (unsigned)s_rid, s_n);
 }
@@ -182,8 +210,6 @@ static void select_item(int i, const char *via, void (*haptic)(void))
     if (i == wheel_sel(s_wheel)) return;
     wheel_select(s_wheel, i);
     hold_cancel(); /* the hold belongs to the item it started on */
-    const attention_t *a = req();
-    if (a) ring_items(a);
     dbg_event("ui", "item", "\"idx\":%d,\"via\":\"%s\"", i, via);
     if (haptic) haptic();
 }
@@ -225,18 +251,29 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
         }
         return true;
     case NAV_HOLD_RELEASE: hold_cancel(); return true;
-    case NAV_COMMIT:
+    case NAV_COMMIT: {
+        /* A tap acts on the row it lands on (UI-V3 §3.3), but never approves or denies: a neighbour that
+         * needs a hold is only selected, and the toast says which hold it needs. */
+        int hit = it ? wheel_hit(s_wheel, g->x, g->y) : -1;
+        if (hit >= 0 && hit < s_n && hit != sel) {
+            const ask_item_t *h = &s_items[hit];
+            select_item(hit, "tap", g_ui_actions->tick);
+            if (h->hold_ms) ui_toast(h->grants ? "Hold to approve" : "Hold to deny", rgb_of(h));
+            else commit(a, hit, 0);
+            return true;
+        }
         if (!it) {
             g_ui_actions->reject();
             return true;
         }
         if (it->hold_ms) { /* a tap never commits an approve-class or deny item */
-            ui_toast("Hold to confirm", rgb_of(it));
+            ui_toast(it->grants ? "Hold to approve" : "Hold to deny", rgb_of(it));
             g_ui_actions->reject();
             return true;
         }
         commit(a, sel, 0);
         return true;
+    }
     case NAV_HOLD_LONG: /* injected input whose duration already covers the hold */
         if (it && it->hold_ms && g->dur_ms >= it->hold_ms && !s_hold_fired &&
             nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now)) {
@@ -256,11 +293,6 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
         g_ui_actions->deny(s_sid, a->rid);
         return true;
     }
-    case NAV_PICK_RIM: {
-        int i = ring_hit(ui_home_ring(), g->x, g->y);
-        if (i >= 0 && it) select_item(i, "tap", g_ui_actions->tick);
-        return true;
-    }
     case NAV_SCRUB:
         if (g->kind != G_SCRUB_END && it) select_item(g->x, "scrub", g_ui_actions->detent);
         return true;
@@ -277,7 +309,6 @@ bool ui_ask_tick(uint32_t now)
     s_now = now;
     const attention_t *a = req();
     if (!a || !model_find(s_sid)) return true;
-    show(s_hint, !ui_toast_active()); /* the toast takes the hint's line (the toast slot) */
     if (s_holding && !s_hold_fired) {
         uint32_t el = now - s_hold_t0;
         const ask_item_t *it = s_hold_idx < s_n ? &s_items[s_hold_idx] : NULL;
@@ -321,7 +352,9 @@ void ui_ask_report(ui_report_t *r)
     if (s_title_txt[0]) ui_report_add(r, "%s", s_title_txt);
     if (s_text_txt[0]) ui_report_add(r, "%s", s_text_txt);
     if (a && a->answer_sent) {
-        ui_report_add(r, "%s", s_answer_txt);
+        ui_report_add(r, "%s", s_word_txt);
+        if (s_opt_txt[0]) ui_report_add(r, "%s", s_opt_txt);
+        ui_report_add(r, "Waiting for your computer");
         return;
     }
     int n = wheel_count(s_wheel), sel = wheel_sel(s_wheel);
@@ -349,24 +382,29 @@ lv_obj_t *ui_ask_init(lv_obj_t *screen)
     lv_obj_remove_style_all(s_root);
     lv_obj_set_size(s_root, UI_SIZE, UI_SIZE);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    s_header = line(s_root, 16, COL_MUTED, HEADER_Y, 260, 1);
-    s_title = line(s_root, 24, COL_TEXT, TITLE_Y, 340, 1);
-    s_text = line(s_root, 20, COL_MUTED, TEXT_Y, 360, TEXT_LINES);
-    s_divider = lv_obj_create(s_root); /* a thin capsule between the question and its answers */
-    lv_obj_remove_style_all(s_divider);
-    lv_obj_set_size(s_divider, 180, 3);
-    lv_obj_set_style_radius(s_divider, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_opa(s_divider, LV_OPA_COVER, 0);
-    theme_set_bg_color(s_divider, COL_BORDER);
-    lv_obj_set_pos(s_divider, UI_CX - 90, DIVIDER_Y);
+    s_header = line(s_root, 16, COL_TEXT2, CAPTION_Y, theme_chord(CAPTION_Y + 10, 20), 1);
+    s_title = line(s_root, 24, COL_TEXT, TITLE_Y, theme_chord(TITLE_Y + 15, 20), 1);
+    s_plat = lv_obj_create(s_root); /* the platter for a permission's text; transparent for a question's */
+    lv_obj_remove_style_all(s_plat);
+    lv_obj_remove_flag(s_plat, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_radius(s_plat, UI_PLATTER_R, 0);
+    theme_set_bg_color(s_plat, COL_FILL1);
+    s_text = theme_label(s_plat, 20, COL_TEXT);
+    lv_obj_set_style_text_align(s_text, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(s_text, LV_LABEL_LONG_MODE_DOTS);
     s_wheel = wheel_create_at(s_root, ASK_WHEEL);
-    s_answer = line(s_root, 24, COL_TEXT, ASK_WHEEL.cy - lv_font_get_line_height(theme_font(24)) / 2, 360, 1);
-    lv_obj_add_flag(s_answer, LV_OBJ_FLAG_HIDDEN);
-    s_hint = line(s_root, 16, COL_MUTED, HINT_Y, 300, 1);
-    static const char *const words[2] = {"OPEN ON PC", "NEXT"};
+    s_icon = line(s_root, 34, COL_TEXT, ICON_Y, 80, 1);
+    lv_obj_set_style_text_font(s_icon, FONT_ICON_L, 0);
+    lv_obj_set_height(s_icon, 44);
+    s_word = line(s_root, 34, COL_TEXT, WORD_Y, 340, 1);
+    s_cap = line(s_root, 16, COL_TEXT2, CAP_Y, 300, 2);
+    show(s_icon, false);
+    show(s_word, false);
+    show(s_cap, false);
+    static const char *const words[2] = {"Open on PC", "Next"};
     for (int i = 0; i < 2; i++)
         s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,
-                                     UI_BADGE_R, &s_key[i], &s_word[i]);
+                                     UI_BADGE_R, &s_key[i], &s_wlbl[i]);
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     return s_root;
 }

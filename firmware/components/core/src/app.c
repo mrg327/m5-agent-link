@@ -160,7 +160,7 @@ static void act_approve(uint32_t sid, uint32_t rid, uint32_t hold_ms)
     } else {
         feedback_reject();
     }
-    toast_cmd_result(sent, "Approved");
+    if (!sent) toast_cmd_result(false, ""); /* ASK shows the word itself (UI-V3 §4.3) */
 }
 
 static void act_deny(uint32_t sid, uint32_t rid)
@@ -172,7 +172,7 @@ static void act_deny(uint32_t sid, uint32_t rid)
     } else {
         feedback_reject();
     }
-    toast_cmd_result(sent, "Denied");
+    if (!sent) toast_cmd_result(false, ""); /* ASK shows the word itself (UI-V3 §4.3) */
 }
 
 /* cmd_op_reply {rid, arg: option index}: a question's answer, or one of a permission's own choices. */
@@ -186,7 +186,7 @@ static void act_reply(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms)
     } else {
         feedback_reject();
     }
-    toast_cmd_result(sent, "Sent");
+    if (!sent) toast_cmd_result(false, "");
 }
 
 /* The daemon stores seen and echoes it to every device; the local update makes the segment dim at once. */

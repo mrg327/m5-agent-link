@@ -1,0 +1,38 @@
+# Safety (UI-V3 §3.3): a tap on a row of the ASK picker never approves or denies. A neighbour that needs
+# a hold is only selected and the toast names the hold; a tap on the selected hold row only toasts.
+# Nothing may reach the daemon: no approve (3), deny (4), reply (5) and no focus (0).
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+expect_label > Approve HOLD
+# the neighbour below is Deny: selected, not denied
+tap 233 330
+wait 300
+expect_screen ask
+expect_label > Deny HOLD
+expect_label Hold to deny
+shot ask_tap_deny_row.png
+# the selected Deny row: a hint only
+tap 233 282
+wait 300
+expect_screen ask
+expect_label > Deny HOLD
+expect_label Hold to deny
+# the neighbour above is Approve: selected, not approved
+tap 233 234
+wait 300
+expect_screen ask
+expect_label > Approve HOLD
+expect_label Hold to approve
+# the selected Approve row: a hint only
+tap 233 282
+wait 300
+expect_screen ask
+expect_label > Approve HOLD
+expect_label Hold to approve
+shot ask_tap_approve_row.png
+quit

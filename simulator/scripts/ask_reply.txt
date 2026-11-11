@@ -16,14 +16,14 @@ shot ask_question.png
 btn B
 wait 150
 expect_label > Vue
-tap 233 233
+tap 233 282
 wait 300
 expect_screen ask
-expect_label Sent "Vue"
+expect_label "Vue"
 shot ask_sent.png
 result ok
 wait 200
-expect_label Sent "Vue"
+expect_label "Vue"
 clear 8 answered_dev
 wait 300
 expect_screen ring
