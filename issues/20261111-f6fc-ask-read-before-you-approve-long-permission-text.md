@@ -38,3 +38,4 @@ implement the `detail` op (PROTOCOL §attention) so the watch can fetch and page
 
 - 2026-11-11T08:16:11Z · claude-code@linux-dev · linux-x86_64 · 0104ec1: filed
 - 2026-11-11T08:16:11Z · claude-code@linux-dev · linux-x86_64 · 0104ec1: claimed
+- 2026-11-11T08:16:25Z · claude-code@linux-dev · linux-x86_64 · 958e24a: Built on branch ui-v3-read-first: reader, approve lock, three sim tests (ask_read_first, ask_read_then_approve, ask_cut_text). ctest 90/90 on linux-x86_64; firmware builds, check_dram 128345 B free. Not flashed, not merged: waiting for the owner's decision, in particular on blocking daemon-cut text.
