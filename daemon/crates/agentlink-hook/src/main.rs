@@ -9,6 +9,12 @@
 //! the shell integration's call (`agentlink shell-init`, docs/design/JOBS.md). It runs in the
 //! background of an interactive shell, so it never reads stdin; otherwise the same rules.
 //!
+//! `agentlink-hook statusline [-- <your status-line command>]` is Claude Code's status-line command
+//! (docs/design/GAUGES.md). It reads the status-line JSON on stdin, forwards the few fields the watch
+//! shows (context fill, model, pull request, plan rate limits) and returns at once; with no daemon it
+//! sends nothing. After `--` it runs the user's own status-line command with the same stdin and passes
+//! its output and exit status through, so installing it never takes a status line away.
+//!
 //! Two Claude Code hooks block for the watch (UI-V2 §7, DESIGN §6a "first answer wins"):
 //! `PermissionRequest` (fires when Claude Code is about to show its permission prompt) and
 //! `PreToolUse` for `AskUserQuestion`. The hook holds the prompt back for `AGENTLINK_WAIT_MS`
@@ -619,11 +625,140 @@ fn shell_run(args: &[String]) {
     let _ = rx.recv_timeout(DEADLINE);
 }
 
+/// The fields of a status-line payload the daemon reads (usage.rs), with their documented names and
+/// nesting (https://code.claude.com/docs/en/statusline). Everything else, paths and costs included,
+/// stays on this machine's screen.
+fn statusline_payload(v: &Value) -> Value {
+    let pick = |v: &Value, keys: &[&str]| -> Value {
+        let mut out = Map::new();
+        for k in keys {
+            if let Some(x) = v.get(*k).filter(|x| !x.is_null()) {
+                out.insert((*k).to_owned(), x.clone());
+            }
+        }
+        Value::Object(out)
+    };
+    let mut out = Map::new();
+    for k in ["session_id", "cwd"] {
+        if let Some(x) = v.get(k).filter(|x| x.is_string()) {
+            out.insert(k.into(), x.clone());
+        }
+    }
+    if v["model"].is_object() {
+        out.insert("model".into(), pick(&v["model"], &["id", "display_name"]));
+    }
+    if v["context_window"].is_object() {
+        // `null` here means "not known yet": keep it so the daemon can tell it from an old version
+        out.insert(
+            "context_window".into(),
+            json!({"used_percentage": v["context_window"]["used_percentage"]}),
+        );
+    }
+    if v["rate_limits"].is_object() {
+        let mut r = Map::new();
+        for w in ["five_hour", "seven_day"] {
+            if v["rate_limits"][w].is_object() {
+                r.insert(
+                    w.into(),
+                    pick(&v["rate_limits"][w], &["used_percentage", "resets_at"]),
+                );
+            }
+        }
+        out.insert("rate_limits".into(), Value::Object(r));
+    }
+    if v["pr"].is_object() {
+        out.insert(
+            "pr".into(),
+            pick(&v["pr"], &["number", "review_state", "kind"]),
+        );
+    }
+    Value::Object(out)
+}
+
+/// The daemon line of a status-line run. No process walk: the session is known by its id, and the
+/// status line must not wait on `ps`.
+fn statusline_line(stdin: &str) -> Option<String> {
+    let v: Value = serde_json::from_str(stdin).ok()?;
+    let payload = statusline_payload(&v);
+    payload["session_id"].as_str()?;
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    Some(
+        json!({"agent": "claude", "event": "statusline", "ts": ts, "payload": payload}).to_string(),
+    )
+}
+
+/// How long the status line may wait for the forward to the daemon (a local socket write).
+const STATUSLINE_FORWARD: Duration = Duration::from_millis(250);
+
+/// Runs `cmd` through the shell with `input` on its stdin; its stdout and stderr are ours. Returns its
+/// exit status (1 when it could not start).
+fn run_chained(cmd: &str, input: &str) -> i32 {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    #[cfg(windows)]
+    let mut c = {
+        let mut c = Command::new("cmd");
+        c.args(["/C", cmd]);
+        c
+    };
+    #[cfg(not(windows))]
+    let mut c = {
+        let mut c = Command::new("sh");
+        c.args(["-c", cmd]);
+        c
+    };
+    let Ok(mut child) = c.stdin(Stdio::piped()).spawn() else {
+        return 1;
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        let input = input.to_owned();
+        std::thread::spawn(move || {
+            let _ = stdin.write_all(input.as_bytes());
+        });
+    }
+    child.wait().ok().and_then(|s| s.code()).unwrap_or(1)
+}
+
+/// `statusline [-- command words…]`: forward, then hand over to the user's own command, if any.
+fn statusline_run(args: &[String]) -> i32 {
+    let chained = args
+        .iter()
+        .position(|a| a == "--")
+        .map(|i| args[i + 1..].join(" "))
+        .filter(|c| !c.trim().is_empty());
+    let input = read_stdin();
+    let (tx, rx) = mpsc::channel();
+    if let Some(line) = statusline_line(&input) {
+        std::thread::spawn(move || {
+            send(&[line], None);
+            let _ = tx.send(());
+        });
+    } else {
+        drop(tx);
+    }
+    let code = match &chained {
+        Some(cmd) => run_chained(cmd, &input),
+        None => 0,
+    };
+    let _ = rx.recv_timeout(STATUSLINE_FORWARD);
+    code
+}
+
 fn main() {
     let mut args = std::env::args().skip(1);
-    if args.next().as_deref() == Some("shell") {
-        shell_run(&args.collect::<Vec<_>>());
-        std::process::exit(0);
+    match args.next().as_deref() {
+        Some("shell") => {
+            shell_run(&args.collect::<Vec<_>>());
+            std::process::exit(0);
+        }
+        Some("statusline") => {
+            let code = statusline_run(&args.collect::<Vec<_>>());
+            std::process::exit(code);
+        }
+        _ => {}
     }
     let mut args = std::env::args().skip(1);
     let agent = args.next().unwrap_or_else(|| "other".into());
@@ -662,6 +797,45 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn statusline_forwards_only_the_gauge_fields() {
+        let input = json!({
+            "cwd": "/w/proj", "session_id": "abc", "transcript_path": "/secret/t.jsonl",
+            "model": {"id": "claude-opus-4-7", "display_name": "Opus"},
+            "workspace": {"current_dir": "/w/proj"}, "cost": {"total_cost_usd": 1.5},
+            "context_window": {"used_percentage": null, "total_input_tokens": 9},
+            "rate_limits": {"five_hour": {"used_percentage": 23.5, "resets_at": 1738425600u64},
+                            "spend_limit": {"used_usd": 3}},
+            "pr": {"number": 7, "url": "https://example.invalid/pull/7", "review_state": "draft"}
+        })
+        .to_string();
+        let line: Value = serde_json::from_str(&statusline_line(&input).unwrap()).unwrap();
+        assert_eq!(
+            (line["agent"].as_str(), line["event"].as_str()),
+            (Some("claude"), Some("statusline"))
+        );
+        assert_eq!(
+            line["payload"],
+            json!({"session_id": "abc", "cwd": "/w/proj",
+                   "model": {"id": "claude-opus-4-7", "display_name": "Opus"},
+                   "context_window": {"used_percentage": null},
+                   "rate_limits": {"five_hour": {"used_percentage": 23.5, "resets_at": 1738425600u64}},
+                   "pr": {"number": 7, "review_state": "draft"}})
+        );
+        assert!(statusline_line("not json").is_none());
+        assert!(
+            statusline_line("{}").is_none(),
+            "no session id: nothing to say"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn statusline_chains_to_the_users_command() {
+        assert_eq!(run_chained("read l; test \"$l\" = hello", "hello\n"), 0);
+        assert_eq!(run_chained("exit 3", ""), 3);
+    }
 
     #[cfg(target_os = "linux")]
     #[test]

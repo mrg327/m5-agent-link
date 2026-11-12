@@ -167,6 +167,10 @@ where
             }
             continue;
         }
+        if event.eq_ignore_ascii_case("statusline") {
+            on_statusline(registry, &v, &via);
+            continue;
+        }
         let key = session_key(&v, &via);
         if let Some(ev) = to_session_event(&v, &via) {
             registry.apply(ev);
@@ -214,6 +218,22 @@ where
         let _ = w.write_all(reply.as_bytes()).await;
     }
     drop(attach_guard);
+}
+
+/// A status-line run (`agentlink-hook statusline`, usage.rs): readouts for its session, and the plan's
+/// rate limits when it runs on this machine (a remote host may be another account). It never creates a
+/// session and never answers or cancels anything.
+fn on_statusline(registry: &Registry, v: &Value, via: &Via) {
+    let payload = &v["payload"];
+    if payload["session_id"].as_str().is_none_or(str::is_empty) {
+        return;
+    }
+    if let Some(key) = session_key(v, via) {
+        registry.readout(&key, &crate::usage::readout_of(payload));
+    }
+    if *via == Via::Local {
+        registry.record_usage(crate::usage::rates_of(payload));
+    }
 }
 
 /// Opens the request and waits for the device, the terminal, or the clock. Never returns
@@ -372,6 +392,10 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
     }
 
     let mut p = SessionPatch::new(agent_of(agent_name));
+    // Claude Code's permission mode rides on most hook payloads (GAUGES.md); not every event has it
+    p.pm = payload["permission_mode"]
+        .as_str()
+        .and_then(agentlink_proto::PermMode::from_claude);
     let tool = payload["toolName"]
         .as_str()
         .or_else(|| payload["tool_name"].as_str());
@@ -751,5 +775,87 @@ mod tests {
         assert_eq!(patch.repo.as_deref(), Some("proj"));
         assert_eq!(patch.branch.as_deref(), Some("feat/x"));
         assert_eq!(session_key(&v, &via).as_deref(), Some(key.as_str()));
+    }
+
+    #[test]
+    fn permission_mode_rides_on_the_hooks() {
+        let p = patch_of(json!({"agent":"claude","event":"PreToolUse","cwd":"/r",
+            "payload":{"session_id":"s","permission_mode":"acceptEdits","tool_name":"Edit"}}));
+        assert_eq!(p.pm, Some(agentlink_proto::PermMode::AcceptEdits));
+        let p = patch_of(json!({"agent":"claude","event":"Stop","cwd":"/r",
+            "payload":{"session_id":"s","permission_mode":"bypassPermissions"}}));
+        assert_eq!(p.pm, Some(agentlink_proto::PermMode::Bypass));
+        let p = patch_of(json!({"agent":"claude","event":"Stop","cwd":"/r",
+            "payload":{"session_id":"s","permission_mode":"someFutureMode"}}));
+        assert_eq!(p.pm, None, "an unknown mode is not guessed");
+        let p = patch_of(
+            json!({"agent":"claude","event":"Stop","cwd":"/r","payload":{"session_id":"s"}}),
+        );
+        assert_eq!(p.pm, None);
+    }
+
+    #[test]
+    fn status_line_feeds_known_sessions_and_local_rate_limits() {
+        use crate::registry::Update;
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        let now = crate::registry::now_unix();
+        let line = |sid: &str| {
+            json!({"agent":"claude","event":"statusline","cwd":"/r","payload":{
+                "session_id": sid, "model": {"display_name": "Opus"},
+                "context_window": {"used_percentage": 71.6},
+                "rate_limits": {"five_hour": {"used_percentage": 12.5, "resets_at": now + 3600}},
+                "pr": {"number": 9, "review_state": "approved"}}})
+        };
+        // no card yet: the readout is dropped, the account's figures are kept
+        on_statusline(&reg, &line("s"), &Via::Local);
+        assert!(
+            reg.snapshot().is_empty(),
+            "a status line never makes a card"
+        );
+        assert!(matches!(rx.try_recv(), Ok(Update::Usage(u)) if u.h5 == Some(12)));
+        // once the hooks made the session, its readouts arrive as one delta
+        reg.apply(
+            to_session_event(
+                &json!({"agent":"claude","event":"SessionStart","cwd":"/r","payload":{"session_id":"s"}}),
+                &Via::Local,
+            )
+            .unwrap(),
+        );
+        let _ = rx.try_recv();
+        on_statusline(&reg, &line("s"), &Via::Local);
+        let Ok(Update::Upsert(d)) = rx.try_recv() else {
+            panic!("readout delta")
+        };
+        assert_eq!(
+            (d.ctx, d.mdl.as_deref(), d.pr, d.prs),
+            (
+                Some(71),
+                Some("Opus"),
+                Some(9),
+                Some(agentlink_proto::PrState::Approved)
+            )
+        );
+        assert!(rx.try_recv().is_err(), "unchanged figures are not re-sent");
+        // the same line again: nothing new
+        on_statusline(&reg, &line("s"), &Via::Local);
+        assert!(rx.try_recv().is_err());
+        // a remote host's rate limits are not this account's
+        let via = Via::Remote {
+            host: "box".into(),
+            os: "linux".into(),
+            attach: None,
+        };
+        let mut v = line("r");
+        v["payload"]["rate_limits"]["five_hour"]["used_percentage"] = json!(99);
+        on_statusline(&reg, &v, &via);
+        assert!(rx.try_recv().is_err());
+        // a line without a session id is ignored
+        on_statusline(
+            &reg,
+            &json!({"agent":"claude","event":"statusline","payload":{}}),
+            &Via::Local,
+        );
+        assert!(rx.try_recv().is_err());
     }
 }

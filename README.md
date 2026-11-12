@@ -60,6 +60,11 @@ they ended; [docs/design/JOBS.md](docs/design/JOBS.md)), add one line to `~/.zsh
 eval "$(agentlink shell-init zsh)"   # or: bash
 ```
 
+**Usage and context gauges:** to see the plan's 5-hour and weekly usage, each session's context fill, model,
+permission mode and pull request ([docs/design/GAUGES.md](docs/design/GAUGES.md)), route Claude Code's status
+line through the watch. `agentlink hooks statusline` prints the `statusLine` block for `~/.claude/settings.json`;
+it keeps your own status-line command, if you have one.
+
 **Daemon environment**
 
 | Variable | Effect |

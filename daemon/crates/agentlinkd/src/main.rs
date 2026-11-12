@@ -22,6 +22,7 @@ mod source;
 mod trace;
 mod transport;
 mod typing;
+mod usage;
 mod usb;
 mod voice;
 mod ws;

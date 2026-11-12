@@ -58,6 +58,28 @@ The snippet calls `agentlink-hook shell start|end|exit --pid <shell> …` in the
 - `~/.agentlink/job-history.json`: for the ETA only. Key = hash of directory + command line, value = the last 5 successful run times in seconds (runs of 5 s or more), at most 500 keys. No command text. The ETA is the median once there are 2 runs.
 - The trace and the audit log never hold the command line (`payload.cmd` of the hook line and `sum` are replaced by `<private>`; `rerun` is audited without its text). Devices below proto 0.9 get neither job sessions nor `eta` / `exit`.
 
+## Gauges
+
+Plan usage, context fill, model, permission mode and pull request on the watch (docs/design/GAUGES.md). The
+data comes from Claude Code's status line. Print the setting and merge it into `~/.claude/settings.json`
+yourself (nothing is installed; your current status-line command, if any, is read and kept):
+
+```sh
+agentlink hooks statusline                 # or: --chain '<your status-line command>'
+```
+
+`agentlink-hook statusline [-- <command>]` reads the status-line JSON, forwards `session_id`, `cwd`, `model`,
+`context_window.used_percentage`, `rate_limits.five_hour|seven_day` and `pr` (nothing else) as
+`event: "statusline"`, then runs `<command>` with the same stdin and passes its output and exit status
+through. `usage.rs` keeps the account's two windows (local status lines only), projects when they run out at
+the current pace and publishes the `usage` message; a status line updates only a session the hooks created.
+`permission_mode` comes from the hook payloads. Devices below proto 0.10 get none of it; the pull request is
+withheld under privacy `meta`. Try it:
+
+```sh
+echo '{"session_id":"s1","context_window":{"used_percentage":42}}' | cargo run -p agentlink-hook -- statusline
+```
+
 ## Files written
 
 - `~/.agentlink/trace/YYYY-MM-DD.jsonl`: `{ts_us, ts, src, dir, kind, sid?, rid?, msg, bytes?}` for every hook event, registry transition and protocol message (decoded JSON plus raw hex).

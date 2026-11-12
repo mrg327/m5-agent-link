@@ -82,6 +82,13 @@ enum Cmd {
 enum HooksCmd {
     /// Print the config snippets for Copilot CLI and Claude Code (nothing is installed).
     Print,
+    /// Print the Claude Code `statusLine` setting that feeds the watch's usage and context gauges.
+    /// Your current status-line command (read from ~/.claude/settings.json) is kept and chained.
+    Statusline {
+        /// Your own status-line command, run after the watch's with the same input.
+        #[arg(long)]
+        chain: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -160,9 +167,10 @@ fn main() -> Result<()> {
         Cmd::Status => status::run(cli.json),
         Cmd::Trace { follow, sid } => trace::run(cli.json, follow, sid),
         Cmd::Decode { hex } => decode(&hex, cli.json),
-        Cmd::Hooks {
-            cmd: HooksCmd::Print,
-        } => hooks::print(cli.json),
+        Cmd::Hooks { cmd } => match cmd {
+            HooksCmd::Print => hooks::print(cli.json),
+            HooksCmd::Statusline { chain } => hooks::statusline(chain, cli.json),
+        },
         Cmd::Remote { cmd } => match cmd {
             RemoteCmd::Init { rotate } => remote::init(cli.json, rotate),
             RemoteCmd::Add {

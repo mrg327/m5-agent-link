@@ -170,10 +170,24 @@ impl Conn {
         if self.peer_minor < JOBS_MINOR {
             (s.eta, s.exit) = (None, None);
         }
+        // context fill, model, permission mode, pull request: proto 0.10 (GAUGES.md)
+        if self.peer_minor < GAUGES_MINOR {
+            (s.ctx, s.mdl, s.pm, s.pr, s.prs) = (None, None, None, None, None);
+        }
         if self.privacy == Privacy::Meta {
             s.sum = None;
+            // which pull request a session works on says what it works on
+            (s.pr, s.prs) = (None, None);
         }
         s
+    }
+
+    /// The plan's usage windows, to a device that can decode them (proto 0.10).
+    async fn send_usage(&mut self, u: Option<Usage>) -> Result<()> {
+        match u {
+            Some(u) if self.peer_minor >= GAUGES_MINOR => self.send(None, Message::Usage(u)).await,
+            _ => Ok(()),
+        }
     }
 
     /// A full replacement: the job sessions an old device cannot decode are left out.
@@ -303,6 +317,9 @@ const DICTATE_MINOR: u64 = 8;
 
 /// Job sessions (`ag` = shell), `session.eta` / `session.exit` and `cmd rerun` need proto 0.9.
 const JOBS_MINOR: u64 = 9;
+
+/// `session.ctx` / `mdl` / `pm` / `pr` / `prs` and the `usage` message need proto 0.10 (GAUGES.md).
+const GAUGES_MINOR: u64 = 10;
 
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
@@ -447,6 +464,7 @@ async fn handshake(
     for att in shared.broker.pending() {
         c.send(None, Message::Attention(att)).await?;
     }
+    c.send_usage(shared.registry.usage()).await?;
 
     // One entry per device id, so a re-handshake or a reconnect on a new link replaces it.
     let key = hex::encode(hello.1.dev.uid);
@@ -522,6 +540,7 @@ async fn serve(
                 }
                 Ok(Update::Attention(a)) => c.send(None, Message::Attention(a)).await?,
                 Ok(Update::Clear(cl)) => c.send(None, Message::Clear(cl)).await?,
+                Ok(Update::Usage(u)) => c.send_usage(Some(u)).await?,
                 // Missed updates: the device has drifted, so send a full replacement.
                 Err(RecvError::Lagged(_)) => {
                     c.deltas.clear();
@@ -530,6 +549,7 @@ async fn serve(
                     for att in shared.broker.pending() {
                         c.send(None, Message::Attention(att)).await?;
                     }
+                    c.send_usage(shared.registry.usage()).await?;
                 }
                 Err(RecvError::Closed) => return Ok(()),
             },
@@ -1994,6 +2014,88 @@ mod tests {
         c.peer_minor = 9;
         let out = c.for_peer(s);
         assert_eq!((out.eta, out.exit), (Some(60), Some(1)));
+    }
+
+    #[test]
+    fn gauge_fields_need_proto_0_10_and_the_pull_request_needs_privacy() {
+        let (_tx, rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let mut c = Conn {
+            link: Box::new(ChanLink { rx, tx }),
+            trace: Trace::null(),
+            src: "t".into(),
+            next_id: 1,
+            privacy: Privacy::Preview,
+            peer_minor: 9,
+            dictate: false,
+            deltas: DeltaQueue::default(),
+            hidden: HashSet::new(),
+        };
+        let mut s = Session::delta(1);
+        (s.ctx, s.mdl, s.pm, s.pr, s.prs) = (
+            Some(72),
+            Some("Opus".into()),
+            Some(PermMode::Plan),
+            Some(12),
+            Some(PrState::Approved),
+        );
+        let out = c.for_peer(s.clone());
+        assert_eq!(out, Session::delta(1), "an 0.9 device gets none of them");
+        c.peer_minor = 10;
+        assert_eq!(c.for_peer(s.clone()), s);
+        c.privacy = Privacy::Meta;
+        let out = c.for_peer(s);
+        assert_eq!(
+            (out.ctx, out.pm, out.pr, out.prs),
+            (Some(72), Some(PermMode::Plan), None, None)
+        );
+    }
+
+    #[tokio::test]
+    async fn usage_reaches_only_devices_speaking_proto_0_10() {
+        use crate::usage::{Rates, Window};
+        let shared = shared();
+        let now = now_unix();
+        let w = |pct| Window {
+            pct,
+            resets_at: now + 3600,
+        };
+        // a reading from before the device connected is handed over after the snapshot
+        shared.registry.record_usage(Rates {
+            five_hour: Some(w(42.0)),
+            seven_day: None,
+        });
+        for (minor, sees) in [(9, false), (10, true)] {
+            let mut d = spawn_link(&shared);
+            d.to_daemon.send(hello_with_minor("1.0.0", minor)).unwrap();
+            d.next().await; // welcome
+            d.next().await; // snapshot
+            shared.registry.record_usage(Rates {
+                five_hour: Some(w(43.0 + minor as f64)),
+                seven_day: None,
+            });
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+            let ping = Envelope {
+                id: 99,
+                re: None,
+                msg: Message::Ping(Empty {}),
+            };
+            d.to_daemon.send(ping.to_bytes().unwrap()).unwrap();
+            let mut seen = Vec::new();
+            loop {
+                match d.next().await.msg {
+                    Message::Pong(_) => break,
+                    Message::Usage(u) => seen.push(u.h5),
+                    m => panic!("unexpected {m:?}"),
+                }
+            }
+            if sees {
+                assert_eq!(seen.len(), 2, "{seen:?}");
+                assert_eq!(seen[1], Some(53));
+            } else {
+                assert!(seen.is_empty(), "nothing for an old device: {seen:?}");
+            }
+        }
     }
 
     #[tokio::test]

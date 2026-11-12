@@ -2,7 +2,9 @@
 //! session list and broadcasts deltas.
 
 use crate::trace::{Dir, Trace};
-use agentlink_proto::{Agent, Attention, Clear, InputSub, SessState, Session};
+use agentlink_proto::{
+    Agent, Attention, Clear, InputSub, PermMode, PrState, SessState, Session, Usage, CTX_UNKNOWN,
+};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
@@ -45,6 +47,8 @@ pub struct SessionPatch {
     /// to the last value: a reused session's new job must restate them.
     pub eta: Option<u64>,
     pub exit: Option<u64>,
+    /// The agent's permission mode, from the hook payload (Claude Code's `permission_mode`; GAUGES.md).
+    pub pm: Option<PermMode>,
 }
 
 /// What a hook line did to the turn's tool-step counter.
@@ -74,6 +78,7 @@ impl SessionPatch {
             t0: None,
             eta: None,
             exit: None,
+            pm: None,
             step: Step::None,
         }
     }
@@ -143,6 +148,8 @@ pub enum Update {
     Attention(Attention),
     /// That request is over: answered (on either side), expired or cancelled.
     Clear(Clear),
+    /// The plan's rate-limit windows changed (usage.rs; devices with proto >= 0.10).
+    Usage(Usage),
 }
 
 struct Record {
@@ -175,6 +182,8 @@ struct State {
 
 pub struct Registry {
     state: Mutex<State>,
+    /// The account's usage windows (usage.rs), fed by local status lines.
+    usage: Mutex<crate::usage::Tracker>,
     tx: broadcast::Sender<Update>,
     trace: Trace,
 }
@@ -215,9 +224,67 @@ impl Registry {
                 next_attach: 1,
                 ..Default::default()
             }),
+            usage: Mutex::default(),
             tx,
             trace,
         }
+    }
+
+    /// A status-line run on this machine: records its rate-limit windows and publishes a `usage` body
+    /// when the figures changed (usage.rs).
+    pub fn record_usage(&self, rates: crate::usage::Rates) {
+        let body = self.usage.lock().unwrap().record(rates, now_unix());
+        if let Some(u) = body {
+            self.publish(Update::Usage(u));
+        }
+    }
+
+    /// The last published usage body, for a device that connects now.
+    pub fn usage(&self) -> Option<Usage> {
+        self.usage.lock().unwrap().last(now_unix())
+    }
+
+    /// A status-line run's readouts (context fill, model, pull request) for a session the hooks already
+    /// created; an unknown key is ignored, so a status line alone never makes a card. Returns whether the
+    /// session is known.
+    pub fn readout(&self, key: &str, r: &crate::usage::Readout) -> bool {
+        let upd = {
+            let mut st = self.state.lock().unwrap();
+            let Some(sid) = st.by_key.get(key).copied() else {
+                return false;
+            };
+            let Some(rec) = st.sessions.get_mut(&sid) else {
+                return false;
+            };
+            let s = &mut rec.session;
+            let mut d = Session::delta(sid);
+            let mut changed = false;
+            // a context that was never known is not cleared: nothing to say yet
+            if r.ctx.is_some()
+                && !(s.ctx.is_none() && r.ctx == Some(CTX_UNKNOWN))
+                && set(&mut s.ctx, r.ctx)
+            {
+                d.ctx = s.ctx;
+                changed = true;
+            }
+            if set(&mut s.mdl, r.mdl.clone()) {
+                d.mdl = s.mdl.clone();
+                changed = true;
+            }
+            if let Some((n, state)) = r.pr {
+                let was = (s.pr.unwrap_or(0), s.prs.unwrap_or(PrState::None));
+                if was != (n, state) && !(s.pr.is_none() && n == 0) {
+                    (s.pr, s.prs) = (Some(n), Some(state));
+                    (d.pr, d.prs) = (s.pr, s.prs);
+                    changed = true;
+                }
+            }
+            changed.then_some(d)
+        };
+        if let Some(d) = upd {
+            self.publish(Update::Upsert(d));
+        }
+        true
     }
 
     pub fn apply(&self, ev: SessionEvent) {
@@ -261,6 +328,12 @@ impl Registry {
                 0,
                 Some(c.rid),
                 serde_json::to_value(c).unwrap_or_default(),
+            ),
+            Update::Usage(u) => (
+                "usage",
+                0,
+                None,
+                serde_json::to_value(u).unwrap_or_default(),
             ),
         };
         self.trace.record(
@@ -383,6 +456,7 @@ impl Registry {
             (s.eta, d.eta, changed) = (Some(eta), Some(eta), true);
         }
         upd!(exit, p.exit);
+        upd!(pm, p.pm);
         if let Some((q, rp)) = p.ask {
             upd!(q, Some(q));
             upd!(rp, Some(rp));
