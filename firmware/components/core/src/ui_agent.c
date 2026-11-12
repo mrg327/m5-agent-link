@@ -11,8 +11,8 @@
 #include "ui_theme.h"
 #include "ui_wheel.h"
 
-#define LIST_Y 226 /* UI-V3 §4.2: the list's centre; 246 under a question */
-#define LIST_Y_Q 246
+#define LIST_Y 232 /* UI-V3 §4.2: the list's centre (73 px selected row); 250 under a question */
+#define LIST_Y_Q 250
 #define QUESTION_Y 62 /* two lines of FONT_BODY_STRONG span y 64-112 */
 
 static lv_obj_t *s_root, *s_header, *s_wheel, *s_wheel_main, *s_wheel_q, *s_question;
@@ -332,8 +332,8 @@ lv_obj_t *ui_agent_init(lv_obj_t *screen)
     lv_obj_set_size(s_header, cw, lh);
     lv_obj_set_style_text_align(s_header, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_pos(s_header, UI_CX - cw / 2, UI_Y_CAPTION - lh / 2);
-    s_wheel_main = s_wheel = wheel_create_at(s_root, WHEEL_LAYOUT_LIST(LIST_Y));
-    s_wheel_q = wheel_create_at(s_root, WHEEL_LAYOUT_LIST(LIST_Y_Q));
+    s_wheel_main = s_wheel = wheel_create_at(s_root, WHEEL_LAYOUT_LIST_TALL(LIST_Y));
+    s_wheel_q = wheel_create_at(s_root, WHEEL_LAYOUT_LIST_TALL(LIST_Y_Q));
     wheel_set_shown(s_wheel_q, false);
     int qw = theme_chord(70, 0), qh = 2 * lv_font_get_line_height(FONT_BODY_STRONG);
     s_question = lv_label_create(s_root); /* the agent's closing question, above the Reply list */

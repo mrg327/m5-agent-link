@@ -25,7 +25,7 @@
 #define TEXT_LINES 5
 #define ERR_ICON_Y 176
 #define REASON_Y 236
-#define BUTTON_Y 300
+#define BUTTON_Y 296
 
 static lv_obj_t *s_root, *s_header, *s_halo, *s_disc, *s_mic, *s_low, *s_text, *s_err, *s_reason, *s_btn;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
@@ -324,7 +324,7 @@ lv_obj_t *ui_voice_init(lv_obj_t *screen)
     lv_label_set_text(s_err, ICON_ERROR);
     lv_obj_align(s_err, LV_ALIGN_TOP_MID, 0, ERR_ICON_Y - 22);
     s_reason = label(s_root, FONT_HEAD, COL_TEXT, REASON_Y, 320, 2);
-    s_btn = wheel_create_at(s_root, WHEEL_LAYOUT_BUTTON(BUTTON_Y));
+    s_btn = wheel_create_at(s_root, WHEEL_LAYOUT_BUTTON_TALL(BUTTON_Y));
     static const char *const words[2] = {"Stop", "Back"}; /* B has no legend here: a short press does nothing */
     for (int i = 0; i < 2; i++)
         s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,

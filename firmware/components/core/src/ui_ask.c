@@ -12,9 +12,9 @@
 #include "ui_theme.h"
 #include "ui_wheel.h"
 
-#define CAPTION_Y 62 /* UI-V3 §4.3: context caption, title, platter, then the picker */
-#define TITLE_Y 84
-#define PLATTER_Y 118
+#define CAPTION_Y 58 /* UI-V3 §4.3: context caption, title, platter, then the picker */
+#define TITLE_Y 80
+#define PLATTER_Y 112
 #define PLATTER_W 320
 #define PLATTER_PAD_X 14
 #define PLATTER_PAD_Y 10
@@ -22,7 +22,7 @@
 #define ICON_Y 154 /* answered state: 44 px icon, word, caption (top edges) */
 #define WORD_Y 215
 #define CAP_Y 266
-#define ASK_WHEEL WHEEL_LAYOUT_BUTTON(282) /* the picker: rows at 234 / 282 / 330 */
+#define ASK_WHEEL WHEEL_LAYOUT_BUTTON_TALL(280) /* the picker: a 73 px selected row at 280, neighbours at 226 / 334 */
 
 static lv_obj_t *s_root, *s_header, *s_title, *s_plat, *s_text, *s_wheel, *s_icon, *s_word, *s_cap;
 static lv_obj_t *s_badge[2], *s_key[2], *s_wlbl[2];
@@ -41,7 +41,7 @@ static const char *s_icon_shown;
  * screen, nothing that grants permission can be held. A text the daemon itself cut (it ends in an ellipsis)
  * can never be shown in full here, so it can be read and denied on the watch but only approved on the PC. */
 #define MORE_LINES 2
-#define READ_Y 118
+#define READ_Y 112
 #define READ_W 320
 #define READ_LINES 7
 #define ASK_BLOCK_CUT_TEXT 1 /* 0: a daemon-cut text may be approved once the part the watch has was read */

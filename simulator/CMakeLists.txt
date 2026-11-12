@@ -63,6 +63,16 @@ target_include_directories(test_sound PRIVATE ${FW}/core/src ${FW}/agentlink_hal
 target_link_libraries(test_sound PRIVATE lvgl::lvgl m)
 add_test(NAME sound_render COMMAND test_sound)
 
+# Equal-advance digits in every UI font (UI-V3 2.1): needs only the font tables and LVGL's text measurement.
+add_executable(test_fonts tests/test_fonts.c ${FW}/core/src/fonts/font_figtree_20_400.c
+               ${FW}/core/src/fonts/font_figtree_20_500.c ${FW}/core/src/fonts/font_figtree_20_600.c
+               ${FW}/core/src/fonts/font_figtree_24_600.c ${FW}/core/src/fonts/font_figtree_34_600.c
+               ${FW}/core/src/fonts/font_figtree_56_600.c ${FW}/core/src/fonts/font_phosphor_20.c
+               ${FW}/core/src/fonts/font_phosphor_28.c ${FW}/core/src/fonts/font_phosphor_44.c)
+target_include_directories(test_fonts PRIVATE ${FW}/core/src)
+target_link_libraries(test_fonts PRIVATE lvgl::lvgl m)
+add_test(NAME tabular_digits COMMAND test_fonts)
+
 add_test(NAME sim_headless_selftest
          COMMAND agentlink_sim --headless --no-ws --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/selftest.txt)
 set_tests_properties(sim_headless_selftest PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30)
@@ -262,6 +272,15 @@ set_tests_properties(sim_watch_states PROPERTIES TIMEOUT 60)
 sim_script_test(sim_ask_hold_neighbour_row ask_hold_neighbour_row.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_agent_hold_neighbour_row agent_hold_neighbour_row.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,|\"op\":8,")
+# Legibility pass: the selected hold row is 73 px (7 mm) on ASK and AGENT; a hold starts only on that row.
+sim_script_test(sim_ask_tall_row_in ask_tall_row_in.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL" PASS_REGULAR_EXPRESSION "\"op\":3")
+sim_script_test(sim_ask_tall_row_out ask_tall_row_out.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
+sim_script_test(sim_agent_tall_row_in agent_tall_row_in.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL" PASS_REGULAR_EXPRESSION "\"op\":6,")
+sim_script_test(sim_agent_tall_row_out agent_tall_row_out.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,|\"op\":8,")
 sim_script_test(sim_agent_hold_cancel_on_select agent_hold_cancel_on_select.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,")
