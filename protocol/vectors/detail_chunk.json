@@ -1,0 +1,15 @@
+{
+  "desc": "Second chunk of request 10's full text: bytes 512-611 of 612 (proto 0.11)",
+  "symbolic": {
+    "t": "detail",
+    "id": 31,
+    "b": {
+      "rid": 10,
+      "sid": 2,
+      "text": "./scripts/deploy.sh --env prod --yes",
+      "off": 512,
+      "total": 612
+    }
+  },
+  "cbor_hex": "a3000a01181f03a5000a01020278242e2f736372697074732f6465706c6f792e7368202d2d656e762070726f64202d2d7965730319020004190264"
+}

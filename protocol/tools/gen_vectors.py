@@ -183,6 +183,42 @@ VECTORS = {
         env("attention", 13, {0: 9, 1: 2, 2: 0, 3: "Run shell command", 4: "npm test -- --watch=false",
             5: ["Yes", "Yes, don't ask again", "No"], 6: [0, 1, 2, 3], 7: 1793995450, 8: 3}),
     ),
+    "attention_window": (
+        "Approval with its answer window (proto 0.11): 42.5 s of 60 s left when sent, and a cut preview whose "
+        "full text is 612 bytes (fetch it with cmd detail)",
+        {"t": "attention", "id": 15, "b": {"rid": 10, "sid": 2, "kind": "approval",
+         "title": "Run shell command", "text": "cd packages/frontend && npm run test -- --watch=false\u2026",
+         "acts": ["approve", "deny", "focus"], "exp": 1793995260, "left": 42500, "win": 60000, "len": 612}},
+        env("attention", 15, {0: 10, 1: 2, 2: 0, 3: "Run shell command",
+            4: "cd packages/frontend && npm run test -- --watch=false\u2026",
+            6: [0, 1, 2], 7: 1793995260, 9: 42500, 10: 60000, 11: 612}),
+    ),
+    "cmd_detail": (
+        "Device asks for request 10's full text from byte 0 (proto 0.11)",
+        {"t": "cmd", "id": 13, "b": {"op": "detail", "sid": 2, "rid": 10, "arg": 0}},
+        env("cmd", 13, {0: 7, 1: 2, 2: 10, 3: 0}),
+    ),
+    "detail_chunk": (
+        "Second chunk of request 10's full text: bytes 512-611 of 612 (proto 0.11)",
+        {"t": "detail", "id": 31, "b": {"rid": 10, "sid": 2, "text": "./scripts/deploy.sh --env prod --yes",
+         "off": 512, "total": 612}},
+        env("detail", 31, {0: 10, 1: 2, 2: "./scripts/deploy.sh --env prod --yes", 3: 512, 4: 612}),
+    ),
+    "cmd_focus_handback": (
+        "Open on PC from the request itself: focus session 2 and hand request 10 back to the terminal (proto 0.11)",
+        {"t": "cmd", "id": 14, "b": {"op": "focus", "sid": 2, "rid": 10}},
+        env("cmd", 14, {0: 0, 1: 2, 2: 10}),
+    ),
+    "clear_handed_back": (
+        "Request 10 went back to the terminal because the device's Open on PC asked for it (proto 0.11)",
+        {"t": "clear", "id": 32, "b": {"rid": 10, "why": "handed_back"}},
+        env("clear", 32, {0: 10, 1: 4}),
+    ),
+    "clear_expired": (
+        "Request 10's answer window ran out: the terminal asks now",
+        {"t": "clear", "id": 33, "b": {"rid": 10, "why": "expired"}},
+        env("clear", 33, {0: 10, 1: 2}),
+    ),
     "cmd_reply": (
         "Device answers rid 9 with option 1 (\"Yes, don't ask again\")",
         {"t": "cmd", "id": 7, "b": {"op": "reply", "sid": 2, "rid": 9, "arg": 1}},

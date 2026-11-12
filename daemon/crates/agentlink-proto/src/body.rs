@@ -241,6 +241,12 @@ body!(Attention {
     #[n(7)] #[serde(skip_serializing_if = "Option::is_none")] exp: Option<u64>,
     /// Bit `i` set: `opts[i]` grants permission (approve-class; the device commits it only by a hold).
     #[n(8)] #[serde(skip_serializing_if = "Option::is_none")] grant_mask: Option<u64>,
+    /// Milliseconds left in the answer window when this message was sent (proto 0.11, ANSWER-WINDOW.md).
+    #[n(9)] #[serde(skip_serializing_if = "Option::is_none")] left: Option<u64>,
+    /// The whole answer window in milliseconds (proto 0.11).
+    #[n(10)] #[serde(skip_serializing_if = "Option::is_none")] win: Option<u64>,
+    /// The full text's length in bytes when `text` is a cut preview (proto 0.11): `detail` serves it.
+    #[n(11)] #[serde(skip_serializing_if = "Option::is_none")] len: Option<u64>,
 });
 body!(Clear {
     #[n(0)]
@@ -374,11 +380,18 @@ body!(
         #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] preview: Option<String>,
     }
 );
-body!(Detail {
-    #[n(0)] #[serde(skip_serializing_if = "Option::is_none")] rid: Option<u64>,
-    #[n(1)] #[serde(skip_serializing_if = "Option::is_none")] sid: Option<u64>,
-    #[n(2)] text: String,
-});
+body!(
+    /// A chunk of a request's full text (proto 0.11): the answer to `cmd detail {rid, arg: off}`.
+    Detail {
+        #[n(0)] #[serde(skip_serializing_if = "Option::is_none")] rid: Option<u64>,
+        #[n(1)] #[serde(skip_serializing_if = "Option::is_none")] sid: Option<u64>,
+        #[n(2)] text: String,
+        /// Byte offset of this chunk in the full text.
+        #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] off: Option<u64>,
+        /// The full text's length in bytes.
+        #[n(4)] #[serde(skip_serializing_if = "Option::is_none")] total: Option<u64>,
+    }
+);
 body!(Batt {
     #[n(0)]
     pct: u64,

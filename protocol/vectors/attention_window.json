@@ -1,0 +1,24 @@
+{
+  "desc": "Approval with its answer window (proto 0.11): 42.5 s of 60 s left when sent, and a cut preview whose full text is 612 bytes (fetch it with cmd detail)",
+  "symbolic": {
+    "t": "attention",
+    "id": 15,
+    "b": {
+      "rid": 10,
+      "sid": 2,
+      "kind": "approval",
+      "title": "Run shell command",
+      "text": "cd packages/frontend && npm run test -- --watch=false…",
+      "acts": [
+        "approve",
+        "deny",
+        "focus"
+      ],
+      "exp": 1793995260,
+      "left": 42500,
+      "win": 60000,
+      "len": 612
+    }
+  },
+  "cbor_hex": "a30006010f03aa000a01020200037152756e207368656c6c20636f6d6d616e640478386364207061636b616765732f66726f6e74656e64202626206e706d2072756e2074657374202d2d202d2d77617463683d66616c7365e280a60683000102071a6aee31fc0919a6040a19ea600b190264"
+}

@@ -1,0 +1,12 @@
+{
+  "desc": "Request 10 went back to the terminal because the device's Open on PC asked for it (proto 0.11)",
+  "symbolic": {
+    "t": "clear",
+    "id": 32,
+    "b": {
+      "rid": 10,
+      "why": "handed_back"
+    }
+  },
+  "cbor_hex": "a3000701182003a2000a0104"
+}

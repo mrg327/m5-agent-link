@@ -1,0 +1,13 @@
+{
+  "desc": "Open on PC from the request itself: focus session 2 and hand request 10 back to the terminal (proto 0.11)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 14,
+    "b": {
+      "op": "focus",
+      "sid": 2,
+      "rid": 10
+    }
+  },
+  "cbor_hex": "a30008010e03a300000102020a"
+}

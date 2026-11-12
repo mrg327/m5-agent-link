@@ -18,7 +18,7 @@ const ENUMS = {
   scroll_unit: { lines: 0, pages: 1, to_end: 2 },
   disp_shape: { round: 0, rect: 1 },
   host_os: { mac: 0, win: 1, linux: 2 },
-  clear_why: { answered_pc: 0, answered_dev: 1, expired: 2, cancelled: 3 },
+  clear_why: { answered_pc: 0, answered_dev: 1, expired: 2, cancelled: 3, handed_back: 4 },
   result_err: { stale: 0, denied: 1, unsupported: 2, no_window: 3, timeout: 4, internal: 5 },
   log_level: { err: 0, warn: 1, info: 2, debug: 3 },
   audio_codec: { adpcm16k: 0, opus16k: 1 },
@@ -65,6 +65,7 @@ const SPECS = {
   attention: {
     rid: [0, 'uint'], sid: [1, 'uint'], kind: [2, 'enum:att_kind'], title: [3, 'tstr'], text: [4, 'tstr'],
     opts: [5, 'tstrs'], acts: [6, 'enums:action'], exp: [7, 'uint'], grant_mask: [8, 'uint'],
+    left: [9, 'uint'], win: [10, 'uint'], len: [11, 'uint'], // proto 0.11 (ANSWER-WINDOW.md)
   },
   clear: { rid: [0, 'uint'], why: [1, 'enum:clear_why'] },
   // cmd_arg = uint / tstr / scroll_arg: a map argument is the scroll one
@@ -72,7 +73,7 @@ const SPECS = {
   cmd: { op: [0, 'enum:cmd_op'], sid: [1, 'uint'], rid: [2, 'uint'], arg: [3, 'cmd_arg'], hold_ms: [4, 'uint'] },
   scroll_pos: { lines_above: [0, 'uint'], at_bottom: [1, 'bool'], total: [2, 'uint'], preview: [3, 'tstr'] },
   result: { ok: [0, 'bool'], err: [1, 'enum:result_err'], msg: [2, 'tstr'], pos: [3, 'obj:scroll_pos'] },
-  detail: { rid: [0, 'uint'], sid: [1, 'uint'], text: [2, 'tstr'] },
+  detail: { rid: [0, 'uint'], sid: [1, 'uint'], text: [2, 'tstr'], off: [3, 'uint'], total: [4, 'uint'] },
   batt: { pct: [0, 'uint'], chg: [1, 'bool'] },
   log: { lvl: [0, 'enum:log_level'], msg: [1, 'tstr'] },
   audio_start: { aid: [0, 'uint'], codec: [1, 'enum:audio_codec'], sid: [2, 'uint'] },
@@ -216,8 +217,8 @@ export function describe(msg, dir) {
       break;
     }
     case 'gone': what = `session ${b.sid} ended`; break;
-    case 'attention': what = `${b.kind ?? 'attention'} request for session ${b.sid}${b.title ? `: ${b.title}` : ''}`; break;
-    case 'clear': what = `request ${b.rid} cleared (${String(b.why).replace('_', ' ')})`; break;
+    case 'attention': what = `${b.kind ?? 'attention'} request for session ${b.sid}${b.title ? `: ${b.title}` : ''}${b.left !== undefined ? `, ${Math.round(b.left / 1000)} s left to answer` : ''}`; break;
+    case 'clear': what = `request ${b.rid} cleared (${String(b.why).replaceAll('_', ' ')})`; break;
     case 'cmd': {
       const scroll = b.op === 'scroll' && b.arg && typeof b.arg === 'object'
         ? ` ${b.arg.unit === 'to_end' ? (b.arg.delta < 0 ? 'to the top' : 'to the bottom') : `${Math.abs(b.arg.delta)} ${b.arg.unit} ${b.arg.delta < 0 ? 'up' : 'down'}`}`
@@ -234,7 +235,7 @@ export function describe(msg, dir) {
     case 'pong': what = 'pong (link is alive)'; break;
     case 'batt': what = `battery ${b.pct}%${b.chg ? ' charging' : ''}`; break;
     case 'log': what = `log: ${b.msg}`; break;
-    case 'detail': what = `full text for ${b.rid !== undefined ? 'request ' + b.rid : 'session ' + b.sid}`; break;
+    case 'detail': what = `full text for ${b.rid !== undefined ? 'request ' + b.rid : 'session ' + b.sid}${b.total !== undefined ? `, bytes ${b.off ?? 0}-${(b.off ?? 0) + new TextEncoder().encode(b.text ?? '').length} of ${b.total}` : ''}`; break;
     case 'cfg': what = 'new device settings'; break;
     case 'usage': what = b.h5 === undefined && b.wk === undefined ? 'plan usage: not known'
       : `plan usage: 5 h ${b.h5 ?? '–'}%, week ${b.wk ?? '–'}%${b.h5o ? ', on pace to run out early' : ''}`; break;

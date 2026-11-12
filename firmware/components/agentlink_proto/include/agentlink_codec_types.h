@@ -514,6 +514,18 @@ struct attention_uint8uint {
 	uint32_t attention_uint8uint;
 };
 
+struct attention_uint9uint {
+	uint32_t attention_uint9uint;
+};
+
+struct attention_uint10uint {
+	uint32_t attention_uint10uint;
+};
+
+struct attention_uint11uint {
+	uint32_t attention_uint11uint;
+};
+
 struct attention {
 	uint32_t attention_uint0uint;
 	uint32_t attention_uint1uint;
@@ -530,6 +542,12 @@ struct attention {
 	bool attention_uint7uint_present;
 	struct attention_uint8uint attention_uint8uint;
 	bool attention_uint8uint_present;
+	struct attention_uint9uint attention_uint9uint;
+	bool attention_uint9uint_present;
+	struct attention_uint10uint attention_uint10uint;
+	bool attention_uint10uint_present;
+	struct attention_uint11uint attention_uint11uint;
+	bool attention_uint11uint_present;
 };
 
 struct msg_attention {
@@ -543,6 +561,7 @@ struct clear_why_r {
 		clear_why_answered_dev_m_c = 1,
 		clear_why_expired_m_c = 2,
 		clear_why_cancelled_m_c = 3,
+		clear_why_handed_back_m_c = 4,
 	} clear_why_choice;
 };
 
@@ -707,12 +726,24 @@ struct detail_uint1uint {
 	uint32_t detail_uint1uint;
 };
 
+struct detail_uint3uint {
+	uint32_t detail_uint3uint;
+};
+
+struct detail_uint4uint {
+	uint32_t detail_uint4uint;
+};
+
 struct detail {
 	struct detail_uint0uint detail_uint0uint;
 	bool detail_uint0uint_present;
 	struct detail_uint1uint detail_uint1uint;
 	bool detail_uint1uint_present;
 	struct zcbor_string detail_uint2tstr;
+	struct detail_uint3uint detail_uint3uint;
+	bool detail_uint3uint_present;
+	struct detail_uint4uint detail_uint4uint;
+	bool detail_uint4uint_present;
 };
 
 struct msg_detail {

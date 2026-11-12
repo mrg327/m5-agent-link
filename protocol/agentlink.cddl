@@ -266,7 +266,13 @@ attention = {
   ? 5 => [0*4 tstr],        ; opts   ≤ 4 choices, each ≤ 24 chars
   6 => [0*6 action],        ; acts   actions the device may offer
   ? 7 => uint,            ; exp    unix time after which to drop
-  ? 8 => uint            ; grant_mask  bit i set = opts[i] grants permission (approve-class: hold to commit)
+  ? 8 => uint,           ; grant_mask  bit i set = opts[i] grants permission (approve-class: hold to commit)
+  ? 9 => uint,           ; left   ms left in the answer window when this message was sent (ANSWER-WINDOW.md);
+                         ;        the device counts down from its own clock on arrival. Keys 9-11 only to
+                         ;        devices with proto >= 0.11
+  ? 10 => uint,          ; win    the whole answer window in ms (left / win = the part still to run)
+  ? 11 => uint           ; len    the full text's length in bytes, sent when `text` is a cut preview: the
+                         ;        device may fetch it with cmd_op_detail (detail chunks) when len <= 4096
 }
 att_kind = att_kind_approval / att_kind_question / att_kind_error / att_kind_done
 att_kind_approval = 0
@@ -301,14 +307,14 @@ cmd_op = cmd_op_focus / cmd_op_ack / cmd_op_snooze / cmd_op_approve / cmd_op_den
   cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet / cmd_op_scroll /
   cmd_op_type / cmd_op_dictate / cmd_op_kb_pick / cmd_op_kb_del / cmd_op_kb_send / cmd_op_kb_end /
   cmd_op_rerun
-cmd_op_focus = 0
+cmd_op_focus = 0    ; with a `rid` (proto 0.11): also hand that request back to the terminal at once
 cmd_op_ack = 1
 cmd_op_snooze = 2
 cmd_op_approve = 3
 cmd_op_deny = 4
 cmd_op_reply = 5
 cmd_op_cancel = 6   ; interrupt the session's running turn (the daemon sends Esc to its terminal)
-cmd_op_detail = 7
+cmd_op_detail = 7   ; send request `rid`'s full text from byte `arg` (0 = from the start) as detail chunks (proto 0.11)
 cmd_op_notify_done = 8
 cmd_op_quiet = 9
 cmd_op_scroll = 10
@@ -346,10 +352,14 @@ scroll_pos = {
   ? 3 => tstr   ; preview       top visible line, ≤ 48 chars
 }
 
+; The full text of request `rid` (proto 0.11, ANSWER-WINDOW.md), the answer to cmd_op_detail {rid, arg: off}.
+; Sent as chunks of <= 1024 bytes, cut on UTF-8 boundaries, in order from `off`; a `result` follows the last.
 detail = {
   ? 0 => uint,   ; rid
   ? 1 => uint,   ; sid
-  2 => tstr     ; text (full)
+  2 => tstr,     ; text   this chunk
+  ? 3 => uint,   ; off    byte offset of this chunk in the full text
+  ? 4 => uint    ; total  the full text's length in bytes (<= 4096)
 }
 
 
@@ -452,11 +462,13 @@ host_os_win = 1
 host_os_linux = 2
 
 clear_why = clear_why_answered_pc / clear_why_answered_dev / clear_why_expired /
-  clear_why_cancelled
+  clear_why_cancelled / clear_why_handed_back
 clear_why_answered_pc = 0
 clear_why_answered_dev = 1
-clear_why_expired = 2
+clear_why_expired = 2        ; the answer window ran out: the terminal asks now (the hook gave no decision)
 clear_why_cancelled = 3
+clear_why_handed_back = 4    ; the device's own Open on PC (cmd_op_focus with the rid) released the hook at
+                             ; once; only to devices with proto >= 0.11 (older ones get cancelled)
 
 result_err = result_err_stale / result_err_denied / result_err_unsupported /
   result_err_no_window / result_err_timeout / result_err_internal

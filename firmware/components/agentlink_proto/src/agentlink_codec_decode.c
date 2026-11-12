@@ -100,6 +100,9 @@ static bool decode_repeated_attention_tstr_l(zcbor_state_t *state, struct attent
 static bool decode_action(zcbor_state_t *state, struct action_r *result);
 static bool decode_repeated_attention_uint7uint(zcbor_state_t *state, struct attention_uint7uint *result);
 static bool decode_repeated_attention_uint8uint(zcbor_state_t *state, struct attention_uint8uint *result);
+static bool decode_repeated_attention_uint9uint(zcbor_state_t *state, struct attention_uint9uint *result);
+static bool decode_repeated_attention_uint10uint(zcbor_state_t *state, struct attention_uint10uint *result);
+static bool decode_repeated_attention_uint11uint(zcbor_state_t *state, struct attention_uint11uint *result);
 static bool decode_attention(zcbor_state_t *state, struct attention *result);
 static bool decode_msg_attention(zcbor_state_t *state, struct msg_attention *result);
 static bool decode_clear_why(zcbor_state_t *state, struct clear_why_r *result);
@@ -127,6 +130,8 @@ static bool decode_result(zcbor_state_t *state, struct result *result);
 static bool decode_msg_result(zcbor_state_t *state, struct msg_result *result);
 static bool decode_repeated_detail_uint0uint(zcbor_state_t *state, struct detail_uint0uint *result);
 static bool decode_repeated_detail_uint1uint(zcbor_state_t *state, struct detail_uint1uint *result);
+static bool decode_repeated_detail_uint3uint(zcbor_state_t *state, struct detail_uint3uint *result);
+static bool decode_repeated_detail_uint4uint(zcbor_state_t *state, struct detail_uint4uint *result);
 static bool decode_detail(zcbor_state_t *state, struct detail *result);
 static bool decode_msg_detail(zcbor_state_t *state, struct msg_detail *result);
 static bool decode_msg_cfg(zcbor_state_t *state, struct msg_cfg *result);
@@ -1329,6 +1334,42 @@ static bool decode_repeated_attention_uint8uint(
 	return res;
 }
 
+static bool decode_repeated_attention_uint9uint(
+		zcbor_state_t *state, struct attention_uint9uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (9))))
+	&& (zcbor_uint32_decode(state, (&(*result).attention_uint9uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_attention_uint10uint(
+		zcbor_state_t *state, struct attention_uint10uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (10))))
+	&& (zcbor_uint32_decode(state, (&(*result).attention_uint10uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_attention_uint11uint(
+		zcbor_state_t *state, struct attention_uint11uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (11))))
+	&& (zcbor_uint32_decode(state, (&(*result).attention_uint11uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_attention(
 		zcbor_state_t *state, struct attention *result)
 {
@@ -1346,7 +1387,10 @@ static bool decode_attention(
 	&& (((zcbor_uint32_expect(state, (6))))
 	&& (zcbor_list_start_decode(state) && ((zcbor_multi_decode(0, 6, &(*result).attention_action_m_l_action_m_count, (zcbor_decoder_t *)decode_action, state, (*&(*result).attention_action_m_l_action_m), sizeof(struct action_r))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_list_end_decode(state)))
 	&& zcbor_present_decode(&((*result).attention_uint7uint_present), (zcbor_decoder_t *)decode_repeated_attention_uint7uint, state, (&(*result).attention_uint7uint))
-	&& zcbor_present_decode(&((*result).attention_uint8uint_present), (zcbor_decoder_t *)decode_repeated_attention_uint8uint, state, (&(*result).attention_uint8uint))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+	&& zcbor_present_decode(&((*result).attention_uint8uint_present), (zcbor_decoder_t *)decode_repeated_attention_uint8uint, state, (&(*result).attention_uint8uint))
+	&& zcbor_present_decode(&((*result).attention_uint9uint_present), (zcbor_decoder_t *)decode_repeated_attention_uint9uint, state, (&(*result).attention_uint9uint))
+	&& zcbor_present_decode(&((*result).attention_uint10uint_present), (zcbor_decoder_t *)decode_repeated_attention_uint10uint, state, (&(*result).attention_uint10uint))
+	&& zcbor_present_decode(&((*result).attention_uint11uint_present), (zcbor_decoder_t *)decode_repeated_attention_uint11uint, state, (&(*result).attention_uint11uint))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
 
 	if (false) {
 		/* For testing that the types of the arguments are correct.
@@ -1358,6 +1402,9 @@ static bool decode_attention(
 		decode_repeated_attention_tstr_l(state, (&(*result).attention_tstr_l));
 		decode_repeated_attention_uint7uint(state, (&(*result).attention_uint7uint));
 		decode_repeated_attention_uint8uint(state, (&(*result).attention_uint8uint));
+		decode_repeated_attention_uint9uint(state, (&(*result).attention_uint9uint));
+		decode_repeated_attention_uint10uint(state, (&(*result).attention_uint10uint));
+		decode_repeated_attention_uint11uint(state, (&(*result).attention_uint11uint));
 	}
 
 	log_result(state, res, __func__);
@@ -1387,7 +1434,8 @@ static bool decode_clear_why(
 	bool res = (((((zcbor_uint_decode(state, &(*result).clear_why_choice, sizeof((*result).clear_why_choice)))) && ((((((*result).clear_why_choice == clear_why_answered_pc_m_c) && ((1)))
 	|| (((*result).clear_why_choice == clear_why_answered_dev_m_c) && ((1)))
 	|| (((*result).clear_why_choice == clear_why_expired_m_c) && ((1)))
-	|| (((*result).clear_why_choice == clear_why_cancelled_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
+	|| (((*result).clear_why_choice == clear_why_cancelled_m_c) && ((1)))
+	|| (((*result).clear_why_choice == clear_why_handed_back_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1763,6 +1811,30 @@ static bool decode_repeated_detail_uint1uint(
 	return res;
 }
 
+static bool decode_repeated_detail_uint3uint(
+		zcbor_state_t *state, struct detail_uint3uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (3))))
+	&& (zcbor_uint32_decode(state, (&(*result).detail_uint3uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_detail_uint4uint(
+		zcbor_state_t *state, struct detail_uint4uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (4))))
+	&& (zcbor_uint32_decode(state, (&(*result).detail_uint4uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_detail(
 		zcbor_state_t *state, struct detail *result)
 {
@@ -1771,7 +1843,9 @@ static bool decode_detail(
 	bool res = (((zcbor_map_start_decode(state) && ((zcbor_present_decode(&((*result).detail_uint0uint_present), (zcbor_decoder_t *)decode_repeated_detail_uint0uint, state, (&(*result).detail_uint0uint))
 	&& zcbor_present_decode(&((*result).detail_uint1uint_present), (zcbor_decoder_t *)decode_repeated_detail_uint1uint, state, (&(*result).detail_uint1uint))
 	&& (((zcbor_uint32_expect(state, (2))))
-	&& (zcbor_tstr_decode(state, (&(*result).detail_uint2tstr))))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+	&& (zcbor_tstr_decode(state, (&(*result).detail_uint2tstr))))
+	&& zcbor_present_decode(&((*result).detail_uint3uint_present), (zcbor_decoder_t *)decode_repeated_detail_uint3uint, state, (&(*result).detail_uint3uint))
+	&& zcbor_present_decode(&((*result).detail_uint4uint_present), (zcbor_decoder_t *)decode_repeated_detail_uint4uint, state, (&(*result).detail_uint4uint))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
 
 	if (false) {
 		/* For testing that the types of the arguments are correct.
@@ -1779,6 +1853,8 @@ static bool decode_detail(
 		 */
 		decode_repeated_detail_uint0uint(state, (&(*result).detail_uint0uint));
 		decode_repeated_detail_uint1uint(state, (&(*result).detail_uint1uint));
+		decode_repeated_detail_uint3uint(state, (&(*result).detail_uint3uint));
+		decode_repeated_detail_uint4uint(state, (&(*result).detail_uint4uint));
 	}
 
 	log_result(state, res, __func__);

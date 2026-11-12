@@ -1,0 +1,12 @@
+{
+  "desc": "Request 10's answer window ran out: the terminal asks now",
+  "symbolic": {
+    "t": "clear",
+    "id": 33,
+    "b": {
+      "rid": 10,
+      "why": "expired"
+    }
+  },
+  "cbor_hex": "a3000701182103a2000a0102"
+}
