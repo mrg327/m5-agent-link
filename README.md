@@ -42,10 +42,10 @@ scripts/atlas --open        # serves index.html at http://localhost:8700/
 
 ## Setup (user)
 
-Run the daemon (`cargo run -p agentlinkd` in `daemon/`; see `daemon/README.md`). It serves USB, BLE and a WebSocket simulator link at once.
+Run the daemon (`cargo run -p agentlinkd` in `daemon/`; see `daemon/README.md`). It serves USB, BLE and a WebSocket simulator link at once. On macOS, `daemon/tools/launchd.sh install` runs it as a launchd agent that starts at login (see `daemon/README.md`).
 
 **macOS permissions**
-- **Bluetooth:** allow the terminal (or the `agentlinkd` binary) under System Settings › Privacy & Security › Bluetooth, or BLE scanning finds nothing.
+- **Bluetooth:** allow the terminal (or the `agentlinkd` binary) under System Settings › Privacy & Security › Bluetooth, or BLE scanning finds nothing. Under launchd, the `agentlinkd` binary needs its own grant.
 - **Automation:** to focus Terminal.app, allow your terminal/`agentlinkd` to control Terminal under System Settings › Privacy & Security › Automation.
 
 **kitty:** add this to `kitty.conf`, then restart kitty (a config reload is not enough):
