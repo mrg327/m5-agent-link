@@ -140,6 +140,7 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
     }
     if (present & SF_PR) dst->pr = src->pr;
     if (present & SF_PRS) dst->prs = src->prs;
+    if (present & SF_HUSH) dst->hush = src->hush;
     if (present & SF_NO_SCROLL) dst->no_scroll = src->no_scroll;
     if (present & SF_BACK) {
         dst->back = src->back;

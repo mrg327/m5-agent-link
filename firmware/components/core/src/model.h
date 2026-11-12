@@ -70,6 +70,9 @@ typedef struct {
      * change of state. */
     bool back;
     uint8_t back_why; /* BACK_EXPIRED / BACK_HANDED */
+    /* Presence (PRESENCE.md, proto 0.12): read only together with SF_HUSH in the same delta; the user is
+     * looking at this session's terminal, so its finish need not buzz. Not a state of the session. */
+    bool hush;
 } session_t;
 enum { BACK_EXPIRED = 0, BACK_HANDED = 1 };
 
@@ -87,7 +90,8 @@ enum {
     SF_OK = 1 << 16, /* with SF_OK, `step` is STEP_OK or STEP_FAIL */
     SF_Q = 1 << 17, SF_RP = 1 << 18, SF_ETA = 1 << 19, SF_EXIT = 1 << 20,
     SF_CTX = 1 << 21, SF_MDL = 1 << 22, SF_PM = 1 << 23, SF_PR = 1 << 24, SF_PRS = 1 << 25,
-    SF_BACK = 1 << 26 /* not on the wire: set by the device (model_attention_went_back) */
+    SF_BACK = 1 << 26, /* not on the wire: set by the device (model_attention_went_back) */
+    SF_HUSH = 1 << 27  /* proto 0.12: with the delta that enters done / error, `hush` says whether to stay quiet */
 };
 
 typedef struct {
@@ -107,6 +111,9 @@ typedef struct {
      * the full text's length in bytes when it is not (0: `text` is the whole text). */
     bool len_known;
     uint32_t full_len;
+    /* Presence (PRESENCE.md, proto 0.12): the user is looking at this request's terminal; no buzz, glow or
+     * reminders. The card and the answers are as ever. */
+    bool hush;
     bool answer_sent; /* an answer (approve/deny/reply/dictate) is out; waiting for clear */
     uint8_t answer;   /* what was sent: ATT_ANSWER_* */
     uint8_t answer_opt; /* option index for ATT_ANSWER_REPLY */

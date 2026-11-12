@@ -38,6 +38,8 @@
  *                                   asked for, then `result ok`; MAXCHUNKS > 0 sends only that many per request and
  *                                   no result (a link lost mid-transfer); `serve_detail off` stops answering
  *   detail RID SID OFF TOTAL TEXT   one raw `detail` chunk (for a wrong id, a gap, a different total)
+ *   hush on|off                     from now on, `session` and `attention` carry hush (proto 0.12, PRESENCE.md): the
+ *                                   user is looking at that terminal, so the watch must not buzz or glow
  *   expect_countdown MIN_S MAX_S    the countdown ring is shown with MIN_S..MAX_S seconds left (-1 -1: hidden)
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
  *   px_reset | expect_px_max PX     redraw budget: pixels flushed since px_reset must stay within PX
@@ -63,7 +65,7 @@
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_EXPECT_COUNTDOWN, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_EXPECT_COUNTDOWN, E_HUSH, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -283,6 +285,9 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "drop") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_DROP, a, 0, 0, NULL);
         *t += 50;
+    } else if (!strcmp(cmd, "hush") && arg[0]) {
+        add(*t, E_HUSH, !strcmp(arg, "on"), 0, 0, NULL);
+        *t += 50;
     } else if (!strcmp(cmd, "attention") && arg[0]) {
         add(*t, E_ATTENTION, 0, 0, 0, arg);
         *t += 50;
@@ -431,6 +436,8 @@ static void send_hex_kind(int kind, const char *hex)
     sim_link_inject_rx_kind(kind, buf, n);
 }
 
+static bool s_hush; /* `hush on`: sessions and attentions carry the proto 0.12 hush key */
+
 static void run_session(const char *spec)
 {
     /* session SID STATE REPO [BRANCH|- [summary text...]] */
@@ -463,6 +470,10 @@ static void run_session(const char *spec)
         d.seen = st[4] == 's';
     } else if (!strcmp(st, "idle")) d.state = SESS_IDLE;
     snprintf(d.repo, sizeof d.repo, "%s", repo);
+    if (s_hush) {
+        d.hush = true;
+        present |= SF_HUSH;
+    }
     model_upsert(&d, present);
 }
 
@@ -698,6 +709,10 @@ static void run_attention_ex(char *spec, bool win, uint32_t left, uint32_t win_m
         a->attention_uint9uint_present = a->attention_uint10uint_present = true;
         a->attention_uint9uint.attention_uint9uint = left;
         a->attention_uint10uint.attention_uint10uint = win_ms;
+    }
+    if (s_hush) {
+        a->attention_uint12bool_present = true;
+        a->attention_uint12bool.attention_uint12bool = true;
     }
     if (len >= 0) {
         a->attention_uint11uint_present = true;
@@ -1006,6 +1021,7 @@ static void run(const ev_t *e)
     case E_DELTA: run_delta(e->text); break;
     case E_REMOTE: run_remote(e->text); break;
     case E_DROP: model_remove((uint32_t)e->a); break;
+    case E_HUSH: s_hush = e->a != 0; break;
     case E_ATTENTION: run_attention(e->text); break;
     case E_ATTENTION_WIN: run_attention_win(e->text); break;
     case E_SERVE_DETAIL: run_serve_detail(e->text); break;

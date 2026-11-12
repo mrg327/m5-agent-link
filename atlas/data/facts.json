@@ -1598,6 +1598,13 @@
           "type": "pr_state",
           "note": "prs   its review state; sent with pr",
           "name": "prs"
+        },
+        {
+          "key": 26,
+          "optional": true,
+          "type": "bool",
+          "note": "hush  only in the delta that enters done / error, only to devices with proto >= 0.12",
+          "name": "hush"
         }
       ],
       "source": "protocol/agentlink.cddl:55"
@@ -1699,6 +1706,13 @@
           "type": "uint",
           "note": "len    the full text's length in bytes, sent when `text` is a cut preview: the",
           "name": "len"
+        },
+        {
+          "key": 12,
+          "optional": true,
+          "type": "bool",
+          "note": "hush   no buzz, glow or reminders for this request: the user is looking at its terminal",
+          "name": "hush"
         }
       ],
       "source": "protocol/agentlink.cddl:57"
@@ -4857,13 +4871,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:647",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:592",
-    "gesture_map.chord": "firmware/components/core/src/app.c:461",
+    "gesture_map.chord": "firmware/components/core/src/app.c:470",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:196",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:156",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:361",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:362",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:488",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:497",
     "haptics.approved": "firmware/components/core/src/feedback.c:80",
     "haptics.denied": "firmware/components/core/src/feedback.c:87",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:67",

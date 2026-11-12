@@ -1,0 +1,18 @@
+# Presence (PRESENCE.md, proto 0.12): a request the daemon marks hush (the user is looking at that terminal) is
+# shown but does not buzz or glow; the card, ASK and the answer rows are as ever, and nothing is answered by
+# itself. Without hush the next request buzzes.
+connect
+rx a400020101020103a40082000c01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+hush on
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+expect_label Run shell command
+expect_label > Approve HOLD
+hush off
+attention 8 2 approval approve,deny,focus 0 Write file|src/index.ts
+wait 400
+expect_screen ask
+quit

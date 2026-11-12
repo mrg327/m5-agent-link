@@ -317,6 +317,7 @@ static void act_nag(void)
     const attention_t *first = model_attention_first();
     if (first && sid_snoozed(first->sid)) return;
     if (first && s_muted_rid && first->rid == s_muted_rid && first->sid == s_muted_sid) return; /* covered: no reminders */
+    if (first && first->hush) return; /* the user is looking at its terminal (PRESENCE.md) */
     if (!model_quiet_active(app_now_unix())) feedback_attention(ATT_APPROVAL);
 }
 
@@ -364,6 +365,10 @@ static void on_attention(const attention_t *a)
         dbg_event("ui", "quiet", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
     } else if (sid_snoozed(a->sid)) {
         dbg_event("ui", "snoozed", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
+    } else if (a->hush) {
+        /* The daemon sees the user at the keyboard with this session's terminal in front (PRESENCE.md): no
+         * buzz, glow or reminders. The card, ASK and the answers are as ever. */
+        dbg_event("ui", "hush", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
     } else {
         feedback_attention(a->kind);
         if (!motion_face_down()) power_attention(rgb, app_now_ms()); /* face down nobody sees a glow */
@@ -392,6 +397,10 @@ static void on_session(const session_t *before, const session_t *now, uint32_t p
     if (!armed && !job && now->sid != ui_watched_sid()) return;
     uint32_t unix_now = app_now_unix();
     if (model_session_snoozed(now, unix_now) || model_quiet_active(unix_now)) return;
+    if ((present & SF_HUSH) && now->hush) { /* the user is looking at its terminal (PRESENCE.md) */
+        dbg_event("ui", "hush", "\"sid\":%u,\"state\":%d", (unsigned)now->sid, (int)now->state);
+        return;
+    }
     feedback_finished(now->state == SESS_ERROR);
 }
 
