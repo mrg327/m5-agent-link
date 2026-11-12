@@ -11,7 +11,14 @@ const here = dirname(fileURLToPath(import.meta.url));
 // file header, and no absolute (user) path may end up in the repository.
 const out = "../../components/core/src/fonts";
 const conv = "node_modules/.bin/lv_font_conv";
-const fig = (w) => `node_modules/@fontsource/figtree/files/figtree-latin-${w}-normal.woff`;
+// Figtree with the tnum feature frozen in (tabular.py): equal-advance digits, nothing else changes.
+mkdirSync(join(here, "tnum"), { recursive: true });
+const fig = (w) => {
+  const src = `node_modules/@fontsource/figtree/files/figtree-latin-${w}-normal.woff`;
+  const dst = `tnum/figtree-${w}-tnum.ttf`;
+  execFileSync("python3", ["tabular.py", src, dst], { stdio: "inherit", cwd: here });
+  return dst;
+};
 const phDir = "node_modules/@phosphor-icons/web/src/fill";
 
 const TEXT_RANGE = "0x20-0x7E,0xA0-0xFF,0x2013,0x2014,0x2018,0x2019,0x201C,0x201D,0x2022,0x2026";
@@ -47,7 +54,7 @@ mkdirSync(join(here, out), { recursive: true });
 const ph = join(phDir, "Phosphor-Fill.ttf");
 for (const s of [20, 28, 44]) make(`font_phosphor_${s}`, ph, s, ICON_RANGE);
 // Each text font falls back to the icon font of the nearest size.
-make("font_figtree_16_500", fig(500), 16, TEXT_RANGE, "font_phosphor_20");
+make("font_figtree_20_500", fig(500), 20, TEXT_RANGE, "font_phosphor_20");
 make("font_figtree_20_400", fig(400), 20, TEXT_RANGE, "font_phosphor_20");
 make("font_figtree_20_600", fig(600), 20, TEXT_RANGE, "font_phosphor_20");
 make("font_figtree_24_600", fig(600), 24, TEXT_RANGE, "font_phosphor_28");
