@@ -14,6 +14,8 @@
 const snd_role_t snd_roles[] = {
     {"done", "A session you armed with Notify when done (or are watching) finishes", "done-ff", 1, 0},
     {"input", "An agent asks a question or needs your approval", "input-ff", 3, 90},
+    {"approved", "An approval hold completes and the answer goes out (rises)", "approved-rise", 1, 0},
+    {"denied", "A deny or stop hold completes and the answer goes out (falls)", "denied-fall", 1, 0},
 };
 const unsigned snd_role_count = sizeof snd_roles / sizeof snd_roles[0];
 
@@ -152,6 +154,16 @@ static const snd_step_t hom_sonic_sel[] = {S(FM, 60, 84, 11, 130, 1)};
 static const snd_step_t hom_pac_sel[] = {S(TRI, 67, 79, 13, 50, 0), S(TRI, 79, 67, 13, 50, 1)};
 static const snd_step_t hom_tetris_sel[] = {S(SQ25, 79, 0, 9, 20, 1), S(SQ25, 86, 0, 9, 25, 1)};
 
+/* ── confirmation: a bright rising arpeggio for approved, a dull falling one for denied (all under 400 ms) ── */
+static const snd_step_t approved_rise[] = {/* C5 G5 C6 */
+                                           S(SQ25, 72, 0, 10, 50, 0), S(SQ25, 79, 0, 10, 50, 0), S(SQ25, 84, 0, 10, 170, 1)};
+static const snd_step_t approved_chime[] = {/* G5 D6, FM bell-like */
+                                            S(FM, 79, 0, 9, 60, 0), S(FM, 86, 0, 9, 220, 1)};
+static const snd_step_t denied_drop[] = {/* G4 gliding down to G3 */
+                                         S(TRI, 67, 55, 12, 220, 1)};
+static const snd_step_t denied_fall[] = {/* D5 G4 C4, triangle */
+                                         S(TRI, 74, 0, 12, 70, 0), S(TRI, 67, 0, 12, 70, 0), S(TRI, 60, 0, 12, 200, 1)};
+
 const snd_sound_t snd_bank[] = {
     {"done-coin", "done", "Coin", {T(done_coin)}, 0, 0},
     {"done-clear", "done", "Stage clear", {T(done_clear)}, 0, 0},
@@ -197,6 +209,10 @@ const snd_sound_t snd_bank[] = {
     {"input-sonic", "input", "Spin (Sonic style)", {T(hom_sonic_sel)}, 0, 0},
     {"input-pacman", "input", "Wakka (Pac-Man style)", {T(hom_pac_sel)}, 0, 0},
     {"input-tetris", "input", "Rotate (Tetris style)", {T(hom_tetris_sel)}, 0, 0},
+    {"approved-chime", "approved", "Chime", {T(approved_chime)}, 0, 0},
+    {"approved-rise", "approved", "Rising", {T(approved_rise)}, 0, 0},
+    {"denied-fall", "denied", "Falling", {T(denied_fall)}, 0, 0},
+    {"denied-drop", "denied", "Drop", {T(denied_drop)}, 0, 0},
 };
 const unsigned snd_bank_count = sizeof snd_bank / sizeof snd_bank[0];
 

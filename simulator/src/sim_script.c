@@ -45,13 +45,14 @@
 #include "keys.h"
 #include "link_internal.h"
 #include "model.h"
+#include "prefs.h"
 #include "ui_theme.h"
 #include "voice.h"
 #include "sim.h"
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -296,6 +297,34 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "lift")) {
         add(*t, E_MOTION, HAL_MOTION_LIFT, 0, 0, NULL);
         *t += 100;
+    } else if (!strcmp(cmd, "pose") && arg[0]) {
+        /* pose NAME | X Y Z: what the simulated IMU reports from now on (milli-g, screen axes) */
+        static const struct { const char *name; int x, y, z; } poses[] = {
+            {"face_up", 0, 0, 1000},    {"face_down", 0, 0, -1000}, {"upright", 0, -1000, 0},
+            {"upside_down", 0, 1000, 0}, {"hanging", 0, -700, 150},  {"reading", 0, -300, 800},
+            {"stand_flipped", 0, 900, 300}};
+        int x = 0, y = 0, z = 0;
+        bool ok = sscanf(rest, "%d %d %d", &x, &y, &z) == 3;
+        for (size_t i = 0; !ok && i < sizeof poses / sizeof *poses; i++)
+            if (!strcmp(arg, poses[i].name)) x = poses[i].x, y = poses[i].y, z = poses[i].z, ok = true;
+        if (!ok) return false;
+        add(*t, E_POSE, x, y, z, NULL);
+        *t += 20;
+    } else if (!strcmp(cmd, "cover") || !strcmp(cmd, "uncover")) {
+        add(*t, E_COVER, cmd[0] == 'c', 0, 0, NULL);
+        *t += 50;
+    } else if (!strcmp(cmd, "pref") && arg[0]) {
+        add(*t, E_PREF, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "expect_flipped") && sscanf(rest, "%d", &a) == 1) {
+        add(*t, E_EXPECT_FLIPPED, a, 0, 0, NULL);
+        *t += 50;
+    } else if (!strcmp(cmd, "fb_mark")) {
+        add(*t + 100, E_FB_MARK, 0, 0, 0, NULL); /* let the last frame render */
+        *t += 150;
+    } else if (!strcmp(cmd, "expect_fb_flipped")) {
+        add(*t + 100, E_EXPECT_FB_FLIPPED, 0, 0, 0, NULL);
+        *t += 150;
     } else if (!strcmp(cmd, "shake")) {
         add(*t, E_MOTION, HAL_MOTION_SHAKE, 0, 0, NULL);
         *t += 100;
@@ -825,6 +854,29 @@ static void run(const ev_t *e)
     case E_TRANSCRIPT: run_transcript(e->text); break;
     case E_CANDS: run_cands(e->text); break;
     case E_CFG: run_cfg(e->text); break;
+    case E_POSE: sim_set_pose(e->a, e->b, e->c); break;
+    case E_COVER: sim_set_cover(e->a != 0); break;
+    case E_PREF: {
+        char key[16] = "", val[16] = "";
+        if (sscanf(e->text, "%15s %15s", key, val) != 2) fail("bad pref", e->text);
+        else if (!strcmp(key, "volume")) prefs_set_volume((uint8_t)atoi(val));
+        else if (!strcmp(key, "orient")) prefs_set_orient(!strcmp(val, "flipped") ? ORIENT_FLIPPED : !strcmp(val, "auto") ? ORIENT_AUTO : ORIENT_NORMAL);
+        else fail("bad pref", e->text);
+        break;
+    }
+    case E_EXPECT_FLIPPED:
+        if (core_display_flipped() != (e->a != 0)) fail(e->a ? "UI should be turned" : "UI should be upright", "");
+        break;
+    case E_FB_MARK: sim_fb_mark(); break;
+    case E_EXPECT_FB_FLIPPED: {
+        int pct = sim_fb_flipped_match_pct();
+        if (pct < 97) {
+            char buf[32];
+            snprintf(buf, sizeof buf, "match %d%%", pct);
+            fail("framebuffer is not the marked one turned 180 degrees:", buf);
+        }
+        break;
+    }
     case E_RTC:
         hal_rtc_set_unix((uint32_t)e->a);
         app_clock_resync();

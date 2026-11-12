@@ -45,8 +45,32 @@ static uint32_t rgb565_to_rgb888(uint16_t c)
     return ((r << 3 | r >> 2) << 16) | ((g << 2 | g >> 4) << 8) | (b << 3 | b >> 2);
 }
 
-static void flush_cb(lv_display_t *disp, const lv_area_t *a, uint8_t *px)
+static lv_display_t *s_disp;
+static uint16_t s_mark[W * H];
+void sim_fb_mark(void) { memcpy(s_mark, s_fb, sizeof s_fb); }
+int sim_fb_flipped_match_pct(void)
 {
+    long same = 0;
+    for (int i = 0; i < W * H; i++) same += s_fb[i] == s_mark[W * H - 1 - i];
+    return (int)(same * 100 / (W * H));
+}
+
+/* Like the watch's flush: a UI turned by 180 degrees is reversed pixel for pixel and its area mirrored, so the
+ * framebuffer (and the PNG) hold what the glass would show. */
+static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px)
+{
+    lv_area_t rot = *area;
+    const lv_area_t *a = area;
+    if (lv_display_get_rotation(disp) == LV_DISPLAY_ROTATION_180) {
+        uint16_t *p = (uint16_t *)px;
+        for (size_t i = 0, j = (size_t)lv_area_get_size(area); i + 1 < j; i++, j--) {
+            uint16_t t = p[i];
+            p[i] = p[j - 1];
+            p[j - 1] = t;
+        }
+        lv_display_rotate_area(disp, &rot);
+        a = &rot;
+    }
     const uint16_t *src = (const uint16_t *)px;
     int w = lv_area_get_width(a);
     for (int y = a->y1; y <= a->y2; y++, src += w) memcpy(&s_fb[y * W + a->x1], src, (size_t)w * 2);
@@ -75,6 +99,7 @@ lv_display_t *hal_display_create(void)
         }
     }
     lv_display_t *d = lv_display_create(W, H);
+    s_disp = d;
     lv_display_set_color_format(d, LV_COLOR_FORMAT_RGB565);
     lv_display_set_buffers(d, s_buf1, s_buf2, sizeof s_buf1, LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(d, flush_cb);
@@ -96,7 +121,10 @@ void hal_display_set_power(bool on)
     s_dirty = true;
 }
 void hal_display_set_brightness(uint8_t level) { s_brightness = level; s_dirty = true; }
-void hal_display_set_rotation_180(bool flipped) { (void)flipped; }
+void hal_display_set_rotation_180(bool flipped)
+{
+    if (s_disp) lv_display_set_rotation(s_disp, flipped ? LV_DISPLAY_ROTATION_180 : LV_DISPLAY_ROTATION_0);
+}
 
 size_t hal_display_snapshot(uint32_t offset, uint8_t *dst, size_t max_len)
 {

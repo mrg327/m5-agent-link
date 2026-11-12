@@ -1,0 +1,13 @@
+# Face down means silence: lying still on its face for 1.5 s, the watch neither buzzes nor sounds nor glows for a
+# permission request, and its display goes off. The alert mode is not touched (no settings event).
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+pose face_down
+wait 5200
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 800
+attention 8 2 approval approve,deny,focus 0 Write file|src/index.ts
+wait 800
+quit

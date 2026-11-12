@@ -179,6 +179,10 @@ void web_motion(int kind)
 
 void hal_haptic_play(const uint16_t *on_off_ms, size_t count) { js_haptic(on_off_ms, (int)count); }
 void hal_audio_play(const int16_t *pcm, size_t n) { (void)pcm; (void)n; }
+void hal_audio_set_volume(uint8_t percent) { (void)percent; }
+bool hal_touch_covered(void) { return false; }
+uint32_t hal_pref_get(const char *key, uint32_t fallback) { (void)key; return fallback; }
+void hal_pref_set(const char *key, uint32_t value) { (void)key; (void)value; }
 void *hal_audio_alloc(size_t bytes) { (void)bytes; return NULL; }
 hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
 {

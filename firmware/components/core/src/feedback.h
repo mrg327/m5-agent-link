@@ -17,3 +17,4 @@ void feedback_quiet_toggled(void); /* STATUS: quiet mode changed: two spaced pul
 void feedback_finished(bool error); /* a watched or notify-armed session finished: done two soft, error three firm pulses */
 void feedback_usage_warn(void); /* the 5-hour window crossed 80 % (GAUGES.md): one 200 ms buzz */
 void feedback_hello(void);   /* boot buzz; ignores the alert mode */
+void feedback_silence_now(void); /* stop the motor and the speaker at once (palm cover); changes no setting */

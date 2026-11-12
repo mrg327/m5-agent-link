@@ -459,3 +459,5 @@ bool ui_on_gesture(const gesture_evt_t *g)
     }
     return ui_home_act(a, g);
 }
+
+void ui_note_motion(void) { ui_home_note_input(); }

@@ -1,8 +1,10 @@
 idf_component_register(
     SRCS
         "audio.cpp"
+        "bmi270_config.c"
         "board.cpp"
         "display.cpp"
+        "imu.cpp"
         "input.cpp"
         "link.cpp"
         "link_ble.cpp"
