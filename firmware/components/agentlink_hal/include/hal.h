@@ -56,8 +56,14 @@ void hal_rtc_set_unix(uint32_t unix_s);
 lv_display_t *hal_display_create(void);
 /* Create the LVGL pointer input device for touch; NULL if the board has no touch. */
 lv_indev_t *hal_touch_create(lv_display_t *disp);
+/* True while the touch controller reports two or more contacts at once: a palm or a whole hand over the glass
+ * (the CST820B has no contact-size field). Core uses it only to silence an alert in progress. */
+bool hal_touch_covered(void);
 void hal_display_set_power(bool on);       /* panel sleep + rail; off = no pixels lit */
 void hal_display_set_brightness(uint8_t level); /* 0..255 */
+/* Draw the UI turned by 180 degrees. Sets the LVGL display rotation (which also turns pointer coordinates);
+ * the flush callback of the board turns each band's pixels and area, so the glass shows the UI upside down.
+ * Call from the LVGL thread; the caller redraws the screen. */
 void hal_display_set_rotation_180(bool flipped);
 
 /* ───────────── buttons ───────────── */
@@ -71,19 +77,23 @@ void hal_buttons_set_callback(hal_button_cb_t cb);
 /* ───────────── motion (IMU) ───────────── */
 
 typedef enum {
-    HAL_MOTION_LIFT = 0,      /* device raised to read (lanyard → face) */
+    HAL_MOTION_LIFT = 0,      /* device raised to read (a hardware or scripted lift gesture) */
     HAL_MOTION_DROP = 1,      /* device let go / hanging again */
     HAL_MOTION_SHAKE = 2,
-    HAL_MOTION_TILT = 3,      /* continuous tilt sample, see x_mg/y_mg */
+    HAL_MOTION_TILT = 3,      /* periodic gravity sample while streaming, see x_mg/y_mg/z_mg */
 } hal_motion_kind_t;
+/* The accelerometer reading in screen axes, in milli-g: x to the right, y towards 6 o'clock (down the
+ * screen), z out of the glass towards the viewer. A watch lying face up and still reads z = +1000,
+ * face down z = -1000; held upright (12 o'clock up) y = -1000. All motion logic is in core/motion.c. */
 typedef struct {
     hal_motion_kind_t kind;
-    int16_t x_mg, y_mg, z_mg; /* gravity vector in milli-g, screen coordinates */
+    int16_t x_mg, y_mg, z_mg;
     uint64_t t_us;
 } hal_motion_evt_t;
 typedef void (*hal_motion_cb_t)(const hal_motion_evt_t *evt);
 void hal_motion_set_callback(hal_motion_cb_t cb);
-/* Enable TILT samples (~30 Hz) for easter eggs; off by default to save power. */
+/* Start or stop TILT samples (about 10 Hz on the watch, low-power accelerometer mode). Core turns them
+ * on at start for raise-to-wake, face-down silence and orientation. */
 void hal_motion_stream_tilt(bool enable);
 
 /* ───────────── haptics & sound ───────────── */
@@ -97,8 +107,16 @@ void hal_haptic_play(const uint16_t *on_off_ms, size_t count);
  * in progress. No-op without a speaker, and while the microphone records. */
 #define HAL_AUDIO_RATE 16000
 void hal_audio_play(const int16_t *pcm, size_t n);
+/* Speaker level, 0..100 % of the full-scale output gain (0 mutes). Applies to the next sound. */
+void hal_audio_set_volume(uint8_t percent);
 /* Long-lived memory for rendered sounds (PSRAM on the watch); NULL when there is none. */
 void *hal_audio_alloc(size_t bytes);
+
+/* ───────────── stored preferences ───────────── */
+
+/* Small persistent numbers (NVS on the watch; RAM only in the simulator). `key` is at most 15 characters. */
+uint32_t hal_pref_get(const char *key, uint32_t fallback);
+void hal_pref_set(const char *key, uint32_t value);
 
 /* ───────────── microphone (voice dictation, issue 0ea9) ───────────── */
 

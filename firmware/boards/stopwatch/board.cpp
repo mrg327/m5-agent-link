@@ -146,7 +146,7 @@ static void info_init(void)
     s_info.height = SW_PANEL_H;
     s_info.color = true;
     s_info.has_touch = true;
-    s_info.has_imu = false;     /* TODO(imu): BMI270 driver */
+    s_info.has_imu = false;     /* set once the BMI270 answers (sw_imu_init) */
     s_info.has_haptic = true;
     s_info.has_speaker = true; /* ES8311 + AW8737A, audio.cpp */
     s_info.has_mic = true; /* ES8311 + MEMS mic, mic.cpp */
@@ -169,6 +169,7 @@ void hal_board_init(void)
     sw_power_init(s_bus);
     vTaskDelay(pdMS_TO_TICKS(50));
     sw_rtc_init();
+    s_info.has_imu = sw_imu_init();
     sw_input_init();
     /* Display and touch are created by hal_display_create / hal_touch_create. */
     ESP_LOGI(TAG, "board init done (ioe=%d)", sw_ioe_ok());
@@ -255,17 +256,24 @@ hal_battery_t hal_battery_read(void)
     return cached;
 }
 
-/* ───────────── motion (TODO) ───────────── */
+/* ───────────── preferences (NVS) ───────────── */
 
-static hal_motion_cb_t s_motion_cb;
-
-void hal_motion_set_callback(hal_motion_cb_t cb)
+uint32_t hal_pref_get(const char *key, uint32_t fallback)
 {
-    /* TODO(imu): BMI270 lift/drop/shake via PM1 PMG0 -> G12; see FIRMWARE.md §4. */
-    s_motion_cb = cb;
+    nvs_handle_t h;
+    uint32_t v = fallback;
+    if (nvs_open("agentlink", NVS_READONLY, &h) == ESP_OK) {
+        if (nvs_get_u32(h, key, &v) != ESP_OK) v = fallback;
+        nvs_close(h);
+    }
+    return v;
 }
 
-void hal_motion_stream_tilt(bool enable)
+void hal_pref_set(const char *key, uint32_t value)
 {
-    (void)enable;
+    nvs_handle_t h;
+    if (nvs_open("agentlink", NVS_READWRITE, &h) == ESP_OK) {
+        if (nvs_set_u32(h, key, value) == ESP_OK) nvs_commit(h);
+        nvs_close(h);
+    }
 }

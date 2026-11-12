@@ -163,6 +163,25 @@ static void stats_tick(void)
 #define ST_ADD(field) do {} while (0)
 #endif
 
+/* UI turned by 180 degrees (hal_display_set_rotation_180): LVGL renders upright and rotates only the
+ * pointer; here the band is reversed in place (a w x h block turned 180 degrees is the same pixels in
+ * reverse order) and its area mirrored. The even/odd edges of rounder_cb survive the mirroring. */
+static void flush_rotate(lv_display_t *disp, lv_area_t *rot, const lv_area_t **area, uint8_t *px_map)
+{
+    if (lv_display_get_rotation(disp) != LV_DISPLAY_ROTATION_180) {
+        return;
+    }
+    uint16_t *p = (uint16_t *)px_map;
+    for (size_t i = 0, j = (size_t)lv_area_get_size(*area); i + 1 < j; i++, j--) {
+        uint16_t t = p[i];
+        p[i] = p[j - 1];
+        p[j - 1] = t;
+    }
+    *rot = **area;
+    lv_display_rotate_area(disp, rot);
+    *area = rot;
+}
+
 #if SW_DIRECT
 static bool s_dma_ok;  /* draw buffers are internal DMA-capable RAM (a PSRAM fallback would need cache writeback) */
 static bool s_pending; /* a band is still on the wire and its bus transaction is open */
@@ -234,6 +253,8 @@ static void dma_finish_locked(void)
 static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
     ST_T0();
+    lv_area_t rot;
+    flush_rotate(disp, &rot, &area, px_map);
     int32_t w = lv_area_get_width(area);
     int32_t h = lv_area_get_height(area);
     if (s_capture && s_shot) {
@@ -289,6 +310,8 @@ static inline void dma_finish_locked(void) {}
 static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
     ST_T0();
+    lv_area_t rot;
+    flush_rotate(disp, &rot, &area, px_map);
     uint32_t w = lv_area_get_width(area);
     uint32_t h = lv_area_get_height(area);
     uint32_t pixels = w * h;
