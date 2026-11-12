@@ -12,6 +12,7 @@ mod focus;
 mod hook_source;
 mod ipc;
 mod jobs;
+mod keepawake;
 mod keys;
 mod paths;
 mod presence;
@@ -61,6 +62,10 @@ async fn main() -> Result<()> {
         stt.warm();
     }
     shared.jobs.spawn_ticker();
+    let awake = keepawake::spawn(
+        registry.clone(),
+        Box::new(keepawake::ChildInhibitor::system()),
+    );
     let started = registry::now_unix();
 
     let status: hook_source::StatusFn = {
@@ -77,6 +82,7 @@ async fn main() -> Result<()> {
                 "remotes": shared.registry.remotes(),
                 "attaches": shared.registry.attaches(),
                 "presence": presence_status(&shared.registry),
+                "keep_awake": keepawake::status_json(),
             })
         })
     };
@@ -120,6 +126,7 @@ async fn main() -> Result<()> {
 
     wait_for_stop().await?;
     tracing::info!("shutting down");
+    awake.shutdown();
     let _ = std::fs::remove_file(paths::hook_socket());
     let _ = std::fs::remove_file(paths::remote_socket());
     for socket in registry.attach_sockets() {
