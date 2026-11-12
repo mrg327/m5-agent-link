@@ -30,3 +30,4 @@ From the market research: captions are below watch-platform size floors and hold
 
 - 2026-11-12T00:32:47Z · claude-code@linux-dev · linux-x86_64 · 6d098e8: filed
 - 2026-11-12T00:32:54Z · claude-code@linux-dev · linux-x86_64 · 6d098e8: claimed
+- 2026-11-12T02:41:33Z · claude-code@linux-dev · linux-x86_64 · c950d64: Built on branch legible (5fd8e8d, 236bacc, 21d6439), merged into next: tnum frozen into all Figtree faces, caption floor 20 px, selected hold rows 73 px. KEYS legends re-fitted in 6fad64c. Flashed with next; on-glass check pending.

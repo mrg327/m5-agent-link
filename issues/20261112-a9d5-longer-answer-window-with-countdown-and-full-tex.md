@@ -30,3 +30,4 @@ The hook hands the prompt back to the terminal after 15 s by default; make the w
 
 - 2026-11-12T00:32:54Z · claude-code@linux-dev · linux-x86_64 · 6d098e8: filed
 - 2026-11-12T00:32:54Z · claude-code@linux-dev · linux-x86_64 · 6d098e8: claimed
+- 2026-11-12T02:41:33Z · claude-code@linux-dev · linux-x86_64 · c950d64: Built on branch next (7b5192f..70ecb34): protocol 0.11, answer window default 60 s (5-300 s, setting), countdown on ASK, handed_back clear reason, detail chunks up to 4096 bytes with approve locked until read. answer_window_e2e 30/30, ctest 136/136 at that point. Not verified in a live session.

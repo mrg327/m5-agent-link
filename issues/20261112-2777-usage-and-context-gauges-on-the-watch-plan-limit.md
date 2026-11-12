@@ -30,3 +30,4 @@ From the market research: the most common feature in rival devices. Daemon reads
 
 - 2026-11-12T00:32:54Z · claude-code@linux-dev · linux-x86_64 · 6d098e8: filed
 - 2026-11-12T00:32:54Z · claude-code@linux-dev · linux-x86_64 · 6d098e8: claimed
+- 2026-11-12T02:41:33Z · claude-code@linux-dev · linux-x86_64 · c950d64: Built on branch next (113d8d7, 499130a, 254ae1f): protocol 0.10 (usage message, session keys ctx/mdl/pm/pr/prs), agentlink-hook statusline shim with chaining, STATUS arcs, idle-face figure, context capsule, AGENT header readout. ctest 104/104 at that point, gauges_e2e 20/20. No CI check state: the status-line data has none. Not verified on a live subscriber session.

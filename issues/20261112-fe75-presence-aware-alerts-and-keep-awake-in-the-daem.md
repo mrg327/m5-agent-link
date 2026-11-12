@@ -30,3 +30,4 @@ Do not buzz for things the user can see at the keyboard; keep the computer awake
 
 - 2026-11-12T00:32:47Z · claude-code@linux-dev · linux-x86_64 · 6d098e8: filed
 - 2026-11-12T00:32:55Z · claude-code@linux-dev · linux-x86_64 · 6d098e8: claimed
+- 2026-11-12T02:41:33Z · claude-code@linux-dev · linux-x86_64 · c950d64: Built on branch next (0b97473..408a196): protocol 0.12 hush flag, presence rule table (answer window 2 s focused / 10 s at keyboard / full when away), keep-awake idle inhibitor (ac default). presence_e2e 41/41, cargo test 273 passed, ctest 139/139. Present-at-keyboard branch tested with an injected source only; macOS and Wayland untested.
