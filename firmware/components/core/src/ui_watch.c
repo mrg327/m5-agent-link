@@ -137,7 +137,7 @@ static void place_rows(int prior)
         lv_text_get_size(&sz, s_row_txt[i], FONT_CAPTION, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
         if (sz.x > maxw) maxw = sz.x;
     }
-    int cap = theme_chord(ROW_Y0, 46) - MARK_W; /* the top row is the narrowest */
+    int cap = theme_chord(ROW_Y0, 24) - MARK_W; /* the top row is the narrowest */
     if (maxw > cap) maxw = cap;
     int w = maxw + MARK_W, x = UI_CX - w / 2;
     if (x == s_blockx && w == s_blockw) return;

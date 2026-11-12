@@ -30,14 +30,14 @@ typedef struct {
     char shown_icon[ROWS][8];
     int n, sel, prog;
     wheel_style_t style;
-    int cy, pitch;
+    int cy, pitch, sel_h, hit_mid, hit_nb; /* capsule height; touch-zone heights of the selected row and a neighbour */
     lv_obj_t *cap, *ring, *row[ROWS], *ico[ROWS];
 } wheel_t;
 
 static wheel_t *data(const lv_obj_t *w) { return lv_obj_get_user_data((lv_obj_t *)w); }
 
 static int cap_w(const wheel_t *d) { return d->style == WHEEL_STYLE_LIST ? LIST_W : BUTTON_W; }
-static int cap_h(const wheel_t *d) { return d->style == WHEEL_STYLE_LIST ? LIST_H : BUTTON_H; }
+static int cap_h(const wheel_t *d) { return d->sel_h; }
 
 /* Whether row r shows an item: +k and -k are different items unless n == 2k, which shows on the next side only. */
 static bool row_shown(const wheel_t *d, int r)
@@ -136,8 +136,16 @@ lv_obj_t *wheel_create_at(lv_obj_t *parent, wheel_layout_t lay)
     lv_obj_set_user_data(w, d);
     d->style = lay.style;
     d->cy = lay.cy;
-    d->pitch = lay.dy1 ? lay.dy1 : lay.style == WHEEL_STYLE_LIST ? LIST_PITCH : BUTTON_PITCH;
     bool list = d->style == WHEEL_STYLE_LIST;
+    if (lay.sel_h) { /* tall hold row: the touch zones are the capsule and a 56 / 34 px band for each neighbour */
+        d->sel_h = d->hit_mid = lay.sel_h;
+        d->hit_nb = list ? 56 : 34;
+        d->pitch = lay.dy1 ? lay.dy1 : (d->sel_h + d->hit_nb + 1) / 2;
+    } else {
+        d->sel_h = list ? LIST_H : BUTTON_H;
+        d->pitch = lay.dy1 ? lay.dy1 : list ? LIST_PITCH : BUTTON_PITCH;
+        d->hit_mid = d->hit_nb = d->pitch;
+    }
 
     d->cap = lv_obj_create(w); /* first child: the labels draw over it */
     lv_obj_remove_style_all(d->cap);
@@ -236,8 +244,8 @@ int wheel_hit(const lv_obj_t *w, int x, int y)
     if (lv_obj_has_flag(w, LV_OBJ_FLAG_HIDDEN) || x < 233 - cap_w(d) / 2 - HIT_PAD || x > 233 + cap_w(d) / 2 + HIT_PAD)
         return -1;
     for (int r = 0; r < ROWS; r++) {
-        int cy = d->cy + (r - MID) * d->pitch;
-        if (row_shown(d, r) && y >= cy - d->pitch / 2 && y < cy + (d->pitch + 1) / 2)
+        int cy = d->cy + (r - MID) * d->pitch, h = r == MID ? d->hit_mid : d->hit_nb;
+        if (row_shown(d, r) && y >= cy - h / 2 && y < cy + (h + 1) / 2)
             return ((d->sel + r - MID) % d->n + d->n) % d->n;
     }
     return -1;

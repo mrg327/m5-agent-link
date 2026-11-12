@@ -6,7 +6,7 @@
 
 /* Fonts (UI-V3 §2.1): Figtree text at five sizes plus a digits-only number font; Phosphor icons are
  * each text font's fallback, so an ICON_* string can sit in any label (ui_icons.h). */
-LV_FONT_DECLARE(font_figtree_16_500)
+LV_FONT_DECLARE(font_figtree_20_500)
 LV_FONT_DECLARE(font_figtree_20_400)
 LV_FONT_DECLARE(font_figtree_20_600)
 LV_FONT_DECLARE(font_figtree_24_600)
@@ -15,7 +15,7 @@ LV_FONT_DECLARE(font_figtree_56_600)
 LV_FONT_DECLARE(font_phosphor_20)
 LV_FONT_DECLARE(font_phosphor_28)
 LV_FONT_DECLARE(font_phosphor_44)
-#define FONT_CAPTION (&font_figtree_16_500)     /* context line, legends, footers */
+#define FONT_CAPTION (&font_figtree_20_500)     /* context line, legends, footers */
 #define FONT_BODY (&font_figtree_20_400)        /* summaries, prompt text, unselected rows */
 #define FONT_BODY_STRONG (&font_figtree_20_600) /* toasts, chips, small buttons */
 #define FONT_HEAD (&font_figtree_24_600)        /* state word, selected row, card titles, buttons */

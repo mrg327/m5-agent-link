@@ -1,0 +1,15 @@
+# UI-V3 legibility pass: the selected hold row of AGENT is 73 px tall (y 196-268). With Stop selected, a hold that
+# starts 2 px inside its top edge (y 198) stops the session (op 6).
+connect
+rx a400020101020103a50082000401a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 1 work webapp feat/login Running the test suite
+wait 300
+tap 233 233
+wait 400
+expect_screen agent
+tap 233 167
+wait 300
+expect_label > Stop
+hold 233 198 1500
+wait 400
+quit

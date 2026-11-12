@@ -29,10 +29,15 @@ typedef struct {
 typedef struct {
     int cy, dy1, dy2;
     wheel_style_t style;
+    int sel_h; /* height of the selected row's capsule: 0 = the style's own (LIST 56, BUTTON 48); a hold row wants >= 73 (7 mm) */
 } wheel_layout_t;
-#define WHEEL_LAYOUT_CENTRE ((wheel_layout_t){226, 0, 0, WHEEL_STYLE_LIST})
-#define WHEEL_LAYOUT_LIST(cy) ((wheel_layout_t){(cy), 0, 0, WHEEL_STYLE_LIST})
-#define WHEEL_LAYOUT_BUTTON(cy) ((wheel_layout_t){(cy), 0, 0, WHEEL_STYLE_BUTTON})
+#define WHEEL_HOLD_H 73 /* selected row of a screen that holds to commit: 7 mm on the 1.75 inch panel */
+#define WHEEL_LAYOUT_CENTRE ((wheel_layout_t){226, 0, 0, WHEEL_STYLE_LIST, 0})
+#define WHEEL_LAYOUT_LIST(cy) ((wheel_layout_t){(cy), 0, 0, WHEEL_STYLE_LIST, 0})
+#define WHEEL_LAYOUT_BUTTON(cy) ((wheel_layout_t){(cy), 0, 0, WHEEL_STYLE_BUTTON, 0})
+/* The same with a WHEEL_HOLD_H selected row; the neighbours move out to clear it (pitch 65 LIST, 54 BUTTON). */
+#define WHEEL_LAYOUT_LIST_TALL(cy) ((wheel_layout_t){(cy), 0, 0, WHEEL_STYLE_LIST, WHEEL_HOLD_H})
+#define WHEEL_LAYOUT_BUTTON_TALL(cy) ((wheel_layout_t){(cy), 0, 0, WHEEL_STYLE_BUTTON, WHEEL_HOLD_H})
 
 lv_obj_t *wheel_create_at(lv_obj_t *parent, wheel_layout_t layout);
 void wheel_set(lv_obj_t *w, const wheel_item_t *items, int n, int sel);
