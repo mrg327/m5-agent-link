@@ -40,6 +40,9 @@
  *   detail RID SID OFF TOTAL TEXT   one raw `detail` chunk (for a wrong id, a gap, a different total)
  *   hush on|off                     from now on, `session` and `attention` carry hush (proto 0.12, PRESENCE.md): the
  *                                   user is looking at that terminal, so the watch must not buzz or glow
+ *   rule session|project|N exact|wide TEXT   from now on, `attention` carries a standing rule (proto 0.13,
+ *                                   STANDING-RULES.md): TEXT is the rule (\n = line break, \t = tab, \xHH = a byte);
+ *                                   N = a raw scope value; `rule off` stops
  *   expect_countdown MIN_S MAX_S    the countdown ring is shown with MIN_S..MAX_S seconds left (-1 -1: hidden)
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
  *   px_reset | expect_px_max PX     redraw budget: pixels flushed since px_reset must stay within PX
@@ -65,7 +68,7 @@
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_EXPECT_COUNTDOWN, E_HUSH, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -285,6 +288,9 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "drop") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_DROP, a, 0, 0, NULL);
         *t += 50;
+    } else if (!strcmp(cmd, "rule") && arg[0]) {
+        add(*t, E_RULE, 0, 0, 0, arg);
+        *t += 50;
     } else if (!strcmp(cmd, "hush") && arg[0]) {
         add(*t, E_HUSH, !strcmp(arg, "on"), 0, 0, NULL);
         *t += 50;
@@ -437,6 +443,36 @@ static void send_hex_kind(int kind, const char *hex)
 }
 
 static bool s_hush; /* `hush on`: sessions and attentions carry the proto 0.12 hush key */
+static bool s_rule_on, s_rule_wide; /* `rule ...`: attentions carry a standing rule (proto 0.13) */
+static unsigned s_rule_scope;
+static char s_rule_text[512];
+static void fail(const char *what, const char *want);
+
+static void run_rule(const char *spec)
+{
+    if (!strcmp(spec, "off")) {
+        s_rule_on = false;
+        return;
+    }
+    char sc[16], wd[8];
+    int n = 0;
+    if (sscanf(spec, "%15s %7s %n", sc, wd, &n) != 2 || !n) {
+        fail("bad rule", spec);
+        return;
+    }
+    s_rule_scope = !strcmp(sc, "project") ? 1 : !strcmp(sc, "session") ? 0 : (unsigned)atoi(sc);
+    s_rule_wide = !strcmp(wd, "wide");
+    size_t o = 0;
+    for (const char *p = spec + n; *p && o < sizeof s_rule_text - 1; p++) {
+        unsigned v;
+        if (p[0] == '\\' && p[1] == 'n') s_rule_text[o++] = '\n', p++;
+        else if (p[0] == '\\' && p[1] == 't') s_rule_text[o++] = '\t', p++;
+        else if (p[0] == '\\' && p[1] == 'x' && sscanf(p + 2, "%2x", &v) == 1) s_rule_text[o++] = (char)v, p += 3;
+        else s_rule_text[o++] = *p;
+    }
+    s_rule_text[o] = 0;
+    s_rule_on = true;
+}
 
 static void run_session(const char *spec)
 {
@@ -713,6 +749,12 @@ static void run_attention_ex(char *spec, bool win, uint32_t left, uint32_t win_m
     if (s_hush) {
         a->attention_uint12bool_present = true;
         a->attention_uint12bool.attention_uint12bool = true;
+    }
+    if (s_rule_on) {
+        a->attention_uint13tstr_present = a->attention_uint14uint_present = a->attention_uint15bool_present = true;
+        a->attention_uint13tstr.attention_uint13tstr = zs(s_rule_text);
+        a->attention_uint14uint.attention_uint14uint = s_rule_scope;
+        a->attention_uint15bool.attention_uint15bool = s_rule_wide;
     }
     if (len >= 0) {
         a->attention_uint11uint_present = true;
@@ -1022,6 +1064,7 @@ static void run(const ev_t *e)
     case E_REMOTE: run_remote(e->text); break;
     case E_DROP: model_remove((uint32_t)e->a); break;
     case E_HUSH: s_hush = e->a != 0; break;
+    case E_RULE: run_rule(e->text); break;
     case E_ATTENTION: run_attention(e->text); break;
     case E_ATTENTION_WIN: run_attention_win(e->text); break;
     case E_SERVE_DETAIL: run_serve_detail(e->text); break;

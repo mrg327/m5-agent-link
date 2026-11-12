@@ -1,0 +1,12 @@
+# A daemon whose welcome says 0.12 never sends a rule; if one arrived anyway the watch offers no row.
+connect
+rx a400020101020103a40082000c01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+rule project wide Bash(npm test:*)
+attention_win 60000 60000 - 12 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 400
+expect_screen ask
+expect_label 3 options
+expect_no_label Always allow
+quit

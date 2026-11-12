@@ -189,6 +189,12 @@ static void on_attention(const struct attention *in, uint32_t now_ms)
     a.len_known = model_peer_minor() >= 11;
     if (in->attention_uint11uint_present) a.full_len = in->attention_uint11uint.attention_uint11uint;
     if (in->attention_uint12bool_present) a.hush = in->attention_uint12bool.attention_uint12bool;
+    /* A standing rule (proto 0.13): rule, scope and wide together, from a daemon that speaks 0.13. */
+    if (model_peer_minor() >= 13 && in->attention_uint13tstr_present && in->attention_uint14uint_present &&
+        a.kind == ATT_APPROVAL && (a.acts & (1u << ACT_APPROVE)))
+        model_attention_set_rule(&a, in->attention_uint13tstr.attention_uint13tstr.value,
+                                 in->attention_uint13tstr.attention_uint13tstr.len, in->attention_uint14uint.attention_uint14uint,
+                                 in->attention_uint15bool_present && in->attention_uint15bool.attention_uint15bool);
     model_attention_add(&a);
     if (g_link.hooks.on_attention) g_link.hooks.on_attention(model_attention_find(a.rid));
 }

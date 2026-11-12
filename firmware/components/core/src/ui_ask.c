@@ -33,7 +33,9 @@ static int s_n;
 static bool s_holding, s_hold_fired, s_ramp_started;
 static uint32_t s_hold_t0, s_hold_rid;
 static int s_hold_idx;
-static char s_header_txt[64], s_title_txt[48], s_text_txt[168], s_word_txt[16], s_opt_txt[48], s_cap_txt[72];
+static char s_header_txt[64], s_title_txt[48], s_text_txt[168], s_word_txt[16], s_opt_txt[MODEL_RULE_CAP + 8],
+    s_cap_txt[MODEL_RULE_CAP + 40];
+static char s_req_title[48]; /* the request's own title; the rule view puts its scope there instead */
 static const char *s_icon_txt;
 static int s_layout_key;
 static const char *s_icon_shown;
@@ -64,6 +66,19 @@ static char s_page_txt[40];
 #define BACK_MIN_MS 3000
 static uint32_t s_back_ms; /* when that state first showed; 0 = not showing */
 #define ANSWERED_MIN_MS 900 /* the answered state stays this long, so a quick clear cannot make it flash */
+#define ANSWERED_RULE_MS 2500 /* a saved standing rule: long enough to read what was saved */
+/* "Always allow" (STANDING-RULES.md). While that row is selected the platter shows the rule exactly as Claude
+ * Code will save it (`Bash(npm test:*)`, one rule per line), the title says where it is saved, in plain words,
+ * and a caption says how wide it is. Nothing is cut: a rule that needs more than RULE_LINES lines, or a scope
+ * title that does not fit, locks the row ("Rule too long for the watch"). The hold is bound to the hash of the
+ * rule on screen: the daemon saves it only if that is the hash of its own rule, and a rule that changes under a
+ * running hold cancels it. */
+#define RULE_LINES 2
+static lv_obj_t *s_gplat, *s_grule, *s_gnote;
+static bool s_gview, s_rule_fits, s_rule_wide_shown, s_answered_rule;
+static uint8_t s_rule_scope_shown;
+static char s_rule_txt[MODEL_RULE_CAP + 1];
+static uint32_t s_rule_hash_shown, s_hold_hash;
 static uint32_t s_answered_ms; /* when the answered state first showed; 0 = not showing */
 static bool s_keeping;         /* the request is gone but the answered state is still held on screen */
 
@@ -81,6 +96,7 @@ static const char *label_of(const ask_item_t *it, const attention_t *a)
     case ASK_APPROVE: return "Approve";
     case ASK_DENY: return "Deny";
     case ASK_DICTATE: return "Dictate";
+    case ASK_GRANT: return "Always allow";
     default: return "Open on PC";
     }
 }
@@ -133,6 +149,7 @@ static bool text_unreachable(void) { return s_cut && (!s_fetch || detail_state(s
 static bool grant_locked(const ask_item_t *it)
 {
     if (!it->grants) return false;
+    if (it->id == ASK_GRANT && (!s_gview || !s_rule_fits)) return true; /* the rule is not on screen in full */
     if (s_cut) {
         if (text_unreachable()) return ASK_BLOCK_CUT_TEXT || !s_read_ok;
         return !(text_complete() && s_read_ok && s_read_len == detail_total(s_rid));
@@ -180,6 +197,8 @@ static void reader_open(void)
     hold_cancel();
     reader_load();
     show(s_plat, false);
+    show(s_gplat, false);
+    s_gview = false;
     wheel_set_shown(s_wheel, false);
     show(s_read, true);
     show(s_page, true);
@@ -195,6 +214,60 @@ static void reader_close(void)
     show(s_read, false);
     show(s_page, false);
     theme_key_badge_set_word(s_badge[1], s_wlbl[1], "Next", UI_BADGE_B_DEG, UI_BADGE_R);
+}
+
+/* Where the rule is saved, in the words the title shows. */
+static const char *scope_title(uint8_t scope) { return scope == MODEL_RULE_PROJECT ? "Saved for this project" : "Until this session ends"; }
+
+/* How wide the rule is: a wildcard is said, in the request's colour, never hidden. */
+static const char *breadth_note(bool wide) { return wide ? "Wide: * matches anything" : "Exactly as written"; }
+
+static bool grant_selected(void)
+{
+    int sel = wheel_sel(s_wheel);
+    return sel >= 0 && sel < s_n && s_items[sel].id == ASK_GRANT;
+}
+
+/* Shows the rule in place of the request text while "Always allow" is selected; puts everything back when it
+ * is not. Called on every refresh and on every change of selection. */
+static void rule_view(const attention_t *a)
+{
+    if (!a) {
+        s_gview = false;
+        show(s_gplat, false);
+        return;
+    }
+    bool on = a && !a->answer_sent && a->has_rule && !s_reading && !s_back_ms && grant_selected();
+    if (on) {
+        bool changed = strcmp(s_rule_txt, a->rule) || s_rule_scope_shown != a->rule_scope || s_rule_wide_shown != a->rule_wide;
+        if (changed || !s_gview) {
+            int iw = PLATTER_W - 2 * PLATTER_PAD_X, lh = lv_font_get_line_height(FONT_BODY);
+            int ch = lv_font_get_line_height(FONT_CAPTION);
+            lv_point_t sz, tz;
+            lv_text_get_size(&sz, a->rule, FONT_BODY, 0, 0, iw, LV_TEXT_FLAG_NONE);
+            lv_text_get_size(&tz, scope_title(a->rule_scope), FONT_HEAD, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+            int lines = sz.y / lh;
+            s_rule_fits = lines >= 1 && lines <= RULE_LINES && sz.x <= iw && tz.x <= lv_obj_get_width(s_title);
+            snprintf(s_rule_txt, sizeof s_rule_txt, "%s", a->rule);
+            s_rule_scope_shown = a->rule_scope;
+            s_rule_wide_shown = a->rule_wide;
+            s_rule_hash_shown = model_rule_hash(s_rule_txt, s_rule_scope_shown, s_rule_wide_shown);
+            if (!s_rule_fits) lines = 2;
+            lv_label_set_text(s_grule, s_rule_fits ? s_rule_txt : "This rule is too long\nto show on the watch");
+            lv_obj_set_size(s_grule, iw, lines * lh);
+            lv_label_set_text_static(s_gnote, s_rule_fits ? breadth_note(s_rule_wide_shown) : "Answer it on your computer");
+            theme_set_text_color(s_gnote, s_rule_wide_shown && s_rule_fits ? lv_color_hex(RGB_PERMISSION) : COL_TEXT2);
+            lv_obj_set_pos(s_gnote, PLATTER_PAD_X, PLATTER_PAD_Y + lines * lh + 4);
+            lv_obj_set_size(s_gplat, PLATTER_W, lines * lh + 4 + ch + 2 * PLATTER_PAD_Y);
+            if (changed) hold_cancel(); /* a hold belongs to the rule it started on */
+            dbg_event("ui", "rule_view", "\"rid\":%u,\"fits\":%s,\"rh\":%u", (unsigned)a->rid, s_rule_fits ? "true" : "false",
+                      (unsigned)s_rule_hash_shown);
+        }
+    }
+    s_gview = on;
+    show(s_gplat, on);
+    if (!s_reading && !(a && a->answer_sent) && !s_back_ms) show(s_plat, !on);
+    theme_set_text(s_title, s_title_txt, sizeof s_title_txt, on ? scope_title(s_rule_scope_shown) : s_req_title);
 }
 
 /* The request text sits in a platter for a permission and bare, secondary-coloured, for a question. */
@@ -257,6 +330,9 @@ static void show_back(const session_t *s, uint32_t now)
     lv_label_set_text(s_icon, ICON_COMPUTER);
     theme_set_text_color(s_icon, COL_TEXT2);
     show(s_plat, false);
+    show(s_gplat, false);
+    s_gview = false;
+    theme_set_text(s_title, s_title_txt, sizeof s_title_txt, s_req_title);
     show(s_icon, true);
     show(s_word, true);
     show(s_cap, true);
@@ -280,7 +356,7 @@ bool ui_ask_refresh(uint32_t now)
     if (!s || s->state == SESS_ENDED) return false;
     if (!a) {
         /* cleared: hold the answered state on screen for a moment (a new request or input still takes over) */
-        if (s_answered_ms && now - s_answered_ms < ANSWERED_MIN_MS) {
+        if (s_answered_ms && now - s_answered_ms < (s_answered_rule ? ANSWERED_RULE_MS : ANSWERED_MIN_MS)) {
             s_keeping = true;
             return true;
         }
@@ -313,18 +389,26 @@ bool ui_ask_refresh(uint32_t now)
     snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
     theme_set_text(s_header, s_header_txt, sizeof s_header_txt, buf);
     bool perm = a->kind == ATT_APPROVAL;
-    theme_set_text(s_title, s_title_txt, sizeof s_title_txt,
-            a->title[0] ? a->title : s->tool[0] ? s->tool : perm ? "Permission request" : "Question");
+    snprintf(s_req_title, sizeof s_req_title, "%s",
+             a->title[0] ? a->title : s->tool[0] ? s->tool : perm ? "Permission request" : "Question");
+    theme_set_text(s_title, s_title_txt, sizeof s_title_txt, s_req_title);
     layout_text(perm, a->text);
     if (s_fetch && !a->answer_sent) detail_want(a, now); /* the full text, while the user looks at the request */
 
-    if (!a->answer_sent) s_answered_ms = 0;
+    if (!a->answer_sent) s_answered_ms = 0, s_answered_rule = false;
     else if (!s_answered_ms) s_answered_ms = now ? now : 1;
     if (a->answer_sent) {
         uint32_t rgb = RGB_DONE;
         s_icon_txt = ICON_DONE;
-        const char *word = "Approved";
+        const char *word = "Approved", *after = "Waiting for your computer";
         s_opt_txt[0] = 0;
+        s_answered_rule = a->answer == ATT_ANSWER_GRANT;
+        if (s_answered_rule) { /* what was granted: the rule's first line, and where it is saved */
+            word = "Always allowed";
+            snprintf(s_opt_txt, sizeof s_opt_txt, "%.*s%s", (int)strcspn(s_rule_txt, "\n"), s_rule_txt,
+                     strchr(s_rule_txt, '\n') ? " +" : "");
+            after = scope_title(s_rule_scope_shown);
+        }
         if (a->answer == ATT_ANSWER_DENY) {
             word = "Denied";
             s_icon_txt = ICON_DENIED;
@@ -335,8 +419,9 @@ bool ui_ask_refresh(uint32_t now)
             rgb = RGB_ASK;
             if (a->answer == ATT_ANSWER_REPLY) snprintf(s_opt_txt, sizeof s_opt_txt, "\"%s\"", a->opts[a->answer_opt % 4]);
         }
-        snprintf(buf, sizeof buf, "%s%sWaiting for your computer", s_opt_txt, s_opt_txt[0] ? "\n" : "");
-        theme_set_text(s_cap, s_cap_txt, sizeof s_cap_txt, buf);
+        char cap[sizeof s_cap_txt];
+        snprintf(cap, sizeof cap, "%s%s%s", s_opt_txt, s_opt_txt[0] ? "\n" : "", after);
+        theme_set_text(s_cap, s_cap_txt, sizeof s_cap_txt, cap);
         int cap_y = s_opt_txt[0] ? CAP_Y - 10 : CAP_Y;
         if (lv_obj_get_y(s_cap) != cap_y) lv_obj_set_y(s_cap, cap_y);
         theme_set_text(s_word, s_word_txt, sizeof s_word_txt, word);
@@ -346,6 +431,9 @@ bool ui_ask_refresh(uint32_t now)
         }
         theme_set_text_color(s_icon, lv_color_hex(rgb));
         reader_close();
+        show(s_gplat, false);
+        s_gview = false;
+        theme_set_text(s_title, s_title_txt, sizeof s_title_txt, s_req_title);
         show(s_plat, false); /* the request text makes room for the answer */
         show(s_icon, true);
         show(s_word, true);
@@ -360,7 +448,8 @@ bool ui_ask_refresh(uint32_t now)
         int sel = wheel_count(s_wheel) == s_n ? wheel_sel(s_wheel) : 0;
         wheel_set(s_wheel, w, s_n, sel);
         wheel_set_shown(s_wheel, !s_reading);
-        show(s_plat, !s_reading);
+        rule_view(a);
+        show(s_plat, !s_reading && !s_gview);
         show(s_icon, false);
         show(s_word, false);
         show(s_cap, false);
@@ -376,8 +465,11 @@ void ui_ask_open(uint32_t sid, uint32_t now)
     s_now = now;
     s_holding = s_hold_fired = s_ramp_started = false;
     s_answered_ms = 0;
+    s_answered_rule = false;
     s_back_ms = 0;
     s_keeping = false;
+    s_gview = false;
+    s_rule_txt[0] = 0;
     s_read_ok = s_gate_press = false;
     s_read_len = 0;
     s_text_txt[0] = 0;
@@ -413,6 +505,7 @@ static void select_item(int i, const char *via, void (*haptic)(void))
     if (i == wheel_sel(s_wheel)) return;
     wheel_select(s_wheel, i);
     hold_cancel(); /* the hold belongs to the item it started on */
+    rule_view(req());
     dbg_event("ui", "item", "\"idx\":%d,\"via\":\"%s\"", i, via);
     if (haptic) haptic();
 }
@@ -427,6 +520,12 @@ static void commit(const attention_t *a, int idx, uint32_t hold_ms)
     switch (it->id) {
     case ASK_OPT: g_ui_actions->reply(s_sid, a->rid, (uint8_t)it->opt, hold_ms); break;
     case ASK_APPROVE: g_ui_actions->approve(s_sid, a->rid, hold_ms); break;
+    case ASK_GRANT: /* the rule on screen, and only if it is still the request's own */
+        if (s_gview && s_rule_fits && a->has_rule && s_rule_hash_shown == a->rule_hash)
+            g_ui_actions->grant(s_sid, a->rid, hold_ms, s_rule_hash_shown);
+        else
+            g_ui_actions->reject();
+        break;
     case ASK_DENY: g_ui_actions->deny(s_sid, a->rid); break;
     case ASK_DICTATE: ui_go_voice(a->rid); break;
     case ASK_OPEN_PC: /* the terminal shows its prompt at once (proto 0.11): the request is handed back */
@@ -449,6 +548,11 @@ bool ui_ask_back(void)
  * can never show all of it. */
 static void grant_tell(const ask_item_t *it)
 {
+    if (it->id == ASK_GRANT && s_gview && !s_rule_fits) {
+        ui_toast("Rule too long for the watch", rgb_of(it));
+        g_ui_actions->reject();
+        return;
+    }
     if (text_unreachable() && ASK_BLOCK_CUT_TEXT && (s_read_ok || !s_long)) {
         ui_toast("Too long to approve here", rgb_of(it));
         g_ui_actions->reject();
@@ -459,7 +563,17 @@ static void grant_tell(const ask_item_t *it)
 }
 
 /* What a hold on a locked grant is told. */
-static const char *lock_word(void) { return text_unreachable() && ASK_BLOCK_CUT_TEXT ? "Too long to approve here" : "Read it first"; }
+static const char *lock_word(const ask_item_t *it)
+{
+    if (it->id == ASK_GRANT && !s_rule_fits) return "Rule too long for the watch";
+    return text_unreachable() && ASK_BLOCK_CUT_TEXT ? "Too long to approve here" : "Read it first";
+}
+
+/* What a tap on a hold item says: a tap never commits it. */
+static const char *hold_word(const ask_item_t *it)
+{
+    return it->id == ASK_GRANT ? "Hold to always allow" : it->grants ? "Hold to approve" : "Hold to deny";
+}
 
 static bool on_platter(const gesture_evt_t *g)
 {
@@ -555,6 +669,7 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
             s_hold_t0 = s_now;
             s_hold_rid = a->rid;
             s_hold_idx = sel;
+            s_hold_hash = it->id == ASK_GRANT ? s_rule_hash_shown : 0;
         }
         return true;
     case NAV_HOLD_RELEASE:
@@ -577,7 +692,7 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
             const ask_item_t *h = &s_items[hit];
             select_item(hit, "tap", g_ui_actions->tick);
             if (h->hold_ms && grant_locked(h)) grant_tell(h);
-            else if (h->hold_ms) ui_toast(h->grants ? "Hold to approve" : "Hold to deny", rgb_of(h));
+            else if (h->hold_ms) ui_toast(hold_word(h), rgb_of(h));
             else commit(a, hit, 0);
             return true;
         }
@@ -590,7 +705,7 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
             return true;
         }
         if (it->hold_ms) { /* a tap never commits an approve-class or deny item */
-            ui_toast(it->grants ? "Hold to approve" : "Hold to deny", rgb_of(it));
+            ui_toast(hold_word(it), rgb_of(it));
             g_ui_actions->reject();
             return true;
         }
@@ -599,7 +714,8 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
     }
     case NAV_HOLD_LONG: /* injected input whose duration already covers the hold */
         if (it && it->hold_ms && !grant_locked(it) && g->dur_ms >= it->hold_ms && !s_hold_fired && press_on_selected(g) &&
-            nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now) && model_attention_left_ms(a, s_now) > 0) {
+            nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now) && model_attention_left_ms(a, s_now) > 0 &&
+            (it->id != ASK_GRANT || s_rule_hash_shown == a->rule_hash)) {
             hold_cancel();
             s_hold_fired = true;
             commit(a, sel, g->dur_ms);
@@ -628,7 +744,9 @@ bool ui_ask_tick(uint32_t now)
     s_now = now;
     const attention_t *a = req();
     if (!model_find(s_sid)) return true;
-    if (!a) return !((s_answered_ms && now - s_answered_ms < ANSWERED_MIN_MS) || (s_back_ms && now - s_back_ms < BACK_MIN_MS));
+    if (!a)
+        return !((s_answered_ms && now - s_answered_ms < (s_answered_rule ? ANSWERED_RULE_MS : ANSWERED_MIN_MS)) ||
+                 (s_back_ms && now - s_back_ms < BACK_MIN_MS));
     if (s_reading && s_fetch && (detail_got(s_rid) != s_reader_got || detail_state(s_rid) != s_reader_st)) {
         reader_load(); /* more of the full text arrived */
         reader_page();
@@ -637,7 +755,7 @@ bool ui_ask_tick(uint32_t now)
         s_gate_press = false;
         int gs = wheel_sel(s_wheel);
         if (!a->answer_sent && gs < s_n && s_items[gs].hold_ms && grant_locked(&s_items[gs])) {
-            ui_toast(lock_word(), rgb_of(&s_items[gs]));
+            ui_toast(lock_word(&s_items[gs]), rgb_of(&s_items[gs]));
             g_ui_actions->reject();
         }
     }
@@ -645,7 +763,8 @@ bool ui_ask_tick(uint32_t now)
         uint32_t el = now - s_hold_t0;
         const ask_item_t *it = s_hold_idx < s_n ? &s_items[s_hold_idx] : NULL;
         if (a->rid != s_hold_rid || a->answer_sent || !it || !it->hold_ms || s_hold_idx != wheel_sel(s_wheel) ||
-            grant_locked(it) || model_attention_left_ms(a, now) == 0) { /* the window is over: nothing to answer */
+            grant_locked(it) || model_attention_left_ms(a, now) == 0 || /* the window is over: nothing to answer */
+            (it->id == ASK_GRANT && (!a->has_rule || s_hold_hash != a->rule_hash || s_hold_hash != s_rule_hash_shown))) {
             hold_cancel();
             return false;
         }
@@ -683,7 +802,12 @@ void ui_ask_report(ui_report_t *r)
     }
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
     if (s_title_txt[0]) ui_report_add(r, "%s", s_title_txt);
-    if (s_text_txt[0]) ui_report_add(r, "%s", s_text_txt);
+    if (s_gview && !(a && a->answer_sent) && !s_keeping) { /* the rule in place of the request text */
+        ui_report_add(r, "%s", s_rule_fits ? s_rule_txt : "This rule is too long to show on the watch");
+        ui_report_add(r, "%s", lv_label_get_text(s_gnote));
+    } else if (s_text_txt[0]) {
+        ui_report_add(r, "%s", s_text_txt);
+    }
     if (s_back_ms) {
         ui_report_add(r, "On your computer");
         return;
@@ -691,7 +815,7 @@ void ui_ask_report(ui_report_t *r)
     if ((a && a->answer_sent) || s_keeping) {
         ui_report_add(r, "%s", s_word_txt);
         if (s_opt_txt[0]) ui_report_add(r, "%s", s_opt_txt);
-        ui_report_add(r, "Waiting for your computer");
+        ui_report_add(r, "%s", s_answered_rule ? scope_title(s_rule_scope_shown) : "Waiting for your computer");
         return;
     }
     if (s_reading) {
@@ -701,7 +825,7 @@ void ui_ask_report(ui_report_t *r)
     }
     if (s_long || s_cut) ui_report_add(r, "Read all");
     int n = wheel_count(s_wheel), sel = wheel_sel(s_wheel);
-    for (int k = 0; k < n && k < 4; k++) {
+    for (int k = 0; k < n && k < (s_gview ? 3 : 4); k++) {
         const wheel_item_t *it = wheel_item(s_wheel, (sel + k) % n);
         ui_report_add(r, "%s%s%s", k == 0 ? "> " : "", it->label, it->hold ? " HOLD" : "");
     }
@@ -744,6 +868,25 @@ lv_obj_t *ui_ask_init(lv_obj_t *screen)
     lv_obj_set_style_text_align(s_more, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text_static(s_more, "Read all");
     show(s_more, false);
+    s_gplat = lv_obj_create(s_root); /* "Always allow": the rule, as it will be saved, in place of the text */
+    lv_obj_remove_style_all(s_gplat);
+    lv_obj_remove_flag(s_gplat, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_radius(s_gplat, UI_PLATTER_R, 0);
+    lv_obj_set_style_bg_opa(s_gplat, LV_OPA_COVER, 0);
+    theme_set_bg_color(s_gplat, COL_FILL1);
+    lv_obj_set_pos(s_gplat, UI_CX - PLATTER_W / 2, PLATTER_Y);
+    s_grule = lv_label_create(s_gplat);
+    lv_obj_set_style_text_font(s_grule, FONT_BODY, 0);
+    lv_obj_set_style_text_color(s_grule, COL_TEXT, 0);
+    lv_obj_set_style_text_align(s_grule, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(s_grule, LV_LABEL_LONG_MODE_CLIP); /* never an ellipsis: a rule that does not fit locks */
+    lv_obj_set_pos(s_grule, PLATTER_PAD_X, PLATTER_PAD_Y);
+    s_gnote = lv_label_create(s_gplat);
+    lv_obj_set_style_text_font(s_gnote, FONT_CAPTION, 0);
+    lv_obj_set_style_text_align(s_gnote, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(s_gnote, PLATTER_W - 2 * PLATTER_PAD_X);
+    lv_label_set_text_static(s_gnote, "");
+    show(s_gplat, false);
     s_read = lv_obj_create(s_root); /* the reader: a window READ_LINES tall over the whole text */
     lv_obj_remove_style_all(s_read);
     lv_obj_remove_flag(s_read, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);

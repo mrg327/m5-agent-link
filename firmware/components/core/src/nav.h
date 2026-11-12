@@ -64,6 +64,7 @@ const char *nav_action_name(nav_action_t a);
 #define NAV_CENTRE_R 150     /* a touch inside this radius is a centre touch; outside it is the rim */
 #define NAV_HOLD_MS 1200     /* hold-to-approve duration; the daemon's floor is 1000 ms */
 #define NAV_DENY_HOLD_MS 800 /* hold-to-deny: shorter, since a deny only sends the agent back to the prompt */
+#define NAV_GRANT_HOLD_MS 1600 /* hold for "Always allow" (STANDING-RULES.md): longer than approve; the daemon's floor is 1500 ms */
 #define NAV_HOLD_SHOW_MS 250 /* the arc and the haptic ramp only start after this, so a tap never flashes them */
 #define NAV_LIST_SECTORS 9   /* a rim drag in a list is a dial: one item per 40 degrees, clockwise = next */
 #define NAV_LIST_DRAG_PX 40  /* a vertical drag in the centre of a list: one item per 40 px (the first also pays the 18 px tap slop) */
@@ -119,8 +120,9 @@ int nav_job_items(sess_state_t state, agent_item_t *out, int cap);
  * PC" is always last, after "Dictate..." where the request takes free text (acts has ACT_DICTATE) and
  * the daemon transcribes (voice). Anything that grants permission (grant_mask bit, or Approve) commits only by
  * the NAV_HOLD_MS hold; a deny-class option by the NAV_DENY_HOLD_MS hold (or the strict swipe); a
- * question option by a tap. */
-typedef enum { ASK_OPT, ASK_APPROVE, ASK_DENY, ASK_DICTATE, ASK_OPEN_PC } ask_action_t;
+ * question option by a tap. A bare permission whose attention carries a standing rule (has_rule, proto 0.13)
+ * also offers "Always allow" after Deny: a grant item held for NAV_GRANT_HOLD_MS (STANDING-RULES.md). */
+typedef enum { ASK_OPT, ASK_APPROVE, ASK_DENY, ASK_DICTATE, ASK_OPEN_PC, ASK_GRANT } ask_action_t;
 
 typedef struct {
     ask_action_t id;

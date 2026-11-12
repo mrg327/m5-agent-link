@@ -7,7 +7,7 @@
 
 MODEL_EXT_BSS static session_t s_sessions[MODEL_MAX_SESSIONS];
 static bool s_used[MODEL_MAX_SESSIONS];
-static attention_t s_att[MODEL_MAX_ATTENTION];
+MODEL_EXT_BSS static attention_t s_att[MODEL_MAX_ATTENTION]; /* PSRAM: a standing rule makes each ~0.5 KB */
 static bool s_att_used[MODEL_MAX_ATTENTION];
 static settings_t s_settings;
 static uint32_t s_rev;
@@ -73,6 +73,31 @@ void model_copy_str(char *dst, size_t cap, const uint8_t *src, size_t len)
     if (len >= cap) len = cap - 1;
     memcpy(dst, src, len);
     dst[len] = 0;
+}
+
+uint32_t model_rule_hash(const char *rule, uint8_t scope, bool wide)
+{
+    uint32_t h = 0x811c9dc5u;
+    const uint8_t tail[3] = {0, scope, wide ? 1 : 0};
+    for (const uint8_t *p = (const uint8_t *)rule; *p; p++) h = (h ^ *p) * 0x01000193u;
+    for (int i = 0; i < 3; i++) h = (h ^ tail[i]) * 0x01000193u;
+    return h;
+}
+
+void model_attention_set_rule(attention_t *a, const uint8_t *rule, size_t len, uint32_t scope, bool wide)
+{
+    a->has_rule = false;
+    a->rule[0] = 0;
+    if (!rule || len == 0 || len > MODEL_RULE_CAP || scope > MODEL_RULE_PROJECT) return;
+    for (size_t i = 0; i < len; i++) /* every byte must show as itself: no control, no UTF-8, no NUL */
+        if (!(rule[i] == '\n' || (rule[i] >= 0x20 && rule[i] < 0x7f))) return;
+    if (rule[0] == '\n' || rule[len - 1] == '\n') return;
+    memcpy(a->rule, rule, len);
+    a->rule[len] = 0;
+    a->rule_scope = (uint8_t)scope;
+    a->rule_wide = wide;
+    a->rule_hash = model_rule_hash(a->rule, a->rule_scope, a->rule_wide);
+    a->has_rule = true;
 }
 
 const char *sess_state_name(sess_state_t s)
@@ -304,13 +329,14 @@ void model_attention_add(const attention_t *a)
     for (int i = 0; i < MODEL_MAX_ATTENTION && slot < 0; i++)
         if (!s_att_used[i]) slot = i;
     if (slot < 0) slot = 0; /* queue full: oldest is least likely to still be live */
-    attention_t old = s_att[slot];
-    bool had = s_att_used[slot] && old.rid == a->rid;
+    bool had = s_att_used[slot] && s_att[slot].rid == a->rid;
+    bool sent = s_att[slot].answer_sent; /* only these three, not a copy: attention_t is ~0.5 KB of stack */
+    uint8_t answer = s_att[slot].answer, answer_opt = s_att[slot].answer_opt;
     s_att[slot] = *a;
     if (had) { /* a re-sent request keeps the answer already given */
-        s_att[slot].answer_sent = old.answer_sent;
-        s_att[slot].answer = old.answer;
-        s_att[slot].answer_opt = old.answer_opt;
+        s_att[slot].answer_sent = sent;
+        s_att[slot].answer = answer;
+        s_att[slot].answer_opt = answer_opt;
     }
     s_att_used[slot] = true;
     int ss = find_slot(a->sid);

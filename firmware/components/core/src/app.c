@@ -191,6 +191,19 @@ static void act_approve(uint32_t sid, uint32_t rid, uint32_t hold_ms)
     if (!sent) toast_cmd_result(false, ""); /* ASK shows the word itself (UI-V3 §4.3) */
 }
 
+/* Approve and save the standing rule the watch showed (STANDING-RULES.md): the hash names that rule. */
+static void act_grant(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32_t rule_hash)
+{
+    bool sent = link_send_approve_rule(sid, rid, hold_ms, rule_hash);
+    if (sent) {
+        model_attention_set_answer(rid, ATT_ANSWER_GRANT, 0);
+        feedback_approved();
+    } else {
+        feedback_reject();
+        toast_cmd_result(false, "");
+    }
+}
+
 static void act_deny(uint32_t sid, uint32_t rid)
 {
     bool sent = link_send_cmd(LINK_OP_DENY, sid, rid, 0);
@@ -324,6 +337,7 @@ static void act_nag(void)
 static const ui_actions_t s_actions = {.focus = act_focus,
                                        .open_request = act_open_request,
                                        .approve = act_approve,
+                                       .grant = act_grant,
                                        .deny = act_deny,
                                        .reply = act_reply,
                                        .ack = act_ack,

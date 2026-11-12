@@ -26,6 +26,7 @@ typedef struct {
     void (*focus)(uint32_t sid);
     void (*open_request)(uint32_t sid, uint32_t rid); /* ASK: Open on PC, handing request rid back to the terminal */
     void (*approve)(uint32_t sid, uint32_t rid, uint32_t hold_ms);
+    void (*grant)(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32_t rule_hash); /* ASK: approve + save the standing rule */
     void (*deny)(uint32_t sid, uint32_t rid);
     void (*reply)(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms); /* ASK: answer a question / pick a grant option */
     void (*ack)(uint32_t sid);

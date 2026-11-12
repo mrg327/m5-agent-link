@@ -1,0 +1,37 @@
+# A grant hold is bound to its request: the request is answered on the PC mid-hold and a new one with the same
+# rule takes its place; that hold grants nothing, for either. Then the window of the new one runs out mid-hold:
+# nothing is sent, and a hold after the window cannot start.
+connect
+rx a400020101020103a40082000d01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+rule project wide Bash(npm test:*)
+attention_win 60000 60000 - 12 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 400
+btn B
+wait 150
+btn B
+wait 300
+press 233 282
+wait 600
+clear 12 answered_pc
+wait 50
+attention_win 4000 4000 - 13 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 1500
+release
+wait 300
+expect_screen ask
+expect_label > Approve HOLD
+btn B
+wait 150
+btn B
+wait 300
+expect_label > Always allow HOLD
+press 233 282
+wait 2400
+release
+wait 300
+hold 233 282 1900
+wait 300
+expect_no_label Always allowed
+quit

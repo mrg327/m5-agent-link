@@ -233,6 +233,9 @@ int nav_ask_items(const attention_t *a, bool voice, ask_item_t *out, int cap)
     } else if (perm) {
         if ((a->acts & (1u << ACT_APPROVE)) && n < cap - 1) out[n++] = (ask_item_t){ASK_APPROVE, -1, NAV_HOLD_MS, true};
         if ((a->acts & (1u << ACT_DENY)) && n < cap - 1) out[n++] = (ask_item_t){ASK_DENY, -1, NAV_DENY_HOLD_MS, false};
+        /* third, two steps from the default, so the plain Approve stays the one under the finger */
+        if (a->has_rule && (a->acts & (1u << ACT_APPROVE)) && n < cap - 1)
+            out[n++] = (ask_item_t){ASK_GRANT, -1, NAV_GRANT_HOLD_MS, true};
     }
     /* opens VOICE on this request; the hold-to-send there is the commit */
     if (voice && (a->acts & (1u << ACT_DICTATE)) && n < cap - 1) out[n++] = (ask_item_t){ASK_DICTATE, -1, 0, false};

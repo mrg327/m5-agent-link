@@ -9,6 +9,7 @@
 
 #define MODEL_MAX_SESSIONS 32
 #define MODEL_MAX_ATTENTION 4
+#define MODEL_RULE_CAP 160 /* the daemon's standing::RULE_CAP */
 
 /* AGENT_SHELL is a job: a command the user started in a terminal (JOBS.md, proto 0.9). */
 typedef enum { AGENT_COPILOT = 0, AGENT_CLAUDE = 1, AGENT_CLOUD = 2, AGENT_SHELL = 3, AGENT_OTHER = 15 } agent_t;
@@ -114,11 +115,27 @@ typedef struct {
     /* Presence (PRESENCE.md, proto 0.12): the user is looking at this request's terminal; no buzz, glow or
      * reminders. The card and the answers are as ever. */
     bool hush;
+    /* A standing rule (STANDING-RULES.md, proto 0.13): "Always allow" may save `rule`, exactly as Claude Code
+     * saves it (one rule per line), for this session or this project. has_rule only for a rule that arrived
+     * whole and that the watch can show as it is (printable ASCII and line breaks); rule_hash binds the grant
+     * to what was shown. */
+    bool has_rule;
+    bool rule_wide;  /* it ends in a wildcard: it matches more than this request */
+    uint8_t rule_scope; /* MODEL_RULE_SESSION / MODEL_RULE_PROJECT */
+    char rule[MODEL_RULE_CAP + 1];
+    uint32_t rule_hash;
     bool answer_sent; /* an answer (approve/deny/reply/dictate) is out; waiting for clear */
     uint8_t answer;   /* what was sent: ATT_ANSWER_* */
     uint8_t answer_opt; /* option index for ATT_ANSWER_REPLY */
 } attention_t;
-enum { ATT_ANSWER_NONE = 0, ATT_ANSWER_APPROVE, ATT_ANSWER_DENY, ATT_ANSWER_REPLY, ATT_ANSWER_DICTATE };
+enum { ATT_ANSWER_NONE = 0, ATT_ANSWER_APPROVE, ATT_ANSWER_DENY, ATT_ANSWER_REPLY, ATT_ANSWER_DICTATE, ATT_ANSWER_GRANT };
+enum { MODEL_RULE_SESSION = 0, MODEL_RULE_PROJECT = 1 };
+/* FNV-1a 32 over the rule's bytes, a 0 byte, the scope and the wide flag (the daemon's standing::hash). */
+uint32_t model_rule_hash(const char *rule, uint8_t scope, bool wide);
+/* Sets has_rule / rule / rule_scope / rule_wide / rule_hash from what arrived; refuses (has_rule false) a rule
+ * that is empty, cut, longer than MODEL_RULE_CAP, holds a byte the watch cannot show as it is, or has a
+ * scope this build does not know. */
+void model_attention_set_rule(attention_t *a, const uint8_t *rule, size_t len, uint32_t scope, bool wide);
 
 typedef struct { uint32_t waiting, error, running, done_unseen; } model_counts_t;
 

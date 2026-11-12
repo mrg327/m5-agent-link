@@ -1,0 +1,29 @@
+# A rule for this session only, and exact: the title says "Until this session ends", the caption "Exactly as
+# written". Approve on the same request saves nothing (op 3 without a rule hash).
+connect
+rx a400020101020103a40082000d01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+rule session exact Bash(rm -rf build)
+attention_win 60000 60000 - 14 2 approval approve,deny,focus 0 Run shell command|rm -rf build
+wait 400
+btn B
+wait 150
+btn B
+wait 200
+expect_label Until this session ends
+expect_label Bash(rm -rf build)
+expect_label Exactly as written
+shot rule_session_exact.png
+btn B
+wait 150
+btn B
+wait 150
+expect_label > Approve HOLD
+expect_label Run shell command
+expect_label rm -rf build
+hold 233 282 1500
+wait 400
+expect_label Approved
+expect_label Waiting for your computer
+quit

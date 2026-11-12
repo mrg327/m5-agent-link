@@ -356,6 +356,24 @@ sim_script_test(sim_detail_resume detail_resume.txt
 set_tests_properties(sim_detail_resume PROPERTIES TIMEOUT 60)
 sim_script_test(sim_detail_too_long detail_too_long.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":7|\"op\":3")
 sim_script_test(sim_detail_privacy_meta detail_privacy_meta.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":7|\"op\":3")
+# Standing rules (STANDING-RULES.md, proto 0.13): "Always allow" shows the rule in full before the hold, needs
+# the 1600 ms grant hold, and sends approve with the hash of the rule on screen; a swapped rule, an expired or
+# replaced request, a rule that cannot be shown in full and an old daemon never produce a grant (tx_rule).
+sim_script_test(sim_rule_grant_hold rule_grant_hold.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4|\"op\":5|\"op\":3,\"sid\":2,\"rid\":12,\"hold_ms\":1[0-5][0-9][0-9],"
+  PASS_REGULAR_EXPRESSION "\"tx_rule\",\"rid\":12,\"rh\":1365922541.*\"op\":3,\"sid\":2,\"rid\":12,\"hold_ms\":1[6-9][0-9][0-9],")
+sim_script_test(sim_rule_session_exact rule_session_exact.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|tx_rule|\"op\":4"
+  PASS_REGULAR_EXPRESSION "\"op\":3,\"sid\":2,\"rid\":14")
+sim_script_test(sim_rule_swapped rule_swapped.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"tx_rule\",\"rid\":12,\"rh\":1365922541|\"op\":4"
+  PASS_REGULAR_EXPRESSION "\"tx_rule\",\"rid\":12,\"rh\":1948751054")
+sim_script_test(sim_rule_bound rule_bound.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|tx_rule|\"op\":3|\"op\":4")
+sim_script_test(sim_rule_too_long rule_too_long.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|tx_rule|\"op\":3|\"op\":4")
+sim_script_test(sim_rule_old_daemon rule_old_daemon.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|tx_rule")
+sim_script_test(sim_rule_read_first rule_read_first.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4"
+  PASS_REGULAR_EXPRESSION "\"tx_rule\",\"rid\":19,\"rh\":1365922541")
 sim_script_test(sim_list_centre_drag list_centre_drag.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_list_rim_dial list_rim_dial.txt

@@ -1,0 +1,42 @@
+# Nothing on a granting row is cut. A rule that needs more than two lines of the platter is not shown in part:
+# the panel says it is too long and the row is locked (a hold says why, nothing is sent). A rule over 160 bytes,
+# one with a byte the watch cannot show as it is (a tab), or a scope this build does not know gives no row.
+connect
+rx a400020101020103a40082000d01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+rule project exact Bash(npm run test -- --reporter=verbose --coverage --watch=false)\nBash(make lint)
+attention_win 60000 60000 - 15 2 approval approve,deny,focus 0 Run shell command|npm run test && make lint
+wait 400
+expect_label 4 options
+btn B
+wait 150
+btn B
+wait 300
+expect_label > Always allow HOLD
+expect_label too long to show on the watch
+expect_no_label --coverage
+shot rule_too_long.png
+hold 233 282 700
+wait 100
+expect_label Rule too long for the watch
+expect_no_label Always allowed
+clear 15 answered_pc
+wait 1200
+rule project exact Bash(xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)
+attention_win 60000 60000 - 16 2 approval approve,deny,focus 0 Run shell command|x
+wait 400
+expect_label 3 options
+clear 16 answered_pc
+wait 1200
+rule project exact Bash(echo\ta)
+attention_win 60000 60000 - 17 2 approval approve,deny,focus 0 Run shell command|echo a
+wait 400
+expect_label 3 options
+clear 17 answered_pc
+wait 1200
+rule 2 exact Bash(ls)
+attention_win 60000 60000 - 18 2 approval approve,deny,focus 0 Run shell command|ls
+wait 400
+expect_label 3 options
+quit
