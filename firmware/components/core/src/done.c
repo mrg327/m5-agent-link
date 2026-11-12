@@ -37,7 +37,7 @@ static void compose(const done_sum_t *d, const char *sep, bool short_tests, done
             out->txt[i][0] = 0;
             continue;
         }
-        snprintf(out->txt[i], sizeof out->txt[0], "%s%s", first ? "" : sep, body[i]);
+        snprintf(out->txt[i], sizeof out->txt[0], "%.6s%.40s", first ? "" : sep, body[i]);
         first = false;
     }
 }

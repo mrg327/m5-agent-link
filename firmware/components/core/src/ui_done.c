@@ -77,7 +77,7 @@ void ui_done_report(ui_report_t *r)
         if (!s_shown[i]) continue;
         char *dst = i < DONE_TESTS ? a : b;
         size_t n = strlen(dst);
-        snprintf(dst + n, sizeof a - n, "%s", s_cache[i]);
+        snprintf(dst + n, sizeof a - n, "%.52s", s_cache[i]);
     }
     if (a[0]) ui_report_add(r, "%s", a);
     if (b[0]) ui_report_add(r, "%s", b);
