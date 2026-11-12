@@ -421,7 +421,15 @@ impl Probe for SystemProbe {
         {
             linux_focus(ctx)
         }
-        #[cfg(not(target_os = "linux"))]
+        // kitty knows its own focus; other macOS terminals are not asked yet
+        #[cfg(target_os = "macos")]
+        {
+            match crate::focus::kitty_focused(ctx) {
+                Some(f) => (if f { Focus::Yes } else { Focus::No }, "kitty"),
+                None => (Focus::Unknown, "none"),
+            }
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
         {
             let _ = ctx;
             (Focus::Unknown, "none")
@@ -438,6 +446,7 @@ fn idle_state(idle_ms: u64, limit: Duration) -> State {
 }
 
 /// The value of `busctl call` output: `b true` -> `true`, `u 9014759` -> `9014759`.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn parse_busctl(out: &str) -> Option<&str> {
     let mut it = out.split_whitespace();
     let ty = it.next()?;
@@ -446,6 +455,7 @@ pub fn parse_busctl(out: &str) -> Option<&str> {
 }
 
 /// `Key=value` lines of `loginctl show-session`.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn parse_props<'a>(out: &'a str, key: &str) -> Option<&'a str> {
     out.lines()
         .filter_map(|l| l.split_once('='))
@@ -566,7 +576,7 @@ fn linux_user(limit: Duration) -> Reading {
     Reading::unknown()
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn locked(source: &'static str) -> Reading {
     Reading {
         state: State::Locked,
@@ -576,6 +586,7 @@ fn locked(source: &'static str) -> Reading {
 }
 
 /// X11 window ids and pids from `xdotool` output are plain decimals.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn decimal(s: &str) -> Option<u64> {
     let s = s.trim();
     (!s.is_empty() && s.len() <= 12 && s.chars().all(|c| c.is_ascii_digit()))
@@ -584,6 +595,7 @@ fn decimal(s: &str) -> Option<u64> {
 
 /// Whether the active window `(id, pid)` is the session's terminal: `WINDOWID` (set by X11 terminals),
 /// kitty's pid, or one of the pids the hook captured.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn is_terminal_window(ctx: &HostCtx, active_id: u64, active_pid: Option<u64>) -> bool {
     let env_u64 = |k: &str| ctx.env.get(k).and_then(|v| v.trim().parse::<u64>().ok());
     if env_u64("WINDOWID") == Some(active_id) {

@@ -13,7 +13,7 @@ use crate::registry::{now_unix, HostCtx, Registry, SessionEvent, SessionPatch, V
 use agentlink_proto::{Agent, SessState};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -332,7 +332,7 @@ impl History {
 fn pid_alive(pid: u32) -> bool {
     #[cfg(target_os = "linux")]
     {
-        Path::new(&format!("/proc/{pid}")).exists()
+        std::path::Path::new(&format!("/proc/{pid}")).exists()
     }
     #[cfg(all(unix, not(target_os = "linux")))]
     {
@@ -353,6 +353,7 @@ fn pid_alive(pid: u32) -> bool {
 
 /// `pgrp` and `tpgid` out of a `/proc/<pid>/stat` line (the command name may hold spaces and
 /// parentheses, so fields count from the last `)`).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn parse_stat(stat: &str) -> Option<(i64, i64)> {
     let rest = stat.get(stat.rfind(')')? + 1..)?;
     let mut f = rest.split_whitespace();

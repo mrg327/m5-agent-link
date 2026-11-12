@@ -26,6 +26,8 @@ if [[ -o interactive ]] && (( $+commands[agentlink-hook] )) && [[ -z "${_agentli
     return $_agentlink_st
   }
   _agentlink_zshexit() {
+    # zsh also runs zshexit in a subshell that calls exit, as in `(exit 7)`: that is not this shell
+    (( ZSH_SUBSHELL )) && return
     agentlink-hook shell exit --pid $$ </dev/null >/dev/null 2>&1 &!
   }
   autoload -Uz add-zsh-hook
@@ -222,9 +224,25 @@ mod tests {
             .write_all(src.as_bytes())
             .unwrap();
         let out = child.wait_with_output().unwrap();
-        // the hook calls are detached: give them a moment
-        std::thread::sleep(std::time::Duration::from_millis(400));
-        let logged = std::fs::read_to_string(&log).unwrap_or_default();
+        // the hook calls are detached, and the first run of a new script can be slow (macOS scans
+        // it): wait until the log has stopped growing
+        let (quiet, cap) = (
+            std::time::Duration::from_millis(400),
+            std::time::Duration::from_secs(10),
+        );
+        let t0 = std::time::Instant::now();
+        let mut logged = String::new();
+        let mut since = std::time::Instant::now();
+        while t0.elapsed() < cap {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            let now = std::fs::read_to_string(&log).unwrap_or_default();
+            if now != logged {
+                logged = now;
+                since = std::time::Instant::now();
+            } else if since.elapsed() >= quiet && (!logged.is_empty() || !path_has_hook) {
+                break;
+            }
+        }
         let _ = std::fs::remove_dir_all(&d);
         (String::from_utf8_lossy(&out.stdout).into_owned(), logged)
     }

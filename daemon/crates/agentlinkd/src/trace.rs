@@ -217,10 +217,14 @@ impl Trace {
     /// Appends to the audit log (and the trace) for approvals and focus actions.
     pub fn audit(&self, kind: &str, sid: Option<u64>, rid: Option<u64>, msg: Value) {
         let line = json!({"ts": chrono::Local::now().to_rfc3339(), "kind": kind, "sid": sid, "rid": rid, "msg": msg});
-        let path = self.inner.lock().unwrap().audit.clone();
-        if let Some(path) = path {
-            if let Err(e) = open_append(&path).and_then(|mut f| writeln!(f, "{line}")) {
-                eprintln!("audit: write failed: {e}");
+        let text = format!("{line}\n");
+        {
+            // one write per line, under the lock: concurrent audits must not interleave
+            let g = self.inner.lock().unwrap();
+            if let Some(path) = g.audit.as_ref() {
+                if let Err(e) = open_append(path).and_then(|mut f| f.write_all(text.as_bytes())) {
+                    eprintln!("audit: write failed: {e}");
+                }
             }
         }
         self.record("audit", Dir::Internal, kind, sid, rid, msg, None);
@@ -230,6 +234,30 @@ impl Trace {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn concurrent_audits_stay_whole_lines() {
+        let d = std::env::temp_dir().join(format!("agentlink-audit-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let t = Trace::new(d.join("trace"), d.join("audit.jsonl"));
+        let big = "x".repeat(4000);
+        std::thread::scope(|s| {
+            for i in 0..8 {
+                let (t, big) = (t.clone(), big.clone());
+                s.spawn(move || {
+                    for j in 0..25 {
+                        t.audit("approval", Some(i), Some(j), json!({"pad": big}));
+                    }
+                });
+            }
+        });
+        let text = std::fs::read_to_string(d.join("audit.jsonl")).unwrap();
+        let _ = std::fs::remove_dir_all(&d);
+        assert_eq!(text.lines().count(), 200);
+        for l in text.lines() {
+            serde_json::from_str::<Value>(l).expect("a whole JSON line");
+        }
+    }
 
     #[test]
     fn shell_hook_lines_lose_the_command() {

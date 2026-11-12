@@ -359,6 +359,7 @@ impl Drop for ChildInhibitor {
 
 /// Whether the machine runs on mains power, from `/sys/class/power_supply` entries `(type, online)`.
 /// No battery (a desktop) counts as on AC.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn ac_from_supplies(supplies: &[(String, Option<bool>)]) -> Option<bool> {
     if supplies.is_empty() {
         return None;
