@@ -17,11 +17,13 @@
 //!
 //! Two Claude Code hooks block for the watch (UI-V2 §7, DESIGN §6a "first answer wins"):
 //! `PermissionRequest` (fires when Claude Code is about to show its permission prompt) and
-//! `PreToolUse` for `AskUserQuestion`. The hook holds the prompt back for `AGENTLINK_WAIT_MS`
-//! (15 s) while the daemon shows the request on the watch. A device answer becomes the
-//! event's own hook output; no answer (timeout, terminal, daemon down) prints nothing and
-//! exits 0, which Claude Code documents as "no decision": its normal prompt appears. Silence
-//! never approves. Format: https://code.claude.com/docs/en/hooks (PermissionRequest
+//! `PreToolUse` for `AskUserQuestion`. The hook holds the prompt back for the daemon's answer
+//! window (docs/design/ANSWER-WINDOW.md: 60 s by default, a daemon setting) while the watch shows the
+//! request: the daemon names the window in a first reply line and keeps the connection alive. An older
+//! daemon does not, and holds for `wait_ms` (15 s, or `AGENTLINK_WAIT_MS`, which also pins the window
+//! for a new daemon). A device answer becomes the event's own hook output; no answer (window over,
+//! terminal, Open on PC, daemon down) prints nothing and exits 0, which Claude Code documents as "no
+//! decision": its normal prompt appears. Silence never approves. Format: https://code.claude.com/docs/en/hooks (PermissionRequest
 //! `hookSpecificOutput.decision.behavior`; PreToolUse `permissionDecision` + `updatedInput`).
 
 use serde_json::{json, Map, Value};
@@ -31,9 +33,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const DEADLINE: Duration = Duration::from_millis(1500);
 const STDIN_TIMEOUT: Duration = Duration::from_millis(500);
-/// How long a blocking hook waits for the watch before letting the terminal prompt appear.
+/// How long a blocking hook waits for a daemon that does not name its window (an older one) before
+/// letting the terminal prompt appear.
 const DEFAULT_WAIT_MS: u64 = 15_000;
-const MAX_WAIT_MS: u64 = 120_000;
+/// Longest wait, whoever asks for it (the daemon's own longest window, window.rs `MAX`).
+const MAX_WAIT_MS: u64 = 300_000;
 /// Slack between the daemon's own timeout and ours, so the daemon's `none` arrives first.
 const WAIT_SLACK: Duration = Duration::from_millis(2000);
 
@@ -90,12 +94,60 @@ fn blocks_for_watch(agent: &str, event: &str, payload: &Value) -> bool {
                 && payload["tool_name"].as_str() == Some("AskUserQuestion")))
 }
 
-fn wait_ms() -> u64 {
-    std::env::var("AGENTLINK_WAIT_MS")
+/// The wait for an older daemon, and whether the user pinned it with `AGENTLINK_WAIT_MS`.
+fn wait_ms() -> (u64, bool) {
+    match std::env::var("AGENTLINK_WAIT_MS")
         .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(DEFAULT_WAIT_MS)
-        .min(MAX_WAIT_MS)
+        .and_then(|v| v.trim().parse::<u64>().ok())
+    {
+        Some(ms) => (ms.min(MAX_WAIT_MS), true),
+        None => (DEFAULT_WAIT_MS, false),
+    }
+}
+
+/// Waits for the daemon's reply on `lines` (one per line received): a `{"window_ms": N}` line moves the
+/// deadline to N from now (plus slack, at most [`MAX_WAIT_MS`]), a blank line is a keepalive, and the
+/// first other line is the reply. `None` when the deadline passes or the daemon goes away first.
+fn await_reply(lines: &mpsc::Receiver<String>, wait: Duration) -> Option<String> {
+    let mut deadline = std::time::Instant::now() + wait;
+    loop {
+        let left = deadline.checked_duration_since(std::time::Instant::now())?;
+        let line = lines.recv_timeout(left).ok()?;
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let v: Value = serde_json::from_str(line).unwrap_or(Value::Null);
+        if v.get("decision").is_none() {
+            if let Some(ms) = v["window_ms"].as_u64() {
+                deadline = std::time::Instant::now()
+                    + Duration::from_millis(ms.min(MAX_WAIT_MS))
+                    + WAIT_SLACK;
+                continue;
+            }
+        }
+        return Some(line.to_owned());
+    }
+}
+
+/// Reads `r` line by line on a thread of its own, so a silent daemon never blocks the caller.
+fn line_reader(r: impl std::io::Read + Send + 'static) -> mpsc::Receiver<String> {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut r = std::io::BufReader::new(r);
+        loop {
+            let mut line = String::new();
+            match r.read_line(&mut line) {
+                Ok(0) | Err(_) => return,
+                Ok(_) => {
+                    if tx.send(line).is_err() {
+                        return;
+                    }
+                }
+            }
+        }
+    });
+    rx
 }
 
 /// Turns the daemon's `{"decision": "allow"|"deny"|"none", "grant"?, "answer"?}` into the
@@ -339,10 +391,10 @@ fn build_line(agent: &str, event: &str, stdin: &str, remote: bool) -> (String, S
     } else {
         event
     };
-    let wait = if blocks_for_watch(agent, event, &payload) {
+    let (wait, pinned) = if blocks_for_watch(agent, event, &payload) {
         wait_ms()
     } else {
-        0
+        (0, false)
     };
     let mut line = json!({"agent": agent, "event": event, "ts": ts, "cwd": cwd, "ppid": ppid, "tty": tty, "pids": pids, "env": env, "payload": payload});
     if remote {
@@ -353,7 +405,9 @@ fn build_line(agent: &str, event: &str, stdin: &str, remote: bool) -> (String, S
         }
     }
     if wait > 0 {
-        line["await"] = json!({"wait_ms": wait});
+        // `window`: tell me your window and keep me alive (ANSWER-WINDOW.md); `pinned`: the user set
+        // AGENTLINK_WAIT_MS for this hook, and it wins over the daemon's setting
+        line["await"] = json!({"wait_ms": wait, "window": true, "pinned": pinned});
     }
     (line.to_string(), event.to_owned(), payload, wait)
 }
@@ -367,13 +421,6 @@ fn write_lines(w: &mut impl std::io::Write, lines: &[String]) -> Option<()> {
     w.flush().ok()
 }
 
-/// Reads one reply line; `None` when empty or on error.
-fn read_reply(r: impl std::io::Read) -> Option<String> {
-    let mut reply = String::new();
-    std::io::BufReader::new(r).read_line(&mut reply).ok()?;
-    Some(reply.trim().to_owned()).filter(|r| !r.is_empty())
-}
-
 /// Sends `lines` to the local daemon; for blocking hooks also waits up to `reply_wait` for
 /// a one-line reply.
 #[cfg(unix)]
@@ -385,8 +432,8 @@ fn send_local(lines: &[String], reply_wait: Option<Duration>) -> Option<String> 
     s.set_write_timeout(Some(Duration::from_millis(300))).ok()?;
     write_lines(&mut s, lines)?;
     s.shutdown(Shutdown::Write).ok()?;
-    s.set_read_timeout(Some(reply_wait?)).ok()?;
-    read_reply(s)
+    let wait = reply_wait?;
+    await_reply(&line_reader(s), wait)
 }
 
 /// `AGENTLINK_REMOTE=tcp:<loopback>:<port>` -> (host to resolve, port). Only loopback is
@@ -454,8 +501,8 @@ fn send_tcp(
     let all: Vec<String> = std::iter::once(auth).chain(lines.iter().cloned()).collect();
     write_lines(&mut s, &all)?;
     s.shutdown(Shutdown::Write).ok()?;
-    s.set_read_timeout(Some(reply_wait?)).ok()?;
-    read_reply(s)
+    let wait = reply_wait?;
+    await_reply(&line_reader(s), wait)
 }
 
 /// Remote transport from `AGENTLINK_REMOTE`; a bad spec or missing token sends nothing.
@@ -518,11 +565,7 @@ fn send_local(lines: &[String], reply_wait: Option<Duration>) -> Option<String> 
     };
     write_lines(&mut pipe, lines)?;
     let wait = reply_wait?;
-    let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || {
-        let _ = tx.send(read_reply(pipe));
-    });
-    rx.recv_timeout(wait).ok()?
+    await_reply(&line_reader(pipe), wait)
 }
 
 #[cfg(not(any(unix, windows)))]
@@ -778,8 +821,10 @@ fn main() {
     let Ok((event, payload, wait)) = kind_rx.recv_timeout(DEADLINE) else {
         std::process::exit(0);
     };
+    // The worker enforces the real deadline (the daemon's window, or `wait` for an older daemon);
+    // this is only the backstop.
     let budget = if wait > 0 {
-        Duration::from_millis(wait) + 2 * WAIT_SLACK
+        Duration::from_millis(MAX_WAIT_MS) + 2 * WAIT_SLACK
     } else {
         DEADLINE
     };
@@ -1027,12 +1072,75 @@ mod tests {
         assert!(wait > 0);
         let v: Value = serde_json::from_str(&line).unwrap();
         assert_eq!(v["await"]["wait_ms"].as_u64(), Some(wait));
+        assert_eq!(
+            v["await"]["window"].as_bool(),
+            Some(true),
+            "asks the daemon for its window"
+        );
         let (line, _, _, wait) = build_line("claude", "Stop", "{}", false);
         assert_eq!(wait, 0);
         assert!(serde_json::from_str::<Value>(&line)
             .unwrap()
             .get("await")
             .is_none());
+    }
+
+    #[test]
+    fn the_daemons_window_line_moves_the_deadline_and_keepalives_are_skipped() {
+        // a new daemon: the window, keepalives, then the decision after the shim's own first wait
+        let (tx, rx) = mpsc::channel();
+        let feeder = std::thread::spawn(move || {
+            tx.send("{\"window_ms\": 900}\n".to_owned()).unwrap();
+            for _ in 0..4 {
+                std::thread::sleep(Duration::from_millis(100));
+                tx.send("\n".to_owned()).unwrap();
+            }
+            tx.send("{\"decision\":\"none\"}\n".to_owned()).unwrap();
+        });
+        let t0 = std::time::Instant::now();
+        let r = await_reply(&rx, Duration::from_millis(150));
+        assert_eq!(r.as_deref(), Some("{\"decision\":\"none\"}"));
+        assert!(
+            t0.elapsed() >= Duration::from_millis(400),
+            "waited past its first 150 ms"
+        );
+        feeder.join().unwrap();
+
+        // an older daemon: no window line, the shim's own wait ends it with no reply at all
+        let (_tx, rx) = mpsc::channel::<String>();
+        let t0 = std::time::Instant::now();
+        assert_eq!(await_reply(&rx, Duration::from_millis(120)), None);
+        assert!(t0.elapsed() < Duration::from_secs(1));
+
+        // a daemon that names a window and then goes silent: the window plus slack, never forever
+        let (tx, rx) = mpsc::channel();
+        tx.send("{\"window_ms\": 0}".to_owned()).unwrap();
+        let t0 = std::time::Instant::now();
+        assert_eq!(await_reply(&rx, Duration::from_millis(50)), None);
+        let took = t0.elapsed();
+        assert!(took >= WAIT_SLACK && took < WAIT_SLACK + Duration::from_secs(1));
+        drop(tx);
+
+        // a closed connection is no decision at once
+        let (tx, rx) = mpsc::channel::<String>();
+        drop(tx);
+        assert_eq!(await_reply(&rx, Duration::from_secs(5)), None);
+    }
+
+    #[test]
+    fn a_window_line_is_never_mistaken_for_a_decision() {
+        let (tx, rx) = mpsc::channel();
+        tx.send("{\"window_ms\": 100, \"decision\": \"allow\"}".to_owned())
+            .unwrap();
+        // a line with a decision is the reply, whatever else it says; hook_output decides what it means
+        assert!(await_reply(&rx, Duration::from_millis(50)).is_some());
+        let (tx, rx) = mpsc::channel();
+        tx.send("garbage".to_owned()).unwrap();
+        assert_eq!(
+            await_reply(&rx, Duration::from_millis(50)).as_deref(),
+            Some("garbage")
+        );
+        assert!(hook_output("PermissionRequest", &json!({}), &Value::Null).is_none());
     }
 
     #[test]

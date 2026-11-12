@@ -114,6 +114,8 @@ struct Conn {
     deltas: DeltaQueue,
     /// Job sessions (proto 0.9) withheld from a device that cannot decode them.
     hidden: HashSet<u64>,
+    /// Counts this device as linked for the answer window (window.rs) once it has handshaken.
+    linked: Option<crate::broker::Linked>,
 }
 
 /// Terminal content leaves the daemon only when the device may show it (UI-V2 §4.4).
@@ -223,6 +225,19 @@ impl Conn {
             if !self.dictate {
                 a.acts.retain(|x| *x != Action::Dictate);
             }
+            // the answer window and the full text's length: proto 0.11 (ANSWER-WINDOW.md)
+            if self.peer_minor < WINDOW_MINOR {
+                (a.left, a.win, a.len) = (None, None, None);
+            }
+            // no full text for a device that may not show content
+            if !preview_allowed(self.privacy) {
+                a.len = None;
+            }
+        }
+        if let Message::Clear(cl) = &mut msg {
+            if cl.why == ClearWhy::HandedBack && self.peer_minor < WINDOW_MINOR {
+                cl.why = ClearWhy::Cancelled;
+            }
         }
         if !self.deltas.is_empty() {
             for s in self.deltas.drain() {
@@ -321,6 +336,10 @@ const JOBS_MINOR: u64 = 9;
 /// `session.ctx` / `mdl` / `pm` / `pr` / `prs` and the `usage` message need proto 0.10 (GAUGES.md).
 const GAUGES_MINOR: u64 = 10;
 
+/// `attention.left` / `win` / `len`, `detail` chunks, `clear` handed_back and the hand-back by
+/// `focus` with a rid need proto 0.11 (ANSWER-WINDOW.md).
+const WINDOW_MINOR: u64 = 11;
+
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
 }
@@ -368,6 +387,7 @@ pub async fn run_link(
         dictate: false,
         deltas: DeltaQueue::default(),
         hidden: HashSet::new(),
+        linked: None,
     };
 
     let hello = loop {
@@ -437,6 +457,7 @@ async fn handshake(
     }
     c.next_id = 1;
     c.peer_minor = hello.1.proto.1;
+    c.linked.get_or_insert_with(|| shared.broker.link());
     c.deltas.clear(); // the snapshot below carries them
     c.hidden.clear();
 
@@ -673,7 +694,11 @@ async fn handle(
         Message::Cmd(cmd) if cmd.op == CmdOp::Scroll => {
             scroll_cmd(shared, c, sc, inflight, env.id, &cmd).await
         }
+        Message::Cmd(cmd) if cmd.op == CmdOp::Detail => detail_cmd(shared, c, env.id, &cmd).await,
         Message::Cmd(cmd) => {
+            if cmd.op == CmdOp::Focus && c.peer_minor >= WINDOW_MINOR {
+                hand_back(shared, &cmd);
+            }
             let res = handle_cmd(shared, &cmd).await;
             c.send(Some(env.id), Message::Result(res)).await
         }
@@ -684,6 +709,82 @@ async fn handle(
         }
         // Traced on receipt; nothing else to do yet.
         _ => Ok(()),
+    }
+}
+
+/// Open on PC on a request (`focus` with its `rid`, proto 0.11): the request goes back to the terminal
+/// at once. It answers nothing: the hook ends with no decision, as when the window runs out.
+fn hand_back(shared: &Shared, cmd: &Cmd) {
+    let Some(rid) = cmd.rid else {
+        return;
+    };
+    let done = shared.broker.hand_back(rid, cmd.sid);
+    shared
+        .trace
+        .audit("hand_back", cmd.sid, Some(rid), json!({"open": done}));
+}
+
+/// `cmd detail {rid, arg: off}` (proto 0.11, ANSWER-WINDOW.md §4): the full text of an open request
+/// from byte `off`, as `detail` chunks of at most [`DETAIL_CHUNK`](crate::broker::DETAIL_CHUNK) bytes
+/// cut on character boundaries, then one `result`. Withheld under privacy `meta`.
+async fn detail_cmd(shared: &Shared, c: &mut Conn, id: u64, cmd: &Cmd) -> Result<()> {
+    let off = match cmd.arg {
+        None => Some(0),
+        Some(Arg::Uint(o)) => usize::try_from(o).ok(),
+        Some(_) => None,
+    };
+    let res = if c.peer_minor < WINDOW_MINOR {
+        Err((ResultErr::Unsupported, "detail needs proto 0.11"))
+    } else if !preview_allowed(c.privacy) {
+        Err((ResultErr::Denied, "content is withheld"))
+    } else {
+        match (cmd.rid, off) {
+            (None, _) => Err((ResultErr::Denied, "rid required")),
+            (_, None) => Err((ResultErr::Denied, "bad offset")),
+            (Some(rid), Some(off)) => shared.broker.detail(rid).and_then(|(sid, text)| {
+                if text.is_char_boundary(off) {
+                    Ok((rid, sid, text, off))
+                } else {
+                    Err((ResultErr::Denied, "bad offset"))
+                }
+            }),
+        }
+    };
+    let res = match res {
+        Ok((rid, sid, text, off)) => {
+            let total = text.len() as u64;
+            for (at, chunk) in chunks(&text, off, crate::broker::DETAIL_CHUNK) {
+                let d = Detail {
+                    rid: Some(rid),
+                    sid: Some(sid),
+                    text: chunk.to_owned(),
+                    off: Some(at as u64),
+                    total: Some(total),
+                };
+                c.send(None, Message::Detail(d)).await?;
+            }
+            CmdResult::ok()
+        }
+        Err((err, msg)) => fail(err, msg),
+    };
+    c.send(Some(id), Message::Result(res)).await
+}
+
+/// `text[off..]` in pieces of at most `max` bytes, each cut on a character boundary, with its offset.
+/// An empty rest is one empty piece, so the device always hears the total.
+fn chunks(text: &str, off: usize, max: usize) -> Vec<(usize, &str)> {
+    let mut out = Vec::new();
+    let mut at = off;
+    loop {
+        let mut end = (at + max).min(text.len());
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        out.push((at, &text[at..end]));
+        if end >= text.len() {
+            return out;
+        }
+        at = end;
     }
 }
 
@@ -1388,6 +1489,7 @@ mod tests {
                 dictate: false,
                 deltas: DeltaQueue::default(),
                 hidden: HashSet::new(),
+                linked: None,
             };
             let out = c.for_peer(s.clone());
             assert_eq!(
@@ -1677,6 +1779,282 @@ mod tests {
         assert_eq!(result_of(&mut d).await.err, Some(ResultErr::Stale));
     }
 
+    fn long_req(text: &str, ttl_s: u64) -> crate::broker::Request {
+        crate::broker::Request {
+            sid: 1,
+            key: "claude:s".into(),
+            tool: Some("Bash".into()),
+            kind: AttKind::Approval,
+            title: Some("Run shell command".into()),
+            text: Some(text.into()),
+            opts: Vec::new(),
+            ttl: std::time::Duration::from_secs(ttl_s),
+            focus_only: false,
+            dictate: false,
+            notice: false,
+        }
+    }
+
+    /// Connects a device speaking proto 0.`minor` and reads past the welcome and the snapshot.
+    async fn linked(shared: &Arc<Shared>, minor: u64) -> Dev {
+        let mut d = spawn_link(shared);
+        d.to_daemon.send(hello_with_minor("1.0.0", minor)).unwrap();
+        d.next().await; // welcome
+        d.next().await; // snapshot
+        d
+    }
+
+    /// The text of every `detail` chunk up to the command's `result`, which it returns.
+    async fn detail_chunks(d: &mut Dev) -> (Vec<Detail>, CmdResult) {
+        let mut chunks = Vec::new();
+        loop {
+            match d.next().await.msg {
+                Message::Detail(c) => chunks.push(c),
+                Message::Result(r) => return (chunks, r),
+                m => panic!("unexpected {m:?}"),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn the_window_and_full_text_reach_only_devices_speaking_0_11() {
+        let shared = shared();
+        let text = format!("deploy {}", "--flag ".repeat(60));
+        let (rid, _wait) = shared.broker.open(long_req(&text, 60));
+        let mut old = linked(&shared, 10).await;
+        let mut new = linked(&shared, 11).await;
+        let Message::Attention(a) = old.next().await.msg else {
+            panic!()
+        };
+        assert_eq!(
+            (a.left, a.win, a.len),
+            (None, None, None),
+            "an old decoder rejects unknown keys"
+        );
+        let Message::Attention(a) = new.next().await.msg else {
+            panic!()
+        };
+        assert_eq!(a.win, Some(60_000));
+        assert!(
+            a.left.unwrap() <= 60_000 && a.left.unwrap() > 50_000,
+            "what is left, not the whole window"
+        );
+        assert_eq!(a.len, Some(text.len() as u64));
+        // Open on PC from the 0.10 watch focuses only: the request stays open
+        old.to_daemon
+            .send(cmd_bytes(1, cmd(CmdOp::Focus, Some(rid), None, None)))
+            .unwrap();
+        let _focus_result = result_of(&mut old).await; // no such session here: only the hand-back matters
+        assert_eq!(shared.broker.pending().len(), 1);
+        // from the 0.11 watch it also hands the request back at once
+        new.to_daemon
+            .send(cmd_bytes(1, cmd(CmdOp::Focus, Some(rid), None, None)))
+            .unwrap();
+        let _focus_result = result_of(&mut new).await;
+        assert!(shared.broker.pending().is_empty());
+        let Message::Clear(c) = new.next().await.msg else {
+            panic!()
+        };
+        assert_eq!((c.rid, c.why), (rid, ClearWhy::HandedBack));
+        let Message::Clear(c) = old.next().await.msg else {
+            panic!()
+        };
+        assert_eq!(
+            (c.rid, c.why),
+            (rid, ClearWhy::Cancelled),
+            "an old decoder knows no handed_back"
+        );
+        // and the answer that might still be on its way is stale
+        new.to_daemon
+            .send(cmd_bytes(
+                2,
+                cmd(CmdOp::Approve, Some(rid), None, Some(1250)),
+            ))
+            .unwrap();
+        assert_eq!(result_of(&mut new).await.err, Some(ResultErr::Stale));
+    }
+
+    #[tokio::test]
+    async fn the_full_text_arrives_in_chunks_bound_to_its_request() {
+        let shared = shared();
+        // multi-byte characters across chunk edges, 2.6 KB in all
+        let text = "é".repeat(700) + &"x".repeat(1200);
+        let (rid, wait) = shared.broker.open(long_req(&text, 60));
+        let mut d = linked(&shared, 11).await;
+        let _att = d.next().await;
+        d.to_daemon
+            .send(cmd_bytes(
+                5,
+                cmd(CmdOp::Detail, Some(rid), Some(Arg::Uint(0)), None),
+            ))
+            .unwrap();
+        let (chunks, r) = detail_chunks(&mut d).await;
+        assert!(r.ok);
+        assert!(chunks.len() >= 3);
+        let mut whole = String::new();
+        for c in &chunks {
+            assert_eq!(
+                (c.rid, c.sid, c.total),
+                (Some(rid), Some(1), Some(text.len() as u64))
+            );
+            assert_eq!(c.off, Some(whole.len() as u64), "in order, no gap");
+            assert!(c.text.len() <= crate::broker::DETAIL_CHUNK);
+            whole.push_str(&c.text);
+        }
+        assert_eq!(whole, text);
+        // after a dropped link the watch resumes where it got to
+        let resume = chunks[0].text.len() as u64;
+        d.to_daemon
+            .send(cmd_bytes(
+                6,
+                cmd(CmdOp::Detail, Some(rid), Some(Arg::Uint(resume)), None),
+            ))
+            .unwrap();
+        let (rest, r) = detail_chunks(&mut d).await;
+        assert!(r.ok);
+        assert_eq!(rest[0].off, Some(resume));
+        assert_eq!(
+            rest.iter().map(|c| c.text.as_str()).collect::<String>(),
+            &text[resume as usize..]
+        );
+        // an offset inside a character, the wrong request, or no request: no text at all
+        for (id, rid, off, err) in [
+            (7, Some(rid), 1, ResultErr::Denied),
+            (8, Some(rid + 77), 0, ResultErr::Stale),
+            (9, None, 0, ResultErr::Denied),
+        ] {
+            d.to_daemon
+                .send(cmd_bytes(
+                    id,
+                    cmd(CmdOp::Detail, rid, Some(Arg::Uint(off)), None),
+                ))
+                .unwrap();
+            let (none, r) = detail_chunks(&mut d).await;
+            assert!(none.is_empty());
+            assert_eq!(r.err, Some(err));
+        }
+        // a transfer does not hold up an answer sent right behind it, and the daemon never asks
+        // whether the text was read (that lock is the watch's; a hold is the proof here)
+        d.to_daemon
+            .send(cmd_bytes(
+                10,
+                cmd(CmdOp::Detail, Some(rid), Some(Arg::Uint(0)), None),
+            ))
+            .unwrap();
+        d.to_daemon
+            .send(cmd_bytes(
+                11,
+                cmd(CmdOp::Approve, Some(rid), None, Some(1250)),
+            ))
+            .unwrap();
+        let (_, r) = detail_chunks(&mut d).await;
+        assert!(r.ok);
+        assert!(result_of(&mut d).await.ok);
+        assert_eq!(wait.await.unwrap().decision, "allow");
+        let _clear = d.next().await;
+        // once answered there is no text to fetch
+        d.to_daemon
+            .send(cmd_bytes(
+                12,
+                cmd(CmdOp::Detail, Some(rid), Some(Arg::Uint(0)), None),
+            ))
+            .unwrap();
+        let (none, r) = detail_chunks(&mut d).await;
+        assert!(none.is_empty());
+        assert_eq!(r.err, Some(ResultErr::Stale));
+    }
+
+    #[tokio::test]
+    async fn detail_needs_proto_0_11_and_content_privacy() {
+        let shared = shared();
+        let (rid, _w) = shared.broker.open(long_req(&"y".repeat(500), 60));
+        let mut d = linked(&shared, 10).await;
+        let _att = d.next().await;
+        d.to_daemon
+            .send(cmd_bytes(
+                5,
+                cmd(CmdOp::Detail, Some(rid), Some(Arg::Uint(0)), None),
+            ))
+            .unwrap();
+        let (none, r) = detail_chunks(&mut d).await;
+        assert!(none.is_empty());
+        assert_eq!(r.err, Some(ResultErr::Unsupported));
+        // privacy meta: neither the length nor the text leaves the daemon
+        let (_tx, rx) = mpsc::unbounded_channel();
+        let (tx, mut out) = mpsc::unbounded_channel();
+        let mut c = Conn {
+            link: Box::new(ChanLink { rx, tx }),
+            trace: Trace::null(),
+            src: "t".into(),
+            next_id: 1,
+            privacy: Privacy::Meta,
+            peer_minor: 11,
+            dictate: false,
+            deltas: DeltaQueue::default(),
+            hidden: HashSet::new(),
+            linked: None,
+        };
+        c.send(
+            None,
+            Message::Attention(shared.broker.pending().pop().unwrap()),
+        )
+        .await
+        .unwrap();
+        let Message::Attention(a) = Envelope::from_bytes(&out.recv().await.unwrap())
+            .unwrap()
+            .msg
+        else {
+            panic!()
+        };
+        assert_eq!(a.len, None);
+        assert!(a.win.is_some(), "the countdown is metadata");
+        detail_cmd(
+            &shared,
+            &mut c,
+            3,
+            &cmd(CmdOp::Detail, Some(rid), Some(Arg::Uint(0)), None),
+        )
+        .await
+        .unwrap();
+        let env = Envelope::from_bytes(&out.recv().await.unwrap()).unwrap();
+        let Message::Result(r) = env.msg else {
+            panic!("no detail under meta, got {:?}", env.msg)
+        };
+        assert_eq!(r.err, Some(ResultErr::Denied));
+    }
+
+    #[test]
+    fn chunks_cut_on_character_boundaries() {
+        let t = "aé€😀".repeat(3);
+        for max in [4usize, 5, 7, 100] {
+            let cs = chunks(&t, 0, max);
+            assert_eq!(cs.iter().map(|(_, c)| *c).collect::<String>(), t);
+            assert!(cs.iter().all(|(_, c)| c.len() <= max && !c.is_empty()));
+        }
+        assert_eq!(
+            chunks("", 0, 8),
+            vec![(0, "")],
+            "an empty text still says its total"
+        );
+        assert_eq!(chunks("abc", 3, 8), vec![(3, "")]);
+    }
+
+    #[tokio::test]
+    async fn a_linked_device_counts_until_its_link_ends() {
+        let shared = shared();
+        assert_eq!(shared.broker.devices(), 0);
+        let d = linked(&shared, 11).await;
+        assert_eq!(shared.broker.devices(), 1);
+        drop(d);
+        for _ in 0..50 {
+            if shared.broker.devices() == 0 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        assert_eq!(shared.broker.devices(), 0);
+    }
+
     fn spawn_link(shared: &Arc<Shared>) -> Dev {
         let (to_daemon, rx) = mpsc::unbounded_channel();
         let (tx, from_daemon) = mpsc::unbounded_channel();
@@ -1809,6 +2187,7 @@ mod tests {
             dictate: false,
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
+            linked: None,
         };
         let mut s = Session::delta(1);
         (s.snz, s.ntf, s.n, s.ok, s.sum) = (
@@ -2006,6 +2385,7 @@ mod tests {
             dictate: false,
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
+            linked: None,
         };
         let mut s = Session::delta(1);
         (s.eta, s.exit) = (Some(60), Some(1));
@@ -2030,6 +2410,7 @@ mod tests {
             dictate: false,
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
+            linked: None,
         };
         let mut s = Session::delta(1);
         (s.ctx, s.mdl, s.pm, s.pr, s.prs) = (

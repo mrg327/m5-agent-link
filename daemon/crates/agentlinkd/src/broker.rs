@@ -13,9 +13,16 @@ use agentlink_proto::{Action, AttKind, Attention, Clear, ClearWhy, ResultErr};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::oneshot;
+
+/// Longest full text a device can fetch with `detail` (ANSWER-WINDOW.md §4): 4 KiB, about twenty
+/// pages of the watch's reader. A longer request stays "Too long to approve here".
+pub const DETAIL_CAP: usize = 4096;
+/// Bytes of text per `detail` chunk: one chunk is a fraction of the watch's 4096-byte message limit.
+pub const DETAIL_CHUNK: usize = 1024;
 
 /// What the device answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -89,6 +96,7 @@ pub struct Request {
     pub text: Option<String>,
     /// `opts` and their meanings, same length; empty = the device synthesises Approve / Deny.
     pub opts: Vec<(String, Meaning)>,
+    /// The answer window (window.rs); a notice's is how long it may stay up.
     pub ttl: Duration,
     /// Nothing can answer it but the terminal: the device only offers Focus.
     pub focus_only: bool,
@@ -105,6 +113,10 @@ struct Pending {
     tool: Option<String>,
     meanings: Vec<Meaning>,
     tx: oneshot::Sender<Outcome>,
+    /// The full text as the watch's reader shows it (`detail_text`); `None` past [`DETAIL_CAP`].
+    full: Option<String>,
+    /// When the answer window ends; `None` for a notice (no countdown).
+    deadline: Option<Instant>,
 }
 
 #[derive(Default)]
@@ -116,6 +128,43 @@ struct Inner {
 pub struct Broker {
     inner: Mutex<Inner>,
     registry: Arc<Registry>,
+    /// Devices linked right now (device.rs holds a [`Linked`] per handshaken link).
+    linked: Arc<AtomicUsize>,
+}
+
+/// Counts one linked device while it lives.
+pub struct Linked(Arc<AtomicUsize>);
+
+impl Drop for Linked {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
+/// Text that is safe to show on a watch *in full* (the `detail` reader): every character the watch
+/// cannot draw is spelled out instead of vanishing (ANSWER-WINDOW.md §4). Line breaks stay; other
+/// control characters become caret notation (`^[` for Esc, `^I` for a tab); characters outside the
+/// watch's glyph set, and the invisible or look-alike ones inside it (no-break space, soft hyphen),
+/// become `\u{…}`. Nothing is collapsed or dropped.
+pub fn detail_text(s: &str) -> String {
+    let s = s.replace("\r\n", "\n");
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\n' => out.push('\n'),
+            '\r' => out.push('\n'),
+            c if (c as u32) < 0x20 => {
+                out.push('^');
+                out.push(char::from(b'@' + c as u8));
+            }
+            '\u{7f}' => out.push_str("^?"),
+            '\u{20}'..='\u{7e}' | '\u{a1}'..='\u{ac}' | '\u{ae}'..='\u{ff}' => out.push(c),
+            '\u{2013}' | '\u{2014}' | '\u{2018}' | '\u{2019}' | '\u{201c}' | '\u{201d}'
+            | '\u{2022}' | '\u{2026}' => out.push(c),
+            c => out.push_str(&format!("\\u{{{:x}}}", c as u32)),
+        }
+    }
+    out
 }
 
 /// Text that is safe to show on a watch: control characters stripped, whitespace collapsed.
@@ -159,7 +208,19 @@ impl Broker {
                 ..Default::default()
             }),
             registry,
+            linked: Arc::new(AtomicUsize::new(0)),
         }
+    }
+
+    /// A device finished its handshake; it counts as linked until the guard drops.
+    pub fn link(&self) -> Linked {
+        self.linked.fetch_add(1, Ordering::Relaxed);
+        Linked(self.linked.clone())
+    }
+
+    /// Devices linked right now: with none, nobody can answer (window.rs).
+    pub fn devices(&self) -> usize {
+        self.linked.load(Ordering::Relaxed)
     }
 
     /// Registers the request, tells every device, and returns the channel the hook waits on.
@@ -191,17 +252,28 @@ impl Broker {
         } else {
             rid + 1
         };
+        let text = req.text.as_deref().map(|t| clip(&tidy(t), 160));
+        let full = req.text.as_deref().map(detail_text);
+        // `len` says the preview is not the whole text (cut, or tidied): the device fetches it
+        let len = full
+            .as_ref()
+            .filter(|f| text.as_ref() != Some(*f))
+            .map(|f| f.len() as u64);
+        let win_ms = (!req.notice).then_some(req.ttl.as_millis() as u64);
         let att = Attention {
             rid,
             sid: req.sid,
             kind: req.kind,
             title: req.title.map(|t| clip(&tidy(&t), 40)),
-            text: req.text.map(|t| clip(&tidy(&t), 160)),
+            text,
             opts: (!req.opts.is_empty() && !req.focus_only)
                 .then(|| req.opts.iter().map(|(o, _)| clip(&tidy(o), 24)).collect()),
             acts,
             exp: Some(now_unix() + req.ttl.as_secs().max(1)),
             grant_mask: (!req.opts.is_empty() && !req.focus_only).then_some(grant_mask),
+            left: win_ms,
+            win: win_ms,
+            len,
         };
         g.pending.insert(
             rid,
@@ -211,6 +283,8 @@ impl Broker {
                 tool: req.tool,
                 meanings: req.opts.into_iter().map(|(_, m)| m).collect(),
                 tx,
+                full: full.filter(|f| f.len() <= DETAIL_CAP),
+                deadline: (!req.notice).then(|| Instant::now() + req.ttl),
             },
         );
         drop(g);
@@ -349,12 +423,51 @@ impl Broker {
         g.pending.values().any(|p| p.att.sid == sid)
     }
 
-    /// Open requests, for a device that connects while they are pending.
+    /// Open requests, for a device that connects while they are pending: `left` is what remains of
+    /// each window now, so a watch that reconnects mid-window counts down from the right place.
     pub fn pending(&self) -> Vec<Attention> {
         let g = self.inner.lock().unwrap();
-        let mut v: Vec<Attention> = g.pending.values().map(|p| p.att.clone()).collect();
+        let now = Instant::now();
+        let mut v: Vec<Attention> = g
+            .pending
+            .values()
+            .map(|p| {
+                let mut a = p.att.clone();
+                if let Some(d) = p.deadline {
+                    a.left = Some(d.saturating_duration_since(now).as_millis() as u64);
+                }
+                a
+            })
+            .collect();
         v.sort_by_key(|a| a.rid);
         v
+    }
+
+    /// The full text of open request `rid`, for a device's `detail` (ANSWER-WINDOW.md §4): `stale`
+    /// when it is no longer open, `denied` past [`DETAIL_CAP`] or when it has no text.
+    pub fn detail(&self, rid: u64) -> Result<(u64, String), (ResultErr, &'static str)> {
+        let g = self.inner.lock().unwrap();
+        let Some(p) = g.pending.get(&rid) else {
+            return Err((ResultErr::Stale, "no pending request for rid"));
+        };
+        match (&p.full, p.att.len) {
+            (Some(f), _) => Ok((p.att.sid, f.clone())),
+            (None, Some(_)) => Err((ResultErr::Denied, "too long for the watch")),
+            (None, None) => Err((ResultErr::Denied, "no text")),
+        }
+    }
+
+    /// The device's Open on PC on request `rid` (proto 0.11): the hook is released with no decision at
+    /// once, so the terminal shows its own prompt now instead of at the end of the window. Never an
+    /// answer: the same as the window running out. False when `rid` is not open.
+    pub fn hand_back(&self, rid: u64, sid: Option<u64>) -> bool {
+        let mine = {
+            let g = self.inner.lock().unwrap();
+            g.pending
+                .get(&rid)
+                .is_some_and(|p| sid.is_none_or(|s| s == p.att.sid))
+        };
+        mine && self.cancel(rid, ClearWhy::HandedBack)
     }
 }
 
@@ -824,6 +937,160 @@ mod tests {
             panic!()
         };
         assert_eq!((c.rid, c.why), (other, ClearWhy::AnsweredPc));
+    }
+
+    fn bash(cmd: &str, ttl: Duration) -> Request {
+        let payload = json!({"tool_name": "Bash", "tool_input": {"command": cmd}});
+        request_of(
+            2,
+            "claude:s".into(),
+            "claude",
+            "PermissionRequest",
+            &payload,
+            ttl,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn the_full_text_spells_out_what_the_watch_cannot_draw() {
+        assert_eq!(detail_text("a\r\nb\tc\u{1b}[0m"), "a\nb^Ic^[[0m");
+        assert_eq!(
+            detail_text("caf\u{e9} \u{2014} ok\u{2026}"),
+            "caf\u{e9} \u{2014} ok\u{2026}"
+        );
+        // invisible or look-alike characters are never shown as if they were not there
+        assert_eq!(detail_text("rm\u{a0}-rf"), "rm\\u{a0}-rf");
+        assert_eq!(detail_text("x\u{ad}y\u{200b}z"), "x\\u{ad}y\\u{200b}z");
+        assert_eq!(detail_text("\u{1F600}\u{7f}\u{85}"), "\\u{1f600}^?\\u{85}");
+        assert_eq!(
+            detail_text("echo \"a    b\""),
+            "echo \"a    b\"",
+            "spaces are not collapsed"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_window_rides_on_the_attention_and_counts_down() {
+        let (b, mut rx) = broker();
+        let (rid, _w) = b.open(bash("npm test", Duration::from_secs(60)));
+        let Update::Attention(att) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert_eq!((att.left, att.win), (Some(60_000), Some(60_000)));
+        assert_eq!(att.len, None, "the preview is the whole text");
+        tokio::time::sleep(Duration::from_millis(120)).await;
+        // a device that connects now counts down from what is left, not from the start
+        let again = b.pending().pop().unwrap();
+        assert_eq!(again.rid, rid);
+        let left = again.left.unwrap();
+        assert!(left <= 59_880 && left > 59_000, "left {left}");
+        assert_eq!(again.win, Some(60_000));
+    }
+
+    #[tokio::test]
+    async fn a_notice_has_no_countdown() {
+        let (b, mut rx) = broker();
+        let payload = json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
+            {"question": "a", "options": [{"label": "x"}]}, {"question": "b", "options": [{"label": "y"}]}]}});
+        let req = request_of(
+            1,
+            "claude:s".into(),
+            "claude",
+            "PreToolUse",
+            &payload,
+            Duration::from_secs(60),
+        )
+        .unwrap();
+        b.open(req);
+        let Update::Attention(att) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert_eq!((att.left, att.win), (None, None));
+    }
+
+    #[tokio::test]
+    async fn a_long_or_reshaped_text_offers_its_full_text_by_rid() {
+        let (b, mut rx) = broker();
+        let long = format!("echo start && {} && echo end", "x".repeat(400));
+        let (rid, _w) = b.open(bash(&long, Duration::from_secs(60)));
+        let Update::Attention(att) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert!(att.text.as_ref().unwrap().ends_with('…'));
+        assert_eq!(att.len, Some(long.len() as u64));
+        assert_eq!(b.detail(rid).unwrap(), (2, long.clone()));
+        // a short text whose preview had to be reshaped (two lines become one) is not whole either
+        let (rid2, _w2) = b.open(bash("cd /tmp\nrm -rf build", Duration::from_secs(60)));
+        let Update::Attention(att) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert_eq!(att.text.as_deref(), Some("cd /tmp rm -rf build"));
+        assert_eq!(att.len, Some(20));
+        assert_eq!(b.detail(rid2).unwrap().1, "cd /tmp\nrm -rf build");
+        // detail is bound to the request: another rid, or a settled one, is stale
+        assert_eq!(b.detail(rid + 1000).unwrap_err().0, ResultErr::Stale);
+        b.cancel(rid, ClearWhy::Expired);
+        assert_eq!(b.detail(rid).unwrap_err().0, ResultErr::Stale);
+    }
+
+    #[tokio::test]
+    async fn past_the_cap_the_full_text_is_refused() {
+        let (b, mut rx) = broker();
+        let huge = "y".repeat(DETAIL_CAP + 1);
+        let (rid, _w) = b.open(bash(&huge, Duration::from_secs(60)));
+        let Update::Attention(att) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert_eq!(
+            att.len,
+            Some(DETAIL_CAP as u64 + 1),
+            "the device learns it is too long"
+        );
+        assert_eq!(b.detail(rid).unwrap_err().0, ResultErr::Denied);
+        let fits = "z".repeat(DETAIL_CAP);
+        let (rid, _w) = b.open(bash(&fits, Duration::from_secs(60)));
+        assert_eq!(b.detail(rid).unwrap().1.len(), DETAIL_CAP);
+    }
+
+    #[tokio::test]
+    async fn handing_back_releases_the_hook_with_no_decision() {
+        let (b, mut rx) = broker();
+        let (rid, wait) = b.open(perm(false));
+        let _ = next_update(&mut rx);
+        assert!(
+            !b.hand_back(rid, Some(99)),
+            "another session's Open on PC hands nothing back"
+        );
+        assert!(
+            !b.hand_back(rid + 1, Some(2)),
+            "nor does another request id"
+        );
+        assert!(b.hand_back(rid, Some(2)));
+        assert!(wait.await.is_err(), "no decision: the terminal asks");
+        let Update::Clear(c) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert_eq!((c.rid, c.why), (rid, ClearWhy::HandedBack));
+        // nothing can answer it afterwards, not even the hold that was already running
+        assert_eq!(
+            b.answer(rid, Decision::Approve).unwrap_err().0,
+            ResultErr::Stale
+        );
+        assert!(!b.hand_back(rid, Some(2)));
+    }
+
+    #[tokio::test]
+    async fn linked_devices_are_counted_while_their_guard_lives() {
+        let (b, _rx) = broker();
+        assert_eq!(b.devices(), 0);
+        let one = b.link();
+        let two = b.link();
+        assert_eq!(b.devices(), 2);
+        drop(one);
+        assert_eq!(b.devices(), 1);
+        drop(two);
+        assert_eq!(b.devices(), 0);
     }
 
     #[test]

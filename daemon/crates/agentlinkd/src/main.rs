@@ -25,6 +25,7 @@ mod typing;
 mod usage;
 mod usb;
 mod voice;
+mod window;
 mod ws;
 
 use anyhow::Result;

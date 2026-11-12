@@ -26,9 +26,12 @@ const CLAUDE_EVENTS: &[&str] = &[
     "Stop",
 ];
 /// Hooks that may block while the watch answers (UI-V2 §7): `PermissionRequest`, and
-/// `PreToolUse` for `AskUserQuestion`. Their timeout must cover `AGENTLINK_WAIT_MS` (15 s by
-/// default) with margin; the others return at once.
+/// `PreToolUse` for `AskUserQuestion`. Their timeout must cover the daemon's longest answer window
+/// (300 s, ANSWER-WINDOW.md) with margin: Claude Code kills a hook at its timeout, and the daemon
+/// shortens the window to fit a smaller one. The others return at once.
 const CLAUDE_BLOCKING: &[&str] = &["PreToolUse", "PermissionRequest"];
+/// Claude Code `timeout` (seconds) for the blocking hooks: the longest window plus 30 s.
+const BLOCKING_TIMEOUT_S: u64 = 330;
 
 /// `~/.copilot/hooks/agentlink.json`
 fn copilot() -> Value {
@@ -53,7 +56,7 @@ fn claude() -> Value {
     let hooks: serde_json::Map<String, Value> = CLAUDE_EVENTS
         .iter()
         .map(|e| {
-            let timeout = if CLAUDE_BLOCKING.contains(e) { 30 } else { 5 };
+            let timeout = if CLAUDE_BLOCKING.contains(e) { BLOCKING_TIMEOUT_S } else { 5 };
             let h = json!([{"hooks": [{"type": "command", "command": format!("agentlink-hook claude {e}"), "timeout": timeout}]}]);
             (e.to_string(), h)
         })

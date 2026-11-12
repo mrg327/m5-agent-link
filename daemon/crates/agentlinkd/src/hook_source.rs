@@ -6,7 +6,11 @@
 //!
 //! A line with `"await": {"wait_ms": N}` is a blocking permission or question hook: it is
 //! opened on the approval broker and the connection stays up until a device answers or the
-//! wait runs out, then one reply line goes back (`{"decision": "allow"|"deny"|"none", ..}`).
+//! window runs out, then one reply line goes back (`{"decision": "allow"|"deny"|"none", ..}`).
+//! The window is the daemon's (`window::answer_window`, ANSWER-WINDOW.md). A hook that says
+//! `"window": true` (agentlink-hook 0.11 and later) first gets `{"window_ms": N}` and then a blank
+//! keepalive line every second, so a hook that Claude Code killed is noticed and its card leaves
+//! the watch; an older hook gets the decision line only, never later than its own `wait_ms`.
 //! Any other event from the same session, except a notification, settles what was pending
 //! there ("first answer wins": the terminal got there first).
 //!
@@ -33,9 +37,8 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader
 
 pub type StatusFn = Arc<dyn Fn() -> Value + Send + Sync>;
 
-/// Longest a hook may ask us to hold its prompt back (DESIGN §6a: a short window, then the
-/// terminal prompt appears as usual).
-const MAX_WAIT: Duration = Duration::from_secs(120);
+/// How often a waiting hook that understands it gets a blank keepalive line.
+const KEEPALIVE: Duration = Duration::from_secs(1);
 
 pub struct HookSource {
     pub socket: PathBuf,
@@ -206,12 +209,16 @@ where
             continue;
         };
         let outcome = await_decision(
-            registry,
-            broker,
-            trace,
+            Ctx {
+                registry,
+                broker,
+                trace,
+            },
             &v,
             key,
             Duration::from_millis(wait),
+            &via,
+            &mut w,
         )
         .await;
         let reply = format!("{}\n", serde_json::to_string(&outcome).unwrap_or_default());
@@ -236,17 +243,38 @@ fn on_statusline(registry: &Registry, v: &Value, via: &Via) {
     }
 }
 
+struct Ctx<'a> {
+    registry: &'a Registry,
+    broker: &'a Broker,
+    trace: &'a Trace,
+}
+
+/// How a wait for an answer ended.
+enum Ended {
+    Answer(Outcome),
+    /// The request was settled elsewhere (terminal answer, hand-back): no decision.
+    Cancelled,
+    Timeout,
+    /// The hook stopped listening (Claude Code killed it at its own timeout, or the user acted in the
+    /// terminal): the terminal has the prompt now.
+    HookGone,
+}
+
 /// Opens the request and waits for the device, the terminal, or the clock. Never returns
 /// `allow` without a device decision.
-async fn await_decision(
-    registry: &Registry,
-    broker: &Broker,
-    trace: &Trace,
+async fn await_decision<W: AsyncWrite + Unpin>(
+    ctx: Ctx<'_>,
     v: &Value,
     key: Option<String>,
-    wait: Duration,
+    hook_wait: Duration,
+    via: &Via,
+    w: &mut W,
 ) -> Outcome {
-    let wait = wait.min(MAX_WAIT);
+    let Ctx {
+        registry,
+        broker,
+        trace,
+    } = ctx;
     let agent = v["agent"].as_str().unwrap_or("");
     let event = v["event"].as_str().unwrap_or("");
     let Some(key) = key else {
@@ -256,7 +284,19 @@ async fn await_decision(
         return Outcome::NONE;
     };
     let host = registry.host_of(sid);
-    let Some(req) = request_of(sid, key, agent, event, &v["payload"], wait) else {
+    // A hook that asks for the window is told it and kept alive; an older one stops listening after
+    // its own wait, so the window may not outlast that.
+    let talks = v["await"]["window"].as_bool() == Some(true);
+    let pinned = v["await"]["pinned"].as_bool() == Some(true);
+    let window = crate::window::answer_window(&crate::window::Ask {
+        event,
+        cwd: v["payload"]["cwd"].as_str(),
+        remote: *via != Via::Local,
+        pinned: pinned.then_some(hook_wait),
+        devices: broker.devices(),
+    });
+    let window = if talks { window } else { window.min(hook_wait) };
+    let Some(req) = request_of(sid, key, agent, event, &v["payload"], window) else {
         trace.record(
             "hook",
             Dir::Internal,
@@ -282,36 +322,78 @@ async fn await_decision(
         );
         return Outcome::NONE;
     }
+    if window.is_zero() {
+        // the user set the window to 0: the terminal asks at once, the watch is not offered it
+        trace.record(
+            "hook",
+            Dir::Internal,
+            "no_window",
+            Some(sid),
+            None,
+            json!({"event": event}),
+            None,
+        );
+        return Outcome::NONE;
+    }
     let (rid, rx) = broker.open(req);
-    match tokio::time::timeout(wait, rx).await {
-        Ok(Ok(outcome)) => {
-            trace.audit(
-                "decision",
-                Some(sid),
-                Some(rid),
-                json!({"from": "device", "outcome": outcome, "host": host}),
-            );
-            outcome
-        }
-        Ok(Err(_)) => {
-            // cancelled (terminal answered, or the request was dropped): no decision
-            trace.audit(
-                "decision",
-                Some(sid),
-                Some(rid),
-                json!({"from": "none", "why": "cancelled", "host": host}),
-            );
-            Outcome::NONE
-        }
-        Err(_) => {
+    trace.record(
+        "hook",
+        Dir::Internal,
+        "window",
+        Some(sid),
+        Some(rid),
+        json!({"event": event, "window_ms": window.as_millis() as u64, "devices": broker.devices()}),
+        None,
+    );
+    let ended = wait_for(rx, window, talks, w).await;
+    let (from, why, outcome) = match ended {
+        Ended::Answer(o) => ("device", None, o),
+        Ended::Cancelled => ("none", Some("cancelled"), Outcome::NONE),
+        Ended::Timeout => {
             broker.cancel(rid, ClearWhy::Expired);
-            trace.audit(
-                "decision",
-                Some(sid),
-                Some(rid),
-                json!({"from": "none", "why": "timeout", "host": host}),
-            );
-            Outcome::NONE
+            ("none", Some("timeout"), Outcome::NONE)
+        }
+        Ended::HookGone => {
+            broker.cancel(rid, ClearWhy::Expired);
+            ("none", Some("hook_gone"), Outcome::NONE)
+        }
+    };
+    let detail = match why {
+        None => json!({"from": from, "outcome": outcome, "host": host}),
+        Some(why) => json!({"from": from, "why": why, "host": host}),
+    };
+    trace.audit("decision", Some(sid), Some(rid), detail);
+    outcome
+}
+
+/// Waits for the device's answer until `window` ends. With `talks`, the hook first gets the window
+/// and then a keepalive line every [`KEEPALIVE`]; a failed write means the hook is gone.
+async fn wait_for<W: AsyncWrite + Unpin>(
+    mut rx: tokio::sync::oneshot::Receiver<Outcome>,
+    window: Duration,
+    talks: bool,
+    w: &mut W,
+) -> Ended {
+    let deadline = tokio::time::Instant::now() + window;
+    if talks {
+        let line = format!("{}\n", json!({"window_ms": window.as_millis() as u64}));
+        if w.write_all(line.as_bytes()).await.is_err() || w.flush().await.is_err() {
+            return Ended::HookGone;
+        }
+    }
+    let mut tick = tokio::time::interval_at(tokio::time::Instant::now() + KEEPALIVE, KEEPALIVE);
+    loop {
+        tokio::select! {
+            r = &mut rx => return match r {
+                Ok(o) => Ended::Answer(o),
+                Err(_) => Ended::Cancelled,
+            },
+            _ = tokio::time::sleep_until(deadline) => return Ended::Timeout,
+            _ = tick.tick(), if talks => {
+                if w.write_all(b"\n").await.is_err() || w.flush().await.is_err() {
+                    return Ended::HookGone;
+                }
+            }
         }
     }
 }
@@ -578,6 +660,224 @@ pub fn host_ctx(v: &Value, cwd: Option<String>) -> HostCtx {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    use crate::broker::Decision;
+    use agentlink_proto::ResultErr;
+    use tokio::io::AsyncReadExt;
+
+    /// The window tests never read the real user's Claude Code settings or daemon setting.
+    fn isolate() {
+        std::env::set_var("CLAUDE_CONFIG_DIR", "/nonexistent/agentlink-test-claude");
+        std::env::set_var("AGENTLINK_ANSWER_WINDOW_S", "60");
+    }
+
+    struct Rig {
+        registry: Arc<Registry>,
+        broker: Arc<Broker>,
+        trace: Trace,
+    }
+
+    fn rig() -> Rig {
+        isolate();
+        let trace = Trace::null();
+        let registry = Arc::new(Registry::new(trace.clone()));
+        let broker = Arc::new(Broker::new(registry.clone()));
+        Rig {
+            registry,
+            broker,
+            trace,
+        }
+    }
+
+    /// A PermissionRequest line from a hook that `talks` (agentlink-hook 0.11) or not, with `wait_ms`.
+    fn perm_line(rig: &Rig, wait_ms: u64, talks: bool, pinned: bool) -> (Value, Option<String>) {
+        let mut v = json!({"agent": "claude", "event": "PermissionRequest", "cwd": "/nonexistent/p",
+            "payload": {"session_id": "s1", "cwd": "/nonexistent/p", "tool_name": "Bash",
+                        "tool_input": {"command": "npm test"}},
+            "await": {"wait_ms": wait_ms}});
+        if talks {
+            v["await"]["window"] = json!(true);
+            v["await"]["pinned"] = json!(pinned);
+        }
+        if let Some(ev) = to_session_event(&v, &Via::Local) {
+            rig.registry.apply(ev);
+        }
+        let key = session_key(&v, &Via::Local);
+        (v, key)
+    }
+
+    async fn run(
+        rig: &Rig,
+        v: &Value,
+        key: Option<String>,
+        w: &mut tokio::io::DuplexStream,
+    ) -> Outcome {
+        let wait = Duration::from_millis(v["await"]["wait_ms"].as_u64().unwrap());
+        await_decision(
+            Ctx {
+                registry: &rig.registry,
+                broker: &rig.broker,
+                trace: &rig.trace,
+            },
+            v,
+            key,
+            wait,
+            &Via::Local,
+            w,
+        )
+        .await
+    }
+
+    async fn read_all(mut r: tokio::io::DuplexStream) -> String {
+        let mut s = String::new();
+        let _ = r.read_to_string(&mut s).await;
+        s
+    }
+
+    #[tokio::test]
+    async fn a_talking_hook_hears_the_window_then_keepalives_and_silence_decides_nothing() {
+        let rig = rig();
+        let _dev = rig.broker.link();
+        // a pinned 1.5 s is raised to the shortest window there is
+        let (v, key) = perm_line(&rig, 1500, true, true);
+        let (mut w, r) = tokio::io::duplex(4096);
+        let reader = tokio::spawn(read_all(r));
+        let t0 = std::time::Instant::now();
+        let out = run(&rig, &v, key, &mut w).await;
+        assert_eq!(
+            out,
+            Outcome::NONE,
+            "the window ran out: no decision, the terminal asks"
+        );
+        assert!(t0.elapsed() >= crate::window::MIN);
+        drop(w);
+        let said = reader.await.unwrap();
+        let mut lines = said.lines();
+        assert_eq!(lines.next(), Some("{\"window_ms\":5000}"));
+        assert!(
+            lines.all(str::is_empty),
+            "only keepalives after the window line: {said:?}"
+        );
+        assert!(said.matches('\n').count() >= 5, "a keepalive every second");
+        // the expired request cannot be answered any more
+        assert!(rig.broker.pending().is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_answer_inside_the_window_is_the_decision() {
+        let rig = rig();
+        let _dev = rig.broker.link();
+        let (v, key) = perm_line(&rig, 30_000, true, true);
+        let (mut w, r) = tokio::io::duplex(4096);
+        let reader = tokio::spawn(read_all(r));
+        let broker = rig.broker.clone();
+        let answer = tokio::spawn(async move {
+            loop {
+                if let Some(a) = broker.pending().pop() {
+                    assert_eq!(a.win, Some(30_000));
+                    return broker.answer(a.rid, Decision::Deny).map(|o| o.decision);
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        });
+        let out = run(&rig, &v, key, &mut w).await;
+        assert_eq!(out.decision, "deny");
+        assert_eq!(answer.await.unwrap(), Ok("deny"));
+        drop(w);
+        assert!(reader.await.unwrap().starts_with("{\"window_ms\":30000}"));
+    }
+
+    #[tokio::test]
+    async fn a_hook_that_stopped_listening_takes_its_card_off_the_watch() {
+        let rig = rig();
+        let _dev = rig.broker.link();
+        let (v, key) = perm_line(&rig, 60_000, true, true);
+        let (mut w, r) = tokio::io::duplex(4096);
+        let broker = rig.broker.clone();
+        // Claude Code kills the hook a moment after the card went out
+        let killer = tokio::spawn(async move {
+            while broker.pending().is_empty() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            let rid = broker.pending()[0].rid;
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            drop(r);
+            rid
+        });
+        let t0 = std::time::Instant::now();
+        let out = run(&rig, &v, key, &mut w).await;
+        let rid = killer.await.unwrap();
+        assert_eq!(out, Outcome::NONE);
+        assert!(
+            t0.elapsed() < Duration::from_secs(5),
+            "noticed at the next keepalive, not at the window's end"
+        );
+        assert!(rig.broker.pending().is_empty());
+        assert_eq!(
+            rig.broker.answer(rid, Decision::Approve).unwrap_err().0,
+            ResultErr::Stale,
+            "a hold that lands after the hook died answers nothing"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_older_hook_is_never_held_past_its_own_wait() {
+        let rig = rig();
+        let _dev = rig.broker.link();
+        let (v, key) = perm_line(&rig, 700, false, false);
+        let (mut w, r) = tokio::io::duplex(4096);
+        let reader = tokio::spawn(read_all(r));
+        let broker = rig.broker.clone();
+        let seen = tokio::spawn(async move {
+            loop {
+                if let Some(a) = broker.pending().pop() {
+                    return a.win;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        });
+        let t0 = std::time::Instant::now();
+        assert_eq!(run(&rig, &v, key, &mut w).await, Outcome::NONE);
+        assert!(
+            t0.elapsed() < Duration::from_millis(1500),
+            "the daemon's 60 s would outlast its read"
+        );
+        assert_eq!(seen.await.unwrap(), Some(700));
+        drop(w);
+        assert_eq!(
+            reader.await.unwrap(),
+            "",
+            "no window line, no keepalives: it reads one line only"
+        );
+    }
+
+    #[tokio::test]
+    async fn no_watch_linked_means_a_short_hold_and_zero_means_none() {
+        let rig = rig();
+        let (v, key) = perm_line(&rig, 120_000, true, true);
+        let broker = rig.broker.clone();
+        let seen = tokio::spawn(async move {
+            loop {
+                if let Some(a) = broker.pending().pop() {
+                    broker.cancel(a.rid, ClearWhy::AnsweredPc);
+                    return a.win;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        });
+        let (mut w, _r) = tokio::io::duplex(4096);
+        assert_eq!(run(&rig, &v, key, &mut w).await, Outcome::NONE);
+        assert_eq!(
+            seen.await.unwrap(),
+            Some(crate::window::NO_DEVICE.as_millis() as u64)
+        );
+        // AGENTLINK_WAIT_MS=0 on the hook: no card, no hold
+        let _dev = rig.broker.link();
+        let (v, key) = perm_line(&rig, 0, true, true);
+        let (mut w, _r) = tokio::io::duplex(4096);
+        assert_eq!(run(&rig, &v, key, &mut w).await, Outcome::NONE);
+        assert!(rig.broker.pending().is_empty());
+    }
 
     #[test]
     fn copilot_permission_notification_is_input_approval() {
