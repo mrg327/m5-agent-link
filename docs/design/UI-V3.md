@@ -314,6 +314,33 @@ A permission can only be approved when all of its text has been on screen.
   `On your computer` · `Answer it there`). Once the window is over a hold cannot start, and a running one is
   cancelled.
 
+#### 4.3c Always allow (2026-11-12, [STANDING-RULES.md](STANDING-RULES.md))
+
+A permission whose request carries a standing rule (proto 0.13) has a third option after Deny:
+`Approve` · `Deny` · `Always allow` · `Open on PC`. The default view is unchanged (`Open on PC` / Approve / `Deny`).
+
+```
+            y 58    Claude Code · webapp              caption (unchanged)
+            y 80    Saved for this project            FONT_HEAD white: where (or "Until this session ends")
+            y 112…  ┌──────────────────────────┐      platter COL_FILL1, r 18, 320 wide, pad 10/14
+                    │     Bash(npm test:*)     │      FONT_BODY white: the rule as saved, ≤ 2 lines, never dotted
+                    │ Wide: * matches anything │      FONT_CAPTION: orange when wide, else "Exactly as written" COL_TEXT2
+                    └──────────────────────────┘
+            y 226   Deny                              picker neighbour
+            y 280   █████ Always allow ○ █████        73 high, orange, hold ring; NAV_GRANT_HOLD_MS 1600 ms
+            y 334   Open on PC                        picker neighbour
+```
+
+- The panel replaces the request platter only while the row is selected; any other row puts the request back.
+- A tap on the row says `Hold to always allow`. The row is locked, like Approve, until a long request text has
+  been read (§4.3a), and for good when the rule does not fit two lines or the scope title does not fit its row:
+  the panel then reads `This rule is too long to show on the watch` · `Answer it on your computer` and a hold
+  says `Rule too long for the watch`.
+- The hold is bound to the rule on screen (its hash goes with the approve) and cancelled if the rule changes; a
+  re-sent request opens again at Approve.
+- Answered: `Always allowed` (`FONT_TITLE`), then the rule's first line and the scope in the caption, held at
+  least 2.5 s (900 ms for the other answers).
+
 ### 4.4 WATCH (shown to the user as "Activity")
 
 Caption y 72. Up to three earlier steps from y 108, pitch 26, `FONT_CAPTION` `COL_TEXT2`, each led
@@ -430,7 +457,8 @@ on its own row: a press beside the button no longer arms Approve.
 | `Interrupt` | `Stop` |
 | `Dismiss error` | `Dismiss` |
 | `Reply…`, `Dictate…`, `Type…` | `Reply`, `Dictate`, `Keyboard` |
-| `Hold to confirm` | `Hold to approve`, `Hold to deny`, `Hold to stop`, `Hold to send` |
+| `Hold to confirm` | `Hold to approve`, `Hold to deny`, `Hold to stop`, `Hold to send`, `Hold to always allow` |
+| `Yes, don't ask again` | `Always allow`, with the rule, `Saved for this project` / `Until this session ends`, `Wide: * matches anything` / `Exactly as written`; answered: `Always allowed` |
 | `Approved · waiting for PC` | `Approved` + `Waiting for your computer` |
 | `-142 lines` / `above the bottom` | `142` / `lines up` |
 | `3 steps · 1:37` | `Step 3 · 1:37` |

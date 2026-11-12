@@ -165,8 +165,9 @@ attention = {
   kind: "approval"/"question"/"error"/"done",
   ? title: tstr,             ; e.g. "Run shell command"
   ? text: tstr,              ; preview (≤ 160) — full text only via `detail` request
-  ? opts: [* tstr],          ; the agent's own choices (≤ 4, each ≤ 24 chars): a question's options, or a
-                             ; permission's "Yes" / "Yes, don't ask again" / "No"
+  ? opts: [* tstr],          ; the agent's own choices (≤ 4, each ≤ 24 chars): a question's options, or the
+                             ; "Yes" / "No" of a prompt read off a terminal (Copilot). Since 0.13 a Claude Code
+                             ; permission has none: "always allow" is the rule below
   acts: [* "approve"/"deny"/"focus"/"reply"/"ack"/"dictate"],
   exp?: uint,                ; unix time after which device must drop it
   grant_mask?: uint,         ; bit i set = opts[i] grants permission (approve-class: the device commits
@@ -174,7 +175,10 @@ attention = {
   ? left: uint,              ; ms left in the answer window when sent       ┐ proto ≥ 0.11
   ? win: uint,               ; the whole answer window in ms                 │ (ANSWER-WINDOW.md)
   ? len: uint,               ; the full text's length in bytes, when text is cut ┘
-  ? hush: bool               ; no buzz, glow or reminders for this request; proto ≥ 0.12 (PRESENCE.md)
+  ? hush: bool,              ; no buzz, glow or reminders for this request; proto ≥ 0.12 (PRESENCE.md)
+  ? rule: tstr,              ; the standing rule, exactly as Claude Code saves it   ┐ proto ≥ 0.13,
+  ? scope: uint,             ; 0 this session, 1 this project (local settings)      │ always together
+  ? wide: bool               ; the rule ends in a wildcard                           ┘ (STANDING-RULES.md)
 }
 clear = { rid: uint, why: "answered_pc"/"answered_dev"/"expired"/"cancelled"/"handed_back" }
 ```
@@ -192,6 +196,14 @@ clear = { rid: uint, why: "answered_pc"/"answered_dev"/"expired"/"cancelled"/"ha
   delta without it says nothing). The card, its actions and the answer window are as ever; the window itself is
   shorter when the user is at the keyboard (`left` / `win` say so). An old device buzzes as before.
 
+- **Standing rules (proto 0.13, [STANDING-RULES.md](STANDING-RULES.md)).** `rule` is one of the request's own
+  `permission_suggestions`, as Claude Code will save it (`Bash(npm test:*)`, several rules one per line, ≤ 160
+  bytes of printable ASCII and line breaks); `scope` says where (`0` session, `1` the user's own
+  `.claude/settings.local.json`; no wider scope is ever sent); `wide` that a rule ends in a wildcard. The device
+  offers "Always allow" only for a rule it can show whole, and grants it with `approve` carrying `rh`. Keys 13-15
+  go only to devices with proto ≥ 0.13, under every privacy setting (the rule is no more than the preview).
+  `scope` is a uint, not the CDDL enum, so a value a device does not know drops the rule, not the request.
+
 The device must show approve/deny **only if** they are in `acts`. The daemon includes them only for prompts the agent itself raised (DESIGN Q6). An option is answered with `cmd { op: "reply", rid, arg: index }`; the daemon maps the index back to the agent's choice (UI-V2 §7).
 
 ## 5. Commands (device → daemon)
@@ -203,7 +215,9 @@ cmd = {
   ? rid: uint,               ; required for approve/deny/reply
   ? arg: uint / tstr / scroll_arg,  ; snooze minutes (the watch sends 30), reply option index, quiet duration,
                              ; or the scroll argument (the CDDL names the union cmd_arg)
-  hold_ms?: uint             ; for approve: measured hold-to-confirm duration (daemon enforces ≥ 1000)
+  hold_ms?: uint,            ; for approve: measured hold-to-confirm duration (daemon enforces ≥ 1000)
+  ? rh: uint                 ; with approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of
+                             ; the rule, a 0 byte, scope and wide (0/1) as the device showed them; hold ≥ 1500
 }
 scroll_arg = { unit: "lines"/"pages"/"to_end", delta: int, ? seq: uint }   ; delta < 0 = up (older); to_end: sign = top / bottom
 result = { ok: bool, ? err: "stale"/"denied"/"unsupported"/"no_window"/"timeout", ? msg: tstr, ? pos: scroll_pos }
@@ -235,6 +249,11 @@ scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tst
   `denied` under privacy `meta`, past 4096 bytes or for an offset inside a character, `unsupported` from a device
   below 0.11. The text keeps line breaks and spells out control and undrawable characters (`^[`, `\u{a0}`). The
   device keeps a chunk only for the rid it asked for, at the offset it has reached, with the announced total.
+- `approve` with `rh` (proto 0.13, [STANDING-RULES.md](STANDING-RULES.md)): approve, and have the hook pass the
+  request's standing rule back to Claude Code as `updatedPermissions`. `denied` when the request offers no rule,
+  when `rh` is not the hash of the rule it offers (another request's, another scope, a broader rule), or when
+  `hold_ms` < 1500; the request stays open. Audited as `standing_rule` (rule, scope, destination, session key,
+  time). An older daemon ignores `rh` and approves once.
 - `approve`/`deny`/`reply` on a `rid` that has already been cleared returns `err: "stale"`, so a race against the terminal answer is safe. The daemon's approval broker holds the agent's blocking hook for that `rid` (DESIGN §6a) for the answer window ([ANSWER-WINDOW.md](ANSWER-WINDOW.md)); the first of {device answer, terminal answer, Open on PC, window over, hook gone} settles it, and only a device answer ever becomes a decision for the agent.
 
 ## 6. Audio: voice dictation (proto 0.6, issue 0ea9)

@@ -71,6 +71,12 @@ usual; the watch shows the time left as a thin ring and fetches the full text of
 number of seconds in `~/.agentlink/answer_window` (5-300; 0 = never hold), and give the two blocking hooks a
 Claude Code `timeout` above it (`agentlink hooks` prints 330); the daemon shortens the window to fit a smaller one.
 
+**Always allow:** when Claude Code suggests a rule for a permission request (`Bash(npm test:*)`), the watch offers
+`Always allow` after Deny; it shows the rule exactly as it will be saved and where (this session, or this project's
+`.claude/settings.local.json`) before a 1.6 s hold, never a whole-tool rule or one for all projects
+([docs/design/STANDING-RULES.md](docs/design/STANDING-RULES.md)). Each grant is in `~/.agentlink/audit.jsonl`;
+remove a rule with `/permissions` in Claude Code.
+
 **Daemon environment**
 
 | Variable | Effect |
