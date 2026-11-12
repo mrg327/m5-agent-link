@@ -150,8 +150,13 @@ fn line_reader(r: impl std::io::Read + Send + 'static) -> mpsc::Receiver<String>
     rx
 }
 
-/// Turns the daemon's `{"decision": "allow"|"deny"|"none", "grant"?, "answer"?}` into the
+/// Turns the daemon's `{"decision": "allow"|"deny"|"none", "permissions"?, "answer"?}` into the
 /// hook output Claude Code expects for `event`. `None` = print nothing (no decision).
+///
+/// `permissions` (a standing rule granted on the watch, docs/design/STANDING-RULES.md) becomes
+/// `updatedPermissions` only when every entry is, exactly, one of the `permission_suggestions` Claude
+/// Code sent this hook: anything else is no decision at all, so the terminal asks. The daemon's older
+/// `"grant": true` (which echoed every suggestion unseen) is ignored: that answer allows this call once.
 fn hook_output(event: &str, payload: &Value, reply: &Value) -> Option<Value> {
     let decision = reply["decision"].as_str()?;
     if decision == "none" {
@@ -160,14 +165,15 @@ fn hook_output(event: &str, payload: &Value, reply: &Value) -> Option<Value> {
     if event.eq_ignore_ascii_case("permissionrequest") {
         let mut d = json!({"behavior": decision});
         if decision == "allow" {
-            // "Yes, don't ask again": apply the rules Claude Code itself proposed for this call
-            if reply["grant"].as_bool() == Some(true) {
-                if let Some(s) = payload["permission_suggestions"]
+            if let Some(p) = reply.get("permissions") {
+                let suggested = payload["permission_suggestions"]
                     .as_array()
-                    .filter(|a| !a.is_empty())
-                {
-                    d["updatedPermissions"] = Value::Array(s.clone());
-                }
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]);
+                let granted = p
+                    .as_array()
+                    .filter(|a| !a.is_empty() && a.iter().all(|e| suggested.contains(e)))?;
+                d["updatedPermissions"] = Value::Array(granted.clone());
             }
         } else if decision == "deny" {
             d["message"] = json!("Denied from the watch");
@@ -1010,16 +1016,16 @@ mod tests {
             .get("updatedPermissions")
             .is_none());
 
-        let grant = hook_output(
+        // the older daemon's "grant": true no longer echoes the suggestions unseen: allow once
+        let legacy = hook_output(
             "PermissionRequest",
             &payload,
             &json!({"decision": "allow", "grant": true}),
         )
         .unwrap();
-        assert_eq!(
-            grant["hookSpecificOutput"]["decision"]["updatedPermissions"],
-            payload["permission_suggestions"]
-        );
+        assert!(legacy["hookSpecificOutput"]["decision"]
+            .get("updatedPermissions")
+            .is_none());
 
         let deny =
             hook_output("PermissionRequest", &payload, &json!({"decision": "deny"})).unwrap();
@@ -1032,6 +1038,55 @@ mod tests {
         assert!(
             hook_output("PermissionRequest", &payload, &json!({"decision": "maybe"})).is_none()
         );
+    }
+
+    #[test]
+    fn a_standing_rule_is_passed_back_only_if_claude_code_suggested_it() {
+        let narrow = json!({"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "npm test:*"}],
+                            "behavior": "allow", "destination": "localSettings"});
+        let mode = json!({"type": "setMode", "mode": "acceptEdits", "destination": "session"});
+        let payload = json!({"tool_name": "Bash", "tool_input": {"command": "npm test"},
+                             "permission_suggestions": [narrow, mode]});
+        let out = |perms: Value| {
+            hook_output(
+                "PermissionRequest",
+                &payload,
+                &json!({"decision": "allow", "permissions": perms}),
+            )
+        };
+        // exactly one of the suggestions: passed back, and only that one
+        let ok = out(json!([narrow])).unwrap();
+        assert_eq!(
+            ok["hookSpecificOutput"]["decision"]["updatedPermissions"],
+            json!([narrow])
+        );
+        assert_eq!(ok["hookSpecificOutput"]["decision"]["behavior"], "allow");
+        // broader, rewritten, to another destination, or not suggested at all: no decision, the terminal asks
+        let mut broader = narrow.clone();
+        broader["rules"] = json!([{"toolName": "Bash"}]);
+        let mut wider = narrow.clone();
+        wider["destination"] = json!("userSettings");
+        let mut star = narrow.clone();
+        star["rules"][0]["ruleContent"] = json!("npm:*");
+        for bad in [
+            json!([broader]),
+            json!([wider]),
+            json!([star]),
+            json!([narrow, {"type": "setMode", "mode": "bypassPermissions", "destination": "session"}]),
+            json!([]),
+            json!("all"),
+            json!(null),
+        ] {
+            assert!(out(bad.clone()).is_none(), "{bad}");
+        }
+        // a payload without suggestions accepts no rule
+        let bare = json!({"tool_name": "Bash", "tool_input": {"command": "npm test"}});
+        assert!(hook_output(
+            "PermissionRequest",
+            &bare,
+            &json!({"decision": "allow", "permissions": [narrow]})
+        )
+        .is_none());
     }
 
     #[test]

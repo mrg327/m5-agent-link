@@ -9,7 +9,8 @@
 //! never an approval.
 
 use crate::registry::{clip, now_unix, Registry, Update};
-use agentlink_proto::{Action, AttKind, Attention, Clear, ClearWhy, ResultErr};
+use crate::standing::Standing;
+use agentlink_proto::{Action, AttKind, Attention, Clear, ClearWhy, ResultErr, RuleScope};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -32,6 +33,9 @@ pub enum Decision {
     Deny,
     /// Index into the request's `opts`.
     Reply(usize),
+    /// Approve, and save the request's standing rule (STANDING-RULES.md): the hash of the rule the
+    /// device showed, which must be the hash of the request's own.
+    Grant(u32),
 }
 
 /// What one of the request's options means to the agent.
@@ -39,47 +43,58 @@ pub enum Decision {
 #[serde(rename_all = "snake_case")]
 pub enum Meaning {
     Allow,
-    /// Allow and remember (Claude Code: apply `permission_suggestions`).
-    AllowGrant,
     Deny,
     /// A question's answer: the option's full label.
     Answer(String),
 }
 
+/// A standing rule the device granted, for the audit log (never sent to hooks).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Saved {
+    pub rule: String,
+    pub scope: RuleScope,
+    pub wide: bool,
+    /// Source session key (`agent:session_id`).
+    pub key: String,
+}
+
 /// What the hook is told; it turns this into the agent's own hook-output JSON.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Outcome {
     /// `allow` | `deny` | `none` (no decision: let the agent prompt as usual).
     pub decision: &'static str,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub grant: bool,
+    /// With `allow`: permission update entries to apply, each one of the request's own
+    /// `permission_suggestions` verbatim (STANDING-RULES.md). The hook passes them back as
+    /// `updatedPermissions` only if each is one it received.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permissions: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub answer: Option<String>,
     /// Index of the option the decision stands for (Approve: the first allow, Deny: the first
     /// deny), so a typed answer knows which key to press. Not sent to hooks.
     #[serde(skip)]
     pub choice: Option<usize>,
+    /// The standing rule this answer saves, for the audit log. Not sent to hooks.
+    #[serde(skip)]
+    pub saved: Option<Saved>,
 }
 
 impl Outcome {
     pub const NONE: Outcome = Outcome {
         decision: "none",
-        grant: false,
+        permissions: None,
         answer: None,
         choice: None,
+        saved: None,
     };
 
-    fn of(
-        decision: &'static str,
-        grant: bool,
-        answer: Option<String>,
-        choice: Option<usize>,
-    ) -> Self {
+    fn of(decision: &'static str, answer: Option<String>, choice: Option<usize>) -> Self {
         Outcome {
             decision,
-            grant,
+            permissions: None,
             answer,
             choice,
+            saved: None,
         }
     }
 }
@@ -105,6 +120,8 @@ pub struct Request {
     /// Shown only: the hook is released at once (the terminal shows the prompt now) and the card
     /// stays until the session moves on, e.g. a question the wheel cannot answer.
     pub notice: bool,
+    /// The standing rule the device may grant with an approve (STANDING-RULES.md).
+    pub standing: Option<Standing>,
 }
 
 struct Pending {
@@ -117,6 +134,8 @@ struct Pending {
     full: Option<String>,
     /// When the answer window ends; `None` for a notice (no countdown).
     deadline: Option<Instant>,
+    /// The standing rule a grant saves; `att.rule` is its text.
+    standing: Option<Standing>,
 }
 
 #[derive(Default)]
@@ -252,7 +271,7 @@ impl Broker {
             .opts
             .iter()
             .enumerate()
-            .filter(|(_, (_, m))| matches!(m, Meaning::Allow | Meaning::AllowGrant))
+            .filter(|(_, (_, m))| matches!(m, Meaning::Allow))
             .fold(0u64, |mask, (i, _)| mask | (1 << i));
         let mut g = self.inner.lock().unwrap();
         let rid = g.next_rid;
@@ -269,6 +288,10 @@ impl Broker {
             .filter(|f| text.as_ref() != Some(*f))
             .map(|f| f.len() as u64);
         let win_ms = (!req.notice).then_some(req.ttl.as_millis() as u64);
+        // a standing rule goes only with a request the device can approve
+        let standing = req
+            .standing
+            .filter(|_| req.kind == AttKind::Approval && !req.focus_only && !req.notice);
         let att = Attention {
             rid,
             sid: req.sid,
@@ -284,6 +307,9 @@ impl Broker {
             win: win_ms,
             len,
             hush: hush.then_some(true),
+            rule: standing.as_ref().map(|s| s.text.clone()),
+            scope: standing.as_ref().map(|s| s.scope),
+            wide: standing.as_ref().map(|s| s.wide),
         };
         g.pending.insert(
             rid,
@@ -295,6 +321,7 @@ impl Broker {
                 tx,
                 full: full.filter(|f| f.len() <= DETAIL_CAP),
                 deadline: (!req.notice).then(|| Instant::now() + req.ttl),
+                standing,
             },
         );
         drop(g);
@@ -319,16 +346,30 @@ impl Broker {
         let first = |want: fn(&Meaning) -> bool| p.meanings.iter().position(want);
         let outcome = match decision {
             Decision::Approve if p.att.kind == AttKind::Approval => {
-                Outcome::of("allow", false, None, first(|m| matches!(m, Meaning::Allow)))
+                Outcome::of("allow", None, first(|m| matches!(m, Meaning::Allow)))
             }
+            Decision::Grant(h) if p.att.kind == AttKind::Approval => match &p.standing {
+                // the rule the device showed is the rule this request offers: hand back that entry only
+                Some(s) if s.hash == h => Outcome {
+                    permissions: Some(vec![s.entry.clone()]),
+                    saved: Some(Saved {
+                        rule: s.text.clone(),
+                        scope: s.scope,
+                        wide: s.wide,
+                        key: p.key.clone(),
+                    }),
+                    ..Outcome::of("allow", None, first(|m| matches!(m, Meaning::Allow)))
+                },
+                Some(_) => return Err((ResultErr::Denied, "not the rule this request offers")),
+                None => return Err((ResultErr::Denied, "no rule to save for this request")),
+            },
             Decision::Deny if p.att.kind == AttKind::Approval => {
-                Outcome::of("deny", false, None, first(|m| matches!(m, Meaning::Deny)))
+                Outcome::of("deny", None, first(|m| matches!(m, Meaning::Deny)))
             }
             Decision::Reply(i) => match p.meanings.get(i) {
-                Some(Meaning::Allow) => Outcome::of("allow", false, None, Some(i)),
-                Some(Meaning::AllowGrant) => Outcome::of("allow", true, None, Some(i)),
-                Some(Meaning::Deny) => Outcome::of("deny", false, None, Some(i)),
-                Some(Meaning::Answer(a)) => Outcome::of("allow", false, Some(a.clone()), Some(i)),
+                Some(Meaning::Allow) => Outcome::of("allow", None, Some(i)),
+                Some(Meaning::Deny) => Outcome::of("deny", None, Some(i)),
+                Some(Meaning::Answer(a)) => Outcome::of("allow", Some(a.clone()), Some(i)),
                 None => return Err((ResultErr::Denied, "no such option")),
             },
             _ => return Err((ResultErr::Denied, "not a permission request")),
@@ -357,7 +398,7 @@ impl Broker {
         if !p.att.acts.contains(&Action::Dictate) {
             return Err((ResultErr::Denied, "this card takes no dictation"));
         }
-        self.settle(g, rid, Outcome::of("allow", false, Some(text), None))
+        self.settle(g, rid, Outcome::of("allow", Some(text), None))
     }
 
     fn settle(
@@ -390,12 +431,9 @@ impl Broker {
             return false;
         };
         match decision {
-            Decision::Approve => p.att.kind == AttKind::Approval,
+            Decision::Approve | Decision::Grant(_) => p.att.kind == AttKind::Approval,
             Decision::Deny => false,
-            Decision::Reply(i) => matches!(
-                p.meanings.get(*i),
-                Some(Meaning::Allow) | Some(Meaning::AllowGrant)
-            ),
+            Decision::Reply(i) => matches!(p.meanings.get(*i), Some(Meaning::Allow)),
         }
     }
 
@@ -508,18 +546,9 @@ pub fn request_of(
         "permissionrequest" => {
             let tool_name = tool.as_deref().unwrap_or("Tool");
             let (title, text) = describe_tool(tool_name, input);
-            let has_suggestions = payload["permission_suggestions"]
-                .as_array()
-                .is_some_and(|a| !a.is_empty());
-            let opts = if has_suggestions {
-                vec![
-                    ("Yes".into(), Meaning::Allow),
-                    ("Yes, don't ask again".into(), Meaning::AllowGrant),
-                    ("No".into(), Meaning::Deny),
-                ]
-            } else {
-                Vec::new()
-            };
+            // Approve / Deny, and "Always allow" when Claude Code suggests a rule the watch can show in
+            // full (standing.rs). Before 0.13 this was a "Yes, don't ask again" option that applied every
+            // suggestion unseen, a permission mode change included.
             Some(Request {
                 sid,
                 key,
@@ -527,11 +556,12 @@ pub fn request_of(
                 kind: AttKind::Approval,
                 title: Some(title),
                 text,
-                opts,
+                opts: Vec::new(),
                 ttl,
                 focus_only: false,
                 dictate: false,
                 notice: false,
+                standing: crate::standing::pick(payload),
             })
         }
         "pretooluse" if tool.as_deref() == Some("AskUserQuestion") => {
@@ -571,6 +601,7 @@ pub fn request_of(
                     focus_only: true,
                     dictate: false,
                     notice: true,
+                    standing: None,
                 }
             };
             let [q] = qs.as_slice() else {
@@ -609,6 +640,7 @@ pub fn request_of(
                 focus_only: false,
                 dictate: false,
                 notice: false,
+                standing: None,
             })
         }
         _ => None,
@@ -647,9 +679,14 @@ mod tests {
         (Arc::new(Broker::new(reg)), rx)
     }
 
+    static SUGGESTION: std::sync::LazyLock<Value> = std::sync::LazyLock::new(|| {
+        json!({"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "npm test:*"}],
+               "behavior": "allow", "destination": "localSettings"})
+    });
+
     fn perm(suggest: bool) -> Request {
         let payload = json!({"tool_name": "Bash", "tool_input": {"command": "npm test"},
-                             "permission_suggestions": if suggest { json!([{"type":"addRules"}]) } else { json!([]) }});
+                             "permission_suggestions": if suggest { json!([SUGGESTION.clone()]) } else { json!([]) }});
         request_of(
             2,
             "claude:s".into(),
@@ -764,34 +801,188 @@ mod tests {
     #[tokio::test]
     async fn deny_and_reply_map_to_the_agents_choices() {
         let (b, mut rx) = broker();
-        let (rid, wait) = b.open(perm(true));
+        let mut r = perm(false);
+        r.opts = vec![("Yes".into(), Meaning::Allow), ("No".into(), Meaning::Deny)];
+        let (rid, wait) = b.open(r.clone());
         let Update::Attention(att) = next_update(&mut rx) else {
             panic!()
         };
         assert_eq!(
             att.opts.as_deref(),
-            Some(&["Yes".to_owned(), "Yes, don't ask again".into(), "No".into()][..])
+            Some(&["Yes".to_owned(), "No".into()][..])
         );
-        assert_eq!(att.grant_mask, Some(0b011));
+        assert_eq!(att.grant_mask, Some(0b01));
         assert!(att.acts.contains(&Action::Reply));
-        let out = b.answer(rid, Decision::Reply(1)).unwrap();
-        assert_eq!((out.decision, out.grant), ("allow", true));
+        let out = b.answer(rid, Decision::Reply(0)).unwrap();
+        assert_eq!((out.decision, &out.permissions), ("allow", &None));
         assert_eq!(wait.await.unwrap(), out);
 
-        let (rid, wait) = b.open(perm(true));
-        assert_eq!(b.answer(rid, Decision::Reply(2)).unwrap().decision, "deny");
+        let (rid, wait) = b.open(r.clone());
+        assert_eq!(b.answer(rid, Decision::Reply(1)).unwrap().decision, "deny");
         assert_eq!(wait.await.unwrap().decision, "deny");
 
         let (rid, wait) = b.open(perm(false));
         assert_eq!(b.answer(rid, Decision::Deny).unwrap().decision, "deny");
         assert_eq!(wait.await.unwrap().decision, "deny");
 
-        let (rid, _wait) = b.open(perm(true));
+        let (rid, _wait) = b.open(r);
         assert_eq!(
             b.answer(rid, Decision::Reply(7)).unwrap_err().0,
             ResultErr::Denied
         );
         assert_eq!(b.pending().len(), 1, "a bad index leaves the request open");
+    }
+
+    #[tokio::test]
+    async fn a_standing_rule_is_offered_and_granted_verbatim() {
+        let (b, mut rx) = broker();
+        let (rid, wait) = b.open(perm(true));
+        let Update::Attention(att) = next_update(&mut rx) else {
+            panic!()
+        };
+        // no options: Approve / Deny, and the rule with its scope and breadth
+        assert!(att.opts.is_none() && att.grant_mask.is_none());
+        assert_eq!(att.acts, vec![Action::Approve, Action::Deny, Action::Focus]);
+        assert_eq!(att.rule.as_deref(), Some("Bash(npm test:*)"));
+        assert_eq!(
+            (att.scope, att.wide),
+            (Some(RuleScope::Project), Some(true))
+        );
+        let h = crate::standing::hash("Bash(npm test:*)", RuleScope::Project, true);
+        assert!(
+            b.grants(rid, &Decision::Grant(h)),
+            "a grant needs the full hold"
+        );
+        let out = b.answer(rid, Decision::Grant(h)).unwrap();
+        assert_eq!(out.decision, "allow");
+        assert_eq!(out.permissions, Some(vec![SUGGESTION.clone()]));
+        let saved = out.saved.clone().unwrap();
+        assert_eq!(
+            (saved.rule.as_str(), saved.scope, saved.key.as_str()),
+            ("Bash(npm test:*)", RuleScope::Project, "claude:s")
+        );
+        let to_hook = wait.await.unwrap();
+        assert_eq!(to_hook, out);
+        // what the hook reads: allow plus the one entry; the audit record is not in it
+        let line = serde_json::to_value(&to_hook).unwrap();
+        assert_eq!(
+            line,
+            json!({"decision": "allow", "permissions": [SUGGESTION.clone()]})
+        );
+        // answered: a second grant is stale
+        assert_eq!(
+            b.answer(rid, Decision::Grant(h)).unwrap_err().0,
+            ResultErr::Stale
+        );
+    }
+
+    #[tokio::test]
+    async fn a_plain_approve_on_a_rule_request_saves_nothing() {
+        let (b, _rx) = broker();
+        let (rid, wait) = b.open(perm(true));
+        let out = b.answer(rid, Decision::Approve).unwrap();
+        assert_eq!((out.permissions, out.saved), (None, None));
+        assert_eq!(
+            serde_json::to_value(wait.await.unwrap()).unwrap(),
+            json!({"decision": "allow"})
+        );
+    }
+
+    #[tokio::test]
+    async fn a_grant_must_name_the_rule_this_request_offers() {
+        let (b, _rx) = broker();
+        let (a, _wa) = b.open(perm(true));
+        let mut other = perm(false);
+        other.standing = crate::standing::pick(&json!({"permission_suggestions": [
+            {"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "rm -rf build"}],
+             "behavior": "allow", "destination": "session"}]}));
+        let (o, wo) = b.open(other);
+        let ha = crate::standing::hash("Bash(npm test:*)", RuleScope::Project, true);
+        let ho = crate::standing::hash("Bash(rm -rf build)", RuleScope::Session, false);
+        // the rule swapped between what was shown and what is held: denied, both still open
+        assert_eq!(
+            b.answer(o, Decision::Grant(ha)).unwrap_err().0,
+            ResultErr::Denied
+        );
+        assert_eq!(
+            b.answer(a, Decision::Grant(ho)).unwrap_err().0,
+            ResultErr::Denied
+        );
+        // the same text with another scope or breadth is another rule
+        let wrong_scope = crate::standing::hash("Bash(npm test:*)", RuleScope::Session, true);
+        assert_eq!(
+            b.answer(a, Decision::Grant(wrong_scope)).unwrap_err().0,
+            ResultErr::Denied
+        );
+        assert_eq!(b.pending().len(), 2);
+        // its own hash grants its own entry
+        assert_eq!(
+            b.answer(o, Decision::Grant(ho))
+                .unwrap()
+                .permissions
+                .unwrap()[0]["rules"][0]["ruleContent"],
+            "rm -rf build"
+        );
+        assert_eq!(wo.await.unwrap().decision, "allow");
+        // a request with no rule cannot be granted one
+        let (plain, _wp) = b.open(perm(false));
+        assert_eq!(
+            b.answer(plain, Decision::Grant(ha)).unwrap_err().0,
+            ResultErr::Denied
+        );
+        // an unknown rid is stale
+        assert_eq!(
+            b.answer(u64::from(u32::MAX), Decision::Grant(ha))
+                .unwrap_err()
+                .0,
+            ResultErr::Stale
+        );
+    }
+
+    #[tokio::test]
+    async fn a_grant_after_the_window_or_the_hand_back_is_stale() {
+        let (b, _rx) = broker();
+        let h = crate::standing::hash("Bash(npm test:*)", RuleScope::Project, true);
+        let (rid, wait) = b.open(perm(true));
+        assert!(b.cancel(rid, ClearWhy::Expired));
+        assert_eq!(
+            b.answer(rid, Decision::Grant(h)).unwrap_err().0,
+            ResultErr::Stale
+        );
+        assert!(!b.grants(rid, &Decision::Grant(h)));
+        assert!(wait.await.is_err(), "no decision reaches the hook");
+        let (rid, wait) = b.open(perm(true));
+        assert!(b.hand_back(rid, Some(2)));
+        assert_eq!(
+            b.answer(rid, Decision::Grant(h)).unwrap_err().0,
+            ResultErr::Stale
+        );
+        assert!(wait.await.is_err());
+        // the terminal answered (a later event from the session)
+        let (rid, _wait) = b.open(perm(true));
+        b.cancel_session("claude:s", None);
+        assert_eq!(
+            b.answer(rid, Decision::Grant(h)).unwrap_err().0,
+            ResultErr::Stale
+        );
+    }
+
+    #[test]
+    fn only_a_request_the_device_can_approve_carries_a_rule() {
+        let (b, _rx) = broker();
+        let mut r = perm(true);
+        r.focus_only = true;
+        let (_, _w) = b.open(r);
+        let mut q = perm(true);
+        q.kind = AttKind::Question;
+        let (_, _w2) = b.open(q);
+        assert!(b
+            .pending()
+            .iter()
+            .all(|a| a.rule.is_none() && a.scope.is_none() && a.wide.is_none()));
+        // and the old "Yes, don't ask again" option is gone
+        let r = perm(true);
+        assert!(r.opts.is_empty() && r.standing.is_some());
     }
 
     #[tokio::test]
@@ -1157,6 +1348,7 @@ mod tests {
             focus_only: !dictate,
             dictate,
             notice: false,
+            standing: None,
         };
         let (plain, _w1) = b.open(card(false));
         let (text, w2) = b.open(card(true));
@@ -1197,6 +1389,7 @@ mod tests {
             focus_only: true,
             dictate: false,
             notice: false,
+            standing: None,
         };
         let (ask, _w1) = b.open(card(Some("ask_user")));
         let (screen, w2) = b.open(card(None));

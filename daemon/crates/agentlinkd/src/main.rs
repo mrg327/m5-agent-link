@@ -21,6 +21,7 @@ mod registry;
 mod remote;
 mod scroll;
 mod source;
+mod standing;
 mod trace;
 mod transport;
 mod typing;

@@ -20,6 +20,9 @@ use tokio::time::Instant;
 
 /// Minimum hold-to-confirm for approvals (PROTOCOL §5).
 const MIN_APPROVE_HOLD_MS: u64 = 1000;
+/// Minimum hold for an approve that also saves a standing rule (STANDING-RULES.md §5): longer than a
+/// plain approve, as the watch's own grant hold is (1600 ms against 1200).
+const MIN_GRANT_HOLD_MS: u64 = 1500;
 
 /// State shared by every link task.
 pub struct Shared {
@@ -235,6 +238,10 @@ impl Conn {
             if self.peer_minor < PRESENCE_MINOR {
                 a.hush = None;
             }
+            // the standing rule: proto 0.13 (STANDING-RULES.md); an older device offers Approve / Deny
+            if self.peer_minor < RULES_MINOR {
+                (a.rule, a.scope, a.wide) = (None, None, None);
+            }
         }
         if let Message::Clear(cl) = &mut msg {
             if cl.why == ClearWhy::HandedBack && self.peer_minor < WINDOW_MINOR {
@@ -343,6 +350,8 @@ const GAUGES_MINOR: u64 = 10;
 const WINDOW_MINOR: u64 = 11;
 /// Presence: `hush` on an attention and on the delta that enters done / error (PRESENCE.md).
 const PRESENCE_MINOR: u64 = 12;
+/// Standing rules: `attention.rule` / `scope` / `wide` and `cmd.rh` with approve (STANDING-RULES.md).
+const RULES_MINOR: u64 = 13;
 
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
@@ -1005,7 +1014,11 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
             // The broker holds the hook that is waiting for this rid; an unknown or settled rid
             // is stale, so a race against the terminal answer is safe (PROTOCOL §5).
             let decision = match cmd.op {
-                CmdOp::Approve => Some(Decision::Approve),
+                // with `rh` (proto 0.13): approve and save the standing rule the device showed
+                CmdOp::Approve => match cmd.rh {
+                    None => Some(Decision::Approve),
+                    Some(h) => u32::try_from(h).ok().map(Decision::Grant),
+                },
                 CmdOp::Deny => Some(Decision::Deny),
                 _ => match cmd.arg {
                     Some(Arg::Uint(i)) => usize::try_from(i).ok().map(Decision::Reply),
@@ -1014,6 +1027,7 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
             };
             let res = match (cmd.rid, decision) {
                 (None, _) => fail(ResultErr::Denied, "rid required"),
+                (_, None) if cmd.op == CmdOp::Approve => fail(ResultErr::Denied, "bad rule hash"),
                 (_, None) => fail(ResultErr::Denied, "reply needs an option index"),
                 (Some(rid), Some(ref d))
                     if shared.broker.grants(rid, d)
@@ -1021,9 +1035,17 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
                 {
                     fail(ResultErr::Denied, "hold-to-confirm too short")
                 }
+                (Some(_), Some(Decision::Grant(_)))
+                    if cmd.hold_ms.unwrap_or(0) < MIN_GRANT_HOLD_MS =>
+                {
+                    fail(ResultErr::Denied, "hold-to-confirm too short")
+                }
                 (Some(rid), Some(d)) => match shared.broker.answer(rid, d) {
                     Ok(outcome) => {
-                        tracing::info!("rid {rid} answered from device: {:?}", outcome);
+                        tracing::info!("rid {rid} answered from device: {:?}", outcome.decision);
+                        if let Some(saved) = &outcome.saved {
+                            audit_rule(shared, cmd.sid, rid, saved);
+                        }
                         CmdResult::ok()
                     }
                     Err((err, msg)) => fail(err, msg),
@@ -1064,6 +1086,27 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         CmdOp::Type | CmdOp::Cancel | CmdOp::Dictate => type_cmd(shared, cmd).await,
         _ => fail(ResultErr::Unsupported, "command not implemented"),
     }
+}
+
+/// The audit record of a standing rule granted from the device (STANDING-RULES.md §6): the rule as Claude
+/// Code saves it, where, the session, and (in the audit line itself) the time. No command output.
+fn audit_rule(shared: &Shared, sid: Option<u64>, rid: u64, saved: &crate::broker::Saved) {
+    use crate::standing::scope_words;
+    let destination = match saved.scope {
+        agentlink_proto::RuleScope::Session => "session",
+        agentlink_proto::RuleScope::Project => "localSettings",
+    };
+    tracing::info!(
+        "rid {rid}: standing rule granted from the device for {}",
+        scope_words(saved.scope)
+    );
+    shared.trace.audit(
+        "standing_rule",
+        sid,
+        Some(rid),
+        json!({"rule": saved.rule, "scope": scope_words(saved.scope), "destination": destination,
+               "wide": saved.wide, "session": saved.key}),
+    );
 }
 
 /// A transcript answering card `rid` (`Action::Dictate`); the card's owner types it.
@@ -1382,6 +1425,7 @@ mod tests {
                 seq: Some(seq),
             })),
             hold_ms: None,
+            rh: None,
         }
     }
 
@@ -1435,6 +1479,7 @@ mod tests {
             rid: None,
             arg: arg.map(Arg::Uint),
             hold_ms,
+            rh: None,
         }
     }
 
@@ -1704,6 +1749,7 @@ mod tests {
             rid,
             arg,
             hold_ms,
+            rh: None,
         }
     }
 
@@ -1733,6 +1779,7 @@ mod tests {
             focus_only: false,
             dictate: false,
             notice: false,
+            standing: None,
         };
         let (rid, wait) = shared.broker.open(req(vec![]));
         let mut d = spawn_link(&shared);
@@ -1775,7 +1822,7 @@ mod tests {
         // reply with an option index, delivered as an attention while connected
         let (rid, wait) = shared.broker.open(req(vec![
             ("Yes".into(), Meaning::Allow),
-            ("Yes, don't ask again".into(), Meaning::AllowGrant),
+            ("Yes, this one too".into(), Meaning::Allow),
             ("No".into(), Meaning::Deny),
         ]));
         let Message::Attention(att) = d.next().await.msg else {
@@ -1801,7 +1848,7 @@ mod tests {
             .unwrap();
         assert!(result_of(&mut d).await.ok);
         let out = wait.await.unwrap();
-        assert_eq!((out.decision, out.grant), ("allow", true));
+        assert_eq!((out.decision, out.permissions), ("allow", None));
         let _clear = d.next().await;
         // reply without an index, and deny of an unknown rid
         d.to_daemon
@@ -1827,6 +1874,7 @@ mod tests {
             focus_only: false,
             dictate: false,
             notice: false,
+            standing: None,
         }
     }
 
@@ -1837,6 +1885,116 @@ mod tests {
         d.next().await; // welcome
         d.next().await; // snapshot
         d
+    }
+
+    fn rule_req() -> crate::broker::Request {
+        let payload = json!({"tool_name": "Bash", "tool_input": {"command": "npm test"},
+            "permission_suggestions": [
+                {"type": "setMode", "mode": "acceptEdits", "destination": "session"},
+                {"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "npm test:*"}],
+                 "behavior": "allow", "destination": "localSettings"}]});
+        crate::broker::request_of(
+            1,
+            "claude:s".into(),
+            "claude",
+            "PermissionRequest",
+            &payload,
+            std::time::Duration::from_secs(30),
+        )
+        .unwrap()
+    }
+
+    fn grant_cmd(rid: u64, rh: u64, hold_ms: u64) -> Cmd {
+        Cmd {
+            rh: Some(rh),
+            ..cmd(CmdOp::Approve, Some(rid), None, Some(hold_ms))
+        }
+    }
+
+    /// STANDING-RULES.md: the rule reaches only devices speaking 0.13; a grant needs the longer hold and the
+    /// hash of the very rule offered; it releases the hook with that one entry and writes the audit line.
+    #[tokio::test]
+    async fn a_standing_rule_reaches_only_0_13_and_needs_its_own_hash_and_hold() {
+        use agentlink_proto::RuleScope;
+        let dir = std::env::temp_dir().join(format!("al-rule-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let audit = dir.join("audit.jsonl");
+        let trace = Trace::new(dir.join("trace"), audit.clone());
+        let registry = Arc::new(Registry::new(trace.clone()));
+        let shared = Arc::new(Shared::new(
+            registry.clone(),
+            Arc::new(Broker::new(registry)),
+            trace,
+            Arc::new(NoFocus),
+            Arc::new(FakeScroll::default()),
+        ));
+        let (rid, wait) = shared.broker.open(rule_req());
+        // an older watch: Approve / Deny only, no rule keys, and approve allows once
+        let mut old = linked(&shared, 12).await;
+        let Message::Attention(a) = old.next().await.msg else {
+            panic!()
+        };
+        assert_eq!((a.rid, &a.rule, a.scope, a.wide), (rid, &None, None, None));
+        assert!(
+            a.opts.is_none(),
+            "no 'don't ask again' option for an old watch either"
+        );
+        let mut new = linked(&shared, 13).await;
+        let Message::Attention(a) = new.next().await.msg else {
+            panic!()
+        };
+        assert_eq!(a.rule.as_deref(), Some("Bash(npm test:*)"));
+        assert_eq!((a.scope, a.wide), (Some(RuleScope::Project), Some(true)));
+        let h = u64::from(crate::standing::hash(
+            "Bash(npm test:*)",
+            RuleScope::Project,
+            true,
+        ));
+        // the approve hold is not enough for a grant; nor a hash of another rule, nor one past u32
+        for (c, want) in [
+            (grant_cmd(rid, h, 1250), ResultErr::Denied),
+            (grant_cmd(rid, h ^ 1, 1600), ResultErr::Denied),
+            (grant_cmd(rid, 1 << 40, 1600), ResultErr::Denied),
+            (grant_cmd(rid + 1, h, 1600), ResultErr::Stale),
+        ] {
+            new.to_daemon.send(cmd_bytes(1, c)).unwrap();
+            let r = result_of(&mut new).await;
+            assert_eq!((r.ok, r.err), (false, Some(want)));
+        }
+        assert_eq!(shared.broker.pending().len(), 1, "still open");
+        new.to_daemon
+            .send(cmd_bytes(2, grant_cmd(rid, h, 1600)))
+            .unwrap();
+        assert!(result_of(&mut new).await.ok);
+        let out = wait.await.unwrap();
+        let line = serde_json::to_value(&out).unwrap();
+        assert_eq!(line["decision"], "allow");
+        assert_eq!(line["permissions"].as_array().unwrap().len(), 1);
+        assert_eq!(line["permissions"][0]["destination"], "localSettings");
+        assert_eq!(
+            line["permissions"][0]["rules"][0]["ruleContent"],
+            "npm test:*"
+        );
+        // the audit log: rule, scope, session, time; no command and no output
+        let log = std::fs::read_to_string(&audit).unwrap();
+        let rec: Value = log
+            .lines()
+            .map(|l| serde_json::from_str::<Value>(l).unwrap())
+            .find(|v| v["kind"] == "standing_rule")
+            .expect("a standing_rule audit line");
+        assert_eq!(rec["msg"]["rule"], "Bash(npm test:*)");
+        assert_eq!(rec["msg"]["scope"], "this project");
+        assert_eq!(rec["msg"]["destination"], "localSettings");
+        assert_eq!(rec["msg"]["session"], "claude:s");
+        assert_eq!(rec["rid"], rid);
+        assert!(rec["ts"].is_string());
+        assert!(!rec.to_string().contains("tool_input"));
+        // answered: the same grant again is stale
+        new.next().await; // clear
+        new.to_daemon
+            .send(cmd_bytes(3, grant_cmd(rid, h, 1600)))
+            .unwrap();
+        assert_eq!(result_of(&mut new).await.err, Some(ResultErr::Stale));
     }
 
     /// The text of every `detail` chunk up to the command's `result`, which it returns.
