@@ -50,3 +50,34 @@ bool ring_pop(ring_t *r, void *item)
     unlock(r);
     return ok;
 }
+
+bool ring_push_n(ring_t *r, const void *item, size_t n)
+{
+    bool ok = false;
+    if (n > r->item_size) n = r->item_size;
+    lock(r);
+    if (r->count < r->capacity) {
+        size_t tail = (r->head + r->count) % r->capacity;
+        memcpy(r->buf + tail * r->item_size, item, n);
+        r->count++;
+        ok = true;
+    }
+    unlock(r);
+    return ok;
+}
+
+bool ring_pop_n(ring_t *r, void *item, ring_used_fn used)
+{
+    bool ok = false;
+    lock(r);
+    if (r->count > 0) {
+        const uint8_t *src = r->buf + r->head * r->item_size;
+        size_t n = used(src);
+        memcpy(item, src, n > r->item_size ? r->item_size : n);
+        r->head = (r->head + 1) % r->capacity;
+        r->count--;
+        ok = true;
+    }
+    unlock(r);
+    return ok;
+}

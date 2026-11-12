@@ -20,6 +20,7 @@ static const char *TAG = "sw-touch";
 
 static i2c_master_dev_handle_t s_dev;
 static bool s_asleep;
+static volatile bool s_cover; /* two or more contacts at once */
 
 #ifdef CONFIG_AGENTLINK_TOUCH_INT
 /* INT gating: with no finger down, a poll reads only after an INT edge or once per FORCE_US. */
@@ -121,6 +122,9 @@ bool sw_touch_read(uint16_t *x, uint16_t *y)
         *x = (uint16_t)(((b[3] & 0x0F) << 8) | b[4]);
         *y = (uint16_t)(((b[5] & 0x0F) << 8) | b[6]);
         down = b[2] > 0 && (event == 0 || event == 2);
+        s_cover = down && b[2] >= 2;
+    } else {
+        s_cover = false;
     }
 #ifdef CONFIG_AGENTLINK_TOUCH_INT
     /* A forced read that finds a new finger with no INT edge: the line is not doing its job. */
@@ -148,4 +152,9 @@ void sw_touch_sleep(bool sleep)
     } else {
         sw_touch_reset(); /* the controller wakes on a reset pulse */
     }
+}
+
+bool hal_touch_covered(void)
+{
+    return s_cover;
 }

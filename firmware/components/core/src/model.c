@@ -7,7 +7,7 @@
 
 MODEL_EXT_BSS static session_t s_sessions[MODEL_MAX_SESSIONS];
 static bool s_used[MODEL_MAX_SESSIONS];
-static attention_t s_att[MODEL_MAX_ATTENTION];
+MODEL_EXT_BSS static attention_t s_att[MODEL_MAX_ATTENTION]; /* PSRAM: a standing rule makes each ~0.5 KB */
 static bool s_att_used[MODEL_MAX_ATTENTION];
 static settings_t s_settings;
 static uint32_t s_rev;
@@ -75,6 +75,31 @@ void model_copy_str(char *dst, size_t cap, const uint8_t *src, size_t len)
     dst[len] = 0;
 }
 
+uint32_t model_rule_hash(const char *rule, uint8_t scope, bool wide)
+{
+    uint32_t h = 0x811c9dc5u;
+    const uint8_t tail[3] = {0, scope, wide ? 1 : 0};
+    for (const uint8_t *p = (const uint8_t *)rule; *p; p++) h = (h ^ *p) * 0x01000193u;
+    for (int i = 0; i < 3; i++) h = (h ^ tail[i]) * 0x01000193u;
+    return h;
+}
+
+void model_attention_set_rule(attention_t *a, const uint8_t *rule, size_t len, uint32_t scope, bool wide)
+{
+    a->has_rule = false;
+    a->rule[0] = 0;
+    if (!rule || len == 0 || len > MODEL_RULE_CAP || scope > MODEL_RULE_PROJECT) return;
+    for (size_t i = 0; i < len; i++) /* every byte must show as itself: no control, no UTF-8, no NUL */
+        if (!(rule[i] == '\n' || (rule[i] >= 0x20 && rule[i] < 0x7f))) return;
+    if (rule[0] == '\n' || rule[len - 1] == '\n') return;
+    memcpy(a->rule, rule, len);
+    a->rule[len] = 0;
+    a->rule_scope = (uint8_t)scope;
+    a->rule_wide = wide;
+    a->rule_hash = model_rule_hash(a->rule, a->rule_scope, a->rule_wide);
+    a->has_rule = true;
+}
+
 const char *sess_state_name(sess_state_t s)
 {
     static const char *const names[] = {"start", "work", "input", "error", "done", "idle", "ended"};
@@ -103,6 +128,8 @@ static int find_slot(uint32_t sid)
 static void apply(session_t *dst, const session_t *src, uint32_t present)
 {
     if (present & SF_AGENT) dst->agent = src->agent;
+    if ((present & SF_STATE) && src->state != dst->state) dst->back = false; /* the session moved on */
+    if (present & SF_STATE) memset(&dst->sum, 0, sizeof dst->sum); /* the last turn's summary is not this one's */
     if (present & SF_STATE) dst->state = src->state;
     if (present & SF_SUB) dst->sub = src->sub;
     if (present & SF_REPO) memcpy(dst->repo, src->repo, sizeof dst->repo);
@@ -126,7 +153,26 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
         memcpy(dst->rp, src->rp, sizeof dst->rp);
         dst->n_rp = src->n_rp;
     }
+    if (present & SF_ETA) dst->eta = src->eta;
+    if (present & SF_EXIT) dst->exit_code = src->exit_code;
+    if (present & SF_CTX) {
+        dst->ctx_known = src->ctx <= 100; /* MODEL_CTX_UNKNOWN clears it */
+        dst->ctx = dst->ctx_known ? src->ctx : 0;
+    }
+    if (present & SF_MDL) memcpy(dst->mdl, src->mdl, sizeof dst->mdl);
+    if (present & SF_PM) {
+        dst->pm = src->pm;
+        dst->pm_known = true;
+    }
+    if (present & SF_PR) dst->pr = src->pr;
+    if (present & SF_PRS) dst->prs = src->prs;
+    if (present & SF_HUSH) dst->hush = src->hush;
+    if (present & SF_DONE) dst->sum = src->sum;
     if (present & SF_NO_SCROLL) dst->no_scroll = src->no_scroll;
+    if (present & SF_BACK) {
+        dst->back = src->back;
+        dst->back_why = src->back_why;
+    }
 }
 
 void model_upsert(const session_t *delta, uint32_t present)
@@ -170,9 +216,20 @@ bool model_session_snoozed(const session_t *s, uint32_t now_unix) { return s && 
 
 void model_replace_all(const session_t *list, size_t n)
 {
+    /* "On your computer" survives a reconnect for a session still in the same state (device-side flag) */
+    struct back_s { uint32_t sid; sess_state_t st; uint8_t why; } back[MODEL_MAX_SESSIONS];
+    int nb = 0;
+    for (int i = 0; i < MODEL_MAX_SESSIONS; i++)
+        if (s_used[i] && s_sessions[i].back)
+            back[nb++] = (struct back_s){s_sessions[i].sid, s_sessions[i].state, s_sessions[i].back_why};
     memset(s_used, 0, sizeof s_used);
     for (size_t i = 0; i < n && i < MODEL_MAX_SESSIONS; i++) {
         s_sessions[i] = list[i];
+        for (int b = 0; b < nb; b++)
+            if (back[b].sid == list[i].sid && back[b].st == list[i].state) {
+                s_sessions[i].back = true;
+                s_sessions[i].back_why = back[b].why;
+            }
         steps_seed(&s_sessions[i].steps, list[i].n, (step_state_t)list[i].step,
                    list[i].summary[0] ? list[i].summary : list[i].tool);
         s_used[i] = true;
@@ -274,15 +331,18 @@ void model_attention_add(const attention_t *a)
     for (int i = 0; i < MODEL_MAX_ATTENTION && slot < 0; i++)
         if (!s_att_used[i]) slot = i;
     if (slot < 0) slot = 0; /* queue full: oldest is least likely to still be live */
-    attention_t old = s_att[slot];
-    bool had = s_att_used[slot] && old.rid == a->rid;
+    bool had = s_att_used[slot] && s_att[slot].rid == a->rid;
+    bool sent = s_att[slot].answer_sent; /* only these three, not a copy: attention_t is ~0.5 KB of stack */
+    uint8_t answer = s_att[slot].answer, answer_opt = s_att[slot].answer_opt;
     s_att[slot] = *a;
     if (had) { /* a re-sent request keeps the answer already given */
-        s_att[slot].answer_sent = old.answer_sent;
-        s_att[slot].answer = old.answer;
-        s_att[slot].answer_opt = old.answer_opt;
+        s_att[slot].answer_sent = sent;
+        s_att[slot].answer = answer;
+        s_att[slot].answer_opt = answer_opt;
     }
     s_att_used[slot] = true;
+    int ss = find_slot(a->sid);
+    if (ss >= 0 && !had) s_sessions[ss].back = false; /* a new request is on the watch again */
     s_rev++;
     dbg_event("model", "attention", "\"rid\":%u,\"sid\":%u,\"kind\":%d", (unsigned)a->rid, (unsigned)a->sid, (int)a->kind);
 }
@@ -345,19 +405,68 @@ void model_attention_set_answer(uint32_t rid, uint8_t answer, uint8_t opt)
     }
 }
 
+/* The session of a request that went back to the computer says so (UI: "On your computer"). */
+static void mark_back(uint32_t sid, uint8_t why)
+{
+    if (!model_find(sid)) return;
+    session_t d = {.sid = sid, .back = true, .back_why = why};
+    model_upsert(&d, SF_BACK);
+}
+
+bool model_attention_went_back(uint32_t rid, uint8_t why)
+{
+    const attention_t *a = model_attention_find(rid);
+    if (!a) return false;
+    uint32_t sid = a->sid;
+    bool answered = a->answer_sent;
+    model_attention_clear(rid);
+    if (!answered) mark_back(sid, why); /* an answer already sent says "Waiting for your computer" instead */
+    dbg_event("model", "attention_back", "\"rid\":%u,\"sid\":%u,\"why\":%d", (unsigned)rid, (unsigned)sid, (int)why);
+    return true;
+}
+
+uint32_t model_attention_left_ms(const attention_t *a, uint32_t now_ms)
+{
+    if (!a || !a->deadline_ms) return UINT32_MAX;
+    int32_t left = (int32_t)(a->deadline_ms - now_ms);
+    return left > 0 ? (uint32_t)left : 0;
+}
+
+void model_attention_expire_ms(uint32_t now_ms)
+{
+    for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
+        if (!s_att_used[i] || !s_att[i].deadline_ms) continue;
+        if ((int32_t)(now_ms - s_att[i].deadline_ms) > MODEL_WINDOW_GRACE_MS) {
+            dbg_event("model", "attention_window_over", "\"rid\":%u", (unsigned)s_att[i].rid);
+            model_attention_went_back(s_att[i].rid, BACK_EXPIRED);
+        }
+    }
+}
+
+static uint8_t s_peer_minor;
+void model_set_peer_minor(uint8_t minor) { s_peer_minor = minor; }
+uint8_t model_peer_minor(void) { return s_peer_minor; }
+
 void model_attention_expire(uint32_t now_unix)
 {
     if (!now_unix) return;
     for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
-        if (s_att_used[i] && s_att[i].exp && now_unix > s_att[i].exp) {
+        /* a request with an answer window ends by that (model_attention_expire_ms), to the millisecond */
+        if (s_att_used[i] && s_att[i].exp && !s_att[i].deadline_ms && now_unix > s_att[i].exp) {
             dbg_event("model", "attention_expired", "\"rid\":%u", (unsigned)s_att[i].rid);
-            s_att_used[i] = false;
-            s_rev++;
+            if (s_att[i].kind == ATT_APPROVAL || s_att[i].kind == ATT_QUESTION) {
+                model_attention_went_back(s_att[i].rid, BACK_EXPIRED); /* the terminal asks now */
+            } else {
+                s_att_used[i] = false;
+                s_rev++;
+            }
         }
     }
 }
 
 settings_t *model_settings(void) { return &s_settings; }
+
+void model_touch(void) { s_rev++; }
 
 void model_settings_changed(void)
 {

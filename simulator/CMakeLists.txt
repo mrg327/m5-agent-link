@@ -50,6 +50,26 @@ add_executable(test_steps tests/test_steps.c ${FW}/core/src/steps.c)
 target_include_directories(test_steps PRIVATE ${FW}/core/src)
 add_test(NAME step_timeline COMMAND test_steps)
 
+# GAUGES.md: when a usage figure may be shown, the 80 % buzz rule, the words.
+add_executable(test_gauges tests/test_gauges.c ${FW}/core/src/gauges.c ${FW}/core/src/model.c ${FW}/core/src/steps.c)
+target_include_directories(test_gauges PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_gauges PRIVATE m)
+add_test(NAME gauges_model COMMAND test_gauges)
+# DONE-SUMMARY.md: the summary line's parts, words and drop order; the model keeps and clears the summary.
+add_executable(test_done tests/test_done.c ${FW}/core/src/done.c ${FW}/core/src/model.c ${FW}/core/src/steps.c ${FW}/core/src/gauges.c)
+target_include_directories(test_done PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_done PRIVATE m)
+add_test(NAME done_summary_model COMMAND test_done)
+# ANSWER-WINDOW.md: the full text bound to its rid, in order, resumed, failing closed; the window on the device's clock.
+add_executable(test_detail tests/test_detail.c ${FW}/core/src/detail.c ${FW}/core/src/model.c ${FW}/core/src/steps.c)
+target_include_directories(test_detail PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_detail PRIVATE m)
+add_test(NAME detail_model COMMAND test_detail)
+
+add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
+target_include_directories(test_ring PRIVATE ${FW}/core/src)
+add_test(NAME ring_fifo COMMAND test_ring)
+
 add_executable(test_nav tests/test_nav.c ${FW}/core/src/nav.c)
 target_include_directories(test_nav PRIVATE ${FW}/core/src)
 add_test(NAME nav_model COMMAND test_nav)
@@ -58,6 +78,16 @@ add_executable(test_sound tests/test_sound.c ${FW}/core/src/sound.c ${FW}/core/s
 target_include_directories(test_sound PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
 target_link_libraries(test_sound PRIVATE lvgl::lvgl m)
 add_test(NAME sound_render COMMAND test_sound)
+
+# Equal-advance digits in every UI font (UI-V3 2.1): needs only the font tables and LVGL's text measurement.
+add_executable(test_fonts tests/test_fonts.c ${FW}/core/src/fonts/font_figtree_20_400.c
+               ${FW}/core/src/fonts/font_figtree_20_500.c ${FW}/core/src/fonts/font_figtree_20_600.c
+               ${FW}/core/src/fonts/font_figtree_24_600.c ${FW}/core/src/fonts/font_figtree_34_600.c
+               ${FW}/core/src/fonts/font_figtree_56_600.c ${FW}/core/src/fonts/font_phosphor_20.c
+               ${FW}/core/src/fonts/font_phosphor_28.c ${FW}/core/src/fonts/font_phosphor_44.c)
+target_include_directories(test_fonts PRIVATE ${FW}/core/src)
+target_link_libraries(test_fonts PRIVATE lvgl::lvgl m)
+add_test(NAME tabular_digits COMMAND test_fonts)
 
 add_test(NAME sim_headless_selftest
          COMMAND agentlink_sim --headless --no-ws --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/selftest.txt)
@@ -89,9 +119,7 @@ sim_script_test(sim_center_tap_focus center_tap_focus.txt
 sim_script_test(sim_approve_hold approve_hold.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"op\":3")
-sim_script_test(sim_deny_swipe deny_swipe.txt
-                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
-                PASS_REGULAR_EXPRESSION "\"op\":4")
+sim_script_test(sim_deny_swipe deny_swipe.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4")
 sim_script_test(sim_button_jump button_jump.txt)
 # Approval safety: the card shows the request; a short or low swipe never denies; a hold before
 # the card has been visible never approves.
@@ -240,7 +268,7 @@ sim_script_test(sim_agent_row_tap agent_row_tap.txt
 # UI-V2 Phase 5: STATUS. Swipe down from HOME (never deny there), the rows, the quiet cycle and every
 # exit path; quiet mode holds the permission buzz until it is turned off again, then it buzzes.
 sim_script_test(sim_status status.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4")
-set_tests_properties(sim_status PROPERTIES TIMEOUT 60)
+set_tests_properties(sim_status PROPERTIES TIMEOUT 120)
 sim_script_test(sim_status_quiet_no_clock status_quiet_no_clock.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"quiet_set\",\"step\":[12]")
 sim_script_test(sim_quiet_buzz quiet_buzz.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4|\"ev\":\"glow\""
@@ -261,8 +289,104 @@ sim_script_test(sim_ask_hold_neighbour_row ask_hold_neighbour_row.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_agent_hold_neighbour_row agent_hold_neighbour_row.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,|\"op\":8,")
+# Legibility pass: the selected hold row is 73 px (7 mm) on ASK and AGENT; a hold starts only on that row.
+sim_script_test(sim_ask_tall_row_in ask_tall_row_in.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL" PASS_REGULAR_EXPRESSION "\"op\":3")
+sim_script_test(sim_ask_tall_row_out ask_tall_row_out.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
+sim_script_test(sim_agent_tall_row_in agent_tall_row_in.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL" PASS_REGULAR_EXPRESSION "\"op\":6,")
+sim_script_test(sim_agent_tall_row_out agent_tall_row_out.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,|\"op\":8,")
 sim_script_test(sim_agent_hold_cancel_on_select agent_hold_cancel_on_select.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,")
+# Read before you approve: an unread long text locks Approve; the reader cannot answer; a daemon-cut text is
+# never approvable on the watch.
+sim_script_test(sim_ask_read_first ask_read_first.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
+sim_script_test(sim_ask_read_then_approve ask_read_then_approve.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4|\"op\":5"
+                PASS_REGULAR_EXPRESSION "\"op\":3,\"sid\":2,\"rid\":7")
+sim_script_test(sim_ask_cut_text ask_cut_text.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":5"
+                PASS_REGULAR_EXPRESSION "\"op\":4,\"sid\":2,\"rid\":7")
+# Jobs (JOBS.md): terminal commands as cards; Stop and Run again only by a hold; Dismiss is the ack.
+sim_script_test(sim_jobs_card jobs_card.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_jobs_wire jobs_wire.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_jobs_menu jobs_menu.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0,|\"op\":1,|\"op\":17,"
+                PASS_REGULAR_EXPRESSION "\"op\":6,\"sid\":5")
+sim_script_test(sim_jobs_rerun jobs_rerun.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0,|\"op\":1,|\"op\":6,"
+                PASS_REGULAR_EXPRESSION "\"op\":17,\"sid\":5")
+sim_script_test(sim_jobs_dismiss jobs_dismiss.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,|\"op\":17,"
+                PASS_REGULAR_EXPRESSION "\"op\":1,\"sid\":5")
+# Gauges (GAUGES.md): plan usage on STATUS and the idle faces, context fill and readouts on the card and AGENT.
+sim_script_test(sim_gauges_status gauges_status.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_gauges_card gauges_card.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4")
+sim_script_test(sim_gauges_face gauges_face.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+set_tests_properties(sim_gauges_face PROPERTIES TIMEOUT 60)
+# exactly one warning buzz: the crossing to 81 % (the quiet one is logged with quiet true and plays nothing)
+sim_script_test(sim_gauges_buzz gauges_buzz.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"usage_warn\",\"pct\":(86|90)|\\[200\\].*\\[200\\]"
+                PASS_REGULAR_EXPRESSION "\"usage_warn\",\"pct\":81,\"quiet\":false.*\"pattern_ms\":\\[200\\].*\"usage_warn\",\"pct\":85,\"quiet\":true")
+sim_script_test(sim_gauges_wire gauges_wire.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# Done summary (DONE-SUMMARY.md, proto 0.14): the line on a finished card, tests failed, only the time, the width limit.
+foreach(n done_all done_failed done_time_only done_long done_wire done_activity)
+  sim_script_test(sim_${n} ${n}.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4")
+endforeach()
+
+# Answer window and full text (ANSWER-WINDOW.md, proto 0.11). No approve (op 3) may leave after a window ended,
+# while the full text is still arriving, for a text that does not add up, past the cap or under privacy meta.
+sim_script_test(sim_window_countdown window_countdown.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_window_expired window_expired.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
+sim_script_test(sim_window_offline_expiry window_offline_expiry.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
+sim_script_test(sim_window_handback window_handback.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3"
+  PASS_REGULAR_EXPRESSION "\"tx_cmd\",\"id\":[0-9]+,\"op\":0,\"sid\":2,\"rid\":7")
+sim_script_test(sim_window_old_daemon window_old_daemon.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# reminders spread over the window: arrival, nothing by 16 s (the `ui` dump), the first reminder at 30 s
+sim_script_test(sim_window_nag window_nag.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\].*\"ev\":\"state\""
+  PASS_REGULAR_EXPRESSION "\"ev\":\"state\".*pattern_ms\":\\[250,120,250\\]")
+set_tests_properties(sim_window_nag PROPERTIES TIMEOUT 60)
+sim_script_test(sim_window_nag_short window_nag_short.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]"
+  PASS_REGULAR_EXPRESSION "pattern_ms\":\\[250,120,250\\]")
+sim_script_test(sim_detail_read_approve detail_read_approve.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+  PASS_REGULAR_EXPRESSION "\"op\":7,\"sid\":2,\"rid\":7.*\"ev\":\"done\",\"rid\":7.*\"op\":3,\"sid\":2,\"rid\":7")
+sim_script_test(sim_detail_bound_to_rid detail_bound_to_rid.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_detail_wrong_total detail_wrong_total.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
+sim_script_test(sim_detail_resume detail_resume.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+  PASS_REGULAR_EXPRESSION "\"ask\",\"rid\":7,\"off\":1024.*\"ask\",\"rid\":7,\"off\":2048.*\"ask\",\"rid\":7,\"off\":3072.*\"op\":3,\"sid\":2,\"rid\":7")
+set_tests_properties(sim_detail_resume PROPERTIES TIMEOUT 60)
+sim_script_test(sim_detail_too_long detail_too_long.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":7|\"op\":3")
+sim_script_test(sim_detail_privacy_meta detail_privacy_meta.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":7|\"op\":3")
+# Standing rules (STANDING-RULES.md, proto 0.13): "Always allow" shows the rule in full before the hold, needs
+# the 1600 ms grant hold, and sends approve with the hash of the rule on screen; a swapped rule, an expired or
+# replaced request, a rule that cannot be shown in full and an old daemon never produce a grant (tx_rule).
+sim_script_test(sim_rule_grant_hold rule_grant_hold.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4|\"op\":5|\"op\":3,\"sid\":2,\"rid\":12,\"hold_ms\":1[0-5][0-9][0-9],"
+  PASS_REGULAR_EXPRESSION "\"tx_rule\",\"rid\":12,\"rh\":1365922541.*\"op\":3,\"sid\":2,\"rid\":12,\"hold_ms\":1[6-9][0-9][0-9],")
+sim_script_test(sim_rule_session_exact rule_session_exact.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|tx_rule|\"op\":4"
+  PASS_REGULAR_EXPRESSION "\"op\":3,\"sid\":2,\"rid\":14")
+sim_script_test(sim_rule_swapped rule_swapped.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"tx_rule\",\"rid\":12,\"rh\":1365922541|\"op\":4"
+  PASS_REGULAR_EXPRESSION "\"tx_rule\",\"rid\":12,\"rh\":1948751054")
+sim_script_test(sim_rule_bound rule_bound.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|tx_rule|\"op\":3|\"op\":4")
+sim_script_test(sim_rule_too_long rule_too_long.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|tx_rule|\"op\":3|\"op\":4")
+sim_script_test(sim_rule_old_daemon rule_old_daemon.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|tx_rule")
+sim_script_test(sim_rule_read_first rule_read_first.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4"
+  PASS_REGULAR_EXPRESSION "\"tx_rule\",\"rid\":19,\"rh\":1365922541")
+sim_script_test(sim_list_centre_drag list_centre_drag.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
+sim_script_test(sim_list_rim_dial list_rim_dial.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_ask_second_tap ask_second_tap.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_ask_tap_open_row ask_tap_open_row.txt
@@ -294,9 +418,22 @@ sim_script_test(sim_finished_buzz finished_buzz.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"glow\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"mode\",\"mode\":\"watch\"([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[30,200,30\\]([^p]|p[^a]|pa[^t])*\"ev\":\"snoozed\",\"rid\":8,([^p]|p[^a]|pa[^t])*\"ev\":\"attention\",\"rid\":9.*\"pattern_ms\":\\[250,120,250\\]")
 
+# Presence (PRESENCE.md, proto 0.12): hush holds the arrival buzz, the reminders and the finished buzz; the
+# card and ASK are as ever, and nothing is answered.
+sim_script_test(sim_presence_hush_ask presence_hush_ask.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"ev\":\"glow\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"hush\",\"rid\":7,([^p]|p[^a]|pa[^t])*\"ev\":\"attention\",\"rid\":8.*pattern_ms\":\\[250,120,250\\]")
+sim_script_test(sim_presence_hush_nag presence_hush_nag.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\]|\"op\":3"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"hush\",\"rid\":7")
+sim_script_test(sim_presence_hush_done presence_hush_done.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"glow\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"mode\",\"mode\":\"watch\"([^p]|p[^a]|pa[^t])*\"ev\":\"hush\",\"sid\":1,([^p]|p[^a]|pa[^t])*pattern_ms\":\\[30,200,30\\]")
+
 # Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
 add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c
-               ${FW}/core/src/link_tx.c ${FW}/core/src/model.c ${FW}/core/src/steps.c)
+               ${FW}/core/src/link_tx.c ${FW}/core/src/model.c ${FW}/core/src/steps.c ${FW}/core/src/gauges.c
+               ${FW}/core/src/detail.c)
 target_include_directories(test_link_arb PRIVATE ${FW}/core/src)
 target_link_libraries(test_link_arb PRIVATE agentlink_hal agentlink_proto lvgl::lvgl m)
 add_test(NAME link_arbitration COMMAND test_link_arb)
@@ -310,3 +447,49 @@ if(Python3_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ram_budget.py $<TARGET_FILE:core> 81920)
     set_tests_properties(core_ram_budget PROPERTIES SKIP_RETURN_CODE 77)
 endif()
+
+# ── Motion (docs/design/MOTION.md) ──
+add_executable(test_motion tests/test_motion.c ${FW}/core/src/motion.c)
+target_include_directories(test_motion PRIVATE ${FW}/core/src)
+add_test(NAME motion_logic COMMAND test_motion)
+
+# Raise to wake: the display (off after 1 s) lights on a raise from hanging to reading, once, and a bump on a
+# desk does nothing; the pending permission request is left unanswered.
+add_test(NAME sim_motion_raise_wake
+         COMMAND agentlink_sim --headless --no-ws --idle-off 1 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/motion_raise_wake.txt)
+set_tests_properties(sim_motion_raise_wake PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]|\"wake_motion\".*\"wake_motion\""
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"display_off\".*\"ev\":\"display_on\".*\"wake_motion\"")
+# Face down: no buzz, no sound, no glow, no settings change; the display sleeps. Face up again, the next request buzzes and sounds.
+sim_script_test(sim_motion_face_down motion_face_down.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[[0-9]+,[0-9]|\"ev\":\"sound\"|\"ev\":\"glow\"|\"ev\":\"settings\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"attention\",\"rid\":7.*\"ev\":\"display_off\"")
+sim_script_test(sim_motion_face_up_restores motion_face_up_restores.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"settings\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"attention\",\"rid\":7,([^p]|p[^a]|pa[^t])*\"ev\":\"attention\",\"rid\":8.*\"pattern_ms\":\\[250,120,250\\].*\"ev\":\"sound\"")
+# Orientation: automatic with dwell and hysteresis, never during a touch; the stored setting; touch maths follow the turn.
+sim_script_test(sim_motion_orientation motion_orientation.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"orientation\",\"flipped\":true.*\"ev\":\"orientation\",\"flipped\":false")
+sim_script_test(sim_motion_orientation_stored motion_orientation_stored.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# Palm cover: the motor and speaker stop and the 15 s reminder is dropped; the request is not answered.
+sim_script_test(sim_motion_cover_mute motion_cover_mute.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"sound\".*pattern_ms\":\\[\\].*\"ev\":\"sound_stop\".*\"ev\":\"cover_mute\"")
+sim_script_test(sim_motion_cover_control motion_cover_nag_control.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"cover_mute\""
+                PASS_REGULAR_EXPRESSION "pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]")
+# Confirmation tones: rising on an approve hold, falling on a deny hold; none with Sounds off.
+sim_script_test(sim_tone_approved approve_hold.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"op\":3.*\"ev\":\"sound\",\"samples\":4320")
+sim_script_test(sim_tone_denied ask_deny_hold.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[35]"
+                PASS_REGULAR_EXPRESSION "\"op\":4.*\"ev\":\"sound\",\"samples\":5440")
+sim_script_test(sim_tone_quiet confirm_tone_quiet.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"sound\""
+                PASS_REGULAR_EXPRESSION "\"op\":4.*pattern_ms\":\\[60,90,60\\]")
+sim_script_test(sim_volume_step confirm_tone_volume.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"volume\",\"percent\":25.*\"ev\":\"sound\"")
+sim_script_test(sim_volume_zero confirm_tone_volume0.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"sound\"")

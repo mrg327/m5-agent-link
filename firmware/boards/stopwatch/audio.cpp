@@ -7,6 +7,7 @@
 // sw_audio_on()/sw_audio_off() are reference counted: the first user powers everything up, the
 // last powers it down and frees the DMA buffers.
 
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -39,6 +40,7 @@ static int s_users;
 static i2c_master_dev_handle_t s_codec;
 static i2s_chan_handle_t s_tx, s_rx;
 static char s_err[80];
+static volatile uint8_t s_dac_vol = DAC_VOLUME; /* ES8311 reg 0x32; set by hal_audio_set_volume */
 
 __attribute__((format(printf, 1, 2))) static bool FAIL(const char *fmt, ...)
 {
@@ -92,7 +94,7 @@ static bool codec_init(void)
         {0x0D, 0x01}, /* power up the analog circuits */
         {0x15, 0x40}, /* ADC ramp rate */
         {0x37, 0x08}, /* DAC EQ bypass */
-        {0x32, DAC_VOLUME},
+        {0x32, s_dac_vol},
         {0x31, 0x00}, /* DAC unmuted */
     };
     for (size_t i = 0; i < sizeof seq / sizeof *seq; i++)
@@ -232,13 +234,14 @@ static void speaker_task(void *)
             on = false;
             continue;
         }
-        if (sw_mic_active()) continue; /* the speaker would be heard in the dictation */
+        if (!p.n || sw_mic_active()) continue; /* a stop request; or the speaker would be heard in the dictation */
         if (!on) {
             if (!sw_audio_on()) continue;
             amp(true);
             vTaskDelay(pdMS_TO_TICKS(AMP_SETTLE_MS));
             on = true;
         }
+        wr(0x32, s_dac_vol); /* the level may have changed since the codec came up */
         /* Stop early when a newer sound is waiting: it replaces this one. */
         for (size_t i = 0; i < p.n && !uxQueueMessagesWaiting(s_q);) {
             size_t k = p.n - i < CHUNK_SAMPLES ? p.n - i : CHUNK_SAMPLES, w = 0;
@@ -250,7 +253,13 @@ static void speaker_task(void *)
 
 extern "C" void hal_audio_play(const int16_t *pcm, size_t n)
 {
-    if (!pcm || !n) return;
+    if (!pcm || !n) { /* stop: an empty item replaces whatever waits, and a sound in progress yields to it */
+        if (s_q) {
+            play_t none = {NULL, 0};
+            xQueueOverwrite(s_q, &none);
+        }
+        return;
+    }
     if (!s_q) {
         lock_create();
         s_q = xQueueCreate(1, sizeof(play_t));
@@ -263,6 +272,14 @@ extern "C" void hal_audio_play(const int16_t *pcm, size_t n)
     }
     play_t p = {pcm, n};
     xQueueOverwrite(s_q, &p);
+}
+
+/* 100 % is the codec's 0 dB; each halving of the percentage is -6 dB (12 steps of 0.5 dB). 0 mutes. */
+extern "C" void hal_audio_set_volume(uint8_t percent)
+{
+    if (percent > 100) percent = 100;
+    int steps = percent ? (int)lroundf(-40.0f * log10f(percent / 100.0f)) : DAC_VOLUME;
+    s_dac_vol = (uint8_t)(steps >= DAC_VOLUME ? 0 : DAC_VOLUME - steps);
 }
 
 extern "C" void *hal_audio_alloc(size_t bytes)

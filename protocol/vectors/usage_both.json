@@ -1,0 +1,16 @@
+{
+  "desc": "Plan usage: 5-hour window at 82 % and on pace to run out before it resets, weekly at 41 % (proto 0.10)",
+  "symbolic": {
+    "t": "usage",
+    "id": 20,
+    "b": {
+      "at": 1793995200,
+      "h5": 82,
+      "h5r": 1794004200,
+      "h5o": 1793998800,
+      "wk": 41,
+      "wkr": 1794340800
+    }
+  },
+  "cbor_hex": "a30017011403a6001a6aee31c0011852021a6aee54e8031a6aee3fd0041829051a6af377c0"
+}

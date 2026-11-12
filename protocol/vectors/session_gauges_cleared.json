@@ -1,0 +1,14 @@
+{
+  "desc": "Delta: session 2 after /compact: context unknown (255), the pull request merged (0) (proto 0.10)",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 19,
+    "b": {
+      "sid": 2,
+      "ctx": 255,
+      "pr": 0,
+      "prs": "none"
+    }
+  },
+  "cbor_hex": "a30004011303a400021518ff181800181900"
+}

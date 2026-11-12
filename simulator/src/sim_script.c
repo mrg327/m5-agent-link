@@ -9,6 +9,17 @@
  *   scrub DEG0 DEG1 [MS [RADIUS]]   drag along the rim, degrees clockwise from 12 o'clock
  *   drag X Y DY [MS]                a slow vertical drag in the centre (default 500 ms: steps, no swipe); a flick is a fast `swipe`
  *   session SID work|input|ask|error|done|idle|doneseen REPO   add or update a session (input = permission, ask = question)
+ *   job SID run|done|fail REPO ELAPSED_S ETA_S EXIT [command line...]   a terminal job (JOBS.md); ETA_S 0 = no estimate
+ *   gauge SID CTX|- [MODEL|- [MODE|- [PR [STATE]]]]   session readouts (GAUGES.md, proto 0.10): context %
+ *                                   (- = unknown, 255 on the wire), model (_ for a space), mode default|plan|
+ *                                   accept_edits|auto|dont_ask|bypass, pull request number (0 = none) and its
+ *                                   state none|pending|approved|changes|draft
+ *   done SID FILES|- ADDED/REMOVED|- pass|fail|- SECS|-   a proto 0.14 done summary (DONE-SUMMARY.md) for a
+ *                                   session already done / error: files changed, lines, the tests' verdict
+ *                                   (- = unknown), the turn's seconds. Replaces the whole summary
+ *   usage H5|- H5_RESET_S H5_OUT_S|- WK|- WK_RESET_S [AGE_S]   a daemon `usage` (GAUGES.md): percent, seconds
+ *                                   until the reset and until it runs out at the current pace (- = not before
+ *                                   the reset), relative to now; the reading is AGE_S old (default 0)
  *   remote SID HOST [NAME]          set host / host name on a session (host 0 = local)
  *   drop SID | lift | shake | connect [usb|ble] | disconnect [usb|ble] | rx [usb|ble] HEX | ui | shot FILE.png
  *   attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OPT...
@@ -21,7 +32,21 @@
  *   snooze SID UNIX|off             a delta with snz (snoozed until UNIX, 0 = off)
  *   notify SID on|off               a delta with ntf (notify when done armed)
  *   rtc UNIX                        set the RTC (0 = clock unknown)
- *   clear RID [answered_pc|answered_dev|expired|cancelled]
+ *   clear RID [answered_pc|answered_dev|expired|cancelled|handed_back]
+ *   attention_win LEFT_MS WIN_MS LEN|auto|- RID SID KIND ACTS GRANT_MASK TITLE|TEXT|...
+ *                                   an `attention` with the answer window (proto 0.11, ANSWER-WINDOW.md): LEFT_MS of
+ *                                   WIN_MS left, and the full text's length (auto = the served detail's; - = whole)
+ *   serve_detail RID SID MAXCHUNKS REPEAT TEXT   a stand-in daemon for `cmd detail` on RID: the full text is TEXT
+ *                                   (\n = line break) repeated REPEAT times, sent in 1024-byte chunks from the offset
+ *                                   asked for, then `result ok`; MAXCHUNKS > 0 sends only that many per request and
+ *                                   no result (a link lost mid-transfer); `serve_detail off` stops answering
+ *   detail RID SID OFF TOTAL TEXT   one raw `detail` chunk (for a wrong id, a gap, a different total)
+ *   hush on|off                     from now on, `session` and `attention` carry hush (proto 0.12, PRESENCE.md): the
+ *                                   user is looking at that terminal, so the watch must not buzz or glow
+ *   rule session|project|N exact|wide TEXT   from now on, `attention` carries a standing rule (proto 0.13,
+ *                                   STANDING-RULES.md): TEXT is the rule (\n = line break, \t = tab, \xHH = a byte);
+ *                                   N = a raw scope value; `rule off` stops
+ *   expect_countdown MIN_S MAX_S    the countdown ring is shown with MIN_S..MAX_S seconds left (-1 -1: hidden)
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
  *   px_reset | expect_px_max PX     redraw budget: pixels flushed since px_reset must stay within PX
  *                                   (the log line also reports core_step host CPU as cpu_us, not asserted)
@@ -31,19 +56,22 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "agentlink_codec_decode.h"
 #include "agentlink_codec_encode.h"
 #include "app.h"
 #include "core.h"
 #include "keys.h"
 #include "link_internal.h"
 #include "model.h"
+#include "prefs.h"
+#include "ui_countdown.h"
 #include "ui_theme.h"
 #include "voice.h"
 #include "sim.h"
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -243,6 +271,18 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "session") && arg[0]) {
         add(*t, E_SESSION, 0, 0, 0, arg);
         *t += 50;
+    } else if (!strcmp(cmd, "job") && arg[0]) {
+        add(*t, E_JOB, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "gauge") && arg[0]) {
+        add(*t, E_GAUGE, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "done") && arg[0]) {
+        add(*t, E_DONE, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "usage") && arg[0]) {
+        add(*t, E_USAGE, 0, 0, 0, arg);
+        *t += 50;
     } else if ((!strcmp(cmd, "step") || !strcmp(cmd, "snooze") || !strcmp(cmd, "notify")) && arg[0]) {
         char line[160];
         snprintf(line, sizeof line, "%s %s", cmd, arg);
@@ -253,6 +293,12 @@ static bool parse_line(char *line, uint32_t *t)
         *t += 50;
     } else if (!strcmp(cmd, "drop") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_DROP, a, 0, 0, NULL);
+        *t += 50;
+    } else if (!strcmp(cmd, "rule") && arg[0]) {
+        add(*t, E_RULE, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "hush") && arg[0]) {
+        add(*t, E_HUSH, !strcmp(arg, "on"), 0, 0, NULL);
         *t += 50;
     } else if (!strcmp(cmd, "attention") && arg[0]) {
         add(*t, E_ATTENTION, 0, 0, 0, arg);
@@ -279,6 +325,34 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "lift")) {
         add(*t, E_MOTION, HAL_MOTION_LIFT, 0, 0, NULL);
         *t += 100;
+    } else if (!strcmp(cmd, "pose") && arg[0]) {
+        /* pose NAME | X Y Z: what the simulated IMU reports from now on (milli-g, screen axes) */
+        static const struct { const char *name; int x, y, z; } poses[] = {
+            {"face_up", 0, 0, 1000},    {"face_down", 0, 0, -1000}, {"upright", 0, -1000, 0},
+            {"upside_down", 0, 1000, 0}, {"hanging", 0, -700, 150},  {"reading", 0, -300, 800},
+            {"stand_flipped", 0, 900, 300}};
+        int x = 0, y = 0, z = 0;
+        bool ok = sscanf(rest, "%d %d %d", &x, &y, &z) == 3;
+        for (size_t i = 0; !ok && i < sizeof poses / sizeof *poses; i++)
+            if (!strcmp(arg, poses[i].name)) x = poses[i].x, y = poses[i].y, z = poses[i].z, ok = true;
+        if (!ok) return false;
+        add(*t, E_POSE, x, y, z, NULL);
+        *t += 20;
+    } else if (!strcmp(cmd, "cover") || !strcmp(cmd, "uncover")) {
+        add(*t, E_COVER, cmd[0] == 'c', 0, 0, NULL);
+        *t += 50;
+    } else if (!strcmp(cmd, "pref") && arg[0]) {
+        add(*t, E_PREF, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "expect_flipped") && sscanf(rest, "%d", &a) == 1) {
+        add(*t, E_EXPECT_FLIPPED, a, 0, 0, NULL);
+        *t += 50;
+    } else if (!strcmp(cmd, "fb_mark")) {
+        add(*t + 100, E_FB_MARK, 0, 0, 0, NULL); /* let the last frame render */
+        *t += 150;
+    } else if (!strcmp(cmd, "expect_fb_flipped")) {
+        add(*t + 100, E_EXPECT_FB_FLIPPED, 0, 0, 0, NULL);
+        *t += 150;
     } else if (!strcmp(cmd, "shake")) {
         add(*t, E_MOTION, HAL_MOTION_SHAKE, 0, 0, NULL);
         *t += 100;
@@ -307,6 +381,17 @@ static bool parse_line(char *line, uint32_t *t)
         *t += 50;
     } else if (!strcmp(cmd, "expect_label") && arg[0]) {
         add(*t, E_EXPECT_LABEL, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "attention_win") && arg[0]) {
+        add(*t, E_ATTENTION_WIN, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "serve_detail") && arg[0]) {
+        add(*t, E_SERVE_DETAIL, 0, 0, 0, arg);
+    } else if (!strcmp(cmd, "detail") && arg[0]) {
+        add(*t, E_DETAIL, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "expect_countdown") && sscanf(rest, "%d %d", &a, &b) == 2) {
+        add(*t, E_EXPECT_COUNTDOWN, a, b, 0, NULL);
         *t += 50;
     } else if (!strcmp(cmd, "px_reset")) {
         add(*t, E_PX_RESET, 0, 0, 0, NULL);
@@ -363,6 +448,38 @@ static void send_hex_kind(int kind, const char *hex)
     sim_link_inject_rx_kind(kind, buf, n);
 }
 
+static bool s_hush; /* `hush on`: sessions and attentions carry the proto 0.12 hush key */
+static bool s_rule_on, s_rule_wide; /* `rule ...`: attentions carry a standing rule (proto 0.13) */
+static unsigned s_rule_scope;
+static char s_rule_text[512];
+static void fail(const char *what, const char *want);
+
+static void run_rule(const char *spec)
+{
+    if (!strcmp(spec, "off")) {
+        s_rule_on = false;
+        return;
+    }
+    char sc[16], wd[8];
+    int n = 0;
+    if (sscanf(spec, "%15s %7s %n", sc, wd, &n) != 2 || !n) {
+        fail("bad rule", spec);
+        return;
+    }
+    s_rule_scope = !strcmp(sc, "project") ? 1 : !strcmp(sc, "session") ? 0 : (unsigned)atoi(sc);
+    s_rule_wide = !strcmp(wd, "wide");
+    size_t o = 0;
+    for (const char *p = spec + n; *p && o < sizeof s_rule_text - 1; p++) {
+        unsigned v;
+        if (p[0] == '\\' && p[1] == 'n') s_rule_text[o++] = '\n', p++;
+        else if (p[0] == '\\' && p[1] == 't') s_rule_text[o++] = '\t', p++;
+        else if (p[0] == '\\' && p[1] == 'x' && sscanf(p + 2, "%2x", &v) == 1) s_rule_text[o++] = (char)v, p += 3;
+        else s_rule_text[o++] = *p;
+    }
+    s_rule_text[o] = 0;
+    s_rule_on = true;
+}
+
 static void run_session(const char *spec)
 {
     /* session SID STATE REPO [BRANCH|- [summary text...]] */
@@ -395,7 +512,116 @@ static void run_session(const char *spec)
         d.seen = st[4] == 's';
     } else if (!strcmp(st, "idle")) d.state = SESS_IDLE;
     snprintf(d.repo, sizeof d.repo, "%s", repo);
+    if (s_hush) {
+        d.hush = true;
+        present |= SF_HUSH;
+    }
     model_upsert(&d, present);
+}
+
+/* job SID run|done|fail REPO ELAPSED_S ETA_S EXIT [command line...]: a terminal job (JOBS.md, proto 0.9).
+ * ELAPSED_S is how long it has run (or ran: a done / fail job ended 5 s ago); ETA_S 0 = no estimate. */
+static void run_job(const char *spec)
+{
+    unsigned sid, el, eta, code;
+    char st[8], repo[33];
+    int n = 0;
+    if (sscanf(spec, "%u %7s %32s %u %u %u %n", &sid, st, repo, &el, &eta, &code, &n) < 6) {
+        fprintf(stderr, "SCRIPT FAIL: bad job '%s'\n", spec);
+        s_failed = true;
+        return;
+    }
+    uint32_t now = theme_now_unix();
+    bool ended = strcmp(st, "run") != 0;
+    session_t d = {.sid = sid, .agent = AGENT_SHELL, .state = !ended ? SESS_WORK : !strcmp(st, "done") ? SESS_DONE : SESS_ERROR,
+                   .eta = eta, .exit_code = (uint8_t)code};
+    d.tst = ended ? now - 5 : now - el;
+    d.t0 = d.tst - (ended ? el : 0);
+    uint32_t present = SF_AGENT | SF_STATE | SF_REPO | SF_T0 | SF_TST | SF_SEEN | SF_ETA | SF_TOOL | SF_BRANCH;
+    if (ended) present |= SF_EXIT;
+    snprintf(d.repo, sizeof d.repo, "%s", repo);
+    snprintf(d.branch, sizeof d.branch, "main");
+    if (n > 0 && spec[n]) {
+        snprintf(d.summary, sizeof d.summary, "%s", spec + n);
+        sscanf(spec + n, "%24s", d.tool);
+        present |= SF_SUMMARY;
+    }
+    model_upsert(&d, present);
+}
+
+/* gauge SID CTX|- [MODEL|- [MODE|- [PR [STATE]]]]: a proto 0.10 session delta (GAUGES.md) */
+static void run_gauge(const char *spec)
+{
+    static const char *const modes[] = {"default", "plan", "accept_edits", "auto", "dont_ask", "bypass"};
+    static const char *const states[] = {"none", "pending", "approved", "changes", "draft"};
+    unsigned sid, pr = 0;
+    char ctx[8], mdl[24] = "", mode[16] = "", st[12] = "";
+    int n = sscanf(spec, "%u %7s %23s %15s %u %11s", &sid, ctx, mdl, mode, &pr, st);
+    if (n < 2) {
+        fprintf(stderr, "SCRIPT FAIL: bad gauge '%s'\n", spec);
+        s_failed = true;
+        return;
+    }
+    session_t d = {.sid = sid};
+    uint32_t present = SF_CTX;
+    d.ctx = !strcmp(ctx, "-") ? MODEL_CTX_UNKNOWN : (uint8_t)atoi(ctx);
+    if (n >= 3 && strcmp(mdl, "-")) {
+        for (char *c = mdl; *c; c++)
+            if (*c == '_') *c = ' ';
+        snprintf(d.mdl, sizeof d.mdl, "%.16s", mdl);
+        present |= SF_MDL;
+    }
+    if (n >= 4 && strcmp(mode, "-")) {
+        for (unsigned i = 0; i < sizeof modes / sizeof modes[0]; i++)
+            if (!strcmp(mode, modes[i])) d.pm = (uint8_t)i;
+        present |= SF_PM;
+    }
+    if (n >= 5) {
+        d.pr = pr;
+        present |= SF_PR | SF_PRS;
+        for (unsigned i = 0; i < sizeof states / sizeof states[0]; i++)
+            if (!strcmp(st, states[i])) d.prs = (uint8_t)i;
+    }
+    model_upsert(&d, present);
+}
+
+/* done SID FILES|- ADDED/REMOVED|- pass|fail|- SECS|-: a proto 0.14 session delta (DONE-SUMMARY.md) */
+static void run_done(const char *spec)
+{
+    unsigned sid;
+    char files[12], lines[24], tests[8], secs[12];
+    if (sscanf(spec, "%u %11s %23s %7s %11s", &sid, files, lines, tests, secs) != 5) {
+        fprintf(stderr, "SCRIPT FAIL: bad done '%s'\n", spec);
+        s_failed = true;
+        return;
+    }
+    session_t d = {.sid = sid};
+    unsigned a, r;
+    if (strcmp(files, "-")) { d.sum.files = (uint32_t)strtoul(files, NULL, 10); d.sum.files_known = true; }
+    if (sscanf(lines, "%u/%u", &a, &r) == 2) { d.sum.added = a; d.sum.removed = r; d.sum.lines_known = true; }
+    if (strcmp(tests, "-")) { d.sum.tests_pass = !strcmp(tests, "pass"); d.sum.tests_known = true; }
+    if (strcmp(secs, "-")) { d.sum.secs = (uint32_t)strtoul(secs, NULL, 10); d.sum.secs_known = true; }
+    model_upsert(&d, SF_DONE);
+}
+
+/* usage H5|- H5_RESET_S H5_OUT_S|- WK|- WK_RESET_S [AGE_S]: a daemon `usage` relative to the clock */
+static void run_usage(const char *spec)
+{
+    char h5[8], h5r[16], h5o[16], wk[8], wkr[16];
+    unsigned age = 0;
+    if (sscanf(spec, "%7s %15s %15s %7s %15s %u", h5, h5r, h5o, wk, wkr, &age) < 5) {
+        fprintf(stderr, "SCRIPT FAIL: bad usage '%s'\n", spec);
+        s_failed = true;
+        return;
+    }
+    uint32_t now = theme_now_unix();
+    usage_t u = {.at = now - age};
+    if (strcmp(h5, "-")) {
+        u.h5 = (usage_win_t){true, (uint8_t)atoi(h5), now + (uint32_t)strtoul(h5r, NULL, 10),
+                             strcmp(h5o, "-") ? now + (uint32_t)strtoul(h5o, NULL, 10) : 0};
+    }
+    if (strcmp(wk, "-")) u.wk = (usage_win_t){true, (uint8_t)atoi(wk), now + (uint32_t)strtoul(wkr, NULL, 10), 0};
+    link_rx_usage(&u);
 }
 
 /* step SID N [ok|fail] [text...] | snooze SID UNIX|off | notify SID on|off: protocol 0.3 session deltas */
@@ -490,8 +716,31 @@ static int enum_of(const char *s, const char *const *names, int n)
     return -1;
 }
 
+/* The stand-in daemon's full text for `cmd detail` (serve_detail). */
+#define SERVE_MAX 8192
+static char s_serve[SERVE_MAX + 1];
+static uint32_t s_serve_rid, s_serve_sid, s_serve_max, s_serve_len;
+
+static void run_attention_ex(char *spec, bool win, uint32_t left, uint32_t win_ms, int len);
+
 /* attention RID SID KIND ACTS GRANT_MASK TITLE|TEXT|OPT... */
-static void run_attention(char *spec)
+static void run_attention(char *spec) { run_attention_ex(spec, false, 0, 0, -1); }
+
+/* attention_win LEFT_MS WIN_MS LEN|auto|- RID SID ... */
+static void run_attention_win(char *spec)
+{
+    unsigned left, win;
+    char len[12];
+    int n = 0;
+    if (sscanf(spec, "%u %u %11s %n", &left, &win, len, &n) != 3) {
+        fail("bad attention_win", spec);
+        return;
+    }
+    int l = !strcmp(len, "auto") ? (int)s_serve_len : !strcmp(len, "-") ? -1 : atoi(len);
+    run_attention_ex(spec + n, true, left, win, l);
+}
+
+static void run_attention_ex(char *spec, bool win, uint32_t left, uint32_t win_ms, int len)
 {
     static const char *const kinds[] = {"approval", "question", "error", "done"};
     static const char *const acts[] = {"approve", "deny", "focus", "reply", "ack", "dictate"};
@@ -517,6 +766,25 @@ static void run_attention(char *spec)
     }
     a->attention_uint8uint_present = true;
     a->attention_uint8uint.attention_uint8uint = grant;
+    if (win) {
+        a->attention_uint9uint_present = a->attention_uint10uint_present = true;
+        a->attention_uint9uint.attention_uint9uint = left;
+        a->attention_uint10uint.attention_uint10uint = win_ms;
+    }
+    if (s_hush) {
+        a->attention_uint12bool_present = true;
+        a->attention_uint12bool.attention_uint12bool = true;
+    }
+    if (s_rule_on) {
+        a->attention_uint13tstr_present = a->attention_uint14uint_present = a->attention_uint15bool_present = true;
+        a->attention_uint13tstr.attention_uint13tstr = zs(s_rule_text);
+        a->attention_uint14uint.attention_uint14uint = s_rule_scope;
+        a->attention_uint15bool.attention_uint15bool = s_rule_wide;
+    }
+    if (len >= 0) {
+        a->attention_uint11uint_present = true;
+        a->attention_uint11uint.attention_uint11uint = (uint32_t)len;
+    }
     /* the text block is kept in the event, so the zcbor_strings may point into it */
     char *fields = spec + n, *save = NULL;
     int i = 0;
@@ -647,12 +915,119 @@ static void run_cands(char *spec)
     inject_env(&env, "kb_cands");
 }
 
+/* One `detail` chunk as the daemon sends it. */
+static void inject_detail(uint32_t rid, uint32_t sid, uint32_t off, uint32_t total, const char *text, size_t len)
+{
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_detail_m_c;
+    env.envelope_msg_detail_m.msg_detail_hdr_m.hdr_uint1uint = ++s_rx_id;
+    struct detail *d = &env.envelope_msg_detail_m.msg_detail_detail_m;
+    d->detail_uint0uint_present = d->detail_uint1uint_present = d->detail_uint3uint_present = d->detail_uint4uint_present = true;
+    d->detail_uint0uint.detail_uint0uint = rid;
+    d->detail_uint1uint.detail_uint1uint = sid;
+    d->detail_uint3uint.detail_uint3uint = off;
+    d->detail_uint4uint.detail_uint4uint = total;
+    d->detail_uint2tstr = (struct zcbor_string){.value = (const uint8_t *)text, .len = len};
+    static uint8_t buf[2048];
+    size_t n = 0;
+    if (cbor_encode_envelope(buf, sizeof buf, &env, &n) != ZCBOR_SUCCESS) {
+        fail("cannot encode", "detail");
+        return;
+    }
+    sim_link_inject_rx(buf, n);
+}
+
+/* The device sent a frame: answer a `cmd detail` for the served request like the daemon does. */
+static void on_device_tx(const uint8_t *frame, size_t len)
+{
+    static struct envelope_r env;
+    size_t used = 0;
+    memset(&env, 0, sizeof env);
+    if (cbor_decode_envelope(frame, len, &env, &used) != ZCBOR_SUCCESS || env.envelope_choice != envelope_msg_cmd_m_c) return;
+    const struct cmd *c = &env.envelope_msg_cmd_m.msg_cmd_cmd_m;
+    if (c->cmd_op_m.cmd_op_choice != 7 || !s_serve_rid) return;
+    uint32_t rid = c->cmd_uint2uint_present ? c->cmd_uint2uint.cmd_uint2uint : 0;
+    uint32_t off = c->cmd_arg_m_present && c->cmd_arg_m.cmd_arg_m.cmd_arg_choice == cmd_arg_uint_c ? c->cmd_arg_m.cmd_arg_m.cmd_arg_uint : 0;
+    uint32_t id = env.envelope_msg_cmd_m.msg_cmd_hdr_m.hdr_uint1uint;
+    sim_log("fake_daemon_detail", "\"rid\":%u,\"off\":%u", (unsigned)rid, (unsigned)off);
+    static struct envelope_r res;
+    memset(&res, 0, sizeof res);
+    res.envelope_choice = envelope_msg_result_m_c;
+    res.envelope_msg_result_m.msg_result_hdr_m.hdr_uint1uint = ++s_rx_id;
+    res.envelope_msg_result_m.msg_result_hdr_m.hdr_uint2uint_present = true;
+    res.envelope_msg_result_m.msg_result_hdr_m.hdr_uint2uint.hdr_uint2uint = id;
+    if (rid != s_serve_rid) { /* the daemon: no such request */
+        res.envelope_msg_result_m.msg_result_result_m.result_err_m_present = true;
+        inject_env(&res, "result");
+        return;
+    }
+    uint32_t sent = 0;
+    while (off < s_serve_len && (!s_serve_max || sent < s_serve_max)) {
+        uint32_t n = s_serve_len - off > 1024 ? 1024 : s_serve_len - off;
+        inject_detail(rid, s_serve_sid, off, s_serve_len, s_serve + off, n);
+        off += n;
+        sent++;
+    }
+    if (s_serve_max && off < s_serve_len) return; /* the link "drops" mid-transfer: no result */
+    res.envelope_msg_result_m.msg_result_result_m.result_uint0bool = true;
+    inject_env(&res, "result");
+}
+
+/* serve_detail RID SID MAXCHUNKS REPEAT TEXT | serve_detail off */
+static void run_serve_detail(const char *spec)
+{
+    unsigned rid, sid, max, rep;
+    int n = 0;
+    if (!strcmp(spec, "off")) {
+        s_serve_rid = 0;
+        return;
+    }
+    if (sscanf(spec, "%u %u %u %u %n", &rid, &sid, &max, &rep, &n) != 4) {
+        fail("bad serve_detail", spec);
+        return;
+    }
+    char one[512];
+    size_t k = 0;
+    for (const char *p = spec + n; *p && k < sizeof one - 1; p++) {
+        if (p[0] == '\\' && p[1] == 'n') {
+            one[k++] = '\n';
+            p++;
+        } else {
+            one[k++] = *p;
+        }
+    }
+    s_serve_len = 0;
+    for (unsigned i = 0; i < rep && s_serve_len + k <= SERVE_MAX; i++) {
+        memcpy(s_serve + s_serve_len, one, k);
+        s_serve_len += (uint32_t)k;
+    }
+    s_serve[s_serve_len] = 0;
+    s_serve_rid = rid;
+    s_serve_sid = sid;
+    s_serve_max = max;
+    sim_link_set_tx_tap(on_device_tx);
+    sim_log("fake_daemon_text", "\"rid\":%u,\"bytes\":%u", (unsigned)rid, (unsigned)s_serve_len);
+}
+
+/* detail RID SID OFF TOTAL TEXT */
+static void run_detail(const char *spec)
+{
+    unsigned rid, sid, off, total;
+    int n = 0;
+    if (sscanf(spec, "%u %u %u %u %n", &rid, &sid, &off, &total, &n) != 4) {
+        fail("bad detail", spec);
+        return;
+    }
+    inject_detail(rid, sid, off, total, spec + n, strlen(spec + n));
+}
+
 static void run_clear(int rid, const char *spec)
 {
-    static const char *const whys[] = {"answered_pc", "answered_dev", "expired", "cancelled"};
+    static const char *const whys[] = {"answered_pc", "answered_dev", "expired", "cancelled", "handed_back"};
     char why[16] = "answered_pc";
     sscanf(spec, "%*d %15s", why);
-    int w = enum_of(why, whys, 4);
+    int w = enum_of(why, whys, 5);
     static struct envelope_r env;
     memset(&env, 0, sizeof env);
     env.envelope_choice = envelope_msg_clear_m_c;
@@ -707,10 +1082,28 @@ static void run(const ev_t *e)
         break;
     }
     case E_SESSION: run_session(e->text); break;
+    case E_JOB: run_job(e->text); break;
+    case E_GAUGE: run_gauge(e->text); break;
+    case E_DONE: run_done(e->text); break;
+    case E_USAGE: run_usage(e->text); break;
     case E_DELTA: run_delta(e->text); break;
     case E_REMOTE: run_remote(e->text); break;
     case E_DROP: model_remove((uint32_t)e->a); break;
+    case E_HUSH: s_hush = e->a != 0; break;
+    case E_RULE: run_rule(e->text); break;
     case E_ATTENTION: run_attention(e->text); break;
+    case E_ATTENTION_WIN: run_attention_win(e->text); break;
+    case E_SERVE_DETAIL: run_serve_detail(e->text); break;
+    case E_DETAIL: run_detail(e->text); break;
+    case E_EXPECT_COUNTDOWN: {
+        int left = ui_countdown_left_s();
+        if (left < e->a || left > e->b) {
+            char want[48];
+            snprintf(want, sizeof want, "%d..%d s, got %d", e->a, e->b, left);
+            fail("countdown", want);
+        }
+        break;
+    }
     case E_RESULT: run_result(e->text); break;
     case E_CLEAR: run_clear(e->a, e->text); break;
     case E_MIC:
@@ -719,11 +1112,41 @@ static void run(const ev_t *e)
     case E_TRANSCRIPT: run_transcript(e->text); break;
     case E_CANDS: run_cands(e->text); break;
     case E_CFG: run_cfg(e->text); break;
+    case E_POSE: sim_set_pose(e->a, e->b, e->c); break;
+    case E_COVER: sim_set_cover(e->a != 0); break;
+    case E_PREF: {
+        char key[16] = "", val[16] = "";
+        if (sscanf(e->text, "%15s %15s", key, val) != 2) fail("bad pref", e->text);
+        else if (!strcmp(key, "volume")) prefs_set_volume((uint8_t)atoi(val));
+        else if (!strcmp(key, "orient")) prefs_set_orient(!strcmp(val, "flipped") ? ORIENT_FLIPPED : !strcmp(val, "auto") ? ORIENT_AUTO : ORIENT_NORMAL);
+        else fail("bad pref", e->text);
+        break;
+    }
+    case E_EXPECT_FLIPPED:
+        if (core_display_flipped() != (e->a != 0)) fail(e->a ? "UI should be turned" : "UI should be upright", "");
+        break;
+    case E_FB_MARK: sim_fb_mark(); break;
+    case E_EXPECT_FB_FLIPPED: {
+        int pct = sim_fb_flipped_match_pct();
+        if (pct < 97) {
+            char buf[32];
+            snprintf(buf, sizeof buf, "match %d%%", pct);
+            fail("framebuffer is not the marked one turned 180 degrees:", buf);
+        }
+        break;
+    }
     case E_RTC:
         hal_rtc_set_unix((uint32_t)e->a);
         app_clock_resync();
         break;
-    case E_QUIT: s_next = s_n; break;
+    case E_QUIT: {
+        /* LVGL's heap at the end of the script: on the device these are internal-RAM allocations */
+        lv_mem_monitor_t m;
+        lv_mem_monitor(&m);
+        sim_log("mem", "\"lvgl_used\":%u,\"lvgl_peak\":%u", (unsigned)(m.total_size - m.free_size), (unsigned)m.max_used);
+        s_next = s_n;
+        break;
+    }
     }
 }
 

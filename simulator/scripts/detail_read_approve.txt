@@ -1,0 +1,51 @@
+# Full text for a long request (ANSWER-WINDOW.md §4): the daemon cut the preview and says the full text is
+# longer (len). Opening the reader fetches it by rid (op 7) in 1024-byte chunks; the reader pages through all
+# of it, and only after its last page may Approve be held (op 3). Holding before that sends nothing.
+connect
+rx a400020101020103a40082000b01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+serve_detail 7 2 0 14 cd packages/frontend && npm run test -- --coverage --runInBand && git push --force origin main && ./scripts/deploy.sh --env prod --yes &&\n
+attention_win 60000 60000 auto 7 2 approval approve,deny,focus 0 Run shell command|cd packages/frontend && npm run test -- --coverage --runInBand && git push --force origin main && ./scripts/deploy.sh --env prod --yes && cd packages/frontend && npm…
+wait 600
+expect_screen ask
+expect_label Read all
+# not read yet: a hold says why and sends nothing
+expect_label > Approve HOLD
+hold 233 282 1500
+wait 300
+expect_label Read it first
+expect_no_label Approved
+shot detail_locked.png
+tap 233 150
+wait 400
+expect_label Reading 1 of
+shot detail_reader_first.png
+# ten pages: nine presses to the last one
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+expect_label Reading 10 of 10
+shot detail_reader_last.png
+btn B
+wait 400
+expect_label > Approve HOLD
+hold 233 282 1500
+wait 400
+expect_label Approved
+quit

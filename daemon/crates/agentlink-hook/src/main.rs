@@ -5,13 +5,25 @@
 //! hard deadline, every failure is swallowed, the exit code is always 0, and stdout stays
 //! empty unless the daemon returns a decision.
 //!
+//! `agentlink-hook shell start|end|exit --pid <shellpid> [--exit <status>] [-- <command line>]` is
+//! the shell integration's call (`agentlink shell-init`, docs/design/JOBS.md). It runs in the
+//! background of an interactive shell, so it never reads stdin; otherwise the same rules.
+//!
+//! `agentlink-hook statusline [-- <your status-line command>]` is Claude Code's status-line command
+//! (docs/design/GAUGES.md). It reads the status-line JSON on stdin, forwards the few fields the watch
+//! shows (context fill, model, pull request, plan rate limits) and returns at once; with no daemon it
+//! sends nothing. After `--` it runs the user's own status-line command with the same stdin and passes
+//! its output and exit status through, so installing it never takes a status line away.
+//!
 //! Two Claude Code hooks block for the watch (UI-V2 §7, DESIGN §6a "first answer wins"):
 //! `PermissionRequest` (fires when Claude Code is about to show its permission prompt) and
-//! `PreToolUse` for `AskUserQuestion`. The hook holds the prompt back for `AGENTLINK_WAIT_MS`
-//! (15 s) while the daemon shows the request on the watch. A device answer becomes the
-//! event's own hook output; no answer (timeout, terminal, daemon down) prints nothing and
-//! exits 0, which Claude Code documents as "no decision": its normal prompt appears. Silence
-//! never approves. Format: https://code.claude.com/docs/en/hooks (PermissionRequest
+//! `PreToolUse` for `AskUserQuestion`. The hook holds the prompt back for the daemon's answer
+//! window (docs/design/ANSWER-WINDOW.md: 60 s by default, a daemon setting) while the watch shows the
+//! request: the daemon names the window in a first reply line and keeps the connection alive. An older
+//! daemon does not, and holds for `wait_ms` (15 s, or `AGENTLINK_WAIT_MS`, which also pins the window
+//! for a new daemon). A device answer becomes the event's own hook output; no answer (window over,
+//! terminal, Open on PC, daemon down) prints nothing and exits 0, which Claude Code documents as "no
+//! decision": its normal prompt appears. Silence never approves. Format: https://code.claude.com/docs/en/hooks (PermissionRequest
 //! `hookSpecificOutput.decision.behavior`; PreToolUse `permissionDecision` + `updatedInput`).
 
 use serde_json::{json, Map, Value};
@@ -21,9 +33,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const DEADLINE: Duration = Duration::from_millis(1500);
 const STDIN_TIMEOUT: Duration = Duration::from_millis(500);
-/// How long a blocking hook waits for the watch before letting the terminal prompt appear.
+/// How long a blocking hook waits for a daemon that does not name its window (an older one) before
+/// letting the terminal prompt appear.
 const DEFAULT_WAIT_MS: u64 = 15_000;
-const MAX_WAIT_MS: u64 = 120_000;
+/// Longest wait, whoever asks for it (the daemon's own longest window, window.rs `MAX`).
+const MAX_WAIT_MS: u64 = 300_000;
 /// Slack between the daemon's own timeout and ours, so the daemon's `none` arrives first.
 const WAIT_SLACK: Duration = Duration::from_millis(2000);
 
@@ -80,16 +94,69 @@ fn blocks_for_watch(agent: &str, event: &str, payload: &Value) -> bool {
                 && payload["tool_name"].as_str() == Some("AskUserQuestion")))
 }
 
-fn wait_ms() -> u64 {
-    std::env::var("AGENTLINK_WAIT_MS")
+/// The wait for an older daemon, and whether the user pinned it with `AGENTLINK_WAIT_MS`.
+fn wait_ms() -> (u64, bool) {
+    match std::env::var("AGENTLINK_WAIT_MS")
         .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(DEFAULT_WAIT_MS)
-        .min(MAX_WAIT_MS)
+        .and_then(|v| v.trim().parse::<u64>().ok())
+    {
+        Some(ms) => (ms.min(MAX_WAIT_MS), true),
+        None => (DEFAULT_WAIT_MS, false),
+    }
 }
 
-/// Turns the daemon's `{"decision": "allow"|"deny"|"none", "grant"?, "answer"?}` into the
+/// Waits for the daemon's reply on `lines` (one per line received): a `{"window_ms": N}` line moves the
+/// deadline to N from now (plus slack, at most [`MAX_WAIT_MS`]), a blank line is a keepalive, and the
+/// first other line is the reply. `None` when the deadline passes or the daemon goes away first.
+fn await_reply(lines: &mpsc::Receiver<String>, wait: Duration) -> Option<String> {
+    let mut deadline = std::time::Instant::now() + wait;
+    loop {
+        let left = deadline.checked_duration_since(std::time::Instant::now())?;
+        let line = lines.recv_timeout(left).ok()?;
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let v: Value = serde_json::from_str(line).unwrap_or(Value::Null);
+        if v.get("decision").is_none() {
+            if let Some(ms) = v["window_ms"].as_u64() {
+                deadline = std::time::Instant::now()
+                    + Duration::from_millis(ms.min(MAX_WAIT_MS))
+                    + WAIT_SLACK;
+                continue;
+            }
+        }
+        return Some(line.to_owned());
+    }
+}
+
+/// Reads `r` line by line on a thread of its own, so a silent daemon never blocks the caller.
+fn line_reader(r: impl std::io::Read + Send + 'static) -> mpsc::Receiver<String> {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut r = std::io::BufReader::new(r);
+        loop {
+            let mut line = String::new();
+            match r.read_line(&mut line) {
+                Ok(0) | Err(_) => return,
+                Ok(_) => {
+                    if tx.send(line).is_err() {
+                        return;
+                    }
+                }
+            }
+        }
+    });
+    rx
+}
+
+/// Turns the daemon's `{"decision": "allow"|"deny"|"none", "permissions"?, "answer"?}` into the
 /// hook output Claude Code expects for `event`. `None` = print nothing (no decision).
+///
+/// `permissions` (a standing rule granted on the watch, docs/design/STANDING-RULES.md) becomes
+/// `updatedPermissions` only when every entry is, exactly, one of the `permission_suggestions` Claude
+/// Code sent this hook: anything else is no decision at all, so the terminal asks. The daemon's older
+/// `"grant": true` (which echoed every suggestion unseen) is ignored: that answer allows this call once.
 fn hook_output(event: &str, payload: &Value, reply: &Value) -> Option<Value> {
     let decision = reply["decision"].as_str()?;
     if decision == "none" {
@@ -98,14 +165,15 @@ fn hook_output(event: &str, payload: &Value, reply: &Value) -> Option<Value> {
     if event.eq_ignore_ascii_case("permissionrequest") {
         let mut d = json!({"behavior": decision});
         if decision == "allow" {
-            // "Yes, don't ask again": apply the rules Claude Code itself proposed for this call
-            if reply["grant"].as_bool() == Some(true) {
-                if let Some(s) = payload["permission_suggestions"]
+            if let Some(p) = reply.get("permissions") {
+                let suggested = payload["permission_suggestions"]
                     .as_array()
-                    .filter(|a| !a.is_empty())
-                {
-                    d["updatedPermissions"] = Value::Array(s.clone());
-                }
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]);
+                let granted = p
+                    .as_array()
+                    .filter(|a| !a.is_empty() && a.iter().all(|e| suggested.contains(e)))?;
+                d["updatedPermissions"] = Value::Array(granted.clone());
             }
         } else if decision == "deny" {
             d["message"] = json!("Denied from the watch");
@@ -174,10 +242,58 @@ fn walk_chain(ps: &str, start: u32, max: usize) -> (Vec<u32>, Option<String>) {
     (chain, tty)
 }
 
+/// `(ppid, tty)` of one process from `/proc/<pid>/stat`, with the tty in `ps` form (`pts/3`, `tty2`,
+/// `?` for none). `None` when the file is missing or the tty is a device this cannot name, so the
+/// caller falls back to `ps`. The command name (field 2) may hold spaces and parentheses: fields are
+/// counted from the last `)`.
+#[cfg(target_os = "linux")]
+fn proc_stat_row(stat: &str) -> Option<(u32, String)> {
+    let rest = &stat[stat.rfind(')')? + 1..];
+    let mut f = rest.split_whitespace();
+    let ppid: u32 = f.nth(1)?.parse().ok()?; // state, ppid
+    let tty_nr: u32 = f.nth(2)?.parse::<i64>().ok()? as u32; // pgrp, session, tty_nr
+    let (major, minor) = (
+        (tty_nr >> 8) & 0xfff,
+        (tty_nr & 0xff) | ((tty_nr >> 12) & 0xfff00),
+    );
+    let tty = match major {
+        0 => "?".to_owned(),
+        136..=143 => format!("pts/{}", (major - 136) * 256 + minor),
+        4 if minor < 64 => format!("tty{minor}"),
+        4 => format!("ttyS{}", minor - 64),
+        _ => return None,
+    };
+    Some((ppid, tty))
+}
+
+/// The ancestors of `start` as `pid ppid tty` rows read straight from `/proc`: at most `max` small
+/// files instead of a `ps -A` over every process (10 ms per hook call, on every tool use and every
+/// shell command). `None` when anything is unreadable or unknown; `ps` then answers.
+#[cfg(target_os = "linux")]
+fn proc_rows(start: u32, max: usize) -> Option<String> {
+    use std::fmt::Write;
+    let mut out = String::new();
+    let mut pid = start;
+    for _ in 0..max {
+        if pid <= 1 {
+            break;
+        }
+        let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+        let (ppid, tty) = proc_stat_row(&stat)?;
+        let _ = writeln!(out, "{pid} {ppid} {tty}");
+        pid = ppid;
+    }
+    (!out.is_empty()).then_some(out)
+}
+
 /// Parent pid chain and controlling tty of the agent. Our own stdio is piped, so the tty
-/// is found on the ancestors. One short `ps` call, bounded by a timeout.
+/// is found on the ancestors: from `/proc` on Linux, else one short `ps` call, bounded by a timeout.
 #[cfg(unix)]
 fn process_identity(ppid: u32) -> (Vec<u32>, Option<String>) {
+    #[cfg(target_os = "linux")]
+    if let Some(rows) = proc_rows(ppid, 8) {
+        return walk_chain(&rows, ppid, 8);
+    }
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let out = std::process::Command::new("ps")
@@ -281,10 +397,10 @@ fn build_line(agent: &str, event: &str, stdin: &str, remote: bool) -> (String, S
     } else {
         event
     };
-    let wait = if blocks_for_watch(agent, event, &payload) {
+    let (wait, pinned) = if blocks_for_watch(agent, event, &payload) {
         wait_ms()
     } else {
-        0
+        (0, false)
     };
     let mut line = json!({"agent": agent, "event": event, "ts": ts, "cwd": cwd, "ppid": ppid, "tty": tty, "pids": pids, "env": env, "payload": payload});
     if remote {
@@ -295,7 +411,9 @@ fn build_line(agent: &str, event: &str, stdin: &str, remote: bool) -> (String, S
         }
     }
     if wait > 0 {
-        line["await"] = json!({"wait_ms": wait});
+        // `window`: tell me your window and keep me alive (ANSWER-WINDOW.md); `pinned`: the user set
+        // AGENTLINK_WAIT_MS for this hook, and it wins over the daemon's setting
+        line["await"] = json!({"wait_ms": wait, "window": true, "pinned": pinned});
     }
     (line.to_string(), event.to_owned(), payload, wait)
 }
@@ -309,13 +427,6 @@ fn write_lines(w: &mut impl std::io::Write, lines: &[String]) -> Option<()> {
     w.flush().ok()
 }
 
-/// Reads one reply line; `None` when empty or on error.
-fn read_reply(r: impl std::io::Read) -> Option<String> {
-    let mut reply = String::new();
-    std::io::BufReader::new(r).read_line(&mut reply).ok()?;
-    Some(reply.trim().to_owned()).filter(|r| !r.is_empty())
-}
-
 /// Sends `lines` to the local daemon; for blocking hooks also waits up to `reply_wait` for
 /// a one-line reply.
 #[cfg(unix)]
@@ -327,8 +438,8 @@ fn send_local(lines: &[String], reply_wait: Option<Duration>) -> Option<String> 
     s.set_write_timeout(Some(Duration::from_millis(300))).ok()?;
     write_lines(&mut s, lines)?;
     s.shutdown(Shutdown::Write).ok()?;
-    s.set_read_timeout(Some(reply_wait?)).ok()?;
-    read_reply(s)
+    let wait = reply_wait?;
+    await_reply(&line_reader(s), wait)
 }
 
 /// `AGENTLINK_REMOTE=tcp:<loopback>:<port>` -> (host to resolve, port). Only loopback is
@@ -396,8 +507,8 @@ fn send_tcp(
     let all: Vec<String> = std::iter::once(auth).chain(lines.iter().cloned()).collect();
     write_lines(&mut s, &all)?;
     s.shutdown(Shutdown::Write).ok()?;
-    s.set_read_timeout(Some(reply_wait?)).ok()?;
-    read_reply(s)
+    let wait = reply_wait?;
+    await_reply(&line_reader(s), wait)
 }
 
 /// Remote transport from `AGENTLINK_REMOTE`; a bad spec or missing token sends nothing.
@@ -460,11 +571,7 @@ fn send_local(lines: &[String], reply_wait: Option<Duration>) -> Option<String> 
     };
     write_lines(&mut pipe, lines)?;
     let wait = reply_wait?;
-    let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || {
-        let _ = tx.send(read_reply(pipe));
-    });
-    rx.recv_timeout(wait).ok()?
+    await_reply(&line_reader(pipe), wait)
 }
 
 #[cfg(not(any(unix, windows)))]
@@ -472,7 +579,236 @@ fn send_local(_lines: &[String], _reply_wait: Option<Duration>) -> Option<String
     None
 }
 
+/// What `agentlink-hook shell …` was asked.
+#[derive(Debug, PartialEq)]
+struct ShellArgs {
+    event: String,
+    pid: u32,
+    exit: Option<u64>,
+    seq: Option<u64>,
+    cmd: Option<String>,
+}
+
+/// `start|end|exit --pid N [--exit S] [-- command words…]`; `None` when the pid or event is missing.
+fn parse_shell_args(args: &[String]) -> Option<ShellArgs> {
+    let event = args
+        .first()
+        .filter(|e| ["start", "end", "exit"].contains(&e.as_str()))?;
+    let (mut pid, mut exit, mut seq, mut cmd) = (None, None, None, None);
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--pid" => {
+                pid = args.get(i + 1).and_then(|v| v.parse().ok());
+                i += 2;
+            }
+            "--exit" => {
+                exit = args.get(i + 1).and_then(|v| v.parse().ok());
+                i += 2;
+            }
+            "--seq" => {
+                seq = args.get(i + 1).and_then(|v| v.parse().ok());
+                i += 2;
+            }
+            "--" => {
+                cmd = Some(args[i + 1..].join(" ")).filter(|c| !c.trim().is_empty());
+                break;
+            }
+            _ => i += 1,
+        }
+    }
+    Some(ShellArgs {
+        event: event.clone(),
+        pid: pid?,
+        exit,
+        seq,
+        cmd,
+    })
+}
+
+/// The daemon line of a shell event: shaped like an agent's, with the shell identified by
+/// `--pid` (the shim's own parent is a throwaway subshell).
+fn shell_line(a: &ShellArgs) -> String {
+    let mut payload = json!({"pid": a.pid});
+    if let Some(cmd) = &a.cmd {
+        payload["cmd"] = json!(cmd);
+    }
+    if let Some(exit) = a.exit {
+        payload["exit"] = json!(exit);
+    }
+    if let Some(seq) = a.seq {
+        payload["seq"] = json!(seq);
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        payload["cwd"] = json!(cwd.to_string_lossy());
+    }
+    let (line, ..) = build_line("shell", &a.event, &payload.to_string(), false);
+    #[cfg(unix)]
+    {
+        let mut v: Value = serde_json::from_str(&line).unwrap_or(Value::Null);
+        if v["tty"].is_null() {
+            // the chain from the shim's parent found no tty: ask about the shell itself
+            let (pids, tty) = process_identity(a.pid);
+            if let Some(t) = tty {
+                v["tty"] = json!(t);
+                v["pids"] = json!(pids);
+            }
+        }
+        if !v.is_null() {
+            return v.to_string();
+        }
+    }
+    line
+}
+
+/// Sends one shell event under the usual hard deadline; nothing is printed and nothing waits.
+fn shell_run(args: &[String]) {
+    let Some(a) = parse_shell_args(args) else {
+        return;
+    };
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        send(&[shell_line(&a)], None);
+        let _ = tx.send(());
+    });
+    let _ = rx.recv_timeout(DEADLINE);
+}
+
+/// The fields of a status-line payload the daemon reads (usage.rs), with their documented names and
+/// nesting (https://code.claude.com/docs/en/statusline). Everything else, paths and costs included,
+/// stays on this machine's screen.
+fn statusline_payload(v: &Value) -> Value {
+    let pick = |v: &Value, keys: &[&str]| -> Value {
+        let mut out = Map::new();
+        for k in keys {
+            if let Some(x) = v.get(*k).filter(|x| !x.is_null()) {
+                out.insert((*k).to_owned(), x.clone());
+            }
+        }
+        Value::Object(out)
+    };
+    let mut out = Map::new();
+    for k in ["session_id", "cwd"] {
+        if let Some(x) = v.get(k).filter(|x| x.is_string()) {
+            out.insert(k.into(), x.clone());
+        }
+    }
+    if v["model"].is_object() {
+        out.insert("model".into(), pick(&v["model"], &["id", "display_name"]));
+    }
+    if v["context_window"].is_object() {
+        // `null` here means "not known yet": keep it so the daemon can tell it from an old version
+        out.insert(
+            "context_window".into(),
+            json!({"used_percentage": v["context_window"]["used_percentage"]}),
+        );
+    }
+    if v["rate_limits"].is_object() {
+        let mut r = Map::new();
+        for w in ["five_hour", "seven_day"] {
+            if v["rate_limits"][w].is_object() {
+                r.insert(
+                    w.into(),
+                    pick(&v["rate_limits"][w], &["used_percentage", "resets_at"]),
+                );
+            }
+        }
+        out.insert("rate_limits".into(), Value::Object(r));
+    }
+    if v["pr"].is_object() {
+        out.insert(
+            "pr".into(),
+            pick(&v["pr"], &["number", "review_state", "kind"]),
+        );
+    }
+    Value::Object(out)
+}
+
+/// The daemon line of a status-line run. No process walk: the session is known by its id, and the
+/// status line must not wait on `ps`.
+fn statusline_line(stdin: &str) -> Option<String> {
+    let v: Value = serde_json::from_str(stdin).ok()?;
+    let payload = statusline_payload(&v);
+    payload["session_id"].as_str()?;
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    Some(
+        json!({"agent": "claude", "event": "statusline", "ts": ts, "payload": payload}).to_string(),
+    )
+}
+
+/// How long the status line may wait for the forward to the daemon (a local socket write).
+const STATUSLINE_FORWARD: Duration = Duration::from_millis(250);
+
+/// Runs `cmd` through the shell with `input` on its stdin; its stdout and stderr are ours. Returns its
+/// exit status (1 when it could not start).
+fn run_chained(cmd: &str, input: &str) -> i32 {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    #[cfg(windows)]
+    let mut c = {
+        let mut c = Command::new("cmd");
+        c.args(["/C", cmd]);
+        c
+    };
+    #[cfg(not(windows))]
+    let mut c = {
+        let mut c = Command::new("sh");
+        c.args(["-c", cmd]);
+        c
+    };
+    let Ok(mut child) = c.stdin(Stdio::piped()).spawn() else {
+        return 1;
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        let input = input.to_owned();
+        std::thread::spawn(move || {
+            let _ = stdin.write_all(input.as_bytes());
+        });
+    }
+    child.wait().ok().and_then(|s| s.code()).unwrap_or(1)
+}
+
+/// `statusline [-- command words…]`: forward, then hand over to the user's own command, if any.
+fn statusline_run(args: &[String]) -> i32 {
+    let chained = args
+        .iter()
+        .position(|a| a == "--")
+        .map(|i| args[i + 1..].join(" "))
+        .filter(|c| !c.trim().is_empty());
+    let input = read_stdin();
+    let (tx, rx) = mpsc::channel();
+    if let Some(line) = statusline_line(&input) {
+        std::thread::spawn(move || {
+            send(&[line], None);
+            let _ = tx.send(());
+        });
+    } else {
+        drop(tx);
+    }
+    let code = match &chained {
+        Some(cmd) => run_chained(cmd, &input),
+        None => 0,
+    };
+    let _ = rx.recv_timeout(STATUSLINE_FORWARD);
+    code
+}
+
 fn main() {
+    let mut args = std::env::args().skip(1);
+    match args.next().as_deref() {
+        Some("shell") => {
+            shell_run(&args.collect::<Vec<_>>());
+            std::process::exit(0);
+        }
+        Some("statusline") => {
+            let code = statusline_run(&args.collect::<Vec<_>>());
+            std::process::exit(code);
+        }
+        _ => {}
+    }
     let mut args = std::env::args().skip(1);
     let agent = args.next().unwrap_or_else(|| "other".into());
     let event = args.next().unwrap_or_default();
@@ -491,8 +827,10 @@ fn main() {
     let Ok((event, payload, wait)) = kind_rx.recv_timeout(DEADLINE) else {
         std::process::exit(0);
     };
+    // The worker enforces the real deadline (the daemon's window, or `wait` for an older daemon);
+    // this is only the backstop.
     let budget = if wait > 0 {
-        Duration::from_millis(wait) + 2 * WAIT_SLACK
+        Duration::from_millis(MAX_WAIT_MS) + 2 * WAIT_SLACK
     } else {
         DEADLINE
     };
@@ -512,6 +850,78 @@ mod tests {
     use super::*;
 
     #[test]
+    fn statusline_forwards_only_the_gauge_fields() {
+        let input = json!({
+            "cwd": "/w/proj", "session_id": "abc", "transcript_path": "/secret/t.jsonl",
+            "model": {"id": "claude-opus-4-7", "display_name": "Opus"},
+            "workspace": {"current_dir": "/w/proj"}, "cost": {"total_cost_usd": 1.5},
+            "context_window": {"used_percentage": null, "total_input_tokens": 9},
+            "rate_limits": {"five_hour": {"used_percentage": 23.5, "resets_at": 1738425600u64},
+                            "spend_limit": {"used_usd": 3}},
+            "pr": {"number": 7, "url": "https://example.invalid/pull/7", "review_state": "draft"}
+        })
+        .to_string();
+        let line: Value = serde_json::from_str(&statusline_line(&input).unwrap()).unwrap();
+        assert_eq!(
+            (line["agent"].as_str(), line["event"].as_str()),
+            (Some("claude"), Some("statusline"))
+        );
+        assert_eq!(
+            line["payload"],
+            json!({"session_id": "abc", "cwd": "/w/proj",
+                   "model": {"id": "claude-opus-4-7", "display_name": "Opus"},
+                   "context_window": {"used_percentage": null},
+                   "rate_limits": {"five_hour": {"used_percentage": 23.5, "resets_at": 1738425600u64}},
+                   "pr": {"number": 7, "review_state": "draft"}})
+        );
+        assert!(statusline_line("not json").is_none());
+        assert!(
+            statusline_line("{}").is_none(),
+            "no session id: nothing to say"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn statusline_chains_to_the_users_command() {
+        assert_eq!(run_chained("read l; test \"$l\" = hello", "hello\n"), 0);
+        assert_eq!(run_chained("exit 3", ""), 3);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn proc_stat_gives_ppid_and_tty_like_ps() {
+        // pid (comm) state ppid pgrp session tty_nr ...; comm may hold spaces and parentheses
+        let row =
+            |tty_nr: u32| format!("700 (my (odd) cmd) S 600 700 600 {tty_nr} 700 4194304 1 0");
+        assert_eq!(proc_stat_row(&row(34819)), Some((600, "pts/3".into()))); // 136:3
+        assert_eq!(proc_stat_row(&row(0)), Some((600, "?".into())));
+        assert_eq!(proc_stat_row(&row(1026)), Some((600, "tty2".into()))); // 4:2
+        assert_eq!(proc_stat_row(&row(1088)), Some((600, "ttyS0".into()))); // 4:64
+        assert_eq!(
+            proc_stat_row(&row(136 << 8 | 0x100000 | 5)),
+            Some((600, "pts/261".into()))
+        );
+        assert_eq!(
+            proc_stat_row(&row(5 << 8)),
+            None,
+            "an unknown device falls back to ps"
+        );
+        assert_eq!(proc_stat_row("garbage"), None);
+        // our own chain: the same pids and tty as `ps` reports
+        let me = std::process::id();
+        let rows = proc_rows(me, 8).expect("/proc is readable");
+        let (chain, tty) = walk_chain(&rows, me, 8);
+        assert_eq!(chain[0], me);
+        let ps = std::process::Command::new("ps")
+            .args(["-A", "-o", "pid=,ppid=,tty="])
+            .output()
+            .unwrap();
+        let (ps_chain, ps_tty) = walk_chain(&String::from_utf8_lossy(&ps.stdout), me, 8);
+        assert_eq!((chain, tty), (ps_chain, ps_tty));
+    }
+
+    #[test]
     fn chain_finds_first_tty_and_stops_at_init() {
         let ps = "  500   1 ??\n  600 500 ttys003\n  700 600 ttys003\n  800 700 ??\n";
         let (chain, tty) = walk_chain(ps, 800, 8);
@@ -519,6 +929,76 @@ mod tests {
         assert_eq!(tty.as_deref(), Some("/dev/ttys003"));
         assert_eq!(walk_chain(ps, 800, 2).0, vec![800, 700]);
         assert_eq!(walk_chain("", 42, 8), (vec![42], None));
+    }
+
+    fn argv(a: &[&str]) -> Vec<String> {
+        a.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn shell_arguments() {
+        let p = |a: &[&str]| parse_shell_args(&argv(a));
+        assert_eq!(
+            p(&["start", "--pid", "42", "--", "cargo", "build", "--", "-x"]),
+            Some(ShellArgs {
+                event: "start".into(),
+                pid: 42,
+                exit: None,
+                seq: None,
+                cmd: Some("cargo build -- -x".into())
+            })
+        );
+        let end = p(&["end", "--pid", "42", "--seq", "9", "--exit", "101"]).unwrap();
+        assert_eq!((end.exit, end.seq, end.cmd), (Some(101), Some(9), None));
+        assert!(p(&["exit", "--pid", "7"]).is_some());
+        assert_eq!(p(&["start", "--pid", "x", "--", "ls"]), None);
+        assert_eq!(p(&["start", "--", "ls"]), None);
+        assert_eq!(p(&["bogus", "--pid", "1"]), None);
+        assert_eq!(p(&[]), None);
+        assert_eq!(p(&["start", "--pid", "1", "--", " "]).unwrap().cmd, None);
+    }
+
+    #[test]
+    fn shell_line_has_the_agent_shape() {
+        let a = parse_shell_args(&argv(&["start", "--pid", "42", "--", "make", "test"])).unwrap();
+        let v: Value = serde_json::from_str(&shell_line(&a)).unwrap();
+        assert_eq!(
+            (v["agent"].as_str(), v["event"].as_str()),
+            (Some("shell"), Some("start"))
+        );
+        assert_eq!(v["payload"]["cmd"], "make test");
+        assert_eq!(v["payload"]["pid"], 42);
+        assert!(v["payload"].get("exit").is_none());
+        assert_eq!(v["payload"]["cwd"], v["cwd"]);
+        assert!(v["pids"].is_array() && v["env"].is_object());
+        let a = parse_shell_args(&argv(&["end", "--pid", "42", "--exit", "0"])).unwrap();
+        let v: Value = serde_json::from_str(&shell_line(&a)).unwrap();
+        assert_eq!(
+            (v["event"].as_str(), v["payload"]["exit"].as_u64()),
+            (Some("end"), Some(0))
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn shell_event_reaches_the_socket_without_stdin_or_output() {
+        let d = scratch("shell-send");
+        std::env::set_var("AGENTLINK_HOME", &d);
+        let l = std::os::unix::net::UnixListener::bind(d.join("hook.sock")).unwrap();
+        let srv = std::thread::spawn(move || {
+            let (s, _) = l.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(s).read_line(&mut line).unwrap();
+            line
+        });
+        // no daemon or a dead pid must not matter either: errors are swallowed
+        shell_run(&argv(&["end", "--pid", "999999", "--exit", "3"]));
+        let v: Value = serde_json::from_str(&srv.join().unwrap()).unwrap();
+        assert_eq!(v["payload"]["exit"], 3);
+        std::env::remove_var("AGENTLINK_HOME");
+        shell_run(&argv(&["start", "--pid", "1", "--", "x"])); // no socket now
+        shell_run(&argv(&["nonsense"]));
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]
@@ -536,16 +1016,16 @@ mod tests {
             .get("updatedPermissions")
             .is_none());
 
-        let grant = hook_output(
+        // the older daemon's "grant": true no longer echoes the suggestions unseen: allow once
+        let legacy = hook_output(
             "PermissionRequest",
             &payload,
             &json!({"decision": "allow", "grant": true}),
         )
         .unwrap();
-        assert_eq!(
-            grant["hookSpecificOutput"]["decision"]["updatedPermissions"],
-            payload["permission_suggestions"]
-        );
+        assert!(legacy["hookSpecificOutput"]["decision"]
+            .get("updatedPermissions")
+            .is_none());
 
         let deny =
             hook_output("PermissionRequest", &payload, &json!({"decision": "deny"})).unwrap();
@@ -558,6 +1038,55 @@ mod tests {
         assert!(
             hook_output("PermissionRequest", &payload, &json!({"decision": "maybe"})).is_none()
         );
+    }
+
+    #[test]
+    fn a_standing_rule_is_passed_back_only_if_claude_code_suggested_it() {
+        let narrow = json!({"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "npm test:*"}],
+                            "behavior": "allow", "destination": "localSettings"});
+        let mode = json!({"type": "setMode", "mode": "acceptEdits", "destination": "session"});
+        let payload = json!({"tool_name": "Bash", "tool_input": {"command": "npm test"},
+                             "permission_suggestions": [narrow, mode]});
+        let out = |perms: Value| {
+            hook_output(
+                "PermissionRequest",
+                &payload,
+                &json!({"decision": "allow", "permissions": perms}),
+            )
+        };
+        // exactly one of the suggestions: passed back, and only that one
+        let ok = out(json!([narrow])).unwrap();
+        assert_eq!(
+            ok["hookSpecificOutput"]["decision"]["updatedPermissions"],
+            json!([narrow])
+        );
+        assert_eq!(ok["hookSpecificOutput"]["decision"]["behavior"], "allow");
+        // broader, rewritten, to another destination, or not suggested at all: no decision, the terminal asks
+        let mut broader = narrow.clone();
+        broader["rules"] = json!([{"toolName": "Bash"}]);
+        let mut wider = narrow.clone();
+        wider["destination"] = json!("userSettings");
+        let mut star = narrow.clone();
+        star["rules"][0]["ruleContent"] = json!("npm:*");
+        for bad in [
+            json!([broader]),
+            json!([wider]),
+            json!([star]),
+            json!([narrow, {"type": "setMode", "mode": "bypassPermissions", "destination": "session"}]),
+            json!([]),
+            json!("all"),
+            json!(null),
+        ] {
+            assert!(out(bad.clone()).is_none(), "{bad}");
+        }
+        // a payload without suggestions accepts no rule
+        let bare = json!({"tool_name": "Bash", "tool_input": {"command": "npm test"}});
+        assert!(hook_output(
+            "PermissionRequest",
+            &bare,
+            &json!({"decision": "allow", "permissions": [narrow]})
+        )
+        .is_none());
     }
 
     #[test]
@@ -598,12 +1127,75 @@ mod tests {
         assert!(wait > 0);
         let v: Value = serde_json::from_str(&line).unwrap();
         assert_eq!(v["await"]["wait_ms"].as_u64(), Some(wait));
+        assert_eq!(
+            v["await"]["window"].as_bool(),
+            Some(true),
+            "asks the daemon for its window"
+        );
         let (line, _, _, wait) = build_line("claude", "Stop", "{}", false);
         assert_eq!(wait, 0);
         assert!(serde_json::from_str::<Value>(&line)
             .unwrap()
             .get("await")
             .is_none());
+    }
+
+    #[test]
+    fn the_daemons_window_line_moves_the_deadline_and_keepalives_are_skipped() {
+        // a new daemon: the window, keepalives, then the decision after the shim's own first wait
+        let (tx, rx) = mpsc::channel();
+        let feeder = std::thread::spawn(move || {
+            tx.send("{\"window_ms\": 900}\n".to_owned()).unwrap();
+            for _ in 0..4 {
+                std::thread::sleep(Duration::from_millis(100));
+                tx.send("\n".to_owned()).unwrap();
+            }
+            tx.send("{\"decision\":\"none\"}\n".to_owned()).unwrap();
+        });
+        let t0 = std::time::Instant::now();
+        let r = await_reply(&rx, Duration::from_millis(150));
+        assert_eq!(r.as_deref(), Some("{\"decision\":\"none\"}"));
+        assert!(
+            t0.elapsed() >= Duration::from_millis(400),
+            "waited past its first 150 ms"
+        );
+        feeder.join().unwrap();
+
+        // an older daemon: no window line, the shim's own wait ends it with no reply at all
+        let (_tx, rx) = mpsc::channel::<String>();
+        let t0 = std::time::Instant::now();
+        assert_eq!(await_reply(&rx, Duration::from_millis(120)), None);
+        assert!(t0.elapsed() < Duration::from_secs(1));
+
+        // a daemon that names a window and then goes silent: the window plus slack, never forever
+        let (tx, rx) = mpsc::channel();
+        tx.send("{\"window_ms\": 0}".to_owned()).unwrap();
+        let t0 = std::time::Instant::now();
+        assert_eq!(await_reply(&rx, Duration::from_millis(50)), None);
+        let took = t0.elapsed();
+        assert!(took >= WAIT_SLACK && took < WAIT_SLACK + Duration::from_secs(1));
+        drop(tx);
+
+        // a closed connection is no decision at once
+        let (tx, rx) = mpsc::channel::<String>();
+        drop(tx);
+        assert_eq!(await_reply(&rx, Duration::from_secs(5)), None);
+    }
+
+    #[test]
+    fn a_window_line_is_never_mistaken_for_a_decision() {
+        let (tx, rx) = mpsc::channel();
+        tx.send("{\"window_ms\": 100, \"decision\": \"allow\"}".to_owned())
+            .unwrap();
+        // a line with a decision is the reply, whatever else it says; hook_output decides what it means
+        assert!(await_reply(&rx, Duration::from_millis(50)).is_some());
+        let (tx, rx) = mpsc::channel();
+        tx.send("garbage".to_owned()).unwrap();
+        assert_eq!(
+            await_reply(&rx, Duration::from_millis(50)).as_deref(),
+            Some("garbage")
+        );
+        assert!(hook_output("PermissionRequest", &json!({}), &Value::Null).is_none());
     }
 
     #[test]

@@ -22,6 +22,7 @@ macro_rules! messages {
         /// Message type + body. Serializes as `{"t": "<name>", "b": {...}}`.
         #[derive(Debug, Clone, PartialEq, Serialize)]
         #[serde(tag = "t", content = "b", rename_all = "snake_case")]
+        #[allow(clippy::large_enum_variant)] // a session object with every optional key; boxed would touch every user
         pub enum Message {
             $($var($ty),)+
             Unknown(Unknown),
@@ -57,7 +58,7 @@ messages! {
     5 Gone(Gone), 6 Attention(Attention), 7 Clear(Clear), 8 Cmd(Cmd), 9 Result(CmdResult),
     10 Detail(Detail), 11 Cfg(DeviceCfg), 12 Batt(Batt), 13 Ping(Empty), 14 Pong(Empty),
     15 Log(Log), 16 AudioStart(AudioStart), 17 Audio(Audio), 18 AudioEnd(AudioEnd),
-    19 Transcript(Transcript), 20 KbStart(KbStart), 21 KbStroke(KbStroke), 22 KbCands(KbCands),
+    19 Transcript(Transcript), 20 KbStart(KbStart), 21 KbStroke(KbStroke), 22 KbCands(KbCands), 23 Usage(Usage),
     64 DbgUiStateReq(Empty), 65 DbgUiState(DbgUiState),
     66 DbgScreenshotReq(Empty), 67 DbgScreenshotChunk(DbgScreenshotChunk),
     68 DbgInjectInput(DbgInjectInput), 69 DbgSetLogLevel(DbgSetLogLevel),

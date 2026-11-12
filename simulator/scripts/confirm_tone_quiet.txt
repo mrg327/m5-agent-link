@@ -1,0 +1,25 @@
+# Confirmation tones follow the alert mode: with Sounds off the deny hold still pulses but plays nothing.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+btn B
+wait 150
+expect_label > Sounds: on
+btn A
+wait 200
+expect_label > Sounds: off
+swipe 233 300 233 180 160
+wait 300
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+btn B
+wait 150
+expect_label > Deny HOLD
+hold 233 282 1100
+wait 400
+quit

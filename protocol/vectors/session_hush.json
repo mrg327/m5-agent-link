@@ -1,0 +1,14 @@
+{
+  "desc": "A session enters done and the device need not buzz (proto 0.12): the user is looking at its terminal",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 17,
+    "b": {
+      "sid": 3,
+      "st": "done",
+      "tst": 1793995300,
+      "hush": true
+    }
+  },
+  "cbor_hex": "a30004011103a400030204081a6aee3224181af5"
+}

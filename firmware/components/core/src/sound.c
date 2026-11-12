@@ -115,7 +115,7 @@ void sound_play(const char *role)
         const snd_role_t *r;
         int16_t *pcm;
         size_t n;
-    } cache[4];
+    } cache[6];
     const snd_role_t *r = snd_role(role);
     const snd_sound_t *s = snd_for(role);
     if (!r || !s || !hal_board_info()->has_speaker) return;

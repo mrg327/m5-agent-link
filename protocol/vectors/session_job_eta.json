@@ -1,0 +1,18 @@
+{
+  "desc": "Delta: session 4 (a shell job, agent shell) enters work with a 120 s estimate (proto 0.9)",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 15,
+    "b": {
+      "sid": 4,
+      "ag": "shell",
+      "st": "work",
+      "tool": "cargo",
+      "t0": 1793995200,
+      "tst": 1793995200,
+      "sum": "cargo build --release",
+      "eta": 120
+    }
+  },
+  "cbor_hex": "a30004010f03a80004010302010665636172676f071a6aee31c0081a6aee31c00975636172676f206275696c64202d2d72656c65617365131878"
+}

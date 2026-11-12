@@ -236,6 +236,7 @@ struct agent_r {
 		agent_copilot_m_c = 0,
 		agent_claude_m_c = 1,
 		agent_cloud_m_c = 2,
+		agent_shell_m_c = 3,
 		agent_other_m_c = 15,
 	} agent_choice;
 };
@@ -332,6 +333,79 @@ struct session_tstr_l_r {
 	size_t session_tstr_l_tstr_count;
 };
 
+struct session_uint19uint {
+	uint32_t session_uint19uint;
+};
+
+struct session_uint20uint {
+	uint32_t session_uint20uint;
+};
+
+struct session_uint21uint {
+	uint32_t session_uint21uint;
+};
+
+struct session_uint22tstr {
+	struct zcbor_string session_uint22tstr;
+};
+
+struct perm_mode_r {
+	enum {
+		perm_mode_default_m_c = 0,
+		perm_mode_plan_m_c = 1,
+		perm_mode_accept_edits_m_c = 2,
+		perm_mode_auto_m_c = 3,
+		perm_mode_dont_ask_m_c = 4,
+		perm_mode_bypass_m_c = 5,
+	} perm_mode_choice;
+};
+
+struct session_perm_mode_m {
+	struct perm_mode_r session_perm_mode_m;
+};
+
+struct session_uint24uint {
+	uint32_t session_uint24uint;
+};
+
+struct pr_state_r {
+	enum {
+		pr_state_none_m_c = 0,
+		pr_state_pending_m_c = 1,
+		pr_state_approved_m_c = 2,
+		pr_state_changes_m_c = 3,
+		pr_state_draft_m_c = 4,
+	} pr_state_choice;
+};
+
+struct session_pr_state_m {
+	struct pr_state_r session_pr_state_m;
+};
+
+struct session_uint26bool {
+	bool session_uint26bool;
+};
+
+struct session_uint30uint {
+	uint32_t session_uint30uint;
+};
+
+struct session_uint31uint {
+	uint32_t session_uint31uint;
+};
+
+struct session_uint32uint {
+	uint32_t session_uint32uint;
+};
+
+struct session_uint33bool {
+	bool session_uint33bool;
+};
+
+struct session_uint34uint {
+	uint32_t session_uint34uint;
+};
+
 struct session {
 	uint32_t session_uint0uint;
 	struct session_agent_m session_agent_m;
@@ -370,6 +444,32 @@ struct session {
 	bool session_uint17tstr_present;
 	struct session_tstr_l_r session_tstr_l;
 	bool session_tstr_l_present;
+	struct session_uint19uint session_uint19uint;
+	bool session_uint19uint_present;
+	struct session_uint20uint session_uint20uint;
+	bool session_uint20uint_present;
+	struct session_uint21uint session_uint21uint;
+	bool session_uint21uint_present;
+	struct session_uint22tstr session_uint22tstr;
+	bool session_uint22tstr_present;
+	struct session_perm_mode_m session_perm_mode_m;
+	bool session_perm_mode_m_present;
+	struct session_uint24uint session_uint24uint;
+	bool session_uint24uint_present;
+	struct session_pr_state_m session_pr_state_m;
+	bool session_pr_state_m_present;
+	struct session_uint26bool session_uint26bool;
+	bool session_uint26bool_present;
+	struct session_uint30uint session_uint30uint;
+	bool session_uint30uint_present;
+	struct session_uint31uint session_uint31uint;
+	bool session_uint31uint_present;
+	struct session_uint32uint session_uint32uint;
+	bool session_uint32uint_present;
+	struct session_uint33bool session_uint33bool;
+	bool session_uint33bool_present;
+	struct session_uint34uint session_uint34uint;
+	bool session_uint34uint_present;
 };
 
 struct att_kind_r {
@@ -450,6 +550,34 @@ struct attention_uint8uint {
 	uint32_t attention_uint8uint;
 };
 
+struct attention_uint9uint {
+	uint32_t attention_uint9uint;
+};
+
+struct attention_uint10uint {
+	uint32_t attention_uint10uint;
+};
+
+struct attention_uint11uint {
+	uint32_t attention_uint11uint;
+};
+
+struct attention_uint12bool {
+	bool attention_uint12bool;
+};
+
+struct attention_uint13tstr {
+	struct zcbor_string attention_uint13tstr;
+};
+
+struct attention_uint14uint {
+	uint32_t attention_uint14uint;
+};
+
+struct attention_uint15bool {
+	bool attention_uint15bool;
+};
+
 struct attention {
 	uint32_t attention_uint0uint;
 	uint32_t attention_uint1uint;
@@ -466,6 +594,20 @@ struct attention {
 	bool attention_uint7uint_present;
 	struct attention_uint8uint attention_uint8uint;
 	bool attention_uint8uint_present;
+	struct attention_uint9uint attention_uint9uint;
+	bool attention_uint9uint_present;
+	struct attention_uint10uint attention_uint10uint;
+	bool attention_uint10uint_present;
+	struct attention_uint11uint attention_uint11uint;
+	bool attention_uint11uint_present;
+	struct attention_uint12bool attention_uint12bool;
+	bool attention_uint12bool_present;
+	struct attention_uint13tstr attention_uint13tstr;
+	bool attention_uint13tstr_present;
+	struct attention_uint14uint attention_uint14uint;
+	bool attention_uint14uint_present;
+	struct attention_uint15bool attention_uint15bool;
+	bool attention_uint15bool_present;
 };
 
 struct msg_attention {
@@ -479,6 +621,7 @@ struct clear_why_r {
 		clear_why_answered_dev_m_c = 1,
 		clear_why_expired_m_c = 2,
 		clear_why_cancelled_m_c = 3,
+		clear_why_handed_back_m_c = 4,
 	} clear_why_choice;
 };
 
@@ -511,6 +654,7 @@ struct cmd_op_r {
 		cmd_op_kb_del_m_c = 14,
 		cmd_op_kb_send_m_c = 15,
 		cmd_op_kb_end_m_c = 16,
+		cmd_op_rerun_m_c = 17,
 	} cmd_op_choice;
 };
 
@@ -562,6 +706,10 @@ struct cmd_uint4uint {
 	uint32_t cmd_uint4uint;
 };
 
+struct cmd_uint5uint {
+	uint32_t cmd_uint5uint;
+};
+
 struct cmd {
 	struct cmd_op_r cmd_op_m;
 	struct cmd_uint1uint cmd_uint1uint;
@@ -572,6 +720,8 @@ struct cmd {
 	bool cmd_arg_m_present;
 	struct cmd_uint4uint cmd_uint4uint;
 	bool cmd_uint4uint_present;
+	struct cmd_uint5uint cmd_uint5uint;
+	bool cmd_uint5uint_present;
 };
 
 struct msg_cmd {
@@ -642,12 +792,24 @@ struct detail_uint1uint {
 	uint32_t detail_uint1uint;
 };
 
+struct detail_uint3uint {
+	uint32_t detail_uint3uint;
+};
+
+struct detail_uint4uint {
+	uint32_t detail_uint4uint;
+};
+
 struct detail {
 	struct detail_uint0uint detail_uint0uint;
 	bool detail_uint0uint_present;
 	struct detail_uint1uint detail_uint1uint;
 	bool detail_uint1uint_present;
 	struct zcbor_string detail_uint2tstr;
+	struct detail_uint3uint detail_uint3uint;
+	bool detail_uint3uint_present;
+	struct detail_uint4uint detail_uint4uint;
+	bool detail_uint4uint_present;
 };
 
 struct msg_detail {
@@ -797,6 +959,51 @@ struct msg_kb_cands {
 	struct kb_cands msg_kb_cands_kb_cands_m;
 };
 
+struct usage_uint1uint {
+	uint32_t usage_uint1uint;
+};
+
+struct usage_uint2uint {
+	uint32_t usage_uint2uint;
+};
+
+struct usage_uint3uint {
+	uint32_t usage_uint3uint;
+};
+
+struct usage_uint4uint {
+	uint32_t usage_uint4uint;
+};
+
+struct usage_uint5uint {
+	uint32_t usage_uint5uint;
+};
+
+struct usage_uint6uint {
+	uint32_t usage_uint6uint;
+};
+
+struct usage {
+	uint32_t usage_uint0uint;
+	struct usage_uint1uint usage_uint1uint;
+	bool usage_uint1uint_present;
+	struct usage_uint2uint usage_uint2uint;
+	bool usage_uint2uint_present;
+	struct usage_uint3uint usage_uint3uint;
+	bool usage_uint3uint_present;
+	struct usage_uint4uint usage_uint4uint;
+	bool usage_uint4uint_present;
+	struct usage_uint5uint usage_uint5uint;
+	bool usage_uint5uint_present;
+	struct usage_uint6uint usage_uint6uint;
+	bool usage_uint6uint_present;
+};
+
+struct msg_usage {
+	struct hdr_r msg_usage_hdr_m;
+	struct usage msg_usage_usage_m;
+};
+
 struct msg_dbg_ui_state_req {
 	struct hdr_r msg_dbg_ui_state_req_hdr_m;
 };
@@ -920,6 +1127,7 @@ struct envelope_r {
 		struct msg_kb_start envelope_msg_kb_start_m;
 		struct msg_kb_stroke envelope_msg_kb_stroke_m;
 		struct msg_kb_cands envelope_msg_kb_cands_m;
+		struct msg_usage envelope_msg_usage_m;
 		struct msg_dbg_ui_state_req envelope_msg_dbg_ui_state_req_m;
 		struct msg_dbg_ui_state envelope_msg_dbg_ui_state_m;
 		struct msg_dbg_screenshot_req envelope_msg_dbg_screenshot_req_m;
@@ -950,6 +1158,7 @@ struct envelope_r {
 		envelope_msg_kb_start_m_c,
 		envelope_msg_kb_stroke_m_c,
 		envelope_msg_kb_cands_m_c,
+		envelope_msg_usage_m_c,
 		envelope_msg_dbg_ui_state_req_m_c,
 		envelope_msg_dbg_ui_state_m_c,
 		envelope_msg_dbg_screenshot_req_m_c,

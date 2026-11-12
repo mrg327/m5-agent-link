@@ -5,13 +5,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "gauges.h"
 #include "hal.h"
 #include "model.h"
 
 typedef enum {
     LINK_OP_FOCUS = 0, LINK_OP_ACK = 1, LINK_OP_SNOOZE = 2, LINK_OP_APPROVE = 3, LINK_OP_DENY = 4,
-    LINK_OP_REPLY = 5, LINK_OP_CANCEL = 6, LINK_OP_NOTIFY_DONE = 8, LINK_OP_SCROLL = 10, LINK_OP_TYPE = 11,
-    LINK_OP_DICTATE = 12, LINK_OP_KB_PICK = 13, LINK_OP_KB_DEL = 14, LINK_OP_KB_SEND = 15, LINK_OP_KB_END = 16
+    LINK_OP_REPLY = 5, LINK_OP_CANCEL = 6, LINK_OP_DETAIL = 7, LINK_OP_NOTIFY_DONE = 8, LINK_OP_SCROLL = 10, LINK_OP_TYPE = 11,
+    LINK_OP_DICTATE = 12, LINK_OP_KB_PICK = 13, LINK_OP_KB_DEL = 14, LINK_OP_KB_SEND = 15, LINK_OP_KB_END = 16,
+    LINK_OP_RERUN = 17 /* JOBS: run a finished job again */
 } link_op_t;
 #define LINK_OP_UNKNOWN (-1)
 
@@ -30,9 +32,14 @@ typedef struct {
     void (*on_transcript)(uint32_t aid, const char *text); /* voice: "" when nothing was heard */
     /* KEYS (proto 0.7): candidates for a stroke; typed -1 when none was typed, err -1 when none (else a result_err value) */
     void (*on_kb_cands)(uint32_t kid, uint32_t seq, const char *const *words, int n, int typed, int err);
+    /* GAUGES (proto 0.10): a new plan-usage reading, after the model holds it; `prev` is the one before. */
+    void (*on_usage)(const usage_t *prev, const usage_t *now);
 } link_hooks_t;
 
 void link_init(const link_hooks_t *hooks);
+/* A plan-usage reading (the `usage` message, GAUGES.md): into the model, then the on_usage hook. The
+ * simulator's `usage` script command enters here too. */
+void link_rx_usage(const usage_t *u);
 void link_on_state(hal_link_kind_t kind, bool connected);
 /* Arbitration: until a welcome arrives, hellos go out on every transport that is up and the first
  * valid welcome picks the active link; afterwards frames from other transports are dropped and
@@ -60,5 +67,7 @@ bool link_send_log(int lvl, const char *msg);
 bool link_send_kb_start(uint32_t kid, uint32_t sid, const uint8_t *keys, size_t len);
 bool link_send_kb_stroke(uint32_t kid, uint32_t seq, const uint8_t *pts, size_t len);
 bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg, uint32_t hold_ms);
+/* cmd_op_approve with rh (proto 0.13, STANDING-RULES.md): approve and save the standing rule whose hash is rh. */
+bool link_send_approve_rule(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32_t rh);
 /* cmd_op_scroll with scroll_arg {unit, delta, seq}; unit is a nav_scroll_unit_t wire value. */
 bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq);

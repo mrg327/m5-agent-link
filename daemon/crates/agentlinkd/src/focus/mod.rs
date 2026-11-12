@@ -259,6 +259,16 @@ pub fn default_driver() -> Arc<dyn FocusDriver> {
     Arc::new(SystemFocus)
 }
 
+/// Whether kitty shows the session's window as focused (`None`: not kitty, or it cannot be asked).
+/// Blocking; used by presence.
+#[cfg_attr(test, allow(dead_code))]
+pub fn kitty_focused(ctx: &HostCtx) -> Option<bool> {
+    if tmux::pane(ctx).is_some() || select_outer(ctx, std::env::consts::OS) != Outer::Kitty {
+        return None;
+    }
+    kitty::focused(ctx)
+}
+
 pub use scroll::{default_driver as default_scroll_driver, ScrollDriver};
 
 #[cfg(test)]

@@ -1,0 +1,78 @@
+# GAUGES.md §4.2-4.3: the session card's context capsule (the job bar's row) with colour steps at 70 % and
+# 90 %, and the AGENT header's readout (model · mode · pull request). Unknown context draws nothing.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login Running the test suite
+wait 300
+expect_screen ring
+expect_no_label context
+# nothing known yet: no capsule, no readout
+tap 233 233
+wait 400
+expect_screen agent
+expect_no_label Opus
+btn B long
+wait 300
+gauge 1 34 Opus_4.7 plan 128 approved
+wait 300
+expect_label context 34%
+expect_label Running the test suite
+shot gauges_card.png
+gauge 1 76
+wait 300
+expect_label context 76%
+shot gauges_card_warn.png
+gauge 1 93
+wait 300
+expect_label context 93%
+shot gauges_card_hot.png
+# after /compact the figure is gone (255 on the wire): no capsule, never 0 %
+gauge 1 -
+wait 300
+expect_no_label context
+gauge 1 12
+wait 300
+expect_label context 12%
+# AGENT: the readout under the caption; the default mode is not named
+tap 233 233
+wait 400
+expect_screen agent
+expect_label webapp
+expect_label Opus 4.7 · Plan · PR 128 approved
+expect_label > Activity
+shot gauges_agent.png
+gauge 1 12 Opus_4.7 default 0 none
+wait 300
+expect_label Opus 4.7
+expect_no_label Plan
+expect_no_label PR 128
+gauge 1 12 - bypass 7 changes
+wait 300
+expect_label Opus 4.7 · Bypass · PR 7 changes
+# a request takes the card's middle: the capsule makes room
+btn B long
+wait 300
+session 1 input webapp feat/login
+attention 7 1 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+btn B long
+wait 300
+expect_label Review
+expect_label Run shell command
+expect_no_label context
+shot gauges_card_request.png
+clear 7 answered_pc
+session 1 work webapp feat/login Running the test suite
+wait 300
+expect_label context 12%
+# a job has no context capsule even if a figure were sent
+job 5 run tools 30 0 0 cargo build
+gauge 5 50
+wait 300
+btn B
+wait 300
+expect_label Terminal
+expect_no_label context
+quit

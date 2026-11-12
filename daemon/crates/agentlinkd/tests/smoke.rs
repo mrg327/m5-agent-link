@@ -84,6 +84,7 @@ async fn handshake_hook_event_and_focus() {
         Command::new(env!("CARGO_BIN_EXE_agentlinkd"))
             .env("AGENTLINK_HOME", &home)
             .env("AGENTLINK_USB", "0")
+            .env("AGENTLINK_KEEP_AWAKE", "off")
             .env("AGENTLINK_BLE", "0")
             .env("AGENTLINK_WS_ADDR", format!("127.0.0.1:{port}"))
             .env("AGENTLINK_PIPE", pipe_name(port))
@@ -166,6 +167,7 @@ async fn second_hello_is_a_full_rehandshake() {
         Command::new(env!("CARGO_BIN_EXE_agentlinkd"))
             .env("AGENTLINK_HOME", &home)
             .env("AGENTLINK_USB", "0")
+            .env("AGENTLINK_KEEP_AWAKE", "off")
             .env("AGENTLINK_BLE", "0")
             .env("AGENTLINK_WS_ADDR", format!("127.0.0.1:{port}"))
             .stderr(Stdio::null())
@@ -199,4 +201,92 @@ async fn second_hello_is_a_full_rehandshake() {
         .path();
     let text = std::fs::read_to_string(day).unwrap();
     assert!(text.contains("\"kind\":\"rehandshake\""));
+}
+
+#[tokio::test]
+async fn a_shell_job_reaches_the_registry_but_its_command_never_the_logs() {
+    let home = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("jobs-home");
+    let _ = std::fs::remove_dir_all(&home);
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let _d = Daemon(
+        Command::new(env!("CARGO_BIN_EXE_agentlinkd"))
+            .env("AGENTLINK_HOME", &home)
+            .env("AGENTLINK_USB", "0")
+            .env("AGENTLINK_KEEP_AWAKE", "off")
+            .env("AGENTLINK_BLE", "0")
+            .env("AGENTLINK_JOB_MIN_S", "0")
+            .env("AGENTLINK_WS_ADDR", format!("127.0.0.1:{port}"))
+            .env("AGENTLINK_PIPE", pipe_name(port))
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    let pid = std::process::id(); // a live pid: the liveness check must not remove the card
+    let line = |ev: &str, p: &str| {
+        format!(
+            r#"{{"agent":"shell","event":"{ev}","cwd":"/x/proj","tty":"/dev/pts/1","payload":{p}}}"#
+        )
+    };
+    // the daemon may not be listening yet
+    let mut conn = None;
+    for _ in 0..100 {
+        if home.join("hook.sock").exists() || cfg!(windows) {
+            conn = Some(
+                send_hook(
+                    &home,
+                    port,
+                    &line(
+                        "start",
+                        &format!(
+                            r#"{{"pid":{pid},"cmd":"deploy --token hunter2","cwd":"/x/proj"}}"#
+                        ),
+                    ),
+                )
+                .await,
+            );
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let _c1 = conn.expect("hook socket");
+    let _c2 = send_hook(
+        &home,
+        port,
+        &line("end", &format!(r#"{{"pid":{pid},"exit":3}}"#)),
+    )
+    .await;
+
+    let read = || {
+        let day = std::fs::read_dir(home.join("trace"))
+            .ok()
+            .and_then(|mut d| d.next())
+            .and_then(|e| e.ok())
+            .map(|e| e.path());
+        day.and_then(|p| std::fs::read_to_string(p).ok())
+            .unwrap_or_default()
+    };
+    let mut text = String::new();
+    for _ in 0..100 {
+        text = read();
+        if text.contains("\"exit\":3") {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert!(text.contains("\"kind\":\"session_upd\""), "{text}");
+    assert!(
+        text.contains("\"ag\":\"shell\"") && text.contains("\"exit\":3"),
+        "{text}"
+    );
+    // the program name travels in `tool`; the arguments never reach the trace
+    assert!(
+        !text.contains("hunter2") && !text.contains("--token"),
+        "command in the trace"
+    );
+    let audit = std::fs::read_to_string(home.join("audit.jsonl")).unwrap_or_default();
+    assert!(!audit.contains("hunter2"));
 }

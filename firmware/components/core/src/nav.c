@@ -26,7 +26,8 @@ const nav_binding_t nav_bindings[] = {
     {MODE_AGENT, G_RELEASE, ZONE_ANY, WHEN_ALWAYS, NAV_HOLD_RELEASE},
     {MODE_AGENT, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
     {MODE_AGENT, G_DOUBLE_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
-    {MODE_AGENT, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* only a long swipe counts */
+    {MODE_AGENT, G_DRAG, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_DRAG}, /* the list follows the finger */
+    {MODE_AGENT, G_LONG_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_HOLD_LONG}, /* held still off the rows: back */
     {MODE_AGENT, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* UI-V3 §5: swipe right goes back */
     {MODE_AGENT, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_AGENT, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
@@ -41,9 +42,8 @@ const nav_binding_t nav_bindings[] = {
     {MODE_ASK, G_RELEASE, ZONE_ANY, WHEN_ALWAYS, NAV_HOLD_RELEASE},
     {MODE_ASK, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT}, /* hold items answer "hold to confirm" */
     {MODE_ASK, G_DOUBLE_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
-    {MODE_ASK, G_LONG_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_HOLD_LONG}, /* injected input only: must cover the hold */
-    {MODE_ASK, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_REQUEST, NAV_DENY}, /* strict: long, from above the centre */
-    {MODE_ASK, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_NO_REQUEST, NAV_BACK}, /* a question: back, request stays */
+    {MODE_ASK, G_LONG_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_HOLD_LONG}, /* off the rows: back; on a row: injected input covering the hold */
+    {MODE_ASK, G_DRAG, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_DRAG}, /* the list follows the finger; no swipe denies */
     {MODE_ASK, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* UI-V3 §5: back; the request stays pending, never deny */
     {MODE_ASK, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_ASK, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
@@ -69,6 +69,7 @@ const nav_binding_t nav_bindings[] = {
     {MODE_STATUS, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
     {MODE_STATUS, G_DOUBLE_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
     {MODE_STATUS, G_SWIPE_UP, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK},
+    {MODE_STATUS, G_LONG_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_HOLD_LONG}, /* held still off the toggles: back */
     {MODE_STATUS, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* UI-V3 §5: swipe right goes back */
     {MODE_STATUS, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
     {MODE_STATUS, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
@@ -141,7 +142,7 @@ const char *nav_action_name(nav_action_t a)
 {
     static const char *const names[NAV_COUNT] = {
         "none", "focus", "open_agent", "open_ask", "open_status", "back", "home", "next", "prev", "next_attention", "pick_rim",
-        "scrub", "commit", "deny", "hold_press", "hold_release", "hold_long", "scroll_drag", "scroll_fling",
+        "scrub", "commit", "hold_press", "hold_release", "hold_long", "scroll_drag", "scroll_fling",
         "scroll_catch", "page_newer", "to_bottom", "erase"};
     return (unsigned)a < NAV_COUNT ? names[a] : "?";
 }
@@ -205,6 +206,18 @@ int nav_agent_items(sess_state_t state, bool typing, bool replies, agent_item_t 
     return k;
 }
 
+int nav_job_items(sess_state_t state, agent_item_t *out, int cap)
+{
+    int n = 0;
+    if (state == SESS_START || state == SESS_WORK) {
+        if (n < cap) out[n++] = (agent_item_t){AG_INTERRUPT, true};
+    } else {
+        if ((state == SESS_DONE || state == SESS_ERROR) && n < cap) out[n++] = (agent_item_t){AG_RERUN, true};
+        if (n < cap) out[n++] = (agent_item_t){AG_DISMISS, false};
+    }
+    return n;
+}
+
 int nav_ask_items(const attention_t *a, bool voice, ask_item_t *out, int cap)
 {
     int n = 0;
@@ -220,6 +233,9 @@ int nav_ask_items(const attention_t *a, bool voice, ask_item_t *out, int cap)
     } else if (perm) {
         if ((a->acts & (1u << ACT_APPROVE)) && n < cap - 1) out[n++] = (ask_item_t){ASK_APPROVE, -1, NAV_HOLD_MS, true};
         if ((a->acts & (1u << ACT_DENY)) && n < cap - 1) out[n++] = (ask_item_t){ASK_DENY, -1, NAV_DENY_HOLD_MS, false};
+        /* third, two steps from the default, so the plain Approve stays the one under the finger */
+        if (a->has_rule && (a->acts & (1u << ACT_APPROVE)) && n < cap - 1)
+            out[n++] = (ask_item_t){ASK_GRANT, -1, NAV_GRANT_HOLD_MS, true};
     }
     /* opens VOICE on this request; the hold-to-send there is the commit */
     if (voice && (a->acts & (1u << ACT_DICTATE)) && n < cap - 1) out[n++] = (ask_item_t){ASK_DICTATE, -1, 0, false};
@@ -249,4 +265,26 @@ uint32_t nav_quiet_next(uint32_t quiet_until, uint32_t now_unix)
     case 2: return now_unix + NAV_QUIET_STEP2_S;
     default: return 0;
     }
+}
+
+int nav_list_scrub(int *last, gesture_kind_t kind, int sector)
+{
+    if (kind == G_SCRUB_START) {
+        *last = sector;
+        return 0;
+    }
+    if (kind != G_SCRUB) return 0;
+    int d = sector - *last;
+    if (d > NAV_LIST_SECTORS / 2) d -= NAV_LIST_SECTORS;
+    else if (d < -NAV_LIST_SECTORS / 2) d += NAV_LIST_SECTORS;
+    *last = sector;
+    return d;
+}
+
+int nav_list_drag(int *acc, int dy)
+{
+    *acc += dy;
+    int n = -(*acc / NAV_LIST_DRAG_PX); /* C division truncates toward zero, so both directions keep a remainder */
+    *acc += n * NAV_LIST_DRAG_PX;
+    return n;
 }

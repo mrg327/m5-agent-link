@@ -12,7 +12,7 @@ envelope = msg_hello / msg_welcome / msg_snapshot / msg_session_upd / msg_gone
          / msg_attention / msg_clear / msg_cmd / msg_result / msg_detail
          / msg_cfg / msg_batt / msg_ping / msg_pong / msg_log
          / msg_audio_start / msg_audio / msg_audio_end / msg_transcript
-         / msg_kb_start / msg_kb_stroke / msg_kb_cands
+         / msg_kb_start / msg_kb_stroke / msg_kb_cands / msg_usage
          / msg_dbg_ui_state_req / msg_dbg_ui_state / msg_dbg_screenshot_req
          / msg_dbg_screenshot_chunk / msg_dbg_inject_input / msg_dbg_set_log_level
 
@@ -40,6 +40,7 @@ msg_transcript           = { 0 => mt_transcript, hdr, 3 => transcript }
 msg_kb_start             = { 0 => mt_kb_start, hdr, 3 => kb_start }
 msg_kb_stroke            = { 0 => mt_kb_stroke, hdr, 3 => kb_stroke }
 msg_kb_cands             = { 0 => mt_kb_cands, hdr, 3 => kb_cands }
+msg_usage                = { 0 => mt_usage, hdr, 3 => usage }
 msg_dbg_ui_state_req     = { 0 => mt_dbg_ui_state_req, hdr, 3 => empty }
 msg_dbg_ui_state         = { 0 => mt_dbg_ui_state, hdr, 3 => dbg_ui_state }
 msg_dbg_screenshot_req   = { 0 => mt_dbg_screenshot_req, hdr, 3 => empty }
@@ -70,6 +71,7 @@ mt_transcript = 19
 mt_kb_start = 20
 mt_kb_stroke = 21
 mt_kb_cands = 22
+mt_usage = 23
 mt_dbg_ui_state_req = 64
 mt_dbg_ui_state = 65
 mt_dbg_screenshot_req = 66
@@ -206,12 +208,47 @@ session = {
   ? 15 => uint,             ; n     tool steps in the current turn (resets on a new prompt)
   ? 16 => bool,             ; ok    result of step n; absent while it runs
   ? 17 => tstr,             ; q     the agent's closing question when its turn ended, <= 120 chars; "" = none (proto 0.5)
-  ? 18 => [0*3 tstr]        ; rp    answers to q for the Reply list, <= 24 chars each; [] = none (proto 0.5)
+  ? 18 => [0*3 tstr],       ; rp    answers to q for the Reply list, <= 24 chars each; [] = none (proto 0.5)
+  ? 19 => uint,             ; eta   a job's expected total run time in seconds (median of its earlier runs);
+                            ;       0 = unknown. Keys 19-20 and agent_shell only to devices with proto ≥ 0.9
+  ? 20 => uint,             ; exit  a job's exit status (0-255), sent with the delta that enters done / error
+  ? 21 => uint,             ; ctx   context window used, percent 0-100; 255 = unknown (GAUGES.md). Keys 21-25
+                            ;       only to devices with proto ≥ 0.10
+  ? 22 => tstr,             ; mdl   the model's short name, <= 16 chars ("Opus 4.7"); "" = unknown
+  ? 23 => perm_mode,        ; pm    the agent's permission mode
+  ? 24 => uint,             ; pr    the open pull request of the session's branch; 0 = none (withheld under privacy meta)
+  ? 25 => pr_state,         ; prs   its review state; sent with pr
+  ? 26 => bool,             ; hush  only in the delta that enters done / error, only to devices with proto >= 0.12
+                            ;       (PRESENCE.md): the user is looking at that session's terminal, do not buzz for
+                            ;       it. Never stored by the device; absent = buzz as its own rules say
+  ? 30 => uint,             ; fc    files the turn changed (>= 1; absent = not known / none seen). Keys 30-34 only to
+                            ;       devices with proto >= 0.14 (DONE-SUMMARY.md); a delta carrying any of them
+                            ;       replaces the whole summary, a delta that changes `st` clears it
+  ? 31 => uint,             ; la    lines added in the turn, sent with lr; absent = not known
+  ? 32 => uint,             ; lr    lines removed
+  ? 33 => bool,             ; tp    the turn's last recognised test run: true passed, false failed; absent = unknown
+  ? 34 => uint              ; dur   the turn's length in seconds, prompt to stop
 }
-agent = agent_copilot / agent_claude / agent_cloud / agent_other
+perm_mode = perm_mode_default / perm_mode_plan / perm_mode_accept_edits / perm_mode_auto /
+  perm_mode_dont_ask / perm_mode_bypass
+perm_mode_default = 0       ; Claude Code "default" (shown as Manual): asks before edits and commands
+perm_mode_plan = 1
+perm_mode_accept_edits = 2
+perm_mode_auto = 3
+perm_mode_dont_ask = 4
+perm_mode_bypass = 5        ; bypassPermissions
+
+pr_state = pr_state_none / pr_state_pending / pr_state_approved / pr_state_changes / pr_state_draft
+pr_state_none = 0           ; no review state reported
+pr_state_pending = 1
+pr_state_approved = 2
+pr_state_changes = 3        ; changes requested
+pr_state_draft = 4
+agent = agent_copilot / agent_claude / agent_cloud / agent_shell / agent_other
 agent_copilot = 0
 agent_claude = 1
 agent_cloud = 2
+agent_shell = 3      ; a job: a command the user started in a terminal (proto 0.9, JOBS.md)
 agent_other = 15
 
 sess_state = sess_state_start / sess_state_work / sess_state_input / sess_state_error /
@@ -239,8 +276,27 @@ attention = {
   ? 5 => [0*4 tstr],        ; opts   ≤ 4 choices, each ≤ 24 chars
   6 => [0*6 action],        ; acts   actions the device may offer
   ? 7 => uint,            ; exp    unix time after which to drop
-  ? 8 => uint            ; grant_mask  bit i set = opts[i] grants permission (approve-class: hold to commit)
+  ? 8 => uint,           ; grant_mask  bit i set = opts[i] grants permission (approve-class: hold to commit)
+  ? 9 => uint,           ; left   ms left in the answer window when this message was sent (ANSWER-WINDOW.md);
+                         ;        the device counts down from its own clock on arrival. Keys 9-11 only to
+                         ;        devices with proto >= 0.11
+  ? 10 => uint,          ; win    the whole answer window in ms (left / win = the part still to run)
+  ? 11 => uint,          ; len    the full text's length in bytes, sent when `text` is a cut preview: the
+                         ;        device may fetch it with cmd_op_detail (detail chunks) when len <= 4096
+  ? 12 => bool,          ; hush   no buzz, glow or reminders for this request: the user is looking at its terminal
+                         ;        (PRESENCE.md). The card is shown and answered as ever. Only to devices with
+                         ;        proto >= 0.12
+  ? 13 => tstr,          ; rule   the standing rule the device may grant with this request, exactly as Claude Code
+                         ;        saves it ("Bash(npm test:*)"; several one per line), <= 160 bytes of printable
+                         ;        ASCII and line breaks (STANDING-RULES.md). Keys 13-15 always together, only to
+                         ;        devices with proto >= 0.13; granted by cmd_op_approve with `rh`
+  ? 14 => uint,          ; scope  where it is saved, a rule_scope value. A uint, not the enum, so that a value a
+                         ;        device does not know drops the rule, not the whole request
+  ? 15 => bool           ; wide   the rule ends in a wildcard: it matches more than this exact request
 }
+rule_scope = rule_scope_session / rule_scope_project
+rule_scope_session = 0   ; this session only (Claude Code destination "session")
+rule_scope_project = 1   ; this project, the user's own .claude/settings.local.json ("localSettings")
 att_kind = att_kind_approval / att_kind_question / att_kind_error / att_kind_done
 att_kind_approval = 0
 att_kind_question = 1
@@ -266,21 +322,25 @@ cmd = {
   ? 1 => uint,     ; sid
   ? 2 => uint,     ; rid   (dictate: the card the transcript answers, proto 0.8)
   ? 3 => cmd_arg,  ; arg   snooze minutes, reply option index, quiet secs
-  ? 4 => uint     ; hold_ms  measured hold-to-confirm (approve)
+  ? 4 => uint,    ; hold_ms  measured hold-to-confirm (approve)
+  ? 5 => uint     ; rh  with cmd_op_approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of
+                  ;     the rule's bytes, 0x00, the scope's value and the wide flag (0/1), as the device showed
+                  ;     them; hold_ms >= 1500 (STANDING-RULES.md)
 }
 ; Scalars for snooze / reply / quiet; a map for scroll. Further structured arguments ({aid}) join this union when they land.
 cmd_arg = uint / tstr / scroll_arg
 cmd_op = cmd_op_focus / cmd_op_ack / cmd_op_snooze / cmd_op_approve / cmd_op_deny /
   cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet / cmd_op_scroll /
-  cmd_op_type / cmd_op_dictate / cmd_op_kb_pick / cmd_op_kb_del / cmd_op_kb_send / cmd_op_kb_end
-cmd_op_focus = 0
+  cmd_op_type / cmd_op_dictate / cmd_op_kb_pick / cmd_op_kb_del / cmd_op_kb_send / cmd_op_kb_end /
+  cmd_op_rerun
+cmd_op_focus = 0    ; with a `rid` (proto 0.11): also hand that request back to the terminal at once
 cmd_op_ack = 1
 cmd_op_snooze = 2
 cmd_op_approve = 3
 cmd_op_deny = 4
 cmd_op_reply = 5
 cmd_op_cancel = 6   ; interrupt the session's running turn (the daemon sends Esc to its terminal)
-cmd_op_detail = 7
+cmd_op_detail = 7   ; send request `rid`'s full text from byte `arg` (0 = from the start) as detail chunks (proto 0.11)
 cmd_op_notify_done = 8
 cmd_op_quiet = 9
 cmd_op_scroll = 10
@@ -290,6 +350,7 @@ cmd_op_kb_pick = 13 ; KEYS: replace the last typed word with candidate `arg` of 
 cmd_op_kb_del = 14  ; KEYS: erase the last word typed from the watch
 cmd_op_kb_send = 15 ; KEYS: press Enter (hold_ms >= 1000); the composition is sent to the agent
 cmd_op_kb_end = 16  ; KEYS: the keyboard closed; `arg` 1 erases what it typed and was not sent, 0 keeps it
+cmd_op_rerun = 17   ; JOBS: run a finished job's command again in its own terminal (hold_ms >= 1000; proto 0.9)
 
 ; cmd_op_scroll argument (UI-V2 §6.1): move the session's terminal scrollback.
 scroll_arg = {
@@ -317,10 +378,14 @@ scroll_pos = {
   ? 3 => tstr   ; preview       top visible line, ≤ 48 chars
 }
 
+; The full text of request `rid` (proto 0.11, ANSWER-WINDOW.md), the answer to cmd_op_detail {rid, arg: off}.
+; Sent as chunks of <= 1024 bytes, cut on UTF-8 boundaries, in order from `off`; a `result` follows the last.
 detail = {
   ? 0 => uint,   ; rid
   ? 1 => uint,   ; sid
-  2 => tstr     ; text (full)
+  2 => tstr,     ; text   this chunk
+  ? 3 => uint,   ; off    byte offset of this chunk in the full text
+  ? 4 => uint    ; total  the full text's length in bytes (<= 4096)
 }
 
 
@@ -373,6 +438,20 @@ kb_cands = {
   ? 4 => result_err             ; err    why nothing was typed
 }
 
+; ───────────────────────── usage (proto 0.10, GAUGES.md) ─────────────────────────
+; The plan's rate-limit windows, from Claude Code's status line. A full replacement: a window that is
+; absent is unknown (no subscription, no reading yet, or it has reset), never zero. Sent only to devices
+; with proto ≥ 0.10.
+usage = {
+  0 => uint,      ; at    when the daemon last read these figures (unix); the device ages them from here
+  ? 1 => uint,    ; h5    5-hour window used, percent 0-100 (rounded down)
+  ? 2 => uint,    ; h5r   5-hour window resets at (unix)
+  ? 3 => uint,    ; h5o   at the current pace the 5-hour window runs out at (unix); absent = not before it resets
+  ? 4 => uint,    ; wk    weekly window used, percent 0-100
+  ? 5 => uint,    ; wkr   weekly window resets at (unix)
+  ? 6 => uint     ; wko   at the current pace the weekly window runs out at (unix)
+}
+
 ; ───────────────────────── debug / observability ─────────────────────────
 dbg_ui_state = {
   0 => tstr,          ; screen   "glance" | "list" | "detail" | "attention" | "badge" | "settings" | "pairing" | "off"
@@ -409,11 +488,13 @@ host_os_win = 1
 host_os_linux = 2
 
 clear_why = clear_why_answered_pc / clear_why_answered_dev / clear_why_expired /
-  clear_why_cancelled
+  clear_why_cancelled / clear_why_handed_back
 clear_why_answered_pc = 0
 clear_why_answered_dev = 1
-clear_why_expired = 2
+clear_why_expired = 2        ; the answer window ran out: the terminal asks now (the hook gave no decision)
 clear_why_cancelled = 3
+clear_why_handed_back = 4    ; the device's own Open on PC (cmd_op_focus with the rid) released the hook at
+                             ; once; only to devices with proto >= 0.11 (older ones get cancelled)
 
 result_err = result_err_stale / result_err_denied / result_err_unsupported /
   result_err_no_window / result_err_timeout / result_err_internal

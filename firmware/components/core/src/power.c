@@ -3,6 +3,7 @@
 #include "debug.h"
 #include "hal.h"
 #include "link.h"
+#include "motion.h"
 #include "ui.h"
 
 #define GLOW_MS 2000
@@ -10,6 +11,8 @@
  * the AMOLED and the battery both suffer from a panel left lit (the ring dims to ambient at 30 s).
  * The simulator overrides it (`--idle-off`, default never) so scripts see a stable screen. */
 #define IDLE_OFF_DEFAULT_MS (60u * 1000u)
+/* Face down and still, the display has no reader: it goes off after this long without input. */
+#define FACE_DOWN_OFF_MS 3000u
 /* Display-off time after which an unattended, battery-powered, unlinked device goes DEEP. */
 #define DEEP_AFTER_MS (10u * 60u * 1000u)
 /* After a timer wake the display stays off; this long to reconnect, then DEEP again. */
@@ -130,6 +133,11 @@ void power_tick(uint32_t now_ms)
             hal_retained_set(s_tries);
             dbg_event("power", "deep_refused", "\"tries\":%u", (unsigned)s_tries);
         }
+    }
+    if (s_on && !s_glowing && motion_face_down() && now_ms - s_last_activity >= FACE_DOWN_OFF_MS) {
+        set_display(false);
+        s_off_since = now_ms;
+        return;
     }
     if (s_on && !s_glowing && s_idle_ms && now_ms - s_last_activity >= s_idle_ms) {
         set_display(false);

@@ -1,0 +1,20 @@
+# Jobs menu after the job ended: Run again is a hold item (a tap says so), Dismiss a tap. Opening the menu does
+# not acknowledge a job (ack is Dismiss and removes the card). The hold sends rerun (op 17); no cancel (op 6).
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+job 5 fail webapp 42 0 1 npm run build
+wait 400
+tap 233 233
+wait 600
+expect_screen agent
+expect_label > Run again
+expect_label Dismiss
+expect_label 2 items
+shot job_menu_ended.png
+tap 233 226
+wait 300
+expect_label Hold to run again
+hold 233 226 1500
+wait 400
+expect_screen ring
+quit

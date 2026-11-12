@@ -39,6 +39,7 @@ bool sw_touch_init(void);
 bool sw_touch_read(uint16_t *x, uint16_t *y);
 void sw_touch_sleep(bool sleep);
 bool sw_rtc_init(void);
+bool sw_imu_init(void); /* imu.cpp: BMI270 chip ID check, then the sampling task starts */
 void sw_input_init(void);
 
 /* Link transports, dispatched by link.cpp. Each calls the hal callbacks with its own kind. */

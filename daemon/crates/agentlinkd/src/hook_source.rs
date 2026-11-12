@@ -6,7 +6,11 @@
 //!
 //! A line with `"await": {"wait_ms": N}` is a blocking permission or question hook: it is
 //! opened on the approval broker and the connection stays up until a device answers or the
-//! wait runs out, then one reply line goes back (`{"decision": "allow"|"deny"|"none", ..}`).
+//! window runs out, then one reply line goes back (`{"decision": "allow"|"deny"|"none", ..}`).
+//! The window is the daemon's (`window::answer_window`, ANSWER-WINDOW.md). A hook that says
+//! `"window": true` (agentlink-hook 0.11 and later) first gets `{"window_ms": N}` and then a blank
+//! keepalive line every second, so a hook that Claude Code killed is noticed and its card leaves
+//! the watch; an older hook gets the decision line only, never later than its own `wait_ms`.
 //! Any other event from the same session, except a notification, settles what was pending
 //! there ("first answer wins": the terminal got there first).
 //!
@@ -17,8 +21,9 @@
 
 use crate::broker::{request_of, Broker, Outcome};
 use crate::ipc;
+use crate::jobs::Jobs;
 use crate::prompt;
-use crate::registry::{clip, HostCtx, Registry, SessionEvent, SessionPatch, Step, Via};
+use crate::registry::{clip, HostCtx, Registry, SessionEvent, SessionPatch, Step, Turn, Via};
 use crate::remote;
 use crate::source::AgentSource;
 use crate::trace::{Dir, Trace};
@@ -32,9 +37,8 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader
 
 pub type StatusFn = Arc<dyn Fn() -> Value + Send + Sync>;
 
-/// Longest a hook may ask us to hold its prompt back (DESIGN §6a: a short window, then the
-/// terminal prompt appears as usual).
-const MAX_WAIT: Duration = Duration::from_secs(120);
+/// How often a waiting hook that understands it gets a blank keepalive line.
+const KEEPALIVE: Duration = Duration::from_secs(1);
 
 pub struct HookSource {
     pub socket: PathBuf,
@@ -45,6 +49,7 @@ pub struct HookSource {
     pub trace: Trace,
     pub status: StatusFn,
     pub broker: Arc<Broker>,
+    pub jobs: Arc<Jobs>,
 }
 
 /// What every connection handler needs.
@@ -55,6 +60,7 @@ pub struct ConnEnv {
     pub status: StatusFn,
     pub token_file: PathBuf,
     pub home: PathBuf,
+    pub jobs: Arc<Jobs>,
 }
 
 /// Which socket a connection came in on.
@@ -83,6 +89,7 @@ impl AgentSource for HookSource {
             status: self.status,
             token_file: self.token_file,
             home: self.home,
+            jobs: self.jobs,
         });
         remote::spawn_remote_socket(&self.remote_socket, env.clone());
         loop {
@@ -101,6 +108,7 @@ where
         broker,
         trace,
         status,
+        jobs,
         ..
     } = &*env;
     let (r, mut w) = tokio::io::split(stream);
@@ -117,6 +125,12 @@ where
     let mut attach_guard = None;
     while let Ok(Some(line)) = lines.next_line().await {
         let Ok(v) = serde_json::from_str::<Value>(&line) else {
+            // a malformed shell line may still hold the command line
+            let line = if line.contains("\"shell\"") {
+                "<private>".into()
+            } else {
+                line
+            };
             trace.record(
                 src,
                 Dir::In,
@@ -146,7 +160,20 @@ where
             continue;
         }
         let event = v["event"].as_str().unwrap_or("?").to_owned();
-        trace.record(src, Dir::In, &event, None, None, v.clone(), None);
+        let mut traced = v.clone();
+        crate::trace::redact_hook(&mut traced);
+        trace.record(src, Dir::In, &event, None, None, traced, None);
+        if v["agent"].as_str() == Some("shell") {
+            // Jobs (jobs.rs) are this machine's own shells; a remote host's are not offered.
+            if via == Via::Local {
+                jobs.on_line(&v);
+            }
+            continue;
+        }
+        if event.eq_ignore_ascii_case("statusline") {
+            on_statusline(registry, &v, &via);
+            continue;
+        }
         let key = session_key(&v, &via);
         if let Some(ev) = to_session_event(&v, &via) {
             registry.apply(ev);
@@ -182,12 +209,16 @@ where
             continue;
         };
         let outcome = await_decision(
-            registry,
-            broker,
-            trace,
+            Ctx {
+                registry,
+                broker,
+                trace,
+            },
             &v,
             key,
             Duration::from_millis(wait),
+            &via,
+            &mut w,
         )
         .await;
         let reply = format!("{}\n", serde_json::to_string(&outcome).unwrap_or_default());
@@ -196,17 +227,54 @@ where
     drop(attach_guard);
 }
 
+/// A status-line run (`agentlink-hook statusline`, usage.rs): readouts for its session, and the plan's
+/// rate limits when it runs on this machine (a remote host may be another account). It never creates a
+/// session and never answers or cancels anything.
+fn on_statusline(registry: &Registry, v: &Value, via: &Via) {
+    let payload = &v["payload"];
+    if payload["session_id"].as_str().is_none_or(str::is_empty) {
+        return;
+    }
+    if let Some(key) = session_key(v, via) {
+        registry.readout(&key, &crate::usage::readout_of(payload));
+    }
+    if *via == Via::Local {
+        registry.record_usage(crate::usage::rates_of(payload));
+    }
+}
+
+struct Ctx<'a> {
+    registry: &'a Registry,
+    broker: &'a Broker,
+    trace: &'a Trace,
+}
+
+/// How a wait for an answer ended.
+enum Ended {
+    Answer(Outcome),
+    /// The request was settled elsewhere (terminal answer, hand-back): no decision.
+    Cancelled,
+    Timeout,
+    /// The hook stopped listening (Claude Code killed it at its own timeout, or the user acted in the
+    /// terminal): the terminal has the prompt now.
+    HookGone,
+}
+
 /// Opens the request and waits for the device, the terminal, or the clock. Never returns
 /// `allow` without a device decision.
-async fn await_decision(
-    registry: &Registry,
-    broker: &Broker,
-    trace: &Trace,
+async fn await_decision<W: AsyncWrite + Unpin>(
+    ctx: Ctx<'_>,
     v: &Value,
     key: Option<String>,
-    wait: Duration,
+    hook_wait: Duration,
+    via: &Via,
+    w: &mut W,
 ) -> Outcome {
-    let wait = wait.min(MAX_WAIT);
+    let Ctx {
+        registry,
+        broker,
+        trace,
+    } = ctx;
     let agent = v["agent"].as_str().unwrap_or("");
     let event = v["event"].as_str().unwrap_or("");
     let Some(key) = key else {
@@ -216,7 +284,27 @@ async fn await_decision(
         return Outcome::NONE;
     };
     let host = registry.host_of(sid);
-    let Some(req) = request_of(sid, key, agent, event, &v["payload"], wait) else {
+    // A hook that asks for the window is told it and kept alive; an older one stops listening after
+    // its own wait, so the window may not outlast that.
+    let talks = v["await"]["window"].as_bool() == Some(true);
+    let pinned = v["await"]["pinned"].as_bool() == Some(true);
+    // Where the user is (presence.rs): shortens the window and hushes the buzz, nothing else.
+    let (here, reading, focus) = crate::presence::global()
+        .here_async(registry.host_ctx(sid))
+        .await;
+    let hush = crate::presence::hush(crate::presence::Event::Needs, here);
+    let seen = json!({"here": here.name(), "presence": reading.state.name(),
+        "source": reading.source, "focus": focus.name(), "hush": hush});
+    let window = crate::window::answer_window(&crate::window::Ask {
+        event,
+        cwd: v["payload"]["cwd"].as_str(),
+        remote: *via != Via::Local,
+        pinned: pinned.then_some(hook_wait),
+        devices: broker.devices(),
+        here,
+    });
+    let window = if talks { window } else { window.min(hook_wait) };
+    let Some(req) = request_of(sid, key, agent, event, &v["payload"], window) else {
         trace.record(
             "hook",
             Dir::Internal,
@@ -230,48 +318,90 @@ async fn await_decision(
     };
     if req.notice {
         // shown on the watch until the session moves on; the terminal takes the prompt now
-        let (rid, _rx) = broker.open(req);
+        let (rid, _rx) = broker.open_with(req, hush);
         trace.record(
             "hook",
             Dir::Internal,
             "notice",
             Some(sid),
             Some(rid),
+            json!({"event": event, "seen": seen}),
+            None,
+        );
+        return Outcome::NONE;
+    }
+    if window.is_zero() {
+        // the user set the window to 0: the terminal asks at once, the watch is not offered it
+        trace.record(
+            "hook",
+            Dir::Internal,
+            "no_window",
+            Some(sid),
+            None,
             json!({"event": event}),
             None,
         );
         return Outcome::NONE;
     }
-    let (rid, rx) = broker.open(req);
-    match tokio::time::timeout(wait, rx).await {
-        Ok(Ok(outcome)) => {
-            trace.audit(
-                "decision",
-                Some(sid),
-                Some(rid),
-                json!({"from": "device", "outcome": outcome, "host": host}),
-            );
-            outcome
-        }
-        Ok(Err(_)) => {
-            // cancelled (terminal answered, or the request was dropped): no decision
-            trace.audit(
-                "decision",
-                Some(sid),
-                Some(rid),
-                json!({"from": "none", "why": "cancelled", "host": host}),
-            );
-            Outcome::NONE
-        }
-        Err(_) => {
+    let (rid, rx) = broker.open_with(req, hush);
+    trace.record(
+        "hook",
+        Dir::Internal,
+        "window",
+        Some(sid),
+        Some(rid),
+        json!({"event": event, "window_ms": window.as_millis() as u64, "devices": broker.devices(), "seen": seen}),
+        None,
+    );
+    let ended = wait_for(rx, window, talks, w).await;
+    let (from, why, outcome) = match ended {
+        Ended::Answer(o) => ("device", None, o),
+        Ended::Cancelled => ("none", Some("cancelled"), Outcome::NONE),
+        Ended::Timeout => {
             broker.cancel(rid, ClearWhy::Expired);
-            trace.audit(
-                "decision",
-                Some(sid),
-                Some(rid),
-                json!({"from": "none", "why": "timeout", "host": host}),
-            );
-            Outcome::NONE
+            ("none", Some("timeout"), Outcome::NONE)
+        }
+        Ended::HookGone => {
+            broker.cancel(rid, ClearWhy::Expired);
+            ("none", Some("hook_gone"), Outcome::NONE)
+        }
+    };
+    let detail = match why {
+        None => json!({"from": from, "outcome": outcome, "host": host}),
+        Some(why) => json!({"from": from, "why": why, "host": host}),
+    };
+    trace.audit("decision", Some(sid), Some(rid), detail);
+    outcome
+}
+
+/// Waits for the device's answer until `window` ends. With `talks`, the hook first gets the window
+/// and then a keepalive line every [`KEEPALIVE`]; a failed write means the hook is gone.
+async fn wait_for<W: AsyncWrite + Unpin>(
+    mut rx: tokio::sync::oneshot::Receiver<Outcome>,
+    window: Duration,
+    talks: bool,
+    w: &mut W,
+) -> Ended {
+    let deadline = tokio::time::Instant::now() + window;
+    if talks {
+        let line = format!("{}\n", json!({"window_ms": window.as_millis() as u64}));
+        if w.write_all(line.as_bytes()).await.is_err() || w.flush().await.is_err() {
+            return Ended::HookGone;
+        }
+    }
+    let mut tick = tokio::time::interval_at(tokio::time::Instant::now() + KEEPALIVE, KEEPALIVE);
+    loop {
+        tokio::select! {
+            r = &mut rx => return match r {
+                Ok(o) => Ended::Answer(o),
+                Err(_) => Ended::Cancelled,
+            },
+            _ = tokio::time::sleep_until(deadline) => return Ended::Timeout,
+            _ = tick.tick(), if talks => {
+                if w.write_all(b"\n").await.is_err() || w.flush().await.is_err() {
+                    return Ended::HookGone;
+                }
+            }
         }
     }
 }
@@ -311,7 +441,7 @@ fn agent_of(name: &str) -> Agent {
     }
 }
 
-fn branch_of(cwd: &str) -> Option<String> {
+pub(crate) fn branch_of(cwd: &str) -> Option<String> {
     let head = std::path::Path::new(cwd)
         .ancestors()
         .find_map(|d| std::fs::read_to_string(d.join(".git/HEAD")).ok())?;
@@ -352,6 +482,10 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
     }
 
     let mut p = SessionPatch::new(agent_of(agent_name));
+    // Claude Code's permission mode rides on most hook payloads (GAUGES.md); not every event has it
+    p.pm = payload["permission_mode"]
+        .as_str()
+        .and_then(agentlink_proto::PermMode::from_claude);
     let tool = payload["toolName"]
         .as_str()
         .or_else(|| payload["tool_name"].as_str());
@@ -361,10 +495,16 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
             p.state = Some(SessState::Work);
             p.step = Step::Reset;
             p.ask = Some(Default::default()); /* the question was answered (or moved past) */
+            p.turn = Turn::Prompt;
         }
         "posttooluse" | "posttoolusefailure" => {
             p.state = Some(SessState::Work);
             p.step = Step::Result(tool_ok(&event, payload));
+            if agent_name == "claude" {
+                if let Some(fx) = crate::turn::effect_of(&event, payload) {
+                    p.turn = Turn::Tool(fx);
+                }
+            }
         }
         "pretooluse" if matches!(tool, Some("AskUserQuestion" | "ask_user")) => {
             p.state = Some(SessState::Input);
@@ -501,7 +641,7 @@ fn step_summary(tool: &str, payload: &Value) -> String {
 }
 
 /// Last path component, splitting on both separators (remote paths may be Windows ones).
-fn repo_of(cwd: &str) -> Option<String> {
+pub(crate) fn repo_of(cwd: &str) -> Option<String> {
     let name = cwd.rsplit(['/', '\\']).find(|c| !c.is_empty())?;
     Some(name.to_owned())
 }
@@ -534,6 +674,224 @@ pub fn host_ctx(v: &Value, cwd: Option<String>) -> HostCtx {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    use crate::broker::Decision;
+    use agentlink_proto::ResultErr;
+    use tokio::io::AsyncReadExt;
+
+    /// The window tests never read the real user's Claude Code settings or daemon setting.
+    fn isolate() {
+        std::env::set_var("CLAUDE_CONFIG_DIR", "/nonexistent/agentlink-test-claude");
+        std::env::set_var("AGENTLINK_ANSWER_WINDOW_S", "60");
+    }
+
+    struct Rig {
+        registry: Arc<Registry>,
+        broker: Arc<Broker>,
+        trace: Trace,
+    }
+
+    fn rig() -> Rig {
+        isolate();
+        let trace = Trace::null();
+        let registry = Arc::new(Registry::new(trace.clone()));
+        let broker = Arc::new(Broker::new(registry.clone()));
+        Rig {
+            registry,
+            broker,
+            trace,
+        }
+    }
+
+    /// A PermissionRequest line from a hook that `talks` (agentlink-hook 0.11) or not, with `wait_ms`.
+    fn perm_line(rig: &Rig, wait_ms: u64, talks: bool, pinned: bool) -> (Value, Option<String>) {
+        let mut v = json!({"agent": "claude", "event": "PermissionRequest", "cwd": "/nonexistent/p",
+            "payload": {"session_id": "s1", "cwd": "/nonexistent/p", "tool_name": "Bash",
+                        "tool_input": {"command": "npm test"}},
+            "await": {"wait_ms": wait_ms}});
+        if talks {
+            v["await"]["window"] = json!(true);
+            v["await"]["pinned"] = json!(pinned);
+        }
+        if let Some(ev) = to_session_event(&v, &Via::Local) {
+            rig.registry.apply(ev);
+        }
+        let key = session_key(&v, &Via::Local);
+        (v, key)
+    }
+
+    async fn run(
+        rig: &Rig,
+        v: &Value,
+        key: Option<String>,
+        w: &mut tokio::io::DuplexStream,
+    ) -> Outcome {
+        let wait = Duration::from_millis(v["await"]["wait_ms"].as_u64().unwrap());
+        await_decision(
+            Ctx {
+                registry: &rig.registry,
+                broker: &rig.broker,
+                trace: &rig.trace,
+            },
+            v,
+            key,
+            wait,
+            &Via::Local,
+            w,
+        )
+        .await
+    }
+
+    async fn read_all(mut r: tokio::io::DuplexStream) -> String {
+        let mut s = String::new();
+        let _ = r.read_to_string(&mut s).await;
+        s
+    }
+
+    #[tokio::test]
+    async fn a_talking_hook_hears_the_window_then_keepalives_and_silence_decides_nothing() {
+        let rig = rig();
+        let _dev = rig.broker.link();
+        // a pinned 1.5 s is raised to the shortest window there is
+        let (v, key) = perm_line(&rig, 1500, true, true);
+        let (mut w, r) = tokio::io::duplex(4096);
+        let reader = tokio::spawn(read_all(r));
+        let t0 = std::time::Instant::now();
+        let out = run(&rig, &v, key, &mut w).await;
+        assert_eq!(
+            out,
+            Outcome::NONE,
+            "the window ran out: no decision, the terminal asks"
+        );
+        assert!(t0.elapsed() >= crate::window::MIN);
+        drop(w);
+        let said = reader.await.unwrap();
+        let mut lines = said.lines();
+        assert_eq!(lines.next(), Some("{\"window_ms\":5000}"));
+        assert!(
+            lines.all(str::is_empty),
+            "only keepalives after the window line: {said:?}"
+        );
+        assert!(said.matches('\n').count() >= 5, "a keepalive every second");
+        // the expired request cannot be answered any more
+        assert!(rig.broker.pending().is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_answer_inside_the_window_is_the_decision() {
+        let rig = rig();
+        let _dev = rig.broker.link();
+        let (v, key) = perm_line(&rig, 30_000, true, true);
+        let (mut w, r) = tokio::io::duplex(4096);
+        let reader = tokio::spawn(read_all(r));
+        let broker = rig.broker.clone();
+        let answer = tokio::spawn(async move {
+            loop {
+                if let Some(a) = broker.pending().pop() {
+                    assert_eq!(a.win, Some(30_000));
+                    return broker.answer(a.rid, Decision::Deny).map(|o| o.decision);
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        });
+        let out = run(&rig, &v, key, &mut w).await;
+        assert_eq!(out.decision, "deny");
+        assert_eq!(answer.await.unwrap(), Ok("deny"));
+        drop(w);
+        assert!(reader.await.unwrap().starts_with("{\"window_ms\":30000}"));
+    }
+
+    #[tokio::test]
+    async fn a_hook_that_stopped_listening_takes_its_card_off_the_watch() {
+        let rig = rig();
+        let _dev = rig.broker.link();
+        let (v, key) = perm_line(&rig, 60_000, true, true);
+        let (mut w, r) = tokio::io::duplex(4096);
+        let broker = rig.broker.clone();
+        // Claude Code kills the hook a moment after the card went out
+        let killer = tokio::spawn(async move {
+            while broker.pending().is_empty() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            let rid = broker.pending()[0].rid;
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            drop(r);
+            rid
+        });
+        let t0 = std::time::Instant::now();
+        let out = run(&rig, &v, key, &mut w).await;
+        let rid = killer.await.unwrap();
+        assert_eq!(out, Outcome::NONE);
+        assert!(
+            t0.elapsed() < Duration::from_secs(5),
+            "noticed at the next keepalive, not at the window's end"
+        );
+        assert!(rig.broker.pending().is_empty());
+        assert_eq!(
+            rig.broker.answer(rid, Decision::Approve).unwrap_err().0,
+            ResultErr::Stale,
+            "a hold that lands after the hook died answers nothing"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_older_hook_is_never_held_past_its_own_wait() {
+        let rig = rig();
+        let _dev = rig.broker.link();
+        let (v, key) = perm_line(&rig, 700, false, false);
+        let (mut w, r) = tokio::io::duplex(4096);
+        let reader = tokio::spawn(read_all(r));
+        let broker = rig.broker.clone();
+        let seen = tokio::spawn(async move {
+            loop {
+                if let Some(a) = broker.pending().pop() {
+                    return a.win;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        });
+        let t0 = std::time::Instant::now();
+        assert_eq!(run(&rig, &v, key, &mut w).await, Outcome::NONE);
+        assert!(
+            t0.elapsed() < Duration::from_millis(1500),
+            "the daemon's 60 s would outlast its read"
+        );
+        assert_eq!(seen.await.unwrap(), Some(700));
+        drop(w);
+        assert_eq!(
+            reader.await.unwrap(),
+            "",
+            "no window line, no keepalives: it reads one line only"
+        );
+    }
+
+    #[tokio::test]
+    async fn no_watch_linked_means_a_short_hold_and_zero_means_none() {
+        let rig = rig();
+        let (v, key) = perm_line(&rig, 120_000, true, true);
+        let broker = rig.broker.clone();
+        let seen = tokio::spawn(async move {
+            loop {
+                if let Some(a) = broker.pending().pop() {
+                    broker.cancel(a.rid, ClearWhy::AnsweredPc);
+                    return a.win;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        });
+        let (mut w, _r) = tokio::io::duplex(4096);
+        assert_eq!(run(&rig, &v, key, &mut w).await, Outcome::NONE);
+        assert_eq!(
+            seen.await.unwrap(),
+            Some(crate::window::NO_DEVICE.as_millis() as u64)
+        );
+        // AGENTLINK_WAIT_MS=0 on the hook: no card, no hold
+        let _dev = rig.broker.link();
+        let (v, key) = perm_line(&rig, 0, true, true);
+        let (mut w, _r) = tokio::io::duplex(4096);
+        assert_eq!(run(&rig, &v, key, &mut w).await, Outcome::NONE);
+        assert!(rig.broker.pending().is_empty());
+    }
 
     #[test]
     fn copilot_permission_notification_is_input_approval() {
@@ -731,5 +1089,216 @@ mod tests {
         assert_eq!(patch.repo.as_deref(), Some("proj"));
         assert_eq!(patch.branch.as_deref(), Some("feat/x"));
         assert_eq!(session_key(&v, &via).as_deref(), Some(key.as_str()));
+    }
+
+    #[test]
+    fn permission_mode_rides_on_the_hooks() {
+        let p = patch_of(json!({"agent":"claude","event":"PreToolUse","cwd":"/r",
+            "payload":{"session_id":"s","permission_mode":"acceptEdits","tool_name":"Edit"}}));
+        assert_eq!(p.pm, Some(agentlink_proto::PermMode::AcceptEdits));
+        let p = patch_of(json!({"agent":"claude","event":"Stop","cwd":"/r",
+            "payload":{"session_id":"s","permission_mode":"bypassPermissions"}}));
+        assert_eq!(p.pm, Some(agentlink_proto::PermMode::Bypass));
+        let p = patch_of(json!({"agent":"claude","event":"Stop","cwd":"/r",
+            "payload":{"session_id":"s","permission_mode":"someFutureMode"}}));
+        assert_eq!(p.pm, None, "an unknown mode is not guessed");
+        let p = patch_of(
+            json!({"agent":"claude","event":"Stop","cwd":"/r","payload":{"session_id":"s"}}),
+        );
+        assert_eq!(p.pm, None);
+    }
+
+    #[test]
+    fn status_line_feeds_known_sessions_and_local_rate_limits() {
+        use crate::registry::Update;
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        let now = crate::registry::now_unix();
+        let line = |sid: &str| {
+            json!({"agent":"claude","event":"statusline","cwd":"/r","payload":{
+                "session_id": sid, "model": {"display_name": "Opus"},
+                "context_window": {"used_percentage": 71.6},
+                "rate_limits": {"five_hour": {"used_percentage": 12.5, "resets_at": now + 3600}},
+                "pr": {"number": 9, "review_state": "approved"}}})
+        };
+        // no card yet: the readout is dropped, the account's figures are kept
+        on_statusline(&reg, &line("s"), &Via::Local);
+        assert!(
+            reg.snapshot().is_empty(),
+            "a status line never makes a card"
+        );
+        assert!(matches!(rx.try_recv(), Ok(Update::Usage(u)) if u.h5 == Some(12)));
+        // once the hooks made the session, its readouts arrive as one delta
+        reg.apply(
+            to_session_event(
+                &json!({"agent":"claude","event":"SessionStart","cwd":"/r","payload":{"session_id":"s"}}),
+                &Via::Local,
+            )
+            .unwrap(),
+        );
+        let _ = rx.try_recv();
+        on_statusline(&reg, &line("s"), &Via::Local);
+        let Ok(Update::Upsert(d)) = rx.try_recv() else {
+            panic!("readout delta")
+        };
+        assert_eq!(
+            (d.ctx, d.mdl.as_deref(), d.pr, d.prs),
+            (
+                Some(71),
+                Some("Opus"),
+                Some(9),
+                Some(agentlink_proto::PrState::Approved)
+            )
+        );
+        assert!(rx.try_recv().is_err(), "unchanged figures are not re-sent");
+        // the same line again: nothing new
+        on_statusline(&reg, &line("s"), &Via::Local);
+        assert!(rx.try_recv().is_err());
+        // a remote host's rate limits are not this account's
+        let via = Via::Remote {
+            host: "box".into(),
+            os: "linux".into(),
+            attach: None,
+        };
+        let mut v = line("r");
+        v["payload"]["rate_limits"]["five_hour"]["used_percentage"] = json!(99);
+        on_statusline(&reg, &v, &via);
+        assert!(rx.try_recv().is_err());
+        // a line without a session id is ignored
+        on_statusline(
+            &reg,
+            &json!({"agent":"claude","event":"statusline","payload":{}}),
+            &Via::Local,
+        );
+        assert!(rx.try_recv().is_err());
+    }
+
+    /// One hook line of a Claude Code session `t`.
+    fn cl(event: &str, payload: Value) -> Value {
+        let mut p = payload;
+        p["session_id"] = json!("t");
+        json!({"agent":"claude","event":event,"cwd":"/nonexistent/proj","payload":p})
+    }
+
+    fn feed(reg: &Registry, v: &Value) {
+        reg.apply(to_session_event(v, &Via::Local).unwrap());
+    }
+
+    fn drain(rx: &mut tokio::sync::broadcast::Receiver<crate::registry::Update>) -> Vec<Session> {
+        let mut out = vec![];
+        while let Ok(crate::registry::Update::Upsert(d)) = rx.try_recv() {
+            out.push(d);
+        }
+        out
+    }
+
+    use agentlink_proto::Session;
+
+    fn edit(path: &str, old: &str, new: &str) -> Value {
+        cl(
+            "PostToolUse",
+            json!({"tool_name":"Edit","tool_input":{"file_path":path,"old_string":old,"new_string":new}}),
+        )
+    }
+
+    #[test]
+    fn a_whole_turn_ends_with_its_summary_and_the_next_prompt_clears_it() {
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        feed(&reg, &cl("UserPromptSubmit", json!({"prompt":"go"})));
+        feed(&reg, &edit("/p/a.rs", "a", "b\nc"));
+        feed(&reg, &edit("/p/a.rs", "x", "y"));
+        feed(&reg, &edit("/p/b.rs", "q\nr", "q"));
+        feed(
+            &reg,
+            &cl(
+                "PostToolUseFailure",
+                json!({"tool_name":"Bash","tool_input":{"command":"cargo test"},
+                "error":"Exit code 101\nfailures"}),
+            ),
+        );
+        feed(&reg, &cl("Stop", json!({})));
+        let ds = drain(&mut rx);
+        // nothing of the summary before the stop
+        assert!(ds[..ds.len() - 1]
+            .iter()
+            .all(|d| d.fc.is_none() && d.dur.is_none()));
+        let last = ds.last().unwrap();
+        assert_eq!(last.st, Some(SessState::Done));
+        assert_eq!(
+            (last.fc, last.la, last.lr, last.tp, last.dur),
+            (Some(2), Some(3), Some(3), Some(false), Some(0))
+        );
+        // a reconnecting device is told the same by the snapshot
+        let snap = &reg.snapshot()[0];
+        assert_eq!((snap.fc, snap.tp), (Some(2), Some(false)));
+        // the next prompt: the tally starts over and the stored figures go
+        feed(&reg, &cl("UserPromptSubmit", json!({"prompt":"again"})));
+        assert_eq!(reg.snapshot()[0].fc, None);
+        feed(&reg, &cl("Stop", json!({})));
+        let ds = drain(&mut rx);
+        let last = ds.last().unwrap();
+        assert_eq!(
+            (last.fc, last.la, last.lr, last.tp, last.dur),
+            (None, None, None, None, Some(0)),
+            "unknown stays absent, not zero"
+        );
+    }
+
+    #[test]
+    fn a_session_the_daemon_met_mid_turn_gets_no_summary() {
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        feed(&reg, &edit("/p/a.rs", "a", "b"));
+        feed(&reg, &cl("Stop", json!({})));
+        let ds = drain(&mut rx);
+        assert!(ds.iter().all(|d| d.fc.is_none() && d.dur.is_none()));
+    }
+
+    #[test]
+    fn an_errored_turn_and_a_copilot_session() {
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        feed(&reg, &cl("UserPromptSubmit", json!({})));
+        feed(&reg, &edit("/p/a.rs", "a", "b"));
+        feed(&reg, &cl("StopFailure", json!({"error":"rate_limit"})));
+        let last = drain(&mut rx).pop().unwrap();
+        assert_eq!(
+            (last.st, last.fc, last.la, last.lr),
+            (Some(SessState::Error), Some(1), Some(1), Some(1))
+        );
+        // Copilot's payloads are not tallied
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        for e in ["userPromptSubmitted", "agentStop"] {
+            feed(
+                &reg,
+                &json!({"agent":"copilot","event":e,"cwd":"/r","payload":{"sessionId":"c"}}),
+            );
+        }
+        assert!(drain(&mut rx).iter().all(|d| d.dur.is_none()));
+    }
+
+    #[test]
+    fn a_second_stop_with_less_known_replaces_the_summary() {
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        feed(&reg, &cl("UserPromptSubmit", json!({})));
+        feed(&reg, &edit("/p/a.rs", "a", "b"));
+        feed(&reg, &cl("Stop", json!({})));
+        let _ = drain(&mut rx);
+        // a stop hook sends the agent back to work; this edit's lines cannot be told
+        feed(
+            &reg,
+            &cl(
+                "PostToolUse",
+                json!({"tool_name":"Write","tool_input":{"file_path":"/p/c","content":"z"},
+                "tool_response":{"type":"update"}}),
+            ),
+        );
+        feed(&reg, &cl("Stop", json!({})));
+        let last = drain(&mut rx).pop().unwrap();
+        assert_eq!((last.fc, last.la, last.lr), (Some(2), None, None));
+        assert_eq!(reg.snapshot()[0].la, None);
     }
 }

@@ -151,6 +151,32 @@ body!(
         #[n(17)] #[serde(skip_serializing_if = "Option::is_none")] q: Option<String>,
         /// Answers to `q` offered on the watch's Reply list (proto 0.5); empty clears them.
         #[n(18)] #[serde(skip_serializing_if = "Option::is_none")] rp: Option<Vec<String>>,
+        /// A job's expected total run time in seconds (proto 0.9); 0 = unknown.
+        #[n(19)] #[serde(skip_serializing_if = "Option::is_none")] eta: Option<u64>,
+        /// A job's exit status, sent with the delta that enters done / error (proto 0.9).
+        #[n(20)] #[serde(skip_serializing_if = "Option::is_none")] exit: Option<u64>,
+        /// Context window used, percent 0-100; `CTX_UNKNOWN` (255) clears it (proto 0.10).
+        #[n(21)] #[serde(skip_serializing_if = "Option::is_none")] ctx: Option<u64>,
+        /// The model's short name, <= 16 chars; "" = unknown (proto 0.10).
+        #[n(22)] #[serde(skip_serializing_if = "Option::is_none")] mdl: Option<String>,
+        /// The agent's permission mode (proto 0.10).
+        #[n(23)] #[serde(skip_serializing_if = "Option::is_none")] pm: Option<PermMode>,
+        /// The branch's open pull request number; 0 = none (proto 0.10, withheld under privacy meta).
+        #[n(24)] #[serde(skip_serializing_if = "Option::is_none")] pr: Option<u64>,
+        /// Its review state, sent with `pr` (proto 0.10).
+        #[n(25)] #[serde(skip_serializing_if = "Option::is_none")] prs: Option<PrState>,
+        /// With the delta that enters done / error: do not buzz for it, the user is looking at its
+        /// terminal (proto 0.12, PRESENCE.md). Never stored; absent = buzz as the device's rules say.
+        #[n(26)] #[serde(skip_serializing_if = "Option::is_none")] hush: Option<bool>,
+        /// Done summary (proto 0.14, DONE-SUMMARY.md): files the turn changed.
+        #[n(30)] #[serde(skip_serializing_if = "Option::is_none")] fc: Option<u64>,
+        /// Lines added / removed in the turn, sent together.
+        #[n(31)] #[serde(skip_serializing_if = "Option::is_none")] la: Option<u64>,
+        #[n(32)] #[serde(skip_serializing_if = "Option::is_none")] lr: Option<u64>,
+        /// The turn's last recognised test run: true passed, false failed.
+        #[n(33)] #[serde(skip_serializing_if = "Option::is_none")] tp: Option<bool>,
+        /// The turn's length in seconds.
+        #[n(34)] #[serde(skip_serializing_if = "Option::is_none")] dur: Option<u64>,
     }
 );
 impl Session {
@@ -176,15 +202,48 @@ impl Session {
             ok: None,
             q: None,
             rp: None,
+            eta: None,
+            exit: None,
+            ctx: None,
+            mdl: None,
+            pm: None,
+            pr: None,
+            prs: None,
+            hush: None,
+            fc: None,
+            la: None,
+            lr: None,
+            tp: None,
+            dur: None,
         }
     }
 
     /// Applies a delta: keys present in `d` overwrite, absent keys are kept.
     pub fn merge(&mut self, d: &Session) {
         macro_rules! m { ($($f:ident),*) => { $(if d.$f.is_some() { self.$f = d.$f.clone(); })* }; }
-        m!(ag, st, sub, repo, br, tool, t0, tst, sum, seen, host, hn, snz, ntf, n, ok);
+        m!(
+            ag, st, sub, repo, br, tool, t0, tst, sum, seen, host, hn, snz, ntf, n, ok, eta, exit,
+            ctx, mdl, pm, pr, prs, hush, fc, la, lr, tp, dur
+        );
     }
 }
+/// `session.ctx` value that clears the context fill (a delta cannot remove a key).
+pub const CTX_UNKNOWN: u64 = 255;
+
+body!(
+    /// The plan's rate-limit windows (proto 0.10, GAUGES.md). A full replacement: an absent window is
+    /// unknown, never zero.
+    Usage {
+        #[n(0)] at: u64,
+        #[n(1)] #[serde(skip_serializing_if = "Option::is_none")] h5: Option<u64>,
+        #[n(2)] #[serde(skip_serializing_if = "Option::is_none")] h5r: Option<u64>,
+        #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] h5o: Option<u64>,
+        #[n(4)] #[serde(skip_serializing_if = "Option::is_none")] wk: Option<u64>,
+        #[n(5)] #[serde(skip_serializing_if = "Option::is_none")] wkr: Option<u64>,
+        #[n(6)] #[serde(skip_serializing_if = "Option::is_none")] wko: Option<u64>,
+    }
+);
+
 body!(Gone {
     #[n(0)]
     sid: u64
@@ -200,6 +259,23 @@ body!(Attention {
     #[n(7)] #[serde(skip_serializing_if = "Option::is_none")] exp: Option<u64>,
     /// Bit `i` set: `opts[i]` grants permission (approve-class; the device commits it only by a hold).
     #[n(8)] #[serde(skip_serializing_if = "Option::is_none")] grant_mask: Option<u64>,
+    /// Milliseconds left in the answer window when this message was sent (proto 0.11, ANSWER-WINDOW.md).
+    #[n(9)] #[serde(skip_serializing_if = "Option::is_none")] left: Option<u64>,
+    /// The whole answer window in milliseconds (proto 0.11).
+    #[n(10)] #[serde(skip_serializing_if = "Option::is_none")] win: Option<u64>,
+    /// The full text's length in bytes when `text` is a cut preview (proto 0.11): `detail` serves it.
+    #[n(11)] #[serde(skip_serializing_if = "Option::is_none")] len: Option<u64>,
+    /// No buzz, glow or reminders for this request: the user is looking at its terminal (proto 0.12,
+    /// PRESENCE.md). The card is shown all the same.
+    #[n(12)] #[serde(skip_serializing_if = "Option::is_none")] hush: Option<bool>,
+    /// The standing rule the device may grant with this request, exactly as Claude Code will save it
+    /// (`Bash(npm test:*)`; several rules one per line). Proto 0.13, STANDING-RULES.md: keys 13-15 only
+    /// to devices whose hello says minor >= 13, always together.
+    #[n(13)] #[serde(skip_serializing_if = "Option::is_none")] rule: Option<String>,
+    /// Where it is saved: this session only, or this project (Claude Code's local settings).
+    #[n(14)] #[serde(skip_serializing_if = "Option::is_none")] scope: Option<RuleScope>,
+    /// The rule matches more than this exact request (it ends in a wildcard).
+    #[n(15)] #[serde(skip_serializing_if = "Option::is_none")] wide: Option<bool>,
 });
 body!(Clear {
     #[n(0)]
@@ -305,6 +381,9 @@ body!(Cmd {
     #[n(2)] #[serde(skip_serializing_if = "Option::is_none")] rid: Option<u64>,
     #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] arg: Option<Arg>,
     #[n(4)] #[serde(skip_serializing_if = "Option::is_none")] hold_ms: Option<u64>,
+    /// With `approve` (proto 0.13): also save the request's standing rule. The hash of the rule as the device
+    /// showed it (STANDING-RULES.md §5); the daemon grants only when it is the hash of its own rule.
+    #[n(5)] #[serde(skip_serializing_if = "Option::is_none")] rh: Option<u64>,
 });
 body!(CmdResult {
     #[n(0)] ok: bool,
@@ -333,11 +412,18 @@ body!(
         #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] preview: Option<String>,
     }
 );
-body!(Detail {
-    #[n(0)] #[serde(skip_serializing_if = "Option::is_none")] rid: Option<u64>,
-    #[n(1)] #[serde(skip_serializing_if = "Option::is_none")] sid: Option<u64>,
-    #[n(2)] text: String,
-});
+body!(
+    /// A chunk of a request's full text (proto 0.11): the answer to `cmd detail {rid, arg: off}`.
+    Detail {
+        #[n(0)] #[serde(skip_serializing_if = "Option::is_none")] rid: Option<u64>,
+        #[n(1)] #[serde(skip_serializing_if = "Option::is_none")] sid: Option<u64>,
+        #[n(2)] text: String,
+        /// Byte offset of this chunk in the full text.
+        #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] off: Option<u64>,
+        /// The full text's length in bytes.
+        #[n(4)] #[serde(skip_serializing_if = "Option::is_none")] total: Option<u64>,
+    }
+);
 body!(Batt {
     #[n(0)]
     pct: u64,

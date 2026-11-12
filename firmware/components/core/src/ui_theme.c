@@ -24,8 +24,15 @@ uint32_t theme_session_rgb(const session_t *s)
     return s->state == SESS_INPUT && s->sub == 0 ? RGB_PERMISSION : theme_state_rgb(s->state);
 }
 
+bool theme_is_job(const session_t *s) { return s->agent == AGENT_SHELL; }
+
 const char *theme_state_word(const session_t *s)
 {
+    if (theme_is_job(s)) { /* a job runs and ends; it does not work or get done */
+        if (s->state == SESS_START || s->state == SESS_WORK) return "Running";
+        if (s->state == SESS_DONE) return "Finished";
+        if (s->state == SESS_ERROR) return "Failed";
+    }
     switch (s->state) {
     case SESS_START: return "Starting";
     case SESS_WORK: return "Working";
@@ -63,6 +70,7 @@ const char *theme_agent_name(agent_t a)
     case AGENT_COPILOT: return "Copilot CLI";
     case AGENT_CLAUDE: return "Claude Code";
     case AGENT_CLOUD: return "Cloud agent";
+    case AGENT_SHELL: return "Terminal";
     default: return "Agent";
     }
 }
@@ -241,4 +249,37 @@ void theme_key_badge_set_word(lv_obj_t *b, lv_obj_t *word_lbl, const char *word,
     int edge = (int)sqrtf((float)(LEGEND_R * LEGEND_R - dy * dy));
     int x = lv_obj_get_user_data(b) ? 233 - edge : 233 + edge - bw;
     lv_obj_set_pos(b, x, UI_Y_LEGEND - bh / 2);
+}
+
+static bool job_running(const session_t *s) { return s->state == SESS_START || s->state == SESS_WORK; }
+
+void theme_job_time(char *dst, size_t cap, const session_t *s, uint32_t now)
+{
+    char t[24];
+    dst[0] = 0;
+    if (!s->t0) return;
+    if (job_running(s)) {
+        if (now < s->t0) return;
+        uint32_t el = now - s->t0;
+        if (s->eta && el < s->eta) { /* rounded up, in calm steps: 10 s under a minute, whole minutes above */
+            uint32_t left = s->eta - el;
+            left = left < 60 ? (left + 9) / 10 * 10 : (left + 59) / 60 * 60;
+            theme_elapsed(t, sizeof t, left);
+            snprintf(dst, cap, "about %s left", t);
+        } else {
+            theme_elapsed_long(dst, cap, el);
+        }
+        return;
+    }
+    if (s->state != SESS_DONE && s->state != SESS_ERROR) return;
+    theme_elapsed_long(t, sizeof t, s->tst >= s->t0 ? s->tst - s->t0 : 0);
+    if (s->state == SESS_DONE) snprintf(dst, cap, "in %s", t);
+    else snprintf(dst, cap, "exit %u%s%s", (unsigned)s->exit_code, theme_sep(), t);
+}
+
+int theme_job_progress(const session_t *s, uint32_t now)
+{
+    if (!theme_is_job(s) || !job_running(s) || !s->eta || !s->t0 || now < s->t0) return -1;
+    uint32_t el = now - s->t0;
+    return el >= s->eta ? 1000 : (int)(el * 1000u / s->eta);
 }

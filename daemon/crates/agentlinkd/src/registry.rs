@@ -2,7 +2,10 @@
 //! session list and broadcasts deltas.
 
 use crate::trace::{Dir, Trace};
-use agentlink_proto::{Agent, Attention, Clear, InputSub, SessState, Session};
+use crate::turn::DoneSummary;
+use agentlink_proto::{
+    Agent, Attention, Clear, InputSub, PermMode, PrState, SessState, Session, Usage, CTX_UNKNOWN,
+};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
@@ -39,6 +42,27 @@ pub struct SessionPatch {
     pub step: Step,
     /// The closing question and its answers (ask.rs); ("", []) clears them when the agent moves on.
     pub ask: Option<(String, Vec<String>)>,
+    /// A job's start (jobs.rs): the session's `t0`, which a hook-fed session sets itself at creation.
+    pub t0: Option<u64>,
+    /// A job's expected run time (0 = unknown) and exit status. Sent as given, even when equal
+    /// to the last value: a reused session's new job must restate them.
+    pub eta: Option<u64>,
+    pub exit: Option<u64>,
+    /// The agent's permission mode, from the hook payload (Claude Code's `permission_mode`; GAUGES.md).
+    pub pm: Option<PermMode>,
+    /// What this event did to the turn's done summary (turn.rs; Claude Code only).
+    pub turn: Turn,
+}
+
+/// An event's part in the turn summary (DONE-SUMMARY.md).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub enum Turn {
+    #[default]
+    None,
+    /// A user prompt: the tally starts over.
+    Prompt,
+    /// A tool call that changed a file or ran a test command.
+    Tool(crate::turn::Effect),
 }
 
 /// What a hook line did to the turn's tool-step counter.
@@ -65,6 +89,11 @@ impl SessionPatch {
             tool: None,
             summary: None,
             ask: None,
+            t0: None,
+            eta: None,
+            exit: None,
+            pm: None,
+            turn: Turn::None,
             step: Step::None,
         }
     }
@@ -126,6 +155,7 @@ pub enum SessionEvent {
 
 /// Broadcast to every connected device link.
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Update {
     /// Full object for a new session, otherwise only the changed keys.
     Upsert(Session),
@@ -134,6 +164,8 @@ pub enum Update {
     Attention(Attention),
     /// That request is over: answered (on either side), expired or cancelled.
     Clear(Clear),
+    /// The plan's rate-limit windows changed (usage.rs; devices with proto >= 0.10).
+    Usage(Usage),
 }
 
 struct Record {
@@ -141,6 +173,8 @@ struct Record {
     /// Display only for remote sessions.
     ctx: HostCtx,
     origin: Origin,
+    /// The running turn's tally; none until a prompt of a Claude Code session is seen (turn.rs).
+    tally: Option<crate::turn::Tally>,
 }
 
 struct RemoteHost {
@@ -166,8 +200,30 @@ struct State {
 
 pub struct Registry {
     state: Mutex<State>,
+    /// The account's usage windows (usage.rs), fed by local status lines.
+    usage: Mutex<crate::usage::Tracker>,
     tx: broadcast::Sender<Update>,
     trace: Trace,
+}
+
+type SummaryKeys = (
+    Option<u64>,
+    Option<u64>,
+    Option<u64>,
+    Option<bool>,
+    Option<u64>,
+);
+
+fn summary_keys(s: &Session) -> SummaryKeys {
+    (s.fc, s.la, s.lr, s.tp, s.dur)
+}
+
+/// Stores the summary's figures on the session; unknown ones are cleared.
+fn set_summary(s: &mut Session, sum: &DoneSummary) {
+    s.fc = sum.files;
+    (s.la, s.lr) = sum.lines.map_or((None, None), |(a, r)| (Some(a), Some(r)));
+    s.tp = sum.tests;
+    s.dur = sum.secs;
 }
 
 pub fn now_unix() -> u64 {
@@ -206,9 +262,67 @@ impl Registry {
                 next_attach: 1,
                 ..Default::default()
             }),
+            usage: Mutex::default(),
             tx,
             trace,
         }
+    }
+
+    /// A status-line run on this machine: records its rate-limit windows and publishes a `usage` body
+    /// when the figures changed (usage.rs).
+    pub fn record_usage(&self, rates: crate::usage::Rates) {
+        let body = self.usage.lock().unwrap().record(rates, now_unix());
+        if let Some(u) = body {
+            self.publish(Update::Usage(u));
+        }
+    }
+
+    /// The last published usage body, for a device that connects now.
+    pub fn usage(&self) -> Option<Usage> {
+        self.usage.lock().unwrap().last(now_unix())
+    }
+
+    /// A status-line run's readouts (context fill, model, pull request) for a session the hooks already
+    /// created; an unknown key is ignored, so a status line alone never makes a card. Returns whether the
+    /// session is known.
+    pub fn readout(&self, key: &str, r: &crate::usage::Readout) -> bool {
+        let upd = {
+            let mut st = self.state.lock().unwrap();
+            let Some(sid) = st.by_key.get(key).copied() else {
+                return false;
+            };
+            let Some(rec) = st.sessions.get_mut(&sid) else {
+                return false;
+            };
+            let s = &mut rec.session;
+            let mut d = Session::delta(sid);
+            let mut changed = false;
+            // a context that was never known is not cleared: nothing to say yet
+            if r.ctx.is_some()
+                && !(s.ctx.is_none() && r.ctx == Some(CTX_UNKNOWN))
+                && set(&mut s.ctx, r.ctx)
+            {
+                d.ctx = s.ctx;
+                changed = true;
+            }
+            if set(&mut s.mdl, r.mdl.clone()) {
+                d.mdl = s.mdl.clone();
+                changed = true;
+            }
+            if let Some((n, state)) = r.pr {
+                let was = (s.pr.unwrap_or(0), s.prs.unwrap_or(PrState::None));
+                if was != (n, state) && !(s.pr.is_none() && n == 0) {
+                    (s.pr, s.prs) = (Some(n), Some(state));
+                    (d.pr, d.prs) = (s.pr, s.prs);
+                    changed = true;
+                }
+            }
+            changed.then_some(d)
+        };
+        if let Some(d) = upd {
+            self.publish(Update::Upsert(d));
+        }
+        true
     }
 
     pub fn apply(&self, ev: SessionEvent) {
@@ -252,6 +366,12 @@ impl Registry {
                 0,
                 Some(c.rid),
                 serde_json::to_value(c).unwrap_or_default(),
+            ),
+            Update::Usage(u) => (
+                "usage",
+                0,
+                None,
+                serde_json::to_value(u).unwrap_or_default(),
             ),
         };
         self.trace.record(
@@ -324,6 +444,7 @@ impl Registry {
                     session: s,
                     ctx: HostCtx::default(),
                     origin,
+                    tally: None,
                 },
             );
         }
@@ -364,6 +485,17 @@ impl Registry {
         upd!(br, p.branch.map(|v| clip(&v, 32)));
         upd!(tool, p.tool);
         upd!(sum, p.summary.map(|v| clip(&v, 80)));
+        if d.st == Some(SessState::Work) && p.exit.is_none() {
+            s.exit = None; // a new run: the last one's status must not reach a new device
+        }
+        if let Some(t0) = p.t0 {
+            (s.t0, d.t0, changed) = (Some(t0), Some(t0), true);
+        }
+        if let Some(eta) = p.eta {
+            (s.eta, d.eta, changed) = (Some(eta), Some(eta), true);
+        }
+        upd!(exit, p.exit);
+        upd!(pm, p.pm);
         if let Some((q, rp)) = p.ask {
             upd!(q, Some(q));
             upd!(rp, Some(rp));
@@ -390,6 +522,35 @@ impl Registry {
                     s.n = Some(0);
                     d.n = s.n;
                     changed = true;
+                }
+            }
+        }
+        // the done summary (DONE-SUMMARY.md): only from a turn whose prompt this daemon saw
+        if p.agent == Agent::Claude {
+            let now = std::time::Instant::now();
+            match &p.turn {
+                Turn::Prompt => {
+                    rec.tally = Some(crate::turn::Tally::start(now));
+                    set_summary(s, &DoneSummary::default());
+                }
+                Turn::Tool(fx) => {
+                    if let Some(t) = &mut rec.tally {
+                        t.add(fx);
+                    }
+                }
+                Turn::None => {}
+            }
+            if matches!(p.state, Some(SessState::Done | SessState::Error)) {
+                let sum = rec
+                    .tally
+                    .as_ref()
+                    .map(|t| t.summary(now))
+                    .unwrap_or_default();
+                let before = summary_keys(s);
+                set_summary(s, &sum);
+                if d.st.is_some() || summary_keys(s) != before {
+                    (d.fc, d.la, d.lr, d.tp, d.dur) = (s.fc, s.la, s.lr, s.tp, s.dur);
+                    changed |= !sum.is_empty();
                 }
             }
         }
@@ -508,6 +669,31 @@ impl Registry {
             Origin::Remote { attach: None, .. } => return Route::Unsupported,
         };
         Route::Ready(rec.session.clone(), ctx)
+    }
+
+    /// The terminal identity of a session on this machine (its own, or its attach window's), for
+    /// presence. `None` for a session whose terminal is on another host with no attach window.
+    pub fn host_ctx(&self, sid: u64) -> Option<HostCtx> {
+        match self.route(sid) {
+            Route::Ready(_, ctx) => Some(ctx),
+            _ => None,
+        }
+    }
+
+    /// The agent kind of a session.
+    pub fn agent_of(&self, sid: u64) -> Option<Agent> {
+        self.state.lock().unwrap().sessions.get(&sid)?.session.ag
+    }
+
+    /// Whether a local non-job session runs in the terminal with this tty: its own card covers
+    /// whatever the shell runs there (jobs.rs).
+    pub fn tty_hosts_agent(&self, tty: &str) -> bool {
+        let st = self.state.lock().unwrap();
+        st.sessions.values().any(|r| {
+            r.origin == Origin::Local
+                && r.session.ag != Some(Agent::Shell)
+                && r.ctx.tty.as_deref() == Some(tty)
+        })
     }
 
     /// Host index of a session (0 = local), for audit lines.

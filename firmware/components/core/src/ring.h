@@ -18,3 +18,9 @@ void ring_init(ring_t *r, void *storage, size_t item_size, size_t capacity);
 /* Returns false (and drops the item) when full. */
 bool ring_push(ring_t *r, const void *item);
 bool ring_pop(ring_t *r, void *item);
+/* For items that are mostly unused tail (a 4 KB frame slot holding an 80 byte message): only the leading
+ * bytes that matter are copied, so the spin flag is held for those and not for the whole slot. `n` is how
+ * much of `item` to store; `used` reads a stored item's header and returns how much of it to hand back. */
+typedef size_t (*ring_used_fn)(const void *stored);
+bool ring_push_n(ring_t *r, const void *item, size_t n);
+bool ring_pop_n(ring_t *r, void *item, ring_used_fn used);

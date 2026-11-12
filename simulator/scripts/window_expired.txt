@@ -1,0 +1,30 @@
+# The window runs out: the daemon's clear (expired) leaves the request with the terminal. ASK says so rather
+# than vanishing, then the card keeps saying it until the session moves on. A hold after that answers nothing.
+connect
+rx a400020101020103a40082000b01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention_win 2000 60000 - 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+expect_countdown 1 2
+wait 1700
+clear 7 expired
+wait 300
+expect_screen ask
+expect_label On your computer
+expect_countdown -1 -1
+shot window_expired_ask.png
+hold 233 282 1500
+wait 300
+expect_no_label Approved
+wait 1500
+expect_screen ring
+expect_label On your computer
+expect_label Answer it there
+shot window_expired_card.png
+# the terminal answered: the session works again and the card is an ordinary card
+session 2 work webapp feat/login
+wait 300
+expect_no_label On your computer
+quit

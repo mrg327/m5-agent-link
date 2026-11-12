@@ -15,6 +15,15 @@
 #define MERGE_AT 9
 #define NAG_MS 15000
 #define NAG_MAX 3
+/* Reminders fit the answer window (ANSWER-WINDOW.md §5): NAG_MAX of them spread over it, at least NAG_MS
+ * apart (a 60 s window: 15, 30, 45 s, as before; 300 s: 75, 150, 225 s), and none in its last NAG_TAIL_MS,
+ * when the request is about to go back to the computer anyway. A request without a window: every NAG_MS. */
+#define NAG_TAIL_MS 5000
+static uint32_t nag_gap(const attention_t *a)
+{
+    uint32_t gap = a->win_ms / (NAG_MAX + 1);
+    return gap > NAG_MS ? gap : NAG_MS;
+}
 
 static lv_obj_t *s_root, *s_ring, *s_centre;
 
@@ -22,7 +31,7 @@ static home_slot_t s_slots[RING_MAX_SEGMENTS];
 static int s_n, s_sel;
 static uint32_t s_sel_sid;
 static bool s_has_sel;
-static bool s_scrubbing, s_freeze_expand;
+static bool s_scrubbing, s_freeze_expand, s_rim_dial;
 static uint32_t s_now, s_last_input, s_last_elapsed;
 static bool s_ambient;
 
@@ -120,7 +129,7 @@ static void rebuild(void)
     s_sel = 0;
     for (int i = 0; i < s_n; i++)
         if (s_slots[i].sid == s_sel_sid) s_sel = i;
-    if (s_n != old_n && g_ui_actions->sectors) g_ui_actions->sectors(s_n);
+    if (s_n != old_n && !s_rim_dial && g_ui_actions->sectors) g_ui_actions->sectors(s_n);
 
     /* AGENT and SCROLL draw their own items or track on the ring; writing sessions there would
      * repaint it twice per delta. Their exit refreshes the deck (enter_mode). */
@@ -219,17 +228,24 @@ static void step_selection(int dir, const char *via)
 bool ui_home_request_pending(void) { return approvable(sel_session()) != NULL; }
 bool ui_home_askable(void) { return askable(sel_session()) != NULL; }
 uint32_t ui_home_sel_sid(void) { return sel_session() ? s_sel_sid : 0; }
+const attention_t *ui_home_sel_request(void) { return askable(sel_session()); }
 lv_obj_t *ui_home_ring(void) { return s_ring; }
 void ui_home_note_input(void) { noted_input(); }
 const session_t *ui_home_sel_session(void) { return sel_session(); }
 const home_slot_t *ui_home_sel_slot(void) { return s_n > 0 ? &s_slots[s_sel] : NULL; }
 int ui_home_slot_count(void) { return s_n; }
+/* What a rim drag means now: a dial through a list's items (AGENT, ASK, STATUS), or the session segments. */
+void ui_home_rim_mode(bool dial)
+{
+    s_rim_dial = dial;
+    if (g_ui_actions->sectors) g_ui_actions->sectors(dial ? NAV_LIST_SECTORS : s_n);
+}
 const attention_t *ui_home_askable_of(const session_t *s) { return askable(s); }
 void ui_home_set_card_shown(bool shown)
 {
     if (shown) {
         lv_obj_remove_flag(s_centre, LV_OBJ_FLAG_HIDDEN);
-        if (g_ui_actions->sectors) g_ui_actions->sectors(s_n); /* the rim counts sessions again */
+        ui_home_rim_mode(false); /* the rim counts sessions again */
     } else {
         lv_obj_add_flag(s_centre, LV_OBJ_FLAG_HIDDEN);
     }
@@ -301,11 +317,11 @@ void ui_home_tick(uint32_t now)
         if (first->rid != s_nag_rid) {
             s_nag_rid = first->rid;
             s_nag_n = 0;
-            s_nag_next = now + NAG_MS;
+            s_nag_next = now + nag_gap(first);
         } else if (s_nag_n < NAG_MAX && (int32_t)(now - s_nag_next) >= 0) {
             s_nag_n++;
-            s_nag_next = now + NAG_MS;
-            g_ui_actions->nag();
+            s_nag_next = now + nag_gap(first);
+            if (model_attention_left_ms(first, now) > NAG_TAIL_MS) g_ui_actions->nag();
         }
     }
 

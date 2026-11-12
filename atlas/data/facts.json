@@ -70,14 +70,14 @@
       "color": "#999999",
       "palette": "idle",
       "label": "Idle",
-      "source": "firmware/components/core/src/ui_theme.c:35"
+      "source": "firmware/components/core/src/ui_theme.c:42"
     },
     "ended": {
       "id": 6,
       "color": "#999999",
       "palette": "idle",
       "label": "Ended",
-      "source": "firmware/components/core/src/ui_theme.c:36"
+      "source": "firmware/components/core/src/ui_theme.c:43"
     }
   },
   "gesture": {
@@ -342,13 +342,22 @@
         "source": "firmware/components/core/src/nav.c:28"
       },
       {
-        "gesture": "G_SWIPE_DOWN",
+        "gesture": "G_DRAG",
         "mode": "agent",
         "zone": "centre",
         "when": "",
-        "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "nav": "NAV_SCROLL_DRAG",
+        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
         "source": "firmware/components/core/src/nav.c:29"
+      },
+      {
+        "gesture": "G_LONG_PRESS",
+        "mode": "agent",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_HOLD_LONG",
+        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "source": "firmware/components/core/src/nav.c:30"
       },
       {
         "gesture": "G_SWIPE_RIGHT",
@@ -357,7 +366,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
-        "source": "firmware/components/core/src/nav.c:30"
+        "source": "firmware/components/core/src/nav.c:31"
       },
       {
         "gesture": "G_SCRUB_START",
@@ -366,7 +375,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "A drag around the rim moves the selection with a detent per step",
-        "source": "firmware/components/core/src/nav.c:31"
+        "source": "firmware/components/core/src/nav.c:32"
       },
       {
         "gesture": "G_SCRUB",
@@ -375,7 +384,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "A drag around the rim moves the selection with a detent per step",
-        "source": "firmware/components/core/src/nav.c:32"
+        "source": "firmware/components/core/src/nav.c:33"
       },
       {
         "gesture": "G_SCRUB_END",
@@ -384,7 +393,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "A drag around the rim moves the selection with a detent per step",
-        "source": "firmware/components/core/src/nav.c:33"
+        "source": "firmware/components/core/src/nav.c:34"
       },
       {
         "gesture": "G_BTN_A",
@@ -393,7 +402,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
-        "source": "firmware/components/core/src/nav.c:34"
+        "source": "firmware/components/core/src/nav.c:35"
       },
       {
         "gesture": "G_BTN_B",
@@ -402,7 +411,7 @@
         "when": "",
         "nav": "NAV_NEXT",
         "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
-        "source": "firmware/components/core/src/nav.c:35"
+        "source": "firmware/components/core/src/nav.c:36"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -411,7 +420,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
-        "source": "firmware/components/core/src/nav.c:36"
+        "source": "firmware/components/core/src/nav.c:37"
       },
       {
         "gesture": "G_CHORD",
@@ -420,7 +429,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "A+B chord: straight back to the deck",
-        "source": "firmware/components/core/src/nav.c:37"
+        "source": "firmware/components/core/src/nav.c:38"
       },
       {
         "gesture": "G_PRESS",
@@ -429,7 +438,7 @@
         "when": "",
         "nav": "NAV_HOLD_PRESS",
         "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
-        "source": "firmware/components/core/src/nav.c:40"
+        "source": "firmware/components/core/src/nav.c:41"
       },
       {
         "gesture": "G_RELEASE",
@@ -438,7 +447,7 @@
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
         "action": "Lifting cancels a hold in progress",
-        "source": "firmware/components/core/src/nav.c:41"
+        "source": "firmware/components/core/src/nav.c:42"
       },
       {
         "gesture": "G_TAP",
@@ -447,7 +456,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
-        "source": "firmware/components/core/src/nav.c:42"
+        "source": "firmware/components/core/src/nav.c:43"
       },
       {
         "gesture": "G_DOUBLE_TAP",
@@ -456,7 +465,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
-        "source": "firmware/components/core/src/nav.c:43"
+        "source": "firmware/components/core/src/nav.c:44"
       },
       {
         "gesture": "G_LONG_PRESS",
@@ -465,24 +474,15 @@
         "when": "",
         "nav": "NAV_HOLD_LONG",
         "action": "An injected long press that already covers the selected hold item's time commits it directly",
-        "source": "firmware/components/core/src/nav.c:44"
-      },
-      {
-        "gesture": "G_SWIPE_DOWN",
-        "mode": "ask",
-        "zone": "centre",
-        "when": "with an approvable request on screen",
-        "nav": "NAV_DENY",
-        "action": "Deny a permission request: a long swipe down that started above the centre",
         "source": "firmware/components/core/src/nav.c:45"
       },
       {
-        "gesture": "G_SWIPE_DOWN",
+        "gesture": "G_DRAG",
         "mode": "ask",
         "zone": "centre",
-        "when": "without an approvable request",
-        "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "when": "",
+        "nav": "NAV_SCROLL_DRAG",
+        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
         "source": "firmware/components/core/src/nav.c:46"
       },
       {
@@ -666,25 +666,25 @@
         "source": "firmware/components/core/src/nav.c:71"
       },
       {
+        "gesture": "G_LONG_PRESS",
+        "mode": "status",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_HOLD_LONG",
+        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "source": "firmware/components/core/src/nav.c:72"
+      },
+      {
         "gesture": "G_SWIPE_RIGHT",
         "mode": "status",
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
-        "source": "firmware/components/core/src/nav.c:72"
-      },
-      {
-        "gesture": "G_SCRUB_START",
-        "mode": "status",
-        "zone": "any",
-        "when": "",
-        "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
         "source": "firmware/components/core/src/nav.c:73"
       },
       {
-        "gesture": "G_SCRUB",
+        "gesture": "G_SCRUB_START",
         "mode": "status",
         "zone": "any",
         "when": "",
@@ -693,7 +693,7 @@
         "source": "firmware/components/core/src/nav.c:74"
       },
       {
-        "gesture": "G_SCRUB_END",
+        "gesture": "G_SCRUB",
         "mode": "status",
         "zone": "any",
         "when": "",
@@ -702,13 +702,22 @@
         "source": "firmware/components/core/src/nav.c:75"
       },
       {
+        "gesture": "G_SCRUB_END",
+        "mode": "status",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:76"
+      },
+      {
         "gesture": "G_BTN_A",
         "mode": "status",
         "zone": "any",
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
-        "source": "firmware/components/core/src/nav.c:76"
+        "source": "firmware/components/core/src/nav.c:77"
       },
       {
         "gesture": "G_BTN_B",
@@ -717,7 +726,7 @@
         "when": "",
         "nav": "NAV_NEXT",
         "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
-        "source": "firmware/components/core/src/nav.c:77"
+        "source": "firmware/components/core/src/nav.c:78"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -726,7 +735,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
-        "source": "firmware/components/core/src/nav.c:78"
+        "source": "firmware/components/core/src/nav.c:79"
       },
       {
         "gesture": "G_CHORD",
@@ -735,7 +744,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "A+B chord: straight back to the deck",
-        "source": "firmware/components/core/src/nav.c:79"
+        "source": "firmware/components/core/src/nav.c:80"
       },
       {
         "gesture": "G_TAP",
@@ -744,7 +753,7 @@
         "when": "with a permission or question pending",
         "nav": "NAV_OPEN_ASK",
         "action": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
-        "source": "firmware/components/core/src/nav.c:84"
+        "source": "firmware/components/core/src/nav.c:85"
       },
       {
         "gesture": "G_TAP",
@@ -753,7 +762,7 @@
         "when": "with nothing to answer",
         "nav": "NAV_FOCUS",
         "action": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
-        "source": "firmware/components/core/src/nav.c:85"
+        "source": "firmware/components/core/src/nav.c:86"
       },
       {
         "gesture": "G_TAP",
@@ -762,7 +771,7 @@
         "when": "",
         "nav": "NAV_PICK_RIM",
         "action": "Select the segment under the finger on the HOME ring (AGENT and ASK rows are tapped directly)",
-        "source": "firmware/components/core/src/nav.c:86"
+        "source": "firmware/components/core/src/nav.c:87"
       },
       {
         "gesture": "G_DRAG",
@@ -771,7 +780,7 @@
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
         "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
-        "source": "firmware/components/core/src/nav.c:87"
+        "source": "firmware/components/core/src/nav.c:88"
       },
       {
         "gesture": "G_SCRUB_START",
@@ -780,7 +789,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "A drag around the rim moves the selection with a detent per step",
-        "source": "firmware/components/core/src/nav.c:88"
+        "source": "firmware/components/core/src/nav.c:89"
       },
       {
         "gesture": "G_SCRUB",
@@ -789,7 +798,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "A drag around the rim moves the selection with a detent per step",
-        "source": "firmware/components/core/src/nav.c:89"
+        "source": "firmware/components/core/src/nav.c:90"
       },
       {
         "gesture": "G_SCRUB_END",
@@ -798,7 +807,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "A drag around the rim moves the selection with a detent per step",
-        "source": "firmware/components/core/src/nav.c:90"
+        "source": "firmware/components/core/src/nav.c:91"
       },
       {
         "gesture": "G_BTN_A",
@@ -807,7 +816,7 @@
         "when": "",
         "nav": "NAV_FOCUS",
         "action": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
-        "source": "firmware/components/core/src/nav.c:91"
+        "source": "firmware/components/core/src/nav.c:92"
       },
       {
         "gesture": "G_BTN_B",
@@ -816,7 +825,7 @@
         "when": "",
         "nav": "NAV_NEXT",
         "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
-        "source": "firmware/components/core/src/nav.c:92"
+        "source": "firmware/components/core/src/nav.c:93"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -825,7 +834,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
-        "source": "firmware/components/core/src/nav.c:93"
+        "source": "firmware/components/core/src/nav.c:94"
       },
       {
         "gesture": "G_LONG_PRESS",
@@ -834,7 +843,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
-        "source": "firmware/components/core/src/nav.c:94"
+        "source": "firmware/components/core/src/nav.c:95"
       },
       {
         "gesture": "G_SWIPE_RIGHT",
@@ -843,7 +852,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
-        "source": "firmware/components/core/src/nav.c:95"
+        "source": "firmware/components/core/src/nav.c:96"
       },
       {
         "gesture": "G_CHORD",
@@ -852,7 +861,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "A+B chord: straight back to the deck",
-        "source": "firmware/components/core/src/nav.c:96"
+        "source": "firmware/components/core/src/nav.c:97"
       },
       {
         "gesture": "G_PRESS",
@@ -861,7 +870,7 @@
         "when": "",
         "nav": "NAV_HOLD_PRESS",
         "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
-        "source": "firmware/components/core/src/nav.c:99"
+        "source": "firmware/components/core/src/nav.c:100"
       },
       {
         "gesture": "G_RELEASE",
@@ -870,7 +879,7 @@
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
         "action": "Lifting cancels a hold in progress",
-        "source": "firmware/components/core/src/nav.c:100"
+        "source": "firmware/components/core/src/nav.c:101"
       },
       {
         "gesture": "G_TAP",
@@ -879,7 +888,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
-        "source": "firmware/components/core/src/nav.c:101"
+        "source": "firmware/components/core/src/nav.c:102"
       },
       {
         "gesture": "G_SWIPE_DOWN",
@@ -888,7 +897,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
-        "source": "firmware/components/core/src/nav.c:102"
+        "source": "firmware/components/core/src/nav.c:103"
       },
       {
         "gesture": "G_SWIPE_RIGHT",
@@ -897,7 +906,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
-        "source": "firmware/components/core/src/nav.c:103"
+        "source": "firmware/components/core/src/nav.c:104"
       },
       {
         "gesture": "G_BTN_A",
@@ -906,7 +915,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
-        "source": "firmware/components/core/src/nav.c:104"
+        "source": "firmware/components/core/src/nav.c:105"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -915,7 +924,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
-        "source": "firmware/components/core/src/nav.c:105"
+        "source": "firmware/components/core/src/nav.c:106"
       },
       {
         "gesture": "G_CHORD",
@@ -924,7 +933,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "A+B chord: straight back to the deck",
-        "source": "firmware/components/core/src/nav.c:106"
+        "source": "firmware/components/core/src/nav.c:107"
       },
       {
         "gesture": "G_BTN_A",
@@ -933,7 +942,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
-        "source": "firmware/components/core/src/nav.c:110"
+        "source": "firmware/components/core/src/nav.c:111"
       },
       {
         "gesture": "G_BTN_A_LONG",
@@ -942,7 +951,7 @@
         "when": "",
         "nav": "NAV_HOLD_PRESS",
         "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
-        "source": "firmware/components/core/src/nav.c:111"
+        "source": "firmware/components/core/src/nav.c:112"
       },
       {
         "gesture": "G_BTN_B",
@@ -951,7 +960,7 @@
         "when": "",
         "nav": "NAV_ERASE",
         "action": "KEYS: button B deletes the last typed word",
-        "source": "firmware/components/core/src/nav.c:112"
+        "source": "firmware/components/core/src/nav.c:113"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -960,7 +969,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
-        "source": "firmware/components/core/src/nav.c:113"
+        "source": "firmware/components/core/src/nav.c:114"
       },
       {
         "gesture": "G_CHORD",
@@ -969,7 +978,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "A+B chord: straight back to the deck",
-        "source": "firmware/components/core/src/nav.c:114"
+        "source": "firmware/components/core/src/nav.c:115"
       }
     ],
     "chord": "A + B held together: Home from any mode (logged on the deck, no action there)",
@@ -979,22 +988,22 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:104"
+      "source": "firmware/components/core/src/ui.c:106"
     },
     {
       "id": "attention",
       "title": "Deck · a request is waiting",
-      "source": "firmware/components/core/src/ui_home.c:342"
+      "source": "firmware/components/core/src/ui_home.c:358"
     },
     {
       "id": "agent",
       "title": "Agent wheel",
-      "source": "firmware/components/core/src/ui_agent.c:291"
+      "source": "firmware/components/core/src/ui_agent.c:310"
     },
     {
       "id": "ask",
       "title": "Ask · the request and its options",
-      "source": "firmware/components/core/src/ui_ask.c:372"
+      "source": "firmware/components/core/src/ui_ask.c:796"
     },
     {
       "id": "scroll",
@@ -1004,7 +1013,7 @@
     {
       "id": "status",
       "title": "Status · link, battery, quiet mode",
-      "source": "firmware/components/core/src/ui_status.c:285"
+      "source": "firmware/components/core/src/ui_status.c:304"
     }
   ],
   "haptics": {
@@ -1326,7 +1335,7 @@
           "name": "batt_pct"
         }
       ],
-      "source": "protocol/agentlink.cddl:51"
+      "source": "protocol/agentlink.cddl:52"
     },
     {
       "name": "welcome",
@@ -1377,7 +1386,7 @@
           "name": "keys"
         }
       ],
-      "source": "protocol/agentlink.cddl:52"
+      "source": "protocol/agentlink.cddl:53"
     },
     {
       "name": "snapshot",
@@ -1400,7 +1409,7 @@
           "name": "away"
         }
       ],
-      "source": "protocol/agentlink.cddl:53"
+      "source": "protocol/agentlink.cddl:54"
     },
     {
       "name": "session_upd",
@@ -1540,9 +1549,100 @@
           "type": "[0*3 tstr]",
           "note": "rp    answers to q for the Reply list, <= 24 chars each; [] = none (proto 0.5)",
           "name": "rp"
+        },
+        {
+          "key": 19,
+          "optional": true,
+          "type": "uint",
+          "note": "eta   a job's expected total run time in seconds (median of its earlier runs);",
+          "name": "eta"
+        },
+        {
+          "key": 20,
+          "optional": true,
+          "type": "uint",
+          "note": "exit  a job's exit status (0-255), sent with the delta that enters done / error",
+          "name": "exit"
+        },
+        {
+          "key": 21,
+          "optional": true,
+          "type": "uint",
+          "note": "ctx   context window used, percent 0-100; 255 = unknown (GAUGES.md). Keys 21-25",
+          "name": "ctx"
+        },
+        {
+          "key": 22,
+          "optional": true,
+          "type": "tstr",
+          "note": "mdl   the model's short name, <= 16 chars (\"Opus 4.7\"); \"\" = unknown",
+          "name": "mdl"
+        },
+        {
+          "key": 23,
+          "optional": true,
+          "type": "perm_mode",
+          "note": "pm    the agent's permission mode",
+          "name": "pm"
+        },
+        {
+          "key": 24,
+          "optional": true,
+          "type": "uint",
+          "note": "pr    the open pull request of the session's branch; 0 = none (withheld under privacy meta)",
+          "name": "pr"
+        },
+        {
+          "key": 25,
+          "optional": true,
+          "type": "pr_state",
+          "note": "prs   its review state; sent with pr",
+          "name": "prs"
+        },
+        {
+          "key": 26,
+          "optional": true,
+          "type": "bool",
+          "note": "hush  only in the delta that enters done / error, only to devices with proto >= 0.12",
+          "name": "hush"
+        },
+        {
+          "key": 30,
+          "optional": true,
+          "type": "uint",
+          "note": "fc    files the turn changed (>= 1; absent = not known / none seen). Keys 30-34 only to",
+          "name": "fc"
+        },
+        {
+          "key": 31,
+          "optional": true,
+          "type": "uint",
+          "note": "la    lines added in the turn, sent with lr; absent = not known",
+          "name": "la"
+        },
+        {
+          "key": 32,
+          "optional": true,
+          "type": "uint",
+          "note": "lr    lines removed",
+          "name": "lr"
+        },
+        {
+          "key": 33,
+          "optional": true,
+          "type": "bool",
+          "note": "tp    the turn's last recognised test run: true passed, false failed; absent = unknown",
+          "name": "tp"
+        },
+        {
+          "key": 34,
+          "optional": true,
+          "type": "uint",
+          "note": "dur   the turn's length in seconds, prompt to stop",
+          "name": "dur"
         }
       ],
-      "source": "protocol/agentlink.cddl:54"
+      "source": "protocol/agentlink.cddl:55"
     },
     {
       "name": "gone",
@@ -1550,7 +1650,7 @@
       "dir": "pc→dev",
       "summary": "A session ended and left the list",
       "fields": [],
-      "source": "protocol/agentlink.cddl:55"
+      "source": "protocol/agentlink.cddl:56"
     },
     {
       "name": "attention",
@@ -1620,9 +1720,58 @@
           "type": "uint",
           "note": "grant_mask  bit i set = opts[i] grants permission (approve-class: hold to commit)",
           "name": "grant_mask"
+        },
+        {
+          "key": 9,
+          "optional": true,
+          "type": "uint",
+          "note": "left   ms left in the answer window when this message was sent (ANSWER-WINDOW.md);",
+          "name": "left"
+        },
+        {
+          "key": 10,
+          "optional": true,
+          "type": "uint",
+          "note": "win    the whole answer window in ms (left / win = the part still to run)",
+          "name": "win"
+        },
+        {
+          "key": 11,
+          "optional": true,
+          "type": "uint",
+          "note": "len    the full text's length in bytes, sent when `text` is a cut preview: the",
+          "name": "len"
+        },
+        {
+          "key": 12,
+          "optional": true,
+          "type": "bool",
+          "note": "hush   no buzz, glow or reminders for this request: the user is looking at its terminal",
+          "name": "hush"
+        },
+        {
+          "key": 13,
+          "optional": true,
+          "type": "tstr",
+          "note": "rule   the standing rule the device may grant with this request, exactly as Claude Code",
+          "name": "rule"
+        },
+        {
+          "key": 14,
+          "optional": true,
+          "type": "uint",
+          "note": "scope  where it is saved, a rule_scope value. A uint, not the enum, so that a value a",
+          "name": "scope"
+        },
+        {
+          "key": 15,
+          "optional": true,
+          "type": "bool",
+          "note": "wide   the rule ends in a wildcard: it matches more than this exact request",
+          "name": "wide"
         }
       ],
-      "source": "protocol/agentlink.cddl:56"
+      "source": "protocol/agentlink.cddl:57"
     },
     {
       "name": "clear",
@@ -1645,7 +1794,7 @@
           "name": "why"
         }
       ],
-      "source": "protocol/agentlink.cddl:57"
+      "source": "protocol/agentlink.cddl:58"
     },
     {
       "name": "cmd",
@@ -1687,9 +1836,16 @@
           "type": "uint",
           "note": "hold_ms  measured hold-to-confirm (approve)",
           "name": "hold_ms"
+        },
+        {
+          "key": 5,
+          "optional": true,
+          "type": "uint",
+          "note": "rh  with cmd_op_approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of",
+          "name": "rh"
         }
       ],
-      "source": "protocol/agentlink.cddl:58"
+      "source": "protocol/agentlink.cddl:59"
     },
     {
       "name": "result",
@@ -1726,7 +1882,7 @@
           "name": "pos"
         }
       ],
-      "source": "protocol/agentlink.cddl:59"
+      "source": "protocol/agentlink.cddl:60"
     },
     {
       "name": "detail",
@@ -1752,11 +1908,25 @@
           "key": 2,
           "optional": false,
           "type": "tstr",
-          "note": "text (full)",
+          "note": "text   this chunk",
           "name": "text"
+        },
+        {
+          "key": 3,
+          "optional": true,
+          "type": "uint",
+          "note": "off    byte offset of this chunk in the full text",
+          "name": "off"
+        },
+        {
+          "key": 4,
+          "optional": true,
+          "type": "uint",
+          "note": "total  the full text's length in bytes (<= 4096)",
+          "name": "total"
         }
       ],
-      "source": "protocol/agentlink.cddl:60"
+      "source": "protocol/agentlink.cddl:61"
     },
     {
       "name": "cfg",
@@ -1800,7 +1970,7 @@
           "name": "badge_handle"
         }
       ],
-      "source": "protocol/agentlink.cddl:61"
+      "source": "protocol/agentlink.cddl:62"
     },
     {
       "name": "batt",
@@ -1823,7 +1993,7 @@
           "name": "chg"
         }
       ],
-      "source": "protocol/agentlink.cddl:62"
+      "source": "protocol/agentlink.cddl:63"
     },
     {
       "name": "ping",
@@ -1831,7 +2001,7 @@
       "dir": "both",
       "summary": "Link-liveness probe",
       "fields": [],
-      "source": "protocol/agentlink.cddl:63"
+      "source": "protocol/agentlink.cddl:64"
     },
     {
       "name": "pong",
@@ -1839,7 +2009,7 @@
       "dir": "both",
       "summary": "Answer to a ping",
       "fields": [],
-      "source": "protocol/agentlink.cddl:64"
+      "source": "protocol/agentlink.cddl:65"
     },
     {
       "name": "log",
@@ -1862,7 +2032,7 @@
           "name": "msg"
         }
       ],
-      "source": "protocol/agentlink.cddl:65"
+      "source": "protocol/agentlink.cddl:66"
     },
     {
       "name": "audio_start",
@@ -1892,7 +2062,7 @@
           "name": "sid"
         }
       ],
-      "source": "protocol/agentlink.cddl:66"
+      "source": "protocol/agentlink.cddl:67"
     },
     {
       "name": "audio",
@@ -1922,7 +2092,7 @@
           "name": "data"
         }
       ],
-      "source": "protocol/agentlink.cddl:67"
+      "source": "protocol/agentlink.cddl:68"
     },
     {
       "name": "audio_end",
@@ -1959,7 +2129,7 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:68"
+      "source": "protocol/agentlink.cddl:69"
     },
     {
       "name": "transcript",
@@ -1989,7 +2159,7 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:69"
+      "source": "protocol/agentlink.cddl:70"
     },
     {
       "name": "kb_start",
@@ -2019,7 +2189,7 @@
           "name": "keys"
         }
       ],
-      "source": "protocol/agentlink.cddl:70"
+      "source": "protocol/agentlink.cddl:71"
     },
     {
       "name": "kb_stroke",
@@ -2049,7 +2219,7 @@
           "name": "pts"
         }
       ],
-      "source": "protocol/agentlink.cddl:71"
+      "source": "protocol/agentlink.cddl:72"
     },
     {
       "name": "kb_cands",
@@ -2093,7 +2263,65 @@
           "name": "err"
         }
       ],
-      "source": "protocol/agentlink.cddl:72"
+      "source": "protocol/agentlink.cddl:73"
+    },
+    {
+      "name": "usage",
+      "type": 23,
+      "dir": "pc→dev",
+      "summary": "Plan usage: the 5-hour and weekly windows, their resets and the pace (GAUGES.md)",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "at    when the daemon last read these figures (unix); the device ages them from here",
+          "name": "at"
+        },
+        {
+          "key": 1,
+          "optional": true,
+          "type": "uint",
+          "note": "h5    5-hour window used, percent 0-100 (rounded down)",
+          "name": "h5"
+        },
+        {
+          "key": 2,
+          "optional": true,
+          "type": "uint",
+          "note": "h5r   5-hour window resets at (unix)",
+          "name": "h5r"
+        },
+        {
+          "key": 3,
+          "optional": true,
+          "type": "uint",
+          "note": "h5o   at the current pace the 5-hour window runs out at (unix); absent = not before it resets",
+          "name": "h5o"
+        },
+        {
+          "key": 4,
+          "optional": true,
+          "type": "uint",
+          "note": "wk    weekly window used, percent 0-100",
+          "name": "wk"
+        },
+        {
+          "key": 5,
+          "optional": true,
+          "type": "uint",
+          "note": "wkr   weekly window resets at (unix)",
+          "name": "wkr"
+        },
+        {
+          "key": 6,
+          "optional": true,
+          "type": "uint",
+          "note": "wko   at the current pace the weekly window runs out at (unix)",
+          "name": "wko"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:74"
     },
     {
       "name": "dbg_ui_state_req",
@@ -2101,7 +2329,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask which screen is showing",
       "fields": [],
-      "source": "protocol/agentlink.cddl:73"
+      "source": "protocol/agentlink.cddl:75"
     },
     {
       "name": "dbg_ui_state",
@@ -2152,7 +2380,7 @@
           "name": "fps"
         }
       ],
-      "source": "protocol/agentlink.cddl:74"
+      "source": "protocol/agentlink.cddl:76"
     },
     {
       "name": "dbg_screenshot_req",
@@ -2160,7 +2388,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask for a screenshot",
       "fields": [],
-      "source": "protocol/agentlink.cddl:75"
+      "source": "protocol/agentlink.cddl:77"
     },
     {
       "name": "dbg_screenshot_chunk",
@@ -2204,7 +2432,7 @@
           "name": "last"
         }
       ],
-      "source": "protocol/agentlink.cddl:76"
+      "source": "protocol/agentlink.cddl:78"
     },
     {
       "name": "dbg_inject_input",
@@ -2234,7 +2462,7 @@
           "name": "y"
         }
       ],
-      "source": "protocol/agentlink.cddl:77"
+      "source": "protocol/agentlink.cddl:79"
     },
     {
       "name": "dbg_set_log_level",
@@ -2250,7 +2478,7 @@
           "name": ""
         }
       ],
-      "source": "protocol/agentlink.cddl:78"
+      "source": "protocol/agentlink.cddl:80"
     }
   ],
   "sounds": {
@@ -2280,6 +2508,20 @@
         "pick": "input-ff",
         "repeat": 3,
         "gap_ms": 90
+      },
+      {
+        "id": "approved",
+        "when": "An approval hold completes and the answer goes out (rises)",
+        "pick": "approved-rise",
+        "repeat": 1,
+        "gap_ms": 0
+      },
+      {
+        "id": "denied",
+        "when": "A deny or stop hold completes and the answer goes out (falls)",
+        "pick": "denied-fall",
+        "repeat": 1,
+        "gap_ms": 0
       }
     ],
     "bank": [
@@ -4498,6 +4740,130 @@
           "ms": 0,
           "pct": 0
         }
+      },
+      {
+        "id": "approved-chime",
+        "role": "approved",
+        "name": "Chime",
+        "tracks": [
+          [
+            {
+              "wave": "fm",
+              "note": 79,
+              "slide": 0,
+              "vol": 9,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "fm",
+              "note": 86,
+              "slide": 0,
+              "vol": 9,
+              "ms": 220,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "approved-rise",
+        "role": "approved",
+        "name": "Rising",
+        "tracks": [
+          [
+            {
+              "wave": "sq25",
+              "note": 72,
+              "slide": 0,
+              "vol": 10,
+              "ms": 50,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 79,
+              "slide": 0,
+              "vol": 10,
+              "ms": 50,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 84,
+              "slide": 0,
+              "vol": 10,
+              "ms": 170,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "denied-fall",
+        "role": "denied",
+        "name": "Falling",
+        "tracks": [
+          [
+            {
+              "wave": "tri",
+              "note": 74,
+              "slide": 0,
+              "vol": 12,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 67,
+              "slide": 0,
+              "vol": 12,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 60,
+              "slide": 0,
+              "vol": 12,
+              "ms": 200,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "denied-drop",
+        "role": "denied",
+        "name": "Drop",
+        "tracks": [
+          [
+            {
+              "wave": "tri",
+              "note": 67,
+              "slide": 55,
+              "vol": 12,
+              "ms": 220,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       }
     ]
   },
@@ -4535,69 +4901,69 @@
     "display.height": "firmware/boards/stopwatch/board_priv.h:28",
     "display.shape": "firmware/boards/stopwatch/display.cpp:1",
     "display.width": "firmware/boards/stopwatch/board_priv.h:27",
-    "gesture.agent_timeout_ms": "firmware/components/core/src/nav.h:71",
+    "gesture.agent_timeout_ms": "firmware/components/core/src/nav.h:73",
     "gesture.b_immediate": "firmware/components/core/src/gesture.c:227",
     "gesture.btn_double_ms": "firmware/components/core/src/gesture.h:12",
-    "gesture.card_arm_ms": "firmware/components/core/src/nav.h:69",
-    "gesture.centre_r_px": "firmware/components/core/src/nav.h:65",
+    "gesture.card_arm_ms": "firmware/components/core/src/nav.h:71",
+    "gesture.centre_r_px": "firmware/components/core/src/nav.h:64",
     "gesture.cx_px": "firmware/components/core/src/gesture.h:22",
     "gesture.cy_px": "firmware/components/core/src/gesture.h:23",
-    "gesture.deny_hold_ms": "firmware/components/core/src/nav.h:67",
+    "gesture.deny_hold_ms": "firmware/components/core/src/nav.h:66",
     "gesture.drag_step_px": "firmware/components/core/src/gesture.h:15",
     "gesture.flick_px_per_s": "firmware/components/core/src/gesture.h:17",
     "gesture.flick_window_ms": "firmware/components/core/src/gesture.h:18",
-    "gesture.hold_confirm_ms": "firmware/components/core/src/nav.h:66",
+    "gesture.hold_confirm_ms": "firmware/components/core/src/nav.h:65",
     "gesture.hold_show_ms": "firmware/components/core/src/nav.h:68",
     "gesture.long_press_ms": "firmware/components/core/src/gesture.h:7",
-    "gesture.long_swipe_px": "firmware/components/core/src/nav.h:70",
-    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:144",
-    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:145",
+    "gesture.long_swipe_px": "firmware/components/core/src/nav.h:72",
+    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:150",
+    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:151",
     "gesture.rim_in_px": "firmware/components/core/src/gesture.h:24",
     "gesture.rim_out_px": "firmware/components/core/src/gesture.h:25",
     "gesture.rim_track_in_px": "firmware/components/core/src/gesture.h:26",
     "gesture.rim_track_out_px": "firmware/components/core/src/gesture.h:27",
-    "gesture.scroll_coalesce_ms": "firmware/components/core/src/nav.h:79",
-    "gesture.scroll_lines_per_step": "firmware/components/core/src/nav.h:78",
-    "gesture.scroll_timeout_ms": "firmware/components/core/src/nav.h:72",
+    "gesture.scroll_coalesce_ms": "firmware/components/core/src/nav.h:81",
+    "gesture.scroll_lines_per_step": "firmware/components/core/src/nav.h:80",
+    "gesture.scroll_timeout_ms": "firmware/components/core/src/nav.h:74",
     "gesture.scrub_hyst_deg": "firmware/components/core/src/gesture.h:29",
     "gesture.scrub_hysteresis_cap": "firmware/components/core/src/gesture.c:70",
     "gesture.scrub_start_deg": "firmware/components/core/src/gesture.h:28",
-    "gesture.status_timeout_ms": "firmware/components/core/src/nav.h:73",
+    "gesture.status_timeout_ms": "firmware/components/core/src/nav.h:75",
     "gesture.swipe_max_ms": "firmware/components/core/src/gesture.h:9",
     "gesture.swipe_min_px": "firmware/components/core/src/gesture.h:8",
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
-    "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:343",
-    "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:296",
-    "gesture_map.chord": "firmware/components/core/src/app.c:402",
-    "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:187",
-    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:155",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:318",
+    "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:765",
+    "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:707",
+    "gesture_map.chord": "firmware/components/core/src/app.c:484",
+    "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:196",
+    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:156",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:376",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:429",
-    "haptics.approved": "firmware/components/core/src/feedback.c:74",
-    "haptics.denied": "firmware/components/core/src/feedback.c:80",
-    "haptics.deny_ramp": "firmware/components/core/src/feedback.c:61",
-    "haptics.detent": "firmware/components/core/src/feedback.c:43",
-    "haptics.detent_min_gap_ms": "firmware/components/core/src/feedback.c:6",
-    "haptics.done": "firmware/components/core/src/feedback.c:25",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:511",
+    "haptics.approved": "firmware/components/core/src/feedback.c:80",
+    "haptics.denied": "firmware/components/core/src/feedback.c:87",
+    "haptics.deny_ramp": "firmware/components/core/src/feedback.c:67",
+    "haptics.detent": "firmware/components/core/src/feedback.c:49",
+    "haptics.detent_min_gap_ms": "firmware/components/core/src/feedback.c:8",
+    "haptics.done": "firmware/components/core/src/feedback.c:31",
     "haptics.duty": "firmware/boards/stopwatch/input.cpp:17",
-    "haptics.error": "firmware/components/core/src/feedback.c:24",
-    "haptics.hello": "firmware/components/core/src/feedback.c:127",
-    "haptics.hold_ramp": "firmware/components/core/src/feedback.c:54",
+    "haptics.error": "firmware/components/core/src/feedback.c:30",
+    "haptics.hello": "firmware/components/core/src/feedback.c:142",
+    "haptics.hold_ramp": "firmware/components/core/src/feedback.c:60",
     "haptics.kick_duty": "firmware/boards/stopwatch/input.cpp:18",
     "haptics.kick_ms": "firmware/boards/stopwatch/input.cpp:19",
     "haptics.kick_only_rule": "firmware/boards/stopwatch/input.cpp:122",
     "haptics.kick_rule": "firmware/boards/stopwatch/input.cpp:108",
-    "haptics.permission": "firmware/components/core/src/feedback.c:22",
-    "haptics.question": "firmware/components/core/src/feedback.c:23",
-    "haptics.quiet_toggled": "firmware/components/core/src/feedback.c:108",
-    "haptics.reject": "firmware/components/core/src/feedback.c:93",
-    "haptics.reply_sent": "firmware/components/core/src/feedback.c:87",
-    "haptics.scroll_stop": "firmware/components/core/src/feedback.c:100",
-    "haptics.tick": "firmware/components/core/src/feedback.c:36",
-    "link.hello_retry_ms": "firmware/components/core/src/link.c:8",
-    "link.idle_ping_ms": "firmware/components/core/src/link.c:14",
+    "haptics.permission": "firmware/components/core/src/feedback.c:28",
+    "haptics.question": "firmware/components/core/src/feedback.c:29",
+    "haptics.quiet_toggled": "firmware/components/core/src/feedback.c:116",
+    "haptics.reject": "firmware/components/core/src/feedback.c:101",
+    "haptics.reply_sent": "firmware/components/core/src/feedback.c:95",
+    "haptics.scroll_stop": "firmware/components/core/src/feedback.c:108",
+    "haptics.tick": "firmware/components/core/src/feedback.c:42",
+    "link.hello_retry_ms": "firmware/components/core/src/link.c:10",
+    "link.idle_ping_ms": "firmware/components/core/src/link.c:16",
     "link.ping_interval_ms": "daemon/crates/agentlinkd/src/usb.rs:26",
     "link.silence_timeout_ms": "firmware/boards/stopwatch/link_usb.cpp:32",
     "messages": "protocol/agentlink.cddl:1",
@@ -4625,8 +4991,8 @@
     "ring.band_out_px": "firmware/components/core/src/ui_ring_internal.h:15",
     "ring.band_w_px": "firmware/components/core/src/ui_ring_internal.h:16",
     "ring.done_sweep_ms": "firmware/components/core/src/ui_ring_internal.h:36",
-    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:409",
-    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:409",
+    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:475",
+    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:475",
     "ring.error_flicker_ms": "firmware/components/core/src/ui_ring_internal.h:37",
     "ring.hint_a_deg": "firmware/components/core/src/ui_theme.h:67",
     "ring.hint_b_deg": "firmware/components/core/src/ui_theme.h:68",
@@ -4636,75 +5002,79 @@
     "ring.merge_at": "firmware/components/core/src/ui_home.c:15",
     "ring.nag_max": "firmware/components/core/src/ui_home.c:17",
     "ring.nag_ms": "firmware/components/core/src/ui_home.c:16",
-    "ring.nothing_else": "firmware/components/core/src/ui_home.c:205",
+    "ring.nothing_else": "firmware/components/core/src/ui_home.c:214",
     "ring.others_pct": "firmware/components/core/src/ui_ring_internal.h:21",
     "ring.perm_period_ms": "firmware/components/core/src/ui_ring_internal.h:35",
-    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:284",
-    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:409",
+    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:327",
+    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:475",
     "ring.prog_out_px": "firmware/components/core/src/ui_ring_internal.h:27",
     "ring.prog_w_px": "firmware/components/core/src/ui_ring_internal.h:28",
     "ring.repo_px": "firmware/components/core/src/ui_theme.h:22",
     "ring.repo_small_px": "firmware/components/core/src/ui_theme.h:21",
-    "ring.repo_w_px": "firmware/components/core/src/ui_home_card.c:15",
+    "ring.repo_w_px": "firmware/components/core/src/ui_home_card.c:17",
     "ring.seg_gap_deg": "firmware/components/core/src/ui_ring_internal.h:19",
     "ring.sel_out_px": "firmware/components/core/src/ui_ring_internal.h:17",
     "ring.sel_w_px": "firmware/components/core/src/ui_ring_internal.h:18",
-    "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:18",
+    "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:23",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:33",
-    "screens": "firmware/components/core/src/ui_home.c:342",
-    "screens.agent": "firmware/components/core/src/ui_agent.c:291",
-    "screens.ask": "firmware/components/core/src/ui_ask.c:372",
+    "screens": "firmware/components/core/src/ui_home.c:358",
+    "screens.agent": "firmware/components/core/src/ui_agent.c:310",
+    "screens.ask": "firmware/components/core/src/ui_ask.c:796",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:299",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:55",
-    "screens.status": "firmware/components/core/src/ui_status.c:285",
-    "sounds.done-achieve": "firmware/components/core/src/sound_bank.c:54",
-    "sounds.done-bonus": "firmware/components/core/src/sound_bank.c:39",
-    "sounds.done-clear": "firmware/components/core/src/sound_bank.c:23",
-    "sounds.done-coin": "firmware/components/core/src/sound_bank.c:21",
-    "sounds.done-contra": "firmware/components/core/src/sound_bank.c:107",
-    "sounds.done-fanfare": "firmware/components/core/src/sound_bank.c:47",
-    "sounds.done-ff": "firmware/components/core/src/sound_bank.c:123",
-    "sounds.done-ko": "firmware/components/core/src/sound_bank.c:66",
-    "sounds.done-levelup": "firmware/components/core/src/sound_bank.c:70",
-    "sounds.done-megaman": "firmware/components/core/src/sound_bank.c:114",
-    "sounds.done-metroid": "firmware/components/core/src/sound_bank.c:121",
-    "sounds.done-pacman": "firmware/components/core/src/sound_bank.c:130",
-    "sounds.done-pokemon": "firmware/components/core/src/sound_bank.c:97",
-    "sounds.done-powerup": "firmware/components/core/src/sound_bank.c:28",
-    "sounds.done-quest": "firmware/components/core/src/sound_bank.c:56",
-    "sounds.done-sf2": "firmware/components/core/src/sound_bank.c:111",
-    "sounds.done-sonic": "firmware/components/core/src/sound_bank.c:128",
-    "sounds.done-sparkle": "firmware/components/core/src/sound_bank.c:60",
-    "sounds.done-tetris": "firmware/components/core/src/sound_bank.c:133",
-    "sounds.done-treasure": "firmware/components/core/src/sound_bank.c:34",
-    "sounds.done-warp": "firmware/components/core/src/sound_bank.c:44",
-    "sounds.done-zelda": "firmware/components/core/src/sound_bank.c:104",
-    "sounds.input-bell": "firmware/components/core/src/sound_bank.c:88",
-    "sounds.input-blip": "firmware/components/core/src/sound_bank.c:79",
-    "sounds.input-bubble": "firmware/components/core/src/sound_bank.c:87",
-    "sounds.input-chk": "firmware/components/core/src/sound_bank.c:83",
-    "sounds.input-confirm": "firmware/components/core/src/sound_bank.c:81",
-    "sounds.input-contra": "firmware/components/core/src/sound_bank.c:142",
-    "sounds.input-ff": "firmware/components/core/src/sound_bank.c:149",
-    "sounds.input-jump": "firmware/components/core/src/sound_bank.c:84",
-    "sounds.input-lock": "firmware/components/core/src/sound_bank.c:89",
-    "sounds.input-megaman": "firmware/components/core/src/sound_bank.c:146",
-    "sounds.input-metroid": "firmware/components/core/src/sound_bank.c:147",
-    "sounds.input-pacman": "firmware/components/core/src/sound_bank.c:152",
-    "sounds.input-pew": "firmware/components/core/src/sound_bank.c:86",
-    "sounds.input-pokemon": "firmware/components/core/src/sound_bank.c:139",
-    "sounds.input-pop": "firmware/components/core/src/sound_bank.c:82",
-    "sounds.input-sf2": "firmware/components/core/src/sound_bank.c:144",
-    "sounds.input-soft": "firmware/components/core/src/sound_bank.c:85",
-    "sounds.input-sonic": "firmware/components/core/src/sound_bank.c:151",
-    "sounds.input-swish": "firmware/components/core/src/sound_bank.c:91",
-    "sounds.input-tetris": "firmware/components/core/src/sound_bank.c:153",
-    "sounds.input-tick": "firmware/components/core/src/sound_bank.c:80",
-    "sounds.input-zelda": "firmware/components/core/src/sound_bank.c:140",
+    "screens.status": "firmware/components/core/src/ui_status.c:304",
+    "sounds.approved-chime": "firmware/components/core/src/sound_bank.c:160",
+    "sounds.approved-rise": "firmware/components/core/src/sound_bank.c:158",
+    "sounds.denied-drop": "firmware/components/core/src/sound_bank.c:162",
+    "sounds.denied-fall": "firmware/components/core/src/sound_bank.c:164",
+    "sounds.done-achieve": "firmware/components/core/src/sound_bank.c:56",
+    "sounds.done-bonus": "firmware/components/core/src/sound_bank.c:41",
+    "sounds.done-clear": "firmware/components/core/src/sound_bank.c:25",
+    "sounds.done-coin": "firmware/components/core/src/sound_bank.c:23",
+    "sounds.done-contra": "firmware/components/core/src/sound_bank.c:109",
+    "sounds.done-fanfare": "firmware/components/core/src/sound_bank.c:49",
+    "sounds.done-ff": "firmware/components/core/src/sound_bank.c:125",
+    "sounds.done-ko": "firmware/components/core/src/sound_bank.c:68",
+    "sounds.done-levelup": "firmware/components/core/src/sound_bank.c:72",
+    "sounds.done-megaman": "firmware/components/core/src/sound_bank.c:116",
+    "sounds.done-metroid": "firmware/components/core/src/sound_bank.c:123",
+    "sounds.done-pacman": "firmware/components/core/src/sound_bank.c:132",
+    "sounds.done-pokemon": "firmware/components/core/src/sound_bank.c:99",
+    "sounds.done-powerup": "firmware/components/core/src/sound_bank.c:30",
+    "sounds.done-quest": "firmware/components/core/src/sound_bank.c:58",
+    "sounds.done-sf2": "firmware/components/core/src/sound_bank.c:113",
+    "sounds.done-sonic": "firmware/components/core/src/sound_bank.c:130",
+    "sounds.done-sparkle": "firmware/components/core/src/sound_bank.c:62",
+    "sounds.done-tetris": "firmware/components/core/src/sound_bank.c:135",
+    "sounds.done-treasure": "firmware/components/core/src/sound_bank.c:36",
+    "sounds.done-warp": "firmware/components/core/src/sound_bank.c:46",
+    "sounds.done-zelda": "firmware/components/core/src/sound_bank.c:106",
+    "sounds.input-bell": "firmware/components/core/src/sound_bank.c:90",
+    "sounds.input-blip": "firmware/components/core/src/sound_bank.c:81",
+    "sounds.input-bubble": "firmware/components/core/src/sound_bank.c:89",
+    "sounds.input-chk": "firmware/components/core/src/sound_bank.c:85",
+    "sounds.input-confirm": "firmware/components/core/src/sound_bank.c:83",
+    "sounds.input-contra": "firmware/components/core/src/sound_bank.c:144",
+    "sounds.input-ff": "firmware/components/core/src/sound_bank.c:151",
+    "sounds.input-jump": "firmware/components/core/src/sound_bank.c:86",
+    "sounds.input-lock": "firmware/components/core/src/sound_bank.c:91",
+    "sounds.input-megaman": "firmware/components/core/src/sound_bank.c:148",
+    "sounds.input-metroid": "firmware/components/core/src/sound_bank.c:149",
+    "sounds.input-pacman": "firmware/components/core/src/sound_bank.c:154",
+    "sounds.input-pew": "firmware/components/core/src/sound_bank.c:88",
+    "sounds.input-pokemon": "firmware/components/core/src/sound_bank.c:141",
+    "sounds.input-pop": "firmware/components/core/src/sound_bank.c:84",
+    "sounds.input-sf2": "firmware/components/core/src/sound_bank.c:146",
+    "sounds.input-soft": "firmware/components/core/src/sound_bank.c:87",
+    "sounds.input-sonic": "firmware/components/core/src/sound_bank.c:153",
+    "sounds.input-swish": "firmware/components/core/src/sound_bank.c:93",
+    "sounds.input-tetris": "firmware/components/core/src/sound_bank.c:155",
+    "sounds.input-tick": "firmware/components/core/src/sound_bank.c:82",
+    "sounds.input-zelda": "firmware/components/core/src/sound_bank.c:142",
     "sounds.rate": "firmware/components/core/src/sound_bank.h:28",
     "sounds.waves": "firmware/components/core/src/sound_bank.h:30",
     "states": "firmware/components/core/src/ui_theme.c:11",
-    "states.input_words": "firmware/components/core/src/ui_theme.c:32",
+    "states.input_words": "firmware/components/core/src/ui_theme.c:39",
     "states.permission_colour": "firmware/components/core/src/ui_theme.c:24",
     "usb.baud": "daemon/crates/agentlinkd/src/usb.rs:23",
     "usb.crc": "daemon/crates/agentlinkd/src/usb/frame.rs:11",

@@ -1,0 +1,15 @@
+{
+  "desc": "Device approves rid 12 and saves its standing rule after a 1600 ms hold (proto 0.13): rh is FNV-1a 32 of 'Bash(npm test:*)', 0x00, scope 1, wide 1",
+  "symbolic": {
+    "t": "cmd",
+    "id": 19,
+    "b": {
+      "op": "approve",
+      "sid": 2,
+      "rid": 12,
+      "hold_ms": 1600,
+      "rh": 1365922541
+    }
+  },
+  "cbor_hex": "a30008011303a500030102020c04190640051a516a52ed"
+}

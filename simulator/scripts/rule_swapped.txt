@@ -1,0 +1,37 @@
+# The rule is bound to the hold: when the daemon re-sends the same request with another rule while the hold
+# runs, the hold is cancelled and nothing is sent; a new hold then grants the rule now on screen (rh 1948751054
+# = "Bash(rm -rf build)", session, exact), never the one shown before (1365922541). The re-sent request opens
+# again at Approve, so the new rule is only granted after it has been selected and shown.
+connect
+rx a400020101020103a40082000d01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+rule project wide Bash(npm test:*)
+attention_win 60000 60000 - 12 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 400
+btn B
+wait 150
+btn B
+wait 300
+expect_label Bash(npm test:*)
+press 233 282
+wait 700
+rule session exact Bash(rm -rf build)
+attention_win 59000 60000 - 12 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 1400
+release
+wait 300
+expect_no_label Always allowed
+# the re-sent request starts over at Approve: the new rule must be selected and read again
+expect_label > Approve HOLD
+btn B
+wait 150
+btn B
+wait 300
+expect_label > Always allow HOLD
+expect_label Bash(rm -rf build)
+expect_label Until this session ends
+hold 233 282 1900
+wait 300
+expect_label Always allowed
+quit

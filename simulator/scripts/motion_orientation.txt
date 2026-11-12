@@ -1,0 +1,42 @@
+# Orientation (automatic): upright by default; lying 6-o'clock-up and still for 1.5 s turns the UI by 180
+# degrees; a mid-way pose keeps it (hysteresis); never while a finger is down. The recognizer sees what the user
+# sees: a raw swipe UP the panel is a swipe DOWN on the turned UI and opens STATUS.
+pref orient auto
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+wait 300
+pose upright
+wait 2500
+fb_mark
+pose upside_down
+wait 800
+# a finger down: the turn waits for it
+press 233 233
+wait 1800
+expect_flipped 0
+release
+wait 400
+expect_flipped 1
+expect_screen ring
+wait 600
+expect_fb_flipped
+pose 0 100 700
+wait 3000
+expect_flipped 1
+swipe 233 286 233 166 160
+wait 400
+expect_screen status
+swipe 233 166 233 286 160
+wait 400
+expect_screen ring
+# mid-way pose: no change; upright for long enough turns it back
+pose 0 100 600
+wait 2500
+expect_flipped 1
+pose upright
+wait 2600
+expect_flipped 0
+swipe 233 180 233 300 160
+wait 400
+expect_screen status
+quit

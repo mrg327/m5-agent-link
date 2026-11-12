@@ -1,0 +1,14 @@
+# Jobs on the wire: the shared protocol vector session_job_eta.json (agent shell, eta 120 s, proto 0.9) decodes
+# into a job card, and the watch works out the time left from its own clock.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1793995230
+rx a30004010f03a80004010302010665636172676f071a6aee31c0081a6aee31c00975636172676f206275696c64202d2d72656c65617365131878
+wait 700
+expect_screen ring
+expect_label Terminal
+expect_label Running
+expect_label about 2m left
+expect_label cargo build --release
+expect_label progress 2
+quit

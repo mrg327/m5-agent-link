@@ -24,14 +24,17 @@ typedef struct {
 /* What the UI asks the app to do; the app talks to the link and feedback. */
 typedef struct {
     void (*focus)(uint32_t sid);
+    void (*open_request)(uint32_t sid, uint32_t rid); /* ASK: Open on PC, handing request rid back to the terminal */
     void (*approve)(uint32_t sid, uint32_t rid, uint32_t hold_ms);
+    void (*grant)(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32_t rule_hash); /* ASK: approve + save the standing rule */
     void (*deny)(uint32_t sid, uint32_t rid);
     void (*reply)(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms); /* ASK: answer a question / pick a grant option */
     void (*ack)(uint32_t sid);
     void (*snooze)(uint32_t sid, uint32_t minutes); /* AGENT: snooze this session (0 cancels) */
     void (*notify_done)(uint32_t sid, bool arm);    /* AGENT: buzz when this session finishes (false disarms) */
     void (*type_reply)(uint32_t sid, int idx);       /* AGENT: type quick reply idx into the terminal */
-    void (*interrupt)(uint32_t sid, uint32_t hold_ms); /* AGENT: stop the running turn (Esc), after a hold */
+    void (*interrupt)(uint32_t sid, uint32_t hold_ms); /* AGENT: stop the running turn (Esc) or job (Ctrl-C), after a hold */
+    void (*rerun)(uint32_t sid, uint32_t hold_ms);     /* AGENT: run a finished job again, after a hold (JOBS.md) */
     void (*dictate)(uint32_t sid, uint32_t rid, uint32_t aid, uint32_t hold_ms); /* VOICE: type recording aid's transcript, or answer request rid with it */
     void (*scroll_open)(uint32_t sid); /* entering SCROLL: bring the terminal to the front, quietly */
     void (*scroll)(uint32_t sid, nav_scroll_unit_t unit, int delta); /* SCROLL: one coalesced cmd_op_scroll */
@@ -75,4 +78,6 @@ void ui_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_
 void ui_glow(uint32_t rgb);
 void ui_glow_hide(void);
 bool ui_glow_active(void);
+/* The wrist was raised: counts as looking at the watch (ends the ambient dim and the nagging), like a touch but without any action. */
+void ui_note_motion(void);
 void ui_set_animations(bool enabled);

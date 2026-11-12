@@ -1,4 +1,5 @@
-# Swipe down across the centre of a permission request denies it.
+# Safety: no swipe denies. A long swipe down across a permission request (the old deny swipe) only moves the
+# list; deny is its hold. No deny (op 4), no approve (op 3).
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 rx a30003010203a10082ab000101000201046d6d352d6167656e742d6c696e6b05646d61696e066462617368071a6aee2d10081a6aee315c096d52756e6e696e672074657374730af40b00aa00020101020203000466776562617070056a666561742f6c6f67696e071a6aee2928081a6aee318e0af40b00
@@ -7,3 +8,6 @@ wait 400
 expect_screen ask
 swipe 233 180 233 330 160
 wait 300
+expect_screen ask
+expect_no_label Denied
+quit

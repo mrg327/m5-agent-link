@@ -11,7 +11,7 @@ use crate::transport::Link;
 use agentlink_proto::*;
 use anyhow::{bail, Result};
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast::error::RecvError;
@@ -20,6 +20,9 @@ use tokio::time::Instant;
 
 /// Minimum hold-to-confirm for approvals (PROTOCOL §5).
 const MIN_APPROVE_HOLD_MS: u64 = 1000;
+/// Minimum hold for an approve that also saves a standing rule (STANDING-RULES.md §5): longer than a
+/// plain approve, as the watch's own grant hold is (1600 ms against 1200).
+const MIN_GRANT_HOLD_MS: u64 = 1500;
 
 /// State shared by every link task.
 pub struct Shared {
@@ -37,6 +40,8 @@ pub struct Shared {
     /// Transcripts waiting for the user's hold (`CmdOp::Dictate`), by recording id.
     pub transcripts: Mutex<crate::voice::Transcripts>,
     pub host: HostInfo,
+    /// Terminal commands shown as sessions (jobs.rs).
+    pub jobs: Arc<crate::jobs::Jobs>,
     /// Connected, handshaken devices keyed by device uid, for `agentlink status`.
     pub devices: Mutex<BTreeMap<String, Value>>,
     next_link: AtomicU64,
@@ -51,6 +56,10 @@ impl Shared {
         scroll: Arc<dyn ScrollDriver>,
     ) -> Self {
         Shared {
+            jobs: Arc::new(crate::jobs::Jobs::new(
+                registry.clone(),
+                crate::jobs::Config::from_env(),
+            )),
             registry,
             broker,
             trace,
@@ -106,6 +115,10 @@ struct Conn {
     dictate: bool,
     /// `session_upd` deltas waiting for the coalescing window.
     deltas: DeltaQueue,
+    /// Job sessions (proto 0.9) withheld from a device that cannot decode them.
+    hidden: HashSet<u64>,
+    /// Counts this device as linked for the answer window (window.rs) once it has handshaken.
+    linked: Option<crate::broker::Linked>,
 }
 
 /// Terminal content leaves the daemon only when the device may show it (UI-V2 §4.4).
@@ -158,14 +171,63 @@ impl Conn {
         if self.peer_minor < ASK_MINOR || self.privacy == Privacy::Meta {
             (s.q, s.rp) = (None, None);
         }
+        // a job's estimate and exit status: proto 0.9
+        if self.peer_minor < JOBS_MINOR {
+            (s.eta, s.exit) = (None, None);
+        }
+        // context fill, model, permission mode, pull request: proto 0.10 (GAUGES.md)
+        if self.peer_minor < GAUGES_MINOR {
+            (s.ctx, s.mdl, s.pm, s.pr, s.prs) = (None, None, None, None, None);
+        }
+        if self.peer_minor < PRESENCE_MINOR {
+            s.hush = None;
+        }
+        // the turn's done summary: proto 0.14 (DONE-SUMMARY.md). Counts and seconds only, so privacy
+        // `meta` does not withhold them; no file name is ever sent.
+        if self.peer_minor < SUMMARY_MINOR {
+            (s.fc, s.la, s.lr, s.tp, s.dur) = (None, None, None, None, None);
+        }
         if self.privacy == Privacy::Meta {
             s.sum = None;
+            // which pull request a session works on says what it works on
+            (s.pr, s.prs) = (None, None);
         }
         s
     }
 
-    fn sessions_for_peer(&self, v: Vec<Session>) -> Vec<Session> {
-        v.into_iter().map(|s| self.for_peer(s)).collect()
+    /// The plan's usage windows, to a device that can decode them (proto 0.10).
+    async fn send_usage(&mut self, u: Option<Usage>) -> Result<()> {
+        match u {
+            Some(u) if self.peer_minor >= GAUGES_MINOR => self.send(None, Message::Usage(u)).await,
+            _ => Ok(()),
+        }
+    }
+
+    /// A full replacement: the job sessions an old device cannot decode are left out.
+    fn sessions_for_peer(&mut self, v: Vec<Session>) -> Vec<Session> {
+        self.hidden.clear();
+        let old = self.peer_minor < JOBS_MINOR;
+        let mut out = Vec::with_capacity(v.len());
+        for s in v {
+            if old && s.ag == Some(Agent::Shell) {
+                self.hidden.insert(s.sid);
+            } else {
+                out.push(self.for_peer(s));
+            }
+        }
+        out
+    }
+
+    /// Whether a delta or `gone` for `sid` is withheld (it names a job session this device
+    /// cannot decode: its first full object carries `ag`, later deltas do not).
+    fn withheld(&mut self, s: &Session) -> bool {
+        if self.peer_minor >= JOBS_MINOR {
+            return false;
+        }
+        if s.ag == Some(Agent::Shell) {
+            self.hidden.insert(s.sid);
+        }
+        self.hidden.contains(&s.sid)
     }
 
     /// Sends `msg`, after the held deltas so the device sees everything in order.
@@ -173,6 +235,22 @@ impl Conn {
         if let Message::Attention(a) = &mut msg {
             if !self.dictate {
                 a.acts.retain(|x| *x != Action::Dictate);
+            }
+            // the answer window and the full text's length: proto 0.11 (ANSWER-WINDOW.md)
+            if self.peer_minor < WINDOW_MINOR {
+                (a.left, a.win, a.len) = (None, None, None);
+            }
+            if self.peer_minor < PRESENCE_MINOR {
+                a.hush = None;
+            }
+            // the standing rule: proto 0.13 (STANDING-RULES.md); an older device offers Approve / Deny
+            if self.peer_minor < RULES_MINOR {
+                (a.rule, a.scope, a.wide) = (None, None, None);
+            }
+        }
+        if let Message::Clear(cl) = &mut msg {
+            if cl.why == ClearWhy::HandedBack && self.peer_minor < WINDOW_MINOR {
+                cl.why = ClearWhy::Cancelled;
             }
         }
         if !self.deltas.is_empty() {
@@ -185,6 +263,9 @@ impl Conn {
 
     /// Holds a session delta for coalescing; sends what it cannot be merged with.
     async fn send_delta(&mut self, s: Session) -> Result<()> {
+        if self.withheld(&s) {
+            return Ok(());
+        }
         let s = self.for_peer(s);
         if s == Session::delta(s.sid) {
             return Ok(()); // every key it had is one this device does not take
@@ -263,6 +344,22 @@ const KEYS_MINOR: u64 = 7;
 /// `action_dictate` on an attention, and `dictate` naming its `rid`, need proto 0.8.
 const DICTATE_MINOR: u64 = 8;
 
+/// Job sessions (`ag` = shell), `session.eta` / `session.exit` and `cmd rerun` need proto 0.9.
+const JOBS_MINOR: u64 = 9;
+
+/// `session.ctx` / `mdl` / `pm` / `pr` / `prs` and the `usage` message need proto 0.10 (GAUGES.md).
+const GAUGES_MINOR: u64 = 10;
+
+/// `attention.left` / `win` / `len`, `detail` chunks, `clear` handed_back and the hand-back by
+/// `focus` with a rid need proto 0.11 (ANSWER-WINDOW.md).
+const WINDOW_MINOR: u64 = 11;
+/// Presence: `hush` on an attention and on the delta that enters done / error (PRESENCE.md).
+const PRESENCE_MINOR: u64 = 12;
+/// Standing rules: `attention.rule` / `scope` / `wide` and `cmd.rh` with approve (STANDING-RULES.md).
+const RULES_MINOR: u64 = 13;
+/// The done summary: `session.fc` / `la` / `lr` / `tp` / `dur` (DONE-SUMMARY.md).
+const SUMMARY_MINOR: u64 = 14;
+
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
 }
@@ -309,6 +406,8 @@ pub async fn run_link(
         peer_minor: 0,
         dictate: false,
         deltas: DeltaQueue::default(),
+        hidden: HashSet::new(),
+        linked: None,
     };
 
     let hello = loop {
@@ -378,7 +477,9 @@ async fn handshake(
     }
     c.next_id = 1;
     c.peer_minor = hello.1.proto.1;
+    c.linked.get_or_insert_with(|| shared.broker.link());
     c.deltas.clear(); // the snapshot below carries them
+    c.hidden.clear();
 
     // Subscribe before taking the snapshot so no update is lost in between.
     let (sessions, updates) = shared.registry.subscribe();
@@ -391,10 +492,11 @@ async fn handshake(
     let w = welcome(&shared.host, replies, voice, keys);
     c.privacy = w.cfg.privacy.unwrap_or(Privacy::Meta);
     c.send(Some(hello.0), Message::Welcome(w)).await?;
+    let sessions = c.sessions_for_peer(sessions);
     c.send(
         None,
         Message::Snapshot(Snapshot {
-            sessions: c.sessions_for_peer(sessions),
+            sessions,
             away: None,
         }),
     )
@@ -403,6 +505,7 @@ async fn handshake(
     for att in shared.broker.pending() {
         c.send(None, Message::Attention(att)).await?;
     }
+    c.send_usage(shared.registry.usage()).await?;
 
     // One entry per device id, so a re-handshake or a reconnect on a new link replaces it.
     let key = hex::encode(hello.1.dev.uid);
@@ -470,10 +573,20 @@ async fn serve(
                 c.send_due_deltas().await?;
             },
             u = updates.recv() => match u {
-                Ok(Update::Upsert(s)) => c.send_delta(s).await?,
-                Ok(Update::Gone(sid)) => c.send(None, Message::Gone(Gone { sid })).await?,
+                Ok(Update::Upsert(mut s)) => {
+                    if c.peer_minor >= PRESENCE_MINOR {
+                        s.hush = finished_hush(shared, &s).await;
+                    }
+                    c.send_delta(s).await?
+                }
+                Ok(Update::Gone(sid)) => {
+                    if !c.hidden.remove(&sid) {
+                        c.send(None, Message::Gone(Gone { sid })).await?
+                    }
+                }
                 Ok(Update::Attention(a)) => c.send(None, Message::Attention(a)).await?,
                 Ok(Update::Clear(cl)) => c.send(None, Message::Clear(cl)).await?,
+                Ok(Update::Usage(u)) => c.send_usage(Some(u)).await?,
                 // Missed updates: the device has drifted, so send a full replacement.
                 Err(RecvError::Lagged(_)) => {
                     c.deltas.clear();
@@ -482,11 +595,38 @@ async fn serve(
                     for att in shared.broker.pending() {
                         c.send(None, Message::Attention(att)).await?;
                     }
+                    c.send_usage(shared.registry.usage()).await?;
                 }
                 Err(RecvError::Closed) => return Ok(()),
             },
         }
     }
+}
+
+/// `Some(true)` when the delta enters done / error while the user has that session's terminal in front
+/// of them: the watch need not buzz (PRESENCE.md). A session armed with Notify (the delta clears `ntf`)
+/// is one the user asked to be told about, so it buzzes whatever presence says.
+async fn finished_hush(shared: &Shared, s: &Session) -> Option<bool> {
+    if !enters_finished(s) {
+        return None;
+    }
+    let (here, _, _) = crate::presence::global()
+        .here_async(shared.registry.host_ctx(s.sid))
+        .await;
+    hush_finished(s, here)
+}
+
+/// The delta enters done / error.
+fn enters_finished(s: &Session) -> bool {
+    matches!(s.st, Some(SessState::Done | SessState::Error))
+}
+
+/// The Finished row of the table for a session at `here`, except that a session armed with Notify (the
+/// delta that enters done clears `ntf`) buzzes whatever presence says.
+fn hush_finished(s: &Session, here: crate::presence::Here) -> Option<bool> {
+    (enters_finished(s) && s.ntf != Some(false))
+        .then(|| crate::presence::hush(crate::presence::Event::Finished, here))
+        .filter(|h| *h)
 }
 
 /// Recordings being received on one link, and where finished transcripts come back (voice.rs).
@@ -605,7 +745,11 @@ async fn handle(
         Message::Cmd(cmd) if cmd.op == CmdOp::Scroll => {
             scroll_cmd(shared, c, sc, inflight, env.id, &cmd).await
         }
+        Message::Cmd(cmd) if cmd.op == CmdOp::Detail => detail_cmd(shared, c, env.id, &cmd).await,
         Message::Cmd(cmd) => {
+            if cmd.op == CmdOp::Focus && c.peer_minor >= WINDOW_MINOR {
+                hand_back(shared, &cmd);
+            }
             let res = handle_cmd(shared, &cmd).await;
             c.send(Some(env.id), Message::Result(res)).await
         }
@@ -616,6 +760,82 @@ async fn handle(
         }
         // Traced on receipt; nothing else to do yet.
         _ => Ok(()),
+    }
+}
+
+/// Open on PC on a request (`focus` with its `rid`, proto 0.11): the request goes back to the terminal
+/// at once. It answers nothing: the hook ends with no decision, as when the window runs out.
+fn hand_back(shared: &Shared, cmd: &Cmd) {
+    let Some(rid) = cmd.rid else {
+        return;
+    };
+    let done = shared.broker.hand_back(rid, cmd.sid);
+    shared
+        .trace
+        .audit("hand_back", cmd.sid, Some(rid), json!({"open": done}));
+}
+
+/// `cmd detail {rid, arg: off}` (proto 0.11, ANSWER-WINDOW.md §4): the full text of an open request
+/// from byte `off`, as `detail` chunks of at most [`DETAIL_CHUNK`](crate::broker::DETAIL_CHUNK) bytes
+/// cut on character boundaries, then one `result`. Withheld under privacy `meta`.
+async fn detail_cmd(shared: &Shared, c: &mut Conn, id: u64, cmd: &Cmd) -> Result<()> {
+    let off = match cmd.arg {
+        None => Some(0),
+        Some(Arg::Uint(o)) => usize::try_from(o).ok(),
+        Some(_) => None,
+    };
+    let res = if c.peer_minor < WINDOW_MINOR {
+        Err((ResultErr::Unsupported, "detail needs proto 0.11"))
+    } else if !preview_allowed(c.privacy) {
+        Err((ResultErr::Denied, "content is withheld"))
+    } else {
+        match (cmd.rid, off) {
+            (None, _) => Err((ResultErr::Denied, "rid required")),
+            (_, None) => Err((ResultErr::Denied, "bad offset")),
+            (Some(rid), Some(off)) => shared.broker.detail(rid).and_then(|(sid, text)| {
+                if text.is_char_boundary(off) {
+                    Ok((rid, sid, text, off))
+                } else {
+                    Err((ResultErr::Denied, "bad offset"))
+                }
+            }),
+        }
+    };
+    let res = match res {
+        Ok((rid, sid, text, off)) => {
+            let total = text.len() as u64;
+            for (at, chunk) in chunks(&text, off, crate::broker::DETAIL_CHUNK) {
+                let d = Detail {
+                    rid: Some(rid),
+                    sid: Some(sid),
+                    text: chunk.to_owned(),
+                    off: Some(at as u64),
+                    total: Some(total),
+                };
+                c.send(None, Message::Detail(d)).await?;
+            }
+            CmdResult::ok()
+        }
+        Err((err, msg)) => fail(err, msg),
+    };
+    c.send(Some(id), Message::Result(res)).await
+}
+
+/// `text[off..]` in pieces of at most `max` bytes, each cut on a character boundary, with its offset.
+/// An empty rest is one empty piece, so the device always hears the total.
+fn chunks(text: &str, off: usize, max: usize) -> Vec<(usize, &str)> {
+    let mut out = Vec::new();
+    let mut at = off;
+    loop {
+        let mut end = (at + max).min(text.len());
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        out.push((at, &text[at..end]));
+        if end >= text.len() {
+            return out;
+        }
+        at = end;
     }
 }
 
@@ -801,7 +1021,11 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
             // The broker holds the hook that is waiting for this rid; an unknown or settled rid
             // is stale, so a race against the terminal answer is safe (PROTOCOL §5).
             let decision = match cmd.op {
-                CmdOp::Approve => Some(Decision::Approve),
+                // with `rh` (proto 0.13): approve and save the standing rule the device showed
+                CmdOp::Approve => match cmd.rh {
+                    None => Some(Decision::Approve),
+                    Some(h) => u32::try_from(h).ok().map(Decision::Grant),
+                },
                 CmdOp::Deny => Some(Decision::Deny),
                 _ => match cmd.arg {
                     Some(Arg::Uint(i)) => usize::try_from(i).ok().map(Decision::Reply),
@@ -810,6 +1034,7 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
             };
             let res = match (cmd.rid, decision) {
                 (None, _) => fail(ResultErr::Denied, "rid required"),
+                (_, None) if cmd.op == CmdOp::Approve => fail(ResultErr::Denied, "bad rule hash"),
                 (_, None) => fail(ResultErr::Denied, "reply needs an option index"),
                 (Some(rid), Some(ref d))
                     if shared.broker.grants(rid, d)
@@ -817,9 +1042,17 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
                 {
                     fail(ResultErr::Denied, "hold-to-confirm too short")
                 }
+                (Some(_), Some(Decision::Grant(_)))
+                    if cmd.hold_ms.unwrap_or(0) < MIN_GRANT_HOLD_MS =>
+                {
+                    fail(ResultErr::Denied, "hold-to-confirm too short")
+                }
                 (Some(rid), Some(d)) => match shared.broker.answer(rid, d) {
                     Ok(outcome) => {
-                        tracing::info!("rid {rid} answered from device: {:?}", outcome);
+                        tracing::info!("rid {rid} answered from device: {:?}", outcome.decision);
+                        if let Some(saved) = &outcome.saved {
+                            audit_rule(shared, cmd.sid, rid, saved);
+                        }
                         CmdResult::ok()
                     }
                     Err((err, msg)) => fail(err, msg),
@@ -833,6 +1066,12 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
             );
             res
         }
+        CmdOp::Rerun => rerun_cmd(shared, cmd).await,
+        CmdOp::Cancel if is_job(shared, cmd.sid) => cancel_job(shared, cmd).await,
+        // a job is not a conversation: nothing to type a reply or a transcript into
+        CmdOp::Type | CmdOp::Dictate if is_job(shared, cmd.sid) => {
+            fail(ResultErr::Denied, "not for terminal jobs")
+        }
         CmdOp::Ack | CmdOp::Snooze | CmdOp::NotifyDone => {
             let reg = &shared.registry;
             let arg = match cmd.arg {
@@ -840,6 +1079,8 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
                 _ => None,
             };
             let done = cmd.sid.and_then(|sid| match cmd.op {
+                // a finished job's card is removed, not just marked seen
+                CmdOp::Ack if shared.jobs.dismiss(sid) => Some(()),
                 CmdOp::Ack => reg.ack(sid),
                 CmdOp::Snooze => reg.snooze(sid, arg.unwrap_or(30)),
                 _ => reg.notify_done(sid, arg != Some(0)),
@@ -852,6 +1093,27 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         CmdOp::Type | CmdOp::Cancel | CmdOp::Dictate => type_cmd(shared, cmd).await,
         _ => fail(ResultErr::Unsupported, "command not implemented"),
     }
+}
+
+/// The audit record of a standing rule granted from the device (STANDING-RULES.md §6): the rule as Claude
+/// Code saves it, where, the session, and (in the audit line itself) the time. No command output.
+fn audit_rule(shared: &Shared, sid: Option<u64>, rid: u64, saved: &crate::broker::Saved) {
+    use crate::standing::scope_words;
+    let destination = match saved.scope {
+        agentlink_proto::RuleScope::Session => "session",
+        agentlink_proto::RuleScope::Project => "localSettings",
+    };
+    tracing::info!(
+        "rid {rid}: standing rule granted from the device for {}",
+        scope_words(saved.scope)
+    );
+    shared.trace.audit(
+        "standing_rule",
+        sid,
+        Some(rid),
+        json!({"rule": saved.rule, "scope": scope_words(saved.scope), "destination": destination,
+               "wide": saved.wide, "session": saved.key}),
+    );
 }
 
 /// A transcript answering card `rid` (`Action::Dictate`); the card's owner types it.
@@ -954,12 +1216,87 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         None,
         json!({"cmd": detail, "ok": res.is_ok()}),
     );
+    typing_result(res)
+}
+
+fn typing_result(res: std::result::Result<(), String>) -> CmdResult {
     match res {
         Ok(()) => CmdResult::ok(),
         Err(m) if m.contains("cannot be typed") => fail(ResultErr::Unsupported, &m),
         Err(m) if m.contains("no window") => fail(ResultErr::NoWindow, &m),
         Err(m) => fail(ResultErr::Denied, &m),
     }
+}
+
+fn is_job(shared: &Shared, sid: Option<u64>) -> bool {
+    sid.and_then(|s| shared.registry.agent_of(s)) == Some(Agent::Shell)
+}
+
+/// `Cancel` on a job: Ctrl-C for the shell's terminal (SIGINT to its foreground process group),
+/// only after a hold.
+async fn cancel_job(shared: &Shared, cmd: &Cmd) -> CmdResult {
+    if cmd.hold_ms.unwrap_or(0) < MIN_APPROVE_HOLD_MS {
+        return fail(ResultErr::Denied, "hold-to-confirm too short");
+    }
+    let Some(pid) = cmd.sid.and_then(|sid| shared.jobs.shell_pid(sid)) else {
+        return fail(ResultErr::Stale, "unknown job");
+    };
+    let res = tokio::task::spawn_blocking(move || crate::jobs::interrupt_foreground(pid))
+        .await
+        .unwrap_or_else(|e| Err(crate::jobs::CancelErr::Failed(e.to_string())));
+    shared.trace.audit(
+        "interrupt",
+        cmd.sid,
+        None,
+        json!({"cmd": serde_json::to_value(cmd).unwrap_or_default(), "ok": res.is_ok()}),
+    );
+    use crate::jobs::CancelErr;
+    match res {
+        Ok(()) => CmdResult::ok(),
+        Err(CancelErr::Stale) => fail(ResultErr::Stale, "nothing runs in that terminal"),
+        Err(CancelErr::Unsupported) => fail(ResultErr::Unsupported, "stop unsupported here"),
+        Err(CancelErr::Failed(m)) => fail(ResultErr::Internal, &m),
+    }
+}
+
+/// `Rerun`: a finished job's command line typed into its terminal again, after a hold. The
+/// audit line names the command like `type` does (the op and sid), never the text.
+async fn rerun_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
+    use crate::jobs::RerunErr;
+    if cmd.hold_ms.unwrap_or(0) < MIN_APPROVE_HOLD_MS {
+        return fail(ResultErr::Denied, "hold-to-confirm too short");
+    }
+    let route = cmd
+        .sid
+        .map_or(Route::Unknown, |sid| shared.registry.route(sid));
+    let (session, ctx) = match route {
+        Route::Ready(s, ctx) => (s, ctx),
+        Route::Unknown => return fail(ResultErr::Stale, "unknown session"),
+        Route::Unsupported => return fail(ResultErr::Unsupported, "no terminal for this session"),
+    };
+    if session.ag != Some(Agent::Shell) {
+        return fail(ResultErr::Denied, "only a finished job can run again");
+    }
+    let text = match shared.jobs.rerun_text(session.sid) {
+        Ok(t) => t,
+        Err(RerunErr::Stale) => return fail(ResultErr::Stale, "no finished job"),
+        Err(RerunErr::Busy) => return fail(ResultErr::Denied, "the terminal is busy"),
+        Err(RerunErr::Untypable) => {
+            return fail(ResultErr::Denied, "that command cannot be typed again")
+        }
+    };
+    let term = shared.term.clone();
+    let res =
+        tokio::task::spawn_blocking(move || crate::typing::type_reply(term.as_ref(), &ctx, &text))
+            .await
+            .unwrap_or_else(|e| Err(e.to_string()));
+    shared.trace.audit(
+        "rerun",
+        cmd.sid,
+        None,
+        json!({"cmd": serde_json::to_value(cmd).unwrap_or_default(), "ok": res.is_ok()}),
+    );
+    typing_result(res)
 }
 
 #[cfg(test)]
@@ -1095,6 +1432,7 @@ mod tests {
                 seq: Some(seq),
             })),
             hold_ms: None,
+            rh: None,
         }
     }
 
@@ -1148,6 +1486,7 @@ mod tests {
             rid: None,
             arg: arg.map(Arg::Uint),
             hold_ms,
+            rh: None,
         }
     }
 
@@ -1236,6 +1575,8 @@ mod tests {
                 peer_minor: minor,
                 dictate: false,
                 deltas: DeltaQueue::default(),
+                hidden: HashSet::new(),
+                linked: None,
             };
             let out = c.for_peer(s.clone());
             assert_eq!(
@@ -1415,6 +1756,7 @@ mod tests {
             rid,
             arg,
             hold_ms,
+            rh: None,
         }
     }
 
@@ -1444,6 +1786,7 @@ mod tests {
             focus_only: false,
             dictate: false,
             notice: false,
+            standing: None,
         };
         let (rid, wait) = shared.broker.open(req(vec![]));
         let mut d = spawn_link(&shared);
@@ -1486,7 +1829,7 @@ mod tests {
         // reply with an option index, delivered as an attention while connected
         let (rid, wait) = shared.broker.open(req(vec![
             ("Yes".into(), Meaning::Allow),
-            ("Yes, don't ask again".into(), Meaning::AllowGrant),
+            ("Yes, this one too".into(), Meaning::Allow),
             ("No".into(), Meaning::Deny),
         ]));
         let Message::Attention(att) = d.next().await.msg else {
@@ -1512,7 +1855,7 @@ mod tests {
             .unwrap();
         assert!(result_of(&mut d).await.ok);
         let out = wait.await.unwrap();
-        assert_eq!((out.decision, out.grant), ("allow", true));
+        assert_eq!((out.decision, out.permissions), ("allow", None));
         let _clear = d.next().await;
         // reply without an index, and deny of an unknown rid
         d.to_daemon
@@ -1523,6 +1866,394 @@ mod tests {
             .send(cmd_bytes(6, cmd(CmdOp::Deny, Some(4242), None, None)))
             .unwrap();
         assert_eq!(result_of(&mut d).await.err, Some(ResultErr::Stale));
+    }
+
+    fn long_req(text: &str, ttl_s: u64) -> crate::broker::Request {
+        crate::broker::Request {
+            sid: 1,
+            key: "claude:s".into(),
+            tool: Some("Bash".into()),
+            kind: AttKind::Approval,
+            title: Some("Run shell command".into()),
+            text: Some(text.into()),
+            opts: Vec::new(),
+            ttl: std::time::Duration::from_secs(ttl_s),
+            focus_only: false,
+            dictate: false,
+            notice: false,
+            standing: None,
+        }
+    }
+
+    /// Connects a device speaking proto 0.`minor` and reads past the welcome and the snapshot.
+    async fn linked(shared: &Arc<Shared>, minor: u64) -> Dev {
+        let mut d = spawn_link(shared);
+        d.to_daemon.send(hello_with_minor("1.0.0", minor)).unwrap();
+        d.next().await; // welcome
+        d.next().await; // snapshot
+        d
+    }
+
+    fn rule_req() -> crate::broker::Request {
+        let payload = json!({"tool_name": "Bash", "tool_input": {"command": "npm test"},
+            "permission_suggestions": [
+                {"type": "setMode", "mode": "acceptEdits", "destination": "session"},
+                {"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "npm test:*"}],
+                 "behavior": "allow", "destination": "localSettings"}]});
+        crate::broker::request_of(
+            1,
+            "claude:s".into(),
+            "claude",
+            "PermissionRequest",
+            &payload,
+            std::time::Duration::from_secs(30),
+        )
+        .unwrap()
+    }
+
+    fn grant_cmd(rid: u64, rh: u64, hold_ms: u64) -> Cmd {
+        Cmd {
+            rh: Some(rh),
+            ..cmd(CmdOp::Approve, Some(rid), None, Some(hold_ms))
+        }
+    }
+
+    /// STANDING-RULES.md: the rule reaches only devices speaking 0.13; a grant needs the longer hold and the
+    /// hash of the very rule offered; it releases the hook with that one entry and writes the audit line.
+    #[tokio::test]
+    async fn a_standing_rule_reaches_only_0_13_and_needs_its_own_hash_and_hold() {
+        use agentlink_proto::RuleScope;
+        let dir = std::env::temp_dir().join(format!("al-rule-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let audit = dir.join("audit.jsonl");
+        let trace = Trace::new(dir.join("trace"), audit.clone());
+        let registry = Arc::new(Registry::new(trace.clone()));
+        let shared = Arc::new(Shared::new(
+            registry.clone(),
+            Arc::new(Broker::new(registry)),
+            trace,
+            Arc::new(NoFocus),
+            Arc::new(FakeScroll::default()),
+        ));
+        let (rid, wait) = shared.broker.open(rule_req());
+        // an older watch: Approve / Deny only, no rule keys, and approve allows once
+        let mut old = linked(&shared, 12).await;
+        let Message::Attention(a) = old.next().await.msg else {
+            panic!()
+        };
+        assert_eq!((a.rid, &a.rule, a.scope, a.wide), (rid, &None, None, None));
+        assert!(
+            a.opts.is_none(),
+            "no 'don't ask again' option for an old watch either"
+        );
+        let mut new = linked(&shared, 13).await;
+        let Message::Attention(a) = new.next().await.msg else {
+            panic!()
+        };
+        assert_eq!(a.rule.as_deref(), Some("Bash(npm test:*)"));
+        assert_eq!((a.scope, a.wide), (Some(RuleScope::Project), Some(true)));
+        let h = u64::from(crate::standing::hash(
+            "Bash(npm test:*)",
+            RuleScope::Project,
+            true,
+        ));
+        // the approve hold is not enough for a grant; nor a hash of another rule, nor one past u32
+        for (c, want) in [
+            (grant_cmd(rid, h, 1250), ResultErr::Denied),
+            (grant_cmd(rid, h ^ 1, 1600), ResultErr::Denied),
+            (grant_cmd(rid, 1 << 40, 1600), ResultErr::Denied),
+            (grant_cmd(rid + 1, h, 1600), ResultErr::Stale),
+        ] {
+            new.to_daemon.send(cmd_bytes(1, c)).unwrap();
+            let r = result_of(&mut new).await;
+            assert_eq!((r.ok, r.err), (false, Some(want)));
+        }
+        assert_eq!(shared.broker.pending().len(), 1, "still open");
+        new.to_daemon
+            .send(cmd_bytes(2, grant_cmd(rid, h, 1600)))
+            .unwrap();
+        assert!(result_of(&mut new).await.ok);
+        let out = wait.await.unwrap();
+        let line = serde_json::to_value(&out).unwrap();
+        assert_eq!(line["decision"], "allow");
+        assert_eq!(line["permissions"].as_array().unwrap().len(), 1);
+        assert_eq!(line["permissions"][0]["destination"], "localSettings");
+        assert_eq!(
+            line["permissions"][0]["rules"][0]["ruleContent"],
+            "npm test:*"
+        );
+        // the audit log: rule, scope, session, time; no command and no output
+        let log = std::fs::read_to_string(&audit).unwrap();
+        let rec: Value = log
+            .lines()
+            .map(|l| serde_json::from_str::<Value>(l).unwrap())
+            .find(|v| v["kind"] == "standing_rule")
+            .expect("a standing_rule audit line");
+        assert_eq!(rec["msg"]["rule"], "Bash(npm test:*)");
+        assert_eq!(rec["msg"]["scope"], "this project");
+        assert_eq!(rec["msg"]["destination"], "localSettings");
+        assert_eq!(rec["msg"]["session"], "claude:s");
+        assert_eq!(rec["rid"], rid);
+        assert!(rec["ts"].is_string());
+        assert!(!rec.to_string().contains("tool_input"));
+        // answered: the same grant again is stale
+        new.next().await; // clear
+        new.to_daemon
+            .send(cmd_bytes(3, grant_cmd(rid, h, 1600)))
+            .unwrap();
+        assert_eq!(result_of(&mut new).await.err, Some(ResultErr::Stale));
+    }
+
+    /// The text of every `detail` chunk up to the command's `result`, which it returns.
+    async fn detail_chunks(d: &mut Dev) -> (Vec<Detail>, CmdResult) {
+        let mut chunks = Vec::new();
+        loop {
+            match d.next().await.msg {
+                Message::Detail(c) => chunks.push(c),
+                Message::Result(r) => return (chunks, r),
+                m => panic!("unexpected {m:?}"),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn the_window_and_full_text_reach_only_devices_speaking_0_11() {
+        let shared = shared();
+        let text = format!("deploy{}", " --flag".repeat(60));
+        let (rid, _wait) = shared.broker.open(long_req(&text, 60));
+        let mut old = linked(&shared, 10).await;
+        let mut new = linked(&shared, 11).await;
+        let Message::Attention(a) = old.next().await.msg else {
+            panic!()
+        };
+        assert_eq!(
+            (a.left, a.win, a.len),
+            (None, None, None),
+            "an old decoder rejects unknown keys"
+        );
+        let Message::Attention(a) = new.next().await.msg else {
+            panic!()
+        };
+        assert_eq!(a.win, Some(60_000));
+        assert!(
+            a.left.unwrap() <= 60_000 && a.left.unwrap() > 50_000,
+            "what is left, not the whole window"
+        );
+        assert_eq!(a.len, Some(text.len() as u64));
+        // Open on PC from the 0.10 watch focuses only: the request stays open
+        old.to_daemon
+            .send(cmd_bytes(1, cmd(CmdOp::Focus, Some(rid), None, None)))
+            .unwrap();
+        let _focus_result = result_of(&mut old).await; // no such session here: only the hand-back matters
+        assert_eq!(shared.broker.pending().len(), 1);
+        // from the 0.11 watch it also hands the request back at once
+        new.to_daemon
+            .send(cmd_bytes(1, cmd(CmdOp::Focus, Some(rid), None, None)))
+            .unwrap();
+        let _focus_result = result_of(&mut new).await;
+        assert!(shared.broker.pending().is_empty());
+        let Message::Clear(c) = new.next().await.msg else {
+            panic!()
+        };
+        assert_eq!((c.rid, c.why), (rid, ClearWhy::HandedBack));
+        let Message::Clear(c) = old.next().await.msg else {
+            panic!()
+        };
+        assert_eq!(
+            (c.rid, c.why),
+            (rid, ClearWhy::Cancelled),
+            "an old decoder knows no handed_back"
+        );
+        // and the answer that might still be on its way is stale
+        new.to_daemon
+            .send(cmd_bytes(
+                2,
+                cmd(CmdOp::Approve, Some(rid), None, Some(1250)),
+            ))
+            .unwrap();
+        assert_eq!(result_of(&mut new).await.err, Some(ResultErr::Stale));
+    }
+
+    #[tokio::test]
+    async fn the_full_text_arrives_in_chunks_bound_to_its_request() {
+        let shared = shared();
+        // multi-byte characters across chunk edges, 2.6 KB in all
+        let text = "é".repeat(700) + &"x".repeat(1200);
+        let (rid, wait) = shared.broker.open(long_req(&text, 60));
+        let mut d = linked(&shared, 11).await;
+        let _att = d.next().await;
+        d.to_daemon
+            .send(cmd_bytes(
+                5,
+                cmd(CmdOp::Detail, Some(rid), Some(Arg::Uint(0)), None),
+            ))
+            .unwrap();
+        let (chunks, r) = detail_chunks(&mut d).await;
+        assert!(r.ok);
+        assert!(chunks.len() >= 3);
+        let mut whole = String::new();
+        for c in &chunks {
+            assert_eq!(
+                (c.rid, c.sid, c.total),
+                (Some(rid), Some(1), Some(text.len() as u64))
+            );
+            assert_eq!(c.off, Some(whole.len() as u64), "in order, no gap");
+            assert!(c.text.len() <= crate::broker::DETAIL_CHUNK);
+            whole.push_str(&c.text);
+        }
+        assert_eq!(whole, text);
+        // after a dropped link the watch resumes where it got to
+        let resume = chunks[0].text.len() as u64;
+        d.to_daemon
+            .send(cmd_bytes(
+                6,
+                cmd(CmdOp::Detail, Some(rid), Some(Arg::Uint(resume)), None),
+            ))
+            .unwrap();
+        let (rest, r) = detail_chunks(&mut d).await;
+        assert!(r.ok);
+        assert_eq!(rest[0].off, Some(resume));
+        assert_eq!(
+            rest.iter().map(|c| c.text.as_str()).collect::<String>(),
+            &text[resume as usize..]
+        );
+        // an offset inside a character, the wrong request, or no request: no text at all
+        for (id, rid, off, err) in [
+            (7, Some(rid), 1, ResultErr::Denied),
+            (8, Some(rid + 77), 0, ResultErr::Stale),
+            (9, None, 0, ResultErr::Denied),
+        ] {
+            d.to_daemon
+                .send(cmd_bytes(
+                    id,
+                    cmd(CmdOp::Detail, rid, Some(Arg::Uint(off)), None),
+                ))
+                .unwrap();
+            let (none, r) = detail_chunks(&mut d).await;
+            assert!(none.is_empty());
+            assert_eq!(r.err, Some(err));
+        }
+        // a transfer does not hold up an answer sent right behind it, and the daemon never asks
+        // whether the text was read (that lock is the watch's; a hold is the proof here)
+        d.to_daemon
+            .send(cmd_bytes(
+                10,
+                cmd(CmdOp::Detail, Some(rid), Some(Arg::Uint(0)), None),
+            ))
+            .unwrap();
+        d.to_daemon
+            .send(cmd_bytes(
+                11,
+                cmd(CmdOp::Approve, Some(rid), None, Some(1250)),
+            ))
+            .unwrap();
+        let (_, r) = detail_chunks(&mut d).await;
+        assert!(r.ok);
+        assert!(result_of(&mut d).await.ok);
+        assert_eq!(wait.await.unwrap().decision, "allow");
+        let _clear = d.next().await;
+        // once answered there is no text to fetch
+        d.to_daemon
+            .send(cmd_bytes(
+                12,
+                cmd(CmdOp::Detail, Some(rid), Some(Arg::Uint(0)), None),
+            ))
+            .unwrap();
+        let (none, r) = detail_chunks(&mut d).await;
+        assert!(none.is_empty());
+        assert_eq!(r.err, Some(ResultErr::Stale));
+    }
+
+    #[tokio::test]
+    async fn detail_needs_proto_0_11_and_content_privacy() {
+        let shared = shared();
+        let (rid, _w) = shared.broker.open(long_req(&"y".repeat(500), 60));
+        let mut d = linked(&shared, 10).await;
+        let _att = d.next().await;
+        d.to_daemon
+            .send(cmd_bytes(
+                5,
+                cmd(CmdOp::Detail, Some(rid), Some(Arg::Uint(0)), None),
+            ))
+            .unwrap();
+        let (none, r) = detail_chunks(&mut d).await;
+        assert!(none.is_empty());
+        assert_eq!(r.err, Some(ResultErr::Unsupported));
+        // privacy meta: the length still says the preview is not the whole text (so the watch keeps
+        // Approve locked), but the text itself never leaves the daemon
+        let (_tx, rx) = mpsc::unbounded_channel();
+        let (tx, mut out) = mpsc::unbounded_channel();
+        let mut c = Conn {
+            link: Box::new(ChanLink { rx, tx }),
+            trace: Trace::null(),
+            src: "t".into(),
+            next_id: 1,
+            privacy: Privacy::Meta,
+            peer_minor: 11,
+            dictate: false,
+            deltas: DeltaQueue::default(),
+            hidden: HashSet::new(),
+            linked: None,
+        };
+        c.send(
+            None,
+            Message::Attention(shared.broker.pending().pop().unwrap()),
+        )
+        .await
+        .unwrap();
+        let Message::Attention(a) = Envelope::from_bytes(&out.recv().await.unwrap())
+            .unwrap()
+            .msg
+        else {
+            panic!()
+        };
+        assert_eq!(a.len, Some(500));
+        assert!(a.win.is_some(), "the countdown is metadata");
+        detail_cmd(
+            &shared,
+            &mut c,
+            3,
+            &cmd(CmdOp::Detail, Some(rid), Some(Arg::Uint(0)), None),
+        )
+        .await
+        .unwrap();
+        let env = Envelope::from_bytes(&out.recv().await.unwrap()).unwrap();
+        let Message::Result(r) = env.msg else {
+            panic!("no detail under meta, got {:?}", env.msg)
+        };
+        assert_eq!(r.err, Some(ResultErr::Denied));
+    }
+
+    #[test]
+    fn chunks_cut_on_character_boundaries() {
+        let t = "aé€😀".repeat(3);
+        for max in [4usize, 5, 7, 100] {
+            let cs = chunks(&t, 0, max);
+            assert_eq!(cs.iter().map(|(_, c)| *c).collect::<String>(), t);
+            assert!(cs.iter().all(|(_, c)| c.len() <= max && !c.is_empty()));
+        }
+        assert_eq!(
+            chunks("", 0, 8),
+            vec![(0, "")],
+            "an empty text still says its total"
+        );
+        assert_eq!(chunks("abc", 3, 8), vec![(3, "")]);
+    }
+
+    #[tokio::test]
+    async fn a_linked_device_counts_until_its_link_ends() {
+        let shared = shared();
+        assert_eq!(shared.broker.devices(), 0);
+        let d = linked(&shared, 11).await;
+        assert_eq!(shared.broker.devices(), 1);
+        drop(d);
+        for _ in 0..50 {
+            if shared.broker.devices() == 0 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        assert_eq!(shared.broker.devices(), 0);
     }
 
     fn spawn_link(shared: &Arc<Shared>) -> Dev {
@@ -1656,6 +2387,8 @@ mod tests {
             peer_minor: 2,
             dictate: false,
             deltas: DeltaQueue::default(),
+            hidden: HashSet::new(),
+            linked: None,
         };
         let mut s = Session::delta(1);
         (s.snz, s.ntf, s.n, s.ok, s.sum) = (
@@ -1673,6 +2406,353 @@ mod tests {
         assert_eq!((out.snz, out.n, out.ok), (Some(5), Some(2), Some(true)));
         c.privacy = Privacy::Meta;
         assert_eq!(c.for_peer(s).sum, None);
+    }
+
+    fn test_conn(peer_minor: u64) -> Conn {
+        let (_tx, rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        Conn {
+            link: Box::new(ChanLink { rx, tx }),
+            trace: Trace::null(),
+            src: "t".into(),
+            next_id: 1,
+            privacy: Privacy::Preview,
+            peer_minor,
+            dictate: false,
+            deltas: DeltaQueue::default(),
+            hidden: HashSet::new(),
+            linked: None,
+        }
+    }
+
+    #[test]
+    fn hush_only_for_a_finished_session_in_front_of_the_user_and_only_to_0_12() {
+        use crate::presence::Here;
+        let fin = |st, ntf| {
+            let mut s = Session::delta(1);
+            s.st = Some(st);
+            s.ntf = ntf;
+            s
+        };
+        for st in [SessState::Done, SessState::Error] {
+            assert_eq!(hush_finished(&fin(st, None), Here::Focused), Some(true));
+            assert_eq!(hush_finished(&fin(st, None), Here::AtKeyboard), None);
+            assert_eq!(hush_finished(&fin(st, None), Here::Away), None);
+            // armed with Notify: the user asked to be told
+            assert_eq!(hush_finished(&fin(st, Some(false)), Here::Focused), None);
+        }
+        for st in [SessState::Work, SessState::Input, SessState::Idle] {
+            assert_eq!(hush_finished(&fin(st, None), Here::Focused), None, "{st:?}");
+        }
+        // an older device gets neither key
+        let mut s = fin(SessState::Done, None);
+        s.hush = Some(true);
+        let mut c = test_conn(11);
+        assert_eq!(c.for_peer(s.clone()).hush, None);
+        c.peer_minor = 12;
+        assert_eq!(c.for_peer(s).hush, Some(true));
+    }
+
+    /// A shell whose job ran (and ended, when `exit` is given) in a `Shared` with a fake terminal.
+    fn job_shared(term: Arc<FakeTerm>, exit: Option<u64>) -> (Arc<Shared>, u64) {
+        use crate::jobs::{Config, Jobs};
+        let trace = Trace::null();
+        let registry = Arc::new(Registry::new(trace.clone()));
+        let mut s = Shared::new(
+            registry.clone(),
+            Arc::new(Broker::new(registry)),
+            trace,
+            Arc::new(NoFocus),
+            Arc::new(FakeScroll::default()),
+        );
+        s.term = term;
+        s.jobs = Arc::new(Jobs::new(
+            s.registry.clone(),
+            Config {
+                min: std::time::Duration::ZERO,
+                ..Default::default()
+            },
+        ));
+        let now = std::time::Instant::now();
+        s.jobs.start(
+            now,
+            1000,
+            4321,
+            "cargo test -- --nocapture",
+            Default::default(),
+        );
+        s.jobs.tick(now);
+        if let Some(code) = exit {
+            s.jobs.end(now, 4321, code);
+        }
+        let sid = s.registry.sid_of("shell:4321").unwrap();
+        (Arc::new(s), sid)
+    }
+
+    #[tokio::test]
+    async fn rerun_types_a_finished_jobs_line_and_refuses_the_rest() {
+        let term = Arc::new(FakeTerm::default());
+        let (shared, sid) = job_shared(term.clone(), Some(1));
+        let rerun = |sid, hold| type_cmd_of(CmdOp::Rerun, sid, None, hold);
+        let r = handle_cmd(&shared, &rerun(sid, Some(300))).await;
+        assert_eq!(
+            (r.ok, r.err),
+            (false, Some(ResultErr::Denied)),
+            "needs a hold"
+        );
+        let r = handle_cmd(&shared, &rerun(999, Some(1250))).await;
+        assert_eq!(r.err, Some(ResultErr::Stale));
+        assert!(term.sent.lock().unwrap().is_empty());
+        let agent = add_session(&shared);
+        let r = handle_cmd(&shared, &rerun(agent, Some(1250))).await;
+        assert_eq!(r.err, Some(ResultErr::Denied), "not a job");
+
+        let r = handle_cmd(&shared, &rerun(sid, Some(1250))).await;
+        assert!(r.ok, "{r:?}");
+        assert_eq!(
+            *term.sent.lock().unwrap(),
+            vec!["cargo test -- --nocapture", "\\r"]
+        );
+
+        // the shell is running something again: refused
+        shared
+            .jobs
+            .start(std::time::Instant::now(), 1, 4321, "ls", Default::default());
+        let r = handle_cmd(&shared, &rerun(sid, Some(1250))).await;
+        assert_eq!(r.err, Some(ResultErr::Denied));
+        assert_eq!(term.sent.lock().unwrap().len(), 2);
+
+        // a job still running (no finished one) is not a finished job
+        let (running, sid) = job_shared(Arc::new(FakeTerm::default()), None);
+        let r = handle_cmd(&running, &rerun(sid, Some(1250))).await;
+        assert_eq!(r.err, Some(ResultErr::Stale));
+        // no quick replies or transcripts for a job
+        let r = handle_cmd(&running, &type_cmd_of(CmdOp::Type, sid, Some(0), None)).await;
+        assert_eq!(r.err, Some(ResultErr::Denied));
+    }
+
+    #[tokio::test]
+    async fn stop_needs_a_hold_and_a_running_foreground_job() {
+        let term = Arc::new(FakeTerm::default());
+        let (shared, sid) = job_shared(term.clone(), None);
+        let stop = |sid, hold| type_cmd_of(CmdOp::Cancel, sid, None, hold);
+        let r = handle_cmd(&shared, &stop(sid, Some(300))).await;
+        assert_eq!(r.err, Some(ResultErr::Denied));
+        // shell pid 4321 is not a process of this machine's tty: nothing to interrupt
+        let r = handle_cmd(&shared, &stop(sid, Some(1250))).await;
+        assert!(!r.ok);
+        assert!(
+            term.sent.lock().unwrap().is_empty(),
+            "a job is stopped with SIGINT, never Esc"
+        );
+    }
+
+    #[tokio::test]
+    async fn ack_removes_a_finished_job_but_only_marks_a_running_one() {
+        let (shared, sid) = job_shared(Arc::new(FakeTerm::default()), None);
+        let ack = type_cmd_of(CmdOp::Ack, sid, None, None);
+        assert!(handle_cmd(&shared, &ack).await.ok);
+        assert_eq!(
+            shared.registry.snapshot()[0].seen,
+            Some(true),
+            "still there"
+        );
+        shared.jobs.end(std::time::Instant::now(), 4321, 0);
+        assert!(handle_cmd(&shared, &ack).await.ok);
+        assert!(shared.registry.snapshot().is_empty());
+        assert_eq!(handle_cmd(&shared, &ack).await.err, Some(ResultErr::Stale));
+    }
+
+    #[tokio::test]
+    async fn jobs_reach_only_devices_speaking_proto_0_9() {
+        let (shared, sid) = job_shared(Arc::new(FakeTerm::default()), None);
+        let agent = add_session(&shared);
+        for (minor, sees) in [(8, false), (9, true)] {
+            let mut d = spawn_link(&shared);
+            d.to_daemon.send(hello_with_minor("1.0.0", minor)).unwrap();
+            d.next().await;
+            let Message::Snapshot(s) = d.next().await.msg else {
+                panic!("snapshot")
+            };
+            let sids: Vec<u64> = s.sessions.iter().map(|s| s.sid).collect();
+            assert_eq!(sids.contains(&sid), sees, "minor {minor}");
+            assert!(sids.contains(&agent));
+            let job = s.sessions.iter().find(|s| s.sid == sid);
+            assert_eq!(job.map(|s| s.eta), sees.then_some(Some(0)));
+
+            // a delta, the finish with its exit status, and the card's removal
+            shared.jobs.end(std::time::Instant::now(), 4321, 2);
+            shared.registry.publish(Update::Gone(sid));
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+            let ping = Envelope {
+                id: 99,
+                re: None,
+                msg: Message::Ping(Empty {}),
+            };
+            d.to_daemon.send(ping.to_bytes().unwrap()).unwrap();
+            let mut seen = Vec::new();
+            loop {
+                match d.next().await.msg {
+                    Message::Pong(_) => break,
+                    m => seen.push(m),
+                }
+            }
+            if sees {
+                assert!(
+                    matches!(&seen[0], Message::SessionUpd(u) if u.exit == Some(2)),
+                    "{seen:?}"
+                );
+                assert!(matches!(seen.last(), Some(Message::Gone(g)) if g.sid == sid));
+            } else {
+                assert!(seen.is_empty(), "nothing for an old device: {seen:?}");
+            }
+            // the next round starts from a fresh job
+            if minor == 8 {
+                let now = std::time::Instant::now();
+                shared
+                    .jobs
+                    .start(now, 1000, 4321, "cargo test", Default::default());
+                shared.jobs.tick(now);
+            }
+        }
+    }
+
+    #[test]
+    fn job_estimate_and_exit_are_stripped_for_old_devices() {
+        let (_tx, rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let mut c = Conn {
+            link: Box::new(ChanLink { rx, tx }),
+            trace: Trace::null(),
+            src: "t".into(),
+            next_id: 1,
+            privacy: Privacy::Preview,
+            peer_minor: 8,
+            dictate: false,
+            deltas: DeltaQueue::default(),
+            hidden: HashSet::new(),
+            linked: None,
+        };
+        let mut s = Session::delta(1);
+        (s.eta, s.exit) = (Some(60), Some(1));
+        let out = c.for_peer(s.clone());
+        assert_eq!((out.eta, out.exit), (None, None));
+        c.peer_minor = 9;
+        let out = c.for_peer(s);
+        assert_eq!((out.eta, out.exit), (Some(60), Some(1)));
+    }
+
+    #[test]
+    fn gauge_fields_need_proto_0_10_and_the_pull_request_needs_privacy() {
+        let (_tx, rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let mut c = Conn {
+            link: Box::new(ChanLink { rx, tx }),
+            trace: Trace::null(),
+            src: "t".into(),
+            next_id: 1,
+            privacy: Privacy::Preview,
+            peer_minor: 9,
+            dictate: false,
+            deltas: DeltaQueue::default(),
+            hidden: HashSet::new(),
+            linked: None,
+        };
+        let mut s = Session::delta(1);
+        (s.ctx, s.mdl, s.pm, s.pr, s.prs) = (
+            Some(72),
+            Some("Opus".into()),
+            Some(PermMode::Plan),
+            Some(12),
+            Some(PrState::Approved),
+        );
+        let out = c.for_peer(s.clone());
+        assert_eq!(out, Session::delta(1), "an 0.9 device gets none of them");
+        c.peer_minor = 10;
+        assert_eq!(c.for_peer(s.clone()), s);
+        c.privacy = Privacy::Meta;
+        let out = c.for_peer(s);
+        assert_eq!(
+            (out.ctx, out.pm, out.pr, out.prs),
+            (Some(72), Some(PermMode::Plan), None, None)
+        );
+    }
+
+    #[test]
+    fn done_summary_needs_proto_0_14_and_survives_privacy_meta() {
+        let (_tx, rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let mut c = Conn {
+            link: Box::new(ChanLink { rx, tx }),
+            trace: Trace::null(),
+            src: "t".into(),
+            next_id: 1,
+            privacy: Privacy::Preview,
+            peer_minor: 13,
+            dictate: false,
+            deltas: DeltaQueue::default(),
+            hidden: HashSet::new(),
+            linked: None,
+        };
+        let mut s = Session::delta(1);
+        (s.fc, s.la, s.lr, s.tp, s.dur) = (Some(3), Some(120), Some(14), Some(false), Some(252));
+        assert_eq!(
+            c.for_peer(s.clone()),
+            Session::delta(1),
+            "an 0.13 device gets none of it"
+        );
+        c.peer_minor = 14;
+        assert_eq!(c.for_peer(s.clone()), s);
+        // counts and seconds are metadata: the text-withholding mode keeps them
+        c.privacy = Privacy::Meta;
+        assert_eq!(c.for_peer(s.clone()), s);
+    }
+
+    #[tokio::test]
+    async fn usage_reaches_only_devices_speaking_proto_0_10() {
+        use crate::usage::{Rates, Window};
+        let shared = shared();
+        let now = now_unix();
+        let w = |pct| Window {
+            pct,
+            resets_at: now + 3600,
+        };
+        // a reading from before the device connected is handed over after the snapshot
+        shared.registry.record_usage(Rates {
+            five_hour: Some(w(42.0)),
+            seven_day: None,
+        });
+        for (minor, sees) in [(9, false), (10, true)] {
+            let mut d = spawn_link(&shared);
+            d.to_daemon.send(hello_with_minor("1.0.0", minor)).unwrap();
+            d.next().await; // welcome
+            d.next().await; // snapshot
+            shared.registry.record_usage(Rates {
+                five_hour: Some(w(43.0 + minor as f64)),
+                seven_day: None,
+            });
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+            let ping = Envelope {
+                id: 99,
+                re: None,
+                msg: Message::Ping(Empty {}),
+            };
+            d.to_daemon.send(ping.to_bytes().unwrap()).unwrap();
+            let mut seen = Vec::new();
+            loop {
+                match d.next().await.msg {
+                    Message::Pong(_) => break,
+                    Message::Usage(u) => seen.push(u.h5),
+                    m => panic!("unexpected {m:?}"),
+                }
+            }
+            if sees {
+                assert_eq!(seen.len(), 2, "{seen:?}");
+                assert_eq!(seen[1], Some(53));
+            } else {
+                assert!(seen.is_empty(), "nothing for an old device: {seen:?}");
+            }
+        }
     }
 
     #[tokio::test]

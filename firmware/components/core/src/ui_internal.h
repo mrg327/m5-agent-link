@@ -24,6 +24,7 @@ void ui_motion_enter(lv_obj_t *content);
 
 /* Mode plumbing (ui.c): the interaction layer decides, the screens draw. */
 nav_mode_t ui_mode(void);
+void ui_go_back(void);          /* one level back; the ASK reader closes first */
 void ui_go_home(void);          /* leave AGENT (commit, back, chord, timeout) */
 void ui_go_watch(void);
 void ui_go_keys(void);  /* the Reply list's "Type...": open KEYS on the selected session */
@@ -56,7 +57,9 @@ void ui_home_note_input(void);  /* any input anywhere resets the ambient timer a
 bool ui_home_request_pending(void); /* the selected session has an unanswered approvable request on screen */
 bool ui_home_askable(void);         /* the selected session has an unanswered permission or question */
 uint32_t ui_home_sel_sid(void);
+const attention_t *ui_home_sel_request(void); /* the selected session's unanswered permission or question */
 lv_obj_t *ui_home_ring(void);
+void ui_home_rim_mode(bool dial); /* true: a rim drag dials through a list; false: it picks session segments */
 void ui_home_set_card_shown(bool shown);
 void ui_home_select_sid(uint32_t sid, const char *via);
 void ui_home_report(ui_report_t *r);
@@ -90,8 +93,11 @@ void ui_ask_open(uint32_t sid, uint32_t now_ms);
 void ui_ask_close(void);
 bool ui_ask_refresh(uint32_t now_ms); /* false: nothing left to ask */
 bool ui_ask_act(nav_action_t a, const gesture_evt_t *g);
+bool ui_ask_back(void);               /* true: the reader was open and is now closed */
 bool ui_ask_tick(uint32_t now_ms);    /* true: wants to close */
 void ui_ask_report(ui_report_t *r);
+/* The request ASK shows and can still be answered (its countdown runs), or NULL. */
+const attention_t *ui_ask_request(void);
 
 /* The STATUS screen (ui_status.c). */
 lv_obj_t *ui_status_init(lv_obj_t *screen);

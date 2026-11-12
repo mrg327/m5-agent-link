@@ -3,7 +3,9 @@
 #include "link_internal.h"
 
 link_state_t g_link;
-struct envelope_r g_rx_env, g_tx_env;
+/* The decoded and the to-be-encoded message: 6 KB each, only touched from core_step. PSRAM. */
+MODEL_EXT_BSS struct envelope_r g_rx_env;
+MODEL_EXT_BSS struct envelope_r g_tx_env;
 
 #define HELLO_RETRY_MS 3000
 /* While welcomed on another transport with USB plugged in, offer a hello on USB this often: a daemon
@@ -198,6 +200,16 @@ bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg, u
     c->cmd_arg_m.cmd_arg_m.cmd_arg_choice = cmd_arg_uint_c;
     c->cmd_arg_m.cmd_arg_m.cmd_arg_uint = arg;
     return finish_cmd(op, sid, rid, hold_ms, (int)arg);
+}
+
+bool link_send_approve_rule(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32_t rh)
+{
+    struct cmd *c = begin_cmd(LINK_OP_APPROVE, sid, rid, hold_ms);
+    if (!c) return false;
+    c->cmd_uint5uint_present = true;
+    c->cmd_uint5uint.cmd_uint5uint = rh;
+    dbg_event("link", "tx_rule", "\"rid\":%u,\"rh\":%u", (unsigned)rid, (unsigned)rh);
+    return finish_cmd(LINK_OP_APPROVE, sid, rid, hold_ms, -1);
 }
 
 bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq)

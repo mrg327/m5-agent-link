@@ -305,30 +305,29 @@ pub fn permission_request(
         focus_only: true,
         dictate: false,
         notice: false,
+        standing: None,
     };
     let Some(s) = screen.filter(|s| s.kind == Kind::Permission && s.opts.len() <= 9) else {
         return (req, None);
     };
-    // Four fit on the watch: keep the first three and the last (the "No").
-    let map: Vec<usize> = if s.opts.len() <= 4 {
-        (0..s.opts.len()).collect()
-    } else {
-        vec![0, 1, 2, s.opts.len() - 1]
-    };
+    // The first option (allow once) and the "No" ones. Copilot's "Yes, and don't ask again for `touch` in
+    // this repo" and any other allow-class option are left to the terminal: what they save is read off
+    // the screen, not known exactly, so the watch cannot show the rule it would grant
+    // (STANDING-RULES.md §7). Four fit on the watch.
+    let is_no = |i: usize| s.opts[i].to_ascii_lowercase().starts_with("no");
+    let map: Vec<usize> = (0..s.opts.len())
+        .filter(|&i| i == 0 || is_no(i))
+        .take(4)
+        .collect();
     req.opts = map
         .iter()
         .map(|&i| {
-            let label = &s.opts[i];
-            let lower = label.to_ascii_lowercase();
-            let meaning = if lower.starts_with("no") {
+            let meaning = if is_no(i) {
                 Meaning::Deny
-            } else if i == 0 {
-                Meaning::Allow
             } else {
-                // "Yes, and …" and anything unknown: allow-class, so the device makes you hold
-                Meaning::AllowGrant
+                Meaning::Allow
             };
-            (short_label(i, label), meaning)
+            (short_label(i, &s.opts[i]), meaning)
         })
         .collect();
     req.focus_only = false;
@@ -395,6 +394,7 @@ pub fn ask_requests(sid: u64, key: String, tool_args: &Value) -> Vec<(Request, O
         focus_only: true,
         dictate: false,
         notice: false,
+        standing: None,
     };
     let fields: Vec<(Option<String>, Vec<String>, bool)> = args["requestedSchema"]["properties"]
         .as_object()
@@ -697,7 +697,9 @@ async fn wait_for_screen(env: &Env, sid: u64, kinds: &[Kind]) -> Option<Screen> 
 /// Opens one card and types the device's answer; true when an answer was typed.
 async fn open_and_wait(env: Env, sid: u64, req: Request, expect: Option<Expect>) -> bool {
     let ttl = req.ttl;
-    let (rid, rx) = env.broker.open(req);
+    use crate::presence::{global, hush, Event};
+    let (here, _, _) = global().here_async(env.registry.host_ctx(sid)).await;
+    let (rid, rx) = env.broker.open_with(req, hush(Event::Needs, here));
     let outcome: Outcome = match tokio::time::timeout(ttl, rx).await {
         Ok(Ok(o)) => o,
         Ok(Err(_)) => return false, // the terminal answered (or the card was cancelled)
@@ -827,12 +829,16 @@ mod tests {
         assert_eq!(req.text.as_deref(), Some("touch /tmp/x"));
         assert!(!req.focus_only);
         let labels: Vec<_> = req.opts.iter().map(|o| o.0.as_str()).collect();
-        assert_eq!(labels, ["Yes", "Yes, don't ask again", "No"]);
+        // the "don't ask again" option is left to the terminal (STANDING-RULES.md §7)
+        assert_eq!(labels, ["Yes", "No"]);
         assert_eq!(
             req.opts.iter().map(|o| o.1.clone()).collect::<Vec<_>>(),
-            [Meaning::Allow, Meaning::AllowGrant, Meaning::Deny]
+            [Meaning::Allow, Meaning::Deny]
         );
-        assert!(matches!(expect, Some(Expect::Permission { n: 3, .. })));
+        match expect {
+            Some(Expect::Permission { n: 3, ref map, .. }) => assert_eq!(map, &[0, 2]),
+            ref e => panic!("{e:?}"),
+        }
         // unreadable terminal: Focus only
         let (req, expect) = permission_request(4, "copilot:s".into(), "Fetch it", None);
         assert!(req.focus_only && expect.is_none());
@@ -1009,7 +1015,8 @@ mod tests {
         let (_, expect) = permission_request(1, "k".into(), "x", Some(&s));
         let expect = expect.unwrap();
         let t = Fake::new(&[PERM]);
-        type_answer(&t, &HostCtx::default(), &expect, 2, Duration::ZERO).unwrap();
+        // the watch's second option is the "No", the screen's third
+        type_answer(&t, &HostCtx::default(), &expect, 1, Duration::ZERO).unwrap();
         assert_eq!(*t.keys.lock().unwrap(), ["3"]);
 
         let other = PERM.replace("touch /tmp/x  ", "rm -rf /tmp/x");

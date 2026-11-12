@@ -9,11 +9,16 @@
 #include "debug.h"
 #include "hal.h"
 #include "nav.h"
+#include "ui_gauges.h"
 #include "ui_internal.h"
 #include "ui_theme.h"
 
 #define TIME_Y 116
 #define CHIP_Y 168
+/* With the usage gauges (GAUGES.md) the clock is the title size and higher, the chips follow it, and
+ * the two figure rows sit at y 152 and 180 (ui_gauges.c). */
+#define TIME_Y_G 84
+#define CHIP_Y_G 120
 #define TOGGLE_Y 246
 #define TOGGLE_D 76
 #define TOGGLE_HIT 46 /* tap radius: a little beyond the disc */
@@ -30,6 +35,7 @@ static uint32_t s_now, s_last_input, s_last_render;
 static status_item_t s_items[ST_COUNT];
 static int s_n, s_sel;
 static char s_time_txt[24], s_link_txt[64], s_batt_txt[24], s_desc_txt[96], s_word_txt[16];
+static bool s_gauges; /* the usage gauges are shown: the top of the screen is laid out for them */
 
 static void show(lv_obj_t *o, bool on)
 {
@@ -146,13 +152,18 @@ static void render_chips(void)
     theme_set_text(s_batt, s_batt_txt, sizeof s_batt_txt, buf);
     show(s_batt, buf[0] != 0);
     lv_obj_update_layout(s_chips);
-    theme_align(s_chips, LV_ALIGN_TOP_MID, 0, CHIP_Y - lv_obj_get_height(s_chips) / 2);
+    theme_align(s_chips, LV_ALIGN_TOP_MID, 0, (s_gauges ? CHIP_Y_G : CHIP_Y) - lv_obj_get_height(s_chips) / 2);
 }
 
-/* LVGL invalidates on every style write, so write the font only when it changes. */
+/* LVGL invalidates on every style write, so write the font only when it changes. The label keeps its centre
+ * row (y TIME_Y, or TIME_Y_G under the gauges) whatever the font. */
 static void set_time_font(const lv_font_t *f)
 {
+    if (s_gauges && f == FONT_NUM) f = FONT_TITLE;
+    int lh = lv_font_get_line_height(f), y = (s_gauges ? TIME_Y_G : TIME_Y) - lh / 2;
     if (lv_obj_get_style_text_font(s_time, 0) != f) lv_obj_set_style_text_font(s_time, f, 0);
+    if (lv_obj_get_height(s_time) != lh) lv_obj_set_height(s_time, lh);
+    if (lv_obj_get_y(s_time) != y) lv_obj_set_y(s_time, y);
 }
 
 static void render(void)
@@ -160,6 +171,7 @@ static void render(void)
     s_last_render = s_now;
     uint32_t now = theme_now_unix();
     char buf[96];
+    s_gauges = ui_gauges_status_render(now);
     if (now > 100000) { /* the clock is set: local time; otherwise the host name stands in */
         uint32_t local = now + (uint32_t)((int32_t)model_settings()->tz_off_min * 60);
         snprintf(buf, sizeof buf, "%u:%02u", (unsigned)(local / 3600 % 24), (unsigned)(local / 60 % 60));
@@ -197,12 +209,14 @@ void ui_status_open(uint32_t now)
     s_n = nav_status_items(s_items, ST_COUNT);
     s_sel = T_QUIET;
     render();
-    if (g_ui_actions->sectors) g_ui_actions->sectors(N_TOGGLES); /* a rim scrub steps through the toggles */
+    ui_home_rim_mode(true); /* a rim drag dials through the toggles */
     show(s_root, true);
     dbg_event("ui", "status", "\"rows\":%d,\"quiet\":%s", N_TOGGLES, model_quiet_active(theme_now_unix()) ? "true" : "false");
 }
 
 void ui_status_close(void) { show(s_root, false); }
+
+static int s_scrub_last;
 
 static void select_item(int i, const char *via, void (*haptic)(void))
 {
@@ -263,9 +277,14 @@ bool ui_status_act(nav_action_t a, const gesture_evt_t *g)
         commit(hit >= 0 ? hit : s_sel);
         return true;
     }
-    case NAV_SCRUB:
-        if (g->kind != G_SCRUB_END) select_item(g->x, "scrub", g_ui_actions->detent);
+    case NAV_HOLD_LONG:
+        if (toggle_at(g->x, g->y) < 0) ui_go_back();
         return true;
+    case NAV_SCRUB: {
+        int d = nav_list_scrub(&s_scrub_last, g->kind, g->x);
+        if (d) select_item(s_sel + d, "scrub", g_ui_actions->detent);
+        return true;
+    }
     case NAV_NEXT: select_item(s_sel + 1, "btn", g_ui_actions->tick); return true;
     case NAV_PREV: select_item(s_sel - 1, "btn", g_ui_actions->tick); return true;
     default: return false;
@@ -286,6 +305,7 @@ void ui_status_report(ui_report_t *r)
     if (s_time_txt[0]) ui_report_add(r, "%s", s_time_txt);
     if (s_link_txt[0]) ui_report_add(r, "%s", s_link_txt);
     if (s_batt_txt[0]) ui_report_add(r, "%s", s_batt_txt);
+    ui_gauges_status_report(r);
     /* the description's lines; the first carries the selection marker */
     char tmp[sizeof s_desc_txt];
     snprintf(tmp, sizeof tmp, "%s", s_desc_txt);
@@ -363,6 +383,7 @@ lv_obj_t *ui_status_init(lv_obj_t *screen)
     lv_obj_set_pos(s_ring, k_tx[0] - SEL_RING_D / 2, TOGGLE_Y - SEL_RING_D / 2);
 
     s_desc = centred(s_root, FONT_BODY, COL_TEXT2, DESC_Y, theme_chord(DESC_Y + 24, 20), 2);
+    ui_gauges_status_create(s_root);
 
     static const char *const words[2] = {"Quiet 30 min", "Next"};
     for (int i = 0; i < 2; i++)

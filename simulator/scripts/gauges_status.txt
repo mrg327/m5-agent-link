@@ -1,0 +1,48 @@
+# GAUGES.md §4.1: STATUS with the plan's usage. Two thin arcs inside the bezel (outer 5 hours, inner the
+# week) and two rows under a smaller clock; the ring still shows the sessions. An unknown window is a dash,
+# never 0 %; a window on pace to run out says when, in amber.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login Running the test suite
+session 2 input api main
+wait 300
+# no usage yet: STATUS as before
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+expect_no_label 5h
+expect_label > Quiet: off
+btn B long
+wait 300
+expect_screen ring
+usage 42 7800 - 18 280000
+wait 100
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+expect_label 5h 42% resets in 2h 10m
+expect_label Week 18% resets in 3d 5h
+expect_label arc0 42%
+expect_label arc1 18%
+expect_label dev-mac
+expect_label > Quiet: off
+shot gauges_status.png
+# on pace to run out: the detail says when, in local time (tz -480 from the welcome)
+usage 83 7800 2700 41 280000
+wait 1200
+expect_label 5h 83% runs out 0:45
+expect_label arc0 83%
+shot gauges_status_pace.png
+# the weekly window unknown (absent): a dash, and its arc is only a track
+usage 96 7800 600 - 0
+wait 1200
+expect_label 5h 96% runs out 0:10
+expect_label Week –
+expect_no_label arc1
+shot gauges_status_hot.png
+# at the limit
+usage 100 3600 - 60 280000
+wait 1200
+expect_label 5h 100% limit until 1:00
+quit

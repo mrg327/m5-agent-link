@@ -1,0 +1,24 @@
+# A chunk whose total disagrees with the length the request announced fails the transfer closed: the reader
+# keeps the preview (with its ellipsis) and Approve answers "Too long to approve here"; Deny still works.
+connect
+rx a400020101020103a40082000b01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention_win 60000 60000 40 7 2 approval approve,deny,focus 0 Run shell command|rm -rf build && make…
+wait 400
+detail 7 2 0 39 rm -rf build && make all && make instal
+wait 200
+expect_label > Approve HOLD
+tap 233 282
+wait 300
+expect_label Too long to approve here
+hold 233 282 1500
+wait 300
+expect_no_label Approved
+btn B
+wait 150
+expect_label > Deny HOLD
+hold 233 282 1100
+wait 400
+expect_label Denied
+quit

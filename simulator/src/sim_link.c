@@ -36,9 +36,13 @@ void hal_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state)
     s_state = on_state;
 }
 
+static sim_tx_tap_t s_tap;
+void sim_link_set_tx_tap(sim_tx_tap_t tap) { s_tap = tap; }
+
 bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 {
     if ((unsigned)kind > HAL_LINK_WS) return false;
+    if (s_tap && !(kind == HAL_LINK_WS && s_ws_enabled) && s_fake_up[kind]) s_tap(frame, len);
     if (kind == HAL_LINK_WS && s_ws_enabled) return ws_send_binary(frame, len);
     /* fake transports swallow frames; USB and BLE ones are logged so scripts can see where hellos go */
     if (kind != HAL_LINK_WS && s_fake_up[kind]) sim_log("fake_tx", "\"transport\":%d,\"len\":%u", (int)kind, (unsigned)len);

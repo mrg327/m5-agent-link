@@ -1,0 +1,73 @@
+# A link lost mid-transfer: the stand-in daemon sends one chunk per request and then goes quiet. After 3 s
+# without a chunk the watch asks again from where it got to (op 7, arg = offset) until the text is whole.
+# Holding Approve during the transfer sends nothing; after reading to the end it approves.
+connect
+rx a400020101020103a40082000b01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+serve_detail 7 2 1 45 kubectl --context prod-eu delete deployment api-gateway --namespace edge &&\n
+attention_win 60000 60000 auto 7 2 approval approve,deny,focus 0 Run shell command|kubectl --context prod-eu delete deployment api-gateway --namespace edge && kubectl --context prod-eu delete deployment api-gate…
+wait 600
+expect_screen ask
+expect_label > Approve HOLD
+hold 233 282 1500
+wait 300
+expect_no_label Approved
+tap 233 150
+wait 400
+expect_label Loading full text
+shot detail_loading.png
+wait 7000
+expect_no_label Loading full text
+swipe 150 233 330 233
+wait 300
+tap 233 150
+wait 400
+# twenty pages: nineteen presses to the last one, one more back to the picker
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+btn B
+wait 350
+expect_label Reading 20 of 20
+shot detail_resumed_last.png
+btn B
+wait 400
+expect_label > Approve HOLD
+hold 233 282 1500
+wait 400
+expect_label Approved
+quit

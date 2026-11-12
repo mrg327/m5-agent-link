@@ -1,0 +1,45 @@
+# Standing rules (STANDING-RULES.md, proto 0.13). "Always allow" is the third row, after Deny. Selected, it shows
+# the rule exactly as it will be saved, where (the title) and how wide (the caption). A tap only says to hold;
+# the approve-length hold is not enough; the full grant hold sends approve with the hash of the rule on screen
+# (op 3 with rh 1365922541 = FNV-1a of "Bash(npm test:*)", 0, 1, 1), and the watch says what was granted.
+connect
+rx a400020101020103a40082000d01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+rule project wide Bash(npm test:*)
+attention_win 60000 60000 - 12 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 400
+expect_screen ask
+expect_label > Approve HOLD
+expect_label 4 options
+expect_no_label Bash(npm test:*)
+shot rule_default.png
+btn B
+wait 150
+btn B
+wait 200
+expect_label > Always allow HOLD
+expect_label Saved for this project
+expect_label Bash(npm test:*)
+expect_label Wide: * matches anything
+expect_no_label Run shell command
+shot rule_view.png
+tap 233 282
+wait 300
+expect_label Hold to always allow
+hold 233 282 1300
+wait 300
+expect_label > Always allow HOLD
+hold 233 282 1900
+wait 300
+expect_label Always allowed
+expect_label Bash(npm test:*)
+expect_label Saved for this project
+shot rule_granted.png
+clear 12 answered_dev
+wait 1200
+expect_screen ask
+expect_label Always allowed
+wait 1800
+expect_screen ring
+quit

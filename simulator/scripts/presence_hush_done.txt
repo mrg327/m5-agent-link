@@ -1,0 +1,22 @@
+# Presence: a watched session that finishes while the user looks at its terminal (hush) does not buzz; the same
+# finish without hush buzzes [30,200,30]. The card still changes. An error finishes the same way.
+connect
+rx a400020101020103a40082000c01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login
+wait 300
+# watch session 1 (Watch is the default item)
+tap 233 233
+wait 300
+btn A
+wait 300
+expect_screen watch
+hush on
+session 1 done webapp feat/login All done
+wait 300
+hush off
+session 1 work webapp feat/login
+wait 300
+session 1 done webapp feat/login All done again
+wait 300
+quit

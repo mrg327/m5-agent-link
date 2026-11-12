@@ -1,0 +1,26 @@
+# GAUGES.md §4.4: one figure on the idle faces. The empty deck shows "5h 42%" under its line; the ambient face
+# the same, dimmed; at 80 % and over it turns amber. Unknown, stale or reset: nothing at all.
+connect
+rtc 1800000000
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+wait 400
+expect_label Nothing running
+expect_no_label 5h
+usage 42 7800 - 18 280000
+wait 300
+expect_label 5h 42%
+shot gauges_face_empty.png
+# a reading an hour old is stale: the figure goes
+usage 42 7800 - 18 280000 3700
+wait 1200
+expect_no_label 5h
+usage 84 7800 - 18 280000
+wait 300
+expect_label 5h 84%
+wait 30000
+session 1 work webapp feat/login Running tests
+wait 300
+expect_label webapp · Working
+expect_label 5h 84%
+shot gauges_face_ambient.png
+quit

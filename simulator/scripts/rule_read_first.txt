@@ -1,0 +1,28 @@
+# "Always allow" grants, so it waits for the request text like Approve: a text longer than the platter must be
+# read to its last page first (UI-V3 §4.3a). A hold before that says "Read it first" and sends nothing.
+connect
+rx a400020101020103a40082000d01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+rule project wide Bash(npm test:*)
+attention_win 60000 60000 - 19 2 approval approve,deny,focus 0 Run shell command|npm test -- --reporter=verbose --coverage --watch=false --runInBand --testTimeout=60000 --maxWorkers=1 --detectOpenHandles
+wait 400
+btn B
+wait 150
+btn B
+wait 300
+expect_label Bash(npm test:*)
+hold 233 282 700
+wait 100
+expect_label Read it first
+expect_no_label Always allowed
+tap 233 282
+wait 400
+expect_label Reading 1 of 1
+btn B
+wait 400
+expect_label > Always allow HOLD
+hold 233 282 1900
+wait 300
+expect_label Always allowed
+quit

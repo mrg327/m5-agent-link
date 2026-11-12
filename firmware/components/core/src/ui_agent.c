@@ -6,13 +6,14 @@
 
 #include "debug.h"
 #include "nav.h"
+#include "ui_gauges.h"
 #include "ui_internal.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
 #include "ui_wheel.h"
 
-#define LIST_Y 226 /* UI-V3 §4.2: the list's centre; 246 under a question */
-#define LIST_Y_Q 246
+#define LIST_Y 232 /* UI-V3 §4.2: the list's centre (73 px selected row); 250 under a question */
+#define LIST_Y_Q 250
 #define QUESTION_Y 62 /* two lines of FONT_BODY_STRONG span y 64-112 */
 
 static lv_obj_t *s_root, *s_header, *s_wheel, *s_wheel_main, *s_wheel_q, *s_question;
@@ -35,12 +36,12 @@ static char s_header_txt[64];
 static const char *const s_labels[AG_COUNT] = {
     [AG_FOCUS] = "Open on PC", [AG_DISMISS] = "Dismiss",
     [AG_SNOOZE] = "Snooze 30 min", [AG_NOTIFY] = "Notify when done", [AG_WATCH] = "Activity",
-    [AG_REPLY] = "Reply",          [AG_INTERRUPT] = "Stop",
+    [AG_REPLY] = "Reply",          [AG_INTERRUPT] = "Stop",       [AG_RERUN] = "Run again",
 };
 
 static const char *const s_icons[AG_COUNT] = {
     [AG_FOCUS] = ICON_OPEN,   [AG_DISMISS] = ICON_DENIED, [AG_SNOOZE] = ICON_IDLE,  [AG_NOTIFY] = ICON_BELL,
-    [AG_WATCH] = ICON_ACTIVITY, [AG_REPLY] = ICON_REPLY,  [AG_INTERRUPT] = ICON_STOP,
+    [AG_WATCH] = ICON_ACTIVITY, [AG_REPLY] = ICON_REPLY,  [AG_INTERRUPT] = ICON_STOP, [AG_RERUN] = ICON_WORKING,
 };
 
 static const session_t *session(void) { return model_find(s_sid); }
@@ -92,9 +93,10 @@ bool ui_agent_refresh(uint32_t now)
         if (model_keys() && n < WHEEL_MAX_ITEMS) w[n++] = (wheel_item_t){"Keyboard", RGB_ASK, false, KEYS_ID, ICON_KEYBOARD};
     } else {
         agent_item_t items[WHEEL_MAX_ITEMS];
-        n = nav_agent_items(s->state, model_can_type(), model_reply_count() > 0 || s->n_rp > 0 || model_voice() || model_keys(), items, WHEEL_MAX_ITEMS);
+        if (theme_is_job(s)) n = nav_job_items(s->state, items, WHEEL_MAX_ITEMS);
+        else n = nav_agent_items(s->state, model_can_type(), model_reply_count() > 0 || s->n_rp > 0 || model_voice() || model_keys(), items, WHEEL_MAX_ITEMS);
         for (int i = 0; i < n; i++)
-            w[i] = (wheel_item_t){label_of(items[i].id, s), items[i].id == AG_INTERRUPT ? RGB_DANGER : rgb, items[i].hold,
+            w[i] = (wheel_item_t){label_of(items[i].id, s), items[i].id == AG_INTERRUPT ? RGB_DANGER : items[i].id == AG_RERUN ? RGB_WORKING : rgb, items[i].hold,
                                   (int)items[i].id, s_icons[items[i].id]};
     }
     const char *q = s_replies ? s->q : "";
@@ -112,6 +114,8 @@ bool ui_agent_refresh(uint32_t now)
         snprintf(s_question_txt, sizeof s_question_txt, "%s", q);
         lv_label_set_text(s_question, q);
     }
+    if (n > 1) lv_obj_remove_flag(s_badge[1], LV_OBJ_FLAG_HIDDEN); /* B steps through the items: none to step to with one */
+    else lv_obj_add_flag(s_badge[1], LV_OBJ_FLAG_HIDDEN);
     if (q[0]) {
         lv_obj_remove_flag(s_question, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_header, LV_OBJ_FLAG_HIDDEN); /* the question owns the top of the screen */
@@ -119,6 +123,7 @@ bool ui_agent_refresh(uint32_t now)
         lv_obj_add_flag(s_question, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(s_header, LV_OBJ_FLAG_HIDDEN);
     }
+    ui_gauges_agent_update(s, !s_replies); /* GAUGES.md: model, mode and pull request under the caption */
     return true;
 }
 
@@ -130,11 +135,13 @@ void ui_agent_open(uint32_t sid, uint32_t now)
     s_replies = false;
     s_question_txt[0] = 0;
     s_header_txt[0] = 0;
+    ui_home_rim_mode(true); /* a rim drag dials through the items */
     ring_set_still(ui_home_ring(), true); /* the sessions stay on the ring, settled: the comets cost redraws */
     wheel_set(s_wheel, NULL, 0, 0);
     ui_agent_refresh(now);
     const session_t *s = session();
-    if (s && s->state == SESS_DONE && !s->seen) g_ui_actions->ack(sid); /* looking at it is seeing it */
+    /* looking at it is seeing it; not for a job, whose ack is Dismiss: the card would go from under the finger */
+    if (s && s->state == SESS_DONE && !s->seen && !theme_is_job(s)) g_ui_actions->ack(sid);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     dbg_event("ui", "agent", "\"sid\":%u,\"items\":%d", (unsigned)sid, wheel_count(s_wheel));
 }
@@ -146,12 +153,11 @@ void ui_agent_close(void)
     ring_set_still(ui_home_ring(), !ui_animations_allowed());
 }
 
-/* A hold acts on the row under the finger: it arms only when the press is on the selected row, or on no row. */
-static bool press_on_selected(const gesture_evt_t *g)
-{
-    int hit = wheel_hit(s_wheel, g->x, g->y);
-    return hit < 0 || hit == wheel_sel(s_wheel);
-}
+/* A hold acts on the row under the finger: it arms only when the press is on the selected row. A finger held
+ * still anywhere off the rows goes back. */
+static bool press_on_selected(const gesture_evt_t *g) { return wheel_hit(s_wheel, g->x, g->y) == wheel_sel(s_wheel); }
+
+static int s_scrub_last, s_drag_acc;
 
 static void select_item(int i, const char *via, void (*haptic)(void))
 {
@@ -201,6 +207,7 @@ static void commit(const wheel_item_t *it)
         dbg_event("ui", "replies", "\"sid\":%u,\"n\":%d", (unsigned)s->sid, model_reply_count());
         return;
     case AG_INTERRUPT: g_ui_actions->interrupt(s->sid, s_hold_ms); break; /* only ever after the hold */
+    case AG_RERUN: g_ui_actions->rerun(s->sid, s_hold_ms); break;         /* only ever after the hold */
     case AG_WATCH: /* the monitor for this session (UI-V2 §4.7) */
         g_ui_actions->tick();
         ui_go_watch();
@@ -217,6 +224,7 @@ bool ui_agent_act(nav_action_t a, const gesture_evt_t *g)
     switch (a) {
     case NAV_HOLD_PRESS:
         s_hold_fired = false;
+        s_drag_acc = 0;
         /* only a destructive item arms a hold, and only once the wheel has been on screen a moment */
         if (it && it->hold && press_on_selected(g) && s_now - s_opened_ms >= NAV_CARD_ARM_MS) {
             s_holding = true;
@@ -225,6 +233,15 @@ bool ui_agent_act(nav_action_t a, const gesture_evt_t *g)
         }
         return true;
     case NAV_HOLD_RELEASE: hold_cancel(); return true;
+    case NAV_HOLD_LONG:
+        if (wheel_hit(s_wheel, g->x, g->y) < 0) ui_go_back();
+        return true;
+    case NAV_SCROLL_DRAG: {
+        hold_cancel(); /* a moving finger is not holding anything */
+        int d = nav_list_drag(&s_drag_acc, g->dy);
+        if (d) select_item(wheel_sel(s_wheel) + d, "drag", g_ui_actions->detent);
+        return true;
+    }
     case NAV_COMMIT:
         if (!it) return false;
         if (g->kind == G_TAP && s_now - s_opened_ms < NAV_CARD_ARM_MS) return true; /* too soon after opening */
@@ -236,15 +253,17 @@ bool ui_agent_act(nav_action_t a, const gesture_evt_t *g)
             }
         }
         if (it->hold) { /* a tap never commits a destructive item */
-            ui_toast("Hold to stop", it->rgb);
+            ui_toast(it->id == AG_RERUN ? "Hold to run again" : "Hold to stop", it->rgb);
             g_ui_actions->reject();
             return true;
         }
         commit(it);
         return true;
-    case NAV_SCRUB:
-        if (g->kind != G_SCRUB_END) select_item(g->x, "scrub", g_ui_actions->detent);
+    case NAV_SCRUB: {
+        int d = nav_list_scrub(&s_scrub_last, g->kind, g->x);
+        if (d) select_item(wheel_sel(s_wheel) + d, "scrub", g_ui_actions->detent);
         return true;
+    }
     case NAV_NEXT: select_item(wheel_sel(s_wheel) + 1, "btn", g_ui_actions->tick); return true;
     case NAV_PREV: select_item(wheel_sel(s_wheel) - 1, "btn", g_ui_actions->tick); return true;
     default: return false;
@@ -292,6 +311,7 @@ void ui_agent_report(ui_report_t *r)
     r->has_sel_sid = session() != NULL;
     r->sel_sid = s_sid;
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
+    ui_gauges_agent_report(r);
     if (s_replies && s_question_txt[0]) ui_report_add(r, "%s", s_question_txt);
     int n = wheel_count(s_wheel), sel = wheel_sel(s_wheel);
     for (int k = 0; k < n && k < 5; k++) {
@@ -315,8 +335,9 @@ lv_obj_t *ui_agent_init(lv_obj_t *screen)
     lv_obj_set_size(s_header, cw, lh);
     lv_obj_set_style_text_align(s_header, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_pos(s_header, UI_CX - cw / 2, UI_Y_CAPTION - lh / 2);
-    s_wheel_main = s_wheel = wheel_create_at(s_root, WHEEL_LAYOUT_LIST(LIST_Y));
-    s_wheel_q = wheel_create_at(s_root, WHEEL_LAYOUT_LIST(LIST_Y_Q));
+    ui_gauges_agent_create(s_root);
+    s_wheel_main = s_wheel = wheel_create_at(s_root, WHEEL_LAYOUT_LIST_TALL(LIST_Y));
+    s_wheel_q = wheel_create_at(s_root, WHEEL_LAYOUT_LIST_TALL(LIST_Y_Q));
     wheel_set_shown(s_wheel_q, false);
     int qw = theme_chord(70, 0), qh = 2 * lv_font_get_line_height(FONT_BODY_STRONG);
     s_question = lv_label_create(s_root); /* the agent's closing question, above the Reply list */

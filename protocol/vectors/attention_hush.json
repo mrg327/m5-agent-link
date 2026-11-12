@@ -1,0 +1,24 @@
+{
+  "desc": "Approval the device need not buzz for (proto 0.12): the user is looking at the session's terminal, so no buzz, glow or reminders; the card is shown and answered as usual",
+  "symbolic": {
+    "t": "attention",
+    "id": 16,
+    "b": {
+      "rid": 11,
+      "sid": 2,
+      "kind": "approval",
+      "title": "Run shell command",
+      "text": "npm test",
+      "acts": [
+        "approve",
+        "deny",
+        "focus"
+      ],
+      "exp": 1793995262,
+      "left": 2000,
+      "win": 2000,
+      "hush": true
+    }
+  },
+  "cbor_hex": "a30006011003aa000b01020200037152756e207368656c6c20636f6d6d616e6404686e706d20746573740683000102071a6aee31fe091907d00a1907d00cf5"
+}

@@ -26,7 +26,7 @@ OUT = Path(__file__).resolve().parent.parent / "vectors"
 MT = dict(hello=1, welcome=2, snapshot=3, session_upd=4, gone=5, attention=6, clear=7,
           cmd=8, result=9, detail=10, cfg=11, batt=12, ping=13, pong=14, log=15,
           audio_start=16, audio=17, audio_end=18, transcript=19,
-          kb_start=20, kb_stroke=21, kb_cands=22,
+          kb_start=20, kb_stroke=21, kb_cands=22, usage=23,
           dbg_ui_state=65, dbg_inject_input=68)
 
 
@@ -118,6 +118,45 @@ VECTORS = {
         {"t": "session_upd", "id": 3, "b": {"sid": 1, "st": "done", "tst": 1793995300}},
         env("session_upd", 3, {0: 1, 2: 4, 8: 1793995300}),
     ),
+    "session_job_eta": (
+        "Delta: session 4 (a shell job, agent shell) enters work with a 120 s estimate (proto 0.9)",
+        {"t": "session_upd", "id": 15, "b": {"sid": 4, "ag": "shell", "st": "work", "tool": "cargo",
+         "t0": 1793995200, "tst": 1793995200, "sum": "cargo build --release", "eta": 120}},
+        env("session_upd", 15, {0: 4, 1: 3, 2: 1, 6: "cargo", 7: 1793995200, 8: 1793995200,
+            9: "cargo build --release", 19: 120}),
+    ),
+    "session_job_exit": (
+        "Delta: session 4's job failed with exit status 101 (proto 0.9)",
+        {"t": "session_upd", "id": 16, "b": {"sid": 4, "st": "error", "tst": 1793995242, "seen": False, "exit": 101}},
+        env("session_upd", 16, {0: 4, 2: 3, 8: 1793995242, 10: False, 20: 101}),
+    ),
+    "cmd_rerun": (
+        "Device runs session 4's finished job again after a hold (proto 0.9)",
+        {"t": "cmd", "id": 17, "b": {"op": "rerun", "sid": 4, "hold_ms": 1250}},
+        env("cmd", 17, {0: 17, 1: 4, 4: 1250}),
+    ),
+    "session_gauges": (
+        "Delta: session 2 (Claude) reports its context fill, model, permission mode and pull request (proto 0.10)",
+        {"t": "session_upd", "id": 18, "b": {"sid": 2, "ctx": 72, "mdl": "Opus 4.7", "pm": "plan", "pr": 128,
+         "prs": "approved"}},
+        env("session_upd", 18, {0: 2, 21: 72, 22: "Opus 4.7", 23: 1, 24: 128, 25: 2}),
+    ),
+    "session_gauges_cleared": (
+        "Delta: session 2 after /compact: context unknown (255), the pull request merged (0) (proto 0.10)",
+        {"t": "session_upd", "id": 19, "b": {"sid": 2, "ctx": 255, "pr": 0, "prs": "none"}},
+        env("session_upd", 19, {0: 2, 21: 255, 24: 0, 25: 0}),
+    ),
+    "usage_both": (
+        "Plan usage: 5-hour window at 82 % and on pace to run out before it resets, weekly at 41 % (proto 0.10)",
+        {"t": "usage", "id": 20, "b": {"at": 1793995200, "h5": 82, "h5r": 1794004200, "h5o": 1793998800,
+         "wk": 41, "wkr": 1794340800}},
+        env("usage", 20, {0: 1793995200, 1: 82, 2: 1794004200, 3: 1793998800, 4: 41, 5: 1794340800}),
+    ),
+    "usage_none": (
+        "Plan usage unknown (no subscription data yet): only the reading time, no window (proto 0.10)",
+        {"t": "usage", "id": 21, "b": {"at": 1793995200}},
+        env("usage", 21, {0: 1793995200}),
+    ),
     "attention_approval": (
         "Approval request for session 2 (agent-raised prompt)",
         {"t": "attention", "id": 4, "b": {"rid": 7, "sid": 2, "kind": "approval",
@@ -143,6 +182,83 @@ VECTORS = {
          "exp": 1793995450, "grant_mask": 3}},
         env("attention", 13, {0: 9, 1: 2, 2: 0, 3: "Run shell command", 4: "npm test -- --watch=false",
             5: ["Yes", "Yes, don't ask again", "No"], 6: [0, 1, 2, 3], 7: 1793995450, 8: 3}),
+    ),
+    "attention_window": (
+        "Approval with its answer window (proto 0.11): 42.5 s of 60 s left when sent, and a cut preview whose "
+        "full text is 612 bytes (fetch it with cmd detail)",
+        {"t": "attention", "id": 15, "b": {"rid": 10, "sid": 2, "kind": "approval",
+         "title": "Run shell command", "text": "cd packages/frontend && npm run test -- --watch=false\u2026",
+         "acts": ["approve", "deny", "focus"], "exp": 1793995260, "left": 42500, "win": 60000, "len": 612}},
+        env("attention", 15, {0: 10, 1: 2, 2: 0, 3: "Run shell command",
+            4: "cd packages/frontend && npm run test -- --watch=false\u2026",
+            6: [0, 1, 2], 7: 1793995260, 9: 42500, 10: 60000, 11: 612}),
+    ),
+    "attention_hush": (
+        "Approval the device need not buzz for (proto 0.12): the user is looking at the session's terminal, so no "
+        "buzz, glow or reminders; the card is shown and answered as usual",
+        {"t": "attention", "id": 16, "b": {"rid": 11, "sid": 2, "kind": "approval",
+         "title": "Run shell command", "text": "npm test", "acts": ["approve", "deny", "focus"],
+         "exp": 1793995262, "left": 2000, "win": 2000, "hush": True}},
+        env("attention", 16, {0: 11, 1: 2, 2: 0, 3: "Run shell command", 4: "npm test", 6: [0, 1, 2],
+            7: 1793995262, 9: 2000, 10: 2000, 12: True}),
+    ),
+    "session_hush": (
+        "A session enters done and the device need not buzz (proto 0.12): the user is looking at its terminal",
+        {"t": "session_upd", "id": 17, "b": {"sid": 3, "st": "done", "tst": 1793995300, "hush": True}},
+        env("session_upd", 17, {0: 3, 2: 4, 8: 1793995300, 26: True}),
+    ),
+    "attention_standing_rule": (
+        "Approval offering a standing rule (proto 0.13, STANDING-RULES.md): the rule exactly as Claude Code saves "
+        "it, saved for this project, and wide (it ends in a wildcard)",
+        {"t": "attention", "id": 18, "b": {"rid": 12, "sid": 2, "kind": "approval",
+         "title": "Run shell command", "text": "npm test", "acts": ["approve", "deny", "focus"],
+         "exp": 1793995262, "left": 60000, "win": 60000,
+         "rule": "Bash(npm test:*)", "scope": "project", "wide": True}},
+        env("attention", 18, {0: 12, 1: 2, 2: 0, 3: "Run shell command", 4: "npm test", 6: [0, 1, 2],
+            7: 1793995262, 9: 60000, 10: 60000, 13: "Bash(npm test:*)", 14: 1, 15: True}),
+    ),
+    "cmd_approve_rule": (
+        "Device approves rid 12 and saves its standing rule after a 1600 ms hold (proto 0.13): rh is FNV-1a 32 of "
+        "'Bash(npm test:*)', 0x00, scope 1, wide 1",
+        {"t": "cmd", "id": 19, "b": {"op": "approve", "sid": 2, "rid": 12, "hold_ms": 1600, "rh": 0x516A52ED}},
+        env("cmd", 19, {0: 3, 1: 2, 2: 12, 4: 1600, 5: 0x516A52ED}),
+    ),
+    "session_done_summary": (
+        "Delta: session 3 (Claude) finished a turn: 3 files, +120 -14 lines, tests passed, 4 min 12 s (proto 0.14)",
+        {"t": "session_upd", "id": 30, "b": {"sid": 3, "st": "done", "tst": 1793995300, "fc": 3, "la": 120,
+         "lr": 14, "tp": True, "dur": 252}},
+        env("session_upd", 30, {0: 3, 2: 4, 8: 1793995300, 30: 3, 31: 120, 32: 14, 33: True, 34: 252}),
+    ),
+    "session_done_summary_partial": (
+        "Delta: session 3 finished with the tests failed and only the time otherwise known (proto 0.14)",
+        {"t": "session_upd", "id": 31, "b": {"sid": 3, "st": "error", "tst": 1793995300, "tp": False, "dur": 37}},
+        env("session_upd", 31, {0: 3, 2: 3, 8: 1793995300, 33: False, 34: 37}),
+    ),
+    "cmd_detail": (
+        "Device asks for request 10's full text from byte 0 (proto 0.11)",
+        {"t": "cmd", "id": 13, "b": {"op": "detail", "sid": 2, "rid": 10, "arg": 0}},
+        env("cmd", 13, {0: 7, 1: 2, 2: 10, 3: 0}),
+    ),
+    "detail_chunk": (
+        "Second chunk of request 10's full text: bytes 512-611 of 612 (proto 0.11)",
+        {"t": "detail", "id": 31, "b": {"rid": 10, "sid": 2, "text": "./scripts/deploy.sh --env prod --yes",
+         "off": 512, "total": 612}},
+        env("detail", 31, {0: 10, 1: 2, 2: "./scripts/deploy.sh --env prod --yes", 3: 512, 4: 612}),
+    ),
+    "cmd_focus_handback": (
+        "Open on PC from the request itself: focus session 2 and hand request 10 back to the terminal (proto 0.11)",
+        {"t": "cmd", "id": 14, "b": {"op": "focus", "sid": 2, "rid": 10}},
+        env("cmd", 14, {0: 0, 1: 2, 2: 10}),
+    ),
+    "clear_handed_back": (
+        "Request 10 went back to the terminal because the device's Open on PC asked for it (proto 0.11)",
+        {"t": "clear", "id": 32, "b": {"rid": 10, "why": "handed_back"}},
+        env("clear", 32, {0: 10, 1: 4}),
+    ),
+    "clear_expired": (
+        "Request 10's answer window ran out: the terminal asks now",
+        {"t": "clear", "id": 33, "b": {"rid": 10, "why": "expired"}},
+        env("clear", 33, {0: 10, 1: 2}),
     ),
     "cmd_reply": (
         "Device answers rid 9 with option 1 (\"Yes, don't ask again\")",

@@ -54,6 +54,29 @@ allow_remote_control socket-only
 listen_on unix:/tmp/kitty
 ```
 
+**Terminal jobs:** to see builds, tests and other long commands on the watch (run time, an estimate, how
+they ended; [docs/design/JOBS.md](docs/design/JOBS.md)), add one line to `~/.zshrc` or `~/.bashrc`:
+```sh
+eval "$(agentlink shell-init zsh)"   # or: bash
+```
+
+**Usage and context gauges:** to see the plan's 5-hour and weekly usage, each session's context fill, model,
+permission mode and pull request ([docs/design/GAUGES.md](docs/design/GAUGES.md)), route Claude Code's status
+line through the watch. `agentlink hooks statusline` prints the `statusLine` block for `~/.claude/settings.json`;
+it keeps your own status-line command, if you have one.
+
+**Answer window:** a permission request waits for the watch for 60 s by default before the terminal asks as
+usual; the watch shows the time left as a thin ring and fetches the full text of a long command
+([docs/design/ANSWER-WINDOW.md](docs/design/ANSWER-WINDOW.md)). Set it with `AGENTLINK_ANSWER_WINDOW_S` or one
+number of seconds in `~/.agentlink/answer_window` (5-300; 0 = never hold), and give the two blocking hooks a
+Claude Code `timeout` above it (`agentlink hooks` prints 330); the daemon shortens the window to fit a smaller one.
+
+**Always allow:** when Claude Code suggests a rule for a permission request (`Bash(npm test:*)`), the watch offers
+`Always allow` after Deny; it shows the rule exactly as it will be saved and where (this session, or this project's
+`.claude/settings.local.json`) before a 1.6 s hold, never a whole-tool rule or one for all projects
+([docs/design/STANDING-RULES.md](docs/design/STANDING-RULES.md)). Each grant is in `~/.agentlink/audit.jsonl`;
+remove a rule with `/permissions` in Claude Code.
+
 **Daemon environment**
 
 | Variable | Effect |
@@ -67,6 +90,7 @@ listen_on unix:/tmp/kitty
 | `AGENTLINK_PIPE` | Windows only: hook named-pipe name override |
 | `AGENTLINK_REMOTE` | Hook on a remote machine: `tcp:127.0.0.1:<port>`, the loopback end of an SSH tunnel to the daemon (REMOTE.md) |
 | `AGENTLINK_SSH` | ssh binary used by `agentlink ssh` (default `ssh` on PATH) |
+| `AGENTLINK_ANSWER_WINDOW_S` | Seconds a blocking hook holds the terminal prompt for the watch (default 60, 5-300, 0 = never); `~/.agentlink/answer_window` when unset |
 
 Hook IPC uses `$AGENTLINK_HOME/hook.sock` on Unix. On Windows it is the named pipe `\\.\pipe\agentlink-<USERNAME>-<fnv64 of the socket path>`.
 

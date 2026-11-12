@@ -16,7 +16,7 @@ test('bank has candidates for every role, ids unique, waves known', () => {
 });
 
 test('every sound renders audible, unclipped, short and click-free at the ends', () => {
-  const limit = { done: 1500, input: 150 };
+  const limit = { done: 1500, input: 150, approved: 400, denied: 400 };
   for (const s of sounds.bank) {
     const pcm = render(s, sounds.rate);
     assert.equal(pcm.length, Math.round((durationMs(s) * sounds.rate) / 1000), s.id);

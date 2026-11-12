@@ -7,6 +7,7 @@
 #include "app.h"
 #include "core.h"
 #include "debug.h"
+#include "detail.h"
 #include "feedback.h"
 #include "gesture.h"
 #include "hal.h"
@@ -16,6 +17,8 @@
 #include "power.h"
 #include "ring.h"
 #include "model.h"
+#include "motion.h"
+#include "prefs.h"
 #include "ui.h"
 #include "ui_theme.h"
 
@@ -28,16 +31,20 @@ typedef struct { uint8_t btn; bool down; uint32_t t_ms; } btn_evt_t;
 static gesture_t s_gesture;
 static ring_t s_frames, s_link_evts, s_btn_evts, s_motion_evts, s_gestures;
 #define FRAME_SLOTS 8
-static frame_t s_frame_buf[FRAME_SLOTS]; /* 32 KiB .bss */
+/* The frame queue and the two staging frames are 41 KB of plain data, filled by the transports' tasks (never
+ * an ISR) and read by core_step: they live in PSRAM, so internal RAM stays for what must be there (BLE). */
+MODEL_EXT_BSS static frame_t s_frame_buf[FRAME_SLOTS];
+static size_t frame_used(const void *stored) { return offsetof(frame_t, data) + ((const frame_t *)stored)->len; }
 static atomic_flag s_rx_lock = ATOMIC_FLAG_INIT; /* transports may deliver from different tasks */
 static atomic_uint s_frames_dropped;
 static link_evt_t s_link_buf[8];
 static btn_evt_t s_btn_buf[16];
-static hal_motion_evt_t s_motion_buf[8];
+static hal_motion_evt_t s_motion_buf[16];
 static gesture_evt_t s_gesture_buf[32];
 
 static uint32_t s_frames_drawn, s_fps, s_fps_t0, s_px_flushed;
 static lv_indev_t *s_touch;
+static lv_display_t *s_disp_main;
 
 uint32_t app_now_ms(void) { return (uint32_t)(hal_time_us() / 1000); }
 uint32_t app_fps(void) { return s_fps; }
@@ -77,14 +84,15 @@ void app_set_sectors(int n) { gesture_set_sectors(&s_gesture, n); }
 
 static void on_rx(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 {
-    static frame_t f;
+    MODEL_EXT_BSS static frame_t f;
     if (len > FRAME_MAX) return;
     while (atomic_flag_test_and_set_explicit(&s_rx_lock, memory_order_acquire)) {
     }
     f.kind = kind;
     f.len = (uint16_t)len;
     memcpy(f.data, frame, len);
-    if (!ring_push(&s_frames, &f)) atomic_fetch_add(&s_frames_dropped, 1);
+    /* only the message itself is copied, not the 4 KB slot */
+    if (!ring_push_n(&s_frames, &f, frame_used(&f))) atomic_fetch_add(&s_frames_dropped, 1);
     atomic_flag_clear_explicit(&s_rx_lock, memory_order_release);
 }
 
@@ -116,9 +124,17 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 {
     s_hal_touch_read(indev, data);
     bool down = data->state == LV_INDEV_STATE_PRESSED;
-    if (keys_touch(down, data->point.x, data->point.y, app_now_ms())) return; /* KEYS owns the finger: strokes, not gestures */
+    /* The panel reports its own coordinates and LVGL turns them for the widgets when the UI is rotated; the
+     * recognizer, the bezel dial and the keyboard work on what the user sees, so they get the turned point. */
+    int32_t x = data->point.x, y = data->point.y;
+    lv_display_t *disp = lv_indev_get_display(indev);
+    if (disp && lv_display_get_rotation(disp) == LV_DISPLAY_ROTATION_180) {
+        x = lv_display_get_horizontal_resolution(disp) - 1 - x;
+        y = lv_display_get_vertical_resolution(disp) - 1 - y;
+    }
+    if (keys_touch(down, x, y, app_now_ms())) return; /* KEYS owns the finger: strokes, not gestures */
     if (!down && !s_gesture.pressed) return;
-    gesture_touch(&s_gesture, down, data->point.x, data->point.y, app_now_ms());
+    gesture_touch(&s_gesture, down, x, y, app_now_ms());
 }
 
 static void on_refr_ready(lv_event_t *e)
@@ -151,6 +167,18 @@ static void act_focus(uint32_t sid)
     toast_cmd_result(sent, "Opening on PC...");
 }
 
+/* Open on PC from a request (ASK): focus, and hand the request back to the terminal at once (proto 0.11;
+ * an older daemon only focuses, and the terminal asks when its window ends). Never an answer. */
+static void act_open_request(uint32_t sid, uint32_t rid)
+{
+    bool sent = link_send_cmd(LINK_OP_FOCUS, sid, rid, 0);
+    if (sent) feedback_tick();
+    else feedback_reject();
+    toast_cmd_result(sent, "Opening on PC...");
+}
+
+static bool send_detail(uint32_t sid, uint32_t rid, uint32_t off) { return link_send_cmd_arg(LINK_OP_DETAIL, sid, rid, off, 0); }
+
 static void act_approve(uint32_t sid, uint32_t rid, uint32_t hold_ms)
 {
     bool sent = link_send_cmd(LINK_OP_APPROVE, sid, rid, hold_ms);
@@ -161,6 +189,19 @@ static void act_approve(uint32_t sid, uint32_t rid, uint32_t hold_ms)
         feedback_reject();
     }
     if (!sent) toast_cmd_result(false, ""); /* ASK shows the word itself (UI-V3 §4.3) */
+}
+
+/* Approve and save the standing rule the watch showed (STANDING-RULES.md): the hash names that rule. */
+static void act_grant(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32_t rule_hash)
+{
+    bool sent = link_send_approve_rule(sid, rid, hold_ms, rule_hash);
+    if (sent) {
+        model_attention_set_answer(rid, ATT_ANSWER_GRANT, 0);
+        feedback_approved();
+    } else {
+        feedback_reject();
+        toast_cmd_result(false, "");
+    }
 }
 
 static void act_deny(uint32_t sid, uint32_t rid)
@@ -236,7 +277,17 @@ static void act_interrupt(uint32_t sid, uint32_t hold_ms)
     bool sent = link_send_cmd(LINK_OP_CANCEL, sid, 0, hold_ms);
     if (sent) feedback_denied();
     else feedback_reject();
-    toast_cmd_result(sent, "Interrupting");
+    const session_t *s = model_find(sid);
+    toast_cmd_result(sent, s && s->agent == AGENT_SHELL ? "Stopping" : "Interrupting");
+}
+
+/* Run again: the daemon types the job's own command into its terminal, only after the hold. */
+static void act_rerun(uint32_t sid, uint32_t hold_ms)
+{
+    bool sent = link_send_cmd(LINK_OP_RERUN, sid, 0, hold_ms);
+    if (sent) feedback_approved();
+    else feedback_reject();
+    toast_cmd_result(sent, "Running again");
 }
 
 /* Voice: type recording aid's transcript, only after the hold (the daemon checks hold_ms too). With a
@@ -272,15 +323,21 @@ static void act_scroll(uint32_t sid, nav_scroll_unit_t unit, int delta)
 }
 
 /* The nag is an alert too: quiet mode holds it as it holds the arrival buzz. */
+static uint32_t s_muted_rid, s_muted_sid; /* the request a palm cover silenced (0 = none) */
+
 static void act_nag(void)
 {
     const attention_t *first = model_attention_first();
     if (first && sid_snoozed(first->sid)) return;
+    if (first && s_muted_rid && first->rid == s_muted_rid && first->sid == s_muted_sid) return; /* covered: no reminders */
+    if (first && first->hush) return; /* the user is looking at its terminal (PRESENCE.md) */
     if (!model_quiet_active(app_now_unix())) feedback_attention(ATT_APPROVAL);
 }
 
 static const ui_actions_t s_actions = {.focus = act_focus,
+                                       .open_request = act_open_request,
                                        .approve = act_approve,
+                                       .grant = act_grant,
                                        .deny = act_deny,
                                        .reply = act_reply,
                                        .ack = act_ack,
@@ -288,6 +345,7 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .notify_done = act_notify_done,
                                        .type_reply = act_type_reply,
                                        .interrupt = act_interrupt,
+                                       .rerun = act_rerun,
                                        .dictate = act_dictate,
                                        .scroll_open = act_scroll_open,
                                        .scroll = act_scroll,
@@ -321,9 +379,14 @@ static void on_attention(const attention_t *a)
         dbg_event("ui", "quiet", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
     } else if (sid_snoozed(a->sid)) {
         dbg_event("ui", "snoozed", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
+    } else if (a->hush) {
+        /* The daemon sees the user at the keyboard with this session's terminal in front (PRESENCE.md): no
+         * buzz, glow or reminders. The card, ASK and the answers are as ever. */
+        dbg_event("ui", "hush", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
     } else {
         feedback_attention(a->kind);
-        power_attention(rgb, app_now_ms());
+        if (!motion_face_down()) power_attention(rgb, app_now_ms()); /* face down nobody sees a glow */
+        if (a->rid != s_muted_rid || a->sid != s_muted_sid) s_muted_rid = s_muted_sid = 0; /* a new request */
     }
     if (!power_display_on() || ui_glow_active()) return; /* a glow: the first touch reveals it */
     if (a->kind == ATT_DONE) return;
@@ -344,14 +407,23 @@ static void on_session(const session_t *before, const session_t *now, uint32_t p
     if (now->state != SESS_DONE && now->state != SESS_ERROR) return;
     if (before && before->state == now->state) return;
     bool armed = before && before->ntf;
-    if (!armed && now->sid != ui_watched_sid()) return;
+    bool job = now->agent == AGENT_SHELL; /* a job is on the watch to say when it ends (JOBS.md) */
+    if (!armed && !job && now->sid != ui_watched_sid()) return;
     uint32_t unix_now = app_now_unix();
     if (model_session_snoozed(now, unix_now) || model_quiet_active(unix_now)) return;
+    if ((present & SF_HUSH) && now->hush) { /* the user is looking at its terminal (PRESENCE.md) */
+        dbg_event("ui", "hush", "\"sid\":%u,\"state\":%d", (unsigned)now->sid, (int)now->state);
+        return;
+    }
     feedback_finished(now->state == SESS_ERROR);
 }
 
 static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, const char *msg)
 {
+    if (op == LINK_OP_DETAIL) { /* a background fetch: ASK shows what it means, no toast */
+        detail_on_result(rid, ok, err);
+        return;
+    }
     if (ok) {
         /* the focus that opens SCROLL stays quiet: the screen itself is the confirmation */
         if (op == LINK_OP_FOCUS && strcmp(core_screen_name(), "scroll") != 0) ui_toast("Focused", RGB_SUCCESS);
@@ -370,7 +442,7 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
     static const char *const errs[] = {"Out of date", "Denied", "Not supported", "No window", "Timed out", "Failed"};
     const char *text = err >= 0 && err < 6 ? errs[err] : msg[0] ? msg : "Failed";
     /* typing refusals say what to do ("Answer the agent first") */
-    if ((op == LINK_OP_TYPE || op == LINK_OP_CANCEL || (op >= LINK_OP_KB_PICK && op <= LINK_OP_KB_END)) && err == 1 && msg[0]) text = msg;
+    if ((op == LINK_OP_TYPE || op == LINK_OP_CANCEL || op == LINK_OP_RERUN || (op >= LINK_OP_KB_PICK && op <= LINK_OP_KB_END)) && err == 1 && msg[0]) text = msg;
     ui_toast(text, err == 3 ? RGB_AMBER : RGB_DANGER);
     feedback_reject();
 }
@@ -381,9 +453,19 @@ static void on_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bo
     ui_scroll_pos(sid, lines_above, at_bottom, has_total, total, preview);
 }
 
+/* GAUGES.md: one buzz when the 5-hour window first crosses 80 % in a window; quiet mode keeps it silent
+ * (and it does not come back later), the alert mode decides as for every other buzz. */
+static void on_usage(const usage_t *prev, const usage_t *now)
+{
+    if (!gauges_should_warn(prev, now)) return;
+    bool quiet = model_quiet_active(app_now_unix());
+    dbg_event("app", "usage_warn", "\"pct\":%u,\"quiet\":%s", (unsigned)now->h5.pct, quiet ? "true" : "false");
+    if (!quiet) feedback_usage_warn();
+}
+
 static const link_hooks_t s_hooks = {
     .on_link = on_link, .on_attention = on_attention, .on_result = on_result, .on_scroll_pos = on_scroll_pos, .on_transcript = voice_on_transcript,
-    .on_kb_cands = keys_on_cands};
+    .on_kb_cands = keys_on_cands, .on_usage = on_usage};
 
 /* ── input dispatch ── */
 
@@ -442,6 +524,8 @@ static void drain_input(uint32_t now)
     while (ring_pop(&s_btn_evts, &b)) gesture_button(&s_gesture, b.btn, b.down, b.t_ms);
     hal_motion_evt_t m;
     while (ring_pop(&s_motion_evts, &m)) {
+        if (m.kind == HAL_MOTION_TILT) motion_sample(m.x_mg, m.y_mg, m.z_mg, now);
+        if (m.kind == HAL_MOTION_LIFT) motion_lift(now);
         gesture_evt_t g = {.kind = m.kind == HAL_MOTION_LIFT ? G_LIFT : G_SHAKE};
         if (m.kind == HAL_MOTION_LIFT || m.kind == HAL_MOTION_SHAKE) ring_push(&s_gestures, &g);
     }
@@ -452,8 +536,8 @@ static void drain_link(uint32_t now)
 {
     link_evt_t e;
     while (ring_pop(&s_link_evts, &e)) link_on_state(e.kind, e.connected);
-    static frame_t f;
-    while (ring_pop(&s_frames, &f)) link_on_frame_from(f.kind, f.data, f.len);
+    MODEL_EXT_BSS static frame_t f;
+    while (ring_pop_n(&s_frames, &f, frame_used)) link_on_frame_from(f.kind, f.data, f.len);
     unsigned dropped = atomic_exchange(&s_frames_dropped, 0);
     if (dropped) dbg_event_at(DBG_DEBUG, "link", "rx_drop", "\"n\":%u", dropped);
     link_tick(now);
@@ -461,11 +545,61 @@ static void drain_link(uint32_t now)
     ui_set_link_transport(link_connected() ? (int)link_active_kind() : -1);
 }
 
+/* ── motion (docs/design/MOTION.md): wake, orientation, palm cover. Never answers, selects or dismisses. ── */
+
+/* Raising the wrist wakes the display the way a touch does: a dark display lights, a glow is revealed, the
+ * ambient dim ends. It is not input to the UI, so nothing is pressed, answered or selected. */
+static void on_raise(uint32_t now)
+{
+    bool glow = ui_glow_active();
+    ui_note_motion();
+    if (power_activity(now)) {
+        uint32_t sid = glow ? ui_pending_attention_sid() : 0;
+        if (sid) ui_show_attention(sid);
+        dbg_event("power", "wake_motion", NULL);
+    }
+}
+
+/* The UI is turned by 180 degrees when the preference says so, or (automatic) when the watch has been still
+ * the other way up for a while. Never in the middle of a touch, a button hold or a stroke. */
+static void orientation_step(void)
+{
+    if (!s_disp_main) return;
+    orient_mode_t m = prefs_orient();
+    bool want = m == ORIENT_FLIPPED || (m == ORIENT_AUTO && motion_auto_flipped());
+    bool now_flipped = lv_display_get_rotation(s_disp_main) == LV_DISPLAY_ROTATION_180;
+    if (want == now_flipped) return;
+    if (s_gesture.pressed || s_gesture.btn[0].down || s_gesture.btn[1].down || keys_active() || voice_state() == VOICE_REC) return;
+    hal_display_set_rotation_180(want);
+    lv_obj_invalidate(lv_screen_active());
+    dbg_event("ui", "orientation", "\"flipped\":%s,\"mode\":%d", want ? "true" : "false", (int)m);
+}
+
+/* A palm over the glass (the controller sees several contacts at once) silences the alert in progress: the
+ * motor and the speaker stop and its reminders are dropped. The request itself stays, unanswered. */
+static void cover_step(void)
+{
+    static bool was;
+    bool cov = hal_touch_covered();
+    if (cov && !was) {
+        feedback_silence_now();
+        const attention_t *first = model_attention_first();
+        if (first) {
+            s_muted_rid = first->rid;
+            s_muted_sid = first->sid;
+        }
+        dbg_event("ui", "cover_mute", "\"rid\":%u", (unsigned)s_muted_rid);
+    }
+    was = cov;
+}
+
 /* ── public ── */
 
 void core_set_idle_timeout_ms(uint32_t ms) { power_set_idle_timeout_ms(ms); }
 void core_set_deep_after_ms(uint32_t ms) { power_set_deep_after_ms(ms); }
 void core_dump_ui_state(void) { dbg_dump_ui_state(); }
+
+bool core_display_flipped(void) { return s_disp_main && lv_display_get_rotation(s_disp_main) == LV_DISPLAY_ROTATION_180; }
 
 const char *core_screen_name(void)
 {
@@ -488,7 +622,7 @@ void core_init(void)
     ring_init(&s_frames, s_frame_buf, sizeof s_frame_buf[0], FRAME_SLOTS);
     ring_init(&s_link_evts, s_link_buf, sizeof s_link_buf[0], 8);
     ring_init(&s_btn_evts, s_btn_buf, sizeof s_btn_buf[0], 16);
-    ring_init(&s_motion_evts, s_motion_buf, sizeof s_motion_buf[0], 8);
+    ring_init(&s_motion_evts, s_motion_buf, sizeof s_motion_buf[0], 16);
     ring_init(&s_gestures, s_gesture_buf, sizeof s_gesture_buf[0], 32);
     gesture_init(&s_gesture, on_gesture, NULL);
 
@@ -497,11 +631,14 @@ void core_init(void)
               (unsigned)bi->width, (unsigned)bi->height);
 
     model_init();
+    prefs_init();
+    motion_reset();
     model_set_session_hook(on_session);
     power_init();
     lv_init();
     lv_tick_set_cb(tick_cb);
     lv_display_t *disp = hal_display_create();
+    s_disp_main = disp;
     lv_display_add_event_cb(disp, on_refr_ready, LV_EVENT_REFR_READY, NULL);
     lv_display_add_event_cb(disp, on_flush_start, LV_EVENT_FLUSH_START, NULL);
     s_touch = hal_touch_create(disp);
@@ -513,8 +650,11 @@ void core_init(void)
 
     ui_init(&s_actions);
     link_init(&s_hooks);
+    detail_reset();
+    detail_set_sender(send_detail);
     hal_buttons_set_callback(on_button);
     hal_motion_set_callback(on_motion);
+    hal_motion_stream_tilt(true);
     hal_link_start(on_rx, on_state);
 #if CORE_BOOT_BUZZ
     if (!power_woke_by_timer()) feedback_hello(); /* a reconnect attempt stays silent and dark */
@@ -527,6 +667,8 @@ uint32_t core_step(void)
 {
     uint32_t now = app_now_ms();
     drain_input(now);
+    if (motion_take_raise()) on_raise(now);
+    cover_step();
     drain_link(now);
     power_tick(now);
     uint32_t wait = lv_timer_handler();
@@ -534,11 +676,14 @@ uint32_t core_step(void)
     gesture_evt_t g;
     while (ring_pop(&s_gestures, &g)) dispatch(&g);
     model_attention_expire(app_now_unix());
+    model_attention_expire_ms(now); /* an answer window over with no word from the daemon: back to the PC */
+    detail_tick(now);
     voice_tick(now);
     keys_tick(now);
     if (keys_active()) power_activity(now); /* the keyboard keeps the display on */
     if (voice_state() == VOICE_REC || voice_state() == VOICE_WAIT) power_activity(now); /* stay awake while dictating */
     ui_tick(now);
+    orientation_step();
     dbg_tick(now);
 
     if (now - s_fps_t0 >= 1000) {

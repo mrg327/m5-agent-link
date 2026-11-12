@@ -7,6 +7,8 @@
 #include <string.h>
 
 #include "hal.h"
+#include "ui_done.h"
+#include "ui_gauges.h"
 #include "ui_home_internal.h"
 #include "ui_theme.h"
 
@@ -15,6 +17,9 @@
 #define TITLE_W 320
 #define STATE_Y 196
 #define SUMMARY_TOP 232 /* top of the first line */
+#define BAR_Y 219 /* a job's progress capsule: between the state row and the summary (JOBS.md §5) */
+#define BAR_W 160
+#define BAR_H 4
 #define SUMMARY_W 320
 #define SLOT_Y 320 /* spec 318: two px lower so a 3-line request clears the button */
 #define REQ_TOP 220 /* a request is one title line and two text lines, 75 px: it starts higher than a summary */
@@ -29,7 +34,8 @@ typedef enum { LOOK_CARD, LOOK_EMPTY, LOOK_AMBIENT } look_t;
 
 static lv_obj_t *s_centre, *s_cap, *s_title, *s_srow, *s_sicon, *s_sword, *s_stime, *s_sum, *s_req_title, *s_req_text;
 static lv_obj_t *s_chip, *s_chip_icon, *s_chip_txt, *s_btn, *s_btn_lbl, *s_quiet;
-static lv_obj_t *s_clock, *s_ready, *s_sub;
+static lv_obj_t *s_clock, *s_ready, *s_sub, *s_bar, *s_bar_fill;
+static int s_bar_w = -1;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2]; /* [0] = A, [1] = B */
 
 static bool s_ambient, s_offline_dim, s_quiet_shown, s_clock_set;
@@ -150,7 +156,29 @@ static void update_time(const session_t *s, bool merged)
 {
     uint32_t now = theme_now_unix() - ui_link_down_ms() / 1000, from = s->tst ? s->tst : s->t0;
     char buf[40] = "";
-    if (!merged && from && now >= from) theme_elapsed_long(buf, sizeof buf, now - from);
+    bool job = !merged && theme_is_job(s);
+    /* a job's estimate: a capsule that fills, in the state colour; change-only, a pixel at a time */
+    int pm = job ? theme_job_progress(s, now) : -1;
+    show(s_bar, pm >= 0);
+    if (pm >= 0) {
+        int w = BAR_W * pm / 1000;
+        if (w < BAR_H) w = BAR_H;
+        if (w != s_bar_w) {
+            s_bar_w = w;
+            lv_obj_set_width(s_bar_fill, w);
+        }
+        theme_set_bg_color(s_bar_fill, offline() ? COL_TEXT2 : lv_color_hex(theme_session_rgb(s)));
+    }
+    if (job) theme_job_time(buf, sizeof buf, s, now);
+    else if (!merged && from && now >= from && (s->state == SESS_DONE || s->state == SESS_ERROR)) {
+        /* a finished agent: how long ago it ended (an age, not a second duration next to the summary's turn time) */
+        if (now - from < 60) snprintf(buf, sizeof buf, "just now");
+        else {
+            char t[16];
+            theme_elapsed(t, sizeof t, now - from);
+            snprintf(buf, sizeof buf, "%s ago", t);
+        }
+    } else if (!merged && from && now >= from) theme_elapsed_long(buf, sizeof buf, now - from);
     if (!merged && model_session_snoozed(s, theme_now_unix())) {
         size_t n = strlen(buf);
         snprintf(buf + n, sizeof buf - n, "%ssnoozed", n ? theme_sep() : "");
@@ -187,6 +215,8 @@ static void set_looks(look_t look)
         show(s_sum, false);
         show(s_req_title, false);
         show(s_req_text, false);
+        show(s_bar, false);
+        ui_done_update(NULL, false, false);
     }
 }
 
@@ -217,12 +247,14 @@ void ui_home_card_update(void)
 
     if (!s || n == 0) {
         set_looks(LOOK_EMPTY);
-        theme_set_text(s_sub, s_sub_txt, sizeof s_sub_txt, "No agents running");
+        theme_set_text(s_sub, s_sub_txt, sizeof s_sub_txt, "Nothing running");
         theme_set_text_color(s_sub, sub_col);
         theme_set_text_color(s_clock, dark ? sub_col : COL_TEXT);
         theme_set_text_color(s_ready, dark ? sub_col : COL_TEXT);
         update_slot(NULL, 0);
         for (int i = 0; i < 2; i++) show(s_badge[i], false);
+        ui_gauges_card_update(NULL, false, false);
+        ui_gauges_face_update(true, dark); /* GAUGES.md: "5h 42%" on the idle face */
         apply_dim();
         apply_shift();
         return;
@@ -230,8 +262,10 @@ void ui_home_card_update(void)
     const home_slot_t *sl = ui_home_sel_slot();
     const attention_t *req = ui_home_askable_of(s);
     /* The request decides what the user is told: its kind, not the session's sub-state, names it. */
+    /* the request went back to the computer (its window ran out, or Open on PC): the terminal asks now */
+    bool back = !sl->n_merged && !req && s->back;
     const char *word = sl->n_merged ? "Done" : req ? (req->kind == ATT_APPROVAL ? "Needs approval" : "Has a question")
-                       : s->state == SESS_INPUT ? "Waiting" : theme_state_word(s);
+                       : back ? "On your computer" : s->state == SESS_INPUT ? "Waiting" : theme_state_word(s);
     if (sl->n_merged) {
         snprintf(buf, sizeof buf, "%d sessions", sl->n_merged);
     } else {
@@ -251,16 +285,20 @@ void ui_home_card_update(void)
         theme_set_text_color(s_clock, sub_col);
         update_slot(NULL, 0);
         for (int i = 0; i < 2; i++) show(s_badge[i], false);
+        ui_gauges_card_update(NULL, false, false);
+        ui_gauges_face_update(true, true);
         apply_dim();
         apply_shift();
         return;
     }
     set_looks(LOOK_CARD);
+    ui_gauges_face_update(false, false);
     theme_set_text(s_cap, s_cap_txt, sizeof s_cap_txt, buf);
     set_title(base);
     uint32_t rgb = req ? (req->kind == ATT_APPROVAL ? RGB_PERMISSION : RGB_ASK) : theme_session_rgb(s);
     lv_color_t sc = offline() ? COL_TEXT2 : lv_color_hex(rgb);
-    theme_set_text(s_sicon, s_sicon_txt, sizeof s_sicon_txt, req ? (req->kind == ATT_APPROVAL ? ICON_PERMISSION : ICON_QUESTION) : theme_state_glyph(s));
+    theme_set_text(s_sicon, s_sicon_txt, sizeof s_sicon_txt,
+                   req ? (req->kind == ATT_APPROVAL ? ICON_PERMISSION : ICON_QUESTION) : back ? ICON_COMPUTER : theme_state_glyph(s));
     theme_set_text(s_sword, s_sword_txt, sizeof s_sword_txt, word);
     theme_set_text_color(s_sicon, sc);
     theme_set_text_color(s_sword, sc);
@@ -271,16 +309,21 @@ void ui_home_card_update(void)
                 req->title[0] ? req->title : s->tool[0] ? s->tool : req->kind == ATT_APPROVAL ? "Permission request" : "Question");
         theme_set_text(s_req_text, s_req_text_txt, sizeof s_req_text_txt, req->text);
         show(s_sum, false);
+        ui_done_update(NULL, false, false);
         show(s_req_title, true);
         show(s_req_text, req->text[0] != 0);
     } else {
         char sum[sizeof s->summary + 4];
-        theme_display_text(sum, sizeof sum, sl->n_merged ? "" : s->summary);
+        /* a job says what runs: its command line, or just the program when the daemon withholds that */
+        bool done_line = ui_done_update(s, !sl->n_merged && !back && !theme_is_job(s), offline());
+        theme_display_text(sum, sizeof sum, sl->n_merged ? "" : back ? "Answer it there" : theme_is_job(s) && !s->summary[0] ? s->tool : s->summary);
         theme_set_text(s_sum, s_sum_txt, sizeof s_sum_txt, sum);
-        show(s_sum, true);
+        show(s_sum, !done_line); /* DONE-SUMMARY.md: the summary line takes the stale last step's place */
         show(s_req_title, false);
         show(s_req_text, false);
     }
+    /* GAUGES.md: the context capsule, in the job bar's row (a job has none); a request needs the room */
+    ui_gauges_card_update(s, !sl->n_merged && !req && !theme_is_job(s), offline());
     update_slot(req ? (req->kind == ATT_APPROVAL ? "Review" : "Answer") : NULL, rgb);
     show(s_badge[0], true);
     show(s_badge[1], n > 1);
@@ -319,6 +362,9 @@ void ui_home_card_report(ui_report_t *r)
         ui_report_add(r, "%s", s_title_txt);
         ui_report_add(r, "%s", s_sword_txt);
         if (s_stime_txt[0]) ui_report_add(r, "%s", s_stime_txt);
+        if (!lv_obj_has_flag(s_bar, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "progress %d%%", s_bar_w * 100 / BAR_W);
+        ui_gauges_card_report(r);
+        ui_done_report(r);
         if (!lv_obj_has_flag(s_sum, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_sum_txt);
         if (!lv_obj_has_flag(s_req_title, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_req_title_txt);
         if (!lv_obj_has_flag(s_req_text, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_req_text_txt);
@@ -326,6 +372,7 @@ void ui_home_card_report(ui_report_t *r)
         ui_report_add(r, "%s", s_sub_txt);
         if (s_clock_set) ui_report_add(r, "%s", s_clock_txt);
         if (!s) ui_report_add(r, "No sessions");
+        ui_gauges_face_report(r);
     }
     if (!lv_obj_has_flag(s_chip, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_chip_txt_txt);
     if (!lv_obj_has_flag(s_btn, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_btn_txt);
@@ -366,6 +413,25 @@ void ui_home_card_create(lv_obj_t *centre)
     content_label(s_sicon);
     content_label(s_sword);
     content_label(s_stime);
+
+    s_bar = lv_obj_create(s_centre);
+    lv_obj_remove_style_all(s_bar);
+    lv_obj_set_size(s_bar, BAR_W, BAR_H);
+    lv_obj_set_pos(s_bar, UI_CX - BAR_W / 2, BAR_Y);
+    lv_obj_set_style_radius(s_bar, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(s_bar, LV_OPA_COVER, 0);
+    theme_set_bg_color(s_bar, COL_FILL2);
+    lv_obj_remove_flag(s_bar, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    s_bar_fill = lv_obj_create(s_bar);
+    lv_obj_remove_style_all(s_bar_fill);
+    lv_obj_set_size(s_bar_fill, BAR_H, BAR_H);
+    lv_obj_set_style_radius(s_bar_fill, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(s_bar_fill, LV_OPA_COVER, 0);
+    lv_obj_remove_flag(s_bar_fill, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+
+    ui_gauges_card_create(s_centre);
+    ui_gauges_face_create(s_centre);
+    ui_done_create(s_centre);
 
     s_sum = mk(s_centre, FONT_BODY, COL_TEXT2);
     put_top(s_sum, SUMMARY_TOP, SUMMARY_W, 2);
@@ -409,6 +475,6 @@ void ui_home_card_create(lv_obj_t *centre)
     static const char *const words[2] = {"Open", "Next"};
     for (int i = 0; i < 2; i++)
         s_badge[i] = theme_key_badge(s_centre, i == 0 ? "A" : "B", words[i], i == 0, 0, 0, &s_key[i], &s_word[i]);
-    lv_obj_t *hide[] = {s_chip, s_btn, s_quiet, s_clock, s_ready, s_sub, s_req_title, s_req_text};
+    lv_obj_t *hide[] = {s_chip, s_btn, s_quiet, s_clock, s_ready, s_sub, s_req_title, s_req_text, s_bar};
     for (size_t i = 0; i < sizeof hide / sizeof hide[0]; i++) lv_obj_add_flag(hide[i], LV_OBJ_FLAG_HIDDEN);
 }

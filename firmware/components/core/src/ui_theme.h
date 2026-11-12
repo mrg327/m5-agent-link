@@ -6,7 +6,7 @@
 
 /* Fonts (UI-V3 §2.1): Figtree text at five sizes plus a digits-only number font; Phosphor icons are
  * each text font's fallback, so an ICON_* string can sit in any label (ui_icons.h). */
-LV_FONT_DECLARE(font_figtree_16_500)
+LV_FONT_DECLARE(font_figtree_20_500)
 LV_FONT_DECLARE(font_figtree_20_400)
 LV_FONT_DECLARE(font_figtree_20_600)
 LV_FONT_DECLARE(font_figtree_24_600)
@@ -15,7 +15,7 @@ LV_FONT_DECLARE(font_figtree_56_600)
 LV_FONT_DECLARE(font_phosphor_20)
 LV_FONT_DECLARE(font_phosphor_28)
 LV_FONT_DECLARE(font_phosphor_44)
-#define FONT_CAPTION (&font_figtree_16_500)     /* context line, legends, footers */
+#define FONT_CAPTION (&font_figtree_20_500)     /* context line, legends, footers */
 #define FONT_BODY (&font_figtree_20_400)        /* summaries, prompt text, unselected rows */
 #define FONT_BODY_STRONG (&font_figtree_20_600) /* toasts, chips, small buttons */
 #define FONT_HEAD (&font_figtree_24_600)        /* state word, selected row, card titles, buttons */
@@ -82,6 +82,14 @@ const char *theme_state_glyph(const session_t *s);
 /* Last path component of a working directory or repo name. */
 const char *theme_basename(const char *path);
 const char *theme_agent_name(agent_t a);
+/* A job (JOBS.md): a terminal command, not an agent. */
+bool theme_is_job(const session_t *s);
+/* The time beside a job's state word: the elapsed run time, "about 2m left" under a known estimate,
+ * "in 3m 12s" once finished, "exit 101 · 42s" once failed. now = unix seconds. */
+void theme_job_time(char *dst, size_t cap, const session_t *s, uint32_t now);
+/* A running job's progress against its estimate in permille, or -1 when there is nothing to draw
+ * (no estimate, not running, clock unknown). Past the estimate it stays at 1000. */
+int theme_job_progress(const session_t *s, uint32_t now);
 /* Compatibility shim for screens that still ask for a pixel size: <=17 caption, <=21 body, <=28 head,
  * <=40 title, else the number font (digits only: never use it for words). */
 const lv_font_t *theme_font(int px);

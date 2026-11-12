@@ -32,7 +32,6 @@ typedef enum {
     NAV_PICK_RIM,       /* tap on the rim: select the segment or item under the finger */
     NAV_SCRUB,          /* rim drag; the gesture kind says start / move / end */
     NAV_COMMIT,         /* AGENT: commit the selected item (safe items only; hold items need a hold) */
-    NAV_DENY,           /* ASK with a request: the strict deny swipe */
     NAV_HOLD_PRESS,     /* raw finger down in the centre: may arm a hold */
     NAV_HOLD_RELEASE,   /* raw finger up: cancels a hold in progress */
     NAV_HOLD_LONG,      /* a long press whose duration already covers the hold (injected input) */
@@ -65,7 +64,10 @@ const char *nav_action_name(nav_action_t a);
 #define NAV_CENTRE_R 150     /* a touch inside this radius is a centre touch; outside it is the rim */
 #define NAV_HOLD_MS 1200     /* hold-to-approve duration; the daemon's floor is 1000 ms */
 #define NAV_DENY_HOLD_MS 800 /* hold-to-deny: shorter, since a deny only sends the agent back to the prompt */
+#define NAV_GRANT_HOLD_MS 1600 /* hold for "Always allow" (STANDING-RULES.md): longer than approve; the daemon's floor is 1500 ms */
 #define NAV_HOLD_SHOW_MS 250 /* the arc and the haptic ramp only start after this, so a tap never flashes them */
+#define NAV_LIST_SECTORS 9   /* a rim drag in a list is a dial: one item per 40 degrees, clockwise = next */
+#define NAV_LIST_DRAG_PX 40  /* a vertical drag in the centre of a list: one item per 40 px (the first also pays the 18 px tap slop) */
 #define NAV_CARD_ARM_MS 300  /* a hold only starts once the request has been on screen this long */
 #define NAV_LONG_SWIPE_PX 120 /* deny, and back-from-AGENT: a deliberate swipe, at least this long */
 #define NAV_AGENT_TIMEOUT_MS 8000
@@ -97,7 +99,7 @@ bool nav_long_swipe_down(int y_start, int y_end);
 
 /* ── AGENT: which actions a session offers, in wheel order, default first (UI-V2 §4.2) ── */
 typedef enum {
-    AG_FOCUS, AG_DISMISS, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_REPLY, AG_INTERRUPT, AG_COUNT
+    AG_FOCUS, AG_DISMISS, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_REPLY, AG_INTERRUPT, AG_RERUN, AG_COUNT
 } agent_action_t;
 
 typedef struct {
@@ -109,14 +111,18 @@ typedef struct {
  * typing: the daemon can type into terminals (welcome.replies present): Interrupt on a working
  * session (a hold), and "Reply..." where the agent waits for you when there are replies to offer. */
 int nav_agent_items(sess_state_t state, bool typing, bool replies, agent_item_t *out, int cap);
+/* A job's menu (JOBS.md §5): Stop while it runs; Run again and Dismiss once it ended. Stop and Run again are
+ * hold items: one interrupts a process, the other starts one. */
+int nav_job_items(sess_state_t state, agent_item_t *out, int cap);
 
 /* ── ASK: the answer options of a request, in wheel order, default first (UI-V2 §4.3, §7) ──
  * Options come from attention.opts verbatim; a bare permission synthesises Approve / Deny; "Open on
  * PC" is always last, after "Dictate..." where the request takes free text (acts has ACT_DICTATE) and
  * the daemon transcribes (voice). Anything that grants permission (grant_mask bit, or Approve) commits only by
  * the NAV_HOLD_MS hold; a deny-class option by the NAV_DENY_HOLD_MS hold (or the strict swipe); a
- * question option by a tap. */
-typedef enum { ASK_OPT, ASK_APPROVE, ASK_DENY, ASK_DICTATE, ASK_OPEN_PC } ask_action_t;
+ * question option by a tap. A bare permission whose attention carries a standing rule (has_rule, proto 0.13)
+ * also offers "Always allow" after Deny: a grant item held for NAV_GRANT_HOLD_MS (STANDING-RULES.md). */
+typedef enum { ASK_OPT, ASK_APPROVE, ASK_DENY, ASK_DICTATE, ASK_OPEN_PC, ASK_GRANT } ask_action_t;
 
 typedef struct {
     ask_action_t id;
@@ -147,3 +153,12 @@ int nav_status_items(status_item_t *out, int cap);
 uint32_t nav_quiet_next(uint32_t quiet_until, uint32_t now_unix);
 /* Which step nav_quiet_next() would take: 1 = 30 min, 2 = 1 h, 0 = off. */
 int nav_quiet_step(uint32_t quiet_until, uint32_t now_unix);
+/* A rim drag in a list (AGENT, ASK, STATUS) steps through the items like a dial, wherever on the rim the
+ * finger is: the list is not drawn on the ring, so the finger's absolute angle means nothing. The screen sets
+ * NAV_LIST_SECTORS rim sectors on opening; this returns how many items to move for one scrub event (clockwise
+ * positive) and keeps the last sector in *last. */
+int nav_list_scrub(int *last, gesture_kind_t kind, int sector);
+/* A vertical drag in the centre of a list moves the list with the finger: dragging up brings the next item
+ * in. Feed each G_DRAG step's dy; returns the items to move (next positive) and keeps the remainder in *acc. */
+int nav_list_drag(int *acc, int dy);
+

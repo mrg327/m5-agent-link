@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "debug.h"
+#include "ui_countdown.h"
 #include "ui_internal.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
@@ -98,6 +99,7 @@ void ui_init(const ui_actions_t *actions)
     s_watch = ui_watch_init(s_home);
     s_voice = ui_voice_init(s_home);
     s_keys = ui_keys_init(s_home);
+    ui_countdown_init(s_home); /* over every mode's content, under the toast and the glow */
     create_overlays();
     lv_screen_load(s_home);
     ui_home_refresh(0);
@@ -200,6 +202,12 @@ static void open_ask(void)
 }
 
 void ui_go_home(void) { leave_mode(); }
+/* Back, as a screen asks for it (hold still off the rows): the ASK reader closes first. */
+void ui_go_back(void)
+{
+    if (!(s_mode == MODE_ASK && ui_ask_back())) leave_mode();
+    g_ui_actions->tick();
+}
 void ui_go_watch(void) { enter_mode(MODE_WATCH); }
 void ui_go_voice(uint32_t rid)
 {
@@ -352,6 +360,8 @@ void ui_tick(uint32_t now_ms)
         }
     }
     if (s_mode == MODE_KEYS) ui_keys_tick(now_ms);
+    /* the answer window runs on the request it belongs to: on ASK, and on its card on the deck */
+    ui_countdown_show(s_mode == MODE_ASK ? ui_ask_request() : s_mode == MODE_HOME ? ui_home_sel_request() : NULL, now_ms);
 }
 
 /* The interaction layer maps the gesture to an action; mode changes are handled here, everything
@@ -390,6 +400,10 @@ bool ui_on_gesture(const gesture_evt_t *g)
         return true;
     case NAV_BACK:
         if (g->kind == G_SWIPE_DOWN && !nav_long_swipe_down(g->y, s_rel_y)) return true; /* too short: ignored */
+        if (s_mode == MODE_ASK && ui_ask_back()) { /* the reader closes first; the request stays on screen */
+            g_ui_actions->tick();
+            return true;
+        }
         if (s_mode == MODE_SCROLL && g->kind == G_TAP && ui_scroll_caught()) return true; /* it stopped a glide */
         if (s_mode == MODE_SCROLL && g->kind == G_SWIPE_RIGHT && ui_scroll_dragged()) return true; /* a flick that scrolled */
         leave_mode();
@@ -449,3 +463,5 @@ bool ui_on_gesture(const gesture_evt_t *g)
     }
     return ui_home_act(a, g);
 }
+
+void ui_note_motion(void) { ui_home_note_input(); }

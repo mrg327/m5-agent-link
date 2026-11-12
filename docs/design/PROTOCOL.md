@@ -72,7 +72,7 @@ device                                 daemon
 ### `hello` (device → daemon)
 ```cddl
 hello = {
-  proto: [uint, uint],             ; [major, minor] = [0, 3]
+  proto: [uint, uint],             ; [major, minor] = [0, 14]
   dev: { class: tstr,              ; "watch" | "desk" | "pad" | "sim" | ...
          board: tstr,              ; "m5stopwatch"
          fw: tstr,                 ; semver
@@ -109,7 +109,7 @@ welcome = {
 ```cddl
 session = {
   sid: uint,                 ; short id assigned by daemon (stable for the session lifetime)
-  ag: "copilot"/"claude"/"cloud"/tstr,
+  ag: "copilot"/"claude"/"cloud"/"shell"/tstr,   ; "shell" = a job, a terminal command (proto 0.9, JOBS.md)
   st: "start"/"work"/"input"/"error"/"done"/"idle"/"ended",
   ? sub: "approval"/"question",      ; when st = input
   repo?: tstr,               ; ≤ 32 chars, ellipsized by daemon
@@ -125,7 +125,20 @@ session = {
   ? snz: uint,               ; snoozed until (unix), 0 = not snoozed          ┐ sent only to devices
   ? ntf: bool,               ; "notify when done" armed                        │ whose hello proto
   ? n: uint,                 ; tool steps in the current turn                  │ is ≥ 0.3
-  ? ok: bool                 ; result of step n; absent while it runs          ┘
+  ? ok: bool,                ; result of step n; absent while it runs          ┘
+  ? eta: uint,               ; a job's expected total run time in s; 0 = unknown  ┐ proto ≥ 0.9
+  ? exit: uint,              ; a job's exit status, with the delta into done/error ┘
+  ? ctx: uint,               ; context window used, percent; 255 = unknown         ┐
+  ? mdl: tstr,               ; model short name (≤ 16 chars)                         │ proto ≥ 0.10
+  ? pm: perm_mode,           ; default / plan / accept_edits / auto / dont_ask / bypass │ (GAUGES.md)
+  ? pr: uint,                ; open pull request number; 0 = none (not under meta)  │
+  ? prs: pr_state,           ; none / pending / approved / changes / draft          ┘
+  ? hush: bool,              ; only with the delta that enters done / error; proto ≥ 0.12 (PRESENCE.md)
+  ? fc: uint,                ; files the turn changed (≥ 1)                          ┐
+  ? la: uint,                ; lines added, with lr                                  │ proto ≥ 0.14
+  ? lr: uint,                ; lines removed                                          │ (DONE-SUMMARY.md)
+  ? tp: bool,                ; the last recognised test run: true passed, false failed │ key 30-34
+  ? dur: uint                ; the turn's length in seconds                           ┘
 }
 ```
 - `q` / `rp` (keys 17, 18, proto 0.5): when an agent's turn ends on a question, the daemon reads it from the turn's last message (Claude Code's Stop hook carries `last_assistant_message`) and sends the question (≤ 120 chars) with up to 3 answers (≤ 24 chars): the options of an "A or B?" question, else `Yes, go ahead` / `No` for a yes/no one, else none. The watch lists them first under Reply, with the question above. They are cleared (`""`, `[]`: a delta cannot remove a key) as soon as the agent works again. Agent content: never sent under privacy `meta`, and only to devices with proto ≥ 0.5.
@@ -137,6 +150,14 @@ session = {
 - `n` counts `pretooluse` events since the last prompt; `ok` arrives with the matching `posttooluse`
   (false for a failed, denied or rejected tool). The device builds its step timeline (UI-V2 §4.5) from
   these two keys and `sum`.
+- **Jobs (proto 0.9, [JOBS.md](JOBS.md)).** A command the user started in a terminal and that has run for
+  ten seconds is a session with `ag: "shell"`: `work` while it runs, `done` for exit 0, `error` otherwise.
+  `t0` is the command's start and `tst` its end; `tool` is the program, `sum` the command line. `eta` is the
+  median of its earlier runs. The daemon sends shell sessions only to devices with proto ≥ 0.9.
+- **Gauges (proto 0.10, [GAUGES.md](GAUGES.md)).** `ctx`, `mdl` and `pr` / `prs` come from Claude Code's status
+  line (`agentlink-hook statusline`), `pm` from the hooks' `permission_mode`. A status line only updates a session
+  the hooks created. `ctx: 255` clears the figure (after `/compact`); `pr: 0` says no pull request is open. The
+  pull request is withheld under privacy `meta`.
 - `snapshot { sessions: [* session], away?: [* event] }`: a full replacement. It is sent on connect and whenever the daemon thinks the device has drifted. The `away` list holds the events the device missed while disconnected; the device shows them as "while you were away".
 - `session { session }`: an upsert. The daemon sends only the changed keys plus `sid` (a delta).
 - `gone { sid }`: the session has been removed.
@@ -149,36 +170,81 @@ attention = {
   kind: "approval"/"question"/"error"/"done",
   ? title: tstr,             ; e.g. "Run shell command"
   ? text: tstr,              ; preview (≤ 160) — full text only via `detail` request
-  ? opts: [* tstr],          ; the agent's own choices (≤ 4, each ≤ 24 chars): a question's options, or a
-                             ; permission's "Yes" / "Yes, don't ask again" / "No"
+  ? opts: [* tstr],          ; the agent's own choices (≤ 4, each ≤ 24 chars): a question's options, or the
+                             ; "Yes" / "No" of a prompt read off a terminal (Copilot). Since 0.13 a Claude Code
+                             ; permission has none: "always allow" is the rule below
   acts: [* "approve"/"deny"/"focus"/"reply"/"ack"/"dictate"],
   exp?: uint,                ; unix time after which device must drop it
-  grant_mask?: uint          ; bit i set = opts[i] grants permission (approve-class: the device commits
+  grant_mask?: uint,         ; bit i set = opts[i] grants permission (approve-class: the device commits
                              ; it only by a hold); sent whenever opts is (0 for a plain question)
+  ? left: uint,              ; ms left in the answer window when sent       ┐ proto ≥ 0.11
+  ? win: uint,               ; the whole answer window in ms                 │ (ANSWER-WINDOW.md)
+  ? len: uint,               ; the full text's length in bytes, when text is cut ┘
+  ? hush: bool,              ; no buzz, glow or reminders for this request; proto ≥ 0.12 (PRESENCE.md)
+  ? rule: tstr,              ; the standing rule, exactly as Claude Code saves it   ┐ proto ≥ 0.13,
+  ? scope: uint,             ; 0 this session, 1 this project (local settings)      │ always together
+  ? wide: bool               ; the rule ends in a wildcard                           ┘ (STANDING-RULES.md)
 }
-clear = { rid: uint, why: "answered_pc"/"answered_dev"/"expired"/"cancelled" }
+clear = { rid: uint, why: "answered_pc"/"answered_dev"/"expired"/"cancelled"/"handed_back" }
 ```
+- **Answer window (proto 0.11, [ANSWER-WINDOW.md](ANSWER-WINDOW.md)).** `left` and `win` let the device count
+  down on its own clock (a re-sent request after a reconnect carries what is left now); `expired` means the
+  window ran out and the terminal asks now. `len` says the preview is not the whole text (cut, or reshaped) and
+  how long the full text is; past 4096 bytes the device cannot fetch it. `handed_back` answers the device's own
+  Open on PC (`focus` with the `rid`). Keys 9-11 and `handed_back` go only to devices with proto ≥ 0.11 (older
+  ones get `cancelled`); `len` is sent under privacy `meta` too, the text is not.
+
+- **Presence (proto 0.12, [PRESENCE.md](PRESENCE.md)).** `hush: true` on an `attention`, or on the session delta
+  that enters `done` / `error`, says the user is at the keyboard with that session's terminal in front of them:
+  the device holds the arrival buzz, the glow and the reminders (attention) or the finished buzz (session) and
+  changes nothing else. It is only ever `true`, only sent to devices with proto ≥ 0.12, and never stored (a
+  delta without it says nothing). The card, its actions and the answer window are as ever; the window itself is
+  shorter when the user is at the keyboard (`left` / `win` say so). An old device buzzes as before.
+
+- **Standing rules (proto 0.13, [STANDING-RULES.md](STANDING-RULES.md)).** `rule` is one of the request's own
+  `permission_suggestions`, as Claude Code will save it (`Bash(npm test:*)`, several rules one per line, ≤ 160
+  bytes of printable ASCII and line breaks); `scope` says where (`0` session, `1` the user's own
+  `.claude/settings.local.json`; no wider scope is ever sent); `wide` that a rule ends in a wildcard. The device
+  offers "Always allow" only for a rule it can show whole, and grants it with `approve` carrying `rh`. Keys 13-15
+  go only to devices with proto ≥ 0.13, under every privacy setting (the rule is no more than the preview).
+  `scope` is a uint, not the CDDL enum, so a value a device does not know drops the rule, not the request.
+- **Done summary (proto 0.14, [DONE-SUMMARY.md](DONE-SUMMARY.md)).** `fc`, `la` / `lr`, `tp` and `dur` (keys 30-34)
+  say what the turn that just ended did, tallied by the daemon from Claude Code's hooks. Each is optional and an
+  absent one is unknown, never zero. They come with the delta that enters done / error (and in a snapshot); a
+  delta that changes `st` clears the device's copy and one carrying any of them replaces it whole. Counts and
+  seconds only: no file name is sent, and privacy `meta` does not withhold them. Only to devices with proto ≥ 0.14.
+
 The device must show approve/deny **only if** they are in `acts`. The daemon includes them only for prompts the agent itself raised (DESIGN Q6). An option is answered with `cmd { op: "reply", rid, arg: index }`; the daemon maps the index back to the agent's choice (UI-V2 §7).
 
 ## 5. Commands (device → daemon)
 
 ```cddl
 cmd = {
-  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end",
+  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end"/"rerun",
   ? sid: uint,
   ? rid: uint,               ; required for approve/deny/reply
   ? arg: uint / tstr / scroll_arg,  ; snooze minutes (the watch sends 30), reply option index, quiet duration,
                              ; or the scroll argument (the CDDL names the union cmd_arg)
-  hold_ms?: uint             ; for approve: measured hold-to-confirm duration (daemon enforces ≥ 1000)
+  hold_ms?: uint,            ; for approve: measured hold-to-confirm duration (daemon enforces ≥ 1000)
+  ? rh: uint                 ; with approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of
+                             ; the rule, a 0 byte, scope and wide (0/1) as the device showed them; hold ≥ 1500
 }
 scroll_arg = { unit: "lines"/"pages"/"to_end", delta: int, ? seq: uint }   ; delta < 0 = up (older); to_end: sign = top / bottom
 result = { ok: bool, ? err: "stale"/"denied"/"unsupported"/"no_window"/"timeout", ? msg: tstr, ? pos: scroll_pos }
 scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tstr }   ; only in answers to scroll
 ```
 - `focus`: the daemon runs the FocusDriver for that session. On `no_window`, the device shows "Open terminal not found".
+  With a `rid` (proto 0.11) it also hands that open request back to the terminal at once: the hook returns no
+  decision, the terminal prompt appears, and devices get `clear` `handed_back`. It answers nothing.
 - `scroll` (UI-V2 §6): the daemon moves the session's terminal scrollback (tmux copy mode first, else kitty remote control; other terminals answer `unsupported` and the device hides the item for that session). The daemon sums a burst into one move while the previous one runs, answers at most one `result` per 250 ms and only when the position changed or the move failed, and clamps `delta` to ±500 lines / ±20 pages. `pos.preview` is the terminal's top visible line, ≤ 48 chars, sent only when the device's privacy is `preview` or `full`; it is never written to the audit log or the trace. Scroll is read-only on the PC and is not audited.
 - `type` (proto 0.4, issue b150): `arg` is an index into `welcome.replies`, or, from 100 up, into the session's own answers `session.rp` (proto 0.5: `arg` 101 = `rp[1]`); the daemon types that reply and Enter into the session's terminal (kitty only today, else `unsupported`). The device never sends text. Refused with `denied` while the session has an open request, while it is `input` with `sub` approval or question, or while a numbered selection list is on screen: Enter there would pick the dialog's highlighted option. Audited with the index, not the text.
 - `cancel` (proto 0.4): interrupts the session's running turn by sending Esc to its terminal. It needs a hold like `approve` (`hold_ms` ≥ 1000, else `denied`). Audited.
+- `cancel` on a job (`ag: "shell"`) sends SIGINT to the foreground process group of the shell's tty instead of
+  Esc; `stale` when nothing runs there.
+- `rerun` (proto 0.9): types a finished job's command line and Enter into its terminal, after a hold
+  (`hold_ms` ≥ 1000, else `denied`). `denied` while that shell runs anything, `stale` when the session is not a
+  finished job, `unsupported` without a typing driver. Audited without the command text.
+- `ack` on a job removes its card (`gone`).
 - `ack`: marks the session seen (all devices). On an `error` session it also dismisses the error: the
   session becomes `idle`.
 - `snooze`: `arg` minutes (the watch sends 30); `0` cancels. The daemon stores `snz` and sends it to
@@ -187,8 +253,18 @@ scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tst
 - `notify_done`: `arg` 1 (or absent) arms, 0 disarms. The daemon sets `ntf`; when the session next
   enters `done` or `error` the same delta carries `ntf: false`, and each device that saw `ntf` true
   buzzes once.
-- `detail`: the daemon replies with `detail { rid|sid, text }`, which holds the full text. This is sent only when privacy ≠ `meta`.
-- `approve`/`deny`/`reply` on a `rid` that has already been cleared returns `err: "stale"`, so a race against the terminal answer is safe. The daemon's approval broker holds the agent's blocking hook for that `rid` (DESIGN §6a); the first of {device answer, terminal answer, timeout} settles it, and only a device answer ever becomes a decision for the agent.
+- `detail` (proto 0.11, [ANSWER-WINDOW.md](ANSWER-WINDOW.md) §4): `{sid, rid, arg: offset}` asks for open request
+  `rid`'s full text from byte `offset`. The daemon replies with `detail { rid, sid, text, off, total }` chunks of
+  at most 1024 bytes, cut on UTF-8 boundaries, in order, then a `result`: `stale` for a request that is not open,
+  `denied` under privacy `meta`, past 4096 bytes or for an offset inside a character, `unsupported` from a device
+  below 0.11. The text keeps line breaks and spells out control and undrawable characters (`^[`, `\u{a0}`). The
+  device keeps a chunk only for the rid it asked for, at the offset it has reached, with the announced total.
+- `approve` with `rh` (proto 0.13, [STANDING-RULES.md](STANDING-RULES.md)): approve, and have the hook pass the
+  request's standing rule back to Claude Code as `updatedPermissions`. `denied` when the request offers no rule,
+  when `rh` is not the hash of the rule it offers (another request's, another scope, a broader rule), or when
+  `hold_ms` < 1500; the request stays open. Audited as `standing_rule` (rule, scope, destination, session key,
+  time). An older daemon ignores `rh` and approves once.
+- `approve`/`deny`/`reply` on a `rid` that has already been cleared returns `err: "stale"`, so a race against the terminal answer is safe. The daemon's approval broker holds the agent's blocking hook for that `rid` (DESIGN §6a) for the answer window ([ANSWER-WINDOW.md](ANSWER-WINDOW.md)); the first of {device answer, terminal answer, Open on PC, window over, hook gone} settles it, and only a device answer ever becomes a decision for the agent.
 
 ## 6. Audio: voice dictation (proto 0.6, issue 0ea9)
 ```
@@ -221,6 +297,18 @@ cmd { op: "kb_end",  sid, arg: 1 erase / 0 keep }     device → daemon
 - On each stroke the daemon decodes (SHARK2-style shape and location channels plus a word-frequency and context prior), answers `kb_cands` with up to four words, best first, and types the first one (with a leading space after a previous word) into the session's terminal; `typed` is the index it typed. `kb_pick` replaces the last typed word with candidate `arg` of the latest `kb_cands`; `kb_del` erases the last word. `kb_send` presses Enter after a hold (`hold_ms` ≥ 1000, else `denied`) and starts a new composition. `kb_end` closes the keyboard and, with `arg` 1, erases what it typed and did not send.
 - Typing has the same refusals as `type` (an open request, a question or approval waiting, a selection list on screen): then `kb_cands` still carries the candidates but `err: "denied"` and no `typed`. Kitty only today, else `unsupported`.
 - Strokes, candidates and typed words never reach the audit log; the trace replaces `keys`, `pts` and `cands` with `<private>`. The daemon logs only word counts.
+
+## 6b. Usage (proto 0.10, [GAUGES.md](GAUGES.md))
+```
+usage { at, h5?, h5r?, h5o?, wk?, wkr?, wko? }      daemon → device (type 23)
+```
+- The plan's rate-limit windows from Claude Code's status line (`rate_limits.five_hour` / `seven_day`): used
+  percent (rounded down), reset time, and the time it runs out at the current pace when that comes first. `at` is
+  when the daemon last read them. A full replacement: an absent window is unknown, never zero.
+- Sent after the snapshot to a device with proto ≥ 0.10 (unless the last reading is over an hour old), on every
+  change of the figures (a projection must move 5 minutes), at least every 5 minutes while readings arrive, and
+  after a lag. Only status lines from this machine feed it.
+- The device shows a window while the clock is set, the window has not reset and `at` is under an hour old.
 
 ## 7. Misc
 - `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray.

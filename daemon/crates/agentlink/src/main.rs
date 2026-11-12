@@ -3,6 +3,7 @@
 mod hooks;
 mod remote;
 mod remotes;
+mod shell_init;
 mod ssh;
 mod status;
 mod trace;
@@ -64,6 +65,12 @@ enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// Print the shell integration that shows long-running commands on the watch.
+    /// Add `eval "$(agentlink shell-init zsh)"` (or bash) to the shell's rc file.
+    ShellInit {
+        /// zsh or bash.
+        shell: String,
+    },
     /// Inspect or drive the connected device.
     Device {
         #[command(subcommand)]
@@ -75,6 +82,13 @@ enum Cmd {
 enum HooksCmd {
     /// Print the config snippets for Copilot CLI and Claude Code (nothing is installed).
     Print,
+    /// Print the Claude Code `statusLine` setting that feeds the watch's usage and context gauges.
+    /// Your current status-line command (read from ~/.claude/settings.json) is kept and chained.
+    Statusline {
+        /// Your own status-line command, run after the watch's with the same input.
+        #[arg(long)]
+        chain: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -153,9 +167,10 @@ fn main() -> Result<()> {
         Cmd::Status => status::run(cli.json),
         Cmd::Trace { follow, sid } => trace::run(cli.json, follow, sid),
         Cmd::Decode { hex } => decode(&hex, cli.json),
-        Cmd::Hooks {
-            cmd: HooksCmd::Print,
-        } => hooks::print(cli.json),
+        Cmd::Hooks { cmd } => match cmd {
+            HooksCmd::Print => hooks::print(cli.json),
+            HooksCmd::Statusline { chain } => hooks::statusline(chain, cli.json),
+        },
         Cmd::Remote { cmd } => match cmd {
             RemoteCmd::Init { rotate } => remote::init(cli.json, rotate),
             RemoteCmd::Add {
@@ -189,6 +204,7 @@ fn main() -> Result<()> {
             }
             None => ssh::run(port.unwrap_or(remotes::DEFAULT_PORT), &dest, &[], &args),
         },
+        Cmd::ShellInit { shell } => shell_init::run(&shell),
         Cmd::Device { cmd } => {
             let name = match cmd {
                 DeviceCmd::State => "state",

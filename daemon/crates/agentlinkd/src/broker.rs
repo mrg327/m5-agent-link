@@ -9,13 +9,21 @@
 //! never an approval.
 
 use crate::registry::{clip, now_unix, Registry, Update};
-use agentlink_proto::{Action, AttKind, Attention, Clear, ClearWhy, ResultErr};
+use crate::standing::Standing;
+use agentlink_proto::{Action, AttKind, Attention, Clear, ClearWhy, ResultErr, RuleScope};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::oneshot;
+
+/// Longest full text a device can fetch with `detail` (ANSWER-WINDOW.md §4): 4 KiB, about twenty
+/// pages of the watch's reader. A longer request stays "Too long to approve here".
+pub const DETAIL_CAP: usize = 4096;
+/// Bytes of text per `detail` chunk: one chunk is a fraction of the watch's 4096-byte message limit.
+pub const DETAIL_CHUNK: usize = 1024;
 
 /// What the device answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -25,6 +33,9 @@ pub enum Decision {
     Deny,
     /// Index into the request's `opts`.
     Reply(usize),
+    /// Approve, and save the request's standing rule (STANDING-RULES.md): the hash of the rule the
+    /// device showed, which must be the hash of the request's own.
+    Grant(u32),
 }
 
 /// What one of the request's options means to the agent.
@@ -32,47 +43,58 @@ pub enum Decision {
 #[serde(rename_all = "snake_case")]
 pub enum Meaning {
     Allow,
-    /// Allow and remember (Claude Code: apply `permission_suggestions`).
-    AllowGrant,
     Deny,
     /// A question's answer: the option's full label.
     Answer(String),
 }
 
+/// A standing rule the device granted, for the audit log (never sent to hooks).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Saved {
+    pub rule: String,
+    pub scope: RuleScope,
+    pub wide: bool,
+    /// Source session key (`agent:session_id`).
+    pub key: String,
+}
+
 /// What the hook is told; it turns this into the agent's own hook-output JSON.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Outcome {
     /// `allow` | `deny` | `none` (no decision: let the agent prompt as usual).
     pub decision: &'static str,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub grant: bool,
+    /// With `allow`: permission update entries to apply, each one of the request's own
+    /// `permission_suggestions` verbatim (STANDING-RULES.md). The hook passes them back as
+    /// `updatedPermissions` only if each is one it received.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permissions: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub answer: Option<String>,
     /// Index of the option the decision stands for (Approve: the first allow, Deny: the first
     /// deny), so a typed answer knows which key to press. Not sent to hooks.
     #[serde(skip)]
     pub choice: Option<usize>,
+    /// The standing rule this answer saves, for the audit log. Not sent to hooks.
+    #[serde(skip)]
+    pub saved: Option<Saved>,
 }
 
 impl Outcome {
     pub const NONE: Outcome = Outcome {
         decision: "none",
-        grant: false,
+        permissions: None,
         answer: None,
         choice: None,
+        saved: None,
     };
 
-    fn of(
-        decision: &'static str,
-        grant: bool,
-        answer: Option<String>,
-        choice: Option<usize>,
-    ) -> Self {
+    fn of(decision: &'static str, answer: Option<String>, choice: Option<usize>) -> Self {
         Outcome {
             decision,
-            grant,
+            permissions: None,
             answer,
             choice,
+            saved: None,
         }
     }
 }
@@ -89,6 +111,7 @@ pub struct Request {
     pub text: Option<String>,
     /// `opts` and their meanings, same length; empty = the device synthesises Approve / Deny.
     pub opts: Vec<(String, Meaning)>,
+    /// The answer window (window.rs); a notice's is how long it may stay up.
     pub ttl: Duration,
     /// Nothing can answer it but the terminal: the device only offers Focus.
     pub focus_only: bool,
@@ -97,6 +120,8 @@ pub struct Request {
     /// Shown only: the hook is released at once (the terminal shows the prompt now) and the card
     /// stays until the session moves on, e.g. a question the wheel cannot answer.
     pub notice: bool,
+    /// The standing rule the device may grant with an approve (STANDING-RULES.md).
+    pub standing: Option<Standing>,
 }
 
 struct Pending {
@@ -105,6 +130,12 @@ struct Pending {
     tool: Option<String>,
     meanings: Vec<Meaning>,
     tx: oneshot::Sender<Outcome>,
+    /// The full text as the watch's reader shows it (`detail_text`); `None` past [`DETAIL_CAP`].
+    full: Option<String>,
+    /// When the answer window ends; `None` for a notice (no countdown).
+    deadline: Option<Instant>,
+    /// The standing rule a grant saves; `att.rule` is its text.
+    standing: Option<Standing>,
 }
 
 #[derive(Default)]
@@ -116,6 +147,45 @@ struct Inner {
 pub struct Broker {
     inner: Mutex<Inner>,
     registry: Arc<Registry>,
+    /// Devices linked right now (device.rs holds a [`Linked`] per handshaken link).
+    linked: Arc<AtomicUsize>,
+}
+
+/// Counts one linked device while it lives.
+pub struct Linked(Arc<AtomicUsize>);
+
+impl Drop for Linked {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
+/// Text that is safe to show on a watch *in full* (the `detail` reader): every character the watch
+/// cannot draw is spelled out instead of vanishing (ANSWER-WINDOW.md §4). Line breaks stay; other
+/// control characters become caret notation (`^[` for Esc, `^I` for a tab); characters outside the
+/// watch's glyph set, and the invisible or look-alike ones inside it (no-break space, soft hyphen),
+/// become `\u{…}`. Nothing is collapsed or dropped, except trailing line breaks and spaces (which show
+/// nothing either way).
+pub fn detail_text(s: &str) -> String {
+    let s = s.replace("\r\n", "\n");
+    let s = s.trim_end_matches([' ', '\n', '\r']);
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\n' => out.push('\n'),
+            '\r' => out.push('\n'),
+            c if (c as u32) < 0x20 => {
+                out.push('^');
+                out.push(char::from(b'@' + c as u8));
+            }
+            '\u{7f}' => out.push_str("^?"),
+            '\u{20}'..='\u{7e}' | '\u{a1}'..='\u{ac}' | '\u{ae}'..='\u{ff}' => out.push(c),
+            '\u{2013}' | '\u{2014}' | '\u{2018}' | '\u{2019}' | '\u{201c}' | '\u{201d}'
+            | '\u{2022}' | '\u{2026}' => out.push(c),
+            c => out.push_str(&format!("\\u{{{:x}}}", c as u32)),
+        }
+    }
+    out
 }
 
 /// Text that is safe to show on a watch: control characters stripped, whitespace collapsed.
@@ -159,12 +229,31 @@ impl Broker {
                 ..Default::default()
             }),
             registry,
+            linked: Arc::new(AtomicUsize::new(0)),
         }
+    }
+
+    /// A device finished its handshake; it counts as linked until the guard drops.
+    pub fn link(&self) -> Linked {
+        self.linked.fetch_add(1, Ordering::Relaxed);
+        Linked(self.linked.clone())
+    }
+
+    /// Devices linked right now: with none, nobody can answer (window.rs).
+    pub fn devices(&self) -> usize {
+        self.linked.load(Ordering::Relaxed)
     }
 
     /// Registers the request, tells every device, and returns the channel the hook waits on.
     /// The channel yields `Err` when the request ends without a device decision.
+    #[cfg(test)]
     pub fn open(&self, req: Request) -> (u64, oneshot::Receiver<Outcome>) {
+        self.open_with(req, false)
+    }
+
+    /// [`Self::open`], with `hush`: tell the devices not to buzz for it (presence.rs). The card is
+    /// shown all the same and can be answered as ever.
+    pub fn open_with(&self, req: Request, hush: bool) -> (u64, oneshot::Receiver<Outcome>) {
         let (tx, rx) = oneshot::channel();
         let mut acts = match req.kind {
             AttKind::Approval if !req.focus_only => {
@@ -182,7 +271,7 @@ impl Broker {
             .opts
             .iter()
             .enumerate()
-            .filter(|(_, (_, m))| matches!(m, Meaning::Allow | Meaning::AllowGrant))
+            .filter(|(_, (_, m))| matches!(m, Meaning::Allow))
             .fold(0u64, |mask, (i, _)| mask | (1 << i));
         let mut g = self.inner.lock().unwrap();
         let rid = g.next_rid;
@@ -191,17 +280,36 @@ impl Broker {
         } else {
             rid + 1
         };
+        let text = req.text.as_deref().map(|t| clip(&tidy(t), 160));
+        let full = req.text.as_deref().map(detail_text);
+        // `len` says the preview is not the whole text (cut, or tidied): the device fetches it
+        let len = full
+            .as_ref()
+            .filter(|f| text.as_ref() != Some(*f))
+            .map(|f| f.len() as u64);
+        let win_ms = (!req.notice).then_some(req.ttl.as_millis() as u64);
+        // a standing rule goes only with a request the device can approve
+        let standing = req
+            .standing
+            .filter(|_| req.kind == AttKind::Approval && !req.focus_only && !req.notice);
         let att = Attention {
             rid,
             sid: req.sid,
             kind: req.kind,
             title: req.title.map(|t| clip(&tidy(&t), 40)),
-            text: req.text.map(|t| clip(&tidy(&t), 160)),
+            text,
             opts: (!req.opts.is_empty() && !req.focus_only)
                 .then(|| req.opts.iter().map(|(o, _)| clip(&tidy(o), 24)).collect()),
             acts,
             exp: Some(now_unix() + req.ttl.as_secs().max(1)),
             grant_mask: (!req.opts.is_empty() && !req.focus_only).then_some(grant_mask),
+            left: win_ms,
+            win: win_ms,
+            len,
+            hush: hush.then_some(true),
+            rule: standing.as_ref().map(|s| s.text.clone()),
+            scope: standing.as_ref().map(|s| s.scope),
+            wide: standing.as_ref().map(|s| s.wide),
         };
         g.pending.insert(
             rid,
@@ -211,6 +319,9 @@ impl Broker {
                 tool: req.tool,
                 meanings: req.opts.into_iter().map(|(_, m)| m).collect(),
                 tx,
+                full: full.filter(|f| f.len() <= DETAIL_CAP),
+                deadline: (!req.notice).then(|| Instant::now() + req.ttl),
+                standing,
             },
         );
         drop(g);
@@ -235,16 +346,30 @@ impl Broker {
         let first = |want: fn(&Meaning) -> bool| p.meanings.iter().position(want);
         let outcome = match decision {
             Decision::Approve if p.att.kind == AttKind::Approval => {
-                Outcome::of("allow", false, None, first(|m| matches!(m, Meaning::Allow)))
+                Outcome::of("allow", None, first(|m| matches!(m, Meaning::Allow)))
             }
+            Decision::Grant(h) if p.att.kind == AttKind::Approval => match &p.standing {
+                // the rule the device showed is the rule this request offers: hand back that entry only
+                Some(s) if s.hash == h => Outcome {
+                    permissions: Some(vec![s.entry.clone()]),
+                    saved: Some(Saved {
+                        rule: s.text.clone(),
+                        scope: s.scope,
+                        wide: s.wide,
+                        key: p.key.clone(),
+                    }),
+                    ..Outcome::of("allow", None, first(|m| matches!(m, Meaning::Allow)))
+                },
+                Some(_) => return Err((ResultErr::Denied, "not the rule this request offers")),
+                None => return Err((ResultErr::Denied, "no rule to save for this request")),
+            },
             Decision::Deny if p.att.kind == AttKind::Approval => {
-                Outcome::of("deny", false, None, first(|m| matches!(m, Meaning::Deny)))
+                Outcome::of("deny", None, first(|m| matches!(m, Meaning::Deny)))
             }
             Decision::Reply(i) => match p.meanings.get(i) {
-                Some(Meaning::Allow) => Outcome::of("allow", false, None, Some(i)),
-                Some(Meaning::AllowGrant) => Outcome::of("allow", true, None, Some(i)),
-                Some(Meaning::Deny) => Outcome::of("deny", false, None, Some(i)),
-                Some(Meaning::Answer(a)) => Outcome::of("allow", false, Some(a.clone()), Some(i)),
+                Some(Meaning::Allow) => Outcome::of("allow", None, Some(i)),
+                Some(Meaning::Deny) => Outcome::of("deny", None, Some(i)),
+                Some(Meaning::Answer(a)) => Outcome::of("allow", Some(a.clone()), Some(i)),
                 None => return Err((ResultErr::Denied, "no such option")),
             },
             _ => return Err((ResultErr::Denied, "not a permission request")),
@@ -273,7 +398,7 @@ impl Broker {
         if !p.att.acts.contains(&Action::Dictate) {
             return Err((ResultErr::Denied, "this card takes no dictation"));
         }
-        self.settle(g, rid, Outcome::of("allow", false, Some(text), None))
+        self.settle(g, rid, Outcome::of("allow", Some(text), None))
     }
 
     fn settle(
@@ -306,12 +431,9 @@ impl Broker {
             return false;
         };
         match decision {
-            Decision::Approve => p.att.kind == AttKind::Approval,
+            Decision::Approve | Decision::Grant(_) => p.att.kind == AttKind::Approval,
             Decision::Deny => false,
-            Decision::Reply(i) => matches!(
-                p.meanings.get(*i),
-                Some(Meaning::Allow) | Some(Meaning::AllowGrant)
-            ),
+            Decision::Reply(i) => matches!(p.meanings.get(*i), Some(Meaning::Allow)),
         }
     }
 
@@ -349,12 +471,51 @@ impl Broker {
         g.pending.values().any(|p| p.att.sid == sid)
     }
 
-    /// Open requests, for a device that connects while they are pending.
+    /// Open requests, for a device that connects while they are pending: `left` is what remains of
+    /// each window now, so a watch that reconnects mid-window counts down from the right place.
     pub fn pending(&self) -> Vec<Attention> {
         let g = self.inner.lock().unwrap();
-        let mut v: Vec<Attention> = g.pending.values().map(|p| p.att.clone()).collect();
+        let now = Instant::now();
+        let mut v: Vec<Attention> = g
+            .pending
+            .values()
+            .map(|p| {
+                let mut a = p.att.clone();
+                if let Some(d) = p.deadline {
+                    a.left = Some(d.saturating_duration_since(now).as_millis() as u64);
+                }
+                a
+            })
+            .collect();
         v.sort_by_key(|a| a.rid);
         v
+    }
+
+    /// The full text of open request `rid`, for a device's `detail` (ANSWER-WINDOW.md §4): `stale`
+    /// when it is no longer open, `denied` past [`DETAIL_CAP`] or when it has no text.
+    pub fn detail(&self, rid: u64) -> Result<(u64, String), (ResultErr, &'static str)> {
+        let g = self.inner.lock().unwrap();
+        let Some(p) = g.pending.get(&rid) else {
+            return Err((ResultErr::Stale, "no pending request for rid"));
+        };
+        match (&p.full, p.att.len) {
+            (Some(f), _) => Ok((p.att.sid, f.clone())),
+            (None, Some(_)) => Err((ResultErr::Denied, "too long for the watch")),
+            (None, None) => Err((ResultErr::Denied, "no text")),
+        }
+    }
+
+    /// The device's Open on PC on request `rid` (proto 0.11): the hook is released with no decision at
+    /// once, so the terminal shows its own prompt now instead of at the end of the window. Never an
+    /// answer: the same as the window running out. False when `rid` is not open.
+    pub fn hand_back(&self, rid: u64, sid: Option<u64>) -> bool {
+        let mine = {
+            let g = self.inner.lock().unwrap();
+            g.pending
+                .get(&rid)
+                .is_some_and(|p| sid.is_none_or(|s| s == p.att.sid))
+        };
+        mine && self.cancel(rid, ClearWhy::HandedBack)
     }
 }
 
@@ -385,18 +546,9 @@ pub fn request_of(
         "permissionrequest" => {
             let tool_name = tool.as_deref().unwrap_or("Tool");
             let (title, text) = describe_tool(tool_name, input);
-            let has_suggestions = payload["permission_suggestions"]
-                .as_array()
-                .is_some_and(|a| !a.is_empty());
-            let opts = if has_suggestions {
-                vec![
-                    ("Yes".into(), Meaning::Allow),
-                    ("Yes, don't ask again".into(), Meaning::AllowGrant),
-                    ("No".into(), Meaning::Deny),
-                ]
-            } else {
-                Vec::new()
-            };
+            // Approve / Deny, and "Always allow" when Claude Code suggests a rule the watch can show in
+            // full (standing.rs). Before 0.13 this was a "Yes, don't ask again" option that applied every
+            // suggestion unseen, a permission mode change included.
             Some(Request {
                 sid,
                 key,
@@ -404,11 +556,12 @@ pub fn request_of(
                 kind: AttKind::Approval,
                 title: Some(title),
                 text,
-                opts,
+                opts: Vec::new(),
                 ttl,
                 focus_only: false,
                 dictate: false,
                 notice: false,
+                standing: crate::standing::pick(payload),
             })
         }
         "pretooluse" if tool.as_deref() == Some("AskUserQuestion") => {
@@ -448,6 +601,7 @@ pub fn request_of(
                     focus_only: true,
                     dictate: false,
                     notice: true,
+                    standing: None,
                 }
             };
             let [q] = qs.as_slice() else {
@@ -486,6 +640,7 @@ pub fn request_of(
                 focus_only: false,
                 dictate: false,
                 notice: false,
+                standing: None,
             })
         }
         _ => None,
@@ -524,9 +679,14 @@ mod tests {
         (Arc::new(Broker::new(reg)), rx)
     }
 
+    static SUGGESTION: std::sync::LazyLock<Value> = std::sync::LazyLock::new(|| {
+        json!({"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "npm test:*"}],
+               "behavior": "allow", "destination": "localSettings"})
+    });
+
     fn perm(suggest: bool) -> Request {
         let payload = json!({"tool_name": "Bash", "tool_input": {"command": "npm test"},
-                             "permission_suggestions": if suggest { json!([{"type":"addRules"}]) } else { json!([]) }});
+                             "permission_suggestions": if suggest { json!([SUGGESTION.clone()]) } else { json!([]) }});
         request_of(
             2,
             "claude:s".into(),
@@ -536,6 +696,30 @@ mod tests {
             Duration::from_secs(15),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn a_hushed_request_is_still_a_whole_card_and_stays_hushed_when_re_sent() {
+        let (b, mut rx) = broker();
+        let (rid, _w) = b.open_with(perm(true), true);
+        let Update::Attention(a) = next_update(&mut rx) else {
+            panic!("an attention")
+        };
+        assert_eq!(a.hush, Some(true));
+        // nothing else about the card changes: same actions, options and window as an unhushed one
+        let (_, _w2) = b.open(perm(true));
+        let Update::Attention(plain) = next_update(&mut rx) else {
+            panic!("an attention")
+        };
+        assert_eq!(plain.hush, None, "never sent as false");
+        assert_eq!(
+            (&a.acts, &a.opts, a.grant_mask),
+            (&plain.acts, &plain.opts, plain.grant_mask)
+        );
+        assert_eq!(a.win, plain.win);
+        // a device that connects later still gets the hush (and the answer is still possible)
+        let again = b.pending().into_iter().find(|p| p.rid == rid).unwrap();
+        assert_eq!(again.hush, Some(true));
     }
 
     fn next_update(rx: &mut tokio::sync::broadcast::Receiver<Update>) -> Update {
@@ -617,34 +801,188 @@ mod tests {
     #[tokio::test]
     async fn deny_and_reply_map_to_the_agents_choices() {
         let (b, mut rx) = broker();
-        let (rid, wait) = b.open(perm(true));
+        let mut r = perm(false);
+        r.opts = vec![("Yes".into(), Meaning::Allow), ("No".into(), Meaning::Deny)];
+        let (rid, wait) = b.open(r.clone());
         let Update::Attention(att) = next_update(&mut rx) else {
             panic!()
         };
         assert_eq!(
             att.opts.as_deref(),
-            Some(&["Yes".to_owned(), "Yes, don't ask again".into(), "No".into()][..])
+            Some(&["Yes".to_owned(), "No".into()][..])
         );
-        assert_eq!(att.grant_mask, Some(0b011));
+        assert_eq!(att.grant_mask, Some(0b01));
         assert!(att.acts.contains(&Action::Reply));
-        let out = b.answer(rid, Decision::Reply(1)).unwrap();
-        assert_eq!((out.decision, out.grant), ("allow", true));
+        let out = b.answer(rid, Decision::Reply(0)).unwrap();
+        assert_eq!((out.decision, &out.permissions), ("allow", &None));
         assert_eq!(wait.await.unwrap(), out);
 
-        let (rid, wait) = b.open(perm(true));
-        assert_eq!(b.answer(rid, Decision::Reply(2)).unwrap().decision, "deny");
+        let (rid, wait) = b.open(r.clone());
+        assert_eq!(b.answer(rid, Decision::Reply(1)).unwrap().decision, "deny");
         assert_eq!(wait.await.unwrap().decision, "deny");
 
         let (rid, wait) = b.open(perm(false));
         assert_eq!(b.answer(rid, Decision::Deny).unwrap().decision, "deny");
         assert_eq!(wait.await.unwrap().decision, "deny");
 
-        let (rid, _wait) = b.open(perm(true));
+        let (rid, _wait) = b.open(r);
         assert_eq!(
             b.answer(rid, Decision::Reply(7)).unwrap_err().0,
             ResultErr::Denied
         );
         assert_eq!(b.pending().len(), 1, "a bad index leaves the request open");
+    }
+
+    #[tokio::test]
+    async fn a_standing_rule_is_offered_and_granted_verbatim() {
+        let (b, mut rx) = broker();
+        let (rid, wait) = b.open(perm(true));
+        let Update::Attention(att) = next_update(&mut rx) else {
+            panic!()
+        };
+        // no options: Approve / Deny, and the rule with its scope and breadth
+        assert!(att.opts.is_none() && att.grant_mask.is_none());
+        assert_eq!(att.acts, vec![Action::Approve, Action::Deny, Action::Focus]);
+        assert_eq!(att.rule.as_deref(), Some("Bash(npm test:*)"));
+        assert_eq!(
+            (att.scope, att.wide),
+            (Some(RuleScope::Project), Some(true))
+        );
+        let h = crate::standing::hash("Bash(npm test:*)", RuleScope::Project, true);
+        assert!(
+            b.grants(rid, &Decision::Grant(h)),
+            "a grant needs the full hold"
+        );
+        let out = b.answer(rid, Decision::Grant(h)).unwrap();
+        assert_eq!(out.decision, "allow");
+        assert_eq!(out.permissions, Some(vec![SUGGESTION.clone()]));
+        let saved = out.saved.clone().unwrap();
+        assert_eq!(
+            (saved.rule.as_str(), saved.scope, saved.key.as_str()),
+            ("Bash(npm test:*)", RuleScope::Project, "claude:s")
+        );
+        let to_hook = wait.await.unwrap();
+        assert_eq!(to_hook, out);
+        // what the hook reads: allow plus the one entry; the audit record is not in it
+        let line = serde_json::to_value(&to_hook).unwrap();
+        assert_eq!(
+            line,
+            json!({"decision": "allow", "permissions": [SUGGESTION.clone()]})
+        );
+        // answered: a second grant is stale
+        assert_eq!(
+            b.answer(rid, Decision::Grant(h)).unwrap_err().0,
+            ResultErr::Stale
+        );
+    }
+
+    #[tokio::test]
+    async fn a_plain_approve_on_a_rule_request_saves_nothing() {
+        let (b, _rx) = broker();
+        let (rid, wait) = b.open(perm(true));
+        let out = b.answer(rid, Decision::Approve).unwrap();
+        assert_eq!((out.permissions, out.saved), (None, None));
+        assert_eq!(
+            serde_json::to_value(wait.await.unwrap()).unwrap(),
+            json!({"decision": "allow"})
+        );
+    }
+
+    #[tokio::test]
+    async fn a_grant_must_name_the_rule_this_request_offers() {
+        let (b, _rx) = broker();
+        let (a, _wa) = b.open(perm(true));
+        let mut other = perm(false);
+        other.standing = crate::standing::pick(&json!({"permission_suggestions": [
+            {"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "rm -rf build"}],
+             "behavior": "allow", "destination": "session"}]}));
+        let (o, wo) = b.open(other);
+        let ha = crate::standing::hash("Bash(npm test:*)", RuleScope::Project, true);
+        let ho = crate::standing::hash("Bash(rm -rf build)", RuleScope::Session, false);
+        // the rule swapped between what was shown and what is held: denied, both still open
+        assert_eq!(
+            b.answer(o, Decision::Grant(ha)).unwrap_err().0,
+            ResultErr::Denied
+        );
+        assert_eq!(
+            b.answer(a, Decision::Grant(ho)).unwrap_err().0,
+            ResultErr::Denied
+        );
+        // the same text with another scope or breadth is another rule
+        let wrong_scope = crate::standing::hash("Bash(npm test:*)", RuleScope::Session, true);
+        assert_eq!(
+            b.answer(a, Decision::Grant(wrong_scope)).unwrap_err().0,
+            ResultErr::Denied
+        );
+        assert_eq!(b.pending().len(), 2);
+        // its own hash grants its own entry
+        assert_eq!(
+            b.answer(o, Decision::Grant(ho))
+                .unwrap()
+                .permissions
+                .unwrap()[0]["rules"][0]["ruleContent"],
+            "rm -rf build"
+        );
+        assert_eq!(wo.await.unwrap().decision, "allow");
+        // a request with no rule cannot be granted one
+        let (plain, _wp) = b.open(perm(false));
+        assert_eq!(
+            b.answer(plain, Decision::Grant(ha)).unwrap_err().0,
+            ResultErr::Denied
+        );
+        // an unknown rid is stale
+        assert_eq!(
+            b.answer(u64::from(u32::MAX), Decision::Grant(ha))
+                .unwrap_err()
+                .0,
+            ResultErr::Stale
+        );
+    }
+
+    #[tokio::test]
+    async fn a_grant_after_the_window_or_the_hand_back_is_stale() {
+        let (b, _rx) = broker();
+        let h = crate::standing::hash("Bash(npm test:*)", RuleScope::Project, true);
+        let (rid, wait) = b.open(perm(true));
+        assert!(b.cancel(rid, ClearWhy::Expired));
+        assert_eq!(
+            b.answer(rid, Decision::Grant(h)).unwrap_err().0,
+            ResultErr::Stale
+        );
+        assert!(!b.grants(rid, &Decision::Grant(h)));
+        assert!(wait.await.is_err(), "no decision reaches the hook");
+        let (rid, wait) = b.open(perm(true));
+        assert!(b.hand_back(rid, Some(2)));
+        assert_eq!(
+            b.answer(rid, Decision::Grant(h)).unwrap_err().0,
+            ResultErr::Stale
+        );
+        assert!(wait.await.is_err());
+        // the terminal answered (a later event from the session)
+        let (rid, _wait) = b.open(perm(true));
+        b.cancel_session("claude:s", None);
+        assert_eq!(
+            b.answer(rid, Decision::Grant(h)).unwrap_err().0,
+            ResultErr::Stale
+        );
+    }
+
+    #[test]
+    fn only_a_request_the_device_can_approve_carries_a_rule() {
+        let (b, _rx) = broker();
+        let mut r = perm(true);
+        r.focus_only = true;
+        let (_, _w) = b.open(r);
+        let mut q = perm(true);
+        q.kind = AttKind::Question;
+        let (_, _w2) = b.open(q);
+        assert!(b
+            .pending()
+            .iter()
+            .all(|a| a.rule.is_none() && a.scope.is_none() && a.wide.is_none()));
+        // and the old "Yes, don't ask again" option is gone
+        let r = perm(true);
+        assert!(r.opts.is_empty() && r.standing.is_some());
     }
 
     #[tokio::test]
@@ -826,6 +1164,160 @@ mod tests {
         assert_eq!((c.rid, c.why), (other, ClearWhy::AnsweredPc));
     }
 
+    fn bash(cmd: &str, ttl: Duration) -> Request {
+        let payload = json!({"tool_name": "Bash", "tool_input": {"command": cmd}});
+        request_of(
+            2,
+            "claude:s".into(),
+            "claude",
+            "PermissionRequest",
+            &payload,
+            ttl,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn the_full_text_spells_out_what_the_watch_cannot_draw() {
+        assert_eq!(detail_text("a\r\nb\tc\u{1b}[0m"), "a\nb^Ic^[[0m");
+        assert_eq!(
+            detail_text("caf\u{e9} \u{2014} ok\u{2026}"),
+            "caf\u{e9} \u{2014} ok\u{2026}"
+        );
+        // invisible or look-alike characters are never shown as if they were not there
+        assert_eq!(detail_text("rm\u{a0}-rf"), "rm\\u{a0}-rf");
+        assert_eq!(detail_text("x\u{ad}y\u{200b}z"), "x\\u{ad}y\\u{200b}z");
+        assert_eq!(detail_text("\u{1F600}\u{7f}\u{85}"), "\\u{1f600}^?\\u{85}");
+        assert_eq!(
+            detail_text("echo \"a    b\""),
+            "echo \"a    b\"",
+            "spaces are not collapsed"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_window_rides_on_the_attention_and_counts_down() {
+        let (b, mut rx) = broker();
+        let (rid, _w) = b.open(bash("npm test", Duration::from_secs(60)));
+        let Update::Attention(att) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert_eq!((att.left, att.win), (Some(60_000), Some(60_000)));
+        assert_eq!(att.len, None, "the preview is the whole text");
+        tokio::time::sleep(Duration::from_millis(120)).await;
+        // a device that connects now counts down from what is left, not from the start
+        let again = b.pending().pop().unwrap();
+        assert_eq!(again.rid, rid);
+        let left = again.left.unwrap();
+        assert!(left <= 59_880 && left > 59_000, "left {left}");
+        assert_eq!(again.win, Some(60_000));
+    }
+
+    #[tokio::test]
+    async fn a_notice_has_no_countdown() {
+        let (b, mut rx) = broker();
+        let payload = json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
+            {"question": "a", "options": [{"label": "x"}]}, {"question": "b", "options": [{"label": "y"}]}]}});
+        let req = request_of(
+            1,
+            "claude:s".into(),
+            "claude",
+            "PreToolUse",
+            &payload,
+            Duration::from_secs(60),
+        )
+        .unwrap();
+        b.open(req);
+        let Update::Attention(att) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert_eq!((att.left, att.win), (None, None));
+    }
+
+    #[tokio::test]
+    async fn a_long_or_reshaped_text_offers_its_full_text_by_rid() {
+        let (b, mut rx) = broker();
+        let long = format!("echo start && {} && echo end", "x".repeat(400));
+        let (rid, _w) = b.open(bash(&long, Duration::from_secs(60)));
+        let Update::Attention(att) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert!(att.text.as_ref().unwrap().ends_with('…'));
+        assert_eq!(att.len, Some(long.len() as u64));
+        assert_eq!(b.detail(rid).unwrap(), (2, long.clone()));
+        // a short text whose preview had to be reshaped (two lines become one) is not whole either
+        let (rid2, _w2) = b.open(bash("cd /tmp\nrm -rf build", Duration::from_secs(60)));
+        let Update::Attention(att) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert_eq!(att.text.as_deref(), Some("cd /tmp rm -rf build"));
+        assert_eq!(att.len, Some(20));
+        assert_eq!(b.detail(rid2).unwrap().1, "cd /tmp\nrm -rf build");
+        // detail is bound to the request: another rid, or a settled one, is stale
+        assert_eq!(b.detail(rid + 1000).unwrap_err().0, ResultErr::Stale);
+        b.cancel(rid, ClearWhy::Expired);
+        assert_eq!(b.detail(rid).unwrap_err().0, ResultErr::Stale);
+    }
+
+    #[tokio::test]
+    async fn past_the_cap_the_full_text_is_refused() {
+        let (b, mut rx) = broker();
+        let huge = "y".repeat(DETAIL_CAP + 1);
+        let (rid, _w) = b.open(bash(&huge, Duration::from_secs(60)));
+        let Update::Attention(att) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert_eq!(
+            att.len,
+            Some(DETAIL_CAP as u64 + 1),
+            "the device learns it is too long"
+        );
+        assert_eq!(b.detail(rid).unwrap_err().0, ResultErr::Denied);
+        let fits = "z".repeat(DETAIL_CAP);
+        let (rid, _w) = b.open(bash(&fits, Duration::from_secs(60)));
+        assert_eq!(b.detail(rid).unwrap().1.len(), DETAIL_CAP);
+    }
+
+    #[tokio::test]
+    async fn handing_back_releases_the_hook_with_no_decision() {
+        let (b, mut rx) = broker();
+        let (rid, wait) = b.open(perm(false));
+        let _ = next_update(&mut rx);
+        assert!(
+            !b.hand_back(rid, Some(99)),
+            "another session's Open on PC hands nothing back"
+        );
+        assert!(
+            !b.hand_back(rid + 1, Some(2)),
+            "nor does another request id"
+        );
+        assert!(b.hand_back(rid, Some(2)));
+        assert!(wait.await.is_err(), "no decision: the terminal asks");
+        let Update::Clear(c) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert_eq!((c.rid, c.why), (rid, ClearWhy::HandedBack));
+        // nothing can answer it afterwards, not even the hold that was already running
+        assert_eq!(
+            b.answer(rid, Decision::Approve).unwrap_err().0,
+            ResultErr::Stale
+        );
+        assert!(!b.hand_back(rid, Some(2)));
+    }
+
+    #[tokio::test]
+    async fn linked_devices_are_counted_while_their_guard_lives() {
+        let (b, _rx) = broker();
+        assert_eq!(b.devices(), 0);
+        let one = b.link();
+        let two = b.link();
+        assert_eq!(b.devices(), 2);
+        drop(one);
+        assert_eq!(b.devices(), 1);
+        drop(two);
+        assert_eq!(b.devices(), 0);
+    }
+
     #[test]
     fn text_is_tidied_and_clipped() {
         assert_eq!(
@@ -856,6 +1348,7 @@ mod tests {
             focus_only: !dictate,
             dictate,
             notice: false,
+            standing: None,
         };
         let (plain, _w1) = b.open(card(false));
         let (text, w2) = b.open(card(true));
@@ -896,6 +1389,7 @@ mod tests {
             focus_only: true,
             dictate: false,
             notice: false,
+            standing: None,
         };
         let (ask, _w1) = b.open(card(Some("ask_user")));
         let (screen, w2) = b.open(card(None));

@@ -1,0 +1,14 @@
+# An older daemon (welcome proto 0.1) sends no window: no ring, and the request behaves exactly as before:
+# a cut text is locked by its ellipsis, and Open on PC is a plain focus with nothing else to it.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+expect_countdown -1 -1
+clear 7 expired
+wait 300
+expect_label On your computer
+quit

@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "debug.h"
+#include "done.h"
 #include "ui_home_internal.h"
 #include "ui_theme.h"
 
@@ -22,6 +23,7 @@
 #define TOOL_Y 210
 #define ARG_Y 252
 #define FOOTER_Y 322
+#define FOOTER_W 352 /* the chord at y 332 less a margin; the done summary's budget */
 #define ICON_Y 176
 #define WORD_Y 236
 #define SUB_Y 278
@@ -34,7 +36,7 @@ static lv_obj_t *s_mark[ROWS], *s_row[ROWS];
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static uint32_t s_sid, s_now;
 static int s_blockx = -1, s_blockw;
-static char s_header_txt[64], s_tool_txt[48], s_arg_txt[48], s_footer_txt[40], s_word_txt[24], s_sub_txt[48];
+static char s_header_txt[64], s_tool_txt[48], s_arg_txt[48], s_footer_txt[96], s_word_txt[24], s_sub_txt[48];
 static char s_row_txt[ROWS][STEP_TEXT_MAX + 8];
 static const char *s_mark_txt[ROWS];
 
@@ -92,12 +94,27 @@ static void step_mark(const step_t *st, const char **sym, uint32_t *rgb)
     }
 }
 
+static int measure_caption(const char *text)
+{
+    lv_point_t sz;
+    lv_text_get_size(&sz, text, FONT_CAPTION, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    return sz.x;
+}
+
 static void render_footer(const session_t *s)
 {
-    char buf[40], t[16];
+    char buf[96], t[16];
     uint32_t secs;
     unsigned n = (unsigned)s->n;
     buf[0] = 0;
+    /* a finished session: the done summary (DONE-SUMMARY.md) in the footer's place, one tone brighter */
+    bool sum = (s->state == SESS_DONE || s->state == SESS_ERROR) && s->agent != AGENT_SHELL && done_known(&s->sum);
+    if (sum) {
+        done_line_t l;
+        done_line_build(&s->sum, theme_sep(), FOOTER_W, measure_caption, &l);
+        done_line_text(&l, buf, sizeof buf);
+    }
+    theme_set_text_color(s_footer, sum ? COL_TEXT2 : COL_TEXT3);
     if (working(s)) {
         if (time_in_state(s, &secs)) {
             clock_text(t, sizeof t, secs);
@@ -137,7 +154,7 @@ static void place_rows(int prior)
         lv_text_get_size(&sz, s_row_txt[i], FONT_CAPTION, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
         if (sz.x > maxw) maxw = sz.x;
     }
-    int cap = theme_chord(ROW_Y0, 46) - MARK_W; /* the top row is the narrowest */
+    int cap = theme_chord(ROW_Y0, 24) - MARK_W; /* the top row is the narrowest */
     if (maxw > cap) maxw = cap;
     int w = maxw + MARK_W, x = UI_CX - w / 2;
     if (x == s_blockx && w == s_blockw) return;
@@ -245,7 +262,7 @@ void ui_watch_open(uint32_t sid, uint32_t now)
     s_header_txt[0] = s_tool_txt[0] = s_arg_txt[0] = s_footer_txt[0] = s_word_txt[0] = s_sub_txt[0] = 0;
     s_blockx = -1;
     ui_home_refresh(now); /* the index ring shows the sessions again, the watched one selected */
-    if (g_ui_actions->sectors) g_ui_actions->sectors(ui_home_slot_count());
+    ui_home_rim_mode(false);
     render();
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     dbg_event("ui", "watch", "\"sid\":%u,\"via\":\"open\"", (unsigned)sid);
@@ -339,7 +356,7 @@ lv_obj_t *ui_watch_init(lv_obj_t *screen)
     }
     s_tool = label(s_root, FONT_TITLE, COL_TEXT, TOOL_Y, theme_chord(TOOL_Y + 20, 24), 1, LV_TEXT_ALIGN_CENTER);
     s_arg = label(s_root, FONT_BODY, COL_TEXT2, ARG_Y, theme_chord(ARG_Y + 50, 24), 2, LV_TEXT_ALIGN_CENTER);
-    s_footer = label(s_root, FONT_CAPTION, COL_TEXT3, FOOTER_Y, 250, 1, LV_TEXT_ALIGN_CENTER);
+    s_footer = label(s_root, FONT_CAPTION, COL_TEXT3, FOOTER_Y, FOOTER_W, 1, LV_TEXT_ALIGN_CENTER);
     s_icon = label(s_root, FONT_ICON_L, COL_TEXT, ICON_Y, 80, 1, LV_TEXT_ALIGN_CENTER);
     s_word_l = label(s_root, FONT_TITLE, COL_TEXT, WORD_Y, theme_chord(WORD_Y + 20, 24), 1, LV_TEXT_ALIGN_CENTER);
     s_sub = label(s_root, FONT_CAPTION, COL_TEXT2, SUB_Y, 280, 1, LV_TEXT_ALIGN_CENTER);

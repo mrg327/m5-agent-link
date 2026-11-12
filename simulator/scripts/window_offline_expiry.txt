@@ -1,0 +1,18 @@
+# The link is gone when the window ends: no clear can arrive, so the watch ends the request itself on its own
+# clock (deadline + 1.5 s) and says where it went. An answer can no longer be started, before or after.
+connect
+rx a400020101020103a40082000b01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention_win 1500 60000 - 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+disconnect
+wait 1300
+# the window is over: a hold does not even arm
+hold 233 282 1500
+wait 300
+expect_no_label Approved
+wait 1500
+expect_label On your computer
+quit

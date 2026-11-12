@@ -1,0 +1,11 @@
+# The stored setting (no sensor involved): flipped from the start, whatever the pose says.
+pref orient flipped
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+wait 300
+pose upright
+wait 2500
+swipe 233 286 233 166 160
+wait 400
+expect_screen status
+quit
