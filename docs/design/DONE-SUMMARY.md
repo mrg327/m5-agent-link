@@ -32,6 +32,8 @@ runs count toward the turn.
 | **Tests** (`tp`) | `PostToolUse` / `PostToolUseFailure` of `Bash` whose command is a recognised test command (§2). The **last** such run of the turn decides. | `true`: it exited 0. `false`: it exited with a code that means the tests failed. | Anything not recognised (a script, `cargo test` behind a pipe, a custom runner). A later recognised run whose result is unknown erases an earlier verdict: the line shows nothing rather than a stale one. "Not run" is not shown: the daemon cannot tell "no tests" from "tests the list does not know". |
 | **Time** (`dur`) | The daemon's clock, from the prompt's hook line to the stop's. Whole seconds. | Wall-clock turn length, including time spent waiting for your approvals. | A session the daemon met mid-turn (its prompt was not seen) gets **no summary at all**: the files and lines would be incomplete. A turn that Claude Code never reports a stop for (interrupted with Esc) gets none. |
 
+The events are registrable Claude Code hooks (hooks reference, checked 2026-11-12: `PostToolUseFailure` "after a tool call fails", `StopFailure` "when the turn ends due to an API error") and `agentlink hooks print` lists both, non-blocking with timeout 5, like `PostToolUse` and `Stop`. An install made before this has to merge the two entries or failed tests and errored turns never reach the daemon.
+
 Claude Code's `tool_response` for `Bash` has no exit-code field: a command that exits non-zero arrives as
 `PostToolUseFailure` with `error` starting `Exit code N`. So `PostToolUse` of a recognised test command means
 exit 0, and the failure's `N` is read from the first line of `error`.

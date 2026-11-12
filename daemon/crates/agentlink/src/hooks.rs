@@ -21,9 +21,11 @@ const CLAUDE_EVENTS: &[&str] = &[
     "UserPromptSubmit",
     "PreToolUse",
     "PostToolUse",
+    "PostToolUseFailure",
     "PermissionRequest",
     "Notification",
     "Stop",
+    "StopFailure",
 ];
 /// Hooks that may block while the watch answers (UI-V2 §7): `PermissionRequest`, and
 /// `PreToolUse` for `AskUserQuestion`. Their timeout must cover the daemon's longest answer window
@@ -133,6 +135,19 @@ pub fn print(json: bool) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_printed_claude_config_has_every_event_the_daemon_uses() {
+        let hooks = &claude()["hooks"];
+        // PostToolUseFailure carries a failed test run's exit code and StopFailure ends a turn in error
+        // (DONE-SUMMARY.md): without them "tests failed" and the summary of an errored turn never arrive
+        for e in ["PostToolUse", "PostToolUseFailure", "Stop", "StopFailure"] {
+            let h = &hooks[e][0]["hooks"][0];
+            assert_eq!(h["command"], format!("agentlink-hook claude {e}"), "{e}");
+            assert_eq!(h["timeout"], 5, "{e}: non-blocking");
+        }
+        assert_eq!(hooks["PermissionRequest"][0]["hooks"][0]["timeout"], 330);
+    }
 
     #[test]
     fn statusline_block_chains_the_users_command_as_one_word() {
