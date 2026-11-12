@@ -72,7 +72,7 @@ device                                 daemon
 ### `hello` (device → daemon)
 ```cddl
 hello = {
-  proto: [uint, uint],             ; [major, minor] = [0, 10]
+  proto: [uint, uint],             ; [major, minor] = [0, 11]
   dev: { class: tstr,              ; "watch" | "desk" | "pad" | "sim" | ...
          board: tstr,              ; "m5stopwatch"
          fw: tstr,                 ; semver
@@ -168,11 +168,21 @@ attention = {
                              ; permission's "Yes" / "Yes, don't ask again" / "No"
   acts: [* "approve"/"deny"/"focus"/"reply"/"ack"/"dictate"],
   exp?: uint,                ; unix time after which device must drop it
-  grant_mask?: uint          ; bit i set = opts[i] grants permission (approve-class: the device commits
+  grant_mask?: uint,         ; bit i set = opts[i] grants permission (approve-class: the device commits
                              ; it only by a hold); sent whenever opts is (0 for a plain question)
+  ? left: uint,              ; ms left in the answer window when sent       ┐ proto ≥ 0.11
+  ? win: uint,               ; the whole answer window in ms                 │ (ANSWER-WINDOW.md)
+  ? len: uint                ; the full text's length in bytes, when text is cut ┘
 }
-clear = { rid: uint, why: "answered_pc"/"answered_dev"/"expired"/"cancelled" }
+clear = { rid: uint, why: "answered_pc"/"answered_dev"/"expired"/"cancelled"/"handed_back" }
 ```
+- **Answer window (proto 0.11, [ANSWER-WINDOW.md](ANSWER-WINDOW.md)).** `left` and `win` let the device count
+  down on its own clock (a re-sent request after a reconnect carries what is left now); `expired` means the
+  window ran out and the terminal asks now. `len` says the preview is not the whole text (cut, or reshaped) and
+  how long the full text is; past 4096 bytes the device cannot fetch it. `handed_back` answers the device's own
+  Open on PC (`focus` with the `rid`). Keys 9-11 and `handed_back` go only to devices with proto ≥ 0.11 (older
+  ones get `cancelled`); `len` is sent under privacy `meta` too, the text is not.
+
 The device must show approve/deny **only if** they are in `acts`. The daemon includes them only for prompts the agent itself raised (DESIGN Q6). An option is answered with `cmd { op: "reply", rid, arg: index }`; the daemon maps the index back to the agent's choice (UI-V2 §7).
 
 ## 5. Commands (device → daemon)
@@ -191,6 +201,8 @@ result = { ok: bool, ? err: "stale"/"denied"/"unsupported"/"no_window"/"timeout"
 scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tstr }   ; only in answers to scroll
 ```
 - `focus`: the daemon runs the FocusDriver for that session. On `no_window`, the device shows "Open terminal not found".
+  With a `rid` (proto 0.11) it also hands that open request back to the terminal at once: the hook returns no
+  decision, the terminal prompt appears, and devices get `clear` `handed_back`. It answers nothing.
 - `scroll` (UI-V2 §6): the daemon moves the session's terminal scrollback (tmux copy mode first, else kitty remote control; other terminals answer `unsupported` and the device hides the item for that session). The daemon sums a burst into one move while the previous one runs, answers at most one `result` per 250 ms and only when the position changed or the move failed, and clamps `delta` to ±500 lines / ±20 pages. `pos.preview` is the terminal's top visible line, ≤ 48 chars, sent only when the device's privacy is `preview` or `full`; it is never written to the audit log or the trace. Scroll is read-only on the PC and is not audited.
 - `type` (proto 0.4, issue b150): `arg` is an index into `welcome.replies`, or, from 100 up, into the session's own answers `session.rp` (proto 0.5: `arg` 101 = `rp[1]`); the daemon types that reply and Enter into the session's terminal (kitty only today, else `unsupported`). The device never sends text. Refused with `denied` while the session has an open request, while it is `input` with `sub` approval or question, or while a numbered selection list is on screen: Enter there would pick the dialog's highlighted option. Audited with the index, not the text.
 - `cancel` (proto 0.4): interrupts the session's running turn by sending Esc to its terminal. It needs a hold like `approve` (`hold_ms` ≥ 1000, else `denied`). Audited.
@@ -208,8 +220,13 @@ scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tst
 - `notify_done`: `arg` 1 (or absent) arms, 0 disarms. The daemon sets `ntf`; when the session next
   enters `done` or `error` the same delta carries `ntf: false`, and each device that saw `ntf` true
   buzzes once.
-- `detail`: the daemon replies with `detail { rid|sid, text }`, which holds the full text. This is sent only when privacy ≠ `meta`.
-- `approve`/`deny`/`reply` on a `rid` that has already been cleared returns `err: "stale"`, so a race against the terminal answer is safe. The daemon's approval broker holds the agent's blocking hook for that `rid` (DESIGN §6a); the first of {device answer, terminal answer, timeout} settles it, and only a device answer ever becomes a decision for the agent.
+- `detail` (proto 0.11, [ANSWER-WINDOW.md](ANSWER-WINDOW.md) §4): `{sid, rid, arg: offset}` asks for open request
+  `rid`'s full text from byte `offset`. The daemon replies with `detail { rid, sid, text, off, total }` chunks of
+  at most 1024 bytes, cut on UTF-8 boundaries, in order, then a `result`: `stale` for a request that is not open,
+  `denied` under privacy `meta`, past 4096 bytes or for an offset inside a character, `unsupported` from a device
+  below 0.11. The text keeps line breaks and spells out control and undrawable characters (`^[`, `\u{a0}`). The
+  device keeps a chunk only for the rid it asked for, at the offset it has reached, with the announced total.
+- `approve`/`deny`/`reply` on a `rid` that has already been cleared returns `err: "stale"`, so a race against the terminal answer is safe. The daemon's approval broker holds the agent's blocking hook for that `rid` (DESIGN §6a) for the answer window ([ANSWER-WINDOW.md](ANSWER-WINDOW.md)); the first of {device answer, terminal answer, Open on PC, window over, hook gone} settles it, and only a device answer ever becomes a decision for the agent.
 
 ## 6. Audio: voice dictation (proto 0.6, issue 0ea9)
 ```

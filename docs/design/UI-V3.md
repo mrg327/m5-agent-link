@@ -288,9 +288,31 @@ A permission can only be approved when all of its text has been on screen.
 - Until the last page has been shown for this request and this text, an item that grants permission
   cannot be held. A tap on it opens the reader; a hold says `Read it first`. Deny and `Open on PC` are
   never locked.
-- A text the daemon cut (it ends in `…`, or it fills the model's buffer) can never be shown whole. It can
-  be read and denied on the watch; Approve answers `Too long to approve here`. (`ASK_BLOCK_CUT_TEXT` in
-  `ui_ask.c`.) The fix for that limit is the `detail` request, which is not built yet.
+- A text the daemon cut is not the whole request. A 0.11 daemon says so with `len`; for an older one the
+  watch goes by the text (it ends in `…`, or it fills the model's buffer). The platter then shows `Read all`
+  even when the preview fits, and the reader fetches the **full text** by request id (the `detail` request,
+  [ANSWER-WINDOW.md](ANSWER-WINDOW.md) §4, up to 4096 bytes) and pages through it as it arrives: `3 of 12+`
+  while more is coming, `12 of 12 · loading` on the last page so far (B stays there), then `3 of 20`. The
+  reader shows the text exactly: line breaks kept, control and undrawable characters spelled out (`^[`,
+  `\u{a0}`), never a description in place of the command.
+- Approve unlocks only when the last page of the whole text has been shown for this request. A cut text the
+  watch can never have in full (an older daemon, privacy `meta`, past 4096 bytes, a refused or failed
+  transfer) can be read (its preview) and denied on the watch; Approve answers `Too long to approve here`.
+  (`ASK_BLOCK_CUT_TEXT` in `ui_ask.c`.) A chunk for another request, out of order, or disagreeing with the
+  announced length never reaches the reader.
+
+#### 4.3b The answer window (2026-11-12, [ANSWER-WINDOW.md](ANSWER-WINDOW.md))
+
+- A thin ring just inside the index ring (centre r 214.5, 3 px, round caps, `COL_TEXT2`, white in the last
+  10 s) shortens toward 12 o'clock as the time to answer on the watch runs out, on ASK and on the request's
+  card on the deck. No text. Hidden once an answer is out, and for a daemon that sends no window.
+- When the window ends ASK shows, for 3 s, `ICON_COMPUTER` (44 px, `COL_TEXT2`) at y 154, `On your computer`
+  (`FONT_TITLE`) at y 215 and `Time ran out here` / `Answer it there` (`FONT_CAPTION`) at y 256; then the deck,
+  where the card's state word reads `On your computer` with `ICON_COMPUTER` and the summary line
+  `Answer it there`, until the session moves on. Any input on that ASK state goes to the deck.
+- A then reads Open on PC as before, and also hands the request back to the terminal at once (the card then says
+  `On your computer` · `Answer it there`). Once the window is over a hold cannot start, and a running one is
+  cancelled.
 
 ### 4.4 WATCH (shown to the user as "Activity")
 
