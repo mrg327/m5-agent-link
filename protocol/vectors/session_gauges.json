@@ -1,0 +1,16 @@
+{
+  "desc": "Delta: session 2 (Claude) reports its context fill, model, permission mode and pull request (proto 0.10)",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 18,
+    "b": {
+      "sid": 2,
+      "ctx": 72,
+      "mdl": "Opus 4.7",
+      "pm": "plan",
+      "pr": 128,
+      "prs": "approved"
+    }
+  },
+  "cbor_hex": "a30004011203a6000215184816684f70757320342e37170118181880181902"
+}

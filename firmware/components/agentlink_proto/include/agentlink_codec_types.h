@@ -341,6 +341,47 @@ struct session_uint20uint {
 	uint32_t session_uint20uint;
 };
 
+struct session_uint21uint {
+	uint32_t session_uint21uint;
+};
+
+struct session_uint22tstr {
+	struct zcbor_string session_uint22tstr;
+};
+
+struct perm_mode_r {
+	enum {
+		perm_mode_default_m_c = 0,
+		perm_mode_plan_m_c = 1,
+		perm_mode_accept_edits_m_c = 2,
+		perm_mode_auto_m_c = 3,
+		perm_mode_dont_ask_m_c = 4,
+		perm_mode_bypass_m_c = 5,
+	} perm_mode_choice;
+};
+
+struct session_perm_mode_m {
+	struct perm_mode_r session_perm_mode_m;
+};
+
+struct session_uint24uint {
+	uint32_t session_uint24uint;
+};
+
+struct pr_state_r {
+	enum {
+		pr_state_none_m_c = 0,
+		pr_state_pending_m_c = 1,
+		pr_state_approved_m_c = 2,
+		pr_state_changes_m_c = 3,
+		pr_state_draft_m_c = 4,
+	} pr_state_choice;
+};
+
+struct session_pr_state_m {
+	struct pr_state_r session_pr_state_m;
+};
+
 struct session {
 	uint32_t session_uint0uint;
 	struct session_agent_m session_agent_m;
@@ -383,6 +424,16 @@ struct session {
 	bool session_uint19uint_present;
 	struct session_uint20uint session_uint20uint;
 	bool session_uint20uint_present;
+	struct session_uint21uint session_uint21uint;
+	bool session_uint21uint_present;
+	struct session_uint22tstr session_uint22tstr;
+	bool session_uint22tstr_present;
+	struct session_perm_mode_m session_perm_mode_m;
+	bool session_perm_mode_m_present;
+	struct session_uint24uint session_uint24uint;
+	bool session_uint24uint_present;
+	struct session_pr_state_m session_pr_state_m;
+	bool session_pr_state_m_present;
 };
 
 struct att_kind_r {
@@ -811,6 +862,51 @@ struct msg_kb_cands {
 	struct kb_cands msg_kb_cands_kb_cands_m;
 };
 
+struct usage_uint1uint {
+	uint32_t usage_uint1uint;
+};
+
+struct usage_uint2uint {
+	uint32_t usage_uint2uint;
+};
+
+struct usage_uint3uint {
+	uint32_t usage_uint3uint;
+};
+
+struct usage_uint4uint {
+	uint32_t usage_uint4uint;
+};
+
+struct usage_uint5uint {
+	uint32_t usage_uint5uint;
+};
+
+struct usage_uint6uint {
+	uint32_t usage_uint6uint;
+};
+
+struct usage {
+	uint32_t usage_uint0uint;
+	struct usage_uint1uint usage_uint1uint;
+	bool usage_uint1uint_present;
+	struct usage_uint2uint usage_uint2uint;
+	bool usage_uint2uint_present;
+	struct usage_uint3uint usage_uint3uint;
+	bool usage_uint3uint_present;
+	struct usage_uint4uint usage_uint4uint;
+	bool usage_uint4uint_present;
+	struct usage_uint5uint usage_uint5uint;
+	bool usage_uint5uint_present;
+	struct usage_uint6uint usage_uint6uint;
+	bool usage_uint6uint_present;
+};
+
+struct msg_usage {
+	struct hdr_r msg_usage_hdr_m;
+	struct usage msg_usage_usage_m;
+};
+
 struct msg_dbg_ui_state_req {
 	struct hdr_r msg_dbg_ui_state_req_hdr_m;
 };
@@ -934,6 +1030,7 @@ struct envelope_r {
 		struct msg_kb_start envelope_msg_kb_start_m;
 		struct msg_kb_stroke envelope_msg_kb_stroke_m;
 		struct msg_kb_cands envelope_msg_kb_cands_m;
+		struct msg_usage envelope_msg_usage_m;
 		struct msg_dbg_ui_state_req envelope_msg_dbg_ui_state_req_m;
 		struct msg_dbg_ui_state envelope_msg_dbg_ui_state_m;
 		struct msg_dbg_screenshot_req envelope_msg_dbg_screenshot_req_m;
@@ -964,6 +1061,7 @@ struct envelope_r {
 		envelope_msg_kb_start_m_c,
 		envelope_msg_kb_stroke_m_c,
 		envelope_msg_kb_cands_m_c,
+		envelope_msg_usage_m_c,
 		envelope_msg_dbg_ui_state_req_m_c,
 		envelope_msg_dbg_ui_state_m_c,
 		envelope_msg_dbg_screenshot_req_m_c,

@@ -12,7 +12,7 @@ envelope = msg_hello / msg_welcome / msg_snapshot / msg_session_upd / msg_gone
          / msg_attention / msg_clear / msg_cmd / msg_result / msg_detail
          / msg_cfg / msg_batt / msg_ping / msg_pong / msg_log
          / msg_audio_start / msg_audio / msg_audio_end / msg_transcript
-         / msg_kb_start / msg_kb_stroke / msg_kb_cands
+         / msg_kb_start / msg_kb_stroke / msg_kb_cands / msg_usage
          / msg_dbg_ui_state_req / msg_dbg_ui_state / msg_dbg_screenshot_req
          / msg_dbg_screenshot_chunk / msg_dbg_inject_input / msg_dbg_set_log_level
 
@@ -40,6 +40,7 @@ msg_transcript           = { 0 => mt_transcript, hdr, 3 => transcript }
 msg_kb_start             = { 0 => mt_kb_start, hdr, 3 => kb_start }
 msg_kb_stroke            = { 0 => mt_kb_stroke, hdr, 3 => kb_stroke }
 msg_kb_cands             = { 0 => mt_kb_cands, hdr, 3 => kb_cands }
+msg_usage                = { 0 => mt_usage, hdr, 3 => usage }
 msg_dbg_ui_state_req     = { 0 => mt_dbg_ui_state_req, hdr, 3 => empty }
 msg_dbg_ui_state         = { 0 => mt_dbg_ui_state, hdr, 3 => dbg_ui_state }
 msg_dbg_screenshot_req   = { 0 => mt_dbg_screenshot_req, hdr, 3 => empty }
@@ -70,6 +71,7 @@ mt_transcript = 19
 mt_kb_start = 20
 mt_kb_stroke = 21
 mt_kb_cands = 22
+mt_usage = 23
 mt_dbg_ui_state_req = 64
 mt_dbg_ui_state = 65
 mt_dbg_screenshot_req = 66
@@ -209,8 +211,29 @@ session = {
   ? 18 => [0*3 tstr],       ; rp    answers to q for the Reply list, <= 24 chars each; [] = none (proto 0.5)
   ? 19 => uint,             ; eta   a job's expected total run time in seconds (median of its earlier runs);
                             ;       0 = unknown. Keys 19-20 and agent_shell only to devices with proto ≥ 0.9
-  ? 20 => uint              ; exit  a job's exit status (0-255), sent with the delta that enters done / error
+  ? 20 => uint,             ; exit  a job's exit status (0-255), sent with the delta that enters done / error
+  ? 21 => uint,             ; ctx   context window used, percent 0-100; 255 = unknown (GAUGES.md). Keys 21-25
+                            ;       only to devices with proto ≥ 0.10
+  ? 22 => tstr,             ; mdl   the model's short name, <= 16 chars ("Opus 4.7"); "" = unknown
+  ? 23 => perm_mode,        ; pm    the agent's permission mode
+  ? 24 => uint,             ; pr    the open pull request of the session's branch; 0 = none (withheld under privacy meta)
+  ? 25 => pr_state          ; prs   its review state; sent with pr
 }
+perm_mode = perm_mode_default / perm_mode_plan / perm_mode_accept_edits / perm_mode_auto /
+  perm_mode_dont_ask / perm_mode_bypass
+perm_mode_default = 0       ; Claude Code "default" (shown as Manual): asks before edits and commands
+perm_mode_plan = 1
+perm_mode_accept_edits = 2
+perm_mode_auto = 3
+perm_mode_dont_ask = 4
+perm_mode_bypass = 5        ; bypassPermissions
+
+pr_state = pr_state_none / pr_state_pending / pr_state_approved / pr_state_changes / pr_state_draft
+pr_state_none = 0           ; no review state reported
+pr_state_pending = 1
+pr_state_approved = 2
+pr_state_changes = 3        ; changes requested
+pr_state_draft = 4
 agent = agent_copilot / agent_claude / agent_cloud / agent_shell / agent_other
 agent_copilot = 0
 agent_claude = 1
@@ -377,6 +400,20 @@ kb_cands = {
   2 => [0*4 tstr],              ; cands  best first, each <= 24 chars
   ? 3 => uint,                  ; typed  index of the candidate now in the terminal (absent: none typed)
   ? 4 => result_err             ; err    why nothing was typed
+}
+
+; ───────────────────────── usage (proto 0.10, GAUGES.md) ─────────────────────────
+; The plan's rate-limit windows, from Claude Code's status line. A full replacement: a window that is
+; absent is unknown (no subscription, no reading yet, or it has reset), never zero. Sent only to devices
+; with proto ≥ 0.10.
+usage = {
+  0 => uint,      ; at    when the daemon last read these figures (unix); the device ages them from here
+  ? 1 => uint,    ; h5    5-hour window used, percent 0-100 (rounded down)
+  ? 2 => uint,    ; h5r   5-hour window resets at (unix)
+  ? 3 => uint,    ; h5o   at the current pace the 5-hour window runs out at (unix); absent = not before it resets
+  ? 4 => uint,    ; wk    weekly window used, percent 0-100
+  ? 5 => uint,    ; wkr   weekly window resets at (unix)
+  ? 6 => uint     ; wko   at the current pace the weekly window runs out at (unix)
 }
 
 ; ───────────────────────── debug / observability ─────────────────────────

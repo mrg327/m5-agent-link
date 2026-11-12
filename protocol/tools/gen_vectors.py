@@ -26,7 +26,7 @@ OUT = Path(__file__).resolve().parent.parent / "vectors"
 MT = dict(hello=1, welcome=2, snapshot=3, session_upd=4, gone=5, attention=6, clear=7,
           cmd=8, result=9, detail=10, cfg=11, batt=12, ping=13, pong=14, log=15,
           audio_start=16, audio=17, audio_end=18, transcript=19,
-          kb_start=20, kb_stroke=21, kb_cands=22,
+          kb_start=20, kb_stroke=21, kb_cands=22, usage=23,
           dbg_ui_state=65, dbg_inject_input=68)
 
 
@@ -134,6 +134,28 @@ VECTORS = {
         "Device runs session 4's finished job again after a hold (proto 0.9)",
         {"t": "cmd", "id": 17, "b": {"op": "rerun", "sid": 4, "hold_ms": 1250}},
         env("cmd", 17, {0: 17, 1: 4, 4: 1250}),
+    ),
+    "session_gauges": (
+        "Delta: session 2 (Claude) reports its context fill, model, permission mode and pull request (proto 0.10)",
+        {"t": "session_upd", "id": 18, "b": {"sid": 2, "ctx": 72, "mdl": "Opus 4.7", "pm": "plan", "pr": 128,
+         "prs": "approved"}},
+        env("session_upd", 18, {0: 2, 21: 72, 22: "Opus 4.7", 23: 1, 24: 128, 25: 2}),
+    ),
+    "session_gauges_cleared": (
+        "Delta: session 2 after /compact: context unknown (255), the pull request merged (0) (proto 0.10)",
+        {"t": "session_upd", "id": 19, "b": {"sid": 2, "ctx": 255, "pr": 0, "prs": "none"}},
+        env("session_upd", 19, {0: 2, 21: 255, 24: 0, 25: 0}),
+    ),
+    "usage_both": (
+        "Plan usage: 5-hour window at 82 % and on pace to run out before it resets, weekly at 41 % (proto 0.10)",
+        {"t": "usage", "id": 20, "b": {"at": 1793995200, "h5": 82, "h5r": 1794004200, "h5o": 1793998800,
+         "wk": 41, "wkr": 1794340800}},
+        env("usage", 20, {0: 1793995200, 1: 82, 2: 1794004200, 3: 1793998800, 4: 41, 5: 1794340800}),
+    ),
+    "usage_none": (
+        "Plan usage unknown (no subscription data yet): only the reading time, no window (proto 0.10)",
+        {"t": "usage", "id": 21, "b": {"at": 1793995200}},
+        env("usage", 21, {0: 1793995200}),
     ),
     "attention_approval": (
         "Approval request for session 2 (agent-raised prompt)",

@@ -1,0 +1,11 @@
+{
+  "desc": "Plan usage unknown (no subscription data yet): only the reading time, no window (proto 0.10)",
+  "symbolic": {
+    "t": "usage",
+    "id": 21,
+    "b": {
+      "at": 1793995200
+    }
+  },
+  "cbor_hex": "a30017011503a1001a6aee31c0"
+}

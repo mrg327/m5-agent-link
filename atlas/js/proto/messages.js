@@ -22,6 +22,8 @@ const ENUMS = {
   result_err: { stale: 0, denied: 1, unsupported: 2, no_window: 3, timeout: 4, internal: 5 },
   log_level: { err: 0, warn: 1, info: 2, debug: 3 },
   audio_codec: { adpcm16k: 0, opus16k: 1 },
+  perm_mode: { default: 0, plan: 1, accept_edits: 2, auto: 3, dont_ask: 4, bypass: 5 },
+  pr_state: { none: 0, pending: 1, approved: 2, changes: 3, draft: 4 },
   input_event: { tap: 0, double_tap: 1, long_press: 2, swipe_up: 3, swipe_down: 4, swipe_left: 5, swipe_right: 6, btn_a: 7, btn_b: 8, btn_a_long: 9, btn_b_long: 10, lift: 11, shake: 12 },
 };
 
@@ -29,6 +31,7 @@ export const MSG_TYPES = {
   hello: 1, welcome: 2, snapshot: 3, session_upd: 4, gone: 5, attention: 6, clear: 7, cmd: 8,
   result: 9, detail: 10, cfg: 11, batt: 12, ping: 13, pong: 14, log: 15, audio_start: 16,
   audio: 17, audio_end: 18, transcript: 19, kb_start: 20, kb_stroke: 21, kb_cands: 22,
+  usage: 23,
   dbg_ui_state_req: 64, dbg_ui_state: 65,
   dbg_screenshot_req: 66, dbg_screenshot_chunk: 67, dbg_inject_input: 68, dbg_set_log_level: 69,
 };
@@ -55,6 +58,7 @@ const SPECS = {
     repo: [4, 'tstr'], br: [5, 'tstr'], tool: [6, 'tstr'], t0: [7, 'uint'], tst: [8, 'uint'],
     sum: [9, 'tstr'], seen: [10, 'bool'], host: [11, 'uint'], hn: [12, 'tstr'],
     snz: [13, 'uint'], ntf: [14, 'bool'], n: [15, 'uint'], ok: [16, 'bool'], q: [17, 'tstr'], rp: [18, 'tstrs'], eta: [19, 'uint'], exit: [20, 'uint'],
+    ctx: [21, 'uint'], mdl: [22, 'tstr'], pm: [23, 'enum:perm_mode'], pr: [24, 'uint'], prs: [25, 'enum:pr_state'],
   },
   snapshot: { sessions: [0, 'objs:session'], away: [1, 'objs:away_event'] },
   gone: { sid: [0, 'uint'] },
@@ -77,6 +81,7 @@ const SPECS = {
   transcript: { aid: [0, 'uint'], text: [1, 'tstr'], autosend_ms: [2, 'uint'] },
   kb_start: { kid: [0, 'uint'], sid: [1, 'uint'], keys: [2, 'hex'] },
   kb_stroke: { kid: [0, 'uint'], seq: [1, 'uint'], pts: [2, 'hex'] },
+  usage: { at: [0, 'uint'], h5: [1, 'uint'], h5r: [2, 'uint'], h5o: [3, 'uint'], wk: [4, 'uint'], wkr: [5, 'uint'], wko: [6, 'uint'] },
   kb_cands: { kid: [0, 'uint'], seq: [1, 'uint'], cands: [2, 'tstrs'], typed: [3, 'uint'], err: [4, 'enum:result_err'] },
   dbg_ui_state: { screen: [0, 'tstr'], sel_sid: [1, 'uint'], rid: [2, 'uint'], visible: [3, 'tstrs'], power: [4, 'tstr'], fps: [5, 'uint'] },
   dbg_screenshot_chunk: { w: [0, 'uint'], h: [1, 'uint'], offset: [2, 'uint'], data: [3, 'bstr'], last: [4, 'bool'] },
@@ -231,6 +236,8 @@ export function describe(msg, dir) {
     case 'log': what = `log: ${b.msg}`; break;
     case 'detail': what = `full text for ${b.rid !== undefined ? 'request ' + b.rid : 'session ' + b.sid}`; break;
     case 'cfg': what = 'new device settings'; break;
+    case 'usage': what = b.h5 === undefined && b.wk === undefined ? 'plan usage: not known'
+      : `plan usage: 5 h ${b.h5 ?? '–'}%, week ${b.wk ?? '–'}%${b.h5o ? ', on pace to run out early' : ''}`; break;
     default: what = msg.t;
   }
   return `${who}: ${what}`;

@@ -72,7 +72,7 @@ device                                 daemon
 ### `hello` (device → daemon)
 ```cddl
 hello = {
-  proto: [uint, uint],             ; [major, minor] = [0, 9]
+  proto: [uint, uint],             ; [major, minor] = [0, 10]
   dev: { class: tstr,              ; "watch" | "desk" | "pad" | "sim" | ...
          board: tstr,              ; "m5stopwatch"
          fw: tstr,                 ; semver
@@ -127,7 +127,12 @@ session = {
   ? n: uint,                 ; tool steps in the current turn                  │ is ≥ 0.3
   ? ok: bool,                ; result of step n; absent while it runs          ┘
   ? eta: uint,               ; a job's expected total run time in s; 0 = unknown  ┐ proto ≥ 0.9
-  ? exit: uint               ; a job's exit status, with the delta into done/error ┘
+  ? exit: uint,              ; a job's exit status, with the delta into done/error ┘
+  ? ctx: uint,               ; context window used, percent; 255 = unknown         ┐
+  ? mdl: tstr,               ; model short name (≤ 16 chars)                         │ proto ≥ 0.10
+  ? pm: perm_mode,           ; default / plan / accept_edits / auto / dont_ask / bypass │ (GAUGES.md)
+  ? pr: uint,                ; open pull request number; 0 = none (not under meta)  │
+  ? prs: pr_state            ; none / pending / approved / changes / draft          ┘
 }
 ```
 - `q` / `rp` (keys 17, 18, proto 0.5): when an agent's turn ends on a question, the daemon reads it from the turn's last message (Claude Code's Stop hook carries `last_assistant_message`) and sends the question (≤ 120 chars) with up to 3 answers (≤ 24 chars): the options of an "A or B?" question, else `Yes, go ahead` / `No` for a yes/no one, else none. The watch lists them first under Reply, with the question above. They are cleared (`""`, `[]`: a delta cannot remove a key) as soon as the agent works again. Agent content: never sent under privacy `meta`, and only to devices with proto ≥ 0.5.
@@ -143,6 +148,10 @@ session = {
   ten seconds is a session with `ag: "shell"`: `work` while it runs, `done` for exit 0, `error` otherwise.
   `t0` is the command's start and `tst` its end; `tool` is the program, `sum` the command line. `eta` is the
   median of its earlier runs. The daemon sends shell sessions only to devices with proto ≥ 0.9.
+- **Gauges (proto 0.10, [GAUGES.md](GAUGES.md)).** `ctx`, `mdl` and `pr` / `prs` come from Claude Code's status
+  line (`agentlink-hook statusline`), `pm` from the hooks' `permission_mode`. A status line only updates a session
+  the hooks created. `ctx: 255` clears the figure (after `/compact`); `pr: 0` says no pull request is open. The
+  pull request is withheld under privacy `meta`.
 - `snapshot { sessions: [* session], away?: [* event] }`: a full replacement. It is sent on connect and whenever the daemon thinks the device has drifted. The `away` list holds the events the device missed while disconnected; the device shows them as "while you were away".
 - `session { session }`: an upsert. The daemon sends only the changed keys plus `sid` (a delta).
 - `gone { sid }`: the session has been removed.
@@ -233,6 +242,18 @@ cmd { op: "kb_end",  sid, arg: 1 erase / 0 keep }     device → daemon
 - On each stroke the daemon decodes (SHARK2-style shape and location channels plus a word-frequency and context prior), answers `kb_cands` with up to four words, best first, and types the first one (with a leading space after a previous word) into the session's terminal; `typed` is the index it typed. `kb_pick` replaces the last typed word with candidate `arg` of the latest `kb_cands`; `kb_del` erases the last word. `kb_send` presses Enter after a hold (`hold_ms` ≥ 1000, else `denied`) and starts a new composition. `kb_end` closes the keyboard and, with `arg` 1, erases what it typed and did not send.
 - Typing has the same refusals as `type` (an open request, a question or approval waiting, a selection list on screen): then `kb_cands` still carries the candidates but `err: "denied"` and no `typed`. Kitty only today, else `unsupported`.
 - Strokes, candidates and typed words never reach the audit log; the trace replaces `keys`, `pts` and `cands` with `<private>`. The daemon logs only word counts.
+
+## 6b. Usage (proto 0.10, [GAUGES.md](GAUGES.md))
+```
+usage { at, h5?, h5r?, h5o?, wk?, wkr?, wko? }      daemon → device (type 23)
+```
+- The plan's rate-limit windows from Claude Code's status line (`rate_limits.five_hour` / `seven_day`): used
+  percent (rounded down), reset time, and the time it runs out at the current pace when that comes first. `at` is
+  when the daemon last read them. A full replacement: an absent window is unknown, never zero.
+- Sent after the snapshot to a device with proto ≥ 0.10 (unless the last reading is over an hour old), on every
+  change of the figures (a projection must move 5 minutes), at least every 5 minutes while readings arrive, and
+  after a lag. Only status lines from this machine feed it.
+- The device shows a window while the clock is set, the window has not reset and `at` is under an hour old.
 
 ## 7. Misc
 - `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray.

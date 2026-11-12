@@ -175,6 +175,7 @@ MSG_EDITORIAL = {
     "kb_start": ("dev→pc", "KEYS: keyboard opens, with its key rectangles"),
     "kb_stroke": ("dev→pc", "KEYS: the touch points of one swiped word"),
     "kb_cands": ("pc→dev", "KEYS: decoded word candidates and which one was typed"),
+    "usage": ("pc→dev", "Plan usage: the 5-hour and weekly windows, their resets and the pace (GAUGES.md)"),
     "dbg_ui_state_req": ("pc→dev", "Debug: ask which screen is showing"),
     "dbg_ui_state": ("dev→pc", "Debug: the current screen and visible labels"),
     "dbg_screenshot_req": ("pc→dev", "Debug: ask for a screenshot"),

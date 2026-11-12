@@ -21,6 +21,38 @@ uint_enum!(AlertMode { Full = 0, Quiet = 1, Silent = 2 });
 uint_enum!(Agent { Copilot = 0, Claude = 1, Cloud = 2, Shell = 3, Other = 15 });
 uint_enum!(SessState { Start = 0, Work = 1, Input = 2, Error = 3, Done = 4, Idle = 5, Ended = 6 });
 uint_enum!(InputSub { Approval = 0, Question = 1 });
+// The agent's permission mode (proto 0.10, GAUGES.md); Claude Code's names in `from_claude`.
+uint_enum!(PermMode { Default = 0, Plan = 1, AcceptEdits = 2, Auto = 3, DontAsk = 4, Bypass = 5 });
+// Review state of a session's open pull request (proto 0.10).
+uint_enum!(PrState { None = 0, Pending = 1, Approved = 2, Changes = 3, Draft = 4 });
+
+impl PermMode {
+    /// Claude Code's `permission_mode` value (hook payloads); `None` for a name this build does not know.
+    pub fn from_claude(s: &str) -> Option<Self> {
+        Some(match s {
+            "default" | "manual" => PermMode::Default,
+            "plan" => PermMode::Plan,
+            "acceptEdits" => PermMode::AcceptEdits,
+            "auto" => PermMode::Auto,
+            "dontAsk" => PermMode::DontAsk,
+            "bypassPermissions" => PermMode::Bypass,
+            _ => return None,
+        })
+    }
+}
+
+impl PrState {
+    /// The status line's `pr.review_state`; absent or unknown is `None` (no state reported).
+    pub fn from_claude(s: Option<&str>) -> Self {
+        match s {
+            Some("pending") => PrState::Pending,
+            Some("approved") => PrState::Approved,
+            Some("changes_requested") => PrState::Changes,
+            Some("draft") => PrState::Draft,
+            _ => PrState::None,
+        }
+    }
+}
 uint_enum!(AttKind { Approval = 0, Question = 1, Error = 2, Done = 3 });
 uint_enum!(Action { Approve = 0, Deny = 1, Focus = 2, Reply = 3, Ack = 4, Dictate = 5 });
 uint_enum!(CmdOp {

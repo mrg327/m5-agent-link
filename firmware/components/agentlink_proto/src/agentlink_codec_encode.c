@@ -78,6 +78,13 @@ static bool encode_repeated_session_uint17tstr(zcbor_state_t *state, const struc
 static bool encode_repeated_session_tstr_l(zcbor_state_t *state, const struct session_tstr_l_r *input);
 static bool encode_repeated_session_uint19uint(zcbor_state_t *state, const struct session_uint19uint *input);
 static bool encode_repeated_session_uint20uint(zcbor_state_t *state, const struct session_uint20uint *input);
+static bool encode_repeated_session_uint21uint(zcbor_state_t *state, const struct session_uint21uint *input);
+static bool encode_repeated_session_uint22tstr(zcbor_state_t *state, const struct session_uint22tstr *input);
+static bool encode_perm_mode(zcbor_state_t *state, const struct perm_mode_r *input);
+static bool encode_repeated_session_perm_mode_m(zcbor_state_t *state, const struct session_perm_mode_m *input);
+static bool encode_repeated_session_uint24uint(zcbor_state_t *state, const struct session_uint24uint *input);
+static bool encode_pr_state(zcbor_state_t *state, const struct pr_state_r *input);
+static bool encode_repeated_session_pr_state_m(zcbor_state_t *state, const struct session_pr_state_m *input);
 static bool encode_session(zcbor_state_t *state, const struct session *input);
 static bool encode_att_kind(zcbor_state_t *state, const struct att_kind_r *input);
 static bool encode_away_event(zcbor_state_t *state, const struct away_event *input);
@@ -149,6 +156,14 @@ static bool encode_repeated_kb_cands_uint3uint(zcbor_state_t *state, const struc
 static bool encode_repeated_kb_cands_result_err_m(zcbor_state_t *state, const struct kb_cands_result_err_m *input);
 static bool encode_kb_cands(zcbor_state_t *state, const struct kb_cands *input);
 static bool encode_msg_kb_cands(zcbor_state_t *state, const struct msg_kb_cands *input);
+static bool encode_repeated_usage_uint1uint(zcbor_state_t *state, const struct usage_uint1uint *input);
+static bool encode_repeated_usage_uint2uint(zcbor_state_t *state, const struct usage_uint2uint *input);
+static bool encode_repeated_usage_uint3uint(zcbor_state_t *state, const struct usage_uint3uint *input);
+static bool encode_repeated_usage_uint4uint(zcbor_state_t *state, const struct usage_uint4uint *input);
+static bool encode_repeated_usage_uint5uint(zcbor_state_t *state, const struct usage_uint5uint *input);
+static bool encode_repeated_usage_uint6uint(zcbor_state_t *state, const struct usage_uint6uint *input);
+static bool encode_usage(zcbor_state_t *state, const struct usage *input);
+static bool encode_msg_usage(zcbor_state_t *state, const struct msg_usage *input);
 static bool encode_msg_dbg_ui_state_req(zcbor_state_t *state, const struct msg_dbg_ui_state_req *input);
 static bool encode_repeated_dbg_ui_state_uint1uint(zcbor_state_t *state, const struct dbg_ui_state_uint1uint *input);
 static bool encode_repeated_dbg_ui_state_uint2uint(zcbor_state_t *state, const struct dbg_ui_state_uint2uint *input);
@@ -897,12 +912,105 @@ static bool encode_repeated_session_uint20uint(
 	return res;
 }
 
+static bool encode_repeated_session_uint21uint(
+		zcbor_state_t *state, const struct session_uint21uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (21))))
+	&& (zcbor_uint32_encode(state, (&(*input).session_uint21uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_session_uint22tstr(
+		zcbor_state_t *state, const struct session_uint22tstr *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (22))))
+	&& (zcbor_tstr_encode(state, (&(*input).session_uint22tstr)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_perm_mode(
+		zcbor_state_t *state, const struct perm_mode_r *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((((*input).perm_mode_choice == perm_mode_default_m_c) ? ((zcbor_uint32_put(state, (0))))
+	: (((*input).perm_mode_choice == perm_mode_plan_m_c) ? ((zcbor_uint32_put(state, (1))))
+	: (((*input).perm_mode_choice == perm_mode_accept_edits_m_c) ? ((zcbor_uint32_put(state, (2))))
+	: (((*input).perm_mode_choice == perm_mode_auto_m_c) ? ((zcbor_uint32_put(state, (3))))
+	: (((*input).perm_mode_choice == perm_mode_dont_ask_m_c) ? ((zcbor_uint32_put(state, (4))))
+	: (((*input).perm_mode_choice == perm_mode_bypass_m_c) ? ((zcbor_uint32_put(state, (5))))
+	: false))))))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_session_perm_mode_m(
+		zcbor_state_t *state, const struct session_perm_mode_m *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (23))))
+	&& (encode_perm_mode(state, (&(*input).session_perm_mode_m)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_session_uint24uint(
+		zcbor_state_t *state, const struct session_uint24uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (24))))
+	&& (zcbor_uint32_encode(state, (&(*input).session_uint24uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_pr_state(
+		zcbor_state_t *state, const struct pr_state_r *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((((*input).pr_state_choice == pr_state_none_m_c) ? ((zcbor_uint32_put(state, (0))))
+	: (((*input).pr_state_choice == pr_state_pending_m_c) ? ((zcbor_uint32_put(state, (1))))
+	: (((*input).pr_state_choice == pr_state_approved_m_c) ? ((zcbor_uint32_put(state, (2))))
+	: (((*input).pr_state_choice == pr_state_changes_m_c) ? ((zcbor_uint32_put(state, (3))))
+	: (((*input).pr_state_choice == pr_state_draft_m_c) ? ((zcbor_uint32_put(state, (4))))
+	: false)))))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_session_pr_state_m(
+		zcbor_state_t *state, const struct session_pr_state_m *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (25))))
+	&& (encode_pr_state(state, (&(*input).session_pr_state_m)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_session(
 		zcbor_state_t *state, const struct session *input)
 {
 	zcbor_log("%s\r\n", __func__);
 
-	bool res = (((zcbor_map_start_encode(state, 21) && (((((zcbor_uint32_put(state, (0))))
+	bool res = (((zcbor_map_start_encode(state, 26) && (((((zcbor_uint32_put(state, (0))))
 	&& (zcbor_uint32_encode(state, (&(*input).session_uint0uint))))
 	&& (!(*input).session_agent_m_present || encode_repeated_session_agent_m(state, (&(*input).session_agent_m)))
 	&& (!(*input).session_sess_state_m_present || encode_repeated_session_sess_state_m(state, (&(*input).session_sess_state_m)))
@@ -923,7 +1031,12 @@ static bool encode_session(
 	&& (!(*input).session_uint17tstr_present || encode_repeated_session_uint17tstr(state, (&(*input).session_uint17tstr)))
 	&& (!(*input).session_tstr_l_present || encode_repeated_session_tstr_l(state, (&(*input).session_tstr_l)))
 	&& (!(*input).session_uint19uint_present || encode_repeated_session_uint19uint(state, (&(*input).session_uint19uint)))
-	&& (!(*input).session_uint20uint_present || encode_repeated_session_uint20uint(state, (&(*input).session_uint20uint)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 21))));
+	&& (!(*input).session_uint20uint_present || encode_repeated_session_uint20uint(state, (&(*input).session_uint20uint)))
+	&& (!(*input).session_uint21uint_present || encode_repeated_session_uint21uint(state, (&(*input).session_uint21uint)))
+	&& (!(*input).session_uint22tstr_present || encode_repeated_session_uint22tstr(state, (&(*input).session_uint22tstr)))
+	&& (!(*input).session_perm_mode_m_present || encode_repeated_session_perm_mode_m(state, (&(*input).session_perm_mode_m)))
+	&& (!(*input).session_uint24uint_present || encode_repeated_session_uint24uint(state, (&(*input).session_uint24uint)))
+	&& (!(*input).session_pr_state_m_present || encode_repeated_session_pr_state_m(state, (&(*input).session_pr_state_m)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 26))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1938,6 +2051,111 @@ static bool encode_msg_kb_cands(
 	return res;
 }
 
+static bool encode_repeated_usage_uint1uint(
+		zcbor_state_t *state, const struct usage_uint1uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (1))))
+	&& (zcbor_uint32_encode(state, (&(*input).usage_uint1uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_usage_uint2uint(
+		zcbor_state_t *state, const struct usage_uint2uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (2))))
+	&& (zcbor_uint32_encode(state, (&(*input).usage_uint2uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_usage_uint3uint(
+		zcbor_state_t *state, const struct usage_uint3uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (3))))
+	&& (zcbor_uint32_encode(state, (&(*input).usage_uint3uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_usage_uint4uint(
+		zcbor_state_t *state, const struct usage_uint4uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (4))))
+	&& (zcbor_uint32_encode(state, (&(*input).usage_uint4uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_usage_uint5uint(
+		zcbor_state_t *state, const struct usage_uint5uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (5))))
+	&& (zcbor_uint32_encode(state, (&(*input).usage_uint5uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_usage_uint6uint(
+		zcbor_state_t *state, const struct usage_uint6uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (6))))
+	&& (zcbor_uint32_encode(state, (&(*input).usage_uint6uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_usage(
+		zcbor_state_t *state, const struct usage *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_encode(state, 7) && (((((zcbor_uint32_put(state, (0))))
+	&& (zcbor_uint32_encode(state, (&(*input).usage_uint0uint))))
+	&& (!(*input).usage_uint1uint_present || encode_repeated_usage_uint1uint(state, (&(*input).usage_uint1uint)))
+	&& (!(*input).usage_uint2uint_present || encode_repeated_usage_uint2uint(state, (&(*input).usage_uint2uint)))
+	&& (!(*input).usage_uint3uint_present || encode_repeated_usage_uint3uint(state, (&(*input).usage_uint3uint)))
+	&& (!(*input).usage_uint4uint_present || encode_repeated_usage_uint4uint(state, (&(*input).usage_uint4uint)))
+	&& (!(*input).usage_uint5uint_present || encode_repeated_usage_uint5uint(state, (&(*input).usage_uint5uint)))
+	&& (!(*input).usage_uint6uint_present || encode_repeated_usage_uint6uint(state, (&(*input).usage_uint6uint)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 7))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_msg_usage(
+		zcbor_state_t *state, const struct msg_usage *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_encode(state, 4) && (((((zcbor_uint32_put(state, (0))))
+	&& (zcbor_uint32_put(state, (23))))
+	&& ((encode_hdr(state, (&(*input).msg_usage_hdr_m))))
+	&& (((zcbor_uint32_put(state, (3))))
+	&& (encode_usage(state, (&(*input).msg_usage_usage_m))))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 4))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_msg_dbg_ui_state_req(
 		zcbor_state_t *state, const struct msg_dbg_ui_state_req *input)
 {
@@ -2204,13 +2422,14 @@ static bool encode_envelope(
 	: (((*input).envelope_choice == envelope_msg_kb_start_m_c) ? ((encode_msg_kb_start(state, (&(*input).envelope_msg_kb_start_m))))
 	: (((*input).envelope_choice == envelope_msg_kb_stroke_m_c) ? ((encode_msg_kb_stroke(state, (&(*input).envelope_msg_kb_stroke_m))))
 	: (((*input).envelope_choice == envelope_msg_kb_cands_m_c) ? ((encode_msg_kb_cands(state, (&(*input).envelope_msg_kb_cands_m))))
+	: (((*input).envelope_choice == envelope_msg_usage_m_c) ? ((encode_msg_usage(state, (&(*input).envelope_msg_usage_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_ui_state_req_m_c) ? ((encode_msg_dbg_ui_state_req(state, (&(*input).envelope_msg_dbg_ui_state_req_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_ui_state_m_c) ? ((encode_msg_dbg_ui_state(state, (&(*input).envelope_msg_dbg_ui_state_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_screenshot_req_m_c) ? ((encode_msg_dbg_screenshot_req(state, (&(*input).envelope_msg_dbg_screenshot_req_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_screenshot_chunk_m_c) ? ((encode_msg_dbg_screenshot_chunk(state, (&(*input).envelope_msg_dbg_screenshot_chunk_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_inject_input_m_c) ? ((encode_msg_dbg_inject_input(state, (&(*input).envelope_msg_dbg_inject_input_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_set_log_level_m_c) ? ((encode_msg_dbg_set_log_level(state, (&(*input).envelope_msg_dbg_set_log_level_m))))
-	: false))))))))))))))))))))))))))))));
+	: false)))))))))))))))))))))))))))))));
 
 	log_result(state, res, __func__);
 	return res;

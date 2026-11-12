@@ -155,6 +155,16 @@ body!(
         #[n(19)] #[serde(skip_serializing_if = "Option::is_none")] eta: Option<u64>,
         /// A job's exit status, sent with the delta that enters done / error (proto 0.9).
         #[n(20)] #[serde(skip_serializing_if = "Option::is_none")] exit: Option<u64>,
+        /// Context window used, percent 0-100; `CTX_UNKNOWN` (255) clears it (proto 0.10).
+        #[n(21)] #[serde(skip_serializing_if = "Option::is_none")] ctx: Option<u64>,
+        /// The model's short name, <= 16 chars; "" = unknown (proto 0.10).
+        #[n(22)] #[serde(skip_serializing_if = "Option::is_none")] mdl: Option<String>,
+        /// The agent's permission mode (proto 0.10).
+        #[n(23)] #[serde(skip_serializing_if = "Option::is_none")] pm: Option<PermMode>,
+        /// The branch's open pull request number; 0 = none (proto 0.10, withheld under privacy meta).
+        #[n(24)] #[serde(skip_serializing_if = "Option::is_none")] pr: Option<u64>,
+        /// Its review state, sent with `pr` (proto 0.10).
+        #[n(25)] #[serde(skip_serializing_if = "Option::is_none")] prs: Option<PrState>,
     }
 );
 impl Session {
@@ -182,15 +192,40 @@ impl Session {
             rp: None,
             eta: None,
             exit: None,
+            ctx: None,
+            mdl: None,
+            pm: None,
+            pr: None,
+            prs: None,
         }
     }
 
     /// Applies a delta: keys present in `d` overwrite, absent keys are kept.
     pub fn merge(&mut self, d: &Session) {
         macro_rules! m { ($($f:ident),*) => { $(if d.$f.is_some() { self.$f = d.$f.clone(); })* }; }
-        m!(ag, st, sub, repo, br, tool, t0, tst, sum, seen, host, hn, snz, ntf, n, ok, eta, exit);
+        m!(
+            ag, st, sub, repo, br, tool, t0, tst, sum, seen, host, hn, snz, ntf, n, ok, eta, exit,
+            ctx, mdl, pm, pr, prs
+        );
     }
 }
+/// `session.ctx` value that clears the context fill (a delta cannot remove a key).
+pub const CTX_UNKNOWN: u64 = 255;
+
+body!(
+    /// The plan's rate-limit windows (proto 0.10, GAUGES.md). A full replacement: an absent window is
+    /// unknown, never zero.
+    Usage {
+        #[n(0)] at: u64,
+        #[n(1)] #[serde(skip_serializing_if = "Option::is_none")] h5: Option<u64>,
+        #[n(2)] #[serde(skip_serializing_if = "Option::is_none")] h5r: Option<u64>,
+        #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] h5o: Option<u64>,
+        #[n(4)] #[serde(skip_serializing_if = "Option::is_none")] wk: Option<u64>,
+        #[n(5)] #[serde(skip_serializing_if = "Option::is_none")] wkr: Option<u64>,
+        #[n(6)] #[serde(skip_serializing_if = "Option::is_none")] wko: Option<u64>,
+    }
+);
+
 body!(Gone {
     #[n(0)]
     sid: u64
