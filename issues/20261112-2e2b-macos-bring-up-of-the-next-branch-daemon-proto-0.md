@@ -1,7 +1,7 @@
 ---
 id: 20261112-2e2b
 title: macOS bring-up of the next-branch daemon (proto 0.9-0.14): gaps and plan
-status: claimed
+status: fixed
 severity: med
 area: daemon
 platforms: macos
@@ -9,7 +9,7 @@ owner: copilot-cli/opus@mac-work
 created: 2026-11-12T15:57:20Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -55,3 +55,11 @@ hooks and the statusline; then verify items 2, 3 and 6 live.
 - 2026-11-12T20:54:29Z · copilot-cli/opus@mac-work · macos-arm64 · 35f8387: Copilot CLI 1.0.106 has data sources for the Claude-only features. (a) statusLine.command in ~/.copilot/settings.json gets the session status as JSON on stdin, the same mechanism as Claude Code's status line, so the agentlink-hook statusline shim from 2777 could take a copilot mode. The stdin shape is not captured yet. (b) ~/.copilot/session-state/<id>/events.jsonl: session.usage_record (model, tokens, maxPromptTokens, cost), session.usage_checkpoint (premium requests), session.mode_changed, session.model_change, session.permissions_changed, and session.shutdown codeChanges (linesAdded, linesRemoved, filesModified). (c) OpenTelemetry (COPILOT_OTEL_FILE_EXPORTER_PATH or an OTLP endpoint). Standing rules: copilot config allowedUrls and the permission settings are possible targets, but there is no Claude-style suggestion to echo back.
 - 2026-11-12T22:13:39Z · copilot-cli/opus@mac-work · macos-arm64 · 65b72db: claimed
 - 2026-11-12T22:22:43Z · copilot-cli/opus@mac-work · macos-arm64 · 0e9cfda: main (65b72db, next merged) did not build on macOS: presence.rs called the Linux-only locked(); clippy failed on Linux-only helpers. Fixed in 0e9cfda, along with: zsh zshexit firing in (exit N) subshells (reported the parent shell as exited), audit.jsonl lines interleaving under concurrent audits (writeln! on an unbuffered File), and shell_init tests racing a fixed 400 ms sleep. macOS presence focus now asks kitty. Checks on macos-arm64: fmt, clippy -D warnings, cargo test --workspace all pass; e2e answer_window, gauges, jobs, presence (systemd-inhibit SKIP), standing_rules, summary all pass. Installed with cargo install and restarted agentlinkd; the watch (fw 09aaf62, already current with main) links over USB and BLE with hello proto [0,14], so no flash. Still open: items 2 (live presence/keep-awake check), 3 (zsh shell-init in the user's .zshrc), 5 (launchd agent), 6 (BLE recovery after adapter off).
+- 2026-11-12T22:39:09Z · copilot-cli/opus@mac-work · macos-arm64 · 4143bb0: Items 2, 3, 5 and 6 verified live on macos-arm64 with 4143bb0. (2) Presence: hid-idle reading, screen lock read as unlocked via ioreg, focus via kitty (new macOS path), keep-awake held via caffeinate -i -w <daemon pid> (PreventUserIdleSystemSleep in pmset -g assertions) and released on battery under the default ac setting. (3) eval of shell-init zsh added to ~/.zshrc. In a real kitty tab running zsh, 'sleep 12; (exit 7)' surfaced, ended as error with exit 7, and Run again (hold 1250) retyped it and it ran and failed again; shell exit was reported once. (5) daemon/tools/launchd.sh installs the LaunchAgent dev.agentlink.agentlinkd. build.rs embeds an Info.plist with NSBluetoothAlwaysUsageDescription, so CoreBluetooth works under launchd; BLE linked in 10 s and KeepAlive restarted a killed daemon. (6) blueutil off 15-20 s, then on: BLE relinked with no restart in 6-13 s over 3 debug rounds and 74 s in one earlier info-level round, with no 'Adapter powered off' loop. Item 4 is split into 20261112-c629.
+- 2026-11-12T22:39:09Z · copilot-cli/opus@mac-work · macos-arm64 · 4143bb0: fixed: commits 0e9cfda, 4143bb0; checks: cargo fmt --check, clippy --all-targets -D warnings, cargo test --workspace, all 6 daemon e2e scripts, live checks for items 2/3/5/6 on macos-arm64
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: 4143bb0 main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74
