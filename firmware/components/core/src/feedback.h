@@ -15,4 +15,5 @@ void feedback_reject(void);   /* command could not be sent: three short pulses *
 void feedback_scroll_stop(void); /* SCROLL reached the bottom or the top: one 40 ms thud */
 void feedback_quiet_toggled(void); /* STATUS: quiet mode changed: two spaced pulses */
 void feedback_finished(bool error); /* a watched or notify-armed session finished: done two soft, error three firm pulses */
+void feedback_usage_warn(void); /* the 5-hour window crossed 80 % (GAUGES.md): one 200 ms buzz */
 void feedback_hello(void);   /* boot buzz; ignores the alert mode */

@@ -1,0 +1,44 @@
+# Gauges on the wire: the shared protocol vectors usage_both, session_gauges and session_gauges_cleared
+# (proto 0.10) decode into the STATUS figures, the card's context capsule and the AGENT readout.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1793995230
+session 2 work api main Refactoring the router
+wait 300
+# usage_both: 5 hours 82 %, on pace to run out an hour after the reading; the week 41 %
+rx a30017011403a6001a6aee31c0011852021a6aee54e8031a6aee3fd0041829051a6af377c0
+# session_gauges: context 72 %, Opus 4.7, plan mode, PR 128 approved
+rx a30004011203a6000215184816684f70757320342e37170118181880181902
+wait 300
+expect_label context 72%
+tap 233 233
+wait 400
+expect_screen agent
+expect_label Opus 4.7 · Plan · PR 128 approved
+btn B long
+wait 300
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+expect_label 5h 82% runs out 13:00
+expect_label Week 41% resets in 4d
+btn B long
+wait 300
+# session_gauges_cleared: context unknown, the pull request gone
+rx a30004011303a400021518ff181800181900
+wait 300
+expect_no_label context
+tap 233 233
+wait 400
+expect_label Opus 4.7 · Plan
+expect_no_label PR 128
+btn B long
+wait 300
+# usage_none: a reading without windows keeps nothing to show
+rx a30017011503a1001a6aee31c0
+wait 300
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+expect_no_label 5h
+quit

@@ -128,6 +128,17 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
     }
     if (present & SF_ETA) dst->eta = src->eta;
     if (present & SF_EXIT) dst->exit_code = src->exit_code;
+    if (present & SF_CTX) {
+        dst->ctx_known = src->ctx <= 100; /* MODEL_CTX_UNKNOWN clears it */
+        dst->ctx = dst->ctx_known ? src->ctx : 0;
+    }
+    if (present & SF_MDL) memcpy(dst->mdl, src->mdl, sizeof dst->mdl);
+    if (present & SF_PM) {
+        dst->pm = src->pm;
+        dst->pm_known = true;
+    }
+    if (present & SF_PR) dst->pr = src->pr;
+    if (present & SF_PRS) dst->prs = src->prs;
     if (present & SF_NO_SCROLL) dst->no_scroll = src->no_scroll;
 }
 
@@ -360,6 +371,8 @@ void model_attention_expire(uint32_t now_unix)
 }
 
 settings_t *model_settings(void) { return &s_settings; }
+
+void model_touch(void) { s_rev++; }
 
 void model_settings_changed(void)
 {

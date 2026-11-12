@@ -998,7 +998,7 @@
     {
       "id": "agent",
       "title": "Agent wheel",
-      "source": "firmware/components/core/src/ui_agent.c:308"
+      "source": "firmware/components/core/src/ui_agent.c:310"
     },
     {
       "id": "ask",
@@ -1013,7 +1013,7 @@
     {
       "id": "status",
       "title": "Status · link, battery, quiet mode",
-      "source": "firmware/components/core/src/ui_status.c:292"
+      "source": "firmware/components/core/src/ui_status.c:304"
     }
   ],
   "haptics": {
@@ -1335,7 +1335,7 @@
           "name": "batt_pct"
         }
       ],
-      "source": "protocol/agentlink.cddl:51"
+      "source": "protocol/agentlink.cddl:52"
     },
     {
       "name": "welcome",
@@ -1386,7 +1386,7 @@
           "name": "keys"
         }
       ],
-      "source": "protocol/agentlink.cddl:52"
+      "source": "protocol/agentlink.cddl:53"
     },
     {
       "name": "snapshot",
@@ -1409,7 +1409,7 @@
           "name": "away"
         }
       ],
-      "source": "protocol/agentlink.cddl:53"
+      "source": "protocol/agentlink.cddl:54"
     },
     {
       "name": "session_upd",
@@ -1563,9 +1563,44 @@
           "type": "uint",
           "note": "exit  a job's exit status (0-255), sent with the delta that enters done / error",
           "name": "exit"
+        },
+        {
+          "key": 21,
+          "optional": true,
+          "type": "uint",
+          "note": "ctx   context window used, percent 0-100; 255 = unknown (GAUGES.md). Keys 21-25",
+          "name": "ctx"
+        },
+        {
+          "key": 22,
+          "optional": true,
+          "type": "tstr",
+          "note": "mdl   the model's short name, <= 16 chars (\"Opus 4.7\"); \"\" = unknown",
+          "name": "mdl"
+        },
+        {
+          "key": 23,
+          "optional": true,
+          "type": "perm_mode",
+          "note": "pm    the agent's permission mode",
+          "name": "pm"
+        },
+        {
+          "key": 24,
+          "optional": true,
+          "type": "uint",
+          "note": "pr    the open pull request of the session's branch; 0 = none (withheld under privacy meta)",
+          "name": "pr"
+        },
+        {
+          "key": 25,
+          "optional": true,
+          "type": "pr_state",
+          "note": "prs   its review state; sent with pr",
+          "name": "prs"
         }
       ],
-      "source": "protocol/agentlink.cddl:54"
+      "source": "protocol/agentlink.cddl:55"
     },
     {
       "name": "gone",
@@ -1573,7 +1608,7 @@
       "dir": "pc→dev",
       "summary": "A session ended and left the list",
       "fields": [],
-      "source": "protocol/agentlink.cddl:55"
+      "source": "protocol/agentlink.cddl:56"
     },
     {
       "name": "attention",
@@ -1645,7 +1680,7 @@
           "name": "grant_mask"
         }
       ],
-      "source": "protocol/agentlink.cddl:56"
+      "source": "protocol/agentlink.cddl:57"
     },
     {
       "name": "clear",
@@ -1668,7 +1703,7 @@
           "name": "why"
         }
       ],
-      "source": "protocol/agentlink.cddl:57"
+      "source": "protocol/agentlink.cddl:58"
     },
     {
       "name": "cmd",
@@ -1712,7 +1747,7 @@
           "name": "hold_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:58"
+      "source": "protocol/agentlink.cddl:59"
     },
     {
       "name": "result",
@@ -1749,7 +1784,7 @@
           "name": "pos"
         }
       ],
-      "source": "protocol/agentlink.cddl:59"
+      "source": "protocol/agentlink.cddl:60"
     },
     {
       "name": "detail",
@@ -1779,7 +1814,7 @@
           "name": "text"
         }
       ],
-      "source": "protocol/agentlink.cddl:60"
+      "source": "protocol/agentlink.cddl:61"
     },
     {
       "name": "cfg",
@@ -1823,7 +1858,7 @@
           "name": "badge_handle"
         }
       ],
-      "source": "protocol/agentlink.cddl:61"
+      "source": "protocol/agentlink.cddl:62"
     },
     {
       "name": "batt",
@@ -1846,7 +1881,7 @@
           "name": "chg"
         }
       ],
-      "source": "protocol/agentlink.cddl:62"
+      "source": "protocol/agentlink.cddl:63"
     },
     {
       "name": "ping",
@@ -1854,7 +1889,7 @@
       "dir": "both",
       "summary": "Link-liveness probe",
       "fields": [],
-      "source": "protocol/agentlink.cddl:63"
+      "source": "protocol/agentlink.cddl:64"
     },
     {
       "name": "pong",
@@ -1862,7 +1897,7 @@
       "dir": "both",
       "summary": "Answer to a ping",
       "fields": [],
-      "source": "protocol/agentlink.cddl:64"
+      "source": "protocol/agentlink.cddl:65"
     },
     {
       "name": "log",
@@ -1885,7 +1920,7 @@
           "name": "msg"
         }
       ],
-      "source": "protocol/agentlink.cddl:65"
+      "source": "protocol/agentlink.cddl:66"
     },
     {
       "name": "audio_start",
@@ -1915,7 +1950,7 @@
           "name": "sid"
         }
       ],
-      "source": "protocol/agentlink.cddl:66"
+      "source": "protocol/agentlink.cddl:67"
     },
     {
       "name": "audio",
@@ -1945,7 +1980,7 @@
           "name": "data"
         }
       ],
-      "source": "protocol/agentlink.cddl:67"
+      "source": "protocol/agentlink.cddl:68"
     },
     {
       "name": "audio_end",
@@ -1982,7 +2017,7 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:68"
+      "source": "protocol/agentlink.cddl:69"
     },
     {
       "name": "transcript",
@@ -2012,7 +2047,7 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:69"
+      "source": "protocol/agentlink.cddl:70"
     },
     {
       "name": "kb_start",
@@ -2042,7 +2077,7 @@
           "name": "keys"
         }
       ],
-      "source": "protocol/agentlink.cddl:70"
+      "source": "protocol/agentlink.cddl:71"
     },
     {
       "name": "kb_stroke",
@@ -2072,7 +2107,7 @@
           "name": "pts"
         }
       ],
-      "source": "protocol/agentlink.cddl:71"
+      "source": "protocol/agentlink.cddl:72"
     },
     {
       "name": "kb_cands",
@@ -2116,7 +2151,65 @@
           "name": "err"
         }
       ],
-      "source": "protocol/agentlink.cddl:72"
+      "source": "protocol/agentlink.cddl:73"
+    },
+    {
+      "name": "usage",
+      "type": 23,
+      "dir": "pc→dev",
+      "summary": "Plan usage: the 5-hour and weekly windows, their resets and the pace (GAUGES.md)",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "at    when the daemon last read these figures (unix); the device ages them from here",
+          "name": "at"
+        },
+        {
+          "key": 1,
+          "optional": true,
+          "type": "uint",
+          "note": "h5    5-hour window used, percent 0-100 (rounded down)",
+          "name": "h5"
+        },
+        {
+          "key": 2,
+          "optional": true,
+          "type": "uint",
+          "note": "h5r   5-hour window resets at (unix)",
+          "name": "h5r"
+        },
+        {
+          "key": 3,
+          "optional": true,
+          "type": "uint",
+          "note": "h5o   at the current pace the 5-hour window runs out at (unix); absent = not before it resets",
+          "name": "h5o"
+        },
+        {
+          "key": 4,
+          "optional": true,
+          "type": "uint",
+          "note": "wk    weekly window used, percent 0-100",
+          "name": "wk"
+        },
+        {
+          "key": 5,
+          "optional": true,
+          "type": "uint",
+          "note": "wkr   weekly window resets at (unix)",
+          "name": "wkr"
+        },
+        {
+          "key": 6,
+          "optional": true,
+          "type": "uint",
+          "note": "wko   at the current pace the weekly window runs out at (unix)",
+          "name": "wko"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:74"
     },
     {
       "name": "dbg_ui_state_req",
@@ -2124,7 +2217,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask which screen is showing",
       "fields": [],
-      "source": "protocol/agentlink.cddl:73"
+      "source": "protocol/agentlink.cddl:75"
     },
     {
       "name": "dbg_ui_state",
@@ -2175,7 +2268,7 @@
           "name": "fps"
         }
       ],
-      "source": "protocol/agentlink.cddl:74"
+      "source": "protocol/agentlink.cddl:76"
     },
     {
       "name": "dbg_screenshot_req",
@@ -2183,7 +2276,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask for a screenshot",
       "fields": [],
-      "source": "protocol/agentlink.cddl:75"
+      "source": "protocol/agentlink.cddl:77"
     },
     {
       "name": "dbg_screenshot_chunk",
@@ -2227,7 +2320,7 @@
           "name": "last"
         }
       ],
-      "source": "protocol/agentlink.cddl:76"
+      "source": "protocol/agentlink.cddl:78"
     },
     {
       "name": "dbg_inject_input",
@@ -2257,7 +2350,7 @@
           "name": "y"
         }
       ],
-      "source": "protocol/agentlink.cddl:77"
+      "source": "protocol/agentlink.cddl:79"
     },
     {
       "name": "dbg_set_log_level",
@@ -2273,7 +2366,7 @@
           "name": ""
         }
       ],
-      "source": "protocol/agentlink.cddl:78"
+      "source": "protocol/agentlink.cddl:80"
     }
   ],
   "sounds": {
@@ -4591,13 +4684,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:534",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:484",
-    "gesture_map.chord": "firmware/components/core/src/app.c:418",
+    "gesture_map.chord": "firmware/components/core/src/app.c:428",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:187",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:156",
     "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:333",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:445",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:455",
     "haptics.approved": "firmware/components/core/src/feedback.c:74",
     "haptics.denied": "firmware/components/core/src/feedback.c:80",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:61",
@@ -4606,7 +4699,7 @@
     "haptics.done": "firmware/components/core/src/feedback.c:25",
     "haptics.duty": "firmware/boards/stopwatch/input.cpp:17",
     "haptics.error": "firmware/components/core/src/feedback.c:24",
-    "haptics.hello": "firmware/components/core/src/feedback.c:127",
+    "haptics.hello": "firmware/components/core/src/feedback.c:134",
     "haptics.hold_ramp": "firmware/components/core/src/feedback.c:54",
     "haptics.kick_duty": "firmware/boards/stopwatch/input.cpp:18",
     "haptics.kick_ms": "firmware/boards/stopwatch/input.cpp:19",
@@ -4648,8 +4741,8 @@
     "ring.band_out_px": "firmware/components/core/src/ui_ring_internal.h:15",
     "ring.band_w_px": "firmware/components/core/src/ui_ring_internal.h:16",
     "ring.done_sweep_ms": "firmware/components/core/src/ui_ring_internal.h:36",
-    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:445",
-    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:445",
+    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:458",
+    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:458",
     "ring.error_flicker_ms": "firmware/components/core/src/ui_ring_internal.h:37",
     "ring.hint_a_deg": "firmware/components/core/src/ui_theme.h:67",
     "ring.hint_b_deg": "firmware/components/core/src/ui_theme.h:68",
@@ -4662,24 +4755,24 @@
     "ring.nothing_else": "firmware/components/core/src/ui_home.c:205",
     "ring.others_pct": "firmware/components/core/src/ui_ring_internal.h:21",
     "ring.perm_period_ms": "firmware/components/core/src/ui_ring_internal.h:35",
-    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:304",
-    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:445",
+    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:312",
+    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:458",
     "ring.prog_out_px": "firmware/components/core/src/ui_ring_internal.h:27",
     "ring.prog_w_px": "firmware/components/core/src/ui_ring_internal.h:28",
     "ring.repo_px": "firmware/components/core/src/ui_theme.h:22",
     "ring.repo_small_px": "firmware/components/core/src/ui_theme.h:21",
-    "ring.repo_w_px": "firmware/components/core/src/ui_home_card.c:15",
+    "ring.repo_w_px": "firmware/components/core/src/ui_home_card.c:16",
     "ring.seg_gap_deg": "firmware/components/core/src/ui_ring_internal.h:19",
     "ring.sel_out_px": "firmware/components/core/src/ui_ring_internal.h:17",
     "ring.sel_w_px": "firmware/components/core/src/ui_ring_internal.h:18",
-    "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:21",
+    "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:22",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:33",
     "screens": "firmware/components/core/src/ui_home.c:348",
-    "screens.agent": "firmware/components/core/src/ui_agent.c:308",
+    "screens.agent": "firmware/components/core/src/ui_agent.c:310",
     "screens.ask": "firmware/components/core/src/ui_ask.c:564",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:299",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:55",
-    "screens.status": "firmware/components/core/src/ui_status.c:292",
+    "screens.status": "firmware/components/core/src/ui_status.c:304",
     "sounds.done-achieve": "firmware/components/core/src/sound_bank.c:54",
     "sounds.done-bonus": "firmware/components/core/src/sound_bank.c:39",
     "sounds.done-clear": "firmware/components/core/src/sound_bank.c:23",

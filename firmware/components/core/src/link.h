@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "gauges.h"
 #include "hal.h"
 #include "model.h"
 
@@ -31,9 +32,14 @@ typedef struct {
     void (*on_transcript)(uint32_t aid, const char *text); /* voice: "" when nothing was heard */
     /* KEYS (proto 0.7): candidates for a stroke; typed -1 when none was typed, err -1 when none (else a result_err value) */
     void (*on_kb_cands)(uint32_t kid, uint32_t seq, const char *const *words, int n, int typed, int err);
+    /* GAUGES (proto 0.10): a new plan-usage reading, after the model holds it; `prev` is the one before. */
+    void (*on_usage)(const usage_t *prev, const usage_t *now);
 } link_hooks_t;
 
 void link_init(const link_hooks_t *hooks);
+/* A plan-usage reading (the `usage` message, GAUGES.md): into the model, then the on_usage hook. The
+ * simulator's `usage` script command enters here too. */
+void link_rx_usage(const usage_t *u);
 void link_on_state(hal_link_kind_t kind, bool connected);
 /* Arbitration: until a welcome arrives, hellos go out on every transport that is up and the first
  * valid welcome picks the active link; afterwards frames from other transports are dropped and

@@ -6,6 +6,7 @@
 
 #include "debug.h"
 #include "nav.h"
+#include "ui_gauges.h"
 #include "ui_internal.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
@@ -122,6 +123,7 @@ bool ui_agent_refresh(uint32_t now)
         lv_obj_add_flag(s_question, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(s_header, LV_OBJ_FLAG_HIDDEN);
     }
+    ui_gauges_agent_update(s, !s_replies); /* GAUGES.md: model, mode and pull request under the caption */
     return true;
 }
 
@@ -309,6 +311,7 @@ void ui_agent_report(ui_report_t *r)
     r->has_sel_sid = session() != NULL;
     r->sel_sid = s_sid;
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
+    ui_gauges_agent_report(r);
     if (s_replies && s_question_txt[0]) ui_report_add(r, "%s", s_question_txt);
     int n = wheel_count(s_wheel), sel = wheel_sel(s_wheel);
     for (int k = 0; k < n && k < 5; k++) {
@@ -332,6 +335,7 @@ lv_obj_t *ui_agent_init(lv_obj_t *screen)
     lv_obj_set_size(s_header, cw, lh);
     lv_obj_set_style_text_align(s_header, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_pos(s_header, UI_CX - cw / 2, UI_Y_CAPTION - lh / 2);
+    ui_gauges_agent_create(s_root);
     s_wheel_main = s_wheel = wheel_create_at(s_root, WHEEL_LAYOUT_LIST(LIST_Y));
     s_wheel_q = wheel_create_at(s_root, WHEEL_LAYOUT_LIST(LIST_Y_Q));
     wheel_set_shown(s_wheel_q, false);

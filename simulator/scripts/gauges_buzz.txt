@@ -1,0 +1,30 @@
+# GAUGES.md §3: one buzz (200 ms) when the 5-hour window first crosses 80 % in a window. Not again in that
+# window, not for a watch that connects above 80 %, and never in quiet mode (nor later for that window).
+connect
+rtc 1800000000
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running tests
+wait 400
+usage 79 7800 - 18 280000
+wait 200
+usage 81 7800 - 18 280000
+wait 200
+usage 86 7800 - 18 280000
+wait 200
+# a new window that starts high: no crossing seen
+usage 90 20000 - 18 280000
+wait 200
+# quiet: a crossing in the next window stays silent
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+btn A
+wait 300
+expect_label > Quiet until
+btn B long
+wait 300
+usage 50 40000 - 18 280000
+wait 200
+usage 85 40000 - 18 280000
+wait 200
+quit

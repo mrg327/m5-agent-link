@@ -56,7 +56,21 @@ typedef struct {
     /* A job (AGENT_SHELL): the expected total run time, 0 = unknown, and the exit status once it ended. */
     uint32_t eta;
     uint8_t exit_code;
+    /* Readouts from the agent's status line and hooks (GAUGES.md, proto 0.10). Each is shown only once
+     * known: ctx_known false = no context figure (never drawn as 0 %); pm_known false = no mode reported;
+     * pr 0 = no open pull request; mdl "" = model unknown. */
+    bool ctx_known, pm_known;
+    uint8_t ctx;  /* context window used, percent 0-100 */
+    uint8_t pm;   /* perm_mode_t */
+    uint8_t prs;  /* pr_state_t */
+    uint32_t pr;
+    char mdl[17];
 } session_t;
+
+/* Wire values of session.pm and session.prs (protocol/agentlink.cddl). */
+typedef enum { PM_DEFAULT = 0, PM_PLAN = 1, PM_ACCEPT_EDITS = 2, PM_AUTO = 3, PM_DONT_ASK = 4, PM_BYPASS = 5 } perm_mode_t;
+typedef enum { PRS_NONE = 0, PRS_PENDING = 1, PRS_APPROVED = 2, PRS_CHANGES = 3, PRS_DRAFT = 4 } pr_state_t;
+#define MODEL_CTX_UNKNOWN 255 /* session.ctx on the wire: the figure is gone (after /compact) */
 
 /* Which fields of a session delta were present on the wire. */
 enum {
@@ -65,7 +79,8 @@ enum {
     SF_NO_SCROLL = 1 << 10, /* not on the wire: set by the device itself */
     SF_HOST = 1 << 11, SF_HN = 1 << 12, SF_SNZ = 1 << 13, SF_NTF = 1 << 14, SF_N = 1 << 15,
     SF_OK = 1 << 16, /* with SF_OK, `step` is STEP_OK or STEP_FAIL */
-    SF_Q = 1 << 17, SF_RP = 1 << 18, SF_ETA = 1 << 19, SF_EXIT = 1 << 20
+    SF_Q = 1 << 17, SF_RP = 1 << 18, SF_ETA = 1 << 19, SF_EXIT = 1 << 20,
+    SF_CTX = 1 << 21, SF_MDL = 1 << 22, SF_PM = 1 << 23, SF_PR = 1 << 24, SF_PRS = 1 << 25
 };
 
 typedef struct {
@@ -129,6 +144,8 @@ void model_attention_expire(uint32_t now_unix);
 settings_t *model_settings(void);
 /* The device changed a setting itself (STATUS): bumps the revision so the screens redraw. */
 void model_settings_changed(void);
+/* Something outside the session table changed (the plan usage, gauges.c): bumps the revision. */
+void model_touch(void);
 /* Timed quiet mode (UI-V2 §4.5): true while quiet_until lies in the future. Attention arrivals then
  * neither buzz, glow nor nag; interaction feedback (ticks, detents) is unaffected. */
 bool model_quiet_active(uint32_t now_unix);

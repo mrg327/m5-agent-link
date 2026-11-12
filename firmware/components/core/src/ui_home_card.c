@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "hal.h"
+#include "ui_gauges.h"
 #include "ui_home_internal.h"
 #include "ui_theme.h"
 
@@ -242,6 +243,8 @@ void ui_home_card_update(void)
         theme_set_text_color(s_ready, dark ? sub_col : COL_TEXT);
         update_slot(NULL, 0);
         for (int i = 0; i < 2; i++) show(s_badge[i], false);
+        ui_gauges_card_update(NULL, false, false);
+        ui_gauges_face_update(true, dark); /* GAUGES.md: "5h 42%" on the idle face */
         apply_dim();
         apply_shift();
         return;
@@ -270,11 +273,14 @@ void ui_home_card_update(void)
         theme_set_text_color(s_clock, sub_col);
         update_slot(NULL, 0);
         for (int i = 0; i < 2; i++) show(s_badge[i], false);
+        ui_gauges_card_update(NULL, false, false);
+        ui_gauges_face_update(true, true);
         apply_dim();
         apply_shift();
         return;
     }
     set_looks(LOOK_CARD);
+    ui_gauges_face_update(false, false);
     theme_set_text(s_cap, s_cap_txt, sizeof s_cap_txt, buf);
     set_title(base);
     uint32_t rgb = req ? (req->kind == ATT_APPROVAL ? RGB_PERMISSION : RGB_ASK) : theme_session_rgb(s);
@@ -301,6 +307,8 @@ void ui_home_card_update(void)
         show(s_req_title, false);
         show(s_req_text, false);
     }
+    /* GAUGES.md: the context capsule, in the job bar's row (a job has none); a request needs the room */
+    ui_gauges_card_update(s, !sl->n_merged && !req && !theme_is_job(s), offline());
     update_slot(req ? (req->kind == ATT_APPROVAL ? "Review" : "Answer") : NULL, rgb);
     show(s_badge[0], true);
     show(s_badge[1], n > 1);
@@ -340,6 +348,7 @@ void ui_home_card_report(ui_report_t *r)
         ui_report_add(r, "%s", s_sword_txt);
         if (s_stime_txt[0]) ui_report_add(r, "%s", s_stime_txt);
         if (!lv_obj_has_flag(s_bar, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "progress %d%%", s_bar_w * 100 / BAR_W);
+        ui_gauges_card_report(r);
         if (!lv_obj_has_flag(s_sum, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_sum_txt);
         if (!lv_obj_has_flag(s_req_title, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_req_title_txt);
         if (!lv_obj_has_flag(s_req_text, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_req_text_txt);
@@ -347,6 +356,7 @@ void ui_home_card_report(ui_report_t *r)
         ui_report_add(r, "%s", s_sub_txt);
         if (s_clock_set) ui_report_add(r, "%s", s_clock_txt);
         if (!s) ui_report_add(r, "No sessions");
+        ui_gauges_face_report(r);
     }
     if (!lv_obj_has_flag(s_chip, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_chip_txt_txt);
     if (!lv_obj_has_flag(s_btn, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_btn_txt);
@@ -402,6 +412,9 @@ void ui_home_card_create(lv_obj_t *centre)
     lv_obj_set_style_radius(s_bar_fill, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_opa(s_bar_fill, LV_OPA_COVER, 0);
     lv_obj_remove_flag(s_bar_fill, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+
+    ui_gauges_card_create(s_centre);
+    ui_gauges_face_create(s_centre);
 
     s_sum = mk(s_centre, FONT_BODY, COL_TEXT2);
     put_top(s_sum, SUMMARY_TOP, SUMMARY_W, 2);

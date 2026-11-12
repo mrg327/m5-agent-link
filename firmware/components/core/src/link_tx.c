@@ -84,9 +84,10 @@ bool link_tx_hello(hal_link_kind_t to)
     set_hdr(&m->msg_hello_hdr_m, false, 0);
     struct hello *h = &m->msg_hello_hello_m;
     h->hello_major_l_major = 0;
-    h->hello_major_l_minor = 9; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice; 0.7: keys;
-                                 * 0.8: action_dictate on attention, dictate with rid answers that card;
-                                 * 0.9: jobs (agent_shell, session eta / exit, cmd_op_rerun) */
+    h->hello_major_l_minor = 10; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice; 0.7: keys;
+                                  * 0.8: action_dictate on attention, dictate with rid answers that card;
+                                  * 0.9: jobs (agent_shell, session eta / exit, cmd_op_rerun);
+                                  * 0.10: gauges (usage message, session ctx / mdl / pm / pr / prs) */
     h->hello_device_info_m.device_info_device_class_m.device_class_choice = device_class(bi);
     h->hello_device_info_m.device_info_uint1tstr = zstr(bi->board);
     h->hello_device_info_m.device_info_uint2tstr = zstr(bi->fw_version);

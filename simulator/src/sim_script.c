@@ -10,6 +10,13 @@
  *   drag X Y DY [MS]                a slow vertical drag in the centre (default 500 ms: steps, no swipe); a flick is a fast `swipe`
  *   session SID work|input|ask|error|done|idle|doneseen REPO   add or update a session (input = permission, ask = question)
  *   job SID run|done|fail REPO ELAPSED_S ETA_S EXIT [command line...]   a terminal job (JOBS.md); ETA_S 0 = no estimate
+ *   gauge SID CTX|- [MODEL|- [MODE|- [PR [STATE]]]]   session readouts (GAUGES.md, proto 0.10): context %
+ *                                   (- = unknown, 255 on the wire), model (_ for a space), mode default|plan|
+ *                                   accept_edits|auto|dont_ask|bypass, pull request number (0 = none) and its
+ *                                   state none|pending|approved|changes|draft
+ *   usage H5|- H5_RESET_S H5_OUT_S|- WK|- WK_RESET_S [AGE_S]   a daemon `usage` (GAUGES.md): percent, seconds
+ *                                   until the reset and until it runs out at the current pace (- = not before
+ *                                   the reset), relative to now; the reading is AGE_S old (default 0)
  *   remote SID HOST [NAME]          set host / host name on a session (host 0 = local)
  *   drop SID | lift | shake | connect [usb|ble] | disconnect [usb|ble] | rx [usb|ble] HEX | ui | shot FILE.png
  *   attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OPT...
@@ -44,7 +51,7 @@
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -247,6 +254,12 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "job") && arg[0]) {
         add(*t, E_JOB, 0, 0, 0, arg);
         *t += 50;
+    } else if (!strcmp(cmd, "gauge") && arg[0]) {
+        add(*t, E_GAUGE, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "usage") && arg[0]) {
+        add(*t, E_USAGE, 0, 0, 0, arg);
+        *t += 50;
     } else if ((!strcmp(cmd, "step") || !strcmp(cmd, "snooze") || !strcmp(cmd, "notify")) && arg[0]) {
         char line[160];
         snprintf(line, sizeof line, "%s %s", cmd, arg);
@@ -430,6 +443,62 @@ static void run_job(const char *spec)
         present |= SF_SUMMARY;
     }
     model_upsert(&d, present);
+}
+
+/* gauge SID CTX|- [MODEL|- [MODE|- [PR [STATE]]]]: a proto 0.10 session delta (GAUGES.md) */
+static void run_gauge(const char *spec)
+{
+    static const char *const modes[] = {"default", "plan", "accept_edits", "auto", "dont_ask", "bypass"};
+    static const char *const states[] = {"none", "pending", "approved", "changes", "draft"};
+    unsigned sid, pr = 0;
+    char ctx[8], mdl[24] = "", mode[16] = "", st[12] = "";
+    int n = sscanf(spec, "%u %7s %23s %15s %u %11s", &sid, ctx, mdl, mode, &pr, st);
+    if (n < 2) {
+        fprintf(stderr, "SCRIPT FAIL: bad gauge '%s'\n", spec);
+        s_failed = true;
+        return;
+    }
+    session_t d = {.sid = sid};
+    uint32_t present = SF_CTX;
+    d.ctx = !strcmp(ctx, "-") ? MODEL_CTX_UNKNOWN : (uint8_t)atoi(ctx);
+    if (n >= 3 && strcmp(mdl, "-")) {
+        for (char *c = mdl; *c; c++)
+            if (*c == '_') *c = ' ';
+        snprintf(d.mdl, sizeof d.mdl, "%.16s", mdl);
+        present |= SF_MDL;
+    }
+    if (n >= 4 && strcmp(mode, "-")) {
+        for (unsigned i = 0; i < sizeof modes / sizeof modes[0]; i++)
+            if (!strcmp(mode, modes[i])) d.pm = (uint8_t)i;
+        present |= SF_PM;
+    }
+    if (n >= 5) {
+        d.pr = pr;
+        present |= SF_PR | SF_PRS;
+        for (unsigned i = 0; i < sizeof states / sizeof states[0]; i++)
+            if (!strcmp(st, states[i])) d.prs = (uint8_t)i;
+    }
+    model_upsert(&d, present);
+}
+
+/* usage H5|- H5_RESET_S H5_OUT_S|- WK|- WK_RESET_S [AGE_S]: a daemon `usage` relative to the clock */
+static void run_usage(const char *spec)
+{
+    char h5[8], h5r[16], h5o[16], wk[8], wkr[16];
+    unsigned age = 0;
+    if (sscanf(spec, "%7s %15s %15s %7s %15s %u", h5, h5r, h5o, wk, wkr, &age) < 5) {
+        fprintf(stderr, "SCRIPT FAIL: bad usage '%s'\n", spec);
+        s_failed = true;
+        return;
+    }
+    uint32_t now = theme_now_unix();
+    usage_t u = {.at = now - age};
+    if (strcmp(h5, "-")) {
+        u.h5 = (usage_win_t){true, (uint8_t)atoi(h5), now + (uint32_t)strtoul(h5r, NULL, 10),
+                             strcmp(h5o, "-") ? now + (uint32_t)strtoul(h5o, NULL, 10) : 0};
+    }
+    if (strcmp(wk, "-")) u.wk = (usage_win_t){true, (uint8_t)atoi(wk), now + (uint32_t)strtoul(wkr, NULL, 10), 0};
+    link_rx_usage(&u);
 }
 
 /* step SID N [ok|fail] [text...] | snooze SID UNIX|off | notify SID on|off: protocol 0.3 session deltas */
@@ -742,6 +811,8 @@ static void run(const ev_t *e)
     }
     case E_SESSION: run_session(e->text); break;
     case E_JOB: run_job(e->text); break;
+    case E_GAUGE: run_gauge(e->text); break;
+    case E_USAGE: run_usage(e->text); break;
     case E_DELTA: run_delta(e->text); break;
     case E_REMOTE: run_remote(e->text); break;
     case E_DROP: model_remove((uint32_t)e->a); break;

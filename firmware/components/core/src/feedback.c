@@ -122,6 +122,13 @@ void feedback_finished(bool error)
     }
 }
 
+/* One buzz, longer than a tick or an approve, with nothing after it: the plan is running low. */
+void feedback_usage_warn(void)
+{
+    static const uint16_t warn[] = {200};
+    haptic(warn, 1);
+}
+
 void feedback_hello(void)
 {
     static const uint16_t hello[] = {60};

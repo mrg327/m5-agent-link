@@ -397,9 +397,19 @@ static void on_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bo
     ui_scroll_pos(sid, lines_above, at_bottom, has_total, total, preview);
 }
 
+/* GAUGES.md: one buzz when the 5-hour window first crosses 80 % in a window; quiet mode keeps it silent
+ * (and it does not come back later), the alert mode decides as for every other buzz. */
+static void on_usage(const usage_t *prev, const usage_t *now)
+{
+    if (!gauges_should_warn(prev, now)) return;
+    bool quiet = model_quiet_active(app_now_unix());
+    dbg_event("app", "usage_warn", "\"pct\":%u,\"quiet\":%s", (unsigned)now->h5.pct, quiet ? "true" : "false");
+    if (!quiet) feedback_usage_warn();
+}
+
 static const link_hooks_t s_hooks = {
     .on_link = on_link, .on_attention = on_attention, .on_result = on_result, .on_scroll_pos = on_scroll_pos, .on_transcript = voice_on_transcript,
-    .on_kb_cands = keys_on_cands};
+    .on_kb_cands = keys_on_cands, .on_usage = on_usage};
 
 /* ── input dispatch ── */
 

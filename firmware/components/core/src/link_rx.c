@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "gauges.h"
 #include "link_internal.h"
 
 #define STR(zs, dst) model_copy_str((dst), sizeof(dst), (zs).value, (zs).len)
@@ -14,7 +15,7 @@ static const struct hdr_r *env_hdr(const struct envelope_r *e)
     H(msg_clear) H(msg_cmd) H(msg_result) H(msg_detail) H(msg_cfg) H(msg_batt) H(msg_ping) H(msg_pong)
     H(msg_log) H(msg_audio_start) H(msg_audio) H(msg_audio_end) H(msg_transcript)
     H(msg_dbg_ui_state_req) H(msg_dbg_ui_state) H(msg_dbg_screenshot_req) H(msg_dbg_screenshot_chunk)
-    H(msg_dbg_inject_input) H(msg_dbg_set_log_level) H(msg_kb_start) H(msg_kb_stroke) H(msg_kb_cands)
+    H(msg_dbg_inject_input) H(msg_dbg_set_log_level) H(msg_kb_start) H(msg_kb_stroke) H(msg_kb_cands) H(msg_usage)
     }
 #undef H
     return NULL;
@@ -65,6 +66,25 @@ static uint32_t convert_session(const struct session *in, session_t *out)
     }
     if (in->session_uint19uint_present) { out->eta = in->session_uint19uint.session_uint19uint; p |= SF_ETA; }
     if (in->session_uint20uint_present) { out->exit_code = (uint8_t)in->session_uint20uint.session_uint20uint; p |= SF_EXIT; }
+    /* GAUGES (proto 0.10). `ctx` keeps the wire value (255 = unknown) for model_upsert; a snapshot entry is
+     * used as it is, so it carries the known flags too. */
+    if (in->session_uint21uint_present) {
+        uint32_t c = in->session_uint21uint.session_uint21uint;
+        out->ctx = (uint8_t)(c > 100 ? MODEL_CTX_UNKNOWN : c);
+        out->ctx_known = c <= 100;
+        p |= SF_CTX;
+    }
+    if (in->session_uint22tstr_present) { STR(in->session_uint22tstr.session_uint22tstr, out->mdl); p |= SF_MDL; }
+    if (in->session_perm_mode_m_present) {
+        out->pm = (uint8_t)in->session_perm_mode_m.session_perm_mode_m.perm_mode_choice;
+        out->pm_known = true;
+        p |= SF_PM;
+    }
+    if (in->session_uint24uint_present) { out->pr = in->session_uint24uint.session_uint24uint; p |= SF_PR; }
+    if (in->session_pr_state_m_present) {
+        out->prs = (uint8_t)in->session_pr_state_m.session_pr_state_m.pr_state_choice;
+        p |= SF_PRS;
+    }
     return p;
 }
 
@@ -190,6 +210,16 @@ static void on_result(const struct msg_result *m, uint32_t re_id, bool has_re)
     }
 }
 
+void link_rx_usage(const usage_t *u)
+{
+    dbg_event("link", "usage", "\"at\":%u,\"h5\":%d,\"h5r\":%u,\"h5o\":%u,\"wk\":%d,\"wkr\":%u", (unsigned)u->at,
+              u->h5.known ? u->h5.pct : -1, (unsigned)u->h5.resets, (unsigned)u->h5.out, u->wk.known ? u->wk.pct : -1,
+              (unsigned)u->wk.resets);
+    usage_t prev = *gauges_usage();
+    gauges_set_usage(u);
+    if (g_link.hooks.on_usage) g_link.hooks.on_usage(&prev, u);
+}
+
 void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
 {
     (void)now_ms;
@@ -247,6 +277,23 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
         dbg_event("link", "kb_cands", "\"kid\":%u,\"seq\":%u,\"n\":%d,\"typed\":%d,\"err\":%d", (unsigned)k->kb_cands_uint0uint,
                   (unsigned)k->kb_cands_uint1uint, n, typed, err);
         if (g_link.hooks.on_kb_cands) g_link.hooks.on_kb_cands(k->kb_cands_uint0uint, k->kb_cands_uint1uint, list, n, typed, err);
+        break;
+    }
+    case envelope_msg_usage_m_c: {
+        const struct usage *in = &e->envelope_msg_usage_m.msg_usage_usage_m;
+        usage_t u = {.at = in->usage_uint0uint};
+#define WIN(w, kp, kr, ko)                                                                    \
+        if (in->usage_uint##kp##uint_present && in->usage_uint##kr##uint_present) {           \
+            u.w.known = true;                                                                 \
+            u.w.pct = (uint8_t)(in->usage_uint##kp##uint.usage_uint##kp##uint > 100 ? 100     \
+                                : in->usage_uint##kp##uint.usage_uint##kp##uint);             \
+            u.w.resets = in->usage_uint##kr##uint.usage_uint##kr##uint;                       \
+            if (in->usage_uint##ko##uint_present) u.w.out = in->usage_uint##ko##uint.usage_uint##ko##uint; \
+        }
+        WIN(h5, 1, 2, 3)
+        WIN(wk, 4, 5, 6)
+#undef WIN
+        link_rx_usage(&u);
         break;
     }
     case envelope_msg_dbg_ui_state_req_m_c: dbg_on_ui_state_req(id); break;

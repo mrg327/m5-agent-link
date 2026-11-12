@@ -50,6 +50,12 @@ add_executable(test_steps tests/test_steps.c ${FW}/core/src/steps.c)
 target_include_directories(test_steps PRIVATE ${FW}/core/src)
 add_test(NAME step_timeline COMMAND test_steps)
 
+# GAUGES.md: when a usage figure may be shown, the 80 % buzz rule, the words.
+add_executable(test_gauges tests/test_gauges.c ${FW}/core/src/gauges.c ${FW}/core/src/model.c ${FW}/core/src/steps.c)
+target_include_directories(test_gauges PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_gauges PRIVATE m)
+add_test(NAME gauges_model COMMAND test_gauges)
+
 add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
 target_include_directories(test_ring PRIVATE ${FW}/core/src)
 add_test(NAME ring_fifo COMMAND test_ring)
@@ -287,6 +293,16 @@ sim_script_test(sim_jobs_rerun jobs_rerun.txt
 sim_script_test(sim_jobs_dismiss jobs_dismiss.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,|\"op\":17,"
                 PASS_REGULAR_EXPRESSION "\"op\":1,\"sid\":5")
+# Gauges (GAUGES.md): plan usage on STATUS and the idle faces, context fill and readouts on the card and AGENT.
+sim_script_test(sim_gauges_status gauges_status.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_gauges_card gauges_card.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4")
+sim_script_test(sim_gauges_face gauges_face.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+set_tests_properties(sim_gauges_face PROPERTIES TIMEOUT 60)
+# exactly one warning buzz: the crossing to 81 % (the quiet one is logged with quiet true and plays nothing)
+sim_script_test(sim_gauges_buzz gauges_buzz.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"usage_warn\",\"pct\":(86|90)|\\[200\\].*\\[200\\]"
+                PASS_REGULAR_EXPRESSION "\"usage_warn\",\"pct\":81,\"quiet\":false.*\"pattern_ms\":\\[200\\].*\"usage_warn\",\"pct\":85,\"quiet\":true")
+sim_script_test(sim_gauges_wire gauges_wire.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_list_centre_drag list_centre_drag.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_list_rim_dial list_rim_dial.txt
@@ -324,7 +340,7 @@ sim_script_test(sim_finished_buzz finished_buzz.txt
 
 # Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
 add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c
-               ${FW}/core/src/link_tx.c ${FW}/core/src/model.c ${FW}/core/src/steps.c)
+               ${FW}/core/src/link_tx.c ${FW}/core/src/model.c ${FW}/core/src/steps.c ${FW}/core/src/gauges.c)
 target_include_directories(test_link_arb PRIVATE ${FW}/core/src)
 target_link_libraries(test_link_arb PRIVATE agentlink_hal agentlink_proto lvgl::lvgl m)
 add_test(NAME link_arbitration COMMAND test_link_arb)

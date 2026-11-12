@@ -222,6 +222,13 @@ A terminal command that runs longer than ten seconds is a session like an agent'
   Opening the menu does not acknowledge a job: its ack is `Dismiss`, which removes the card. A one-item
   menu hides the B legend.
 
+### 4.1c Gauges on the deck (2026-11-12, [GAUGES.md](GAUGES.md))
+
+- A Claude session with a known context fill gets a 160 × 4 capsule in the job bar's row (y 219): grey, amber
+  from 70 %, vermillion from 90 %. Hidden under a request, for a merged slot and for a job.
+- The empty deck and the ambient face show `5h 42%` (`FONT_BODY`, y 304) while the plan's 5-hour figure is
+  known and fresh; amber from 80 %.
+
 ### 4.2 AGENT
 
 Caption y 72: the project (host first when remote). The list (§3.2) centred on y 226. Items and
@@ -316,6 +323,21 @@ one line. No chevrons, no hint. Legends: A `Bottom`, B `Page`, both hidden while
 - Legends: A names the commit (`Quiet 30 min`, `Quiet 1 h`, `Quiet off`, `Mute`, `Unmute`; hidden
   on About), B `Next`.
 - Issue 4843 (volume) adds a fourth control here; the row has room at Ø 64.
+
+### 4.6b STATUS with usage (2026-11-12, [GAUGES.md](GAUGES.md))
+
+```
+            r 192 / 182   two 240° arcs through 12 o'clock, 4 px: outer 5 hours, inner the week
+            y 84    12:30                             FONT_TITLE (FONT_NUM without usage)
+            y 120   🖥 dev-mac   ▮ 80%                 chip row
+            y 152   5h 42%  resets in 2h 10m          FONT_BODY_STRONG figure + FONT_BODY detail
+            y 180   Week 18%  resets in 3d 5h
+            y 246…  toggles, description, legends as §4.6
+```
+
+Arc fill white, amber from 80 %, vermillion from 95 %; an unknown or stale window is a dash over its track. In
+AGENT (§4.2) a readout line sits at y 108: `Opus 4.7 · Plan · PR 128 approved`. Without any usage reading STATUS is
+exactly §4.6.
 
 ### 4.7 VOICE
 
