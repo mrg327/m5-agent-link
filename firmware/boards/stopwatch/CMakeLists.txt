@@ -10,6 +10,7 @@ idf_component_register(
         "link_ble.cpp"
         "link_usb.cpp"
         "mic.cpp"
+        "ota.cpp"
         "rtc.cpp"
         "touch.cpp"
     INCLUDE_DIRS "."
@@ -26,6 +27,7 @@ idf_component_register(
         esp_hw_support
         nvs_flash
         esp_app_format
+        app_update
         m5stack__m5gfx
         lvgl__lvgl
 )

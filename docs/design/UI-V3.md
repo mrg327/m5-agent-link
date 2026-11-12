@@ -430,6 +430,16 @@ tap goes round to the first again.
 Owned by issue 1e57: v3 changes only what the shared tokens change (typeface, legends, toast).
 Finding L2 is logged on that issue.
 
+### 4.9 UPDATING
+
+Full-screen overlay on the top layer while a firmware update is open (`ui_ota.c`, driven by `ota.c`).
+Progress ring at r 226, width 10: grey track, blue arc from 12 o'clock (green when done). Title
+`Updating` (`FONT_TITLE`), the version in `FONT_CAPTION` when given, the percentage in `FONT_NUM`,
+hint `Hold B to cancel` on the legend line. Link loss adds an amber `Waiting for the computer…`.
+On done the title becomes `Restarting…` and the watch restarts after 1 s. On bad, failed, cancelled or
+timed-out transfers the overlay closes and a toast shows the reason. All gestures are swallowed while
+open except the B hold. The ring is drawn with `lv_draw_arc`; `LV_USE_ARC` and `LV_USE_BAR` stay off.
+
 ## 5. Interaction changes (`nav.c`)
 
 | Change | Rows | Why |

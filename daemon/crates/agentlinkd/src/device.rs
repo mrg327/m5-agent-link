@@ -44,6 +44,8 @@ pub struct Shared {
     pub jobs: Arc<crate::jobs::Jobs>,
     /// Connected, handshaken devices keyed by device uid, for `agentlink status`.
     pub devices: Mutex<BTreeMap<String, Value>>,
+    /// The firmware update in progress, and the links it can reach (ota.rs).
+    pub ota: Arc<crate::ota::Ota>,
     next_link: AtomicU64,
 }
 
@@ -55,6 +57,7 @@ impl Shared {
         focus: Arc<dyn FocusDriver>,
         scroll: Arc<dyn ScrollDriver>,
     ) -> Self {
+        let ota_trace = trace.clone();
         Shared {
             jobs: Arc::new(crate::jobs::Jobs::new(
                 registry.clone(),
@@ -71,6 +74,7 @@ impl Shared {
             transcripts: Mutex::default(),
             host: host_info(),
             devices: Mutex::default(),
+            ota: Arc::new(crate::ota::Ota::new(ota_trace)),
             next_link: AtomicU64::new(1),
         }
     }
@@ -359,6 +363,9 @@ const PRESENCE_MINOR: u64 = 12;
 const RULES_MINOR: u64 = 13;
 /// The done summary: `session.fc` / `la` / `lr` / `tp` / `dur` (DONE-SUMMARY.md).
 const SUMMARY_MINOR: u64 = 14;
+/// Firmware update: `fw_begin` / `fw_chunk` go only to a device that announced proto 0.15 (PROTOCOL §6c), and
+/// only when the user asks (`agentlink ota`, ota.rs).
+pub const FW_MINOR: u64 = 15;
 
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
@@ -452,6 +459,7 @@ pub async fn run_link(
             devices.remove(&key);
         }
     }
+    shared.ota.link_down(link_id);
     tracing::info!("device disconnected: {peer}");
     result
 }
@@ -518,6 +526,9 @@ async fn handshake(
         key.clone(),
         json!({"transport": transport, "peer": peer, "dev": info, "link": link_id}),
     );
+    shared
+        .ota
+        .hello(&key, link_id, c.peer_minor, &hello.1.dev.fw);
     *dev_key = Some(key);
     Ok(updates)
 }
@@ -540,16 +551,24 @@ async fn serve(
         done: vtx,
         keys: crate::keys::KeysLink::default(),
     };
+    let (otx, mut orx) = tokio::sync::mpsc::unbounded_channel();
+    shared.ota.attach(link_id, otx);
     loop {
         let deferred_due = sc.deferred_due();
         let deltas_due = c.deltas.next_due();
         tokio::select! {
+            Some(msg) = orx.recv() => c.send(None, msg).await?,
             env = c.recv() => match env? {
                 None => return Ok(()),
                 Some(Envelope { id, msg: Message::Hello(h), .. }) => {
                     shared.trace.record(&c.src, Dir::Internal, "rehandshake", None, None, json!({"peer": peer}), None);
                     *updates = handshake(shared, c, (id, h), link_id, transport, peer, dev_key).await?;
                     tracing::info!("device re-handshake: {peer} ({transport})");
+                }
+                Some(Envelope { msg: Message::FwAck(a), .. }) => {
+                    if let Some(key) = dev_key.as_deref() {
+                        shared.ota.on_ack(key, a);
+                    }
                 }
                 Some(env) => handle(shared, c, env, &mut sc, &mut inflight, &mut vs).await?,
             },

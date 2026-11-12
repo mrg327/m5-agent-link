@@ -14,6 +14,7 @@ mod ipc;
 mod jobs;
 mod keepawake;
 mod keys;
+mod ota;
 mod paths;
 mod presence;
 mod prompt;
@@ -98,6 +99,7 @@ async fn main() -> Result<()> {
         status,
         broker,
         jobs: shared.jobs.clone(),
+        ota: shared.ota.clone(),
     })];
     for s in sources {
         let reg = registry.clone();

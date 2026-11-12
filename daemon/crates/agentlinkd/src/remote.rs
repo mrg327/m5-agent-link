@@ -283,6 +283,7 @@ mod tests {
             status: Arc::new(|| json!({})),
             token_file: d.join("remote.token"),
             home: d.to_path_buf(),
+            ota: Arc::new(crate::ota::Ota::new(Trace::null())),
         })
     }
 

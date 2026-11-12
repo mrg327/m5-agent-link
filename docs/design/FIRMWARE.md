@@ -109,8 +109,26 @@ With 450 mAh, STANDBY at 2.5 mA is about 7 days, and 40 lifts × 10 s/day at 100
 ## 8. Storage (NVS)
 - Bonds/keys (encrypted NVS), user settings (alert mode, quiet hours, brightness, privacy, handle for the badge), and the last snapshot (optional, for a "stale" view after reboot).
 
-## 9. OTA (v3)
-- Dual OTA partitions on the 16 MB flash. The image is pushed by the daemon over BLE (slow but fine) or USB. It is signed with the project's key and rolls back if it doesn't boot.
+## 9. OTA (proto 0.15, issue b769)
+- **Slots.** Two 6 MB app slots (`ota_0`, `ota_1`) on the 16 MB flash. A USB flash writes `ota_0` and
+  resets `otadata`; an update writes the slot that is not running and then boots it.
+- **Transfer.** `agentlink ota firmware/build/agentlink.bin` pushes the image over whatever link the watch
+  is on (BLE or USB): `fw_begin`, 2 KB `fw_chunk`s with up to 4 in flight, `fw_ack` per chunk
+  ([PROTOCOL.md](PROTOCOL.md) §6c). Core (`core/ota.c`) runs the transfer from the main loop, checks the
+  SHA-256 and shows the Updating screen (B held cancels); the board (`boards/stopwatch/ota.cpp`) writes the
+  slot with `esp_ota_*`, erasing sector by sector as the image arrives. A dropped link resumes from the last
+  written byte if the daemon asks again within 30 s. The watch refuses an update while it records, or below
+  15% battery unless it is charging, and stays out of standby while one runs.
+- **Signing.** Images are signed (ESP-IDF "Require signed app images" without hardware secure boot, RSA-3072
+  Secure Boot V2 format; `sdkconfig.defaults`). Nothing is burned into eFuses: a USB flash still boots any
+  image. An update is accepted only if it is signed by the key in the running image's signature block, so
+  nobody in BLE range can flash the watch. The key is per machine, outside the repository:
+  `$AGENTLINK_FW_KEY`, else `~/.agentlink/fw_signing_key.pem`, made by the first build
+  (`firmware/CMakeLists.txt`). Keep it: a watch flashed with one machine's key only takes updates built with
+  that key, until it is flashed over USB again. After changing the key path, delete `firmware/sdkconfig`.
+- **Rollback** (`CONFIG_APP_ROLLBACK_ENABLE`). A new image boots unconfirmed. Core confirms it once a daemon
+  welcomes it; if that does not happen within 5 minutes, or the image resets first (a panic, a watchdog), the
+  bootloader boots the previous image again. The daemon reads the result from the `fw` in the next `hello`.
 
 ## 10. Spikes to de-risk
 | ID | Spike | Exit criteria |

@@ -31,3 +31,4 @@ Firmware updates over the link (BLE or USB) instead of idf.py over USB (FIRMWARE
 - 2026-11-12T23:07:52Z · copilot-cli/opus@mac-work · macos-arm64 · 4458c6b: filed
 - 2026-11-12T23:08:12Z · copilot-cli/opus@mac-work · macos-arm64 · 4458c6b: claimed
 - 2026-11-12T23:10:07Z · copilot-cli/opus@mac-work · macos-arm64 · 4458c6b+dirty: Protocol 0.15 fw_begin/fw_chunk/fw_ack: CDDL, vectors, zcbor regen, Rust types, hal_ota_* contract, PROTOCOL.md §6c
+- 2026-11-12T23:24:25Z · copilot-cli/opus@mac-work · macos-arm64 · ab840fc+dirty: Implemented: board ota.cpp (esp_ota_*, header check), RSA-3072 signed images without secure boot (key ~/.agentlink/fw_signing_key.pem made by the build), core ota.c + Updating overlay + rollback confirm, sim HAL + 14 tests, daemon sender (4-chunk window, rewind, resume) + agentlink ota CLI + ota_e2e.py. Checks: sim 167/167, idf build + check_dram ok, cargo fmt/clippy/test ok, ota_e2e 16 PASS. Flashed signed image over USB, boots.

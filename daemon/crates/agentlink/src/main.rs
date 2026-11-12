@@ -1,6 +1,7 @@
 //! agentlink: the CLI window into the daemon (DESIGN §0: auditability).
 
 mod hooks;
+mod ota;
 mod remote;
 mod remotes;
 mod shell_init;
@@ -70,6 +71,17 @@ enum Cmd {
     ShellInit {
         /// zsh or bash.
         shell: String,
+    },
+    /// Send a signed firmware image to the connected watch over the air (PROTOCOL §6c).
+    Ota {
+        /// The signed app image (build/agentlink.bin).
+        image: std::path::PathBuf,
+        /// Skip the signature check here (the watch refuses an unsigned image itself).
+        #[arg(long)]
+        unsigned: bool,
+        /// Device id (hex uid, a prefix will do); needed when several watches are connected.
+        #[arg(long)]
+        device: Option<String>,
     },
     /// Inspect or drive the connected device.
     Device {
@@ -205,6 +217,11 @@ fn main() -> Result<()> {
             None => ssh::run(port.unwrap_or(remotes::DEFAULT_PORT), &dest, &[], &args),
         },
         Cmd::ShellInit { shell } => shell_init::run(&shell),
+        Cmd::Ota {
+            image,
+            unsigned,
+            device,
+        } => ota::run(cli.json, &image, unsigned, device),
         Cmd::Device { cmd } => {
             let name = match cmd {
                 DeviceCmd::State => "state",

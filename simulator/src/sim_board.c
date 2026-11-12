@@ -32,12 +32,16 @@ static int64_t s_rtc_offset;
 void hal_board_init(void) {}
 const hal_board_info_t *hal_board_info(void) { return &s_info; }
 
+static uint64_t s_skip_us; /* `skip`: the clock jumps, to test long timeouts */
+
 uint64_t hal_time_us(void)
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000u + (uint64_t)ts.tv_nsec / 1000u;
+    return (uint64_t)ts.tv_sec * 1000000u + (uint64_t)ts.tv_nsec / 1000u + s_skip_us;
 }
+
+void sim_skip_time(uint32_t ms) { s_skip_us += (uint64_t)ms * 1000u; }
 
 static bool s_rtc_unknown; /* set to 0: the clock stays unknown, as on a board whose RTC was never set */
 uint32_t hal_rtc_get_unix(void) { return s_rtc_unknown ? 0 : (uint32_t)((int64_t)time(NULL) + s_rtc_offset); }
@@ -145,9 +149,17 @@ uint32_t hal_retained_get(void) { return s_retained; }
 const char *hal_reset_reason(void) { return "poweron"; }
 void hal_retained_set(uint32_t v) { s_retained = v; }
 
+static int s_batt_pct = 80, s_batt_chg = -1; /* -1: the default, plugged in unless on_battery */
+void sim_set_battery_pct(unsigned pct, bool charging)
+{
+    s_batt_pct = (int)pct;
+    s_batt_chg = charging;
+}
+
 hal_battery_t hal_battery_read(void)
 {
-    return (hal_battery_t){.percent = 80, .charging = false, .usb_present = !s_on_battery};
+    if (s_batt_chg >= 0) return (hal_battery_t){.percent = (uint8_t)s_batt_pct, .charging = s_batt_chg, .usb_present = s_batt_chg};
+    return (hal_battery_t){.percent = (uint8_t)s_batt_pct, .charging = false, .usb_present = !s_on_battery};
 }
 
 void hal_debug_line(const char *json)

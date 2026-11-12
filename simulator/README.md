@@ -60,6 +60,14 @@ exits with code 1. `shot` writes a PNG of the framebuffer (round mask applied); 
 `perf_four_agents.txt` for the redraw budget with four busy agents. The log line also reports
 `cpu_us` (host CPU inside `core_step`), informational only since it varies with machine load.
 
+Firmware update (OTA) commands: `fw_image SIZE [unsigned|badhdr|badsha]` synthesises a fake image
+(0xE9 header, 0xE7 0x02 signature marker in the last 4 KiB) and its SHA-256; `fw_begin [VER]` sends
+`fw_begin` for it; `fw_stop` sends `fw_begin` with size 0; `fw_send OFF LEN [COUNT]` sends COUNT
+`fw_chunk` frames 20 ms apart (clamped to the image end); `battery PCT [chg]` sets the battery;
+`skip MS` jumps the HAL clock forward (for the 30 s timeout and the 5 min rollback guard). The sim
+OTA slot lives in RAM; `AGENTLINK_SIM_UNCONFIRMED=1` makes `hal_ota_unconfirmed()` true at boot.
+`hal_restart()` logs a `restart` event and returns. See `scripts/ota_*.txt`.
+
 ## Notes
 
 - Single thread: the main loop pumps SDL and the WebSocket between `core_step()` calls.

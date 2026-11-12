@@ -52,3 +52,12 @@ bool sim_script_failed(void);
 
 /* main.c: CPU time spent in core_step() so far (thread CPU clock), in microseconds. */
 uint64_t sim_core_cpu_us(void);
+
+/* sim_ota.c: the script's synthetic firmware image (mode: "", "unsigned", "badhdr", "badsha"). */
+bool sim_fw_image(uint32_t size, const char *mode);
+uint32_t sim_fw_size(void);
+const uint8_t *sim_fw_sha(void);
+const uint8_t *sim_fw_data(void);
+/* sim_board.c: the battery reading (`battery PCT [chg]`) and a jump of the monotonic clock (`skip MS`). */
+void sim_set_battery_pct(unsigned pct, bool charging);
+void sim_skip_time(uint32_t ms);

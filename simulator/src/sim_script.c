@@ -47,6 +47,13 @@
  *                                   STANDING-RULES.md): TEXT is the rule (\n = line break, \t = tab, \xHH = a byte);
  *                                   N = a raw scope value; `rule off` stops
  *   expect_countdown MIN_S MAX_S    the countdown ring is shown with MIN_S..MAX_S seconds left (-1 -1: hidden)
+ *   fw_image SIZE [unsigned|badhdr|badsha]   make a synthetic firmware image (OTA, PROTOCOL.md 6c): an app header, a
+ *                                   "signature" in its last 4 KB (unless unsigned), its SHA-256 (flipped for badsha)
+ *   fw_begin [VER] | fw_stop        a daemon `fw_begin` for that image (with a version), or size 0 to stop
+ *   fw_send OFF LEN [COUNT]         COUNT (default 1) `fw_chunk`s of LEN bytes from OFF on, 20 ms apart; the data is
+ *                                   the image's, cut at its end (a LEN over 2048 is a protocol error to try)
+ *   battery PCT [chg]               the battery reading (chg = charging and on USB)
+ *   skip MS                         jump the clock forward (the script's own timeline stays put): long timeouts
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
  *   px_reset | expect_px_max PX     redraw budget: pixels flushed since px_reset must stay within PX
  *                                   (the log line also reports core_step host CPU as cpu_us, not asserted)
@@ -71,7 +78,7 @@
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -397,6 +404,27 @@ static bool parse_line(char *line, uint32_t *t)
         add(*t, E_PX_RESET, 0, 0, 0, NULL);
     } else if (!strcmp(cmd, "expect_px_max") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_EXPECT_PX_MAX, a, 0, 0, NULL);
+    } else if (!strcmp(cmd, "fw_image") && arg[0]) {
+        add(*t, E_FW_IMAGE, 0, 0, 0, arg);
+        *t += 20;
+    } else if (!strcmp(cmd, "fw_begin")) {
+        add(*t, E_FW_BEGIN, 0, 0, 0, arg);
+        *t += 20;
+    } else if (!strcmp(cmd, "fw_stop")) {
+        add(*t, E_FW_BEGIN, 1, 0, 0, NULL);
+        *t += 20;
+    } else if (!strcmp(cmd, "fw_send") && sscanf(rest, "%d %d %d", &a, &b, &c) >= 2) {
+        if (sscanf(rest, "%*d %*d %d", &c) != 1) c = 1;
+        for (int i = 0; i < c; i++) {
+            add(*t, E_FW_CHUNK, a + i * b, b, 0, NULL);
+            *t += 20;
+        }
+    } else if (!strcmp(cmd, "battery") && arg[0]) {
+        add(*t, E_BATTERY, 0, 0, 0, arg);
+        *t += 20;
+    } else if (!strcmp(cmd, "skip") && sscanf(rest, "%d", &a) == 1) {
+        add(*t, E_SKIP, a, 0, 0, NULL);
+        *t += 20;
     } else if (!strcmp(cmd, "quit")) {
         add(*t, E_QUIT, 0, 0, 0, NULL);
     } else {
@@ -1022,6 +1050,48 @@ static void run_detail(const char *spec)
     inject_detail(rid, sid, off, total, spec + n, strlen(spec + n));
 }
 
+/* OTA: the stand-in daemon's fw_begin / fw_chunk for the image `fw_image` made. */
+static void inject_fw(struct envelope_r *env, const char *what)
+{
+    static uint8_t buf[2304];
+    size_t n = 0;
+    if (cbor_encode_envelope(buf, sizeof buf, env, &n) != ZCBOR_SUCCESS) {
+        fail("cannot encode", what);
+        return;
+    }
+    sim_link_inject_rx(buf, n);
+}
+
+static void run_fw_begin(bool stop, const char *ver)
+{
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_fw_begin_m_c;
+    env.envelope_msg_fw_begin_m.msg_fw_begin_hdr_m.hdr_uint1uint = ++s_rx_id;
+    struct fw_begin *b = &env.envelope_msg_fw_begin_m.msg_fw_begin_fw_begin_m;
+    b->fw_begin_uint0uint = stop ? 0 : sim_fw_size();
+    b->fw_begin_uint1bstr = (struct zcbor_string){.value = sim_fw_sha(), .len = 32};
+    if (ver && ver[0]) {
+        b->fw_begin_uint2tstr_present = true;
+        b->fw_begin_uint2tstr.fw_begin_uint2tstr = zs(ver);
+    }
+    inject_fw(&env, "fw_begin");
+}
+
+static void run_fw_chunk(uint32_t off, uint32_t len)
+{
+    if (off >= sim_fw_size()) return;
+    if (len > sim_fw_size() - off) len = sim_fw_size() - off;
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_fw_chunk_m_c;
+    env.envelope_msg_fw_chunk_m.msg_fw_chunk_hdr_m.hdr_uint1uint = ++s_rx_id;
+    struct fw_chunk *c = &env.envelope_msg_fw_chunk_m.msg_fw_chunk_fw_chunk_m;
+    c->fw_chunk_uint0uint = off;
+    c->fw_chunk_uint1bstr = (struct zcbor_string){.value = sim_fw_data() + off, .len = len};
+    inject_fw(&env, "fw_chunk");
+}
+
 static void run_clear(int rid, const char *spec)
 {
     static const char *const whys[] = {"answered_pc", "answered_dev", "expired", "cancelled", "handed_back"};
@@ -1135,6 +1205,25 @@ static void run(const ev_t *e)
         }
         break;
     }
+    case E_FW_IMAGE: {
+        unsigned size = 0;
+        char mode[16] = "";
+        if (sscanf(e->text, "%u %15s", &size, mode) < 1 || !sim_fw_image(size, mode)) fail("bad fw_image", e->text);
+        break;
+    }
+    case E_FW_BEGIN: run_fw_begin(e->a != 0, e->text); break;
+    case E_FW_CHUNK: run_fw_chunk((uint32_t)e->a, (uint32_t)e->b); break;
+    case E_BATTERY: {
+        unsigned pct = 0;
+        char chg[8] = "";
+        if (sscanf(e->text, "%u %7s", &pct, chg) < 1) fail("bad battery", e->text);
+        else sim_set_battery_pct(pct, !strcmp(chg, "chg"));
+        break;
+    }
+    case E_SKIP:
+        sim_skip_time((uint32_t)e->a);
+        s_t0 += (uint32_t)e->a; /* the script's own timeline does not move with it */
+        break;
     case E_RTC:
         hal_rtc_set_unix((uint32_t)e->a);
         app_clock_resync();
@@ -1159,7 +1248,7 @@ bool sim_script_poll(uint32_t now_ms)
     while (s_next < s_n && now_ms - s_t0 >= s_ev[s_next].at_ms && !s_failed) {
         const ev_t *e = &s_ev[s_next++];
         run(e);
-        if (e->kind == E_QUIT) break;
+        if (e->kind == E_QUIT || e->kind == E_SKIP) break; /* `now` is stale after a skip */
     }
     return s_next < s_n && !s_failed;
 }

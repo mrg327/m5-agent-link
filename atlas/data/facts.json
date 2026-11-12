@@ -988,7 +988,7 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:106"
+      "source": "firmware/components/core/src/ui.c:108"
     },
     {
       "id": "attention",
@@ -1335,7 +1335,7 @@
           "name": "batt_pct"
         }
       ],
-      "source": "protocol/agentlink.cddl:52"
+      "source": "protocol/agentlink.cddl:56"
     },
     {
       "name": "welcome",
@@ -1386,7 +1386,7 @@
           "name": "keys"
         }
       ],
-      "source": "protocol/agentlink.cddl:53"
+      "source": "protocol/agentlink.cddl:57"
     },
     {
       "name": "snapshot",
@@ -1409,7 +1409,7 @@
           "name": "away"
         }
       ],
-      "source": "protocol/agentlink.cddl:54"
+      "source": "protocol/agentlink.cddl:58"
     },
     {
       "name": "session_upd",
@@ -1642,7 +1642,7 @@
           "name": "dur"
         }
       ],
-      "source": "protocol/agentlink.cddl:55"
+      "source": "protocol/agentlink.cddl:59"
     },
     {
       "name": "gone",
@@ -1650,7 +1650,7 @@
       "dir": "pc→dev",
       "summary": "A session ended and left the list",
       "fields": [],
-      "source": "protocol/agentlink.cddl:56"
+      "source": "protocol/agentlink.cddl:60"
     },
     {
       "name": "attention",
@@ -1771,7 +1771,7 @@
           "name": "wide"
         }
       ],
-      "source": "protocol/agentlink.cddl:57"
+      "source": "protocol/agentlink.cddl:61"
     },
     {
       "name": "clear",
@@ -1794,7 +1794,7 @@
           "name": "why"
         }
       ],
-      "source": "protocol/agentlink.cddl:58"
+      "source": "protocol/agentlink.cddl:62"
     },
     {
       "name": "cmd",
@@ -1845,7 +1845,7 @@
           "name": "rh"
         }
       ],
-      "source": "protocol/agentlink.cddl:59"
+      "source": "protocol/agentlink.cddl:63"
     },
     {
       "name": "result",
@@ -1882,7 +1882,7 @@
           "name": "pos"
         }
       ],
-      "source": "protocol/agentlink.cddl:60"
+      "source": "protocol/agentlink.cddl:64"
     },
     {
       "name": "detail",
@@ -1926,7 +1926,7 @@
           "name": "total"
         }
       ],
-      "source": "protocol/agentlink.cddl:61"
+      "source": "protocol/agentlink.cddl:65"
     },
     {
       "name": "cfg",
@@ -1970,7 +1970,7 @@
           "name": "badge_handle"
         }
       ],
-      "source": "protocol/agentlink.cddl:62"
+      "source": "protocol/agentlink.cddl:66"
     },
     {
       "name": "batt",
@@ -1993,7 +1993,7 @@
           "name": "chg"
         }
       ],
-      "source": "protocol/agentlink.cddl:63"
+      "source": "protocol/agentlink.cddl:67"
     },
     {
       "name": "ping",
@@ -2001,7 +2001,7 @@
       "dir": "both",
       "summary": "Link-liveness probe",
       "fields": [],
-      "source": "protocol/agentlink.cddl:64"
+      "source": "protocol/agentlink.cddl:68"
     },
     {
       "name": "pong",
@@ -2009,7 +2009,7 @@
       "dir": "both",
       "summary": "Answer to a ping",
       "fields": [],
-      "source": "protocol/agentlink.cddl:65"
+      "source": "protocol/agentlink.cddl:69"
     },
     {
       "name": "log",
@@ -2032,7 +2032,7 @@
           "name": "msg"
         }
       ],
-      "source": "protocol/agentlink.cddl:66"
+      "source": "protocol/agentlink.cddl:70"
     },
     {
       "name": "audio_start",
@@ -2062,7 +2062,7 @@
           "name": "sid"
         }
       ],
-      "source": "protocol/agentlink.cddl:67"
+      "source": "protocol/agentlink.cddl:71"
     },
     {
       "name": "audio",
@@ -2092,7 +2092,7 @@
           "name": "data"
         }
       ],
-      "source": "protocol/agentlink.cddl:68"
+      "source": "protocol/agentlink.cddl:72"
     },
     {
       "name": "audio_end",
@@ -2129,7 +2129,7 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:69"
+      "source": "protocol/agentlink.cddl:73"
     },
     {
       "name": "transcript",
@@ -2159,7 +2159,7 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:70"
+      "source": "protocol/agentlink.cddl:74"
     },
     {
       "name": "kb_start",
@@ -2189,7 +2189,7 @@
           "name": "keys"
         }
       ],
-      "source": "protocol/agentlink.cddl:71"
+      "source": "protocol/agentlink.cddl:75"
     },
     {
       "name": "kb_stroke",
@@ -2219,7 +2219,7 @@
           "name": "pts"
         }
       ],
-      "source": "protocol/agentlink.cddl:72"
+      "source": "protocol/agentlink.cddl:76"
     },
     {
       "name": "kb_cands",
@@ -2263,7 +2263,7 @@
           "name": "err"
         }
       ],
-      "source": "protocol/agentlink.cddl:73"
+      "source": "protocol/agentlink.cddl:77"
     },
     {
       "name": "usage",
@@ -2321,7 +2321,90 @@
           "name": "wko"
         }
       ],
-      "source": "protocol/agentlink.cddl:74"
+      "source": "protocol/agentlink.cddl:78"
+    },
+    {
+      "name": "fw_begin",
+      "type": 24,
+      "dir": "pc→dev",
+      "summary": "Firmware update: opens (or resumes, or with size 0 stops) a signed image transfer",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "size   the image's length in bytes; 0 = stop the transfer in progress",
+          "name": "size"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "bstr .size 32",
+          "note": "sha    SHA-256 of the whole image: a begin naming the image already in progress",
+          "name": "sha"
+        },
+        {
+          "key": 2,
+          "optional": true,
+          "type": "tstr",
+          "note": "ver    the image's version (its app description), <= 32 chars, for the screen",
+          "name": "ver"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:79"
+    },
+    {
+      "name": "fw_chunk",
+      "type": 25,
+      "dir": "pc→dev",
+      "summary": "Firmware update: 2 KB of the image at an offset",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "off    byte offset of this chunk in the image",
+          "name": "off"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "bstr .size (0..2048)",
+          "note": "data",
+          "name": "data"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:80"
+    },
+    {
+      "name": "fw_ack",
+      "type": 26,
+      "dir": "dev→pc",
+      "summary": "Firmware update: go / done / busy / bad / fail / stopped, and the next offset wanted",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "fw_status",
+          "note": "st",
+          "name": "st"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "uint",
+          "note": "next   bytes received and written so far: the offset the device wants next",
+          "name": "next"
+        },
+        {
+          "key": 2,
+          "optional": true,
+          "type": "tstr",
+          "note": "msg    why, for busy / bad / fail / stopped, <= 48 chars",
+          "name": "msg"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:81"
     },
     {
       "name": "dbg_ui_state_req",
@@ -2329,7 +2412,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask which screen is showing",
       "fields": [],
-      "source": "protocol/agentlink.cddl:75"
+      "source": "protocol/agentlink.cddl:82"
     },
     {
       "name": "dbg_ui_state",
@@ -2380,7 +2463,7 @@
           "name": "fps"
         }
       ],
-      "source": "protocol/agentlink.cddl:76"
+      "source": "protocol/agentlink.cddl:83"
     },
     {
       "name": "dbg_screenshot_req",
@@ -2388,7 +2471,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask for a screenshot",
       "fields": [],
-      "source": "protocol/agentlink.cddl:77"
+      "source": "protocol/agentlink.cddl:84"
     },
     {
       "name": "dbg_screenshot_chunk",
@@ -2432,7 +2515,7 @@
           "name": "last"
         }
       ],
-      "source": "protocol/agentlink.cddl:78"
+      "source": "protocol/agentlink.cddl:85"
     },
     {
       "name": "dbg_inject_input",
@@ -2462,7 +2545,7 @@
           "name": "y"
         }
       ],
-      "source": "protocol/agentlink.cddl:79"
+      "source": "protocol/agentlink.cddl:86"
     },
     {
       "name": "dbg_set_log_level",
@@ -2478,7 +2561,7 @@
           "name": ""
         }
       ],
-      "source": "protocol/agentlink.cddl:80"
+      "source": "protocol/agentlink.cddl:87"
     }
   ],
   "sounds": {
@@ -4934,13 +5017,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:765",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:707",
-    "gesture_map.chord": "firmware/components/core/src/app.c:484",
+    "gesture_map.chord": "firmware/components/core/src/app.c:486",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:196",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:156",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:376",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:378",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:511",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:513",
     "haptics.approved": "firmware/components/core/src/feedback.c:80",
     "haptics.denied": "firmware/components/core/src/feedback.c:87",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:67",

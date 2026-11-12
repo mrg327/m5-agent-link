@@ -23,14 +23,14 @@ set(FW ${CMAKE_CURRENT_SOURCE_DIR}/../firmware/components)
 # The simulator's implementation of hal.h. Named `agentlink_hal` so core/ links against it exactly as it
 # does against the real HAL component on the device.
 add_library(agentlink_hal STATIC
-    src/sim_board.c src/sim_display.c src/sim_link.c src/sim_ws.c src/sim_png.c src/sim_mic.c)
+    src/sim_board.c src/sim_display.c src/sim_link.c src/sim_ws.c src/sim_png.c src/sim_mic.c src/sim_ota.c)
 target_include_directories(agentlink_hal PUBLIC ${FW}/agentlink_hal/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(agentlink_hal PUBLIC lvgl::lvgl SDL2::SDL2)
 
 add_subdirectory(${FW}/agentlink_proto agentlink_proto)
 add_subdirectory(${FW}/core core)
 
-add_executable(agentlink_sim src/main.c src/sim_script.c)
+add_executable(agentlink_sim src/main.c src/sim_script.c src/sim_fw_image.c)
 target_include_directories(agentlink_sim PRIVATE ${FW}/core/src)
 target_link_libraries(agentlink_sim PRIVATE core agentlink_hal)
 target_compile_options(agentlink_sim PRIVATE -Wall -Wextra)
@@ -70,6 +70,9 @@ add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
 target_include_directories(test_ring PRIVATE ${FW}/core/src)
 add_test(NAME ring_fifo COMMAND test_ring)
 
+add_executable(test_sha256 tests/test_sha256.c ${FW}/core/src/sha256.c)
+target_include_directories(test_sha256 PRIVATE ${FW}/core/src)
+add_test(NAME sha256 COMMAND test_sha256)
 add_executable(test_nav tests/test_nav.c ${FW}/core/src/nav.c)
 target_include_directories(test_nav PRIVATE ${FW}/core/src)
 add_test(NAME nav_model COMMAND test_nav)
@@ -495,3 +498,47 @@ sim_script_test(sim_volume_step confirm_tone_volume.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"ev\":\"volume\",\"percent\":25.*\"ev\":\"sound\"")
 sim_script_test(sim_volume_zero confirm_tone_volume0.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"sound\"")
+
+# OTA (PROTOCOL.md 6c): the Updating overlay, the transfer rules, the rollback guard. Events: ota_begin, ota_resume,
+# ota_gap, ota_done, ota_bad, ota_stopped, ota_confirm, ota_busy; the simulator's own `restart` is the restart.
+sim_script_test(sim_ota_happy ota_happy.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_begin\".*\"ev\":\"ota_done\".*\"ev\":\"ota_ack\",\"st\":1,\"next\":20000.*\"ev\":\"restart\"")
+sim_script_test(sim_ota_gap ota_gap.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_gap\",\"off\":0,\"next\":4096.*\"ev\":\"ota_gap\",\"off\":8192,\"next\":4096.*\"ev\":\"ota_ack\",\"st\":0,\"next\":10240")
+sim_script_test(sim_ota_resume ota_resume.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"ota_begin\".*\"ev\":\"ota_begin\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_resume\",\"next\":6144.*\"ev\":\"ota_done\"")
+sim_script_test(sim_ota_stop ota_stop.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_stopped\",\"why\":\"daemon\".*\"ev\":\"ota_ack\",\"st\":5")
+sim_script_test(sim_ota_cancel_hold_b ota_cancel_hold_b.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_stopped\",\"why\":\"user\".*\"ev\":\"ota_ack\",\"st\":5")
+sim_script_test(sim_ota_unsigned ota_unsigned.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_done|\"ev\":\"restart\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_bad\",\"st\":3,\"msg\":\"Signature not trusted\"")
+sim_script_test(sim_ota_bad_header ota_bad_header.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_done"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_bad\",\"st\":3,\"msg\":\"Not an app image\"")
+sim_script_test(sim_ota_bad_sha ota_bad_sha.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_done|ota_slot_ready"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_bad\",\"st\":3,\"msg\":\"Checksum mismatch\"")
+sim_script_test(sim_ota_busy_low_battery ota_busy_low_battery.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_busy\",\"msg\":\"Battery too low\".*\"ev\":\"ota_ack\",\"st\":2.*\"ev\":\"ota_begin\"")
+sim_script_test(sim_ota_busy_recording ota_busy_recording.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_begin"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_busy\",\"msg\":\"Recording a message\"")
+sim_script_test(sim_ota_timeout ota_timeout.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_stopped\",\"why\":\"timeout\".*\"ev\":\"ota_ack\",\"st\":5")
+sim_script_test(sim_ota_rollback_confirm ota_rollback_confirm.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_rollback|\"ev\":\"restart\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_unconfirmed\".*\"ev\":\"ota_confirm\".*\"ev\":\"ota_confirmed\"|\"ev\":\"ota_unconfirmed\".*\"ev\":\"ota_confirm\"")
+set_tests_properties(sim_ota_rollback_confirm PROPERTIES ENVIRONMENT "AGENTLINK_SIM_UNCONFIRMED=1")
+sim_script_test(sim_ota_rollback_timeout ota_rollback_timeout.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_confirm\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_rollback\".*\"ev\":\"restart\"")
+set_tests_properties(sim_ota_rollback_timeout PROPERTIES ENVIRONMENT "AGENTLINK_SIM_UNCONFIRMED=1")

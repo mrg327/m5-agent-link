@@ -1,0 +1,6 @@
+# OTA: a new image that no daemon welcomes within 5 minutes restarts (the bootloader then rolls back).
+wait 500
+skip 299000
+wait 300
+skip 2000
+wait 500

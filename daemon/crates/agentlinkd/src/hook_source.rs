@@ -50,6 +50,7 @@ pub struct HookSource {
     pub status: StatusFn,
     pub broker: Arc<Broker>,
     pub jobs: Arc<Jobs>,
+    pub ota: Arc<crate::ota::Ota>,
 }
 
 /// What every connection handler needs.
@@ -61,6 +62,7 @@ pub struct ConnEnv {
     pub token_file: PathBuf,
     pub home: PathBuf,
     pub jobs: Arc<Jobs>,
+    pub ota: Arc<crate::ota::Ota>,
 }
 
 /// Which socket a connection came in on.
@@ -90,6 +92,7 @@ impl AgentSource for HookSource {
             token_file: self.token_file,
             home: self.home,
             jobs: self.jobs,
+            ota: self.ota,
         });
         remote::spawn_remote_socket(&self.remote_socket, env.clone());
         loop {
@@ -144,6 +147,10 @@ where
         };
         if v.get("ctl").is_some() && via != Via::Local {
             trace.record(src, Dir::Internal, "ctl_ignored", None, None, v, None);
+            continue;
+        }
+        if v.get("ctl").and_then(Value::as_str) == Some("ota") {
+            run_ota(&env.ota, &v, &mut lines, &mut w).await;
             continue;
         }
         let reply = match v.get("ctl").and_then(Value::as_str) {
@@ -225,6 +232,53 @@ where
         let _ = w.write_all(reply.as_bytes()).await;
     }
     drop(attach_guard);
+}
+
+/// `{"ctl":"ota"}`: the update runs while this connection stays open, one progress line per event.
+/// Closing the connection stops it (the update sends the stop itself before it ends).
+async fn run_ota<R, W>(ota: &crate::ota::Ota, v: &Value, lines: &mut tokio::io::Lines<R>, w: &mut W)
+where
+    R: tokio::io::AsyncBufRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    let Some(req) = crate::ota::Request::from_json(v) else {
+        let _ = w
+            .write_all(b"{\"ota\":\"error\",\"msg\":\"missing path\"}\n")
+            .await;
+        return;
+    };
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut rx = Some(rx);
+    let mut run = std::pin::pin!(ota.run(req, tx));
+    let mut eof = false;
+    loop {
+        tokio::select! {
+            _ = &mut run => break,
+            line = async {
+                match rx.as_mut() {
+                    Some(r) => r.recv().await,
+                    None => std::future::pending().await,
+                }
+            }, if rx.is_some() => {
+                let Some(line) = line else { rx = None; continue };
+                if w.write_all(format!("{line}\n").as_bytes()).await.is_err() {
+                    rx = None;
+                }
+            }
+            l = lines.next_line(), if !eof && rx.is_some() => {
+                if !matches!(l, Ok(Some(_))) {
+                    eof = true;
+                    rx = None;
+                }
+            }
+        }
+    }
+    // the run's last lines are already queued
+    if let Some(mut rx) = rx {
+        while let Ok(line) = rx.try_recv() {
+            let _ = w.write_all(format!("{line}\n").as_bytes()).await;
+        }
+    }
 }
 
 /// A status-line run (`agentlink-hook statusline`, usage.rs): readouts for its session, and the plan's

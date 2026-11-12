@@ -66,6 +66,23 @@ pub fn redact_keys(kind: &str, msg: &mut Value) -> bool {
     hit
 }
 
+/// Firmware chunks are the image, not log material: only their length is traced.
+pub fn redact_fw(kind: &str, msg: &mut Value) -> bool {
+    if kind != "fw_chunk" {
+        return false;
+    }
+    let Some(b) = msg.get_mut("b").and_then(Value::as_object_mut) else {
+        return false;
+    };
+    let len = b
+        .get("data")
+        .and_then(Value::as_str)
+        .map_or(0, |h| h.len() / 2);
+    b.insert("data".into(), "<private>".into());
+    b.insert("len".into(), len.into());
+    true
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum Dir {
     In,
@@ -197,6 +214,7 @@ impl Trace {
             }
         }
         private |= redact_keys(&kind, &mut msg);
+        private |= redact_fw(&kind, &mut msg);
         let sid = msg["b"]["sid"].as_u64();
         let rid = msg["b"]["rid"].as_u64();
         self.record(src, dir, &kind, sid, rid, msg, (!private).then_some(bytes));
@@ -269,6 +287,15 @@ mod tests {
         let mut other = json!({"agent": "claude", "payload": {"cmd": "x"}});
         assert!(!redact_hook(&mut other));
         assert_eq!(other["payload"]["cmd"], "x");
+    }
+
+    #[test]
+    fn firmware_chunks_show_only_their_length() {
+        let mut m = json!({"t": "fw_chunk", "b": {"off": 0, "data": "deadbeef"}});
+        assert!(redact_fw("fw_chunk", &mut m));
+        assert_eq!(m["b"]["data"], "<private>");
+        assert_eq!(m["b"]["len"], 4);
+        assert!(!redact_fw("fw_ack", &mut json!({"b": {}})));
     }
 
     #[test]

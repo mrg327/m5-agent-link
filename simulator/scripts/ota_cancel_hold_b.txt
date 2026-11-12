@@ -1,0 +1,13 @@
+# OTA: holding B on the Updating overlay cancels; the device tells the daemon it stopped.
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 300
+fw_image 20000
+fw_begin
+wait 200
+fw_send 0 2048 2
+wait 200
+btn B long
+wait 500
+expect_screen ring
+expect_label Update cancelled

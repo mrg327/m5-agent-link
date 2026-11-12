@@ -18,6 +18,7 @@
 #include "ring.h"
 #include "model.h"
 #include "motion.h"
+#include "ota.h"
 #include "prefs.h"
 #include "ui.h"
 #include "ui_theme.h"
@@ -368,6 +369,7 @@ static void on_link(bool welcomed)
 {
     if (welcomed) app_clock_resync(); /* the welcome has just set the RTC */
     ui_set_link_state(welcomed);
+    ota_on_link(welcomed, app_now_ms());
 }
 
 static void on_attention(const attention_t *a)
@@ -515,6 +517,10 @@ static void dispatch(const gesture_evt_t *g)
         dbg_event("power", "wake_input", "\"touch\":%s", touch ? "true" : "false");
         return;
     }
+    if (ota_active()) { /* the Updating overlay owns the screen: only B held does anything */
+        if (g->kind == G_BTN_B_LONG) ota_cancel(app_now_ms());
+        return;
+    }
     ui_on_gesture(g);
 }
 
@@ -660,6 +666,7 @@ void core_init(void)
     if (!power_woke_by_timer()) feedback_hello(); /* a reconnect attempt stays silent and dark */
 #endif
     power_start(app_now_ms());
+    ota_init(app_now_ms());
     s_fps_t0 = app_now_ms();
 }
 
@@ -679,6 +686,8 @@ uint32_t core_step(void)
     model_attention_expire_ms(now); /* an answer window over with no word from the daemon: back to the PC */
     detail_tick(now);
     voice_tick(now);
+    ota_tick(now);
+    if (ota_active()) power_activity(now); /* a firmware update keeps the display on */
     keys_tick(now);
     if (keys_active()) power_activity(now); /* the keyboard keeps the display on */
     if (voice_state() == VOICE_REC || voice_state() == VOICE_WAIT) power_activity(now); /* stay awake while dictating */

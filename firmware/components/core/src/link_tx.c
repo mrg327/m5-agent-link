@@ -84,7 +84,7 @@ bool link_tx_hello(hal_link_kind_t to)
     set_hdr(&m->msg_hello_hdr_m, false, 0);
     struct hello *h = &m->msg_hello_hello_m;
     h->hello_major_l_major = 0;
-    h->hello_major_l_minor = 14; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice; 0.7: keys;
+    h->hello_major_l_minor = 15; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice; 0.7: keys;
                                   * 0.8: action_dictate on attention, dictate with rid answers that card;
                                   * 0.9: jobs (agent_shell, session eta / exit, cmd_op_rerun);
                                   * 0.10: gauges (usage message, session ctx / mdl / pm / pr / prs);
@@ -92,7 +92,8 @@ bool link_tx_hello(hal_link_kind_t to)
                                   *       handed_back, focus with a rid hands it back);
                                   * 0.12: presence (attention hush, session hush);
                                   * 0.13: standing rules (attention rule / scope / wide, approve with rh);
-                                  * 0.14: done summary (session fc / la / lr / tp / dur) */
+                                  * 0.14: done summary (session fc / la / lr / tp / dur);
+                                  * 0.15: firmware update (fw_begin / fw_chunk / fw_ack) */
     h->hello_device_info_m.device_info_device_class_m.device_class_choice = device_class(bi);
     h->hello_device_info_m.device_info_uint1tstr = zstr(bi->board);
     h->hello_device_info_m.device_info_uint2tstr = zstr(bi->fw_version);
@@ -237,4 +238,21 @@ bool link_send_screenshot_chunk(uint16_t w, uint16_t h, uint32_t offset, const u
     c->dbg_screenshot_chunk_uint3bstr = (struct zcbor_string){.value = data, .len = len};
     c->dbg_screenshot_chunk_uint4bool = last;
     return send_env(g_link.kind, "screenshot_chunk");
+}
+
+bool link_send_fw_ack(int st, uint32_t next, const char *msg)
+{
+    if (!g_link.welcomed) return false;
+    memset(&g_tx_env, 0, sizeof g_tx_env);
+    g_tx_env.envelope_choice = envelope_msg_fw_ack_m_c;
+    struct msg_fw_ack *m = &g_tx_env.envelope_msg_fw_ack_m;
+    set_hdr(&m->msg_fw_ack_hdr_m, false, 0);
+    m->msg_fw_ack_fw_ack_m.fw_ack_fw_status_m.fw_status_choice = st;
+    m->msg_fw_ack_fw_ack_m.fw_ack_uint1uint = next;
+    if (msg && msg[0]) {
+        m->msg_fw_ack_fw_ack_m.fw_ack_uint2tstr_present = true;
+        m->msg_fw_ack_fw_ack_m.fw_ack_uint2tstr.fw_ack_uint2tstr = zstr(msg);
+    }
+    dbg_event("ota", "ota_ack", "\"st\":%d,\"next\":%u", st, (unsigned)next);
+    return send_env(g_link.kind, "fw_ack");
 }

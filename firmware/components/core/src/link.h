@@ -71,3 +71,5 @@ bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg, u
 bool link_send_approve_rule(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32_t rh);
 /* cmd_op_scroll with scroll_arg {unit, delta, seq}; unit is a nav_scroll_unit_t wire value. */
 bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq);
+/* Firmware update (proto 0.15): fw_ack {st, next, msg}; st is the wire value (0 go, 1 done, 2 busy, 3 bad, 4 fail, 5 stopped). */
+bool link_send_fw_ack(int st, uint32_t next, const char *msg);

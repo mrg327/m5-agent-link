@@ -1,0 +1,22 @@
+# OTA: a whole image arrives in 2 KB chunks, the Updating overlay follows it, the SHA and signature check out,
+# the device acks done and restarts about a second later.
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 300
+fw_image 20000
+fw_begin 1.2.3
+wait 300
+expect_screen ota
+expect_label Updating
+expect_label 1.2.3
+expect_label Hold B to cancel
+fw_send 0 2048 5
+wait 400
+expect_label 51%
+shot ota_updating.png
+fw_send 10240 2048 5
+wait 400
+expect_label Restarting…
+shot ota_restarting.png
+wait 1500
+expect_screen ring

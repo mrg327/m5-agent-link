@@ -1,0 +1,15 @@
+# OTA: under 15 % and not charging the watch answers busy; charging, it accepts.
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 300
+fw_image 20000
+battery 10
+fw_begin
+wait 300
+expect_screen ring
+battery 10 chg
+fw_begin
+wait 300
+expect_screen ota
+fw_stop
+wait 200

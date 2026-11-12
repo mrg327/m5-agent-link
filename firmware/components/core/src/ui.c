@@ -7,6 +7,7 @@
 #include "debug.h"
 #include "ui_countdown.h"
 #include "ui_internal.h"
+#include "ui_ota.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
 
@@ -43,6 +44,7 @@ lv_obj_t *ui_new_screen(void)
 static void create_overlays(void)
 {
     lv_obj_t *top = lv_layer_top();
+    ui_ota_init(top); /* under the toast, so a refusal shows over it */
     /* The legends share the toast's row: a black pill under the toast covers them cleanly while it shows. */
     s_toast_mask = lv_obj_create(top);
     lv_obj_remove_style_all(s_toast_mask);
@@ -264,6 +266,10 @@ void ui_report(ui_report_t *r)
 {
     memset(r, 0, sizeof *r);
     r->power = "active";
+    if (ui_ota_visible()) { /* the Updating overlay covers everything */
+        ui_ota_report(r);
+        return;
+    }
     if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", lv_label_get_text(s_toast_label));
     if (s_mode == MODE_AGENT) ui_agent_report(r);
     else if (s_mode == MODE_ASK) ui_ask_report(r);

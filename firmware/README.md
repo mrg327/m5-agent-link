@@ -14,6 +14,20 @@ idf.py set-target esp32s3 build flash monitor     # add -p <port> if needed
 - Device port: `/dev/cu.usbmodem101` on macOS, `/dev/ttyACM0` on Linux (USB Serial/JTAG console).
   On Linux your user needs access to the port (`dialout`/`plugdev` group, or a udev rule).
 - Download mode: hold the power button until the green LED blinks.
+- Images are signed. The first build creates this machine's key, `~/.agentlink/fw_signing_key.pem`
+  (or `$AGENTLINK_FW_KEY`); keep it. If `firmware/sdkconfig` predates signing, delete it once.
+
+## Update over the air
+
+Once the watch runs signed firmware (flash it over USB once), later builds need no cable:
+
+```sh
+idf.py build && agentlink ota build/agentlink.bin
+```
+
+The daemon sends the image over BLE or USB, and the watch checks the signature, restarts into the new
+image, and rolls back if that image is not welcomed by a daemon within 5 minutes
+(`docs/design/FIRMWARE.md` §9).
 
 ## Options
 
