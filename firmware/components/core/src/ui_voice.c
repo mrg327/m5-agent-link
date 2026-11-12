@@ -2,7 +2,9 @@
  * at the end of the Reply list, or on ASK for a request that takes free text (rid != 0: the transcript
  * answers it). Listening (tap or A stops; 15 s at most), Transcribing, then the transcript with a hold
  * button: only the 1.2 s hold sends it (cmd dictate names the recording; the daemon holds the text and
- * types it). Long swipe down or B held discards. voice.c does the recording. */
+ * types it). A transcript longer than its five-line box is paged (issue c6cf): a tap or A turns the page,
+ * and the button reads "More" until the last page has been on screen, so a hold never sends words the user
+ * was not shown. Long swipe down or B held discards. voice.c does the recording. */
 #include <stdio.h>
 #include <string.h>
 
@@ -27,15 +29,17 @@
 #define REASON_Y 236
 #define BUTTON_Y 296
 
-static lv_obj_t *s_root, *s_header, *s_halo, *s_disc, *s_mic, *s_low, *s_text, *s_err, *s_reason, *s_btn;
+static lv_obj_t *s_root, *s_header, *s_halo, *s_disc, *s_mic, *s_low, *s_box, *s_text, *s_err, *s_reason, *s_btn;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static char s_header_txt[64], s_low_txt[32], s_text_txt[256], s_reason_txt[96], s_word_txt[16];
 static uint32_t s_sid, s_rid, s_now, s_text_since;
 static voice_state_t s_shown = (voice_state_t)-1;
 static bool s_holding, s_ramp_started;
+static bool s_lock_press; /* a press while pages are unread: says so once it has lasted NAV_HOLD_SHOW_MS */
 static uint32_t s_hold_t0;
 static int s_halo_r;
-static bool s_too_long; /* the transcript does not fit its box: the user could not read all of what a hold would send */
+static int s_page_i, s_pages;
+static bool s_read_all; /* the last page has been on screen: everything a hold would send has been shown */
 
 static void show(lv_obj_t *o, bool on)
 {
@@ -82,31 +86,48 @@ static void set_halo(int level)
     lv_obj_set_pos(s_halo, UI_CX - r, DISC_Y - r);
 }
 
-/* The transcript, centred on y 170: FONT_BODY, the box as tall as the text (at most five lines). Text that
- * does not fit is cut with dots on glass, so it must not be sent from here (s_too_long). */
+/* The transcript, centred on y 170: FONT_BODY in a box as tall as the text, at most five lines. A longer
+ * text is shown five lines at a time (the label slides up inside the clipping box). */
 static void set_transcript(const char *t)
 {
+    if (!strcmp(t, s_text_txt)) return;
     const lv_font_t *f = FONT_BODY;
     int lh = lv_font_get_line_height(f);
     int w = theme_chord(TEXT_CY - TEXT_LINES * lh / 2, 12); /* the narrowest row is the top one */
     if (w > TEXT_W_MAX) w = TEXT_W_MAX;
     lv_point_t sz;
     lv_text_get_size(&sz, t, f, 0, 0, w, LV_TEXT_FLAG_NONE);
-    s_too_long = sz.y / lh > TEXT_LINES;
-    if (!strcmp(t, s_text_txt)) return;
-    int lines = sz.y / lh < 1 ? 1 : sz.y / lh > TEXT_LINES ? TEXT_LINES : sz.y / lh;
+    int all = sz.y / lh < 1 ? 1 : sz.y / lh;
+    int lines = all > TEXT_LINES ? TEXT_LINES : all;
+    s_pages = (all + TEXT_LINES - 1) / TEXT_LINES;
+    s_page_i = 0;
+    s_read_all = s_pages == 1;
+    lv_obj_set_size(s_box, w, lines * lh);
+    lv_obj_set_pos(s_box, UI_CX - w / 2, TEXT_CY - lines * lh / 2);
     lv_obj_set_width(s_text, w);
-    lv_obj_set_x(s_text, UI_CX - w / 2);
-    lv_obj_set_height(s_text, lines * lh);
-    lv_obj_set_y(s_text, TEXT_CY - lines * lh / 2);
+    lv_obj_set_y(s_text, 0);
     theme_set_text(s_text, s_text_txt, sizeof s_text_txt, t);
 }
 
+/* "Send" (the hold) once every page has been shown; until then "More 1/3", which a tap answers. */
 static void set_button(voice_state_t st)
 {
     static const wheel_item_t send = {"Send", RGB_ASK, true, 1, NULL}, retry = {"Try again", 0, false, 2, NULL};
-    wheel_set(s_btn, st == VOICE_TEXT ? &send : &retry, 1, 0);
+    char more[24];
+    wheel_item_t next = {more, 0, false, 3, NULL};
+    snprintf(more, sizeof more, "More %d/%d", s_page_i + 1, s_pages);
+    wheel_set(s_btn, st != VOICE_TEXT ? &retry : s_read_all ? &send : &next, 1, 0);
     wheel_set_shown(s_btn, true);
+}
+
+/* The next page (the first again after the last); the last one on screen unlocks the hold. */
+static void turn_page(void)
+{
+    s_page_i = (s_page_i + 1) % s_pages;
+    lv_obj_set_y(s_text, -s_page_i * TEXT_LINES * lv_font_get_line_height(FONT_BODY));
+    if (s_page_i == s_pages - 1) s_read_all = true;
+    set_button(VOICE_TEXT);
+    dbg_event("ui", "voice_page", "\"page\":%d,\"pages\":%d", s_page_i + 1, s_pages);
 }
 
 static void render(void)
@@ -127,7 +148,11 @@ static void render(void)
         theme_set_bg_color(s_disc, rec ? lv_color_hex(RGB_ASK) : COL_FILL2);
         theme_set_text_color(s_mic, rec ? COL_ON_ACCENT : COL_TEXT);
         show(s_low, rec || wait);
-        show(s_text, text);
+        if (text) { /* before the button, which names the pages */
+            s_text_txt[0] = 0; /* a retry that heard the same words starts on page one again */
+            set_transcript(voice_text());
+        }
+        show(s_box, text);
         show(s_err, !rec && !wait && !text);
         show(s_reason, !rec && !wait && !text);
         if (text || st == VOICE_FAILED) set_button(st);
@@ -150,8 +175,7 @@ static void render(void)
         word = ""; /* A does nothing while waiting */
         break;
     case VOICE_TEXT:
-        set_transcript(voice_text());
-        word = "";
+        word = s_read_all ? "" : "More";
         break;
     case VOICE_FAILED:
     default:
@@ -174,8 +198,11 @@ void ui_voice_open(uint32_t sid, uint32_t rid, uint32_t now)
     s_now = now;
     s_shown = (voice_state_t)-1;
     s_halo_r = 0;
-    s_too_long = false;
-    s_holding = s_ramp_started = false;
+    s_text_txt[0] = 0;
+    s_page_i = 0;
+    s_pages = 1;
+    s_read_all = false;
+    s_holding = s_ramp_started = s_lock_press = false;
     ring_set_still(ui_home_ring(), true);
     voice_start(sid, now); /* a refusal shows as the failed state with its reason */
     render();
@@ -216,25 +243,32 @@ bool ui_voice_act(nav_action_t a, const gesture_evt_t *g)
         } else if (st == VOICE_FAILED) {
             voice_start(s_sid, s_now);
             g_ui_actions->tick();
+        } else if (st == VOICE_TEXT && s_pages > 1) {
+            hold_cancel();
+            turn_page();
+            g_ui_actions->tick();
         } else if (st == VOICE_TEXT) {
-            if (s_too_long) ui_toast("Too long to send from here", RGB_AMBER);
-            else ui_toast("Hold to send", RGB_ASK);
+            ui_toast("Hold to send", RGB_ASK);
             g_ui_actions->reject();
         }
         render();
         return true;
     case NAV_HOLD_PRESS:
-        /* only the transcript arms a hold, and only once it has been readable for a moment */
-        if (st == VOICE_TEXT && s_too_long) {
-            ui_toast("Too long to send from here", RGB_AMBER);
-            g_ui_actions->reject();
+        /* only the transcript arms a hold, only once all of it has been shown, and only once it has been
+         * readable for a moment */
+        if (st == VOICE_TEXT && !s_read_all) {
+            s_lock_press = true;
+            s_hold_t0 = s_now;
         } else if (st == VOICE_TEXT && s_now - s_text_since >= NAV_CARD_ARM_MS) {
             s_holding = true;
             s_ramp_started = false;
             s_hold_t0 = s_now;
         }
         return true;
-    case NAV_HOLD_RELEASE: hold_cancel(); return true;
+    case NAV_HOLD_RELEASE:
+        s_lock_press = false;
+        hold_cancel();
+        return true;
     default: return false;
     }
 }
@@ -243,7 +277,13 @@ bool ui_voice_act(nav_action_t a, const gesture_evt_t *g)
 bool ui_voice_tick(uint32_t now)
 {
     s_now = now;
-    if (s_holding && voice_state() == VOICE_TEXT && !s_too_long) {
+    if (s_lock_press && now - s_hold_t0 >= NAV_HOLD_SHOW_MS) { /* a hold, not a tap: say why it does nothing */
+        s_lock_press = false;
+        ui_toast("Tap to read the rest", RGB_AMBER);
+        g_ui_actions->reject();
+        dbg_event("ui", "voice_locked", "\"pages\":%d", s_pages);
+    }
+    if (s_holding && voice_state() == VOICE_TEXT && s_read_all) {
         uint32_t el = now - s_hold_t0;
         if (el >= NAV_HOLD_SHOW_MS) {
             if (!s_ramp_started) {
@@ -273,7 +313,8 @@ void ui_voice_report(ui_report_t *r)
     if (s_low_txt[0] && (st == VOICE_REC || st == VOICE_WAIT)) ui_report_add(r, "%s", s_low_txt);
     if (st == VOICE_TEXT) ui_report_add(r, "(transcript)");
     if (st == VOICE_FAILED) ui_report_add(r, "%s", s_reason_txt);
-    if (st == VOICE_TEXT || st == VOICE_FAILED) ui_report_add(r, "%s", st == VOICE_TEXT ? "Send" : "Try again"); /* the button */
+    if (st == VOICE_TEXT && !s_read_all) ui_report_add(r, "More %d/%d", s_page_i + 1, s_pages); /* the button */
+    else if (st == VOICE_TEXT || st == VOICE_FAILED) ui_report_add(r, "%s", st == VOICE_TEXT ? "Send" : "Try again");
 }
 
 static lv_obj_t *label(lv_obj_t *parent, const lv_font_t *f, lv_color_t col, int cy, int w, int lines)
@@ -317,7 +358,14 @@ lv_obj_t *ui_voice_init(lv_obj_t *screen)
     lv_label_set_text(s_mic, ICON_MIC);
     lv_obj_center(s_mic);
     s_low = label(s_root, FONT_TITLE, COL_TEXT, LOW_Y, 300, 1);
-    s_text = label(s_root, FONT_BODY, COL_TEXT, TEXT_CY, TEXT_W_MAX, TEXT_LINES);
+    s_box = lv_obj_create(s_root); /* clips the transcript to one page */
+    lv_obj_remove_style_all(s_box);
+    lv_obj_remove_flag(s_box, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(s_box, TEXT_W_MAX, TEXT_LINES * lv_font_get_line_height(FONT_BODY));
+    s_text = label(s_box, FONT_BODY, COL_TEXT, 0, TEXT_W_MAX, 1);
+    lv_label_set_long_mode(s_text, LV_LABEL_LONG_MODE_WRAP);
+    lv_obj_set_pos(s_text, 0, 0);
+    lv_obj_set_height(s_text, LV_SIZE_CONTENT);
     s_err = lv_label_create(s_root);
     lv_obj_set_style_text_font(s_err, FONT_ICON_L, 0);
     lv_obj_set_style_text_color(s_err, lv_color_hex(RGB_ERROR), 0);

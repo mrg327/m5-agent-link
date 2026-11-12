@@ -417,9 +417,11 @@ stays clear of the timer; the elapsed time in `FONT_TITLE` white on y 292. Legen
 listening) has a legend: a short B press does nothing here (B held is back), so no `Back` legend.
 **Transcript**: the text in `FONT_BODY` white, up to five lines, as wide as the chord allows (at most
 330 px), centred on y 170; a prominent yellow hold button `Send` (§2.5) on y 296 (73 high). A tap answers with the
-toast `Hold to send`. **A transcript that does not fit the five-line box is never sent from here**: it
-would be cut with dots on glass while the hold sent all of it. A tap or a press on `Send` then toasts
-`Too long to send from here` (amber) and nothing is sent; the hold never arms.
+toast `Hold to send`. **A transcript longer than the five-line box is paged** (issue c6cf): five lines at
+a time, a tap or A (legend `More`) turns the page, and the button is a neutral `More 1/2` until the last
+page has been on screen; only then does it become `Send`, so a hold never sends words that were not
+shown. A hold before that sends nothing and toasts `Tap to read the rest` (amber). After the last page a
+tap goes round to the first again.
 **Failed**: `ICON_ERROR` 44 px on y 176, the reason in `FONT_HEAD` on y 236, a neutral button
 `Try again` on y 300.
 

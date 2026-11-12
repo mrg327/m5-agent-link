@@ -393,7 +393,9 @@ sim_script_test(sim_ask_tap_open_row ask_tap_open_row.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"op\":5"
                 PASS_REGULAR_EXPRESSION "\"op\":0,\"sid\":2")
 sim_script_test(sim_ask_answered_stays ask_answered_stays.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
-sim_script_test(sim_voice_long_transcript voice_long_transcript.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":12,")
+sim_script_test(sim_voice_long_transcript voice_long_transcript.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "voice_locked.*voice_page.*\"op\":12,\"sid\":1")
 sim_script_test(sim_voice_fit_transcript voice_fit_transcript.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"op\":12,\"sid\":1")

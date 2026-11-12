@@ -18,6 +18,8 @@ pub const RATE: u32 = 16_000;
 /// A recording is capped on the watch at 15 s; allow some slack for a late stop.
 const MAX_SAMPLES: usize = RATE as usize * 20;
 pub const MAX_TEXT: usize = 240;
+/// The watch holds a transcript in 256 bytes with its NUL; a longer one would show less than a hold types.
+pub const MAX_TEXT_BYTES: usize = 255;
 /// A transcript waits this long for the user's hold before it is forgotten.
 pub const KEEP: Duration = Duration::from_secs(300);
 
@@ -100,7 +102,18 @@ pub fn clean(text: &str) -> String {
         }
     }
     let words: Vec<&str> = out.split_whitespace().collect();
-    clip(&words.join(" "), MAX_TEXT)
+    let text = clip(&words.join(" "), MAX_TEXT);
+    if text.len() <= MAX_TEXT_BYTES {
+        return text;
+    }
+    let room = MAX_TEXT_BYTES - '…'.len_utf8();
+    let mut out: String = text
+        .char_indices()
+        .take_while(|(i, c)| i + c.len_utf8() <= room)
+        .map(|(_, c)| c)
+        .collect();
+    out.push('…');
+    out
 }
 
 /// One recording being received.
@@ -376,6 +389,18 @@ mod tests {
             "Run the tests again."
         );
         assert_eq!(clean("a\u{7}b"), "a b");
+    }
+
+    #[test]
+    fn transcripts_fit_the_watch_buffer() {
+        let ascii = "word ".repeat(100);
+        let t = clean(&ascii);
+        assert_eq!(t.chars().count(), MAX_TEXT);
+        let wide = "überprüfe ".repeat(40);
+        let t = clean(&wide);
+        assert!(t.len() <= MAX_TEXT_BYTES, "{} bytes", t.len());
+        assert!(t.ends_with('…'));
+        assert!(wide.starts_with(t.trim_end_matches('…')));
     }
 
     #[test]
