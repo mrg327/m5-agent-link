@@ -32,12 +32,20 @@ A never approves.
 
 | Token | Size / weight | Use |
 |---|---|---|
-| `FONT_CAPTION` | 16 / 500 | context line, legends, footers |
+| `FONT_CAPTION` | 20 / 500 | context line, legends, footers, step rows (the smallest text: 20 px, about 1.9 mm, legibility pass 20261112-491a) |
 | `FONT_BODY` | 20 / 400 | summaries, prompt text, unselected rows |
 | `FONT_BODY_STRONG` | 20 / 600 | toasts, chips, small buttons |
 | `FONT_HEAD` | 24 / 600 | state word, selected row, card titles, buttons |
 | `FONT_TITLE` | 34 / 600 | the subject of the screen (project, tool, result) |
 | `FONT_NUM` | 56 / 600 | clock, timers, counters: glyphs `0-9 : - % .` and space only |
+
+**Tabular digits.** Every Figtree face has its OpenType `tnum` feature frozen in before conversion
+(`firmware/tools/fonts/tabular.py`, called by `gen.mjs`): the cmap entries for 0-9 point at the
+tabular glyphs, so all ten digits share one advance and a ticking clock, timer, step time or
+percentage never moves its neighbours. It applies to every size (a separate proportional set would
+cost about 450 KB of flash); digits inside running text are the font's own tabular glyphs. The colon,
+percent sign and space were already fixed. `simulator/tests/test_fonts.c` (ctest `tabular_digits`)
+measures `1:11` against `0:00`, `11%` against `00%` and more in every size.
 
 Glyph range for the text fonts: U+0020–007E, U+00A0–00FF, U+2013, U+2014, U+2018, U+2019, U+201C,
 U+201D, U+2022, U+2026. Each text font falls back to the icon font of the nearest size, then to
@@ -122,7 +130,7 @@ carries black text. `theme_dim(rgb, pct)` mixes toward black (ring segments at r
   the left, height 40, max width 290, centred on y 364. One slot on every screen (G4, L3).
 - **Chip**: icon 20 + text in `FONT_CAPTION` (not `FONT_BODY_STRONG`), no background; used for
   exceptions only.
-- **Button**: capsule, height 48, `FONT_HEAD`. Prominent = filled accent, black text. Neutral =
+- **Button**: capsule, height 48 (73 for a hold row, §3.2 and §3.3), `FONT_HEAD`. Prominent = filled accent, black text. Neutral =
   `COL_FILL2`, white text. A hold button carries the hold ring (a 20 px outlined circle) at its
   right end; while held, a lighter overlay grows from the left edge across the capsule, and the
   bezel shows the same progress as an arc (the finger usually covers the button).
@@ -148,7 +156,8 @@ carries black text. `theme_dim(rgb, pct)` mixes toward black (ring segments at r
 
 ### 3.2 List (`ui_wheel`, style LIST): AGENT, Reply
 
-Three rows, pitch 62, the selected one in the middle. Selected: a `COL_FILL2` capsule 56 high and
+Three rows, the selected one in the middle. In AGENT the selected capsule is 73 high (7 mm: the hold row
+must be hit with a thumb) and the pitch 65; the layout's default is 56 high and pitch 62. The capsule is `COL_FILL2` and
 330 wide; a 28 px icon at 22 px from its left edge; the label in `FONT_HEAD` white, left-aligned
 64 px from the edge. Neighbours: no capsule, icon in `COL_TEXT3`, label in `FONT_BODY`
 `COL_TEXT2`, same left edge. No chevrons (X5). A destructive row is vermillion (icon and label) and
@@ -156,7 +165,7 @@ shows the hold ring at the right end of the capsule.
 
 ### 3.3 Picker (`ui_wheel`, style BUTTON): ASK, VOICE send
 
-Three rows, pitch 48. Selected: a button (§2.5), 280 wide, label centred; filled with the item's
+Three rows. Selected: a button (§2.5), 280 wide and 73 high in ASK and VOICE send (pitch 54; the default layout is 48 high, pitch 48), label centred; filled with the item's
 colour, or neutral for "Open on PC". Neighbours: `FONT_BODY` `COL_TEXT2`, centred. A hold item has
 the hold ring; there is no `HOLD` tag.
 
@@ -224,7 +233,7 @@ A terminal command that runs longer than ten seconds is a session like an agent'
 
 ### 4.2 AGENT
 
-Caption y 72: the project (host first when remote). The list (§3.2) centred on y 226. Items and
+Caption y 72: the project (host first when remote). The list (§3.2) centred on y 232 (250 under a question). Items and
 order as v2 §4.2, relabelled: **Activity** (was Watch), **Notify when done** / **Don't notify**,
 **Snooze 30 min** / **Unsnooze**, **Stop** (was Interrupt, hold), **Reply**, **Dismiss** (was
 Dismiss error), **Open on PC** (was Focus terminal), **Dictate**, **Keyboard** (was Type…).
@@ -235,14 +244,14 @@ centred on y 246. Legends: A `Select`, B `Next`.
 ### 4.3 ASK
 
 ```
-            y 62    Claude Code · webapp              caption
-            y 84    Run shell command                 FONT_HEAD white, one line
-            y 118…  ┌──────────────────────────┐      platter COL_FILL1, r 18, 320 wide, pad 10/14
+            y 58    Claude Code · webapp              caption
+            y 80    Run shell command                 FONT_HEAD white, one line
+            y 112…  ┌──────────────────────────┐      platter COL_FILL1, r 18, 320 wide, pad 10/14
                     │ npm test -- --watch=false │      FONT_BODY white, up to 3 lines
                     └──────────────────────────┘      (a question's text: no platter, COL_TEXT2)
-            y 234   Open on PC                        picker neighbour
-            y 282   ████████ Approve ○ ████████        the button; orange; hold ring
-            y 330   Deny                              picker neighbour
+            y 226   Open on PC                        picker neighbour (touch zone y 209-243)
+            y 280   ████████ Approve ○ ████████        the button, 73 high (y 244-316); orange; hold ring
+            y 334   Deny                              picker neighbour (touch zone y 317-351)
             y 364   Ⓐ Open on PC              Next Ⓑ
 ```
 
@@ -326,7 +335,7 @@ stays clear of the timer; the elapsed time in `FONT_TITLE` white on y 292. Legen
 **Transcribing**: the disc in `COL_FILL2`, `Transcribing…` in `FONT_HEAD` on y 292. Only A (`Stop`,
 listening) has a legend: a short B press does nothing here (B held is back), so no `Back` legend.
 **Transcript**: the text in `FONT_BODY` white, up to five lines, as wide as the chord allows (at most
-330 px), centred on y 170; a prominent yellow hold button `Send` (§2.5) on y 300. A tap answers with the
+330 px), centred on y 170; a prominent yellow hold button `Send` (§2.5) on y 296 (73 high). A tap answers with the
 toast `Hold to send`. **A transcript that does not fit the five-line box is never sent from here**: it
 would be cut with dots on glass while the hold sent all of it. A tap or a press on `Send` then toasts
 `Too long to send from here` (amber) and nothing is sent; the hold never arms.
