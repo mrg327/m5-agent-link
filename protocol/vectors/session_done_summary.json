@@ -1,0 +1,18 @@
+{
+  "desc": "Delta: session 3 (Claude) finished a turn: 3 files, +120 -14 lines, tests passed, 4 min 12 s (proto 0.14)",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 30,
+    "b": {
+      "sid": 3,
+      "st": "done",
+      "tst": 1793995300,
+      "fc": 3,
+      "la": 120,
+      "lr": 14,
+      "tp": true,
+      "dur": 252
+    }
+  },
+  "cbor_hex": "a3000401181e03a800030204081a6aee3224181e03181f187818200e1821f5182218fc"
+}

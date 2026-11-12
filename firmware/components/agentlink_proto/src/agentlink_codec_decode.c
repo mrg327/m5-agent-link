@@ -86,6 +86,11 @@ static bool decode_repeated_session_uint24uint(zcbor_state_t *state, struct sess
 static bool decode_pr_state(zcbor_state_t *state, struct pr_state_r *result);
 static bool decode_repeated_session_pr_state_m(zcbor_state_t *state, struct session_pr_state_m *result);
 static bool decode_repeated_session_uint26bool(zcbor_state_t *state, struct session_uint26bool *result);
+static bool decode_repeated_session_uint30uint(zcbor_state_t *state, struct session_uint30uint *result);
+static bool decode_repeated_session_uint31uint(zcbor_state_t *state, struct session_uint31uint *result);
+static bool decode_repeated_session_uint32uint(zcbor_state_t *state, struct session_uint32uint *result);
+static bool decode_repeated_session_uint33bool(zcbor_state_t *state, struct session_uint33bool *result);
+static bool decode_repeated_session_uint34uint(zcbor_state_t *state, struct session_uint34uint *result);
 static bool decode_session(zcbor_state_t *state, struct session *result);
 static bool decode_att_kind(zcbor_state_t *state, struct att_kind_r *result);
 static bool decode_away_event(zcbor_state_t *state, struct away_event *result);
@@ -1074,6 +1079,66 @@ static bool decode_repeated_session_uint26bool(
 	return res;
 }
 
+static bool decode_repeated_session_uint30uint(
+		zcbor_state_t *state, struct session_uint30uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (30))))
+	&& (zcbor_uint32_decode(state, (&(*result).session_uint30uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_session_uint31uint(
+		zcbor_state_t *state, struct session_uint31uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (31))))
+	&& (zcbor_uint32_decode(state, (&(*result).session_uint31uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_session_uint32uint(
+		zcbor_state_t *state, struct session_uint32uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (32))))
+	&& (zcbor_uint32_decode(state, (&(*result).session_uint32uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_session_uint33bool(
+		zcbor_state_t *state, struct session_uint33bool *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (33))))
+	&& (zcbor_bool_decode(state, (&(*result).session_uint33bool)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_session_uint34uint(
+		zcbor_state_t *state, struct session_uint34uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (34))))
+	&& (zcbor_uint32_decode(state, (&(*result).session_uint34uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_session(
 		zcbor_state_t *state, struct session *result)
 {
@@ -1106,7 +1171,12 @@ static bool decode_session(
 	&& zcbor_present_decode(&((*result).session_perm_mode_m_present), (zcbor_decoder_t *)decode_repeated_session_perm_mode_m, state, (&(*result).session_perm_mode_m))
 	&& zcbor_present_decode(&((*result).session_uint24uint_present), (zcbor_decoder_t *)decode_repeated_session_uint24uint, state, (&(*result).session_uint24uint))
 	&& zcbor_present_decode(&((*result).session_pr_state_m_present), (zcbor_decoder_t *)decode_repeated_session_pr_state_m, state, (&(*result).session_pr_state_m))
-	&& zcbor_present_decode(&((*result).session_uint26bool_present), (zcbor_decoder_t *)decode_repeated_session_uint26bool, state, (&(*result).session_uint26bool))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+	&& zcbor_present_decode(&((*result).session_uint26bool_present), (zcbor_decoder_t *)decode_repeated_session_uint26bool, state, (&(*result).session_uint26bool))
+	&& zcbor_present_decode(&((*result).session_uint30uint_present), (zcbor_decoder_t *)decode_repeated_session_uint30uint, state, (&(*result).session_uint30uint))
+	&& zcbor_present_decode(&((*result).session_uint31uint_present), (zcbor_decoder_t *)decode_repeated_session_uint31uint, state, (&(*result).session_uint31uint))
+	&& zcbor_present_decode(&((*result).session_uint32uint_present), (zcbor_decoder_t *)decode_repeated_session_uint32uint, state, (&(*result).session_uint32uint))
+	&& zcbor_present_decode(&((*result).session_uint33bool_present), (zcbor_decoder_t *)decode_repeated_session_uint33bool, state, (&(*result).session_uint33bool))
+	&& zcbor_present_decode(&((*result).session_uint34uint_present), (zcbor_decoder_t *)decode_repeated_session_uint34uint, state, (&(*result).session_uint34uint))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
 
 	if (false) {
 		/* For testing that the types of the arguments are correct.
@@ -1138,6 +1208,11 @@ static bool decode_session(
 		decode_repeated_session_uint24uint(state, (&(*result).session_uint24uint));
 		decode_repeated_session_pr_state_m(state, (&(*result).session_pr_state_m));
 		decode_repeated_session_uint26bool(state, (&(*result).session_uint26bool));
+		decode_repeated_session_uint30uint(state, (&(*result).session_uint30uint));
+		decode_repeated_session_uint31uint(state, (&(*result).session_uint31uint));
+		decode_repeated_session_uint32uint(state, (&(*result).session_uint32uint));
+		decode_repeated_session_uint33bool(state, (&(*result).session_uint33bool));
+		decode_repeated_session_uint34uint(state, (&(*result).session_uint34uint));
 	}
 
 	log_result(state, res, __func__);

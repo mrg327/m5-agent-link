@@ -129,6 +129,7 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
 {
     if (present & SF_AGENT) dst->agent = src->agent;
     if ((present & SF_STATE) && src->state != dst->state) dst->back = false; /* the session moved on */
+    if (present & SF_STATE) memset(&dst->sum, 0, sizeof dst->sum); /* the last turn's summary is not this one's */
     if (present & SF_STATE) dst->state = src->state;
     if (present & SF_SUB) dst->sub = src->sub;
     if (present & SF_REPO) memcpy(dst->repo, src->repo, sizeof dst->repo);
@@ -166,6 +167,7 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
     if (present & SF_PR) dst->pr = src->pr;
     if (present & SF_PRS) dst->prs = src->prs;
     if (present & SF_HUSH) dst->hush = src->hush;
+    if (present & SF_DONE) dst->sum = src->sum;
     if (present & SF_NO_SCROLL) dst->no_scroll = src->no_scroll;
     if (present & SF_BACK) {
         dst->back = src->back;

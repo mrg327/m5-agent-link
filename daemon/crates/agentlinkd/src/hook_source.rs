@@ -23,7 +23,7 @@ use crate::broker::{request_of, Broker, Outcome};
 use crate::ipc;
 use crate::jobs::Jobs;
 use crate::prompt;
-use crate::registry::{clip, HostCtx, Registry, SessionEvent, SessionPatch, Step, Via};
+use crate::registry::{clip, HostCtx, Registry, SessionEvent, SessionPatch, Step, Turn, Via};
 use crate::remote;
 use crate::source::AgentSource;
 use crate::trace::{Dir, Trace};
@@ -495,10 +495,16 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
             p.state = Some(SessState::Work);
             p.step = Step::Reset;
             p.ask = Some(Default::default()); /* the question was answered (or moved past) */
+            p.turn = Turn::Prompt;
         }
         "posttooluse" | "posttoolusefailure" => {
             p.state = Some(SessState::Work);
             p.step = Step::Result(tool_ok(&event, payload));
+            if agent_name == "claude" {
+                if let Some(fx) = crate::turn::effect_of(&event, payload) {
+                    p.turn = Turn::Tool(fx);
+                }
+            }
         }
         "pretooluse" if matches!(tool, Some("AskUserQuestion" | "ask_user")) => {
             p.state = Some(SessState::Input);
@@ -1165,5 +1171,134 @@ mod tests {
             &Via::Local,
         );
         assert!(rx.try_recv().is_err());
+    }
+
+    /// One hook line of a Claude Code session `t`.
+    fn cl(event: &str, payload: Value) -> Value {
+        let mut p = payload;
+        p["session_id"] = json!("t");
+        json!({"agent":"claude","event":event,"cwd":"/nonexistent/proj","payload":p})
+    }
+
+    fn feed(reg: &Registry, v: &Value) {
+        reg.apply(to_session_event(v, &Via::Local).unwrap());
+    }
+
+    fn drain(rx: &mut tokio::sync::broadcast::Receiver<crate::registry::Update>) -> Vec<Session> {
+        let mut out = vec![];
+        while let Ok(crate::registry::Update::Upsert(d)) = rx.try_recv() {
+            out.push(d);
+        }
+        out
+    }
+
+    use agentlink_proto::Session;
+
+    fn edit(path: &str, old: &str, new: &str) -> Value {
+        cl(
+            "PostToolUse",
+            json!({"tool_name":"Edit","tool_input":{"file_path":path,"old_string":old,"new_string":new}}),
+        )
+    }
+
+    #[test]
+    fn a_whole_turn_ends_with_its_summary_and_the_next_prompt_clears_it() {
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        feed(&reg, &cl("UserPromptSubmit", json!({"prompt":"go"})));
+        feed(&reg, &edit("/p/a.rs", "a", "b\nc"));
+        feed(&reg, &edit("/p/a.rs", "x", "y"));
+        feed(&reg, &edit("/p/b.rs", "q\nr", "q"));
+        feed(
+            &reg,
+            &cl(
+                "PostToolUseFailure",
+                json!({"tool_name":"Bash","tool_input":{"command":"cargo test"},
+                "error":"Exit code 101\nfailures"}),
+            ),
+        );
+        feed(&reg, &cl("Stop", json!({})));
+        let ds = drain(&mut rx);
+        // nothing of the summary before the stop
+        assert!(ds[..ds.len() - 1]
+            .iter()
+            .all(|d| d.fc.is_none() && d.dur.is_none()));
+        let last = ds.last().unwrap();
+        assert_eq!(last.st, Some(SessState::Done));
+        assert_eq!(
+            (last.fc, last.la, last.lr, last.tp, last.dur),
+            (Some(2), Some(3), Some(3), Some(false), Some(0))
+        );
+        // a reconnecting device is told the same by the snapshot
+        let snap = &reg.snapshot()[0];
+        assert_eq!((snap.fc, snap.tp), (Some(2), Some(false)));
+        // the next prompt: the tally starts over and the stored figures go
+        feed(&reg, &cl("UserPromptSubmit", json!({"prompt":"again"})));
+        assert_eq!(reg.snapshot()[0].fc, None);
+        feed(&reg, &cl("Stop", json!({})));
+        let ds = drain(&mut rx);
+        let last = ds.last().unwrap();
+        assert_eq!(
+            (last.fc, last.la, last.lr, last.tp, last.dur),
+            (None, None, None, None, Some(0)),
+            "unknown stays absent, not zero"
+        );
+    }
+
+    #[test]
+    fn a_session_the_daemon_met_mid_turn_gets_no_summary() {
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        feed(&reg, &edit("/p/a.rs", "a", "b"));
+        feed(&reg, &cl("Stop", json!({})));
+        let ds = drain(&mut rx);
+        assert!(ds.iter().all(|d| d.fc.is_none() && d.dur.is_none()));
+    }
+
+    #[test]
+    fn an_errored_turn_and_a_copilot_session() {
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        feed(&reg, &cl("UserPromptSubmit", json!({})));
+        feed(&reg, &edit("/p/a.rs", "a", "b"));
+        feed(&reg, &cl("StopFailure", json!({"error":"rate_limit"})));
+        let last = drain(&mut rx).pop().unwrap();
+        assert_eq!(
+            (last.st, last.fc, last.la, last.lr),
+            (Some(SessState::Error), Some(1), Some(1), Some(1))
+        );
+        // Copilot's payloads are not tallied
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        for e in ["userPromptSubmitted", "agentStop"] {
+            feed(
+                &reg,
+                &json!({"agent":"copilot","event":e,"cwd":"/r","payload":{"sessionId":"c"}}),
+            );
+        }
+        assert!(drain(&mut rx).iter().all(|d| d.dur.is_none()));
+    }
+
+    #[test]
+    fn a_second_stop_with_less_known_replaces_the_summary() {
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        feed(&reg, &cl("UserPromptSubmit", json!({})));
+        feed(&reg, &edit("/p/a.rs", "a", "b"));
+        feed(&reg, &cl("Stop", json!({})));
+        let _ = drain(&mut rx);
+        // a stop hook sends the agent back to work; this edit's lines cannot be told
+        feed(
+            &reg,
+            &cl(
+                "PostToolUse",
+                json!({"tool_name":"Write","tool_input":{"file_path":"/p/c","content":"z"},
+                "tool_response":{"type":"update"}}),
+            ),
+        );
+        feed(&reg, &cl("Stop", json!({})));
+        let last = drain(&mut rx).pop().unwrap();
+        assert_eq!((last.fc, last.la, last.lr), (Some(2), None, None));
+        assert_eq!(reg.snapshot()[0].la, None);
     }
 }

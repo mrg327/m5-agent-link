@@ -1,0 +1,21 @@
+# DONE-SUMMARY.md §4: only the time is known (no edits seen, no test command): nothing else is drawn, and
+# never a "0 files" or "tests not run".
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 done docs main Read README.md
+done 1 - - - 8
+wait 400
+expect_label 8s
+expect_no_label files
+expect_no_label passed
+expect_no_label failed
+expect_no_label 0
+shot done_time_only.png
+# an old daemon sends nothing: the card keeps its step text
+session 2 done old main Edit src/main.rs
+wait 300
+btn B
+wait 400
+expect_label Edit src/main.rs
+quit

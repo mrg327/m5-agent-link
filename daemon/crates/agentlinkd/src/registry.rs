@@ -2,6 +2,7 @@
 //! session list and broadcasts deltas.
 
 use crate::trace::{Dir, Trace};
+use crate::turn::DoneSummary;
 use agentlink_proto::{
     Agent, Attention, Clear, InputSub, PermMode, PrState, SessState, Session, Usage, CTX_UNKNOWN,
 };
@@ -49,6 +50,19 @@ pub struct SessionPatch {
     pub exit: Option<u64>,
     /// The agent's permission mode, from the hook payload (Claude Code's `permission_mode`; GAUGES.md).
     pub pm: Option<PermMode>,
+    /// What this event did to the turn's done summary (turn.rs; Claude Code only).
+    pub turn: Turn,
+}
+
+/// An event's part in the turn summary (DONE-SUMMARY.md).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub enum Turn {
+    #[default]
+    None,
+    /// A user prompt: the tally starts over.
+    Prompt,
+    /// A tool call that changed a file or ran a test command.
+    Tool(crate::turn::Effect),
 }
 
 /// What a hook line did to the turn's tool-step counter.
@@ -79,6 +93,7 @@ impl SessionPatch {
             eta: None,
             exit: None,
             pm: None,
+            turn: Turn::None,
             step: Step::None,
         }
     }
@@ -140,6 +155,7 @@ pub enum SessionEvent {
 
 /// Broadcast to every connected device link.
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Update {
     /// Full object for a new session, otherwise only the changed keys.
     Upsert(Session),
@@ -157,6 +173,8 @@ struct Record {
     /// Display only for remote sessions.
     ctx: HostCtx,
     origin: Origin,
+    /// The running turn's tally; none until a prompt of a Claude Code session is seen (turn.rs).
+    tally: Option<crate::turn::Tally>,
 }
 
 struct RemoteHost {
@@ -186,6 +204,26 @@ pub struct Registry {
     usage: Mutex<crate::usage::Tracker>,
     tx: broadcast::Sender<Update>,
     trace: Trace,
+}
+
+type SummaryKeys = (
+    Option<u64>,
+    Option<u64>,
+    Option<u64>,
+    Option<bool>,
+    Option<u64>,
+);
+
+fn summary_keys(s: &Session) -> SummaryKeys {
+    (s.fc, s.la, s.lr, s.tp, s.dur)
+}
+
+/// Stores the summary's figures on the session; unknown ones are cleared.
+fn set_summary(s: &mut Session, sum: &DoneSummary) {
+    s.fc = sum.files;
+    (s.la, s.lr) = sum.lines.map_or((None, None), |(a, r)| (Some(a), Some(r)));
+    s.tp = sum.tests;
+    s.dur = sum.secs;
 }
 
 pub fn now_unix() -> u64 {
@@ -406,6 +444,7 @@ impl Registry {
                     session: s,
                     ctx: HostCtx::default(),
                     origin,
+                    tally: None,
                 },
             );
         }
@@ -483,6 +522,35 @@ impl Registry {
                     s.n = Some(0);
                     d.n = s.n;
                     changed = true;
+                }
+            }
+        }
+        // the done summary (DONE-SUMMARY.md): only from a turn whose prompt this daemon saw
+        if p.agent == Agent::Claude {
+            let now = std::time::Instant::now();
+            match &p.turn {
+                Turn::Prompt => {
+                    rec.tally = Some(crate::turn::Tally::start(now));
+                    set_summary(s, &DoneSummary::default());
+                }
+                Turn::Tool(fx) => {
+                    if let Some(t) = &mut rec.tally {
+                        t.add(fx);
+                    }
+                }
+                Turn::None => {}
+            }
+            if matches!(p.state, Some(SessState::Done | SessState::Error)) {
+                let sum = rec
+                    .tally
+                    .as_ref()
+                    .map(|t| t.summary(now))
+                    .unwrap_or_default();
+                let before = summary_keys(s);
+                set_summary(s, &sum);
+                if d.st.is_some() || summary_keys(s) != before {
+                    (d.fc, d.la, d.lr, d.tp, d.dur) = (s.fc, s.la, s.lr, s.tp, s.dur);
+                    changed |= !sum.is_empty();
                 }
             }
         }

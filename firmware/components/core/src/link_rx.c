@@ -87,6 +87,17 @@ static uint32_t convert_session(const struct session *in, session_t *out)
         out->prs = (uint8_t)in->session_pr_state_m.session_pr_state_m.pr_state_choice;
         p |= SF_PRS;
     }
+    /* DONE-SUMMARY (proto 0.14): every figure is optional; lines are shown only with both halves. */
+    done_sum_t *d = &out->sum;
+    if (in->session_uint30uint_present) { d->files = in->session_uint30uint.session_uint30uint; d->files_known = true; p |= SF_DONE; }
+    if (in->session_uint31uint_present && in->session_uint32uint_present) {
+        d->added = in->session_uint31uint.session_uint31uint;
+        d->removed = in->session_uint32uint.session_uint32uint;
+        d->lines_known = true;
+    }
+    if (in->session_uint31uint_present || in->session_uint32uint_present) p |= SF_DONE;
+    if (in->session_uint33bool_present) { d->tests_pass = in->session_uint33bool.session_uint33bool; d->tests_known = true; p |= SF_DONE; }
+    if (in->session_uint34uint_present) { d->secs = in->session_uint34uint.session_uint34uint; d->secs_known = true; p |= SF_DONE; }
     return p;
 }
 

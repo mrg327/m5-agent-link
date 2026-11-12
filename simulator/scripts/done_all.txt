@@ -1,0 +1,26 @@
+# DONE-SUMMARY.md §4: a finished turn with every part known. The line takes the place of the stale last-step
+# text; the context capsule above it stays; nothing about it is touchable.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login Bash cargo test --workspace
+wait 300
+gauge 1 34 Opus_4.7
+wait 300
+expect_no_label files
+session 1 done webapp feat/login Bash cargo test --workspace
+done 1 3 120/14 pass 252
+wait 400
+expect_screen ring
+expect_label 3 files · +120 –14
+expect_label  passed · 4m 12s
+expect_no_label Bash
+expect_label Done
+expect_label context 34%
+shot done_all.png
+# the next prompt: the old summary goes with the state change, the step text is back
+session 1 work webapp feat/login Reading the router
+wait 300
+expect_no_label files
+expect_label Reading the router
+quit

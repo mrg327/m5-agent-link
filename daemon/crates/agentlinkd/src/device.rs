@@ -182,6 +182,11 @@ impl Conn {
         if self.peer_minor < PRESENCE_MINOR {
             s.hush = None;
         }
+        // the turn's done summary: proto 0.14 (DONE-SUMMARY.md). Counts and seconds only, so privacy
+        // `meta` does not withhold them; no file name is ever sent.
+        if self.peer_minor < SUMMARY_MINOR {
+            (s.fc, s.la, s.lr, s.tp, s.dur) = (None, None, None, None, None);
+        }
         if self.privacy == Privacy::Meta {
             s.sum = None;
             // which pull request a session works on says what it works on
@@ -352,6 +357,8 @@ const WINDOW_MINOR: u64 = 11;
 const PRESENCE_MINOR: u64 = 12;
 /// Standing rules: `attention.rule` / `scope` / `wide` and `cmd.rh` with approve (STANDING-RULES.md).
 const RULES_MINOR: u64 = 13;
+/// The done summary: `session.fc` / `la` / `lr` / `tp` / `dur` (DONE-SUMMARY.md).
+const SUMMARY_MINOR: u64 = 14;
 
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
@@ -2669,6 +2676,36 @@ mod tests {
             (out.ctx, out.pm, out.pr, out.prs),
             (Some(72), Some(PermMode::Plan), None, None)
         );
+    }
+
+    #[test]
+    fn done_summary_needs_proto_0_14_and_survives_privacy_meta() {
+        let (_tx, rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let mut c = Conn {
+            link: Box::new(ChanLink { rx, tx }),
+            trace: Trace::null(),
+            src: "t".into(),
+            next_id: 1,
+            privacy: Privacy::Preview,
+            peer_minor: 13,
+            dictate: false,
+            deltas: DeltaQueue::default(),
+            hidden: HashSet::new(),
+            linked: None,
+        };
+        let mut s = Session::delta(1);
+        (s.fc, s.la, s.lr, s.tp, s.dur) = (Some(3), Some(120), Some(14), Some(false), Some(252));
+        assert_eq!(
+            c.for_peer(s.clone()),
+            Session::delta(1),
+            "an 0.13 device gets none of it"
+        );
+        c.peer_minor = 14;
+        assert_eq!(c.for_peer(s.clone()), s);
+        // counts and seconds are metadata: the text-withholding mode keeps them
+        c.privacy = Privacy::Meta;
+        assert_eq!(c.for_peer(s.clone()), s);
     }
 
     #[tokio::test]

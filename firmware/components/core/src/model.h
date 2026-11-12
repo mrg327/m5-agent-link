@@ -34,6 +34,15 @@ typedef enum { ALERT_FULL = 0, ALERT_QUIET = 1, ALERT_SILENT = 2 } alert_mode_t;
 #define MODEL_EXT_BSS
 #endif
 
+/* The summary of the turn that just ended (DONE-SUMMARY.md, proto 0.14). Each figure is shown only once
+ * known: an unknown one is absent, never 0. Valid while the session is done / error; any change of state
+ * clears it, and a delta carrying any of keys 30-34 replaces the whole of it. */
+typedef struct {
+    bool files_known, lines_known, tests_known, secs_known;
+    bool tests_pass;
+    uint32_t files, added, removed, secs;
+} done_sum_t;
+
 typedef struct {
     uint32_t sid;
     agent_t agent;
@@ -74,6 +83,7 @@ typedef struct {
     /* Presence (PRESENCE.md, proto 0.12): read only together with SF_HUSH in the same delta; the user is
      * looking at this session's terminal, so its finish need not buzz. Not a state of the session. */
     bool hush;
+    done_sum_t sum;
 } session_t;
 enum { BACK_EXPIRED = 0, BACK_HANDED = 1 };
 
@@ -92,7 +102,8 @@ enum {
     SF_Q = 1 << 17, SF_RP = 1 << 18, SF_ETA = 1 << 19, SF_EXIT = 1 << 20,
     SF_CTX = 1 << 21, SF_MDL = 1 << 22, SF_PM = 1 << 23, SF_PR = 1 << 24, SF_PRS = 1 << 25,
     SF_BACK = 1 << 26, /* not on the wire: set by the device (model_attention_went_back) */
-    SF_HUSH = 1 << 27  /* proto 0.12: with the delta that enters done / error, `hush` says whether to stay quiet */
+    SF_HUSH = 1 << 27, /* proto 0.12: with the delta that enters done / error, `hush` says whether to stay quiet */
+    SF_DONE = 1 << 28  /* proto 0.14: any of keys 30-34 was present: `sum` replaces the session's whole summary */
 };
 
 typedef struct {

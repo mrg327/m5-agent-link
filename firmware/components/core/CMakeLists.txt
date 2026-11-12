@@ -3,7 +3,7 @@ set(CORE_SRCS
     src/link.c src/link_rx.c src/link_tx.c
     src/motion.c src/prefs.c
     src/nav.c src/ui.c src/ui_theme.c src/ui_ring.c src/ui_ring_draw.c src/ui_wheel.c src/ui_home.c src/ui_home_card.c
-    src/ui_agent.c src/ui_ask.c src/ui_scroll.c src/ui_voice.c src/voice.c src/ui_keys.c src/keys.c src/ui_status.c src/ui_gauges.c src/ui_countdown.c src/ui_watch.c src/sound_bank.c src/sound.c
+    src/ui_agent.c src/ui_ask.c src/ui_scroll.c src/ui_voice.c src/voice.c src/ui_keys.c src/keys.c src/ui_status.c src/ui_gauges.c src/done.c src/ui_done.c src/ui_countdown.c src/ui_watch.c src/sound_bank.c src/sound.c
     src/fonts/font_figtree_20_500.c src/fonts/font_figtree_20_400.c src/fonts/font_figtree_20_600.c
     src/fonts/font_figtree_24_600.c src/fonts/font_figtree_34_600.c src/fonts/font_figtree_56_600.c
     src/fonts/font_phosphor_20.c src/fonts/font_phosphor_28.c src/fonts/font_phosphor_44.c)
