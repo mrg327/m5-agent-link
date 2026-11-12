@@ -1,0 +1,15 @@
+{
+  "desc": "Delta: session 3 finished with the tests failed and only the time otherwise known (proto 0.14)",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 31,
+    "b": {
+      "sid": 3,
+      "st": "error",
+      "tst": 1793995300,
+      "tp": false,
+      "dur": 37
+    }
+  },
+  "cbor_hex": "a3000401181f03a500030203081a6aee32241821f418221825"
+}

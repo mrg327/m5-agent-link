@@ -1605,6 +1605,41 @@
           "type": "bool",
           "note": "hush  only in the delta that enters done / error, only to devices with proto >= 0.12",
           "name": "hush"
+        },
+        {
+          "key": 30,
+          "optional": true,
+          "type": "uint",
+          "note": "fc    files the turn changed (>= 1; absent = not known / none seen). Keys 30-34 only to",
+          "name": "fc"
+        },
+        {
+          "key": 31,
+          "optional": true,
+          "type": "uint",
+          "note": "la    lines added in the turn, sent with lr; absent = not known",
+          "name": "la"
+        },
+        {
+          "key": 32,
+          "optional": true,
+          "type": "uint",
+          "note": "lr    lines removed",
+          "name": "lr"
+        },
+        {
+          "key": 33,
+          "optional": true,
+          "type": "bool",
+          "note": "tp    the turn's last recognised test run: true passed, false failed; absent = unknown",
+          "name": "tp"
+        },
+        {
+          "key": 34,
+          "optional": true,
+          "type": "uint",
+          "note": "dur   the turn's length in seconds, prompt to stop",
+          "name": "dur"
         }
       ],
       "source": "protocol/agentlink.cddl:55"

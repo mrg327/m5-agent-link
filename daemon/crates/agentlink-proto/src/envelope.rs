@@ -22,6 +22,7 @@ macro_rules! messages {
         /// Message type + body. Serializes as `{"t": "<name>", "b": {...}}`.
         #[derive(Debug, Clone, PartialEq, Serialize)]
         #[serde(tag = "t", content = "b", rename_all = "snake_case")]
+        #[allow(clippy::large_enum_variant)] // a session object with every optional key; boxed would touch every user
         pub enum Message {
             $($var($ty),)+
             Unknown(Unknown),

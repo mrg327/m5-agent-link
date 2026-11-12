@@ -60,6 +60,7 @@ const SPECS = {
     snz: [13, 'uint'], ntf: [14, 'bool'], n: [15, 'uint'], ok: [16, 'bool'], q: [17, 'tstr'], rp: [18, 'tstrs'], eta: [19, 'uint'], exit: [20, 'uint'],
     ctx: [21, 'uint'], mdl: [22, 'tstr'], pm: [23, 'enum:perm_mode'], pr: [24, 'uint'], prs: [25, 'enum:pr_state'],
     hush: [26, 'bool'], // proto 0.12 (PRESENCE.md)
+    fc: [30, 'uint'], la: [31, 'uint'], lr: [32, 'uint'], tp: [33, 'bool'], dur: [34, 'uint'], // proto 0.14 (DONE-SUMMARY.md)
   },
   snapshot: { sessions: [0, 'objs:session'], away: [1, 'objs:away_event'] },
   gone: { sid: [0, 'uint'] },

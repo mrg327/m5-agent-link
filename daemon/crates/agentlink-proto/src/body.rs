@@ -168,6 +168,15 @@ body!(
         /// With the delta that enters done / error: do not buzz for it, the user is looking at its
         /// terminal (proto 0.12, PRESENCE.md). Never stored; absent = buzz as the device's rules say.
         #[n(26)] #[serde(skip_serializing_if = "Option::is_none")] hush: Option<bool>,
+        /// Done summary (proto 0.14, DONE-SUMMARY.md): files the turn changed.
+        #[n(30)] #[serde(skip_serializing_if = "Option::is_none")] fc: Option<u64>,
+        /// Lines added / removed in the turn, sent together.
+        #[n(31)] #[serde(skip_serializing_if = "Option::is_none")] la: Option<u64>,
+        #[n(32)] #[serde(skip_serializing_if = "Option::is_none")] lr: Option<u64>,
+        /// The turn's last recognised test run: true passed, false failed.
+        #[n(33)] #[serde(skip_serializing_if = "Option::is_none")] tp: Option<bool>,
+        /// The turn's length in seconds.
+        #[n(34)] #[serde(skip_serializing_if = "Option::is_none")] dur: Option<u64>,
     }
 );
 impl Session {
@@ -201,6 +210,11 @@ impl Session {
             pr: None,
             prs: None,
             hush: None,
+            fc: None,
+            la: None,
+            lr: None,
+            tp: None,
+            dur: None,
         }
     }
 
@@ -209,7 +223,7 @@ impl Session {
         macro_rules! m { ($($f:ident),*) => { $(if d.$f.is_some() { self.$f = d.$f.clone(); })* }; }
         m!(
             ag, st, sub, repo, br, tool, t0, tst, sum, seen, host, hn, snz, ntf, n, ok, eta, exit,
-            ctx, mdl, pm, pr, prs, hush
+            ctx, mdl, pm, pr, prs, hush, fc, la, lr, tp, dur
         );
     }
 }

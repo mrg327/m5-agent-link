@@ -207,6 +207,17 @@ VECTORS = {
         {"t": "session_upd", "id": 17, "b": {"sid": 3, "st": "done", "tst": 1793995300, "hush": True}},
         env("session_upd", 17, {0: 3, 2: 4, 8: 1793995300, 26: True}),
     ),
+    "session_done_summary": (
+        "Delta: session 3 (Claude) finished a turn: 3 files, +120 -14 lines, tests passed, 4 min 12 s (proto 0.14)",
+        {"t": "session_upd", "id": 30, "b": {"sid": 3, "st": "done", "tst": 1793995300, "fc": 3, "la": 120,
+         "lr": 14, "tp": True, "dur": 252}},
+        env("session_upd", 30, {0: 3, 2: 4, 8: 1793995300, 30: 3, 31: 120, 32: 14, 33: True, 34: 252}),
+    ),
+    "session_done_summary_partial": (
+        "Delta: session 3 finished with the tests failed and only the time otherwise known (proto 0.14)",
+        {"t": "session_upd", "id": 31, "b": {"sid": 3, "st": "error", "tst": 1793995300, "tp": False, "dur": 37}},
+        env("session_upd", 31, {0: 3, 2: 3, 8: 1793995300, 33: False, 34: 37}),
+    ),
     "cmd_detail": (
         "Device asks for request 10's full text from byte 0 (proto 0.11)",
         {"t": "cmd", "id": 13, "b": {"op": "detail", "sid": 2, "rid": 10, "arg": 0}},

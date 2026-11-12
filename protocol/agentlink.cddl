@@ -218,9 +218,16 @@ session = {
   ? 23 => perm_mode,        ; pm    the agent's permission mode
   ? 24 => uint,             ; pr    the open pull request of the session's branch; 0 = none (withheld under privacy meta)
   ? 25 => pr_state,         ; prs   its review state; sent with pr
-  ? 26 => bool              ; hush  only in the delta that enters done / error, only to devices with proto >= 0.12
+  ? 26 => bool,             ; hush  only in the delta that enters done / error, only to devices with proto >= 0.12
                             ;       (PRESENCE.md): the user is looking at that session's terminal, do not buzz for
                             ;       it. Never stored by the device; absent = buzz as its own rules say
+  ? 30 => uint,             ; fc    files the turn changed (>= 1; absent = not known / none seen). Keys 30-34 only to
+                            ;       devices with proto >= 0.14 (DONE-SUMMARY.md); a delta carrying any of them
+                            ;       replaces the whole summary, a delta that changes `st` clears it
+  ? 31 => uint,             ; la    lines added in the turn, sent with lr; absent = not known
+  ? 32 => uint,             ; lr    lines removed
+  ? 33 => bool,             ; tp    the turn's last recognised test run: true passed, false failed; absent = unknown
+  ? 34 => uint              ; dur   the turn's length in seconds, prompt to stop
 }
 perm_mode = perm_mode_default / perm_mode_plan / perm_mode_accept_edits / perm_mode_auto /
   perm_mode_dont_ask / perm_mode_bypass

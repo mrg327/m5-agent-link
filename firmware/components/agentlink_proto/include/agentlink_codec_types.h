@@ -386,6 +386,26 @@ struct session_uint26bool {
 	bool session_uint26bool;
 };
 
+struct session_uint30uint {
+	uint32_t session_uint30uint;
+};
+
+struct session_uint31uint {
+	uint32_t session_uint31uint;
+};
+
+struct session_uint32uint {
+	uint32_t session_uint32uint;
+};
+
+struct session_uint33bool {
+	bool session_uint33bool;
+};
+
+struct session_uint34uint {
+	uint32_t session_uint34uint;
+};
+
 struct session {
 	uint32_t session_uint0uint;
 	struct session_agent_m session_agent_m;
@@ -440,6 +460,16 @@ struct session {
 	bool session_pr_state_m_present;
 	struct session_uint26bool session_uint26bool;
 	bool session_uint26bool_present;
+	struct session_uint30uint session_uint30uint;
+	bool session_uint30uint_present;
+	struct session_uint31uint session_uint31uint;
+	bool session_uint31uint_present;
+	struct session_uint32uint session_uint32uint;
+	bool session_uint32uint_present;
+	struct session_uint33bool session_uint33bool;
+	bool session_uint33bool_present;
+	struct session_uint34uint session_uint34uint;
+	bool session_uint34uint_present;
 };
 
 struct att_kind_r {
