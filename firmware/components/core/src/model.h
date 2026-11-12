@@ -65,7 +65,13 @@ typedef struct {
     uint8_t prs;  /* pr_state_t */
     uint32_t pr;
     char mdl[17];
+    /* Device-side (ANSWER-WINDOW.md): this session's last request went back to the computer (its answer
+     * window ran out, or Open on PC handed it back) and the terminal asks now. Cleared by a new request or a
+     * change of state. */
+    bool back;
+    uint8_t back_why; /* BACK_EXPIRED / BACK_HANDED */
 } session_t;
+enum { BACK_EXPIRED = 0, BACK_HANDED = 1 };
 
 /* Wire values of session.pm and session.prs (protocol/agentlink.cddl). */
 typedef enum { PM_DEFAULT = 0, PM_PLAN = 1, PM_ACCEPT_EDITS = 2, PM_AUTO = 3, PM_DONT_ASK = 4, PM_BYPASS = 5 } perm_mode_t;
@@ -80,7 +86,8 @@ enum {
     SF_HOST = 1 << 11, SF_HN = 1 << 12, SF_SNZ = 1 << 13, SF_NTF = 1 << 14, SF_N = 1 << 15,
     SF_OK = 1 << 16, /* with SF_OK, `step` is STEP_OK or STEP_FAIL */
     SF_Q = 1 << 17, SF_RP = 1 << 18, SF_ETA = 1 << 19, SF_EXIT = 1 << 20,
-    SF_CTX = 1 << 21, SF_MDL = 1 << 22, SF_PM = 1 << 23, SF_PR = 1 << 24, SF_PRS = 1 << 25
+    SF_CTX = 1 << 21, SF_MDL = 1 << 22, SF_PM = 1 << 23, SF_PR = 1 << 24, SF_PRS = 1 << 25,
+    SF_BACK = 1 << 26 /* not on the wire: set by the device (model_attention_went_back) */
 };
 
 typedef struct {
@@ -92,6 +99,14 @@ typedef struct {
     uint8_t acts; /* bitmask of 1 << att_action_t */
     uint8_t grant_mask; /* bit i set: opts[i] grants permission (approve-class, hold to commit) */
     uint32_t exp; /* unix, 0 = none */
+    /* The answer window (proto 0.11, ANSWER-WINDOW.md), on the device's own millisecond clock: the daemon
+     * sends what is left when it sends the request, so a reconnect or a clock difference cannot skew it. */
+    uint32_t deadline_ms; /* when the window ends; 0 = no window known (an older daemon, or a notice) */
+    uint32_t win_ms;      /* the whole window */
+    /* The full text (proto 0.11): len_known says the daemon reports whether `text` is whole, and full_len is
+     * the full text's length in bytes when it is not (0: `text` is the whole text). */
+    bool len_known;
+    uint32_t full_len;
     bool answer_sent; /* an answer (approve/deny/reply/dictate) is out; waiting for clear */
     uint8_t answer;   /* what was sent: ATT_ANSWER_* */
     uint8_t answer_opt; /* option index for ATT_ANSWER_REPLY */
@@ -140,6 +155,18 @@ const attention_t *model_attention_first(void);
  * (the daemon rejected the command). */
 void model_attention_set_answer(uint32_t rid, uint8_t answer, uint8_t opt);
 void model_attention_expire(uint32_t now_unix);
+/* Drops requests whose answer window ended more than MODEL_WINDOW_GRACE_MS ago without the daemon's clear
+ * (the link is down): they went back to the computer. */
+#define MODEL_WINDOW_GRACE_MS 1500
+void model_attention_expire_ms(uint32_t now_ms);
+/* Request `rid` went back to the computer (the daemon's clear expired / handed_back, or the local
+ * deadline): its session is marked `back` (BACK_*), and the request removed. False if it was not there. */
+bool model_attention_went_back(uint32_t rid, uint8_t why);
+/* Milliseconds left in `a`'s answer window at now_ms; 0 when it has ended; UINT32_MAX when none is known. */
+uint32_t model_attention_left_ms(const attention_t *a, uint32_t now_ms);
+/* The daemon's protocol minor from its welcome (0 until one arrives). */
+void model_set_peer_minor(uint8_t minor);
+uint8_t model_peer_minor(void);
 
 settings_t *model_settings(void);
 /* The device changed a setting itself (STATUS): bumps the revision so the screens redraw. */

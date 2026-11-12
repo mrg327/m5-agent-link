@@ -37,6 +37,9 @@ bool sim_mic_load(const char *path);
 void sim_link_set_connected_kind(int kind, bool connected);
 void sim_link_inject_rx_kind(int kind, const uint8_t *frame, size_t len);
 void sim_link_inject_rx(const uint8_t *frame, size_t len);
+/* Called with every frame the device sends on a fake (--no-ws) transport: the script's stand-in daemon. */
+typedef void (*sim_tx_tap_t)(const uint8_t *frame, size_t len);
+void sim_link_set_tx_tap(sim_tx_tap_t tap);
 
 /* sim_png.c: writes an RGB (3 bytes/pixel) image; returns false on I/O error. */
 bool sim_png_write(const char *path, const uint8_t *rgb, int w, int h);

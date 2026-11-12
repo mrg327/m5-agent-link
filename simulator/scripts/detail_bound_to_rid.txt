@@ -1,0 +1,43 @@
+# Detail is bound to the request: a chunk for another rid, or one out of order, is dropped and never reaches
+# the reader, so the lock stays (no op 3). Then the request's own text arrives, and after its last page the
+# hold approves. A chunk that disagrees with the announced length fails closed: Approve stays on the PC.
+connect
+rx a400020101020103a40082000b01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention_win 60000 60000 40 7 2 approval approve,deny,focus 0 Run shell command|rm -rf build && make…
+wait 400
+expect_screen ask
+detail 8 2 0 40 echo this belongs to request eight.......
+detail 7 2 5 40 build && make all && make install
+tap 233 150
+wait 400
+expect_label Reading 1 of 1
+expect_label Loading full text
+expect_no_label this belongs
+# the last page of a text still arriving is not the end: B stays, and Approve stays locked
+btn B
+wait 300
+expect_label Reading 1 of 1
+swipe 150 233 330 233
+wait 300
+expect_label > Approve HOLD
+hold 233 282 1500
+wait 300
+expect_no_label Approved
+# the request's own text
+detail 7 2 0 40 rm -rf build && make all && make install
+wait 200
+tap 233 150
+wait 400
+expect_label Reading 1 of 1
+expect_no_label Loading full text
+expect_label rm -rf build && make…
+shot detail_bound_reader.png
+tap 233 233
+wait 400
+expect_label > Approve HOLD
+hold 233 282 1500
+wait 400
+expect_label Approved
+quit

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "detail.h"
 #include "gauges.h"
 #include "link_internal.h"
 
@@ -118,6 +119,7 @@ static void on_welcome(const struct welcome *w)
     hal_rtc_set_unix(w->welcome_time_sync_m.time_sync_uint0uint);
     model_settings()->tz_off_min = w->welcome_time_sync_m.time_sync_uint1int;
     g_link.welcomed = true;
+    model_set_peer_minor((uint8_t)(w->welcome_major_l_minor > 255 ? 255 : w->welcome_major_l_minor));
     dbg_event("link", "welcome", "\"host\":%s,\"unix\":%u,\"tz_off\":%d", dbg_q(host),
               (unsigned)w->welcome_time_sync_m.time_sync_uint0uint, (int)w->welcome_time_sync_m.time_sync_uint1int);
     apply_cfg(&w->welcome_device_cfg_m);
@@ -159,7 +161,7 @@ static void on_snapshot(const struct snapshot *s)
     model_replace_all(list, n);
 }
 
-static void on_attention(const struct attention *in)
+static void on_attention(const struct attention *in, uint32_t now_ms)
 {
     attention_t a;
     memset(&a, 0, sizeof a);
@@ -176,6 +178,15 @@ static void on_attention(const struct attention *in)
         a.acts |= (uint8_t)(1u << in->attention_action_m_l_action_m[i].action_choice);
     if (in->attention_uint7uint_present) a.exp = in->attention_uint7uint.attention_uint7uint;
     if (in->attention_uint8uint_present) a.grant_mask = (uint8_t)in->attention_uint8uint.attention_uint8uint;
+    /* The answer window (proto 0.11): what was left when the daemon sent it, counted on our own clock. */
+    if (in->attention_uint9uint_present && in->attention_uint10uint_present && in->attention_uint10uint.attention_uint10uint) {
+        uint32_t left = in->attention_uint9uint.attention_uint9uint, win = in->attention_uint10uint.attention_uint10uint;
+        a.win_ms = win;
+        a.deadline_ms = now_ms + (left < win ? left : win);
+        if (!a.deadline_ms) a.deadline_ms = 1; /* 0 means "no window" */
+    }
+    a.len_known = model_peer_minor() >= 11;
+    if (in->attention_uint11uint_present) a.full_len = in->attention_uint11uint.attention_uint11uint;
     model_attention_add(&a);
     if (g_link.hooks.on_attention) g_link.hooks.on_attention(model_attention_find(a.rid));
 }
@@ -222,7 +233,6 @@ void link_rx_usage(const usage_t *u)
 
 void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
 {
-    (void)now_ms;
     const struct hdr_r *h = env_hdr(e);
     uint32_t id = h ? h->hdr_uint1uint : 0;
     bool has_re = h && h->hdr_uint2uint_present;
@@ -244,11 +254,24 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
         break;
     }
     case envelope_msg_gone_m_c: model_remove(e->envelope_msg_gone_m.msg_gone_gone_m.gone_uint0uint); break;
-    case envelope_msg_attention_m_c: on_attention(&e->envelope_msg_attention_m.msg_attention_attention_m); break;
+    case envelope_msg_attention_m_c: on_attention(&e->envelope_msg_attention_m.msg_attention_attention_m, now_ms); break;
     case envelope_msg_clear_m_c: {
         const struct clear *c = &e->envelope_msg_clear_m.msg_clear_clear_m;
-        if (model_attention_clear(c->clear_uint0uint) && g_link.hooks.on_cleared)
-            g_link.hooks.on_cleared(c->clear_uint0uint, (int)c->clear_why_m.clear_why_choice);
+        int why = (int)c->clear_why_m.clear_why_choice;
+        /* the window ran out, or our own Open on PC handed it back: the terminal asks now, and the card says so */
+        bool back = why == clear_why_expired_m_c || why == clear_why_handed_back_m_c;
+        bool had = back ? model_attention_went_back(c->clear_uint0uint, why == clear_why_handed_back_m_c ? BACK_HANDED : BACK_EXPIRED)
+                        : model_attention_clear(c->clear_uint0uint);
+        if (had && g_link.hooks.on_cleared) g_link.hooks.on_cleared(c->clear_uint0uint, why);
+        break;
+    }
+    case envelope_msg_detail_m_c: {
+        /* a chunk of a request's full text (proto 0.11): detail.c checks it belongs to the request asked for */
+        const struct detail *d = &e->envelope_msg_detail_m.msg_detail_detail_m;
+        if (d->detail_uint0uint_present && d->detail_uint3uint_present && d->detail_uint4uint_present)
+            detail_on_chunk(d->detail_uint0uint.detail_uint0uint, d->detail_uint1uint_present ? d->detail_uint1uint.detail_uint1uint : 0,
+                            d->detail_uint3uint.detail_uint3uint, d->detail_uint4uint.detail_uint4uint, d->detail_uint2tstr.value,
+                            (uint32_t)d->detail_uint2tstr.len, now_ms);
         break;
     }
     case envelope_msg_result_m_c: on_result(&e->envelope_msg_result_m, re, has_re); break;
@@ -309,9 +332,6 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
     case envelope_msg_dbg_set_log_level_m_c:
         dbg_set_level((dbg_level_t)e->envelope_msg_dbg_set_log_level_m.msg_dbg_set_log_level_dbg_set_log_level_m
                           .dbg_set_log_level_log_level_m.log_level_choice);
-        break;
-    case envelope_msg_detail_m_c:
-        dbg_event("link", "detail_ignored", NULL); /* "reveal full text" is not implemented yet */
         break;
     default: break; /* hello, batt, audio, ... are not for the device */
     }

@@ -988,12 +988,12 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:104"
+      "source": "firmware/components/core/src/ui.c:106"
     },
     {
       "id": "attention",
       "title": "Deck · a request is waiting",
-      "source": "firmware/components/core/src/ui_home.c:348"
+      "source": "firmware/components/core/src/ui_home.c:358"
     },
     {
       "id": "agent",
@@ -1003,7 +1003,7 @@
     {
       "id": "ask",
       "title": "Ask · the request and its options",
-      "source": "firmware/components/core/src/ui_ask.c:564"
+      "source": "firmware/components/core/src/ui_ask.c:677"
     },
     {
       "id": "scroll",
@@ -1678,6 +1678,27 @@
           "type": "uint",
           "note": "grant_mask  bit i set = opts[i] grants permission (approve-class: hold to commit)",
           "name": "grant_mask"
+        },
+        {
+          "key": 9,
+          "optional": true,
+          "type": "uint",
+          "note": "left   ms left in the answer window when this message was sent (ANSWER-WINDOW.md);",
+          "name": "left"
+        },
+        {
+          "key": 10,
+          "optional": true,
+          "type": "uint",
+          "note": "win    the whole answer window in ms (left / win = the part still to run)",
+          "name": "win"
+        },
+        {
+          "key": 11,
+          "optional": true,
+          "type": "uint",
+          "note": "len    the full text's length in bytes, sent when `text` is a cut preview: the",
+          "name": "len"
         }
       ],
       "source": "protocol/agentlink.cddl:57"
@@ -1810,8 +1831,22 @@
           "key": 2,
           "optional": false,
           "type": "tstr",
-          "note": "text (full)",
+          "note": "text   this chunk",
           "name": "text"
+        },
+        {
+          "key": 3,
+          "optional": true,
+          "type": "uint",
+          "note": "off    byte offset of this chunk in the full text",
+          "name": "off"
+        },
+        {
+          "key": 4,
+          "optional": true,
+          "type": "uint",
+          "note": "total  the full text's length in bytes (<= 4096)",
+          "name": "total"
         }
       ],
       "source": "protocol/agentlink.cddl:61"
@@ -4820,15 +4855,15 @@
     "gesture.swipe_max_ms": "firmware/components/core/src/gesture.h:9",
     "gesture.swipe_min_px": "firmware/components/core/src/gesture.h:8",
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
-    "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:534",
-    "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:484",
-    "gesture_map.chord": "firmware/components/core/src/app.c:443",
-    "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:187",
+    "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:647",
+    "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:592",
+    "gesture_map.chord": "firmware/components/core/src/app.c:461",
+    "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:196",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:156",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:347",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:361",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:470",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:488",
     "haptics.approved": "firmware/components/core/src/feedback.c:80",
     "haptics.denied": "firmware/components/core/src/feedback.c:87",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:67",
@@ -4879,8 +4914,8 @@
     "ring.band_out_px": "firmware/components/core/src/ui_ring_internal.h:15",
     "ring.band_w_px": "firmware/components/core/src/ui_ring_internal.h:16",
     "ring.done_sweep_ms": "firmware/components/core/src/ui_ring_internal.h:36",
-    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:458",
-    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:458",
+    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:461",
+    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:461",
     "ring.error_flicker_ms": "firmware/components/core/src/ui_ring_internal.h:37",
     "ring.hint_a_deg": "firmware/components/core/src/ui_theme.h:67",
     "ring.hint_b_deg": "firmware/components/core/src/ui_theme.h:68",
@@ -4890,11 +4925,11 @@
     "ring.merge_at": "firmware/components/core/src/ui_home.c:15",
     "ring.nag_max": "firmware/components/core/src/ui_home.c:17",
     "ring.nag_ms": "firmware/components/core/src/ui_home.c:16",
-    "ring.nothing_else": "firmware/components/core/src/ui_home.c:205",
+    "ring.nothing_else": "firmware/components/core/src/ui_home.c:214",
     "ring.others_pct": "firmware/components/core/src/ui_ring_internal.h:21",
     "ring.perm_period_ms": "firmware/components/core/src/ui_ring_internal.h:35",
-    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:312",
-    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:458",
+    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:315",
+    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:461",
     "ring.prog_out_px": "firmware/components/core/src/ui_ring_internal.h:27",
     "ring.prog_w_px": "firmware/components/core/src/ui_ring_internal.h:28",
     "ring.repo_px": "firmware/components/core/src/ui_theme.h:22",
@@ -4905,9 +4940,9 @@
     "ring.sel_w_px": "firmware/components/core/src/ui_ring_internal.h:18",
     "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:22",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:33",
-    "screens": "firmware/components/core/src/ui_home.c:348",
+    "screens": "firmware/components/core/src/ui_home.c:358",
     "screens.agent": "firmware/components/core/src/ui_agent.c:310",
-    "screens.ask": "firmware/components/core/src/ui_ask.c:564",
+    "screens.ask": "firmware/components/core/src/ui_ask.c:677",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:299",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:55",
     "screens.status": "firmware/components/core/src/ui_status.c:304",

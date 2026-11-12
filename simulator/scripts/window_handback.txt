@@ -1,0 +1,19 @@
+# Open on PC from the request (button A) sends focus with the request's rid (op 0): a 0.11 daemon hands it
+# back at once (clear handed_back), so the terminal prompt appears now instead of at the end of the window.
+connect
+rx a400020101020103a40082000b01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention_win 60000 60000 - 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+btn A
+wait 300
+expect_screen attention
+clear 7 handed_back
+wait 300
+expect_label On your computer
+expect_label Answer it there
+expect_countdown -1 -1
+shot window_handback_card.png
+quit

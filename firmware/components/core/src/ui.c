@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "debug.h"
+#include "ui_countdown.h"
 #include "ui_internal.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
@@ -98,6 +99,7 @@ void ui_init(const ui_actions_t *actions)
     s_watch = ui_watch_init(s_home);
     s_voice = ui_voice_init(s_home);
     s_keys = ui_keys_init(s_home);
+    ui_countdown_init(s_home); /* over every mode's content, under the toast and the glow */
     create_overlays();
     lv_screen_load(s_home);
     ui_home_refresh(0);
@@ -358,6 +360,8 @@ void ui_tick(uint32_t now_ms)
         }
     }
     if (s_mode == MODE_KEYS) ui_keys_tick(now_ms);
+    /* the answer window runs on the request it belongs to: on ASK, and on its card on the deck */
+    ui_countdown_show(s_mode == MODE_ASK ? ui_ask_request() : s_mode == MODE_HOME ? ui_home_sel_request() : NULL, now_ms);
 }
 
 /* The interaction layer maps the gesture to an action; mode changes are handled here, everything

@@ -252,8 +252,10 @@ void ui_home_card_update(void)
     const home_slot_t *sl = ui_home_sel_slot();
     const attention_t *req = ui_home_askable_of(s);
     /* The request decides what the user is told: its kind, not the session's sub-state, names it. */
+    /* the request went back to the computer (its window ran out, or Open on PC): the terminal asks now */
+    bool back = !sl->n_merged && !req && s->back;
     const char *word = sl->n_merged ? "Done" : req ? (req->kind == ATT_APPROVAL ? "Needs approval" : "Has a question")
-                       : s->state == SESS_INPUT ? "Waiting" : theme_state_word(s);
+                       : back ? "On your computer" : s->state == SESS_INPUT ? "Waiting" : theme_state_word(s);
     if (sl->n_merged) {
         snprintf(buf, sizeof buf, "%d sessions", sl->n_merged);
     } else {
@@ -285,7 +287,8 @@ void ui_home_card_update(void)
     set_title(base);
     uint32_t rgb = req ? (req->kind == ATT_APPROVAL ? RGB_PERMISSION : RGB_ASK) : theme_session_rgb(s);
     lv_color_t sc = offline() ? COL_TEXT2 : lv_color_hex(rgb);
-    theme_set_text(s_sicon, s_sicon_txt, sizeof s_sicon_txt, req ? (req->kind == ATT_APPROVAL ? ICON_PERMISSION : ICON_QUESTION) : theme_state_glyph(s));
+    theme_set_text(s_sicon, s_sicon_txt, sizeof s_sicon_txt,
+                   req ? (req->kind == ATT_APPROVAL ? ICON_PERMISSION : ICON_QUESTION) : back ? ICON_COMPUTER : theme_state_glyph(s));
     theme_set_text(s_sword, s_sword_txt, sizeof s_sword_txt, word);
     theme_set_text_color(s_sicon, sc);
     theme_set_text_color(s_sword, sc);
@@ -301,7 +304,7 @@ void ui_home_card_update(void)
     } else {
         char sum[sizeof s->summary + 4];
         /* a job says what runs: its command line, or just the program when the daemon withholds that */
-        theme_display_text(sum, sizeof sum, sl->n_merged ? "" : theme_is_job(s) && !s->summary[0] ? s->tool : s->summary);
+        theme_display_text(sum, sizeof sum, sl->n_merged ? "" : back ? "Answer it there" : theme_is_job(s) && !s->summary[0] ? s->tool : s->summary);
         theme_set_text(s_sum, s_sum_txt, sizeof s_sum_txt, sum);
         show(s_sum, true);
         show(s_req_title, false);

@@ -7,6 +7,7 @@
 #include "app.h"
 #include "core.h"
 #include "debug.h"
+#include "detail.h"
 #include "feedback.h"
 #include "gesture.h"
 #include "hal.h"
@@ -166,6 +167,18 @@ static void act_focus(uint32_t sid)
     toast_cmd_result(sent, "Opening on PC...");
 }
 
+/* Open on PC from a request (ASK): focus, and hand the request back to the terminal at once (proto 0.11;
+ * an older daemon only focuses, and the terminal asks when its window ends). Never an answer. */
+static void act_open_request(uint32_t sid, uint32_t rid)
+{
+    bool sent = link_send_cmd(LINK_OP_FOCUS, sid, rid, 0);
+    if (sent) feedback_tick();
+    else feedback_reject();
+    toast_cmd_result(sent, "Opening on PC...");
+}
+
+static bool send_detail(uint32_t sid, uint32_t rid, uint32_t off) { return link_send_cmd_arg(LINK_OP_DETAIL, sid, rid, off, 0); }
+
 static void act_approve(uint32_t sid, uint32_t rid, uint32_t hold_ms)
 {
     bool sent = link_send_cmd(LINK_OP_APPROVE, sid, rid, hold_ms);
@@ -308,6 +321,7 @@ static void act_nag(void)
 }
 
 static const ui_actions_t s_actions = {.focus = act_focus,
+                                       .open_request = act_open_request,
                                        .approve = act_approve,
                                        .deny = act_deny,
                                        .reply = act_reply,
@@ -383,6 +397,10 @@ static void on_session(const session_t *before, const session_t *now, uint32_t p
 
 static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, const char *msg)
 {
+    if (op == LINK_OP_DETAIL) { /* a background fetch: ASK shows what it means, no toast */
+        detail_on_result(rid, ok, err);
+        return;
+    }
     if (ok) {
         /* the focus that opens SCROLL stays quiet: the screen itself is the confirmation */
         if (op == LINK_OP_FOCUS && strcmp(core_screen_name(), "scroll") != 0) ui_toast("Focused", RGB_SUCCESS);
@@ -609,6 +627,8 @@ void core_init(void)
 
     ui_init(&s_actions);
     link_init(&s_hooks);
+    detail_reset();
+    detail_set_sender(send_detail);
     hal_buttons_set_callback(on_button);
     hal_motion_set_callback(on_motion);
     hal_motion_stream_tilt(true);
@@ -633,6 +653,8 @@ uint32_t core_step(void)
     gesture_evt_t g;
     while (ring_pop(&s_gestures, &g)) dispatch(&g);
     model_attention_expire(app_now_unix());
+    model_attention_expire_ms(now); /* an answer window over with no word from the daemon: back to the PC */
+    detail_tick(now);
     voice_tick(now);
     keys_tick(now);
     if (keys_active()) power_activity(now); /* the keyboard keeps the display on */

@@ -55,6 +55,11 @@ add_executable(test_gauges tests/test_gauges.c ${FW}/core/src/gauges.c ${FW}/cor
 target_include_directories(test_gauges PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
 target_link_libraries(test_gauges PRIVATE m)
 add_test(NAME gauges_model COMMAND test_gauges)
+# ANSWER-WINDOW.md: the full text bound to its rid, in order, resumed, failing closed; the window on the device's clock.
+add_executable(test_detail tests/test_detail.c ${FW}/core/src/detail.c ${FW}/core/src/model.c ${FW}/core/src/steps.c)
+target_include_directories(test_detail PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_detail PRIVATE m)
+add_test(NAME detail_model COMMAND test_detail)
 
 add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
 target_include_directories(test_ring PRIVATE ${FW}/core/src)
@@ -322,6 +327,35 @@ sim_script_test(sim_gauges_buzz gauges_buzz.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"usage_warn\",\"pct\":(86|90)|\\[200\\].*\\[200\\]"
                 PASS_REGULAR_EXPRESSION "\"usage_warn\",\"pct\":81,\"quiet\":false.*\"pattern_ms\":\\[200\\].*\"usage_warn\",\"pct\":85,\"quiet\":true")
 sim_script_test(sim_gauges_wire gauges_wire.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+
+# Answer window and full text (ANSWER-WINDOW.md, proto 0.11). No approve (op 3) may leave after a window ended,
+# while the full text is still arriving, for a text that does not add up, past the cap or under privacy meta.
+sim_script_test(sim_window_countdown window_countdown.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_window_expired window_expired.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
+sim_script_test(sim_window_offline_expiry window_offline_expiry.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
+sim_script_test(sim_window_handback window_handback.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3"
+  PASS_REGULAR_EXPRESSION "\"tx_cmd\",\"id\":[0-9]+,\"op\":0,\"sid\":2,\"rid\":7")
+sim_script_test(sim_window_old_daemon window_old_daemon.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# reminders spread over the window: arrival, nothing by 16 s (the `ui` dump), the first reminder at 30 s
+sim_script_test(sim_window_nag window_nag.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\].*\"ev\":\"state\""
+  PASS_REGULAR_EXPRESSION "\"ev\":\"state\".*pattern_ms\":\\[250,120,250\\]")
+set_tests_properties(sim_window_nag PROPERTIES TIMEOUT 60)
+sim_script_test(sim_window_nag_short window_nag_short.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]"
+  PASS_REGULAR_EXPRESSION "pattern_ms\":\\[250,120,250\\]")
+sim_script_test(sim_detail_read_approve detail_read_approve.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+  PASS_REGULAR_EXPRESSION "\"op\":7,\"sid\":2,\"rid\":7.*\"ev\":\"done\",\"rid\":7.*\"op\":3,\"sid\":2,\"rid\":7")
+sim_script_test(sim_detail_bound_to_rid detail_bound_to_rid.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_detail_wrong_total detail_wrong_total.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
+sim_script_test(sim_detail_resume detail_resume.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+  PASS_REGULAR_EXPRESSION "\"ask\",\"rid\":7,\"off\":1024.*\"ask\",\"rid\":7,\"off\":2048.*\"ask\",\"rid\":7,\"off\":3072.*\"op\":3,\"sid\":2,\"rid\":7")
+set_tests_properties(sim_detail_resume PROPERTIES TIMEOUT 60)
+sim_script_test(sim_detail_too_long detail_too_long.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":7|\"op\":3")
+sim_script_test(sim_detail_privacy_meta detail_privacy_meta.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":7|\"op\":3")
 sim_script_test(sim_list_centre_drag list_centre_drag.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_list_rim_dial list_rim_dial.txt
@@ -359,7 +393,8 @@ sim_script_test(sim_finished_buzz finished_buzz.txt
 
 # Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
 add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c
-               ${FW}/core/src/link_tx.c ${FW}/core/src/model.c ${FW}/core/src/steps.c ${FW}/core/src/gauges.c)
+               ${FW}/core/src/link_tx.c ${FW}/core/src/model.c ${FW}/core/src/steps.c ${FW}/core/src/gauges.c
+               ${FW}/core/src/detail.c)
 target_include_directories(test_link_arb PRIVATE ${FW}/core/src)
 target_link_libraries(test_link_arb PRIVATE agentlink_hal agentlink_proto lvgl::lvgl m)
 add_test(NAME link_arbitration COMMAND test_link_arb)

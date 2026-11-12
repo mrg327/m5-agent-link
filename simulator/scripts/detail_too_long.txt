@@ -1,0 +1,23 @@
+# Past the cap (4096 bytes) the watch does not fetch at all (no op 7): Approve answers "Too long to approve
+# here", the reader shows the preview, Deny and Open on PC still work.
+connect
+rx a400020101020103a40082000b01a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention_win 60000 60000 9000 7 2 approval approve,deny,focus 0 Run shell command|python3 - <<'EOF' import base64; exec(base64.b64decode('aW1wb3J0IG9zO29zLnN5c3RlbSgicm0gLXJmIH4iKQ==')) ...…
+wait 400
+expect_label Read all
+# a first tap on the locked Approve opens the reader (the preview: nothing more can come)
+tap 233 282
+wait 400
+expect_label Reading 1 of 1
+btn B
+wait 400
+expect_label > Approve HOLD
+tap 233 282
+wait 300
+expect_label Too long to approve here
+hold 233 282 1500
+wait 300
+expect_no_label Approved
+quit

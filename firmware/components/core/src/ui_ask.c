@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "debug.h"
+#include "detail.h"
 #include "nav.h"
 #include "ui_internal.h"
 #include "ui_ring.h"
@@ -38,19 +39,30 @@ static int s_layout_key;
 static const char *s_icon_shown;
 /* Read before you approve (UI-V3 §4.3a). A text that does not fit the platter shows MORE_LINES lines and
  * "Read all"; a tap opens the reader, which pages through the whole text. Until its last page has been on
- * screen, nothing that grants permission can be held. A text the daemon itself cut (it ends in an ellipsis)
- * can never be shown in full here, so it can be read and denied on the watch but only approved on the PC. */
+ * screen, nothing that grants permission can be held. A text the daemon cut (proto 0.11: it says so with
+ * `len`; older daemons: it ends in an ellipsis or fills the buffer) is not the whole request: the reader
+ * fetches the full text by request id (detail.c, ANSWER-WINDOW.md §4) and pages through it as it arrives,
+ * and the lock releases only once all of it has arrived and its last page has been shown. A cut text the
+ * watch cannot fetch (an older daemon, privacy meta, over DETAIL_CAP, a refused or failed transfer) can be
+ * read and denied here but only approved on the PC. */
 #define MORE_LINES 2
 #define READ_Y 112
 #define READ_W 320
 #define READ_LINES 7
-#define ASK_BLOCK_CUT_TEXT 1 /* 0: a daemon-cut text may be approved once the part the watch has was read */
+#define ASK_BLOCK_CUT_TEXT 1 /* 0: a daemon-cut text the watch cannot fetch may be approved once its preview was read */
 #define GATE_TELL_MS 400     /* a finger resting this long on a locked Approve gets told why nothing happens */
 static lv_obj_t *s_more, *s_read, *s_read_lbl, *s_page;
-static bool s_long, s_cut, s_reading, s_read_ok, s_gate_press;
+static bool s_long, s_cut, s_fetch, s_reading, s_read_ok, s_gate_press;
 static int s_page_i, s_pages;
 static uint32_t s_read_ms, s_gate_t0;
-static char s_page_txt[32];
+static uint32_t s_reader_len; /* bytes of text in the reader now; s_read_len: when its last page was shown */
+static uint32_t s_read_len;
+static uint32_t s_reader_got; /* detail bytes the reader was last loaded with, and the transfer's state then */
+static detail_state_t s_reader_st;
+static char s_page_txt[40];
+/* The request went back to the computer (window over, or handed back): ASK says so for BACK_MIN_MS. */
+#define BACK_MIN_MS 3000
+static uint32_t s_back_ms; /* when that state first showed; 0 = not showing */
 #define ANSWERED_MIN_MS 900 /* the answered state stays this long, so a quick clear cannot make it flash */
 static uint32_t s_answered_ms; /* when the answered state first showed; 0 = not showing */
 static bool s_keeping;         /* the request is gone but the answered state is still held on screen */
@@ -102,35 +114,71 @@ static void show(lv_obj_t *o, bool on)
     else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
 }
 
-/* True while item `it` may not be held: it grants permission and the text has not been, or cannot be, read. */
+/* What the reader shows: the full text as far as it has arrived, else the request's own text. */
+static const char *reader_text(void)
+{
+    detail_state_t st = s_fetch ? detail_state(s_rid) : DETAIL_NONE;
+    const char *d = st == DETAIL_LOADING || st == DETAIL_DONE ? detail_text(s_rid) : NULL;
+    return d ? d : s_text_txt; /* a failed transfer shows the preview, which ends in its ellipsis */
+}
+
+/* The reader holds the whole request: a text that was never cut, or a cut one whose full text has arrived. */
+static bool text_complete(void) { return !s_cut || (s_fetch && detail_state(s_rid) == DETAIL_DONE); }
+
+/* A cut text the watch will never have in full: approve only on the PC. */
+static bool text_unreachable(void) { return s_cut && (!s_fetch || detail_state(s_rid) == DETAIL_FAILED); }
+
+/* True while item `it` may not be held: it grants permission and the whole text has not been, or cannot be,
+ * read: its last page shown while the reader held all of it. */
 static bool grant_locked(const ask_item_t *it)
 {
-    return it->grants && ((s_long && !s_read_ok) || (ASK_BLOCK_CUT_TEXT && s_cut));
+    if (!it->grants) return false;
+    if (s_cut) {
+        if (text_unreachable()) return ASK_BLOCK_CUT_TEXT || !s_read_ok;
+        return !(text_complete() && s_read_ok && s_read_len == detail_total(s_rid));
+    }
+    return s_long && !s_read_ok;
 }
 
 static void reader_page(void)
 {
     int lh = lv_font_get_line_height(FONT_BODY);
     lv_obj_set_y(s_read_lbl, -s_page_i * READ_LINES * lh);
-    snprintf(s_page_txt, sizeof s_page_txt, "%d of %d", s_page_i + 1, s_pages);
-    lv_label_set_text(s_page, s_pages > 1 ? s_page_txt : "");
-    bool last = s_page_i == s_pages - 1;
-    theme_key_badge_set_word(s_badge[1], s_wlbl[1], last ? "Done" : "More", UI_BADGE_B_DEG, UI_BADGE_R);
+    bool last = s_page_i == s_pages - 1, done = text_complete() || text_unreachable();
+    if (!done) snprintf(s_page_txt, sizeof s_page_txt, "%d of %d%s", s_page_i + 1, s_pages, last ? " · loading" : "+");
+    else snprintf(s_page_txt, sizeof s_page_txt, "%d of %d", s_page_i + 1, s_pages);
+    lv_label_set_text(s_page, s_pages > 1 || !done ? s_page_txt : "");
+    theme_key_badge_set_word(s_badge[1], s_wlbl[1], last && done ? "Done" : "More", UI_BADGE_B_DEG, UI_BADGE_R);
     s_read_ms = s_now;
-    if (last) s_read_ok = true; /* the whole text has now been on screen */
+    if (last && done) { /* the whole text has now been on screen */
+        s_read_ok = true;
+        s_read_len = s_reader_len;
+    }
+}
+
+/* Measures the reader's text again (it grows as the full text arrives); the page on screen stays. */
+static void reader_load(void)
+{
+    const char *t = reader_text();
+    int lh = lv_font_get_line_height(FONT_BODY);
+    lv_point_t sz;
+    lv_text_get_size(&sz, t, FONT_BODY, 0, 0, READ_W, LV_TEXT_FLAG_NONE);
+    int lines = sz.y / lh;
+    for (size_t n = strlen(t); n > 0 && t[n - 1] == '\n' && lines > 1; n--) lines--; /* no page of blank lines at the end */
+    s_pages = lines <= READ_LINES ? 1 : (lines + READ_LINES - 1) / READ_LINES;
+    if (s_page_i >= s_pages) s_page_i = s_pages - 1;
+    s_reader_len = (uint32_t)strlen(t);
+    s_reader_got = detail_got(s_rid);
+    s_reader_st = detail_state(s_rid);
+    lv_label_set_text_static(s_read_lbl, t);
 }
 
 static void reader_open(void)
 {
-    int lh = lv_font_get_line_height(FONT_BODY);
-    lv_point_t sz;
-    lv_text_get_size(&sz, s_text_txt, FONT_BODY, 0, 0, READ_W, LV_TEXT_FLAG_NONE);
-    int lines = sz.y / lh;
-    s_pages = lines <= READ_LINES ? 1 : (lines + READ_LINES - 1) / READ_LINES;
     s_page_i = 0;
     s_reading = true;
     hold_cancel();
-    lv_label_set_text_static(s_read_lbl, s_text_txt);
+    reader_load();
     show(s_plat, false);
     wheel_set_shown(s_wheel, false);
     show(s_read, true);
@@ -164,14 +212,18 @@ static void layout_text(bool perm, const char *text)
     s_long = lines > TEXT_LINES;
     /* the daemon clips with an ellipsis; a text that fills the model's buffer was clipped on arrival */
     s_cut = (tl >= 3 && !memcmp(text + tl - 3, "\xE2\x80\xA6", 3)) || tl >= sizeof(((attention_t *)0)->text) - 1;
+    const attention_t *a = req();
+    if (a && a->len_known && a->full_len > 0) s_cut = true; /* proto 0.11: the daemon says it is not the whole text */
+    s_fetch = s_cut && detail_fetchable(a);
+    bool more = s_long || s_cut; /* "Read all": a text that does not fit, or is not all of it */
     lines = lines < 1 ? 1 : s_long ? MORE_LINES : lines;
-    int more_h = s_long ? lv_font_get_line_height(FONT_CAPTION) + 4 : 0;
+    int more_h = more ? lv_font_get_line_height(FONT_CAPTION) + 4 : 0;
     if (strcmp(s_text_txt, text)) { /* a different text has not been read */
         s_read_ok = false;
         reader_close();
     }
     /* every style or size write invalidates, and refresh runs on each session delta: change-only */
-    int key = (perm << 20) | (s_long << 19) | (pw << 8) | lines;
+    int key = (perm << 21) | (more << 20) | (s_long << 19) | (pw << 8) | lines;
     if (key != s_layout_key) {
         s_layout_key = key;
         lv_obj_set_style_bg_opa(s_plat, perm ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
@@ -183,9 +235,40 @@ static void layout_text(bool perm, const char *text)
         lv_obj_set_size(s_more, pw - 2 * px, lv_font_get_line_height(FONT_CAPTION));
         lv_obj_set_pos(s_more, px, py + lines * lh + 4);
         theme_set_text_color(s_more, lv_color_hex(perm ? RGB_PERMISSION : RGB_ASK));
-        show(s_more, s_long);
+        show(s_more, more);
     }
     theme_set_text(s_text, s_text_txt, sizeof s_text_txt, text);
+}
+
+/* The request went back to the computer: the terminal shows its own prompt now (ANSWER-WINDOW.md §5). */
+static void show_back(const session_t *s, uint32_t now)
+{
+    s_back_ms = now ? now : 1;
+    hold_cancel();
+    reader_close();
+    s_n = 0;
+    s_opt_txt[0] = 0;
+    theme_set_text(s_word, s_word_txt, sizeof s_word_txt, "On your computer");
+    theme_set_text(s_cap, s_cap_txt, sizeof s_cap_txt,
+                   s->back_why == BACK_HANDED ? "Answer it there" : "Time ran out here\nAnswer it there");
+    int cap_y = s->back_why == BACK_HANDED ? CAP_Y : CAP_Y - 10;
+    if (lv_obj_get_y(s_cap) != cap_y) lv_obj_set_y(s_cap, cap_y);
+    s_icon_shown = NULL; /* shown once per request: set it, and let the answered state set its own again */
+    lv_label_set_text(s_icon, ICON_COMPUTER);
+    theme_set_text_color(s_icon, COL_TEXT2);
+    show(s_plat, false);
+    show(s_icon, true);
+    show(s_word, true);
+    show(s_cap, true);
+    wheel_set_shown(s_wheel, false);
+    show(s_badge[1], false);
+    dbg_event("ui", "ask_back", "\"rid\":%u,\"why\":%d", (unsigned)s_rid, (int)s->back_why);
+}
+
+const attention_t *ui_ask_request(void)
+{
+    const attention_t *a = req();
+    return a && !a->answer_sent && !s_back_ms ? a : NULL;
 }
 
 /* Returns false when there is nothing left to ask (request cleared or session gone). */
@@ -201,9 +284,18 @@ bool ui_ask_refresh(uint32_t now)
             s_keeping = true;
             return true;
         }
+        /* the window ran out (or Open on PC handed it back): say where the request is now, then go */
+        if (!s_answered_ms && s_rid && s->back) {
+            if (!s_back_ms) show_back(s, now);
+            return now - s_back_ms < BACK_MIN_MS;
+        }
         return false;
     }
     s_keeping = false;
+    if (s_back_ms) { /* a new request took over from the "On your computer" state */
+        s_back_ms = 0;
+        s_rid = 0;
+    }
     if (a->rid != s_rid) { /* a different request: re-arm, start at the default, drop any hold */
         hold_cancel();
         reader_close();
@@ -211,6 +303,7 @@ bool ui_ask_refresh(uint32_t now)
         s_text_txt[0] = 0;
         s_rid = a->rid;
         s_shown_ms = now;
+        s_read_len = 0;
         wheel_set(s_wheel, NULL, 0, 0);
     }
     char buf[80];
@@ -223,6 +316,7 @@ bool ui_ask_refresh(uint32_t now)
     theme_set_text(s_title, s_title_txt, sizeof s_title_txt,
             a->title[0] ? a->title : s->tool[0] ? s->tool : perm ? "Permission request" : "Question");
     layout_text(perm, a->text);
+    if (s_fetch && !a->answer_sent) detail_want(a, now); /* the full text, while the user looks at the request */
 
     if (!a->answer_sent) s_answered_ms = 0;
     else if (!s_answered_ms) s_answered_ms = now ? now : 1;
@@ -282,8 +376,10 @@ void ui_ask_open(uint32_t sid, uint32_t now)
     s_now = now;
     s_holding = s_hold_fired = s_ramp_started = false;
     s_answered_ms = 0;
+    s_back_ms = 0;
     s_keeping = false;
     s_read_ok = s_gate_press = false;
+    s_read_len = 0;
     s_text_txt[0] = 0;
     reader_close();
     wheel_set(s_wheel, NULL, 0, 0);
@@ -333,8 +429,8 @@ static void commit(const attention_t *a, int idx, uint32_t hold_ms)
     case ASK_APPROVE: g_ui_actions->approve(s_sid, a->rid, hold_ms); break;
     case ASK_DENY: g_ui_actions->deny(s_sid, a->rid); break;
     case ASK_DICTATE: ui_go_voice(a->rid); break;
-    case ASK_OPEN_PC:
-        g_ui_actions->focus(s_sid);
+    case ASK_OPEN_PC: /* the terminal shows its prompt at once (proto 0.11): the request is handed back */
+        g_ui_actions->open_request(s_sid, a->rid);
         ui_go_home();
         break;
     }
@@ -353,14 +449,17 @@ bool ui_ask_back(void)
  * can never show all of it. */
 static void grant_tell(const ask_item_t *it)
 {
-    if (s_long && !s_read_ok) {
-        reader_open();
-        g_ui_actions->tick();
-    } else {
+    if (text_unreachable() && ASK_BLOCK_CUT_TEXT && (s_read_ok || !s_long)) {
         ui_toast("Too long to approve here", rgb_of(it));
         g_ui_actions->reject();
+    } else {
+        reader_open();
+        g_ui_actions->tick();
     }
 }
+
+/* What a hold on a locked grant is told. */
+static const char *lock_word(void) { return text_unreachable() && ASK_BLOCK_CUT_TEXT ? "Too long to approve here" : "Read it first"; }
 
 static bool on_platter(const gesture_evt_t *g)
 {
@@ -380,6 +479,8 @@ static bool read_act(nav_action_t act, const gesture_evt_t *g)
         if (s_page_i < s_pages - 1) {
             s_page_i++;
             reader_page();
+        } else if (!text_complete() && !text_unreachable()) {
+            return true; /* the rest is still arriving: the next page appears when it has */
         } else {
             ui_ask_back();
         }
@@ -417,6 +518,11 @@ static bool read_act(nav_action_t act, const gesture_evt_t *g)
 bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
 {
     const attention_t *a = req();
+    if (s_back_ms) { /* "On your computer": nothing to answer; any input goes on to the deck */
+        if (act == NAV_FOCUS) g_ui_actions->focus(s_sid);
+        if (act != NAV_HOLD_PRESS && act != NAV_HOLD_RELEASE && act != NAV_SCRUB) ui_go_home();
+        return true;
+    }
     if (s_reading && act != NAV_FOCUS) return read_act(act, g);
     if (act == NAV_SCROLL_DRAG) { /* the list follows the finger; a moving finger holds nothing */
         s_gate_press = false;
@@ -440,8 +546,10 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
             s_gate_t0 = s_now;
             return true;
         }
-        /* only a hold item arms a hold, only for the request on screen, and only once it is armed */
-        if (it && it->hold_ms && press_on_selected(g) && nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now)) {
+        /* only a hold item arms a hold, only for the request on screen, only once it is armed, and only while
+         * its answer window runs */
+        if (it && it->hold_ms && press_on_selected(g) && nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now) &&
+            model_attention_left_ms(a, s_now) > 0) {
             s_holding = true;
             s_ramp_started = false;
             s_hold_t0 = s_now;
@@ -459,7 +567,7 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
         if (g->kind == G_TAP && s_now - s_shown_ms < NAV_CARD_ARM_MS) return true;
         /* A tap acts on the row it lands on (UI-V3 §3.3), but never approves or denies: a neighbour that
          * needs a hold is only selected, and the toast says which hold it needs. */
-        if (it && s_long && on_platter(g)) { /* the text itself opens the reader */
+        if (it && (s_long || s_cut) && on_platter(g)) { /* the text itself opens the reader */
             reader_open();
             g_ui_actions->tick();
             return true;
@@ -491,14 +599,15 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
     }
     case NAV_HOLD_LONG: /* injected input whose duration already covers the hold */
         if (it && it->hold_ms && !grant_locked(it) && g->dur_ms >= it->hold_ms && !s_hold_fired && press_on_selected(g) &&
-            nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now)) {
+            nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now) && model_attention_left_ms(a, s_now) > 0) {
             hold_cancel();
             s_hold_fired = true;
             commit(a, sel, g->dur_ms);
         }
         return true;
-    case NAV_FOCUS: /* button A: Open on PC, whatever is selected */
-        g_ui_actions->focus(s_sid);
+    case NAV_FOCUS: /* button A: Open on PC, whatever is selected; the request goes back to the terminal */
+        if (a && !a->answer_sent) g_ui_actions->open_request(s_sid, a->rid);
+        else g_ui_actions->focus(s_sid);
         ui_go_home();
         return true;
     case NAV_SCRUB: {
@@ -519,12 +628,16 @@ bool ui_ask_tick(uint32_t now)
     s_now = now;
     const attention_t *a = req();
     if (!model_find(s_sid)) return true;
-    if (!a) return !(s_answered_ms && now - s_answered_ms < ANSWERED_MIN_MS);
+    if (!a) return !((s_answered_ms && now - s_answered_ms < ANSWERED_MIN_MS) || (s_back_ms && now - s_back_ms < BACK_MIN_MS));
+    if (s_reading && s_fetch && (detail_got(s_rid) != s_reader_got || detail_state(s_rid) != s_reader_st)) {
+        reader_load(); /* more of the full text arrived */
+        reader_page();
+    }
     if (s_gate_press && now - s_gate_t0 >= GATE_TELL_MS) { /* a hold on a locked Approve: say why, once */
         s_gate_press = false;
         int gs = wheel_sel(s_wheel);
         if (!a->answer_sent && gs < s_n && s_items[gs].hold_ms && grant_locked(&s_items[gs])) {
-            ui_toast(s_long && !s_read_ok ? "Read it first" : "Too long to approve here", rgb_of(&s_items[gs]));
+            ui_toast(lock_word(), rgb_of(&s_items[gs]));
             g_ui_actions->reject();
         }
     }
@@ -532,7 +645,7 @@ bool ui_ask_tick(uint32_t now)
         uint32_t el = now - s_hold_t0;
         const ask_item_t *it = s_hold_idx < s_n ? &s_items[s_hold_idx] : NULL;
         if (a->rid != s_hold_rid || a->answer_sent || !it || !it->hold_ms || s_hold_idx != wheel_sel(s_wheel) ||
-            grant_locked(it)) {
+            grant_locked(it) || model_attention_left_ms(a, now) == 0) { /* the window is over: nothing to answer */
             hold_cancel();
             return false;
         }
@@ -571,6 +684,10 @@ void ui_ask_report(ui_report_t *r)
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
     if (s_title_txt[0]) ui_report_add(r, "%s", s_title_txt);
     if (s_text_txt[0]) ui_report_add(r, "%s", s_text_txt);
+    if (s_back_ms) {
+        ui_report_add(r, "On your computer");
+        return;
+    }
     if ((a && a->answer_sent) || s_keeping) {
         ui_report_add(r, "%s", s_word_txt);
         if (s_opt_txt[0]) ui_report_add(r, "%s", s_opt_txt);
@@ -579,9 +696,10 @@ void ui_ask_report(ui_report_t *r)
     }
     if (s_reading) {
         ui_report_add(r, "Reading %d of %d", s_page_i + 1, s_pages);
+        if (!text_complete() && !text_unreachable()) ui_report_add(r, "Loading full text");
         return;
     }
-    if (s_long) ui_report_add(r, "Read all");
+    if (s_long || s_cut) ui_report_add(r, "Read all");
     int n = wheel_count(s_wheel), sel = wheel_sel(s_wheel);
     for (int k = 0; k < n && k < 4; k++) {
         const wheel_item_t *it = wheel_item(s_wheel, (sel + k) % n);
@@ -637,7 +755,7 @@ lv_obj_t *ui_ask_init(lv_obj_t *screen)
     lv_obj_set_style_text_align(s_read_lbl, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(s_read_lbl, READ_W);
     lv_label_set_text_static(s_read_lbl, "");
-    s_page = line(s_root, FONT_CAPTION, COL_TEXT2, READ_Y + READ_LINES * lv_font_get_line_height(FONT_BODY) + 6, 160, 1);
+    s_page = line(s_root, FONT_CAPTION, COL_TEXT2, READ_Y + READ_LINES * lv_font_get_line_height(FONT_BODY) + 6, 240, 1);
     show(s_read, false);
     show(s_page, false);
     s_wheel = wheel_create_at(s_root, ASK_WHEEL);

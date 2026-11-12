@@ -15,6 +15,15 @@
 #define MERGE_AT 9
 #define NAG_MS 15000
 #define NAG_MAX 3
+/* Reminders fit the answer window (ANSWER-WINDOW.md §5): NAG_MAX of them spread over it, at least NAG_MS
+ * apart (a 60 s window: 15, 30, 45 s, as before; 300 s: 75, 150, 225 s), and none in its last NAG_TAIL_MS,
+ * when the request is about to go back to the computer anyway. A request without a window: every NAG_MS. */
+#define NAG_TAIL_MS 5000
+static uint32_t nag_gap(const attention_t *a)
+{
+    uint32_t gap = a->win_ms / (NAG_MAX + 1);
+    return gap > NAG_MS ? gap : NAG_MS;
+}
 
 static lv_obj_t *s_root, *s_ring, *s_centre;
 
@@ -219,6 +228,7 @@ static void step_selection(int dir, const char *via)
 bool ui_home_request_pending(void) { return approvable(sel_session()) != NULL; }
 bool ui_home_askable(void) { return askable(sel_session()) != NULL; }
 uint32_t ui_home_sel_sid(void) { return sel_session() ? s_sel_sid : 0; }
+const attention_t *ui_home_sel_request(void) { return askable(sel_session()); }
 lv_obj_t *ui_home_ring(void) { return s_ring; }
 void ui_home_note_input(void) { noted_input(); }
 const session_t *ui_home_sel_session(void) { return sel_session(); }
@@ -307,11 +317,11 @@ void ui_home_tick(uint32_t now)
         if (first->rid != s_nag_rid) {
             s_nag_rid = first->rid;
             s_nag_n = 0;
-            s_nag_next = now + NAG_MS;
+            s_nag_next = now + nag_gap(first);
         } else if (s_nag_n < NAG_MAX && (int32_t)(now - s_nag_next) >= 0) {
             s_nag_n++;
-            s_nag_next = now + NAG_MS;
-            g_ui_actions->nag();
+            s_nag_next = now + nag_gap(first);
+            if (model_attention_left_ms(first, now) > NAG_TAIL_MS) g_ui_actions->nag();
         }
     }
 

@@ -29,7 +29,16 @@
  *   snooze SID UNIX|off             a delta with snz (snoozed until UNIX, 0 = off)
  *   notify SID on|off               a delta with ntf (notify when done armed)
  *   rtc UNIX                        set the RTC (0 = clock unknown)
- *   clear RID [answered_pc|answered_dev|expired|cancelled]
+ *   clear RID [answered_pc|answered_dev|expired|cancelled|handed_back]
+ *   attention_win LEFT_MS WIN_MS LEN|auto|- RID SID KIND ACTS GRANT_MASK TITLE|TEXT|...
+ *                                   an `attention` with the answer window (proto 0.11, ANSWER-WINDOW.md): LEFT_MS of
+ *                                   WIN_MS left, and the full text's length (auto = the served detail's; - = whole)
+ *   serve_detail RID SID MAXCHUNKS REPEAT TEXT   a stand-in daemon for `cmd detail` on RID: the full text is TEXT
+ *                                   (\n = line break) repeated REPEAT times, sent in 1024-byte chunks from the offset
+ *                                   asked for, then `result ok`; MAXCHUNKS > 0 sends only that many per request and
+ *                                   no result (a link lost mid-transfer); `serve_detail off` stops answering
+ *   detail RID SID OFF TOTAL TEXT   one raw `detail` chunk (for a wrong id, a gap, a different total)
+ *   expect_countdown MIN_S MAX_S    the countdown ring is shown with MIN_S..MAX_S seconds left (-1 -1: hidden)
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
  *   px_reset | expect_px_max PX     redraw budget: pixels flushed since px_reset must stay within PX
  *                                   (the log line also reports core_step host CPU as cpu_us, not asserted)
@@ -39,6 +48,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "agentlink_codec_decode.h"
 #include "agentlink_codec_encode.h"
 #include "app.h"
 #include "core.h"
@@ -46,13 +56,14 @@
 #include "link_internal.h"
 #include "model.h"
 #include "prefs.h"
+#include "ui_countdown.h"
 #include "ui_theme.h"
 #include "voice.h"
 #include "sim.h"
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_EXPECT_COUNTDOWN, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -354,6 +365,17 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "expect_label") && arg[0]) {
         add(*t, E_EXPECT_LABEL, 0, 0, 0, arg);
         *t += 50;
+    } else if (!strcmp(cmd, "attention_win") && arg[0]) {
+        add(*t, E_ATTENTION_WIN, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "serve_detail") && arg[0]) {
+        add(*t, E_SERVE_DETAIL, 0, 0, 0, arg);
+    } else if (!strcmp(cmd, "detail") && arg[0]) {
+        add(*t, E_DETAIL, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "expect_countdown") && sscanf(rest, "%d %d", &a, &b) == 2) {
+        add(*t, E_EXPECT_COUNTDOWN, a, b, 0, NULL);
+        *t += 50;
     } else if (!strcmp(cmd, "px_reset")) {
         add(*t, E_PX_RESET, 0, 0, 0, NULL);
     } else if (!strcmp(cmd, "expect_px_max") && sscanf(rest, "%d", &a) == 1) {
@@ -622,8 +644,31 @@ static int enum_of(const char *s, const char *const *names, int n)
     return -1;
 }
 
+/* The stand-in daemon's full text for `cmd detail` (serve_detail). */
+#define SERVE_MAX 8192
+static char s_serve[SERVE_MAX + 1];
+static uint32_t s_serve_rid, s_serve_sid, s_serve_max, s_serve_len;
+
+static void run_attention_ex(char *spec, bool win, uint32_t left, uint32_t win_ms, int len);
+
 /* attention RID SID KIND ACTS GRANT_MASK TITLE|TEXT|OPT... */
-static void run_attention(char *spec)
+static void run_attention(char *spec) { run_attention_ex(spec, false, 0, 0, -1); }
+
+/* attention_win LEFT_MS WIN_MS LEN|auto|- RID SID ... */
+static void run_attention_win(char *spec)
+{
+    unsigned left, win;
+    char len[12];
+    int n = 0;
+    if (sscanf(spec, "%u %u %11s %n", &left, &win, len, &n) != 3) {
+        fail("bad attention_win", spec);
+        return;
+    }
+    int l = !strcmp(len, "auto") ? (int)s_serve_len : !strcmp(len, "-") ? -1 : atoi(len);
+    run_attention_ex(spec + n, true, left, win, l);
+}
+
+static void run_attention_ex(char *spec, bool win, uint32_t left, uint32_t win_ms, int len)
 {
     static const char *const kinds[] = {"approval", "question", "error", "done"};
     static const char *const acts[] = {"approve", "deny", "focus", "reply", "ack", "dictate"};
@@ -649,6 +694,15 @@ static void run_attention(char *spec)
     }
     a->attention_uint8uint_present = true;
     a->attention_uint8uint.attention_uint8uint = grant;
+    if (win) {
+        a->attention_uint9uint_present = a->attention_uint10uint_present = true;
+        a->attention_uint9uint.attention_uint9uint = left;
+        a->attention_uint10uint.attention_uint10uint = win_ms;
+    }
+    if (len >= 0) {
+        a->attention_uint11uint_present = true;
+        a->attention_uint11uint.attention_uint11uint = (uint32_t)len;
+    }
     /* the text block is kept in the event, so the zcbor_strings may point into it */
     char *fields = spec + n, *save = NULL;
     int i = 0;
@@ -779,12 +833,119 @@ static void run_cands(char *spec)
     inject_env(&env, "kb_cands");
 }
 
+/* One `detail` chunk as the daemon sends it. */
+static void inject_detail(uint32_t rid, uint32_t sid, uint32_t off, uint32_t total, const char *text, size_t len)
+{
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_detail_m_c;
+    env.envelope_msg_detail_m.msg_detail_hdr_m.hdr_uint1uint = ++s_rx_id;
+    struct detail *d = &env.envelope_msg_detail_m.msg_detail_detail_m;
+    d->detail_uint0uint_present = d->detail_uint1uint_present = d->detail_uint3uint_present = d->detail_uint4uint_present = true;
+    d->detail_uint0uint.detail_uint0uint = rid;
+    d->detail_uint1uint.detail_uint1uint = sid;
+    d->detail_uint3uint.detail_uint3uint = off;
+    d->detail_uint4uint.detail_uint4uint = total;
+    d->detail_uint2tstr = (struct zcbor_string){.value = (const uint8_t *)text, .len = len};
+    static uint8_t buf[2048];
+    size_t n = 0;
+    if (cbor_encode_envelope(buf, sizeof buf, &env, &n) != ZCBOR_SUCCESS) {
+        fail("cannot encode", "detail");
+        return;
+    }
+    sim_link_inject_rx(buf, n);
+}
+
+/* The device sent a frame: answer a `cmd detail` for the served request like the daemon does. */
+static void on_device_tx(const uint8_t *frame, size_t len)
+{
+    static struct envelope_r env;
+    size_t used = 0;
+    memset(&env, 0, sizeof env);
+    if (cbor_decode_envelope(frame, len, &env, &used) != ZCBOR_SUCCESS || env.envelope_choice != envelope_msg_cmd_m_c) return;
+    const struct cmd *c = &env.envelope_msg_cmd_m.msg_cmd_cmd_m;
+    if (c->cmd_op_m.cmd_op_choice != 7 || !s_serve_rid) return;
+    uint32_t rid = c->cmd_uint2uint_present ? c->cmd_uint2uint.cmd_uint2uint : 0;
+    uint32_t off = c->cmd_arg_m_present && c->cmd_arg_m.cmd_arg_m.cmd_arg_choice == cmd_arg_uint_c ? c->cmd_arg_m.cmd_arg_m.cmd_arg_uint : 0;
+    uint32_t id = env.envelope_msg_cmd_m.msg_cmd_hdr_m.hdr_uint1uint;
+    sim_log("fake_daemon_detail", "\"rid\":%u,\"off\":%u", (unsigned)rid, (unsigned)off);
+    static struct envelope_r res;
+    memset(&res, 0, sizeof res);
+    res.envelope_choice = envelope_msg_result_m_c;
+    res.envelope_msg_result_m.msg_result_hdr_m.hdr_uint1uint = ++s_rx_id;
+    res.envelope_msg_result_m.msg_result_hdr_m.hdr_uint2uint_present = true;
+    res.envelope_msg_result_m.msg_result_hdr_m.hdr_uint2uint.hdr_uint2uint = id;
+    if (rid != s_serve_rid) { /* the daemon: no such request */
+        res.envelope_msg_result_m.msg_result_result_m.result_err_m_present = true;
+        inject_env(&res, "result");
+        return;
+    }
+    uint32_t sent = 0;
+    while (off < s_serve_len && (!s_serve_max || sent < s_serve_max)) {
+        uint32_t n = s_serve_len - off > 1024 ? 1024 : s_serve_len - off;
+        inject_detail(rid, s_serve_sid, off, s_serve_len, s_serve + off, n);
+        off += n;
+        sent++;
+    }
+    if (s_serve_max && off < s_serve_len) return; /* the link "drops" mid-transfer: no result */
+    res.envelope_msg_result_m.msg_result_result_m.result_uint0bool = true;
+    inject_env(&res, "result");
+}
+
+/* serve_detail RID SID MAXCHUNKS REPEAT TEXT | serve_detail off */
+static void run_serve_detail(const char *spec)
+{
+    unsigned rid, sid, max, rep;
+    int n = 0;
+    if (!strcmp(spec, "off")) {
+        s_serve_rid = 0;
+        return;
+    }
+    if (sscanf(spec, "%u %u %u %u %n", &rid, &sid, &max, &rep, &n) != 4) {
+        fail("bad serve_detail", spec);
+        return;
+    }
+    char one[512];
+    size_t k = 0;
+    for (const char *p = spec + n; *p && k < sizeof one - 1; p++) {
+        if (p[0] == '\\' && p[1] == 'n') {
+            one[k++] = '\n';
+            p++;
+        } else {
+            one[k++] = *p;
+        }
+    }
+    s_serve_len = 0;
+    for (unsigned i = 0; i < rep && s_serve_len + k <= SERVE_MAX; i++) {
+        memcpy(s_serve + s_serve_len, one, k);
+        s_serve_len += (uint32_t)k;
+    }
+    s_serve[s_serve_len] = 0;
+    s_serve_rid = rid;
+    s_serve_sid = sid;
+    s_serve_max = max;
+    sim_link_set_tx_tap(on_device_tx);
+    sim_log("fake_daemon_text", "\"rid\":%u,\"bytes\":%u", (unsigned)rid, (unsigned)s_serve_len);
+}
+
+/* detail RID SID OFF TOTAL TEXT */
+static void run_detail(const char *spec)
+{
+    unsigned rid, sid, off, total;
+    int n = 0;
+    if (sscanf(spec, "%u %u %u %u %n", &rid, &sid, &off, &total, &n) != 4) {
+        fail("bad detail", spec);
+        return;
+    }
+    inject_detail(rid, sid, off, total, spec + n, strlen(spec + n));
+}
+
 static void run_clear(int rid, const char *spec)
 {
-    static const char *const whys[] = {"answered_pc", "answered_dev", "expired", "cancelled"};
+    static const char *const whys[] = {"answered_pc", "answered_dev", "expired", "cancelled", "handed_back"};
     char why[16] = "answered_pc";
     sscanf(spec, "%*d %15s", why);
-    int w = enum_of(why, whys, 4);
+    int w = enum_of(why, whys, 5);
     static struct envelope_r env;
     memset(&env, 0, sizeof env);
     env.envelope_choice = envelope_msg_clear_m_c;
@@ -846,6 +1007,18 @@ static void run(const ev_t *e)
     case E_REMOTE: run_remote(e->text); break;
     case E_DROP: model_remove((uint32_t)e->a); break;
     case E_ATTENTION: run_attention(e->text); break;
+    case E_ATTENTION_WIN: run_attention_win(e->text); break;
+    case E_SERVE_DETAIL: run_serve_detail(e->text); break;
+    case E_DETAIL: run_detail(e->text); break;
+    case E_EXPECT_COUNTDOWN: {
+        int left = ui_countdown_left_s();
+        if (left < e->a || left > e->b) {
+            char want[48];
+            snprintf(want, sizeof want, "%d..%d s, got %d", e->a, e->b, left);
+            fail("countdown", want);
+        }
+        break;
+    }
     case E_RESULT: run_result(e->text); break;
     case E_CLEAR: run_clear(e->a, e->text); break;
     case E_MIC:

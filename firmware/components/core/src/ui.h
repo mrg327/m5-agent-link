@@ -24,6 +24,7 @@ typedef struct {
 /* What the UI asks the app to do; the app talks to the link and feedback. */
 typedef struct {
     void (*focus)(uint32_t sid);
+    void (*open_request)(uint32_t sid, uint32_t rid); /* ASK: Open on PC, handing request rid back to the terminal */
     void (*approve)(uint32_t sid, uint32_t rid, uint32_t hold_ms);
     void (*deny)(uint32_t sid, uint32_t rid);
     void (*reply)(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms); /* ASK: answer a question / pick a grant option */
