@@ -66,6 +66,9 @@ uint_enum!(ResultErr {
 });
 uint_enum!(DispShape { Round = 0, Rect = 1 });
 uint_enum!(HostOs { Mac = 0, Win = 1, Linux = 2 });
+// Where a standing rule from the watch is saved (proto 0.13, STANDING-RULES.md): Claude Code's `session`
+// and `localSettings` destinations. Wider ones (`projectSettings`, `userSettings`) are never offered.
+uint_enum!(RuleScope { Session = 0, Project = 1 });
 uint_enum!(ClearWhy { AnsweredPc = 0, AnsweredDev = 1, Expired = 2, Cancelled = 3, HandedBack = 4 });
 uint_enum!(LogLevel { Err = 0, Warn = 1, Info = 2, Debug = 3 });
 uint_enum!(AudioCodec { Adpcm16k = 0, Opus16k = 1 });

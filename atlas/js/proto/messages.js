@@ -24,6 +24,7 @@ const ENUMS = {
   audio_codec: { adpcm16k: 0, opus16k: 1 },
   perm_mode: { default: 0, plan: 1, accept_edits: 2, auto: 3, dont_ask: 4, bypass: 5 },
   pr_state: { none: 0, pending: 1, approved: 2, changes: 3, draft: 4 },
+  rule_scope: { session: 0, project: 1 }, // proto 0.13 (STANDING-RULES.md)
   input_event: { tap: 0, double_tap: 1, long_press: 2, swipe_up: 3, swipe_down: 4, swipe_left: 5, swipe_right: 6, btn_a: 7, btn_b: 8, btn_a_long: 9, btn_b_long: 10, lift: 11, shake: 12 },
 };
 
@@ -68,11 +69,12 @@ const SPECS = {
     opts: [5, 'tstrs'], acts: [6, 'enums:action'], exp: [7, 'uint'], grant_mask: [8, 'uint'],
     left: [9, 'uint'], win: [10, 'uint'], len: [11, 'uint'], // proto 0.11 (ANSWER-WINDOW.md)
     hush: [12, 'bool'], // proto 0.12 (PRESENCE.md)
+    rule: [13, 'tstr'], scope: [14, 'enum:rule_scope'], wide: [15, 'bool'], // proto 0.13 (STANDING-RULES.md)
   },
   clear: { rid: [0, 'uint'], why: [1, 'enum:clear_why'] },
   // cmd_arg = uint / tstr / scroll_arg: a map argument is the scroll one
   scroll_arg: { unit: [0, 'enum:scroll_unit'], delta: [1, 'int'], seq: [2, 'uint'] },
-  cmd: { op: [0, 'enum:cmd_op'], sid: [1, 'uint'], rid: [2, 'uint'], arg: [3, 'cmd_arg'], hold_ms: [4, 'uint'] },
+  cmd: { op: [0, 'enum:cmd_op'], sid: [1, 'uint'], rid: [2, 'uint'], arg: [3, 'cmd_arg'], hold_ms: [4, 'uint'], rh: [5, 'uint'] }, // rh: proto 0.13 (STANDING-RULES.md)
   scroll_pos: { lines_above: [0, 'uint'], at_bottom: [1, 'bool'], total: [2, 'uint'], preview: [3, 'tstr'] },
   result: { ok: [0, 'bool'], err: [1, 'enum:result_err'], msg: [2, 'tstr'], pos: [3, 'obj:scroll_pos'] },
   detail: { rid: [0, 'uint'], sid: [1, 'uint'], text: [2, 'tstr'], off: [3, 'uint'], total: [4, 'uint'] },

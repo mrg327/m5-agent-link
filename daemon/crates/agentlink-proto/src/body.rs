@@ -254,6 +254,14 @@ body!(Attention {
     /// No buzz, glow or reminders for this request: the user is looking at its terminal (proto 0.12,
     /// PRESENCE.md). The card is shown all the same.
     #[n(12)] #[serde(skip_serializing_if = "Option::is_none")] hush: Option<bool>,
+    /// The standing rule the device may grant with this request, exactly as Claude Code will save it
+    /// (`Bash(npm test:*)`; several rules one per line). Proto 0.13, STANDING-RULES.md: keys 13-15 only
+    /// to devices whose hello says minor >= 13, always together.
+    #[n(13)] #[serde(skip_serializing_if = "Option::is_none")] rule: Option<String>,
+    /// Where it is saved: this session only, or this project (Claude Code's local settings).
+    #[n(14)] #[serde(skip_serializing_if = "Option::is_none")] scope: Option<RuleScope>,
+    /// The rule matches more than this exact request (it ends in a wildcard).
+    #[n(15)] #[serde(skip_serializing_if = "Option::is_none")] wide: Option<bool>,
 });
 body!(Clear {
     #[n(0)]
@@ -359,6 +367,9 @@ body!(Cmd {
     #[n(2)] #[serde(skip_serializing_if = "Option::is_none")] rid: Option<u64>,
     #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] arg: Option<Arg>,
     #[n(4)] #[serde(skip_serializing_if = "Option::is_none")] hold_ms: Option<u64>,
+    /// With `approve` (proto 0.13): also save the request's standing rule. The hash of the rule as the device
+    /// showed it (STANDING-RULES.md §5); the daemon grants only when it is the hash of its own rule.
+    #[n(5)] #[serde(skip_serializing_if = "Option::is_none")] rh: Option<u64>,
 });
 body!(CmdResult {
     #[n(0)] ok: bool,

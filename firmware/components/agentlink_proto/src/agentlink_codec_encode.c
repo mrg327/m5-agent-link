@@ -105,6 +105,9 @@ static bool encode_repeated_attention_uint9uint(zcbor_state_t *state, const stru
 static bool encode_repeated_attention_uint10uint(zcbor_state_t *state, const struct attention_uint10uint *input);
 static bool encode_repeated_attention_uint11uint(zcbor_state_t *state, const struct attention_uint11uint *input);
 static bool encode_repeated_attention_uint12bool(zcbor_state_t *state, const struct attention_uint12bool *input);
+static bool encode_repeated_attention_uint13tstr(zcbor_state_t *state, const struct attention_uint13tstr *input);
+static bool encode_repeated_attention_uint14uint(zcbor_state_t *state, const struct attention_uint14uint *input);
+static bool encode_repeated_attention_uint15bool(zcbor_state_t *state, const struct attention_uint15bool *input);
 static bool encode_attention(zcbor_state_t *state, const struct attention *input);
 static bool encode_msg_attention(zcbor_state_t *state, const struct msg_attention *input);
 static bool encode_clear_why(zcbor_state_t *state, const struct clear_why_r *input);
@@ -119,6 +122,7 @@ static bool encode_scroll_arg(zcbor_state_t *state, const struct scroll_arg *inp
 static bool encode_cmd_arg(zcbor_state_t *state, const struct cmd_arg_r *input);
 static bool encode_repeated_cmd_arg_m(zcbor_state_t *state, const struct cmd_arg_m *input);
 static bool encode_repeated_cmd_uint4uint(zcbor_state_t *state, const struct cmd_uint4uint *input);
+static bool encode_repeated_cmd_uint5uint(zcbor_state_t *state, const struct cmd_uint5uint *input);
 static bool encode_cmd(zcbor_state_t *state, const struct cmd *input);
 static bool encode_msg_cmd(zcbor_state_t *state, const struct msg_cmd *input);
 static bool encode_result_err(zcbor_state_t *state, const struct result_err_r *input);
@@ -1300,12 +1304,48 @@ static bool encode_repeated_attention_uint12bool(
 	return res;
 }
 
+static bool encode_repeated_attention_uint13tstr(
+		zcbor_state_t *state, const struct attention_uint13tstr *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (13))))
+	&& (zcbor_tstr_encode(state, (&(*input).attention_uint13tstr)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_attention_uint14uint(
+		zcbor_state_t *state, const struct attention_uint14uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (14))))
+	&& (zcbor_uint32_encode(state, (&(*input).attention_uint14uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_attention_uint15bool(
+		zcbor_state_t *state, const struct attention_uint15bool *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (15))))
+	&& (zcbor_bool_encode(state, (&(*input).attention_uint15bool)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_attention(
 		zcbor_state_t *state, const struct attention *input)
 {
 	zcbor_log("%s\r\n", __func__);
 
-	bool res = (((zcbor_map_start_encode(state, 13) && (((((zcbor_uint32_put(state, (0))))
+	bool res = (((zcbor_map_start_encode(state, 16) && (((((zcbor_uint32_put(state, (0))))
 	&& (zcbor_uint32_encode(state, (&(*input).attention_uint0uint))))
 	&& (((zcbor_uint32_put(state, (1))))
 	&& (zcbor_uint32_encode(state, (&(*input).attention_uint1uint))))
@@ -1321,7 +1361,10 @@ static bool encode_attention(
 	&& (!(*input).attention_uint9uint_present || encode_repeated_attention_uint9uint(state, (&(*input).attention_uint9uint)))
 	&& (!(*input).attention_uint10uint_present || encode_repeated_attention_uint10uint(state, (&(*input).attention_uint10uint)))
 	&& (!(*input).attention_uint11uint_present || encode_repeated_attention_uint11uint(state, (&(*input).attention_uint11uint)))
-	&& (!(*input).attention_uint12bool_present || encode_repeated_attention_uint12bool(state, (&(*input).attention_uint12bool)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 13))));
+	&& (!(*input).attention_uint12bool_present || encode_repeated_attention_uint12bool(state, (&(*input).attention_uint12bool)))
+	&& (!(*input).attention_uint13tstr_present || encode_repeated_attention_uint13tstr(state, (&(*input).attention_uint13tstr)))
+	&& (!(*input).attention_uint14uint_present || encode_repeated_attention_uint14uint(state, (&(*input).attention_uint14uint)))
+	&& (!(*input).attention_uint15bool_present || encode_repeated_attention_uint15bool(state, (&(*input).attention_uint15bool)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 16))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1519,17 +1562,30 @@ static bool encode_repeated_cmd_uint4uint(
 	return res;
 }
 
+static bool encode_repeated_cmd_uint5uint(
+		zcbor_state_t *state, const struct cmd_uint5uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (5))))
+	&& (zcbor_uint32_encode(state, (&(*input).cmd_uint5uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_cmd(
 		zcbor_state_t *state, const struct cmd *input)
 {
 	zcbor_log("%s\r\n", __func__);
 
-	bool res = (((zcbor_map_start_encode(state, 5) && (((((zcbor_uint32_put(state, (0))))
+	bool res = (((zcbor_map_start_encode(state, 6) && (((((zcbor_uint32_put(state, (0))))
 	&& (encode_cmd_op(state, (&(*input).cmd_op_m))))
 	&& (!(*input).cmd_uint1uint_present || encode_repeated_cmd_uint1uint(state, (&(*input).cmd_uint1uint)))
 	&& (!(*input).cmd_uint2uint_present || encode_repeated_cmd_uint2uint(state, (&(*input).cmd_uint2uint)))
 	&& (!(*input).cmd_arg_m_present || encode_repeated_cmd_arg_m(state, (&(*input).cmd_arg_m)))
-	&& (!(*input).cmd_uint4uint_present || encode_repeated_cmd_uint4uint(state, (&(*input).cmd_uint4uint)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 5))));
+	&& (!(*input).cmd_uint4uint_present || encode_repeated_cmd_uint4uint(state, (&(*input).cmd_uint4uint)))
+	&& (!(*input).cmd_uint5uint_present || encode_repeated_cmd_uint5uint(state, (&(*input).cmd_uint5uint)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 6))));
 
 	log_result(state, res, __func__);
 	return res;

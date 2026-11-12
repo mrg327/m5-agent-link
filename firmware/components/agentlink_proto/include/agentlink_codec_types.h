@@ -536,6 +536,18 @@ struct attention_uint12bool {
 	bool attention_uint12bool;
 };
 
+struct attention_uint13tstr {
+	struct zcbor_string attention_uint13tstr;
+};
+
+struct attention_uint14uint {
+	uint32_t attention_uint14uint;
+};
+
+struct attention_uint15bool {
+	bool attention_uint15bool;
+};
+
 struct attention {
 	uint32_t attention_uint0uint;
 	uint32_t attention_uint1uint;
@@ -560,6 +572,12 @@ struct attention {
 	bool attention_uint11uint_present;
 	struct attention_uint12bool attention_uint12bool;
 	bool attention_uint12bool_present;
+	struct attention_uint13tstr attention_uint13tstr;
+	bool attention_uint13tstr_present;
+	struct attention_uint14uint attention_uint14uint;
+	bool attention_uint14uint_present;
+	struct attention_uint15bool attention_uint15bool;
+	bool attention_uint15bool_present;
 };
 
 struct msg_attention {
@@ -658,6 +676,10 @@ struct cmd_uint4uint {
 	uint32_t cmd_uint4uint;
 };
 
+struct cmd_uint5uint {
+	uint32_t cmd_uint5uint;
+};
+
 struct cmd {
 	struct cmd_op_r cmd_op_m;
 	struct cmd_uint1uint cmd_uint1uint;
@@ -668,6 +690,8 @@ struct cmd {
 	bool cmd_arg_m_present;
 	struct cmd_uint4uint cmd_uint4uint;
 	bool cmd_uint4uint_present;
+	struct cmd_uint5uint cmd_uint5uint;
+	bool cmd_uint5uint_present;
 };
 
 struct msg_cmd {

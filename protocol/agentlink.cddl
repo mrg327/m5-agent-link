@@ -276,10 +276,20 @@ attention = {
   ? 10 => uint,          ; win    the whole answer window in ms (left / win = the part still to run)
   ? 11 => uint,          ; len    the full text's length in bytes, sent when `text` is a cut preview: the
                          ;        device may fetch it with cmd_op_detail (detail chunks) when len <= 4096
-  ? 12 => bool           ; hush   no buzz, glow or reminders for this request: the user is looking at its terminal
+  ? 12 => bool,          ; hush   no buzz, glow or reminders for this request: the user is looking at its terminal
                          ;        (PRESENCE.md). The card is shown and answered as ever. Only to devices with
                          ;        proto >= 0.12
+  ? 13 => tstr,          ; rule   the standing rule the device may grant with this request, exactly as Claude Code
+                         ;        saves it ("Bash(npm test:*)"; several one per line), <= 160 bytes of printable
+                         ;        ASCII and line breaks (STANDING-RULES.md). Keys 13-15 always together, only to
+                         ;        devices with proto >= 0.13; granted by cmd_op_approve with `rh`
+  ? 14 => uint,          ; scope  where it is saved, a rule_scope value. A uint, not the enum, so that a value a
+                         ;        device does not know drops the rule, not the whole request
+  ? 15 => bool           ; wide   the rule ends in a wildcard: it matches more than this exact request
 }
+rule_scope = rule_scope_session / rule_scope_project
+rule_scope_session = 0   ; this session only (Claude Code destination "session")
+rule_scope_project = 1   ; this project, the user's own .claude/settings.local.json ("localSettings")
 att_kind = att_kind_approval / att_kind_question / att_kind_error / att_kind_done
 att_kind_approval = 0
 att_kind_question = 1
@@ -305,7 +315,10 @@ cmd = {
   ? 1 => uint,     ; sid
   ? 2 => uint,     ; rid   (dictate: the card the transcript answers, proto 0.8)
   ? 3 => cmd_arg,  ; arg   snooze minutes, reply option index, quiet secs
-  ? 4 => uint     ; hold_ms  measured hold-to-confirm (approve)
+  ? 4 => uint,    ; hold_ms  measured hold-to-confirm (approve)
+  ? 5 => uint     ; rh  with cmd_op_approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of
+                  ;     the rule's bytes, 0x00, the scope's value and the wide flag (0/1), as the device showed
+                  ;     them; hold_ms >= 1500 (STANDING-RULES.md)
 }
 ; Scalars for snooze / reply / quiet; a map for scroll. Further structured arguments ({aid}) join this union when they land.
 cmd_arg = uint / tstr / scroll_arg

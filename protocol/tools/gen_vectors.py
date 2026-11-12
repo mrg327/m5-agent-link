@@ -207,6 +207,22 @@ VECTORS = {
         {"t": "session_upd", "id": 17, "b": {"sid": 3, "st": "done", "tst": 1793995300, "hush": True}},
         env("session_upd", 17, {0: 3, 2: 4, 8: 1793995300, 26: True}),
     ),
+    "attention_standing_rule": (
+        "Approval offering a standing rule (proto 0.13, STANDING-RULES.md): the rule exactly as Claude Code saves "
+        "it, saved for this project, and wide (it ends in a wildcard)",
+        {"t": "attention", "id": 18, "b": {"rid": 12, "sid": 2, "kind": "approval",
+         "title": "Run shell command", "text": "npm test", "acts": ["approve", "deny", "focus"],
+         "exp": 1793995262, "left": 60000, "win": 60000,
+         "rule": "Bash(npm test:*)", "scope": "project", "wide": True}},
+        env("attention", 18, {0: 12, 1: 2, 2: 0, 3: "Run shell command", 4: "npm test", 6: [0, 1, 2],
+            7: 1793995262, 9: 60000, 10: 60000, 13: "Bash(npm test:*)", 14: 1, 15: True}),
+    ),
+    "cmd_approve_rule": (
+        "Device approves rid 12 and saves its standing rule after a 1600 ms hold (proto 0.13): rh is FNV-1a 32 of "
+        "'Bash(npm test:*)', 0x00, scope 1, wide 1",
+        {"t": "cmd", "id": 19, "b": {"op": "approve", "sid": 2, "rid": 12, "hold_ms": 1600, "rh": 0x516A52ED}},
+        env("cmd", 19, {0: 3, 1: 2, 2: 12, 4: 1600, 5: 0x516A52ED}),
+    ),
     "cmd_detail": (
         "Device asks for request 10's full text from byte 0 (proto 0.11)",
         {"t": "cmd", "id": 13, "b": {"op": "detail", "sid": 2, "rid": 10, "arg": 0}},

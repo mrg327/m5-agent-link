@@ -1,0 +1,26 @@
+{
+  "desc": "Approval offering a standing rule (proto 0.13, STANDING-RULES.md): the rule exactly as Claude Code saves it, saved for this project, and wide (it ends in a wildcard)",
+  "symbolic": {
+    "t": "attention",
+    "id": 18,
+    "b": {
+      "rid": 12,
+      "sid": 2,
+      "kind": "approval",
+      "title": "Run shell command",
+      "text": "npm test",
+      "acts": [
+        "approve",
+        "deny",
+        "focus"
+      ],
+      "exp": 1793995262,
+      "left": 60000,
+      "win": 60000,
+      "rule": "Bash(npm test:*)",
+      "scope": "project",
+      "wide": true
+    }
+  },
+  "cbor_hex": "a30006011203ac000c01020200037152756e207368656c6c20636f6d6d616e6404686e706d20746573740683000102071a6aee31fe0919ea600a19ea600d7042617368286e706d20746573743a2a290e010ff5"
+}
