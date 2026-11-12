@@ -45,8 +45,9 @@ denies) and makes the window a setting.
 
 - **One decision point.** `window::answer_window(&Ask)` in `daemon/crates/agentlinkd/src/window.rs` decides the
   window for each request, from the event, the agent's working directory, whether the hook is remote, the hook's
-  own pinned wait and the number of linked devices. Presence detection (short at the keyboard, long when away)
-  belongs here and nowhere else; this build has none.
+  own pinned wait and the number of linked devices. Presence detection lives here and nowhere else
+  ([PRESENCE.md](PRESENCE.md)): with the user at the keyboard and that terminal focused the default window is 2 s, at the
+  keyboard elsewhere 10 s, away or unknown the full window below. An explicit setting is never shortened.
 - **Setting.** `AGENTLINK_ANSWER_WINDOW_S` in the daemon's environment, else the first number in
   `~/.agentlink/answer_window` (seconds; `#` comments allowed; read per request, so an edit applies to the next
   request without a restart). Clamped to 5-300 s; `0` means never hold (the terminal asks at once and the watch
@@ -83,8 +84,9 @@ The hook blocks the terminal prompt, so no key in Claude Code can bring it forwa
 interrupting a running `PermissionRequest` hook; not tried). The watch is the way out: **Open on PC** (button A
 on ASK, or the row) now sends `focus` with the request's `rid`, and a 0.11 daemon hands the request back at once
 (`clear` `handed_back`): the hook returns no decision and the prompt appears immediately. It answers nothing, so
-it is a press, not a hold. A watch that is off or out of range leaves the user waiting for the window; the
-presence build is the fix for that.
+it is a press, not a hold. A watch that is off or out of range leaves the user waiting for the window; presence shortens it to 2 s when
+that terminal is the focused window and 10 s when the user is at the keyboard elsewhere (PRESENCE.md), where the
+daemon can tell.
 
 ## 4. The full text (`detail`)
 
@@ -180,8 +182,7 @@ to break them:
 
 ## 8. Not in this version
 
-- Presence detection (short at the keyboard, long when away) and keep-awake: later builds; the seam is
-  `answer_window`.
+- Presence detection and keep-awake: built, see [PRESENCE.md](PRESENCE.md) (the seam was `answer_window`).
 - A way out at the keyboard without the watch.
 - Full text for the deck card's two-line preview (the card shows the preview; the reader is on ASK).
 - The device itself, Windows (the keepalive over the named pipe is untested), a remote hook through ssh, and a

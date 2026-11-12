@@ -207,7 +207,7 @@ Items in *italics* need a daemon that types into terminals (decision 28: the wel
 - Question options (`attention.opts`, ≤ 4 × 24 chars) commit by tap or A; they are not destructive. The reply is `cmd_op_reply` with `arg = option index`.
 - Toasts on ASK (`Hold to confirm`, `Out of date`, `Offline`) take the hint line under the key badges (`UI_TOAST_LOW_Y`; the hint hides meanwhile), not the action-pill slot the deck uses, which would sit on the wheel's selected row. STATUS does the same.
 - After an answer: the wheel collapses to one line `Approved · waiting for PC` (or `Denied`, `Sent "Yes" · waiting for PC`) in the answer's colour (green, vermillion, yellow); the index ring shows one dim capsule; the card stays until `clear`, then HOME returns. A `result.ok = false` shows the error as a toast, restores the options and buzzes the reject pattern.
-- Nag: up to 3 re-buzzes every 15 s while a permission is unanswered and the display is off; any input stops it. (2026-11-12: spread over the answer window, at least 15 s apart, none in its last 5 s: [ANSWER-WINDOW.md](ANSWER-WINDOW.md) §1.)
+- Nag: up to 3 re-buzzes every 15 s while a permission is unanswered and the display is off; any input stops it. (2026-11-12: spread over the answer window, at least 15 s apart, none in its last 5 s: [ANSWER-WINDOW.md](ANSWER-WINDOW.md) §1. A request the daemon marks `hush` (the user is looking at its terminal, [PRESENCE.md](PRESENCE.md)) is not nagged, and does not buzz or glow.)
 
 ### 4.4 SCROLL: the terminal's scrollback
 
