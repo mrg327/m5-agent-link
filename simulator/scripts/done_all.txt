@@ -16,6 +16,7 @@ expect_label 3 files · +120 –14
 expect_label  passed · 4m 12s
 expect_no_label Bash
 expect_label Done
+expect_label ago
 expect_label context 34%
 shot done_all.png
 # the next prompt: the old summary goes with the state change, the step text is back

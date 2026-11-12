@@ -194,7 +194,8 @@ anywhere else in the centre behaves as in v2. A tap still never commits a hold i
 ```
 
 - State words (W3): `Working`, `Has a question`, `Needs approval`, `Done`, `Error`, `Idle`,
-  `Waiting` (input with no request). Snoozed appends `· snoozed` after the time.
+  `Waiting` (input with no request). Snoozed appends `· snoozed` after the time. The time of a finished agent
+  (`Done` / `Error`) is an age: `Done 1m ago`, `just now` under a minute (a job keeps its own times).
 - A session that needs you shows its request from y 220 instead of the summary: a title line and two
   text lines (a request starts higher than a summary so that three lines clear the button).
 - No action pill, no link row (H2, H3). The exception slot shows, in this order of precedence:

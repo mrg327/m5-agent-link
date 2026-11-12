@@ -15,6 +15,7 @@ wait 300
 btn B
 wait 400
 expect_label Error
+expect_label ago
 expect_label  tests failed · 12s
 shot done_failed_error.png
 quit

@@ -73,8 +73,10 @@ prompt (a stop hook sent the agent back to work) sends the summary again, restat
 On HOME the finished card (state `done` or `error`, not a job, not a request, not "On your computer") draws one
 line at y 246 (centre), `FONT_BODY` (20 px) `COL_TEXT2`, tabular digits, centred, in the place of the stale
 last-step text (`Bash · cargo test`) that the card showed before: that text names the step before the stop, not
-what the turn amounted to. Everything else on the card stays: caption, subject, state row with the time since the
-finish, and the context capsule (y 219).
+what the turn amounted to. Everything else on the card stays: caption, subject, state row, and the context capsule (y 219).
+The state row's time of a finished agent (done or error) reads as an age, `Done 1m ago` (`just now` under a
+minute; the short formatter `4m`, `1h05m` plus ` ago`), so that it does not compete with the turn duration in the
+summary line, which stays `4m 12s`. A job keeps its own times (JOBS.md §5).
 
 Parts, in order: `3 files` (`1 file`), `+120 –14` (en dash, the font has no minus), `✓ tests passed` /
 `✗ tests failed` (the existing Phosphor Fill check-circle / x-circle, 20 px), `4m 12s` (`<1s` under a second;

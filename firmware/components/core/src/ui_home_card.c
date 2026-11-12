@@ -170,7 +170,15 @@ static void update_time(const session_t *s, bool merged)
         theme_set_bg_color(s_bar_fill, offline() ? COL_TEXT2 : lv_color_hex(theme_session_rgb(s)));
     }
     if (job) theme_job_time(buf, sizeof buf, s, now);
-    else if (!merged && from && now >= from) theme_elapsed_long(buf, sizeof buf, now - from);
+    else if (!merged && from && now >= from && (s->state == SESS_DONE || s->state == SESS_ERROR)) {
+        /* a finished agent: how long ago it ended (an age, not a second duration next to the summary's turn time) */
+        if (now - from < 60) snprintf(buf, sizeof buf, "just now");
+        else {
+            char t[16];
+            theme_elapsed(t, sizeof t, now - from);
+            snprintf(buf, sizeof buf, "%s ago", t);
+        }
+    } else if (!merged && from && now >= from) theme_elapsed_long(buf, sizeof buf, now - from);
     if (!merged && model_session_snoozed(s, theme_now_unix())) {
         size_t n = strlen(buf);
         snprintf(buf + n, sizeof buf - n, "%ssnoozed", n ? theme_sep() : "");

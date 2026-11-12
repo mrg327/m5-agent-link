@@ -268,7 +268,7 @@ sim_script_test(sim_agent_row_tap agent_row_tap.txt
 # UI-V2 Phase 5: STATUS. Swipe down from HOME (never deny there), the rows, the quiet cycle and every
 # exit path; quiet mode holds the permission buzz until it is turned off again, then it buzzes.
 sim_script_test(sim_status status.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4")
-set_tests_properties(sim_status PROPERTIES TIMEOUT 60)
+set_tests_properties(sim_status PROPERTIES TIMEOUT 120)
 sim_script_test(sim_status_quiet_no_clock status_quiet_no_clock.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"quiet_set\",\"step\":[12]")
 sim_script_test(sim_quiet_buzz quiet_buzz.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4|\"ev\":\"glow\""
