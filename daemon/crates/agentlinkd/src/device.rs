@@ -229,10 +229,6 @@ impl Conn {
             if self.peer_minor < WINDOW_MINOR {
                 (a.left, a.win, a.len) = (None, None, None);
             }
-            // no full text for a device that may not show content
-            if !preview_allowed(self.privacy) {
-                a.len = None;
-            }
         }
         if let Message::Clear(cl) = &mut msg {
             if cl.why == ClearWhy::HandedBack && self.peer_minor < WINDOW_MINOR {
@@ -1819,7 +1815,7 @@ mod tests {
     #[tokio::test]
     async fn the_window_and_full_text_reach_only_devices_speaking_0_11() {
         let shared = shared();
-        let text = format!("deploy {}", "--flag ".repeat(60));
+        let text = format!("deploy{}", " --flag".repeat(60));
         let (rid, _wait) = shared.broker.open(long_req(&text, 60));
         let mut old = linked(&shared, 10).await;
         let mut new = linked(&shared, 11).await;
@@ -1979,7 +1975,8 @@ mod tests {
         let (none, r) = detail_chunks(&mut d).await;
         assert!(none.is_empty());
         assert_eq!(r.err, Some(ResultErr::Unsupported));
-        // privacy meta: neither the length nor the text leaves the daemon
+        // privacy meta: the length still says the preview is not the whole text (so the watch keeps
+        // Approve locked), but the text itself never leaves the daemon
         let (_tx, rx) = mpsc::unbounded_channel();
         let (tx, mut out) = mpsc::unbounded_channel();
         let mut c = Conn {
@@ -2006,7 +2003,7 @@ mod tests {
         else {
             panic!()
         };
-        assert_eq!(a.len, None);
+        assert_eq!(a.len, Some(500));
         assert!(a.win.is_some(), "the countdown is metadata");
         detail_cmd(
             &shared,

@@ -145,9 +145,11 @@ impl Drop for Linked {
 /// cannot draw is spelled out instead of vanishing (ANSWER-WINDOW.md §4). Line breaks stay; other
 /// control characters become caret notation (`^[` for Esc, `^I` for a tab); characters outside the
 /// watch's glyph set, and the invisible or look-alike ones inside it (no-break space, soft hyphen),
-/// become `\u{…}`. Nothing is collapsed or dropped.
+/// become `\u{…}`. Nothing is collapsed or dropped, except trailing line breaks and spaces (which show
+/// nothing either way).
 pub fn detail_text(s: &str) -> String {
     let s = s.replace("\r\n", "\n");
+    let s = s.trim_end_matches([' ', '\n', '\r']);
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {
