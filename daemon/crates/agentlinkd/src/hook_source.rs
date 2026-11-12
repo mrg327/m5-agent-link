@@ -288,12 +288,20 @@ async fn await_decision<W: AsyncWrite + Unpin>(
     // its own wait, so the window may not outlast that.
     let talks = v["await"]["window"].as_bool() == Some(true);
     let pinned = v["await"]["pinned"].as_bool() == Some(true);
+    // Where the user is (presence.rs): shortens the window and hushes the buzz, nothing else.
+    let (here, reading, focus) = crate::presence::global()
+        .here_async(registry.host_ctx(sid))
+        .await;
+    let hush = crate::presence::hush(crate::presence::Event::Needs, here);
+    let seen = json!({"here": here.name(), "presence": reading.state.name(),
+        "source": reading.source, "focus": focus.name(), "hush": hush});
     let window = crate::window::answer_window(&crate::window::Ask {
         event,
         cwd: v["payload"]["cwd"].as_str(),
         remote: *via != Via::Local,
         pinned: pinned.then_some(hook_wait),
         devices: broker.devices(),
+        here,
     });
     let window = if talks { window } else { window.min(hook_wait) };
     let Some(req) = request_of(sid, key, agent, event, &v["payload"], window) else {
@@ -310,14 +318,14 @@ async fn await_decision<W: AsyncWrite + Unpin>(
     };
     if req.notice {
         // shown on the watch until the session moves on; the terminal takes the prompt now
-        let (rid, _rx) = broker.open(req);
+        let (rid, _rx) = broker.open_with(req, hush);
         trace.record(
             "hook",
             Dir::Internal,
             "notice",
             Some(sid),
             Some(rid),
-            json!({"event": event}),
+            json!({"event": event, "seen": seen}),
             None,
         );
         return Outcome::NONE;
@@ -335,14 +343,14 @@ async fn await_decision<W: AsyncWrite + Unpin>(
         );
         return Outcome::NONE;
     }
-    let (rid, rx) = broker.open(req);
+    let (rid, rx) = broker.open_with(req, hush);
     trace.record(
         "hook",
         Dir::Internal,
         "window",
         Some(sid),
         Some(rid),
-        json!({"event": event, "window_ms": window.as_millis() as u64, "devices": broker.devices()}),
+        json!({"event": event, "window_ms": window.as_millis() as u64, "devices": broker.devices(), "seen": seen}),
         None,
     );
     let ended = wait_for(rx, window, talks, w).await;

@@ -430,6 +430,36 @@ pub fn send_text(ctx: &HostCtx, text: &str) -> Result<(), FocusError> {
     checked(&send_text_args(&listen, &matcher, text), "send-text").map(drop)
 }
 
+/// Whether kitty shows this session's window as the one being typed into: its OS window has the
+/// system's focus and the window is the active one of its tab. `None` when kitty cannot be asked
+/// (no remote control, no such window).
+#[cfg_attr(test, allow(dead_code))]
+pub fn focused(ctx: &HostCtx) -> Option<bool> {
+    let (listen, matcher) = target(ctx).ok()?;
+    let out = run_rc(&ls_args(&listen, &matcher)).ok().filter(|o| o.ok)?;
+    window_focused(&out.stdout)
+}
+
+/// From `kitty @ ls` JSON (already limited to the matched windows): true when one of them is the
+/// focused window of the focused OS window and its tab is the active one.
+pub fn window_focused(ls_json: &str) -> Option<bool> {
+    let v: serde_json::Value = serde_json::from_str(ls_json).ok()?;
+    let mut seen = false;
+    for os in v.as_array()? {
+        let os_focused = os["is_focused"].as_bool().unwrap_or(false);
+        for tab in os["tabs"].as_array().into_iter().flatten() {
+            let tab_active = tab["is_active"].as_bool().unwrap_or(false);
+            for w in tab["windows"].as_array().into_iter().flatten() {
+                seen = true;
+                if os_focused && tab_active && w["is_focused"].as_bool().unwrap_or(false) {
+                    return Some(true);
+                }
+            }
+        }
+    }
+    seen.then_some(false)
+}
+
 fn raise(ctx: &HostCtx, os: &str) -> Result<(), FocusError> {
     match os {
         "macos" => generic::activate_app("kitty"),
@@ -441,6 +471,21 @@ fn raise(ctx: &HostCtx, os: &str) -> Result<(), FocusError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_focus_from_ls() {
+        let ls = |os: bool, tab: bool, win: bool| {
+            format!(
+                r#"[{{"is_focused":{os},"tabs":[{{"is_active":{tab},"windows":[{{"id":3,"is_focused":{win}}}]}}]}}]"#
+            )
+        };
+        assert_eq!(window_focused(&ls(true, true, true)), Some(true));
+        assert_eq!(window_focused(&ls(false, true, true)), Some(false));
+        assert_eq!(window_focused(&ls(true, false, true)), Some(false));
+        assert_eq!(window_focused(&ls(true, true, false)), Some(false));
+        assert_eq!(window_focused("[]"), None);
+        assert_eq!(window_focused("nope"), None);
+    }
 
     #[test]
     fn builds_focus_window_args() {

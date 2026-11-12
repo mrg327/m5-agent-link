@@ -176,6 +176,9 @@ impl Conn {
         if self.peer_minor < GAUGES_MINOR {
             (s.ctx, s.mdl, s.pm, s.pr, s.prs) = (None, None, None, None, None);
         }
+        if self.peer_minor < PRESENCE_MINOR {
+            s.hush = None;
+        }
         if self.privacy == Privacy::Meta {
             s.sum = None;
             // which pull request a session works on says what it works on
@@ -228,6 +231,9 @@ impl Conn {
             // the answer window and the full text's length: proto 0.11 (ANSWER-WINDOW.md)
             if self.peer_minor < WINDOW_MINOR {
                 (a.left, a.win, a.len) = (None, None, None);
+            }
+            if self.peer_minor < PRESENCE_MINOR {
+                a.hush = None;
             }
         }
         if let Message::Clear(cl) = &mut msg {
@@ -335,6 +341,8 @@ const GAUGES_MINOR: u64 = 10;
 /// `attention.left` / `win` / `len`, `detail` chunks, `clear` handed_back and the hand-back by
 /// `focus` with a rid need proto 0.11 (ANSWER-WINDOW.md).
 const WINDOW_MINOR: u64 = 11;
+/// Presence: `hush` on an attention and on the delta that enters done / error (PRESENCE.md).
+const PRESENCE_MINOR: u64 = 12;
 
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
@@ -549,7 +557,12 @@ async fn serve(
                 c.send_due_deltas().await?;
             },
             u = updates.recv() => match u {
-                Ok(Update::Upsert(s)) => c.send_delta(s).await?,
+                Ok(Update::Upsert(mut s)) => {
+                    if c.peer_minor >= PRESENCE_MINOR {
+                        s.hush = finished_hush(shared, &s).await;
+                    }
+                    c.send_delta(s).await?
+                }
                 Ok(Update::Gone(sid)) => {
                     if !c.hidden.remove(&sid) {
                         c.send(None, Message::Gone(Gone { sid })).await?
@@ -572,6 +585,32 @@ async fn serve(
             },
         }
     }
+}
+
+/// `Some(true)` when the delta enters done / error while the user has that session's terminal in front
+/// of them: the watch need not buzz (PRESENCE.md). A session armed with Notify (the delta clears `ntf`)
+/// is one the user asked to be told about, so it buzzes whatever presence says.
+async fn finished_hush(shared: &Shared, s: &Session) -> Option<bool> {
+    if !enters_finished(s) {
+        return None;
+    }
+    let (here, _, _) = crate::presence::global()
+        .here_async(shared.registry.host_ctx(s.sid))
+        .await;
+    hush_finished(s, here)
+}
+
+/// The delta enters done / error.
+fn enters_finished(s: &Session) -> bool {
+    matches!(s.st, Some(SessState::Done | SessState::Error))
+}
+
+/// The Finished row of the table for a session at `here`, except that a session armed with Notify (the
+/// delta that enters done clears `ntf`) buzzes whatever presence says.
+fn hush_finished(s: &Session, here: crate::presence::Here) -> Option<bool> {
+    (enters_finished(s) && s.ntf != Some(false))
+        .then(|| crate::presence::hush(crate::presence::Event::Finished, here))
+        .filter(|h| *h)
 }
 
 /// Recordings being received on one link, and where finished transcripts come back (voice.rs).
@@ -2202,6 +2241,51 @@ mod tests {
         assert_eq!((out.snz, out.n, out.ok), (Some(5), Some(2), Some(true)));
         c.privacy = Privacy::Meta;
         assert_eq!(c.for_peer(s).sum, None);
+    }
+
+    fn test_conn(peer_minor: u64) -> Conn {
+        let (_tx, rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        Conn {
+            link: Box::new(ChanLink { rx, tx }),
+            trace: Trace::null(),
+            src: "t".into(),
+            next_id: 1,
+            privacy: Privacy::Preview,
+            peer_minor,
+            dictate: false,
+            deltas: DeltaQueue::default(),
+            hidden: HashSet::new(),
+            linked: None,
+        }
+    }
+
+    #[test]
+    fn hush_only_for_a_finished_session_in_front_of_the_user_and_only_to_0_12() {
+        use crate::presence::Here;
+        let fin = |st, ntf| {
+            let mut s = Session::delta(1);
+            s.st = Some(st);
+            s.ntf = ntf;
+            s
+        };
+        for st in [SessState::Done, SessState::Error] {
+            assert_eq!(hush_finished(&fin(st, None), Here::Focused), Some(true));
+            assert_eq!(hush_finished(&fin(st, None), Here::AtKeyboard), None);
+            assert_eq!(hush_finished(&fin(st, None), Here::Away), None);
+            // armed with Notify: the user asked to be told
+            assert_eq!(hush_finished(&fin(st, Some(false)), Here::Focused), None);
+        }
+        for st in [SessState::Work, SessState::Input, SessState::Idle] {
+            assert_eq!(hush_finished(&fin(st, None), Here::Focused), None, "{st:?}");
+        }
+        // an older device gets neither key
+        let mut s = fin(SessState::Done, None);
+        s.hush = Some(true);
+        let mut c = test_conn(11);
+        assert_eq!(c.for_peer(s.clone()).hush, None);
+        c.peer_minor = 12;
+        assert_eq!(c.for_peer(s).hush, Some(true));
     }
 
     /// A shell whose job ran (and ended, when `exit` is given) in a `Shared` with a fake terminal.

@@ -603,6 +603,15 @@ impl Registry {
         Route::Ready(rec.session.clone(), ctx)
     }
 
+    /// The terminal identity of a session on this machine (its own, or its attach window's), for
+    /// presence. `None` for a session whose terminal is on another host with no attach window.
+    pub fn host_ctx(&self, sid: u64) -> Option<HostCtx> {
+        match self.route(sid) {
+            Route::Ready(_, ctx) => Some(ctx),
+            _ => None,
+        }
+    }
+
     /// The agent kind of a session.
     pub fn agent_of(&self, sid: u64) -> Option<Agent> {
         self.state.lock().unwrap().sessions.get(&sid)?.session.ag

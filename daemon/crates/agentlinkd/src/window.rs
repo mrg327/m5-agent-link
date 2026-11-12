@@ -7,9 +7,11 @@
 //! room, short enough that a user at the keyboard is not kept waiting for nothing. Silence never
 //! decides: when the window ends the hook prints nothing and the terminal asks as usual.
 //!
-//! [`answer_window`] is the one place that decides the window for a request. A later build adds
-//! presence (short at the keyboard, long when away) here, and nowhere else.
+//! [`answer_window`] is the one place that decides the window for a request. Presence (PRESENCE.md) acts
+//! here and nowhere else: with the user at the keyboard the default window shortens to the table's cell;
+//! a window the user set explicitly (setting or the hook's own pin) is never touched by it.
 
+use crate::presence::{cell, Cell, Event, Here};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -42,6 +44,8 @@ pub struct Ask<'a> {
     pub pinned: Option<Duration>,
     /// Devices linked right now.
     pub devices: usize,
+    /// Where the user is relative to this session's terminal (presence.rs); `Away` = as before.
+    pub here: Here,
 }
 
 /// The window for one request. 0 = do not hold at all (the terminal asks at once).
@@ -52,19 +56,24 @@ pub fn answer_window(ask: &Ask) -> Duration {
     } else {
         hook_timeout(&settings_files(ask.cwd), ask.event)
     };
-    decide(configured, hook_timeout, ask.devices)
+    decide(configured, ask.here, hook_timeout, ask.devices)
 }
 
 /// The pure rule behind [`answer_window`].
 pub fn decide(
     configured: Option<Duration>,
+    here: Here,
     hook_timeout: Option<Duration>,
     devices: usize,
 ) -> Duration {
     let mut w = match configured {
         Some(d) if d.is_zero() => return Duration::ZERO,
+        // an explicit setting wins over presence
         Some(d) => d.clamp(MIN, MAX),
-        None => DEFAULT,
+        None => match cell(Event::Window, here) {
+            Cell::Short(d) => d.min(DEFAULT),
+            _ => DEFAULT,
+        },
     };
     if let Some(t) = hook_timeout {
         // Claude Code kills the hook at its timeout and then shows the dialog anyway; the watch's
@@ -156,16 +165,16 @@ mod tests {
 
     #[test]
     fn the_default_is_a_minute_and_settings_are_clamped() {
-        assert_eq!(decide(None, None, 1), S(60));
+        assert_eq!(decide(None, Here::Away, None, 1), S(60));
         assert_eq!(
-            decide(Some(S(1)), None, 1),
+            decide(Some(S(1)), Here::Away, None, 1),
             MIN,
             "too short to reach the watch"
         );
-        assert_eq!(decide(Some(S(3600)), None, 1), MAX);
-        assert_eq!(decide(Some(S(90)), None, 1), S(90));
+        assert_eq!(decide(Some(S(3600)), Here::Away, None, 1), MAX);
+        assert_eq!(decide(Some(S(90)), Here::Away, None, 1), S(90));
         assert_eq!(
-            decide(Some(Duration::ZERO), Some(S(30)), 1),
+            decide(Some(Duration::ZERO), Here::Away, Some(S(30)), 1),
             Duration::ZERO,
             "0 = never hold"
         );
@@ -174,15 +183,38 @@ mod tests {
     #[test]
     fn the_hooks_own_timeout_caps_the_window() {
         // the old printed setting (timeout 30): the countdown must end before Claude Code kills the hook
-        assert_eq!(decide(None, Some(S(30)), 1), S(27));
-        assert_eq!(decide(Some(S(300)), Some(S(600)), 1), S(300));
-        assert_eq!(decide(None, Some(S(2)), 1), Duration::ZERO);
+        assert_eq!(decide(None, Here::Away, Some(S(30)), 1), S(27));
+        assert_eq!(decide(Some(S(300)), Here::Away, Some(S(600)), 1), S(300));
+        assert_eq!(decide(None, Here::Away, Some(S(2)), 1), Duration::ZERO);
     }
 
     #[test]
     fn nobody_to_answer_means_a_short_hold() {
-        assert_eq!(decide(None, None, 0), NO_DEVICE);
-        assert_eq!(decide(Some(S(5)), None, 0), S(5));
+        assert_eq!(decide(None, Here::Away, None, 0), NO_DEVICE);
+        assert_eq!(decide(Some(S(5)), Here::Away, None, 0), S(5));
+    }
+
+    #[test]
+    fn presence_shortens_the_default_and_never_an_explicit_setting() {
+        use crate::presence::{FOCUSED_WINDOW, KEYBOARD_WINDOW};
+        assert_eq!(decide(None, Here::Focused, None, 1), FOCUSED_WINDOW);
+        assert_eq!(decide(None, Here::AtKeyboard, None, 1), KEYBOARD_WINDOW);
+        assert_eq!(
+            decide(None, Here::Away, None, 1),
+            DEFAULT,
+            "away: the full window"
+        );
+        // an explicit setting (or the hook's pin) wins, whatever presence says
+        for here in [Here::Focused, Here::AtKeyboard, Here::Away] {
+            assert_eq!(decide(Some(S(90)), here, None, 1), S(90));
+            assert_eq!(decide(Some(Duration::ZERO), here, None, 1), Duration::ZERO);
+        }
+        // the other caps still apply to a short window
+        assert_eq!(decide(None, Here::AtKeyboard, Some(S(8)), 1), S(5));
+        assert_eq!(
+            decide(None, Here::AtKeyboard, None, 0),
+            KEYBOARD_WINDOW.min(NO_DEVICE)
+        );
     }
 
     #[test]

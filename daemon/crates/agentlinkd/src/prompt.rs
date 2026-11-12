@@ -697,7 +697,9 @@ async fn wait_for_screen(env: &Env, sid: u64, kinds: &[Kind]) -> Option<Screen> 
 /// Opens one card and types the device's answer; true when an answer was typed.
 async fn open_and_wait(env: Env, sid: u64, req: Request, expect: Option<Expect>) -> bool {
     let ttl = req.ttl;
-    let (rid, rx) = env.broker.open(req);
+    use crate::presence::{global, hush, Event};
+    let (here, _, _) = global().here_async(env.registry.host_ctx(sid)).await;
+    let (rid, rx) = env.broker.open_with(req, hush(Event::Needs, here));
     let outcome: Outcome = match tokio::time::timeout(ttl, rx).await {
         Ok(Ok(o)) => o,
         Ok(Err(_)) => return false, // the terminal answered (or the card was cancelled)

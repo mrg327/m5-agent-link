@@ -14,6 +14,7 @@ mod ipc;
 mod jobs;
 mod keys;
 mod paths;
+mod presence;
 mod prompt;
 mod registry;
 mod remote;
@@ -75,6 +76,7 @@ async fn main() -> Result<()> {
                 "sessions": shared.registry.snapshot(),
                 "remotes": shared.registry.remotes(),
                 "attaches": shared.registry.attaches(),
+                "presence": presence_status(&shared.registry),
             })
         })
     };
@@ -116,7 +118,7 @@ async fn main() -> Result<()> {
         ));
     }
 
-    tokio::signal::ctrl_c().await?;
+    wait_for_stop().await?;
     tracing::info!("shutting down");
     let _ = std::fs::remove_file(paths::hook_socket());
     let _ = std::fs::remove_file(paths::remote_socket());
@@ -124,6 +126,36 @@ async fn main() -> Result<()> {
         let _ = std::fs::remove_file(socket);
     }
     Ok(())
+}
+
+/// Ctrl-C, or SIGTERM (what `systemctl stop` sends) on Unix.
+async fn wait_for_stop() -> Result<()> {
+    #[cfg(unix)]
+    {
+        let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+        tokio::select! {
+            r = tokio::signal::ctrl_c() => r?,
+            _ = term.recv() => {}
+        }
+        Ok(())
+    }
+    #[cfg(not(unix))]
+    {
+        tokio::signal::ctrl_c().await?;
+        Ok(())
+    }
+}
+
+/// What the daemon believes about the user, for `agentlink status`. Asks the system (a few small
+/// processes), off the async threads.
+fn presence_status(registry: &registry::Registry) -> serde_json::Value {
+    let sessions: Vec<(u64, Option<registry::HostCtx>)> = registry
+        .snapshot()
+        .iter()
+        .filter(|s| !matches!(s.st, Some(agentlink_proto::SessState::Ended)))
+        .map(|s| (s.sid, registry.host_ctx(s.sid)))
+        .collect();
+    tokio::task::block_in_place(|| presence::global().status(&sessions))
 }
 
 /// Transports are on unless the env var is set to `0`/`false`/`off`.
