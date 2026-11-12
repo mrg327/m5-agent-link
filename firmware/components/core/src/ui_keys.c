@@ -25,7 +25,9 @@
 #define N_SLOTS 3
 #define TRAIL_PTS 64
 #define FADE_MS 250
-/* below the keys, either side of the centre: the lower corners are keys now */
+/* below the key block (it ends at KEYS_BOTTOM_Y 386): legend centre row and the half-width they span */
+#define BADGE_Y 415
+#define BADGE_EDGE 88
 #define BADGE_R 190
 #define BADGE_A_DEG 199
 #define BADGE_B_DEG 161
@@ -345,6 +347,13 @@ lv_obj_t *ui_keys_init(lv_obj_t *screen)
     for (int i = 0; i < 2; i++)
         s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? BADGE_A_DEG : BADGE_B_DEG, BADGE_R,
                                      &s_key[i], &s_word[i]);
+    /* The key block now reaches down to KEYS_BOTTOM_Y, where the usual legend row (UI_Y_LEGEND) is: the legends
+     * sit in the glass below it instead, side by side near the middle, inside the ring like the others. */
+    for (int i = 0; i < 2; i++) {
+        lv_obj_update_layout(s_badge[i]);
+        int bw = lv_obj_get_width(s_badge[i]), bh = lv_obj_get_height(s_badge[i]);
+        lv_obj_set_pos(s_badge[i], i == 0 ? UI_CX - BADGE_EDGE : UI_CX + BADGE_EDGE - bw, BADGE_Y - bh / 2);
+    }
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     return s_root;
 }
