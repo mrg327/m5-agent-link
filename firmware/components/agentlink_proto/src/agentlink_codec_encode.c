@@ -85,6 +85,7 @@ static bool encode_repeated_session_perm_mode_m(zcbor_state_t *state, const stru
 static bool encode_repeated_session_uint24uint(zcbor_state_t *state, const struct session_uint24uint *input);
 static bool encode_pr_state(zcbor_state_t *state, const struct pr_state_r *input);
 static bool encode_repeated_session_pr_state_m(zcbor_state_t *state, const struct session_pr_state_m *input);
+static bool encode_repeated_session_uint26bool(zcbor_state_t *state, const struct session_uint26bool *input);
 static bool encode_session(zcbor_state_t *state, const struct session *input);
 static bool encode_att_kind(zcbor_state_t *state, const struct att_kind_r *input);
 static bool encode_away_event(zcbor_state_t *state, const struct away_event *input);
@@ -103,6 +104,7 @@ static bool encode_repeated_attention_uint8uint(zcbor_state_t *state, const stru
 static bool encode_repeated_attention_uint9uint(zcbor_state_t *state, const struct attention_uint9uint *input);
 static bool encode_repeated_attention_uint10uint(zcbor_state_t *state, const struct attention_uint10uint *input);
 static bool encode_repeated_attention_uint11uint(zcbor_state_t *state, const struct attention_uint11uint *input);
+static bool encode_repeated_attention_uint12bool(zcbor_state_t *state, const struct attention_uint12bool *input);
 static bool encode_attention(zcbor_state_t *state, const struct attention *input);
 static bool encode_msg_attention(zcbor_state_t *state, const struct msg_attention *input);
 static bool encode_clear_why(zcbor_state_t *state, const struct clear_why_r *input);
@@ -1010,12 +1012,24 @@ static bool encode_repeated_session_pr_state_m(
 	return res;
 }
 
+static bool encode_repeated_session_uint26bool(
+		zcbor_state_t *state, const struct session_uint26bool *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (26))))
+	&& (zcbor_bool_encode(state, (&(*input).session_uint26bool)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_session(
 		zcbor_state_t *state, const struct session *input)
 {
 	zcbor_log("%s\r\n", __func__);
 
-	bool res = (((zcbor_map_start_encode(state, 26) && (((((zcbor_uint32_put(state, (0))))
+	bool res = (((zcbor_map_start_encode(state, 27) && (((((zcbor_uint32_put(state, (0))))
 	&& (zcbor_uint32_encode(state, (&(*input).session_uint0uint))))
 	&& (!(*input).session_agent_m_present || encode_repeated_session_agent_m(state, (&(*input).session_agent_m)))
 	&& (!(*input).session_sess_state_m_present || encode_repeated_session_sess_state_m(state, (&(*input).session_sess_state_m)))
@@ -1041,7 +1055,8 @@ static bool encode_session(
 	&& (!(*input).session_uint22tstr_present || encode_repeated_session_uint22tstr(state, (&(*input).session_uint22tstr)))
 	&& (!(*input).session_perm_mode_m_present || encode_repeated_session_perm_mode_m(state, (&(*input).session_perm_mode_m)))
 	&& (!(*input).session_uint24uint_present || encode_repeated_session_uint24uint(state, (&(*input).session_uint24uint)))
-	&& (!(*input).session_pr_state_m_present || encode_repeated_session_pr_state_m(state, (&(*input).session_pr_state_m)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 26))));
+	&& (!(*input).session_pr_state_m_present || encode_repeated_session_pr_state_m(state, (&(*input).session_pr_state_m)))
+	&& (!(*input).session_uint26bool_present || encode_repeated_session_uint26bool(state, (&(*input).session_uint26bool)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 27))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1273,12 +1288,24 @@ static bool encode_repeated_attention_uint11uint(
 	return res;
 }
 
+static bool encode_repeated_attention_uint12bool(
+		zcbor_state_t *state, const struct attention_uint12bool *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (12))))
+	&& (zcbor_bool_encode(state, (&(*input).attention_uint12bool)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_attention(
 		zcbor_state_t *state, const struct attention *input)
 {
 	zcbor_log("%s\r\n", __func__);
 
-	bool res = (((zcbor_map_start_encode(state, 12) && (((((zcbor_uint32_put(state, (0))))
+	bool res = (((zcbor_map_start_encode(state, 13) && (((((zcbor_uint32_put(state, (0))))
 	&& (zcbor_uint32_encode(state, (&(*input).attention_uint0uint))))
 	&& (((zcbor_uint32_put(state, (1))))
 	&& (zcbor_uint32_encode(state, (&(*input).attention_uint1uint))))
@@ -1293,7 +1320,8 @@ static bool encode_attention(
 	&& (!(*input).attention_uint8uint_present || encode_repeated_attention_uint8uint(state, (&(*input).attention_uint8uint)))
 	&& (!(*input).attention_uint9uint_present || encode_repeated_attention_uint9uint(state, (&(*input).attention_uint9uint)))
 	&& (!(*input).attention_uint10uint_present || encode_repeated_attention_uint10uint(state, (&(*input).attention_uint10uint)))
-	&& (!(*input).attention_uint11uint_present || encode_repeated_attention_uint11uint(state, (&(*input).attention_uint11uint)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 12))));
+	&& (!(*input).attention_uint11uint_present || encode_repeated_attention_uint11uint(state, (&(*input).attention_uint11uint)))
+	&& (!(*input).attention_uint12bool_present || encode_repeated_attention_uint12bool(state, (&(*input).attention_uint12bool)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 13))));
 
 	log_result(state, res, __func__);
 	return res;

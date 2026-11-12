@@ -165,6 +165,9 @@ body!(
         #[n(24)] #[serde(skip_serializing_if = "Option::is_none")] pr: Option<u64>,
         /// Its review state, sent with `pr` (proto 0.10).
         #[n(25)] #[serde(skip_serializing_if = "Option::is_none")] prs: Option<PrState>,
+        /// With the delta that enters done / error: do not buzz for it, the user is looking at its
+        /// terminal (proto 0.12, PRESENCE.md). Never stored; absent = buzz as the device's rules say.
+        #[n(26)] #[serde(skip_serializing_if = "Option::is_none")] hush: Option<bool>,
     }
 );
 impl Session {
@@ -197,6 +200,7 @@ impl Session {
             pm: None,
             pr: None,
             prs: None,
+            hush: None,
         }
     }
 
@@ -205,7 +209,7 @@ impl Session {
         macro_rules! m { ($($f:ident),*) => { $(if d.$f.is_some() { self.$f = d.$f.clone(); })* }; }
         m!(
             ag, st, sub, repo, br, tool, t0, tst, sum, seen, host, hn, snz, ntf, n, ok, eta, exit,
-            ctx, mdl, pm, pr, prs
+            ctx, mdl, pm, pr, prs, hush
         );
     }
 }
@@ -247,6 +251,9 @@ body!(Attention {
     #[n(10)] #[serde(skip_serializing_if = "Option::is_none")] win: Option<u64>,
     /// The full text's length in bytes when `text` is a cut preview (proto 0.11): `detail` serves it.
     #[n(11)] #[serde(skip_serializing_if = "Option::is_none")] len: Option<u64>,
+    /// No buzz, glow or reminders for this request: the user is looking at its terminal (proto 0.12,
+    /// PRESENCE.md). The card is shown all the same.
+    #[n(12)] #[serde(skip_serializing_if = "Option::is_none")] hush: Option<bool>,
 });
 body!(Clear {
     #[n(0)]

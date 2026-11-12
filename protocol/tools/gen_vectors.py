@@ -193,6 +193,20 @@ VECTORS = {
             4: "cd packages/frontend && npm run test -- --watch=false\u2026",
             6: [0, 1, 2], 7: 1793995260, 9: 42500, 10: 60000, 11: 612}),
     ),
+    "attention_hush": (
+        "Approval the device need not buzz for (proto 0.12): the user is looking at the session's terminal, so no "
+        "buzz, glow or reminders; the card is shown and answered as usual",
+        {"t": "attention", "id": 16, "b": {"rid": 11, "sid": 2, "kind": "approval",
+         "title": "Run shell command", "text": "npm test", "acts": ["approve", "deny", "focus"],
+         "exp": 1793995262, "left": 2000, "win": 2000, "hush": True}},
+        env("attention", 16, {0: 11, 1: 2, 2: 0, 3: "Run shell command", 4: "npm test", 6: [0, 1, 2],
+            7: 1793995262, 9: 2000, 10: 2000, 12: True}),
+    ),
+    "session_hush": (
+        "A session enters done and the device need not buzz (proto 0.12): the user is looking at its terminal",
+        {"t": "session_upd", "id": 17, "b": {"sid": 3, "st": "done", "tst": 1793995300, "hush": True}},
+        env("session_upd", 17, {0: 3, 2: 4, 8: 1793995300, 26: True}),
+    ),
     "cmd_detail": (
         "Device asks for request 10's full text from byte 0 (proto 0.11)",
         {"t": "cmd", "id": 13, "b": {"op": "detail", "sid": 2, "rid": 10, "arg": 0}},

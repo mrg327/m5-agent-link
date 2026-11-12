@@ -59,6 +59,7 @@ const SPECS = {
     sum: [9, 'tstr'], seen: [10, 'bool'], host: [11, 'uint'], hn: [12, 'tstr'],
     snz: [13, 'uint'], ntf: [14, 'bool'], n: [15, 'uint'], ok: [16, 'bool'], q: [17, 'tstr'], rp: [18, 'tstrs'], eta: [19, 'uint'], exit: [20, 'uint'],
     ctx: [21, 'uint'], mdl: [22, 'tstr'], pm: [23, 'enum:perm_mode'], pr: [24, 'uint'], prs: [25, 'enum:pr_state'],
+    hush: [26, 'bool'], // proto 0.12 (PRESENCE.md)
   },
   snapshot: { sessions: [0, 'objs:session'], away: [1, 'objs:away_event'] },
   gone: { sid: [0, 'uint'] },
@@ -66,6 +67,7 @@ const SPECS = {
     rid: [0, 'uint'], sid: [1, 'uint'], kind: [2, 'enum:att_kind'], title: [3, 'tstr'], text: [4, 'tstr'],
     opts: [5, 'tstrs'], acts: [6, 'enums:action'], exp: [7, 'uint'], grant_mask: [8, 'uint'],
     left: [9, 'uint'], win: [10, 'uint'], len: [11, 'uint'], // proto 0.11 (ANSWER-WINDOW.md)
+    hush: [12, 'bool'], // proto 0.12 (PRESENCE.md)
   },
   clear: { rid: [0, 'uint'], why: [1, 'enum:clear_why'] },
   // cmd_arg = uint / tstr / scroll_arg: a map argument is the scroll one

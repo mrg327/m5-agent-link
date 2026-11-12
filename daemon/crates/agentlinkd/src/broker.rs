@@ -227,7 +227,14 @@ impl Broker {
 
     /// Registers the request, tells every device, and returns the channel the hook waits on.
     /// The channel yields `Err` when the request ends without a device decision.
+    #[cfg(test)]
     pub fn open(&self, req: Request) -> (u64, oneshot::Receiver<Outcome>) {
+        self.open_with(req, false)
+    }
+
+    /// [`Self::open`], with `hush`: tell the devices not to buzz for it (presence.rs). The card is
+    /// shown all the same and can be answered as ever.
+    pub fn open_with(&self, req: Request, hush: bool) -> (u64, oneshot::Receiver<Outcome>) {
         let (tx, rx) = oneshot::channel();
         let mut acts = match req.kind {
             AttKind::Approval if !req.focus_only => {
@@ -276,6 +283,7 @@ impl Broker {
             left: win_ms,
             win: win_ms,
             len,
+            hush: hush.then_some(true),
         };
         g.pending.insert(
             rid,
@@ -651,6 +659,30 @@ mod tests {
             Duration::from_secs(15),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn a_hushed_request_is_still_a_whole_card_and_stays_hushed_when_re_sent() {
+        let (b, mut rx) = broker();
+        let (rid, _w) = b.open_with(perm(true), true);
+        let Update::Attention(a) = next_update(&mut rx) else {
+            panic!("an attention")
+        };
+        assert_eq!(a.hush, Some(true));
+        // nothing else about the card changes: same actions, options and window as an unhushed one
+        let (_, _w2) = b.open(perm(true));
+        let Update::Attention(plain) = next_update(&mut rx) else {
+            panic!("an attention")
+        };
+        assert_eq!(plain.hush, None, "never sent as false");
+        assert_eq!(
+            (&a.acts, &a.opts, a.grant_mask),
+            (&plain.acts, &plain.opts, plain.grant_mask)
+        );
+        assert_eq!(a.win, plain.win);
+        // a device that connects later still gets the hush (and the answer is still possible)
+        let again = b.pending().into_iter().find(|p| p.rid == rid).unwrap();
+        assert_eq!(again.hush, Some(true));
     }
 
     fn next_update(rx: &mut tokio::sync::broadcast::Receiver<Update>) -> Update {

@@ -85,6 +85,7 @@ static bool decode_repeated_session_perm_mode_m(zcbor_state_t *state, struct ses
 static bool decode_repeated_session_uint24uint(zcbor_state_t *state, struct session_uint24uint *result);
 static bool decode_pr_state(zcbor_state_t *state, struct pr_state_r *result);
 static bool decode_repeated_session_pr_state_m(zcbor_state_t *state, struct session_pr_state_m *result);
+static bool decode_repeated_session_uint26bool(zcbor_state_t *state, struct session_uint26bool *result);
 static bool decode_session(zcbor_state_t *state, struct session *result);
 static bool decode_att_kind(zcbor_state_t *state, struct att_kind_r *result);
 static bool decode_away_event(zcbor_state_t *state, struct away_event *result);
@@ -103,6 +104,7 @@ static bool decode_repeated_attention_uint8uint(zcbor_state_t *state, struct att
 static bool decode_repeated_attention_uint9uint(zcbor_state_t *state, struct attention_uint9uint *result);
 static bool decode_repeated_attention_uint10uint(zcbor_state_t *state, struct attention_uint10uint *result);
 static bool decode_repeated_attention_uint11uint(zcbor_state_t *state, struct attention_uint11uint *result);
+static bool decode_repeated_attention_uint12bool(zcbor_state_t *state, struct attention_uint12bool *result);
 static bool decode_attention(zcbor_state_t *state, struct attention *result);
 static bool decode_msg_attention(zcbor_state_t *state, struct msg_attention *result);
 static bool decode_clear_why(zcbor_state_t *state, struct clear_why_r *result);
@@ -1056,6 +1058,18 @@ static bool decode_repeated_session_pr_state_m(
 	return res;
 }
 
+static bool decode_repeated_session_uint26bool(
+		zcbor_state_t *state, struct session_uint26bool *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (26))))
+	&& (zcbor_bool_decode(state, (&(*result).session_uint26bool)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_session(
 		zcbor_state_t *state, struct session *result)
 {
@@ -1087,7 +1101,8 @@ static bool decode_session(
 	&& zcbor_present_decode(&((*result).session_uint22tstr_present), (zcbor_decoder_t *)decode_repeated_session_uint22tstr, state, (&(*result).session_uint22tstr))
 	&& zcbor_present_decode(&((*result).session_perm_mode_m_present), (zcbor_decoder_t *)decode_repeated_session_perm_mode_m, state, (&(*result).session_perm_mode_m))
 	&& zcbor_present_decode(&((*result).session_uint24uint_present), (zcbor_decoder_t *)decode_repeated_session_uint24uint, state, (&(*result).session_uint24uint))
-	&& zcbor_present_decode(&((*result).session_pr_state_m_present), (zcbor_decoder_t *)decode_repeated_session_pr_state_m, state, (&(*result).session_pr_state_m))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+	&& zcbor_present_decode(&((*result).session_pr_state_m_present), (zcbor_decoder_t *)decode_repeated_session_pr_state_m, state, (&(*result).session_pr_state_m))
+	&& zcbor_present_decode(&((*result).session_uint26bool_present), (zcbor_decoder_t *)decode_repeated_session_uint26bool, state, (&(*result).session_uint26bool))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
 
 	if (false) {
 		/* For testing that the types of the arguments are correct.
@@ -1118,6 +1133,7 @@ static bool decode_session(
 		decode_repeated_session_perm_mode_m(state, (&(*result).session_perm_mode_m));
 		decode_repeated_session_uint24uint(state, (&(*result).session_uint24uint));
 		decode_repeated_session_pr_state_m(state, (&(*result).session_pr_state_m));
+		decode_repeated_session_uint26bool(state, (&(*result).session_uint26bool));
 	}
 
 	log_result(state, res, __func__);
@@ -1370,6 +1386,18 @@ static bool decode_repeated_attention_uint11uint(
 	return res;
 }
 
+static bool decode_repeated_attention_uint12bool(
+		zcbor_state_t *state, struct attention_uint12bool *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (12))))
+	&& (zcbor_bool_decode(state, (&(*result).attention_uint12bool)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_attention(
 		zcbor_state_t *state, struct attention *result)
 {
@@ -1390,7 +1418,8 @@ static bool decode_attention(
 	&& zcbor_present_decode(&((*result).attention_uint8uint_present), (zcbor_decoder_t *)decode_repeated_attention_uint8uint, state, (&(*result).attention_uint8uint))
 	&& zcbor_present_decode(&((*result).attention_uint9uint_present), (zcbor_decoder_t *)decode_repeated_attention_uint9uint, state, (&(*result).attention_uint9uint))
 	&& zcbor_present_decode(&((*result).attention_uint10uint_present), (zcbor_decoder_t *)decode_repeated_attention_uint10uint, state, (&(*result).attention_uint10uint))
-	&& zcbor_present_decode(&((*result).attention_uint11uint_present), (zcbor_decoder_t *)decode_repeated_attention_uint11uint, state, (&(*result).attention_uint11uint))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+	&& zcbor_present_decode(&((*result).attention_uint11uint_present), (zcbor_decoder_t *)decode_repeated_attention_uint11uint, state, (&(*result).attention_uint11uint))
+	&& zcbor_present_decode(&((*result).attention_uint12bool_present), (zcbor_decoder_t *)decode_repeated_attention_uint12bool, state, (&(*result).attention_uint12bool))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
 
 	if (false) {
 		/* For testing that the types of the arguments are correct.
@@ -1405,6 +1434,7 @@ static bool decode_attention(
 		decode_repeated_attention_uint9uint(state, (&(*result).attention_uint9uint));
 		decode_repeated_attention_uint10uint(state, (&(*result).attention_uint10uint));
 		decode_repeated_attention_uint11uint(state, (&(*result).attention_uint11uint));
+		decode_repeated_attention_uint12bool(state, (&(*result).attention_uint12bool));
 	}
 
 	log_result(state, res, __func__);

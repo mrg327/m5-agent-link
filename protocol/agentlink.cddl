@@ -217,7 +217,10 @@ session = {
   ? 22 => tstr,             ; mdl   the model's short name, <= 16 chars ("Opus 4.7"); "" = unknown
   ? 23 => perm_mode,        ; pm    the agent's permission mode
   ? 24 => uint,             ; pr    the open pull request of the session's branch; 0 = none (withheld under privacy meta)
-  ? 25 => pr_state          ; prs   its review state; sent with pr
+  ? 25 => pr_state,         ; prs   its review state; sent with pr
+  ? 26 => bool              ; hush  only in the delta that enters done / error, only to devices with proto >= 0.12
+                            ;       (PRESENCE.md): the user is looking at that session's terminal, do not buzz for
+                            ;       it. Never stored by the device; absent = buzz as its own rules say
 }
 perm_mode = perm_mode_default / perm_mode_plan / perm_mode_accept_edits / perm_mode_auto /
   perm_mode_dont_ask / perm_mode_bypass
@@ -271,8 +274,11 @@ attention = {
                          ;        the device counts down from its own clock on arrival. Keys 9-11 only to
                          ;        devices with proto >= 0.11
   ? 10 => uint,          ; win    the whole answer window in ms (left / win = the part still to run)
-  ? 11 => uint           ; len    the full text's length in bytes, sent when `text` is a cut preview: the
+  ? 11 => uint,          ; len    the full text's length in bytes, sent when `text` is a cut preview: the
                          ;        device may fetch it with cmd_op_detail (detail chunks) when len <= 4096
+  ? 12 => bool           ; hush   no buzz, glow or reminders for this request: the user is looking at its terminal
+                         ;        (PRESENCE.md). The card is shown and answered as ever. Only to devices with
+                         ;        proto >= 0.12
 }
 att_kind = att_kind_approval / att_kind_question / att_kind_error / att_kind_done
 att_kind_approval = 0

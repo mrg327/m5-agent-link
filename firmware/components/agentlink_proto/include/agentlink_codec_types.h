@@ -382,6 +382,10 @@ struct session_pr_state_m {
 	struct pr_state_r session_pr_state_m;
 };
 
+struct session_uint26bool {
+	bool session_uint26bool;
+};
+
 struct session {
 	uint32_t session_uint0uint;
 	struct session_agent_m session_agent_m;
@@ -434,6 +438,8 @@ struct session {
 	bool session_uint24uint_present;
 	struct session_pr_state_m session_pr_state_m;
 	bool session_pr_state_m_present;
+	struct session_uint26bool session_uint26bool;
+	bool session_uint26bool_present;
 };
 
 struct att_kind_r {
@@ -526,6 +532,10 @@ struct attention_uint11uint {
 	uint32_t attention_uint11uint;
 };
 
+struct attention_uint12bool {
+	bool attention_uint12bool;
+};
+
 struct attention {
 	uint32_t attention_uint0uint;
 	uint32_t attention_uint1uint;
@@ -548,6 +558,8 @@ struct attention {
 	bool attention_uint10uint_present;
 	struct attention_uint11uint attention_uint11uint;
 	bool attention_uint11uint_present;
+	struct attention_uint12bool attention_uint12bool;
+	bool attention_uint12bool_present;
 };
 
 struct msg_attention {

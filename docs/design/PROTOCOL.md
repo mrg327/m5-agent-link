@@ -132,7 +132,8 @@ session = {
   ? mdl: tstr,               ; model short name (≤ 16 chars)                         │ proto ≥ 0.10
   ? pm: perm_mode,           ; default / plan / accept_edits / auto / dont_ask / bypass │ (GAUGES.md)
   ? pr: uint,                ; open pull request number; 0 = none (not under meta)  │
-  ? prs: pr_state            ; none / pending / approved / changes / draft          ┘
+  ? prs: pr_state,           ; none / pending / approved / changes / draft          ┘
+  ? hush: bool               ; only with the delta that enters done / error; proto ≥ 0.12 (PRESENCE.md)
 }
 ```
 - `q` / `rp` (keys 17, 18, proto 0.5): when an agent's turn ends on a question, the daemon reads it from the turn's last message (Claude Code's Stop hook carries `last_assistant_message`) and sends the question (≤ 120 chars) with up to 3 answers (≤ 24 chars): the options of an "A or B?" question, else `Yes, go ahead` / `No` for a yes/no one, else none. The watch lists them first under Reply, with the question above. They are cleared (`""`, `[]`: a delta cannot remove a key) as soon as the agent works again. Agent content: never sent under privacy `meta`, and only to devices with proto ≥ 0.5.
@@ -172,7 +173,8 @@ attention = {
                              ; it only by a hold); sent whenever opts is (0 for a plain question)
   ? left: uint,              ; ms left in the answer window when sent       ┐ proto ≥ 0.11
   ? win: uint,               ; the whole answer window in ms                 │ (ANSWER-WINDOW.md)
-  ? len: uint                ; the full text's length in bytes, when text is cut ┘
+  ? len: uint,               ; the full text's length in bytes, when text is cut ┘
+  ? hush: bool               ; no buzz, glow or reminders for this request; proto ≥ 0.12 (PRESENCE.md)
 }
 clear = { rid: uint, why: "answered_pc"/"answered_dev"/"expired"/"cancelled"/"handed_back" }
 ```
@@ -182,6 +184,13 @@ clear = { rid: uint, why: "answered_pc"/"answered_dev"/"expired"/"cancelled"/"ha
   how long the full text is; past 4096 bytes the device cannot fetch it. `handed_back` answers the device's own
   Open on PC (`focus` with the `rid`). Keys 9-11 and `handed_back` go only to devices with proto ≥ 0.11 (older
   ones get `cancelled`); `len` is sent under privacy `meta` too, the text is not.
+
+- **Presence (proto 0.12, [PRESENCE.md](PRESENCE.md)).** `hush: true` on an `attention`, or on the session delta
+  that enters `done` / `error`, says the user is at the keyboard with that session's terminal in front of them:
+  the device holds the arrival buzz, the glow and the reminders (attention) or the finished buzz (session) and
+  changes nothing else. It is only ever `true`, only sent to devices with proto ≥ 0.12, and never stored (a
+  delta without it says nothing). The card, its actions and the answer window are as ever; the window itself is
+  shorter when the user is at the keyboard (`left` / `win` say so). An old device buzzes as before.
 
 The device must show approve/deny **only if** they are in `acts`. The daemon includes them only for prompts the agent itself raised (DESIGN Q6). An option is answered with `cmd { op: "reply", rid, arg: index }`; the daemon maps the index back to the agent's choice (UI-V2 §7).
 
