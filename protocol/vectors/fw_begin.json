@@ -1,0 +1,13 @@
+{
+  "desc": "Daemon starts a firmware update (proto 0.15): a 1.4 MB image, its SHA-256 and version",
+  "symbolic": {
+    "t": "fw_begin",
+    "id": 30,
+    "b": {
+      "size": 1388032,
+      "sha": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "ver": "819843e"
+    }
+  },
+  "cbor_hex": "a300181801181e03a3001a00152e000158209f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08026738313938343365"
+}

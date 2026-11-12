@@ -71,6 +71,8 @@ uint_enum!(HostOs { Mac = 0, Win = 1, Linux = 2 });
 uint_enum!(RuleScope { Session = 0, Project = 1 });
 uint_enum!(ClearWhy { AnsweredPc = 0, AnsweredDev = 1, Expired = 2, Cancelled = 3, HandedBack = 4 });
 uint_enum!(LogLevel { Err = 0, Warn = 1, Info = 2, Debug = 3 });
+// Firmware update (proto 0.15): the device's answer to fw_begin / fw_chunk.
+uint_enum!(FwStatus { Go = 0, Done = 1, Busy = 2, Bad = 3, Fail = 4, Stopped = 5 });
 uint_enum!(AudioCodec { Adpcm16k = 0, Opus16k = 1 });
 uint_enum!(InputEvent {
     Tap = 0, DoubleTap = 1, LongPress = 2, SwipeUp = 3, SwipeDown = 4, SwipeLeft = 5,

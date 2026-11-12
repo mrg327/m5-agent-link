@@ -1,0 +1,13 @@
+{
+  "desc": "Device has written 6144 bytes and wants the next chunk from there",
+  "symbolic": {
+    "t": "fw_ack",
+    "id": 40,
+    "re": 31,
+    "b": {
+      "st": "go",
+      "next": 6144
+    }
+  },
+  "cbor_hex": "a400181a01182802181f03a2000001191800"
+}

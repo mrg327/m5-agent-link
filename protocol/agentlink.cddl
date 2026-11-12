@@ -13,6 +13,7 @@ envelope = msg_hello / msg_welcome / msg_snapshot / msg_session_upd / msg_gone
          / msg_cfg / msg_batt / msg_ping / msg_pong / msg_log
          / msg_audio_start / msg_audio / msg_audio_end / msg_transcript
          / msg_kb_start / msg_kb_stroke / msg_kb_cands / msg_usage
+         / msg_fw_begin / msg_fw_chunk / msg_fw_ack
          / msg_dbg_ui_state_req / msg_dbg_ui_state / msg_dbg_screenshot_req
          / msg_dbg_screenshot_chunk / msg_dbg_inject_input / msg_dbg_set_log_level
 
@@ -41,6 +42,9 @@ msg_kb_start             = { 0 => mt_kb_start, hdr, 3 => kb_start }
 msg_kb_stroke            = { 0 => mt_kb_stroke, hdr, 3 => kb_stroke }
 msg_kb_cands             = { 0 => mt_kb_cands, hdr, 3 => kb_cands }
 msg_usage                = { 0 => mt_usage, hdr, 3 => usage }
+msg_fw_begin             = { 0 => mt_fw_begin, hdr, 3 => fw_begin }
+msg_fw_chunk             = { 0 => mt_fw_chunk, hdr, 3 => fw_chunk }
+msg_fw_ack               = { 0 => mt_fw_ack, hdr, 3 => fw_ack }
 msg_dbg_ui_state_req     = { 0 => mt_dbg_ui_state_req, hdr, 3 => empty }
 msg_dbg_ui_state         = { 0 => mt_dbg_ui_state, hdr, 3 => dbg_ui_state }
 msg_dbg_screenshot_req   = { 0 => mt_dbg_screenshot_req, hdr, 3 => empty }
@@ -72,6 +76,9 @@ mt_kb_start = 20
 mt_kb_stroke = 21
 mt_kb_cands = 22
 mt_usage = 23
+mt_fw_begin = 24
+mt_fw_chunk = 25
+mt_fw_ack = 26
 mt_dbg_ui_state_req = 64
 mt_dbg_ui_state = 65
 mt_dbg_screenshot_req = 66
@@ -451,6 +458,36 @@ usage = {
   ? 5 => uint,    ; wkr   weekly window resets at (unix)
   ? 6 => uint     ; wko   at the current pace the weekly window runs out at (unix)
 }
+
+; ───────────────────────── firmware update (proto 0.15, FIRMWARE.md §9) ─────────────────────────
+; The daemon pushes a signed app image into the device's spare app slot; only to devices with proto >= 0.15.
+; The device answers every fw_begin and fw_chunk with fw_ack; `next` is the offset it wants next, so a lost
+; or out-of-order chunk is simply sent again from there. The daemon keeps at most 4 chunks unanswered.
+fw_begin = {
+  0 => uint,               ; size   the image's length in bytes; 0 = stop the transfer in progress
+  1 => bstr .size 32,      ; sha    SHA-256 of the whole image: a begin naming the image already in progress
+                           ;        (same sha and size) resumes it at the device's `next`
+  ? 2 => tstr              ; ver    the image's version (its app description), <= 32 chars, for the screen
+}
+fw_chunk = {
+  0 => uint,                 ; off    byte offset of this chunk in the image
+  1 => bstr .size (0..2048)  ; data
+}
+fw_ack = {
+  0 => fw_status,   ; st
+  1 => uint,        ; next   bytes received and written so far: the offset the device wants next
+  ? 2 => tstr       ; msg    why, for busy / bad / fail / stopped, <= 48 chars
+}
+fw_status = fw_status_go / fw_status_done / fw_status_busy / fw_status_bad / fw_status_fail /
+  fw_status_stopped
+fw_status_go = 0        ; send from `next`
+fw_status_done = 1      ; the whole image arrived and was verified (hash, signature); it boots next and the
+                        ; device restarts about a second after this ack
+fw_status_busy = 2      ; not now (recording, low battery, cannot update itself): nothing was written
+fw_status_bad = 3       ; the image was refused (size, not an app image, signature); the transfer is over
+fw_status_fail = 4      ; writing the flash failed; the transfer is over
+fw_status_stopped = 5   ; the transfer ended without an image: a begin with size 0, the user cancelled on the
+                        ; device, or no chunk came for 30 s. May be sent unasked
 
 ; ───────────────────────── debug / observability ─────────────────────────
 dbg_ui_state = {

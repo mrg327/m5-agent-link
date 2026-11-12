@@ -180,6 +180,15 @@ static bool decode_repeated_usage_uint5uint(zcbor_state_t *state, struct usage_u
 static bool decode_repeated_usage_uint6uint(zcbor_state_t *state, struct usage_uint6uint *result);
 static bool decode_usage(zcbor_state_t *state, struct usage *result);
 static bool decode_msg_usage(zcbor_state_t *state, struct msg_usage *result);
+static bool decode_repeated_fw_begin_uint2tstr(zcbor_state_t *state, struct fw_begin_uint2tstr *result);
+static bool decode_fw_begin(zcbor_state_t *state, struct fw_begin *result);
+static bool decode_msg_fw_begin(zcbor_state_t *state, struct msg_fw_begin *result);
+static bool decode_fw_chunk(zcbor_state_t *state, struct fw_chunk *result);
+static bool decode_msg_fw_chunk(zcbor_state_t *state, struct msg_fw_chunk *result);
+static bool decode_fw_status(zcbor_state_t *state, struct fw_status_r *result);
+static bool decode_repeated_fw_ack_uint2tstr(zcbor_state_t *state, struct fw_ack_uint2tstr *result);
+static bool decode_fw_ack(zcbor_state_t *state, struct fw_ack *result);
+static bool decode_msg_fw_ack(zcbor_state_t *state, struct msg_fw_ack *result);
 static bool decode_msg_dbg_ui_state_req(zcbor_state_t *state, struct msg_dbg_ui_state_req *result);
 static bool decode_repeated_dbg_ui_state_uint1uint(zcbor_state_t *state, struct dbg_ui_state_uint1uint *result);
 static bool decode_repeated_dbg_ui_state_uint2uint(zcbor_state_t *state, struct dbg_ui_state_uint2uint *result);
@@ -2570,6 +2579,152 @@ static bool decode_msg_usage(
 	return res;
 }
 
+static bool decode_repeated_fw_begin_uint2tstr(
+		zcbor_state_t *state, struct fw_begin_uint2tstr *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (2))))
+	&& (zcbor_tstr_decode(state, (&(*result).fw_begin_uint2tstr)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_fw_begin(
+		zcbor_state_t *state, struct fw_begin *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_decode(state, (&(*result).fw_begin_uint0uint))))
+	&& (((zcbor_uint32_expect(state, (1))))
+	&& (zcbor_bstr_decode(state, (&(*result).fw_begin_uint1bstr)))
+	&& ((((*result).fw_begin_uint1bstr.len == 32)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false)))
+	&& zcbor_present_decode(&((*result).fw_begin_uint2tstr_present), (zcbor_decoder_t *)decode_repeated_fw_begin_uint2tstr, state, (&(*result).fw_begin_uint2tstr))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	if (false) {
+		/* For testing that the types of the arguments are correct.
+		 * A compiler error here means a bug in zcbor.
+		 */
+		decode_repeated_fw_begin_uint2tstr(state, (&(*result).fw_begin_uint2tstr));
+	}
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_msg_fw_begin(
+		zcbor_state_t *state, struct msg_fw_begin *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_expect(state, (24))))
+	&& ((decode_hdr(state, (&(*result).msg_fw_begin_hdr_m))))
+	&& (((zcbor_uint32_expect(state, (3))))
+	&& (decode_fw_begin(state, (&(*result).msg_fw_begin_fw_begin_m))))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_fw_chunk(
+		zcbor_state_t *state, struct fw_chunk *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_decode(state, (&(*result).fw_chunk_uint0uint))))
+	&& (((zcbor_uint32_expect(state, (1))))
+	&& (zcbor_bstr_decode(state, (&(*result).fw_chunk_uint1bstr)))
+	&& ((((*result).fw_chunk_uint1bstr.len >= 0)
+	&& ((*result).fw_chunk_uint1bstr.len <= 2048)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false)))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_msg_fw_chunk(
+		zcbor_state_t *state, struct msg_fw_chunk *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_expect(state, (25))))
+	&& ((decode_hdr(state, (&(*result).msg_fw_chunk_hdr_m))))
+	&& (((zcbor_uint32_expect(state, (3))))
+	&& (decode_fw_chunk(state, (&(*result).msg_fw_chunk_fw_chunk_m))))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_fw_status(
+		zcbor_state_t *state, struct fw_status_r *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((((zcbor_uint_decode(state, &(*result).fw_status_choice, sizeof((*result).fw_status_choice)))) && ((((((*result).fw_status_choice == fw_status_go_m_c) && ((1)))
+	|| (((*result).fw_status_choice == fw_status_done_m_c) && ((1)))
+	|| (((*result).fw_status_choice == fw_status_busy_m_c) && ((1)))
+	|| (((*result).fw_status_choice == fw_status_bad_m_c) && ((1)))
+	|| (((*result).fw_status_choice == fw_status_fail_m_c) && ((1)))
+	|| (((*result).fw_status_choice == fw_status_stopped_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_fw_ack_uint2tstr(
+		zcbor_state_t *state, struct fw_ack_uint2tstr *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (2))))
+	&& (zcbor_tstr_decode(state, (&(*result).fw_ack_uint2tstr)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_fw_ack(
+		zcbor_state_t *state, struct fw_ack *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (decode_fw_status(state, (&(*result).fw_ack_fw_status_m))))
+	&& (((zcbor_uint32_expect(state, (1))))
+	&& (zcbor_uint32_decode(state, (&(*result).fw_ack_uint1uint))))
+	&& zcbor_present_decode(&((*result).fw_ack_uint2tstr_present), (zcbor_decoder_t *)decode_repeated_fw_ack_uint2tstr, state, (&(*result).fw_ack_uint2tstr))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	if (false) {
+		/* For testing that the types of the arguments are correct.
+		 * A compiler error here means a bug in zcbor.
+		 */
+		decode_repeated_fw_ack_uint2tstr(state, (&(*result).fw_ack_uint2tstr));
+	}
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_msg_fw_ack(
+		zcbor_state_t *state, struct msg_fw_ack *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_expect(state, (26))))
+	&& ((decode_hdr(state, (&(*result).msg_fw_ack_hdr_m))))
+	&& (((zcbor_uint32_expect(state, (3))))
+	&& (decode_fw_ack(state, (&(*result).msg_fw_ack_fw_ack_m))))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_msg_dbg_ui_state_req(
 		zcbor_state_t *state, struct msg_dbg_ui_state_req *result)
 {
@@ -2855,6 +3010,9 @@ static bool decode_envelope(
 	|| (zcbor_union_elem_code(state) && (((decode_msg_kb_stroke(state, (&(*result).envelope_msg_kb_stroke_m)))) && (((*result).envelope_choice = envelope_msg_kb_stroke_m_c), true)))
 	|| (zcbor_union_elem_code(state) && (((decode_msg_kb_cands(state, (&(*result).envelope_msg_kb_cands_m)))) && (((*result).envelope_choice = envelope_msg_kb_cands_m_c), true)))
 	|| (zcbor_union_elem_code(state) && (((decode_msg_usage(state, (&(*result).envelope_msg_usage_m)))) && (((*result).envelope_choice = envelope_msg_usage_m_c), true)))
+	|| (zcbor_union_elem_code(state) && (((decode_msg_fw_begin(state, (&(*result).envelope_msg_fw_begin_m)))) && (((*result).envelope_choice = envelope_msg_fw_begin_m_c), true)))
+	|| (zcbor_union_elem_code(state) && (((decode_msg_fw_chunk(state, (&(*result).envelope_msg_fw_chunk_m)))) && (((*result).envelope_choice = envelope_msg_fw_chunk_m_c), true)))
+	|| (zcbor_union_elem_code(state) && (((decode_msg_fw_ack(state, (&(*result).envelope_msg_fw_ack_m)))) && (((*result).envelope_choice = envelope_msg_fw_ack_m_c), true)))
 	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_ui_state_req(state, (&(*result).envelope_msg_dbg_ui_state_req_m)))) && (((*result).envelope_choice = envelope_msg_dbg_ui_state_req_m_c), true)))
 	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_ui_state(state, (&(*result).envelope_msg_dbg_ui_state_m)))) && (((*result).envelope_choice = envelope_msg_dbg_ui_state_m_c), true)))
 	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_screenshot_req(state, (&(*result).envelope_msg_dbg_screenshot_req_m)))) && (((*result).envelope_choice = envelope_msg_dbg_screenshot_req_m_c), true)))

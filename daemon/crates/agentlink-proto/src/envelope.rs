@@ -59,6 +59,7 @@ messages! {
     10 Detail(Detail), 11 Cfg(DeviceCfg), 12 Batt(Batt), 13 Ping(Empty), 14 Pong(Empty),
     15 Log(Log), 16 AudioStart(AudioStart), 17 Audio(Audio), 18 AudioEnd(AudioEnd),
     19 Transcript(Transcript), 20 KbStart(KbStart), 21 KbStroke(KbStroke), 22 KbCands(KbCands), 23 Usage(Usage),
+    24 FwBegin(FwBegin), 25 FwChunk(FwChunk), 26 FwAck(FwAck),
     64 DbgUiStateReq(Empty), 65 DbgUiState(DbgUiState),
     66 DbgScreenshotReq(Empty), 67 DbgScreenshotChunk(DbgScreenshotChunk),
     68 DbgInjectInput(DbgInjectInput), 69 DbgSetLogLevel(DbgSetLogLevel),

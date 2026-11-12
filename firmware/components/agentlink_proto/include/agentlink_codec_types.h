@@ -1004,6 +1004,59 @@ struct msg_usage {
 	struct usage msg_usage_usage_m;
 };
 
+struct fw_begin_uint2tstr {
+	struct zcbor_string fw_begin_uint2tstr;
+};
+
+struct fw_begin {
+	uint32_t fw_begin_uint0uint;
+	struct zcbor_string fw_begin_uint1bstr;
+	struct fw_begin_uint2tstr fw_begin_uint2tstr;
+	bool fw_begin_uint2tstr_present;
+};
+
+struct msg_fw_begin {
+	struct hdr_r msg_fw_begin_hdr_m;
+	struct fw_begin msg_fw_begin_fw_begin_m;
+};
+
+struct fw_chunk {
+	uint32_t fw_chunk_uint0uint;
+	struct zcbor_string fw_chunk_uint1bstr;
+};
+
+struct msg_fw_chunk {
+	struct hdr_r msg_fw_chunk_hdr_m;
+	struct fw_chunk msg_fw_chunk_fw_chunk_m;
+};
+
+struct fw_status_r {
+	enum {
+		fw_status_go_m_c = 0,
+		fw_status_done_m_c = 1,
+		fw_status_busy_m_c = 2,
+		fw_status_bad_m_c = 3,
+		fw_status_fail_m_c = 4,
+		fw_status_stopped_m_c = 5,
+	} fw_status_choice;
+};
+
+struct fw_ack_uint2tstr {
+	struct zcbor_string fw_ack_uint2tstr;
+};
+
+struct fw_ack {
+	struct fw_status_r fw_ack_fw_status_m;
+	uint32_t fw_ack_uint1uint;
+	struct fw_ack_uint2tstr fw_ack_uint2tstr;
+	bool fw_ack_uint2tstr_present;
+};
+
+struct msg_fw_ack {
+	struct hdr_r msg_fw_ack_hdr_m;
+	struct fw_ack msg_fw_ack_fw_ack_m;
+};
+
 struct msg_dbg_ui_state_req {
 	struct hdr_r msg_dbg_ui_state_req_hdr_m;
 };
@@ -1128,6 +1181,9 @@ struct envelope_r {
 		struct msg_kb_stroke envelope_msg_kb_stroke_m;
 		struct msg_kb_cands envelope_msg_kb_cands_m;
 		struct msg_usage envelope_msg_usage_m;
+		struct msg_fw_begin envelope_msg_fw_begin_m;
+		struct msg_fw_chunk envelope_msg_fw_chunk_m;
+		struct msg_fw_ack envelope_msg_fw_ack_m;
 		struct msg_dbg_ui_state_req envelope_msg_dbg_ui_state_req_m;
 		struct msg_dbg_ui_state envelope_msg_dbg_ui_state_m;
 		struct msg_dbg_screenshot_req envelope_msg_dbg_screenshot_req_m;
@@ -1159,6 +1215,9 @@ struct envelope_r {
 		envelope_msg_kb_stroke_m_c,
 		envelope_msg_kb_cands_m_c,
 		envelope_msg_usage_m_c,
+		envelope_msg_fw_begin_m_c,
+		envelope_msg_fw_chunk_m_c,
+		envelope_msg_fw_ack_m_c,
 		envelope_msg_dbg_ui_state_req_m_c,
 		envelope_msg_dbg_ui_state_m_c,
 		envelope_msg_dbg_screenshot_req_m_c,

@@ -1,0 +1,14 @@
+{
+  "desc": "Device refuses the finished image: its signature does not match the running firmware's key",
+  "symbolic": {
+    "t": "fw_ack",
+    "id": 41,
+    "re": 35,
+    "b": {
+      "st": "bad",
+      "next": 1388032,
+      "msg": "Signature not trusted"
+    }
+  },
+  "cbor_hex": "a400181a01182902182303a30003011a00152e0002755369676e6174757265206e6f742074727573746564"
+}

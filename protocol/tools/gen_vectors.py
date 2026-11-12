@@ -27,6 +27,7 @@ MT = dict(hello=1, welcome=2, snapshot=3, session_upd=4, gone=5, attention=6, cl
           cmd=8, result=9, detail=10, cfg=11, batt=12, ping=13, pong=14, log=15,
           audio_start=16, audio=17, audio_end=18, transcript=19,
           kb_start=20, kb_stroke=21, kb_cands=22, usage=23,
+          fw_begin=24, fw_chunk=25, fw_ack=26,
           dbg_ui_state=65, dbg_inject_input=68)
 
 
@@ -325,6 +326,26 @@ VECTORS = {
         "Daemon answers recording 4 with its transcript; never sent automatically",
         {"t": "transcript", "id": 20, "b": {"aid": 4, "text": "run the tests again", "autosend_ms": 0}},
         env("transcript", 20, {0: 4, 1: "run the tests again", 2: 0}),
+    ),
+    "fw_begin": (
+        "Daemon starts a firmware update (proto 0.15): a 1.4 MB image, its SHA-256 and version",
+        {"t": "fw_begin", "id": 30, "b": {"size": 1388032, "sha": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "ver": "819843e"}},
+        env("fw_begin", 30, {0: 1388032, 1: bytes.fromhex("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"), 2: "819843e"}),
+    ),
+    "fw_chunk": (
+        "Daemon sends 8 bytes of the image at offset 4096",
+        {"t": "fw_chunk", "id": 31, "b": {"off": 4096, "data": "e903021000000000"}},
+        env("fw_chunk", 31, {0: 4096, 1: bytes.fromhex("e903021000000000")}),
+    ),
+    "fw_ack_go": (
+        "Device has written 6144 bytes and wants the next chunk from there",
+        {"t": "fw_ack", "id": 40, "re": 31, "b": {"st": "go", "next": 6144}},
+        env("fw_ack", 40, {0: 0, 1: 6144}, re_=31),
+    ),
+    "fw_ack_bad": (
+        "Device refuses the finished image: its signature does not match the running firmware's key",
+        {"t": "fw_ack", "id": 41, "re": 35, "b": {"st": "bad", "next": 1388032, "msg": "Signature not trusted"}},
+        env("fw_ack", 41, {0: 3, 1: 1388032, 2: "Signature not trusted"}, re_=35),
     ),
     "welcome_keys": (
         "Welcome (proto 0.7): quick replies and the 71002100a6002800300077004900a60028003000200099003601a0003000 swipe keyboard (the daemon decodes strokes)",

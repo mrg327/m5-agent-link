@@ -167,6 +167,37 @@ bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len);
  * 15–30 ms connection interval; false returns to the interval the central chose. No-op elsewhere. */
 void hal_link_interactive(bool on);
 
+/* ───────────── firmware update (OTA, FIRMWARE.md §9, proto 0.15) ───────────── */
+
+/* Writing a new app image into the spare app slot, in order, from offset 0. Core drives the transfer
+ * (core/ota.c); the board owns the flash and the trust check. A call that does not return HAL_OTA_OK ends
+ * the transfer, and hal_ota_error() then says why in a few words ("Signature not trusted"). */
+typedef enum {
+    HAL_OTA_OK = 0,
+    HAL_OTA_BAD = 1,         /* the image is refused: too big, not an app for this chip, hash or signature */
+    HAL_OTA_FAIL = 2,        /* the flash failed */
+    HAL_OTA_UNSUPPORTED = 3, /* this board cannot update itself */
+} hal_ota_result_t;
+/* Opens the spare slot for an image of `size` bytes, dropping any write in progress. */
+hal_ota_result_t hal_ota_begin(uint32_t size);
+/* Appends the next `len` bytes. May block for a flash erase (tens of ms). The first bytes are checked
+ * for an app image header. */
+hal_ota_result_t hal_ota_write(const uint8_t *data, size_t len);
+/* All `size` bytes written: verifies the image (an app for this chip, its hash, and a signature by the key
+ * the running firmware was signed with) and makes it boot next. */
+hal_ota_result_t hal_ota_finish(void);
+/* Drops a write in progress; the spare slot is left unused. Safe to call when none is open. */
+void hal_ota_abort(void);
+const char *hal_ota_error(void);
+/* True while this is a new image's first run: it has not been confirmed yet, and a reset before
+ * hal_ota_confirm() boots the previous image again (rollback). */
+bool hal_ota_unconfirmed(void);
+/* Keeps the running image (cancels the rollback). No-op when it is already confirmed. */
+void hal_ota_confirm(void);
+/* Restarts the device (into the new image after hal_ota_finish(), else the same one). Does not return on
+ * the watch; the simulator logs it and carries on. */
+void hal_restart(void);
+
 /* ───────────── debug / observability (DESIGN §0) ───────────── */
 
 /* Write one JSON object line to the debug channel (USB CDC `#`-prefixed lines on

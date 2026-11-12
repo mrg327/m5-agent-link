@@ -310,6 +310,31 @@ usage { at, h5?, h5r?, h5o?, wk?, wkr?, wko? }      daemon → device (type 23)
   after a lag. Only status lines from this machine feed it.
 - The device shows a window while the clock is set, the window has not reset and `at` is under an hour old.
 
+## 6c. Firmware update (proto 0.15, [FIRMWARE.md](FIRMWARE.md) §9, issue b769)
+```
+fw_begin { size, sha: bstr(32), ver? }           daemon → device (type 24); size 0 stops
+fw_chunk { off, data: bstr(≤ 2048) }             daemon → device (type 25)
+fw_ack   { st, next, msg? }                      device → daemon (type 26)
+st: go 0 | done 1 | busy 2 | bad 3 | fail 4 | stopped 5
+```
+- Only to a device with proto ≥ 0.15, and only when asked (`agentlink ota <image.bin>`); never on its own.
+- `fw_begin` opens a transfer of a whole app image (`sha` is its SHA-256). The device answers `fw_ack go`
+  with `next` = 0, or with the offset it already holds when a transfer of the same `sha` and `size` is open
+  (resume after a dropped link). It answers `busy` (recording, low battery and not charging, another link
+  updating it) or `bad` (does not fit, or this board cannot update itself) with a short `msg`.
+- The daemon then sends `fw_chunk`s in order from `next`, at most 4 unanswered. The device writes each chunk
+  whose `off` equals its `next` and acks `go` with the new `next`; a chunk at any other offset is not written,
+  and its ack carries the expected `next`, from which the daemon resends.
+- After the last byte the device verifies the image (an app for this chip, the SHA-256, and a signature by
+  the key the running firmware was signed with) and acks `done`, then restarts about a second later into
+  the new image; or acks `bad` (refused) / `fail` (flash error) and keeps running the old one.
+- `fw_begin` with `size` 0 stops the transfer; the device acks `stopped`. The device also sends `stopped`
+  on its own when the user cancels (B held) or no chunk has arrived for 30 s.
+- The new image runs unconfirmed until a daemon welcomes it; it then keeps itself. If it is not welcomed
+  within 5 minutes, or resets before that, the previous image boots again (rollback). The daemon compares the
+  `fw` in the next `hello` with the image's version to tell the two apart.
+- Chunks never reach the trace (it shows the size only).
+
 ## 7. Misc
 - `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray.
 - `cfg { … }` (daemon → device) is a partial update of the `welcome.cfg` fields.

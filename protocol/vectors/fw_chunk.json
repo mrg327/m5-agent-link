@@ -1,0 +1,12 @@
+{
+  "desc": "Daemon sends 8 bytes of the image at offset 4096",
+  "symbolic": {
+    "t": "fw_chunk",
+    "id": 31,
+    "b": {
+      "off": 4096,
+      "data": "e903021000000000"
+    }
+  },
+  "cbor_hex": "a300181901181f03a2001910000148e903021000000000"
+}
