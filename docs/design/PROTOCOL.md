@@ -72,7 +72,7 @@ device                                 daemon
 ### `hello` (device → daemon)
 ```cddl
 hello = {
-  proto: [uint, uint],             ; [major, minor] = [0, 11]
+  proto: [uint, uint],             ; [major, minor] = [0, 14]
   dev: { class: tstr,              ; "watch" | "desk" | "pad" | "sim" | ...
          board: tstr,              ; "m5stopwatch"
          fw: tstr,                 ; semver
@@ -133,7 +133,12 @@ session = {
   ? pm: perm_mode,           ; default / plan / accept_edits / auto / dont_ask / bypass │ (GAUGES.md)
   ? pr: uint,                ; open pull request number; 0 = none (not under meta)  │
   ? prs: pr_state,           ; none / pending / approved / changes / draft          ┘
-  ? hush: bool               ; only with the delta that enters done / error; proto ≥ 0.12 (PRESENCE.md)
+  ? hush: bool,              ; only with the delta that enters done / error; proto ≥ 0.12 (PRESENCE.md)
+  ? fc: uint,                ; files the turn changed (≥ 1)                          ┐
+  ? la: uint,                ; lines added, with lr                                  │ proto ≥ 0.14
+  ? lr: uint,                ; lines removed                                          │ (DONE-SUMMARY.md)
+  ? tp: bool,                ; the last recognised test run: true passed, false failed │ key 30-34
+  ? dur: uint                ; the turn's length in seconds                           ┘
 }
 ```
 - `q` / `rp` (keys 17, 18, proto 0.5): when an agent's turn ends on a question, the daemon reads it from the turn's last message (Claude Code's Stop hook carries `last_assistant_message`) and sends the question (≤ 120 chars) with up to 3 answers (≤ 24 chars): the options of an "A or B?" question, else `Yes, go ahead` / `No` for a yes/no one, else none. The watch lists them first under Reply, with the question above. They are cleared (`""`, `[]`: a delta cannot remove a key) as soon as the agent works again. Agent content: never sent under privacy `meta`, and only to devices with proto ≥ 0.5.
@@ -191,6 +196,12 @@ clear = { rid: uint, why: "answered_pc"/"answered_dev"/"expired"/"cancelled"/"ha
   changes nothing else. It is only ever `true`, only sent to devices with proto ≥ 0.12, and never stored (a
   delta without it says nothing). The card, its actions and the answer window are as ever; the window itself is
   shorter when the user is at the keyboard (`left` / `win` say so). An old device buzzes as before.
+
+- **Done summary (proto 0.14, [DONE-SUMMARY.md](DONE-SUMMARY.md)).** `fc`, `la` / `lr`, `tp` and `dur` (keys 30-34)
+  say what the turn that just ended did, tallied by the daemon from Claude Code's hooks. Each is optional and an
+  absent one is unknown, never zero. They come with the delta that enters done / error (and in a snapshot); a
+  delta that changes `st` clears the device's copy and one carrying any of them replaces it whole. Counts and
+  seconds only: no file name is sent, and privacy `meta` does not withhold them. Only to devices with proto ≥ 0.14.
 
 The device must show approve/deny **only if** they are in `acts`. The daemon includes them only for prompts the agent itself raised (DESIGN Q6). An option is answered with `cmd { op: "reply", rid, arg: index }`; the daemon maps the index back to the agent's choice (UI-V2 §7).
 

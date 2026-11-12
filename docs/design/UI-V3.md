@@ -238,6 +238,15 @@ A terminal command that runs longer than ten seconds is a session like an agent'
 - The empty deck and the ambient face show `5h 42%` (`FONT_BODY`, y 304) while the plan's 5-hour figure is
   known and fresh; amber from 80 %.
 
+### 4.1d The done summary (2026-11-12, [DONE-SUMMARY.md](DONE-SUMMARY.md))
+
+- A finished (done / error) Claude session with a summary draws one line at y 246 in place of the step text:
+  `3 files · +120 –14 · ✓ passed · 4m 12s`, `FONT_BODY` `COL_TEXT2`, at most 372 px. Parts: files, lines, tests,
+  time; unknown ones are not drawn. Failed tests alone are vermillion (`✗ tests failed`). Too wide: `tests
+  passed` shortens to `passed`, then the lines, the time and the files drop, in that order; the tests stay.
+- Not for jobs, a request, a merged slot or "On your computer". The Activity footer (y 322, `FONT_CAPTION`)
+  shows the same line for a finished session.
+
 ### 4.2 AGENT
 
 Caption y 72: the project (host first when remote). The list (§3.2) centred on y 232 (250 under a question). Items and
