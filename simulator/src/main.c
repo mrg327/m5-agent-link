@@ -77,6 +77,7 @@ int main(int argc, char **argv)
         uint32_t now = (uint32_t)(hal_time_us() / 1000);
         sim_display_pump();
         sim_link_poll(now);
+        sim_motion_poll(now);
         if (script_running && !sim_script_poll(now)) {
             if (sim_script_failed()) return 1;
             if (headless || no_ws) break;

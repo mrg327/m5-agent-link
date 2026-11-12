@@ -16,3 +16,4 @@ void feedback_scroll_stop(void); /* SCROLL reached the bottom or the top: one 40
 void feedback_quiet_toggled(void); /* STATUS: quiet mode changed: two spaced pulses */
 void feedback_finished(bool error); /* a watched or notify-armed session finished: done two soft, error three firm pulses */
 void feedback_hello(void);   /* boot buzz; ignores the alert mode */
+void feedback_silence_now(void); /* stop the motor and the speaker at once (palm cover); changes no setting */

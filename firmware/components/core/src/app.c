@@ -16,6 +16,8 @@
 #include "power.h"
 #include "ring.h"
 #include "model.h"
+#include "motion.h"
+#include "prefs.h"
 #include "ui.h"
 #include "ui_theme.h"
 
@@ -36,11 +38,12 @@ static atomic_flag s_rx_lock = ATOMIC_FLAG_INIT; /* transports may deliver from 
 static atomic_uint s_frames_dropped;
 static link_evt_t s_link_buf[8];
 static btn_evt_t s_btn_buf[16];
-static hal_motion_evt_t s_motion_buf[8];
+static hal_motion_evt_t s_motion_buf[16];
 static gesture_evt_t s_gesture_buf[32];
 
 static uint32_t s_frames_drawn, s_fps, s_fps_t0, s_px_flushed;
 static lv_indev_t *s_touch;
+static lv_display_t *s_disp_main;
 
 uint32_t app_now_ms(void) { return (uint32_t)(hal_time_us() / 1000); }
 uint32_t app_fps(void) { return s_fps; }
@@ -120,9 +123,17 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 {
     s_hal_touch_read(indev, data);
     bool down = data->state == LV_INDEV_STATE_PRESSED;
-    if (keys_touch(down, data->point.x, data->point.y, app_now_ms())) return; /* KEYS owns the finger: strokes, not gestures */
+    /* The panel reports its own coordinates and LVGL turns them for the widgets when the UI is rotated; the
+     * recognizer, the bezel dial and the keyboard work on what the user sees, so they get the turned point. */
+    int32_t x = data->point.x, y = data->point.y;
+    lv_display_t *disp = lv_indev_get_display(indev);
+    if (disp && lv_display_get_rotation(disp) == LV_DISPLAY_ROTATION_180) {
+        x = lv_display_get_horizontal_resolution(disp) - 1 - x;
+        y = lv_display_get_vertical_resolution(disp) - 1 - y;
+    }
+    if (keys_touch(down, x, y, app_now_ms())) return; /* KEYS owns the finger: strokes, not gestures */
     if (!down && !s_gesture.pressed) return;
-    gesture_touch(&s_gesture, down, data->point.x, data->point.y, app_now_ms());
+    gesture_touch(&s_gesture, down, x, y, app_now_ms());
 }
 
 static void on_refr_ready(lv_event_t *e)
@@ -286,10 +297,13 @@ static void act_scroll(uint32_t sid, nav_scroll_unit_t unit, int delta)
 }
 
 /* The nag is an alert too: quiet mode holds it as it holds the arrival buzz. */
+static uint32_t s_muted_rid, s_muted_sid; /* the request a palm cover silenced (0 = none) */
+
 static void act_nag(void)
 {
     const attention_t *first = model_attention_first();
     if (first && sid_snoozed(first->sid)) return;
+    if (first && s_muted_rid && first->rid == s_muted_rid && first->sid == s_muted_sid) return; /* covered: no reminders */
     if (!model_quiet_active(app_now_unix())) feedback_attention(ATT_APPROVAL);
 }
 
@@ -338,7 +352,8 @@ static void on_attention(const attention_t *a)
         dbg_event("ui", "snoozed", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
     } else {
         feedback_attention(a->kind);
-        power_attention(rgb, app_now_ms());
+        if (!motion_face_down()) power_attention(rgb, app_now_ms()); /* face down nobody sees a glow */
+        if (a->rid != s_muted_rid || a->sid != s_muted_sid) s_muted_rid = s_muted_sid = 0; /* a new request */
     }
     if (!power_display_on() || ui_glow_active()) return; /* a glow: the first touch reveals it */
     if (a->kind == ATT_DONE) return;
@@ -458,6 +473,8 @@ static void drain_input(uint32_t now)
     while (ring_pop(&s_btn_evts, &b)) gesture_button(&s_gesture, b.btn, b.down, b.t_ms);
     hal_motion_evt_t m;
     while (ring_pop(&s_motion_evts, &m)) {
+        if (m.kind == HAL_MOTION_TILT) motion_sample(m.x_mg, m.y_mg, m.z_mg, now);
+        if (m.kind == HAL_MOTION_LIFT) motion_lift(now);
         gesture_evt_t g = {.kind = m.kind == HAL_MOTION_LIFT ? G_LIFT : G_SHAKE};
         if (m.kind == HAL_MOTION_LIFT || m.kind == HAL_MOTION_SHAKE) ring_push(&s_gestures, &g);
     }
@@ -477,11 +494,61 @@ static void drain_link(uint32_t now)
     ui_set_link_transport(link_connected() ? (int)link_active_kind() : -1);
 }
 
+/* ── motion (docs/design/MOTION.md): wake, orientation, palm cover. Never answers, selects or dismisses. ── */
+
+/* Raising the wrist wakes the display the way a touch does: a dark display lights, a glow is revealed, the
+ * ambient dim ends. It is not input to the UI, so nothing is pressed, answered or selected. */
+static void on_raise(uint32_t now)
+{
+    bool glow = ui_glow_active();
+    ui_note_motion();
+    if (power_activity(now)) {
+        uint32_t sid = glow ? ui_pending_attention_sid() : 0;
+        if (sid) ui_show_attention(sid);
+        dbg_event("power", "wake_motion", NULL);
+    }
+}
+
+/* The UI is turned by 180 degrees when the preference says so, or (automatic) when the watch has been still
+ * the other way up for a while. Never in the middle of a touch, a button hold or a stroke. */
+static void orientation_step(void)
+{
+    if (!s_disp_main) return;
+    orient_mode_t m = prefs_orient();
+    bool want = m == ORIENT_FLIPPED || (m == ORIENT_AUTO && motion_auto_flipped());
+    bool now_flipped = lv_display_get_rotation(s_disp_main) == LV_DISPLAY_ROTATION_180;
+    if (want == now_flipped) return;
+    if (s_gesture.pressed || s_gesture.btn[0].down || s_gesture.btn[1].down || keys_active() || voice_state() == VOICE_REC) return;
+    hal_display_set_rotation_180(want);
+    lv_obj_invalidate(lv_screen_active());
+    dbg_event("ui", "orientation", "\"flipped\":%s,\"mode\":%d", want ? "true" : "false", (int)m);
+}
+
+/* A palm over the glass (the controller sees several contacts at once) silences the alert in progress: the
+ * motor and the speaker stop and its reminders are dropped. The request itself stays, unanswered. */
+static void cover_step(void)
+{
+    static bool was;
+    bool cov = hal_touch_covered();
+    if (cov && !was) {
+        feedback_silence_now();
+        const attention_t *first = model_attention_first();
+        if (first) {
+            s_muted_rid = first->rid;
+            s_muted_sid = first->sid;
+        }
+        dbg_event("ui", "cover_mute", "\"rid\":%u", (unsigned)s_muted_rid);
+    }
+    was = cov;
+}
+
 /* ── public ── */
 
 void core_set_idle_timeout_ms(uint32_t ms) { power_set_idle_timeout_ms(ms); }
 void core_set_deep_after_ms(uint32_t ms) { power_set_deep_after_ms(ms); }
 void core_dump_ui_state(void) { dbg_dump_ui_state(); }
+
+bool core_display_flipped(void) { return s_disp_main && lv_display_get_rotation(s_disp_main) == LV_DISPLAY_ROTATION_180; }
 
 const char *core_screen_name(void)
 {
@@ -504,7 +571,7 @@ void core_init(void)
     ring_init(&s_frames, s_frame_buf, sizeof s_frame_buf[0], FRAME_SLOTS);
     ring_init(&s_link_evts, s_link_buf, sizeof s_link_buf[0], 8);
     ring_init(&s_btn_evts, s_btn_buf, sizeof s_btn_buf[0], 16);
-    ring_init(&s_motion_evts, s_motion_buf, sizeof s_motion_buf[0], 8);
+    ring_init(&s_motion_evts, s_motion_buf, sizeof s_motion_buf[0], 16);
     ring_init(&s_gestures, s_gesture_buf, sizeof s_gesture_buf[0], 32);
     gesture_init(&s_gesture, on_gesture, NULL);
 
@@ -513,11 +580,14 @@ void core_init(void)
               (unsigned)bi->width, (unsigned)bi->height);
 
     model_init();
+    prefs_init();
+    motion_reset();
     model_set_session_hook(on_session);
     power_init();
     lv_init();
     lv_tick_set_cb(tick_cb);
     lv_display_t *disp = hal_display_create();
+    s_disp_main = disp;
     lv_display_add_event_cb(disp, on_refr_ready, LV_EVENT_REFR_READY, NULL);
     lv_display_add_event_cb(disp, on_flush_start, LV_EVENT_FLUSH_START, NULL);
     s_touch = hal_touch_create(disp);
@@ -531,6 +601,7 @@ void core_init(void)
     link_init(&s_hooks);
     hal_buttons_set_callback(on_button);
     hal_motion_set_callback(on_motion);
+    hal_motion_stream_tilt(true);
     hal_link_start(on_rx, on_state);
 #if CORE_BOOT_BUZZ
     if (!power_woke_by_timer()) feedback_hello(); /* a reconnect attempt stays silent and dark */
@@ -543,6 +614,8 @@ uint32_t core_step(void)
 {
     uint32_t now = app_now_ms();
     drain_input(now);
+    if (motion_take_raise()) on_raise(now);
+    cover_step();
     drain_link(now);
     power_tick(now);
     uint32_t wait = lv_timer_handler();
@@ -555,6 +628,7 @@ uint32_t core_step(void)
     if (keys_active()) power_activity(now); /* the keyboard keeps the display on */
     if (voice_state() == VOICE_REC || voice_state() == VOICE_WAIT) power_activity(now); /* stay awake while dictating */
     ui_tick(now);
+    orientation_step();
     dbg_tick(now);
 
     if (now - s_fps_t0 >= 1000) {

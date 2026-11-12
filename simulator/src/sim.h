@@ -13,13 +13,19 @@ void sim_input_button(int btn, bool down);
 void sim_set_battery(bool on_battery);
 void sim_set_wake(hal_wake_t why, uint32_t retained);
 void sim_input_motion(hal_motion_kind_t kind);
+/* The pose the simulated IMU reports (milli-g, screen axes) and the palm-cover flag of the touch controller. */
+void sim_set_pose(int x, int y, int z);
+void sim_set_cover(bool on);
+void sim_motion_poll(uint32_t now_ms); /* streams one sample per 100 ms, as the watch's IMU task does */
 
 /* sim_display.c */
 void sim_display_set_headless(bool headless);
 void sim_display_pump(void);          /* SDL events (mouse/keys), then present if dirty */
 bool sim_display_quit_requested(void);
 void sim_input_pointer(bool down, int x, int y);
-bool sim_save_png(const char *path);  /* current framebuffer, round mask applied */
+bool sim_save_png(const char *path);
+void sim_fb_mark(void);              /* remember the current framebuffer */
+int sim_fb_flipped_match_pct(void); /* % of pixels equal to the marked frame turned 180 degrees */  /* current framebuffer, round mask applied */
 
 /* sim_link.c */
 void sim_link_enable_ws(bool enable);

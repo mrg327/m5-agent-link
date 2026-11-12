@@ -1,19 +1,25 @@
 #include "feedback.h"
 
 #include "hal.h"
+#include "motion.h"
+#include "prefs.h"
 #include "sound.h"
 
 #define DETENT_MIN_GAP_MS 45
 
+/* A watch lying face down is silent (MOTION.md): nothing buzzes or sounds until it is turned back. The
+ * user's alert mode is not touched, so it applies again the moment the watch is lifted. */
 static void haptic(const uint16_t *p, size_t n)
 {
-    if (model_settings()->alert != ALERT_SILENT) hal_haptic_play(p, n);
+    if (model_settings()->alert != ALERT_SILENT && !motion_face_down()) hal_haptic_play(p, n);
 }
 
-/* Speaker cues (roles in sound_bank.c); only in the full alert mode ("Sounds: on"). */
+/* Speaker cues (roles in sound_bank.c); only in the full alert mode ("Sounds: on"), at the stored volume. */
 static void sound(const char *role)
 {
-    if (model_settings()->alert == ALERT_FULL) sound_play(role);
+    if (model_settings()->alert != ALERT_FULL || motion_face_down() || !prefs_volume()) return;
+    hal_audio_set_volume(prefs_volume_percent());
+    sound_play(role);
 }
 
 /* Entry haptics follow docs/design/UI-RING.md §4. Normal pulses stay >= 35 ms: shorter ones do not spin the motor. */
@@ -73,12 +79,14 @@ void feedback_approved(void)
 {
     static const uint16_t approved[] = {150};
     haptic(approved, 1);
+    sound("approved");
 }
 
 void feedback_denied(void)
 {
     static const uint16_t denied[] = {60, 90, 60};
     haptic(denied, 3);
+    sound("denied");
 }
 
 /* Three ticks: an answer went out that neither grants nor denies. */
@@ -126,4 +134,11 @@ void feedback_hello(void)
 {
     static const uint16_t hello[] = {60};
     hal_haptic_play(hello, 1); /* unconditional: proves the motor path regardless of the alert mode */
+}
+
+/* A palm cover: whatever buzz or sound is running stops. Nothing is stored; the next alert plays normally. */
+void feedback_silence_now(void)
+{
+    hal_haptic_play(NULL, 0);
+    hal_audio_play(NULL, 0);
 }

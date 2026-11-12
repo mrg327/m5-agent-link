@@ -338,3 +338,49 @@ if(Python3_FOUND)
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/ram_budget.py $<TARGET_FILE:core> 81920)
     set_tests_properties(core_ram_budget PROPERTIES SKIP_RETURN_CODE 77)
 endif()
+
+# ── Motion (docs/design/MOTION.md) ──
+add_executable(test_motion tests/test_motion.c ${FW}/core/src/motion.c)
+target_include_directories(test_motion PRIVATE ${FW}/core/src)
+add_test(NAME motion_logic COMMAND test_motion)
+
+# Raise to wake: the display (off after 1 s) lights on a raise from hanging to reading, once, and a bump on a
+# desk does nothing; the pending permission request is left unanswered.
+add_test(NAME sim_motion_raise_wake
+         COMMAND agentlink_sim --headless --no-ws --idle-off 1 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/motion_raise_wake.txt)
+set_tests_properties(sim_motion_raise_wake PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]|\"wake_motion\".*\"wake_motion\""
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"display_off\".*\"ev\":\"display_on\".*\"wake_motion\"")
+# Face down: no buzz, no sound, no glow, no settings change; the display sleeps. Face up again, the next request buzzes and sounds.
+sim_script_test(sim_motion_face_down motion_face_down.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[[0-9]+,[0-9]|\"ev\":\"sound\"|\"ev\":\"glow\"|\"ev\":\"settings\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"attention\",\"rid\":7.*\"ev\":\"display_off\"")
+sim_script_test(sim_motion_face_up_restores motion_face_up_restores.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"settings\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"attention\",\"rid\":7,([^p]|p[^a]|pa[^t])*\"ev\":\"attention\",\"rid\":8.*\"pattern_ms\":\\[250,120,250\\].*\"ev\":\"sound\"")
+# Orientation: automatic with dwell and hysteresis, never during a touch; the stored setting; touch maths follow the turn.
+sim_script_test(sim_motion_orientation motion_orientation.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"orientation\",\"flipped\":true.*\"ev\":\"orientation\",\"flipped\":false")
+sim_script_test(sim_motion_orientation_stored motion_orientation_stored.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# Palm cover: the motor and speaker stop and the 15 s reminder is dropped; the request is not answered.
+sim_script_test(sim_motion_cover_mute motion_cover_mute.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"sound\".*pattern_ms\":\\[\\].*\"ev\":\"sound_stop\".*\"ev\":\"cover_mute\"")
+sim_script_test(sim_motion_cover_control motion_cover_nag_control.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"cover_mute\""
+                PASS_REGULAR_EXPRESSION "pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]")
+# Confirmation tones: rising on an approve hold, falling on a deny hold; none with Sounds off.
+sim_script_test(sim_tone_approved approve_hold.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"op\":3.*\"ev\":\"sound\",\"samples\":4320")
+sim_script_test(sim_tone_denied ask_deny_hold.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[35]"
+                PASS_REGULAR_EXPRESSION "\"op\":4.*\"ev\":\"sound\",\"samples\":5440")
+sim_script_test(sim_tone_quiet confirm_tone_quiet.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"sound\""
+                PASS_REGULAR_EXPRESSION "\"op\":4.*pattern_ms\":\\[60,90,60\\]")
+sim_script_test(sim_volume_step confirm_tone_volume.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"volume\",\"percent\":25.*\"ev\":\"sound\"")
+sim_script_test(sim_volume_zero confirm_tone_volume0.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"sound\"")

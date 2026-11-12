@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include "sim.h"
@@ -48,7 +49,51 @@ void hal_rtc_set_unix(uint32_t unix_s)
 
 void hal_buttons_set_callback(hal_button_cb_t cb) { s_button_cb = cb; }
 void hal_motion_set_callback(hal_motion_cb_t cb) { s_motion_cb = cb; }
-void hal_motion_stream_tilt(bool enable) { (void)enable; }
+static bool s_tilt_stream;
+static int s_pose[3] = {0, 0, 1000}; /* lying face up, still */
+static uint32_t s_pose_next_ms;
+static bool s_cover_on;
+void hal_motion_stream_tilt(bool enable) { s_tilt_stream = enable; }
+bool hal_touch_covered(void) { return s_cover_on; }
+void sim_set_cover(bool on) { s_cover_on = on; }
+void sim_set_pose(int x, int y, int z)
+{
+    s_pose[0] = x;
+    s_pose[1] = y;
+    s_pose[2] = z;
+}
+
+/* The IMU task of the watch: one gravity sample every 100 ms while streaming. */
+void sim_motion_poll(uint32_t now_ms)
+{
+    if (!s_tilt_stream || !s_motion_cb || (int32_t)(now_ms - s_pose_next_ms) < 0) return;
+    s_pose_next_ms = now_ms + 100;
+    hal_motion_evt_t e = {.kind = HAL_MOTION_TILT, .x_mg = (int16_t)s_pose[0], .y_mg = (int16_t)s_pose[1],
+                          .z_mg = (int16_t)s_pose[2], .t_us = hal_time_us()};
+    s_motion_cb(&e);
+}
+
+static uint32_t s_prefs[8][2]; /* key hash, value; RAM only */
+static const char *s_pref_keys[8];
+uint32_t hal_pref_get(const char *key, uint32_t fallback)
+{
+    for (int i = 0; i < 8; i++)
+        if (s_pref_keys[i] && !strcmp(s_pref_keys[i], key)) return s_prefs[i][1];
+    return fallback;
+}
+
+void hal_pref_set(const char *key, uint32_t value)
+{
+    int free_i = -1;
+    for (int i = 0; i < 8; i++) {
+        if (s_pref_keys[i] && !strcmp(s_pref_keys[i], key)) return (void)(s_prefs[i][1] = value);
+        if (!s_pref_keys[i] && free_i < 0) free_i = i;
+    }
+    if (free_i >= 0) {
+        s_pref_keys[free_i] = key; /* callers pass string literals */
+        s_prefs[free_i][1] = value;
+    }
+}
 
 void sim_input_button(int btn, bool down)
 {
@@ -70,7 +115,18 @@ void hal_haptic_play(const uint16_t *on_off_ms, size_t count)
     sim_log("haptic", "\"pattern_ms\":[%s]", list);
 }
 
-void hal_audio_play(const int16_t *pcm, size_t n) { (void)pcm; sim_log("sound", "\"samples\":%u", (unsigned)n); }
+void hal_audio_play(const int16_t *pcm, size_t n)
+{
+    if (!pcm || !n) sim_log("sound_stop", NULL);
+    else sim_log("sound", "\"samples\":%u", (unsigned)n);
+}
+static uint8_t s_volume = 100;
+void hal_audio_set_volume(uint8_t percent)
+{
+    if (percent == s_volume) return;
+    s_volume = percent;
+    sim_log("volume", "\"percent\":%u", (unsigned)percent);
+}
 void *hal_audio_alloc(size_t bytes) { return malloc(bytes); }
 
 hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)

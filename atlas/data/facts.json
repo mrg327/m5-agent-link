@@ -2303,6 +2303,20 @@
         "pick": "input-ff",
         "repeat": 3,
         "gap_ms": 90
+      },
+      {
+        "id": "approved",
+        "when": "An approval hold completes and the answer goes out (rises)",
+        "pick": "approved-rise",
+        "repeat": 1,
+        "gap_ms": 0
+      },
+      {
+        "id": "denied",
+        "when": "A deny or stop hold completes and the answer goes out (falls)",
+        "pick": "denied-fall",
+        "repeat": 1,
+        "gap_ms": 0
       }
     ],
     "bank": [
@@ -4521,6 +4535,130 @@
           "ms": 0,
           "pct": 0
         }
+      },
+      {
+        "id": "approved-chime",
+        "role": "approved",
+        "name": "Chime",
+        "tracks": [
+          [
+            {
+              "wave": "fm",
+              "note": 79,
+              "slide": 0,
+              "vol": 9,
+              "ms": 60,
+              "decay": 0
+            },
+            {
+              "wave": "fm",
+              "note": 86,
+              "slide": 0,
+              "vol": 9,
+              "ms": 220,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "approved-rise",
+        "role": "approved",
+        "name": "Rising",
+        "tracks": [
+          [
+            {
+              "wave": "sq25",
+              "note": 72,
+              "slide": 0,
+              "vol": 10,
+              "ms": 50,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 79,
+              "slide": 0,
+              "vol": 10,
+              "ms": 50,
+              "decay": 0
+            },
+            {
+              "wave": "sq25",
+              "note": 84,
+              "slide": 0,
+              "vol": 10,
+              "ms": 170,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "denied-fall",
+        "role": "denied",
+        "name": "Falling",
+        "tracks": [
+          [
+            {
+              "wave": "tri",
+              "note": 74,
+              "slide": 0,
+              "vol": 12,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 67,
+              "slide": 0,
+              "vol": 12,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 60,
+              "slide": 0,
+              "vol": 12,
+              "ms": 200,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "denied-drop",
+        "role": "denied",
+        "name": "Drop",
+        "tracks": [
+          [
+            {
+              "wave": "tri",
+              "note": 67,
+              "slide": 55,
+              "vol": 12,
+              "ms": 220,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       }
     ]
   },
@@ -4591,34 +4729,34 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:534",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:484",
-    "gesture_map.chord": "firmware/components/core/src/app.c:418",
+    "gesture_map.chord": "firmware/components/core/src/app.c:433",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:187",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:156",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:333",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:347",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:445",
-    "haptics.approved": "firmware/components/core/src/feedback.c:74",
-    "haptics.denied": "firmware/components/core/src/feedback.c:80",
-    "haptics.deny_ramp": "firmware/components/core/src/feedback.c:61",
-    "haptics.detent": "firmware/components/core/src/feedback.c:43",
-    "haptics.detent_min_gap_ms": "firmware/components/core/src/feedback.c:6",
-    "haptics.done": "firmware/components/core/src/feedback.c:25",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:460",
+    "haptics.approved": "firmware/components/core/src/feedback.c:80",
+    "haptics.denied": "firmware/components/core/src/feedback.c:87",
+    "haptics.deny_ramp": "firmware/components/core/src/feedback.c:67",
+    "haptics.detent": "firmware/components/core/src/feedback.c:49",
+    "haptics.detent_min_gap_ms": "firmware/components/core/src/feedback.c:8",
+    "haptics.done": "firmware/components/core/src/feedback.c:31",
     "haptics.duty": "firmware/boards/stopwatch/input.cpp:17",
-    "haptics.error": "firmware/components/core/src/feedback.c:24",
-    "haptics.hello": "firmware/components/core/src/feedback.c:127",
-    "haptics.hold_ramp": "firmware/components/core/src/feedback.c:54",
+    "haptics.error": "firmware/components/core/src/feedback.c:30",
+    "haptics.hello": "firmware/components/core/src/feedback.c:135",
+    "haptics.hold_ramp": "firmware/components/core/src/feedback.c:60",
     "haptics.kick_duty": "firmware/boards/stopwatch/input.cpp:18",
     "haptics.kick_ms": "firmware/boards/stopwatch/input.cpp:19",
     "haptics.kick_only_rule": "firmware/boards/stopwatch/input.cpp:122",
     "haptics.kick_rule": "firmware/boards/stopwatch/input.cpp:108",
-    "haptics.permission": "firmware/components/core/src/feedback.c:22",
-    "haptics.question": "firmware/components/core/src/feedback.c:23",
-    "haptics.quiet_toggled": "firmware/components/core/src/feedback.c:108",
-    "haptics.reject": "firmware/components/core/src/feedback.c:93",
-    "haptics.reply_sent": "firmware/components/core/src/feedback.c:87",
-    "haptics.scroll_stop": "firmware/components/core/src/feedback.c:100",
-    "haptics.tick": "firmware/components/core/src/feedback.c:36",
+    "haptics.permission": "firmware/components/core/src/feedback.c:28",
+    "haptics.question": "firmware/components/core/src/feedback.c:29",
+    "haptics.quiet_toggled": "firmware/components/core/src/feedback.c:116",
+    "haptics.reject": "firmware/components/core/src/feedback.c:101",
+    "haptics.reply_sent": "firmware/components/core/src/feedback.c:95",
+    "haptics.scroll_stop": "firmware/components/core/src/feedback.c:108",
+    "haptics.tick": "firmware/components/core/src/feedback.c:42",
     "link.hello_retry_ms": "firmware/components/core/src/link.c:10",
     "link.idle_ping_ms": "firmware/components/core/src/link.c:16",
     "link.ping_interval_ms": "daemon/crates/agentlinkd/src/usb.rs:26",
@@ -4680,50 +4818,54 @@
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:299",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:55",
     "screens.status": "firmware/components/core/src/ui_status.c:292",
-    "sounds.done-achieve": "firmware/components/core/src/sound_bank.c:54",
-    "sounds.done-bonus": "firmware/components/core/src/sound_bank.c:39",
-    "sounds.done-clear": "firmware/components/core/src/sound_bank.c:23",
-    "sounds.done-coin": "firmware/components/core/src/sound_bank.c:21",
-    "sounds.done-contra": "firmware/components/core/src/sound_bank.c:107",
-    "sounds.done-fanfare": "firmware/components/core/src/sound_bank.c:47",
-    "sounds.done-ff": "firmware/components/core/src/sound_bank.c:123",
-    "sounds.done-ko": "firmware/components/core/src/sound_bank.c:66",
-    "sounds.done-levelup": "firmware/components/core/src/sound_bank.c:70",
-    "sounds.done-megaman": "firmware/components/core/src/sound_bank.c:114",
-    "sounds.done-metroid": "firmware/components/core/src/sound_bank.c:121",
-    "sounds.done-pacman": "firmware/components/core/src/sound_bank.c:130",
-    "sounds.done-pokemon": "firmware/components/core/src/sound_bank.c:97",
-    "sounds.done-powerup": "firmware/components/core/src/sound_bank.c:28",
-    "sounds.done-quest": "firmware/components/core/src/sound_bank.c:56",
-    "sounds.done-sf2": "firmware/components/core/src/sound_bank.c:111",
-    "sounds.done-sonic": "firmware/components/core/src/sound_bank.c:128",
-    "sounds.done-sparkle": "firmware/components/core/src/sound_bank.c:60",
-    "sounds.done-tetris": "firmware/components/core/src/sound_bank.c:133",
-    "sounds.done-treasure": "firmware/components/core/src/sound_bank.c:34",
-    "sounds.done-warp": "firmware/components/core/src/sound_bank.c:44",
-    "sounds.done-zelda": "firmware/components/core/src/sound_bank.c:104",
-    "sounds.input-bell": "firmware/components/core/src/sound_bank.c:88",
-    "sounds.input-blip": "firmware/components/core/src/sound_bank.c:79",
-    "sounds.input-bubble": "firmware/components/core/src/sound_bank.c:87",
-    "sounds.input-chk": "firmware/components/core/src/sound_bank.c:83",
-    "sounds.input-confirm": "firmware/components/core/src/sound_bank.c:81",
-    "sounds.input-contra": "firmware/components/core/src/sound_bank.c:142",
-    "sounds.input-ff": "firmware/components/core/src/sound_bank.c:149",
-    "sounds.input-jump": "firmware/components/core/src/sound_bank.c:84",
-    "sounds.input-lock": "firmware/components/core/src/sound_bank.c:89",
-    "sounds.input-megaman": "firmware/components/core/src/sound_bank.c:146",
-    "sounds.input-metroid": "firmware/components/core/src/sound_bank.c:147",
-    "sounds.input-pacman": "firmware/components/core/src/sound_bank.c:152",
-    "sounds.input-pew": "firmware/components/core/src/sound_bank.c:86",
-    "sounds.input-pokemon": "firmware/components/core/src/sound_bank.c:139",
-    "sounds.input-pop": "firmware/components/core/src/sound_bank.c:82",
-    "sounds.input-sf2": "firmware/components/core/src/sound_bank.c:144",
-    "sounds.input-soft": "firmware/components/core/src/sound_bank.c:85",
-    "sounds.input-sonic": "firmware/components/core/src/sound_bank.c:151",
-    "sounds.input-swish": "firmware/components/core/src/sound_bank.c:91",
-    "sounds.input-tetris": "firmware/components/core/src/sound_bank.c:153",
-    "sounds.input-tick": "firmware/components/core/src/sound_bank.c:80",
-    "sounds.input-zelda": "firmware/components/core/src/sound_bank.c:140",
+    "sounds.approved-chime": "firmware/components/core/src/sound_bank.c:160",
+    "sounds.approved-rise": "firmware/components/core/src/sound_bank.c:158",
+    "sounds.denied-drop": "firmware/components/core/src/sound_bank.c:162",
+    "sounds.denied-fall": "firmware/components/core/src/sound_bank.c:164",
+    "sounds.done-achieve": "firmware/components/core/src/sound_bank.c:56",
+    "sounds.done-bonus": "firmware/components/core/src/sound_bank.c:41",
+    "sounds.done-clear": "firmware/components/core/src/sound_bank.c:25",
+    "sounds.done-coin": "firmware/components/core/src/sound_bank.c:23",
+    "sounds.done-contra": "firmware/components/core/src/sound_bank.c:109",
+    "sounds.done-fanfare": "firmware/components/core/src/sound_bank.c:49",
+    "sounds.done-ff": "firmware/components/core/src/sound_bank.c:125",
+    "sounds.done-ko": "firmware/components/core/src/sound_bank.c:68",
+    "sounds.done-levelup": "firmware/components/core/src/sound_bank.c:72",
+    "sounds.done-megaman": "firmware/components/core/src/sound_bank.c:116",
+    "sounds.done-metroid": "firmware/components/core/src/sound_bank.c:123",
+    "sounds.done-pacman": "firmware/components/core/src/sound_bank.c:132",
+    "sounds.done-pokemon": "firmware/components/core/src/sound_bank.c:99",
+    "sounds.done-powerup": "firmware/components/core/src/sound_bank.c:30",
+    "sounds.done-quest": "firmware/components/core/src/sound_bank.c:58",
+    "sounds.done-sf2": "firmware/components/core/src/sound_bank.c:113",
+    "sounds.done-sonic": "firmware/components/core/src/sound_bank.c:130",
+    "sounds.done-sparkle": "firmware/components/core/src/sound_bank.c:62",
+    "sounds.done-tetris": "firmware/components/core/src/sound_bank.c:135",
+    "sounds.done-treasure": "firmware/components/core/src/sound_bank.c:36",
+    "sounds.done-warp": "firmware/components/core/src/sound_bank.c:46",
+    "sounds.done-zelda": "firmware/components/core/src/sound_bank.c:106",
+    "sounds.input-bell": "firmware/components/core/src/sound_bank.c:90",
+    "sounds.input-blip": "firmware/components/core/src/sound_bank.c:81",
+    "sounds.input-bubble": "firmware/components/core/src/sound_bank.c:89",
+    "sounds.input-chk": "firmware/components/core/src/sound_bank.c:85",
+    "sounds.input-confirm": "firmware/components/core/src/sound_bank.c:83",
+    "sounds.input-contra": "firmware/components/core/src/sound_bank.c:144",
+    "sounds.input-ff": "firmware/components/core/src/sound_bank.c:151",
+    "sounds.input-jump": "firmware/components/core/src/sound_bank.c:86",
+    "sounds.input-lock": "firmware/components/core/src/sound_bank.c:91",
+    "sounds.input-megaman": "firmware/components/core/src/sound_bank.c:148",
+    "sounds.input-metroid": "firmware/components/core/src/sound_bank.c:149",
+    "sounds.input-pacman": "firmware/components/core/src/sound_bank.c:154",
+    "sounds.input-pew": "firmware/components/core/src/sound_bank.c:88",
+    "sounds.input-pokemon": "firmware/components/core/src/sound_bank.c:141",
+    "sounds.input-pop": "firmware/components/core/src/sound_bank.c:84",
+    "sounds.input-sf2": "firmware/components/core/src/sound_bank.c:146",
+    "sounds.input-soft": "firmware/components/core/src/sound_bank.c:87",
+    "sounds.input-sonic": "firmware/components/core/src/sound_bank.c:153",
+    "sounds.input-swish": "firmware/components/core/src/sound_bank.c:93",
+    "sounds.input-tetris": "firmware/components/core/src/sound_bank.c:155",
+    "sounds.input-tick": "firmware/components/core/src/sound_bank.c:82",
+    "sounds.input-zelda": "firmware/components/core/src/sound_bank.c:142",
     "sounds.rate": "firmware/components/core/src/sound_bank.h:28",
     "sounds.waves": "firmware/components/core/src/sound_bank.h:30",
     "states": "firmware/components/core/src/ui_theme.c:11",

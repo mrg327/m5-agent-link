@@ -76,4 +76,6 @@ void ui_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_
 void ui_glow(uint32_t rgb);
 void ui_glow_hide(void);
 bool ui_glow_active(void);
+/* The wrist was raised: counts as looking at the watch (ends the ambient dim and the nagging), like a touch but without any action. */
+void ui_note_motion(void);
 void ui_set_animations(bool enabled);
