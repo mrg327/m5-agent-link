@@ -55,6 +55,11 @@ add_executable(test_gauges tests/test_gauges.c ${FW}/core/src/gauges.c ${FW}/cor
 target_include_directories(test_gauges PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
 target_link_libraries(test_gauges PRIVATE m)
 add_test(NAME gauges_model COMMAND test_gauges)
+# DONE-SUMMARY.md: the summary line's parts, words and drop order; the model keeps and clears the summary.
+add_executable(test_done tests/test_done.c ${FW}/core/src/done.c ${FW}/core/src/model.c ${FW}/core/src/steps.c ${FW}/core/src/gauges.c)
+target_include_directories(test_done PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_done PRIVATE m)
+add_test(NAME done_summary_model COMMAND test_done)
 # ANSWER-WINDOW.md: the full text bound to its rid, in order, resumed, failing closed; the window on the device's clock.
 add_executable(test_detail tests/test_detail.c ${FW}/core/src/detail.c ${FW}/core/src/model.c ${FW}/core/src/steps.c)
 target_include_directories(test_detail PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
@@ -327,6 +332,10 @@ sim_script_test(sim_gauges_buzz gauges_buzz.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"usage_warn\",\"pct\":(86|90)|\\[200\\].*\\[200\\]"
                 PASS_REGULAR_EXPRESSION "\"usage_warn\",\"pct\":81,\"quiet\":false.*\"pattern_ms\":\\[200\\].*\"usage_warn\",\"pct\":85,\"quiet\":true")
 sim_script_test(sim_gauges_wire gauges_wire.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# Done summary (DONE-SUMMARY.md, proto 0.14): the line on a finished card, tests failed, only the time, the width limit.
+foreach(n done_all done_failed done_time_only done_long done_wire done_activity)
+  sim_script_test(sim_${n} ${n}.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4")
+endforeach()
 
 # Answer window and full text (ANSWER-WINDOW.md, proto 0.11). No approve (op 3) may leave after a window ended,
 # while the full text is still arriving, for a text that does not add up, past the cap or under privacy meta.

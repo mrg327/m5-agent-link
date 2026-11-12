@@ -1,0 +1,17 @@
+# DONE-SUMMARY.md §4: long values at the width limit. Everything known with big numbers does not fit 384 px,
+# so the lines give way (then the time, then the files); the tests never do.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 done monorepo-with-a-long-name feature/x Bash make test
+done 1 1234 123456/98765 fail 40000
+wait 400
+expect_no_label +123456
+expect_label 1234 files
+shot done_long.png
+done 1 12 1234/987 pass 3725
+wait 300
+expect_label 12 files
+expect_label  passed · 1h 02m
+shot done_wide.png
+quit

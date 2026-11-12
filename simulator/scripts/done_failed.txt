@@ -1,0 +1,20 @@
+# DONE-SUMMARY.md §4: tests failed is the one part in the error colour; a failed turn (error state) gets its
+# summary where the data exists.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 done api main Bash cargo test
+done 1 2 31/9 fail 97
+wait 400
+expect_label 2 files · +31 –9
+expect_label  tests failed · 1m 37s
+shot done_failed.png
+session 2 error web main API Error: overloaded
+done 2 - - fail 12
+wait 300
+btn B
+wait 400
+expect_label Error
+expect_label  tests failed · 12s
+shot done_failed_error.png
+quit

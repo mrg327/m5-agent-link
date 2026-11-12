@@ -14,6 +14,9 @@
  *                                   (- = unknown, 255 on the wire), model (_ for a space), mode default|plan|
  *                                   accept_edits|auto|dont_ask|bypass, pull request number (0 = none) and its
  *                                   state none|pending|approved|changes|draft
+ *   done SID FILES|- ADDED/REMOVED|- pass|fail|- SECS|-   a proto 0.14 done summary (DONE-SUMMARY.md) for a
+ *                                   session already done / error: files changed, lines, the tests' verdict
+ *                                   (- = unknown), the turn's seconds. Replaces the whole summary
  *   usage H5|- H5_RESET_S H5_OUT_S|- WK|- WK_RESET_S [AGE_S]   a daemon `usage` (GAUGES.md): percent, seconds
  *                                   until the reset and until it runs out at the current pace (- = not before
  *                                   the reset), relative to now; the reading is AGE_S old (default 0)
@@ -65,7 +68,7 @@
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_EXPECT_COUNTDOWN, E_HUSH, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_EXPECT_COUNTDOWN, E_HUSH, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -270,6 +273,9 @@ static bool parse_line(char *line, uint32_t *t)
         *t += 50;
     } else if (!strcmp(cmd, "gauge") && arg[0]) {
         add(*t, E_GAUGE, 0, 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "done") && arg[0]) {
+        add(*t, E_DONE, 0, 0, 0, arg);
         *t += 50;
     } else if (!strcmp(cmd, "usage") && arg[0]) {
         add(*t, E_USAGE, 0, 0, 0, arg);
@@ -541,6 +547,25 @@ static void run_gauge(const char *spec)
             if (!strcmp(st, states[i])) d.prs = (uint8_t)i;
     }
     model_upsert(&d, present);
+}
+
+/* done SID FILES|- ADDED/REMOVED|- pass|fail|- SECS|-: a proto 0.14 session delta (DONE-SUMMARY.md) */
+static void run_done(const char *spec)
+{
+    unsigned sid;
+    char files[12], lines[24], tests[8], secs[12];
+    if (sscanf(spec, "%u %11s %23s %7s %11s", &sid, files, lines, tests, secs) != 5) {
+        fprintf(stderr, "SCRIPT FAIL: bad done '%s'\n", spec);
+        s_failed = true;
+        return;
+    }
+    session_t d = {.sid = sid};
+    unsigned a, r;
+    if (strcmp(files, "-")) { d.sum.files = (uint32_t)strtoul(files, NULL, 10); d.sum.files_known = true; }
+    if (sscanf(lines, "%u/%u", &a, &r) == 2) { d.sum.added = a; d.sum.removed = r; d.sum.lines_known = true; }
+    if (strcmp(tests, "-")) { d.sum.tests_pass = !strcmp(tests, "pass"); d.sum.tests_known = true; }
+    if (strcmp(secs, "-")) { d.sum.secs = (uint32_t)strtoul(secs, NULL, 10); d.sum.secs_known = true; }
+    model_upsert(&d, SF_DONE);
 }
 
 /* usage H5|- H5_RESET_S H5_OUT_S|- WK|- WK_RESET_S [AGE_S]: a daemon `usage` relative to the clock */
@@ -1017,6 +1042,7 @@ static void run(const ev_t *e)
     case E_SESSION: run_session(e->text); break;
     case E_JOB: run_job(e->text); break;
     case E_GAUGE: run_gauge(e->text); break;
+    case E_DONE: run_done(e->text); break;
     case E_USAGE: run_usage(e->text); break;
     case E_DELTA: run_delta(e->text); break;
     case E_REMOTE: run_remote(e->text); break;

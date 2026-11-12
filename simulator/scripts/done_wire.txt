@@ -1,0 +1,22 @@
+# Done summary on the wire: the shared protocol vectors session_done_summary and session_done_summary_partial
+# (proto 0.14) decode into the card's line. The second delta changes the state, so it replaces the first summary.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1793995330
+session 3 work api main Running the tests
+wait 300
+expect_no_label files
+# session_done_summary: done, 3 files, +120 -14, tests passed, 4m 12s
+rx a3000401181e03a800030204081a6aee3224181e03181f187818200e1821f5182218fc
+wait 400
+expect_label Done
+expect_label 3 files · +120 –14
+expect_label  passed · 4m 12s
+# session_done_summary_partial: error, tests failed, 37 s: nothing else is left over from the last turn
+rx a3000401181f03a500030203081a6aee32241821f418221825
+wait 400
+expect_label Error
+expect_label  tests failed · 37s
+expect_no_label files
+shot done_wire.png
+quit

@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "hal.h"
+#include "ui_done.h"
 #include "ui_gauges.h"
 #include "ui_home_internal.h"
 #include "ui_theme.h"
@@ -207,6 +208,7 @@ static void set_looks(look_t look)
         show(s_req_title, false);
         show(s_req_text, false);
         show(s_bar, false);
+        ui_done_update(NULL, false, false);
     }
 }
 
@@ -299,14 +301,16 @@ void ui_home_card_update(void)
                 req->title[0] ? req->title : s->tool[0] ? s->tool : req->kind == ATT_APPROVAL ? "Permission request" : "Question");
         theme_set_text(s_req_text, s_req_text_txt, sizeof s_req_text_txt, req->text);
         show(s_sum, false);
+        ui_done_update(NULL, false, false);
         show(s_req_title, true);
         show(s_req_text, req->text[0] != 0);
     } else {
         char sum[sizeof s->summary + 4];
         /* a job says what runs: its command line, or just the program when the daemon withholds that */
+        bool done_line = ui_done_update(s, !sl->n_merged && !back && !theme_is_job(s), offline());
         theme_display_text(sum, sizeof sum, sl->n_merged ? "" : back ? "Answer it there" : theme_is_job(s) && !s->summary[0] ? s->tool : s->summary);
         theme_set_text(s_sum, s_sum_txt, sizeof s_sum_txt, sum);
-        show(s_sum, true);
+        show(s_sum, !done_line); /* DONE-SUMMARY.md: the summary line takes the stale last step's place */
         show(s_req_title, false);
         show(s_req_text, false);
     }
@@ -352,6 +356,7 @@ void ui_home_card_report(ui_report_t *r)
         if (s_stime_txt[0]) ui_report_add(r, "%s", s_stime_txt);
         if (!lv_obj_has_flag(s_bar, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "progress %d%%", s_bar_w * 100 / BAR_W);
         ui_gauges_card_report(r);
+        ui_done_report(r);
         if (!lv_obj_has_flag(s_sum, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_sum_txt);
         if (!lv_obj_has_flag(s_req_title, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_req_title_txt);
         if (!lv_obj_has_flag(s_req_text, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_req_text_txt);
@@ -418,6 +423,7 @@ void ui_home_card_create(lv_obj_t *centre)
 
     ui_gauges_card_create(s_centre);
     ui_gauges_face_create(s_centre);
+    ui_done_create(s_centre);
 
     s_sum = mk(s_centre, FONT_BODY, COL_TEXT2);
     put_top(s_sum, SUMMARY_TOP, SUMMARY_W, 2);
