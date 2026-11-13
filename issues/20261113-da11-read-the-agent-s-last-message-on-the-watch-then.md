@@ -43,3 +43,4 @@ dictation from across the room. The daemon already receives the whole final mess
 
 - 2026-11-13T01:56:16Z · claude-code@linux-dev · linux-x86_64 · fce1a1d: filed
 - 2026-11-13T01:56:36Z · claude-code@linux-dev · linux-x86_64 · bf451bb: claimed
+- 2026-11-13T06:58:09Z · claude-code@linux-dev · linux-x86_64 · f288ede: Deployed tonight: watch runs a389685 (branch power, which contains response 11baa78) via BLE OTA; daemon/hook/CLI from the same commit. Awaiting the user's live test.
