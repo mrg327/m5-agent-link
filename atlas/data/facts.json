@@ -1119,7 +1119,7 @@
     {
       "id": "attention",
       "title": "Deck · a request is waiting",
-      "source": "firmware/components/core/src/ui_home.c:358"
+      "source": "firmware/components/core/src/ui_home.c:360"
     },
     {
       "id": "agent",
@@ -1461,7 +1461,7 @@
           "name": "batt_pct"
         }
       ],
-      "source": "protocol/agentlink.cddl:56"
+      "source": "protocol/agentlink.cddl:57"
     },
     {
       "name": "welcome",
@@ -1512,7 +1512,7 @@
           "name": "keys"
         }
       ],
-      "source": "protocol/agentlink.cddl:57"
+      "source": "protocol/agentlink.cddl:58"
     },
     {
       "name": "snapshot",
@@ -1535,7 +1535,7 @@
           "name": "away"
         }
       ],
-      "source": "protocol/agentlink.cddl:58"
+      "source": "protocol/agentlink.cddl:59"
     },
     {
       "name": "session_upd",
@@ -1796,7 +1796,7 @@
           "name": "lp"
         }
       ],
-      "source": "protocol/agentlink.cddl:59"
+      "source": "protocol/agentlink.cddl:60"
     },
     {
       "name": "gone",
@@ -1804,7 +1804,7 @@
       "dir": "pc→dev",
       "summary": "A session ended and left the list",
       "fields": [],
-      "source": "protocol/agentlink.cddl:60"
+      "source": "protocol/agentlink.cddl:61"
     },
     {
       "name": "attention",
@@ -1932,7 +1932,7 @@
           "name": "qs"
         }
       ],
-      "source": "protocol/agentlink.cddl:61"
+      "source": "protocol/agentlink.cddl:62"
     },
     {
       "name": "clear",
@@ -1955,7 +1955,7 @@
           "name": "why"
         }
       ],
-      "source": "protocol/agentlink.cddl:62"
+      "source": "protocol/agentlink.cddl:63"
     },
     {
       "name": "cmd",
@@ -2027,7 +2027,7 @@
           "name": "aids"
         }
       ],
-      "source": "protocol/agentlink.cddl:63"
+      "source": "protocol/agentlink.cddl:64"
     },
     {
       "name": "result",
@@ -2064,7 +2064,7 @@
           "name": "pos"
         }
       ],
-      "source": "protocol/agentlink.cddl:64"
+      "source": "protocol/agentlink.cddl:65"
     },
     {
       "name": "detail",
@@ -2115,7 +2115,7 @@
           "name": "lm"
         }
       ],
-      "source": "protocol/agentlink.cddl:65"
+      "source": "protocol/agentlink.cddl:66"
     },
     {
       "name": "cfg",
@@ -2159,7 +2159,7 @@
           "name": "badge_handle"
         }
       ],
-      "source": "protocol/agentlink.cddl:66"
+      "source": "protocol/agentlink.cddl:67"
     },
     {
       "name": "batt",
@@ -2182,7 +2182,7 @@
           "name": "chg"
         }
       ],
-      "source": "protocol/agentlink.cddl:67"
+      "source": "protocol/agentlink.cddl:68"
     },
     {
       "name": "ping",
@@ -2190,7 +2190,7 @@
       "dir": "both",
       "summary": "Link-liveness probe",
       "fields": [],
-      "source": "protocol/agentlink.cddl:68"
+      "source": "protocol/agentlink.cddl:69"
     },
     {
       "name": "pong",
@@ -2198,7 +2198,7 @@
       "dir": "both",
       "summary": "Answer to a ping",
       "fields": [],
-      "source": "protocol/agentlink.cddl:69"
+      "source": "protocol/agentlink.cddl:70"
     },
     {
       "name": "log",
@@ -2221,7 +2221,7 @@
           "name": "msg"
         }
       ],
-      "source": "protocol/agentlink.cddl:70"
+      "source": "protocol/agentlink.cddl:71"
     },
     {
       "name": "audio_start",
@@ -2251,7 +2251,7 @@
           "name": "sid"
         }
       ],
-      "source": "protocol/agentlink.cddl:71"
+      "source": "protocol/agentlink.cddl:72"
     },
     {
       "name": "audio",
@@ -2281,7 +2281,7 @@
           "name": "data"
         }
       ],
-      "source": "protocol/agentlink.cddl:72"
+      "source": "protocol/agentlink.cddl:73"
     },
     {
       "name": "audio_end",
@@ -2318,7 +2318,7 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:73"
+      "source": "protocol/agentlink.cddl:74"
     },
     {
       "name": "transcript",
@@ -2348,7 +2348,7 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:74"
+      "source": "protocol/agentlink.cddl:75"
     },
     {
       "name": "kb_start",
@@ -2378,7 +2378,7 @@
           "name": "keys"
         }
       ],
-      "source": "protocol/agentlink.cddl:75"
+      "source": "protocol/agentlink.cddl:76"
     },
     {
       "name": "kb_stroke",
@@ -2408,7 +2408,7 @@
           "name": "pts"
         }
       ],
-      "source": "protocol/agentlink.cddl:76"
+      "source": "protocol/agentlink.cddl:77"
     },
     {
       "name": "kb_cands",
@@ -2452,7 +2452,7 @@
           "name": "err"
         }
       ],
-      "source": "protocol/agentlink.cddl:77"
+      "source": "protocol/agentlink.cddl:78"
     },
     {
       "name": "usage",
@@ -2510,7 +2510,7 @@
           "name": "wko"
         }
       ],
-      "source": "protocol/agentlink.cddl:78"
+      "source": "protocol/agentlink.cddl:79"
     },
     {
       "name": "fw_begin",
@@ -2540,7 +2540,7 @@
           "name": "ver"
         }
       ],
-      "source": "protocol/agentlink.cddl:79"
+      "source": "protocol/agentlink.cddl:80"
     },
     {
       "name": "fw_chunk",
@@ -2563,7 +2563,7 @@
           "name": "data"
         }
       ],
-      "source": "protocol/agentlink.cddl:80"
+      "source": "protocol/agentlink.cddl:81"
     },
     {
       "name": "fw_ack",
@@ -2593,7 +2593,121 @@
           "name": "msg"
         }
       ],
-      "source": "protocol/agentlink.cddl:81"
+      "source": "protocol/agentlink.cddl:82"
+    },
+    {
+      "name": "power",
+      "type": 27,
+      "dir": "dev→pc",
+      "summary": "Power report: battery voltage and the time spent in each power state (POWER.md)",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "mv     battery voltage, the last raw reading (mV); 0 = no reading",
+          "name": "mv"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "uint",
+          "note": "mvf    battery voltage as filtered for the device's own percent (mV)",
+          "name": "mvf"
+        },
+        {
+          "key": 2,
+          "optional": false,
+          "type": "uint",
+          "note": "vin    input (USB / charger) voltage (mV)",
+          "name": "vin"
+        },
+        {
+          "key": 3,
+          "optional": false,
+          "type": "bool",
+          "note": "chg    charging",
+          "name": "chg"
+        },
+        {
+          "key": 4,
+          "optional": false,
+          "type": "bool",
+          "note": "usb    external power present",
+          "name": "usb"
+        },
+        {
+          "key": 5,
+          "optional": false,
+          "type": "uint",
+          "note": "pct    battery percent as the device shows it (linear 3.3-4.2 V)",
+          "name": "pct"
+        },
+        {
+          "key": 6,
+          "optional": false,
+          "type": "uint",
+          "note": "on     ms with the display on at full look",
+          "name": "on"
+        },
+        {
+          "key": 7,
+          "optional": false,
+          "type": "uint",
+          "note": "dim    ms with the display on and dimmed to the ambient face",
+          "name": "dim"
+        },
+        {
+          "key": 8,
+          "optional": false,
+          "type": "uint",
+          "note": "off    ms with the display off (standby)",
+          "name": "off"
+        },
+        {
+          "key": 9,
+          "optional": false,
+          "type": "uint",
+          "note": "deep   ms in deep sleep, measured across the wake reboot",
+          "name": "deep"
+        },
+        {
+          "key": 10,
+          "optional": false,
+          "type": "uint",
+          "note": "lk     ms welcomed by a daemon, on any transport",
+          "name": "lk"
+        },
+        {
+          "key": 11,
+          "optional": false,
+          "type": "uint",
+          "note": "ble    ms with a BLE central connected",
+          "name": "ble"
+        },
+        {
+          "key": 12,
+          "optional": false,
+          "type": "uint",
+          "note": "itvl   BLE connection interval in force now (us); 0 = no BLE connection",
+          "name": "itvl"
+        },
+        {
+          "key": 13,
+          "optional": false,
+          "type": "uint",
+          "note": "seq    report number since power-on (kept across deep sleep); 0 = the first",
+          "name": "seq"
+        },
+        {
+          "key": 14,
+          "optional": false,
+          "type": "uint",
+          "note": "nd     deep sleeps that ended within these times",
+          "name": "nd"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:83"
     },
     {
       "name": "dbg_ui_state_req",
@@ -2601,7 +2715,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask which screen is showing",
       "fields": [],
-      "source": "protocol/agentlink.cddl:82"
+      "source": "protocol/agentlink.cddl:84"
     },
     {
       "name": "dbg_ui_state",
@@ -2652,7 +2766,7 @@
           "name": "fps"
         }
       ],
-      "source": "protocol/agentlink.cddl:83"
+      "source": "protocol/agentlink.cddl:85"
     },
     {
       "name": "dbg_screenshot_req",
@@ -2660,7 +2774,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask for a screenshot",
       "fields": [],
-      "source": "protocol/agentlink.cddl:84"
+      "source": "protocol/agentlink.cddl:86"
     },
     {
       "name": "dbg_screenshot_chunk",
@@ -2704,7 +2818,7 @@
           "name": "last"
         }
       ],
-      "source": "protocol/agentlink.cddl:85"
+      "source": "protocol/agentlink.cddl:87"
     },
     {
       "name": "dbg_inject_input",
@@ -2734,7 +2848,7 @@
           "name": "y"
         }
       ],
-      "source": "protocol/agentlink.cddl:86"
+      "source": "protocol/agentlink.cddl:88"
     },
     {
       "name": "dbg_set_log_level",
@@ -2750,7 +2864,7 @@
           "name": ""
         }
       ],
-      "source": "protocol/agentlink.cddl:87"
+      "source": "protocol/agentlink.cddl:89"
     }
   ],
   "sounds": {
@@ -5319,13 +5433,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:913",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:855",
-    "gesture_map.chord": "firmware/components/core/src/app.c:512",
+    "gesture_map.chord": "firmware/components/core/src/app.c:513",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:196",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:173",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:404",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:405",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:539",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:540",
     "haptics.approved": "firmware/components/core/src/feedback.c:80",
     "haptics.denied": "firmware/components/core/src/feedback.c:87",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:67",
@@ -5402,7 +5516,7 @@
     "ring.sel_w_px": "firmware/components/core/src/ui_ring_internal.h:18",
     "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:23",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:33",
-    "screens": "firmware/components/core/src/ui_home.c:358",
+    "screens": "firmware/components/core/src/ui_home.c:360",
     "screens.agent": "firmware/components/core/src/ui_agent.c:357",
     "screens.ask": "firmware/components/core/src/ui_ask.c:944",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:299",
