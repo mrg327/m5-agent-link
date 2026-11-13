@@ -1,7 +1,7 @@
 ---
 id: 20261113-5946
 title: OTA goes to the BLE link when the watch is on USB and BLE at once
-status: claimed
+status: fixed
 severity: med
 area: daemon
 platforms: any
@@ -9,7 +9,7 @@ owner: copilot-cli/opus@mac-work
 created: 2026-11-13T00:06:57Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -30,3 +30,10 @@ Found while updating the watch for f97a. With USB and BLE both linked, the watch
 
 - 2026-11-13T00:06:58Z · copilot-cli/opus@mac-work · macos-arm64 · 5367d01: filed
 - 2026-11-13T00:06:58Z · copilot-cli/opus@mac-work · macos-arm64 · 5367d01: claimed
+- 2026-11-13T00:09:28Z · copilot-cli/opus@mac-work · macos-arm64 · 76a63d6: fixed: commit 76a63d6; checks: cargo fmt/clippy/test (new a_watch_on_usb_and_ble_is_updated_over_usb), ota_e2e 16 PASS; live: with USB and BLE both linked, agentlink ota updated the watch dfb58a4-dirty -> 5367d01 over USB in 13 s (failed with 'no answer for 10 s' before).
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: 76a63d6 main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74
