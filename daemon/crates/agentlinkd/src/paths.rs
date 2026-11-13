@@ -30,6 +30,11 @@ pub fn audit_log() -> PathBuf {
     home().join("audit.jsonl")
 }
 
+/// Firmware images, the bases of delta updates (fwcache.rs).
+pub fn fw_dir() -> PathBuf {
+    home().join("fw")
+}
+
 /// Per-user named pipe for hook IPC on Windows. `AGENTLINK_PIPE` overrides it; otherwise
 /// the name is derived from the socket path so `AGENTLINK_HOME` gets its own pipe.
 /// Must match `pipe_name` in agentlink-hook.

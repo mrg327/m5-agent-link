@@ -1,0 +1,9 @@
+[package]
+name = "agentlink-delta"
+description = "Delta firmware updates: detools sequential patches (bsdiff, heatshrink)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+divsufsort = "2"

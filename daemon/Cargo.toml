@@ -6,6 +6,7 @@ members = [
     "crates/agentlink-hook",
     "crates/agentlink",
     "crates/agentlink-keys",
+    "crates/agentlink-delta",
 ]
 
 [workspace.package]
@@ -39,6 +40,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # opt-level 0 (its accuracy gate took 10-30 s and timed out under load, issue 5617), and CBOR, BLE and
 # the async runtime are third-party code nobody steps through.
 [profile.dev.package.agentlink-keys]
+opt-level = 3
+
+# Making a firmware patch (bsdiff over a 1.3 MB image) takes seconds even optimised.
+[profile.dev.package.agentlink-delta]
 opt-level = 3
 
 [profile.dev.package."*"]

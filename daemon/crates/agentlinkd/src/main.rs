@@ -9,6 +9,7 @@ mod broker;
 mod deltas;
 mod device;
 mod focus;
+mod fwcache;
 mod hook_source;
 mod ipc;
 mod jobs;

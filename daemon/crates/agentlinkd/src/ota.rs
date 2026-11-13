@@ -3,12 +3,18 @@
 //! Only on request (`{"ctl":"ota"}` from `agentlink ota`), never on its own. The request streams
 //! progress lines back on the same connection; closing it stops the transfer. The pure parts (the
 //! image check and the send window) are separate so they can be tested without a device.
+//!
+//! A watch with proto 0.21 gets a patch instead of the whole image when this machine has the image the
+//! watch runs (fwcache.rs, found by the version in its hello): `fw_begin` names the base, and the
+//! chunks carry the patch. If the watch refuses it, the whole image follows, once.
 
+use crate::fwcache::{Delta, FwCache};
 use crate::trace::Trace;
-use agentlink_proto::{FwAck, FwBegin, FwChunk, FwStatus, Message};
+use agentlink_proto::{FwAck, FwBegin, FwChunk, FwPatch, FwStatus, Message};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, VecDeque};
+use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -18,6 +24,8 @@ use tokio::time::Instant;
 pub const CHUNK: usize = 2048;
 /// Chunks sent and not yet answered.
 pub const WINDOW: usize = 4;
+/// Firmware that takes a patch (`fw_begin.patch`, proto 0.21).
+pub const DELTA_MINOR: u64 = 21;
 /// The OTA slot's size.
 pub const MAX_IMAGE: usize = 0x60_0000;
 /// No answer from the watch for this long ends the transfer.
@@ -198,6 +206,8 @@ struct Inner {
 pub struct Ota {
     inner: Mutex<Inner>,
     trace: Trace,
+    /// The image cache (fwcache.rs).
+    fw_dir: PathBuf,
 }
 
 struct ActiveGuard<'a>(&'a Ota);
@@ -227,9 +237,14 @@ impl Request {
 
 impl Ota {
     pub fn new(trace: Trace) -> Self {
+        Self::with_fw_dir(trace, crate::paths::fw_dir())
+    }
+
+    pub fn with_fw_dir(trace: Trace, fw_dir: PathBuf) -> Self {
         Ota {
             inner: Mutex::default(),
             trace,
+            fw_dir,
         }
     }
 
@@ -306,6 +321,10 @@ impl Ota {
         }
     }
 
+    fn link_of(&self, key: &str) -> Option<u64> {
+        self.inner.lock().unwrap().devs.get(key).map(|d| d.link_id)
+    }
+
     fn send(&self, key: &str, msg: Message) -> bool {
         let g = self.inner.lock().unwrap();
         g.devs
@@ -316,7 +335,8 @@ impl Ota {
 
     // ── the update ──
 
-    fn pick(&self, want: Option<&str>) -> Result<(String, u64, String), String> {
+    /// The watch to update: its key, link, firmware version and protocol minor.
+    fn pick(&self, want: Option<&str>) -> Result<(String, u64, String, u64), String> {
         let g = self.inner.lock().unwrap();
         let mut ok: Vec<_> = g
             .devs
@@ -332,7 +352,7 @@ impl Ota {
             } else {
                 "no watch connected with firmware that supports OTA (proto 0.15)".into()
             }),
-            [(k, d)] => Ok(((*k).clone(), d.link_id, d.fw.clone())),
+            [(k, d)] => Ok(((*k).clone(), d.link_id, d.fw.clone(), d.minor)),
             many => Err(format!(
                 "several watches are connected ({}); pick one with --device",
                 many.iter()
@@ -372,25 +392,74 @@ impl Ota {
             g.active = Some(tx);
             ActiveGuard(self)
         };
-        let (key, link_id, old_fw) = self.pick(req.device.as_deref())?;
+        let (key, link_id, old_fw, minor) = self.pick(req.device.as_deref())?;
         let size = data.len() as u64;
+        let mut delta = if minor >= DELTA_MINOR {
+            let (dir, fw, image) = (self.fw_dir.clone(), old_fw.clone(), data.clone());
+            let make = tokio::task::spawn_blocking(move || {
+                crate::fwcache::delta_for(&FwCache::new(dir), &fw, &image, &sha)
+            });
+            tokio::select! {
+                _ = out.closed() => return Err("cancelled".into()),
+                d = make => d.ok().flatten(),
+            }
+        } else {
+            None
+        };
+        let patch_info = |d: &Delta| json!({"size": d.patch.len(), "base": d.base_version, "base_sha": hex::encode(d.base_sha)});
         self.trace.audit(
             "ota_start",
             None,
             None,
-            json!({"device": key, "size": size, "sha": hex::encode(sha), "ver": info.version, "old": old_fw}),
+            json!({"device": key, "size": size, "sha": hex::encode(sha), "ver": info.version, "old": old_fw,
+                   "patch": delta.as_ref().map(patch_info)}),
         );
-        let _ = out.send(json!({"ota": "begin", "size": size, "ver": info.version, "from": old_fw, "device": key}));
+        let mut begin = json!({"ota": "begin", "size": size, "ver": info.version, "from": old_fw, "device": key});
+        if let Some(d) = &delta {
+            begin["patch"] = patch_info(d);
+        }
+        let _ = out.send(begin);
 
-        let mut xfer = Transfer {
-            ota: self,
-            key: &key,
-            data: &data,
-            sha,
-            ver: &info.version,
-            out,
-        };
-        xfer.run(&mut rx, link_id).await?;
+        let mut link_id = link_id;
+        loop {
+            let mut xfer = Transfer {
+                ota: self,
+                key: &key,
+                data: delta.as_ref().map_or(&data[..], |d| &d.patch[..]),
+                size,
+                sha,
+                ver: &info.version,
+                patch: delta.as_ref().map(|d| FwPatch {
+                    psize: d.patch.len() as u64,
+                    base: d.base_sha,
+                    bsize: d.base_len,
+                }),
+                out,
+            };
+            match xfer.run(&mut rx, link_id).await {
+                Ok(()) => break,
+                // the watch does not run the base (or could not use the patch): the whole image, once
+                Err(Failed { msg, refused: true }) if delta.is_some() => {
+                    delta = None;
+                    self.trace.audit(
+                        "ota_fallback",
+                        None,
+                        None,
+                        json!({"device": key, "msg": msg}),
+                    );
+                    let _ = out.send(json!({"ota": "fallback", "msg": msg, "size": size}));
+                    link_id = self.link_of(&key).ok_or("link to the watch dropped")?;
+                }
+                Err(f) => return Err(f.msg),
+            }
+        }
+        let fw_dir = self.fw_dir.clone();
+        let _ = tokio::task::spawn_blocking(move || {
+            if let Err(e) = FwCache::new(fw_dir).store(&data, &sha) {
+                tracing::warn!("cannot keep the sent image for delta updates: {e}");
+            }
+        })
+        .await;
         let _ = out.send(json!({"ota": "done"}));
         let _ = out.send(json!({"ota": "restarting"}));
 
@@ -419,12 +488,37 @@ impl Ota {
     }
 }
 
+/// Why a transfer ended early. `refused`: the watch answered `bad` (it would not take what was sent).
+struct Failed {
+    msg: String,
+    refused: bool,
+}
+
+impl From<String> for Failed {
+    fn from(msg: String) -> Self {
+        Failed {
+            msg,
+            refused: false,
+        }
+    }
+}
+
+impl From<&str> for Failed {
+    fn from(msg: &str) -> Self {
+        msg.to_owned().into()
+    }
+}
+
 struct Transfer<'a> {
     ota: &'a Ota,
     key: &'a str,
+    /// What the chunks carry: the image, or the patch that rebuilds it.
     data: &'a [u8],
+    /// The image's size and hash.
+    size: u64,
     sha: [u8; 32],
     ver: &'a str,
+    patch: Option<FwPatch>,
     out: &'a UnboundedSender<Value>,
 }
 
@@ -433,10 +527,10 @@ impl Transfer<'_> {
         self.ota.send(
             self.key,
             Message::FwBegin(FwBegin {
-                size: self.data.len() as u64,
+                size: self.size,
                 sha: self.sha,
                 ver: Some(self.ver.to_owned()),
-                patch: None,
+                patch: self.patch.clone(),
             }),
         );
     }
@@ -471,7 +565,7 @@ impl Transfer<'_> {
         &mut self,
         rx: &mut UnboundedReceiver<Event>,
         mut link_id: u64,
-    ) -> Result<(), String> {
+    ) -> Result<(), Failed> {
         let size = self.data.len() as u64;
         let mut win = Window::new(size);
         let mut started = false;
@@ -540,10 +634,21 @@ impl Transfer<'_> {
                             self.progress(&mut last_say, win.acked(), size);
                         }
                         FwStatus::Done => return Ok(()),
-                        FwStatus::Busy => return Err(why("the watch is busy")),
-                        FwStatus::Bad => return Err(why("the watch refused the image")),
-                        FwStatus::Fail => return Err(why("the watch failed to write the image")),
-                        FwStatus::Stopped => return Err(why("the watch stopped the update")),
+                        FwStatus::Busy => return Err(why("the watch is busy").into()),
+                        FwStatus::Bad => {
+                            return Err(Failed {
+                                msg: why(if self.patch.is_some() {
+                                    "the watch refused the patch"
+                                } else {
+                                    "the watch refused the image"
+                                }),
+                                refused: true,
+                            })
+                        }
+                        FwStatus::Fail => {
+                            return Err(why("the watch failed to write the image").into())
+                        }
+                        FwStatus::Stopped => return Err(why("the watch stopped the update").into()),
                     }
                 }
                 _ => {}
@@ -571,7 +676,7 @@ mod tests {
     #[test]
     fn a_watch_on_usb_and_ble_is_updated_over_usb() {
         let ota = Ota::new(Trace::null());
-        let link = |ota: &Ota| ota.pick(None).map(|(_, l, _)| l);
+        let link = |ota: &Ota| ota.pick(None).map(|(_, l, _, _)| l);
         ota.hello("w", 1, 16, "a", true);
         ota.hello("w", 2, 16, "a", false); // BLE says hello last; the watch stays on USB
         assert_eq!(link(&ota), Ok(1));
@@ -663,6 +768,244 @@ mod tests {
         // then progress is normal again
         assert_eq!(offs(w.on_go(2 * C).unwrap()), [5 * C]);
         assert_eq!(w.acked(), 2 * C);
+    }
+
+    use crate::fwcache::tests::image as app_image;
+    use std::sync::Arc;
+
+    /// What a fake watch saw of one update, and how the update ended.
+    struct Seen {
+        begins: Vec<FwBegin>,
+        offs: Vec<u64>,
+        lines: Vec<Value>,
+    }
+
+    impl Seen {
+        fn end(&self) -> &str {
+            self.lines.last().unwrap()["ota"].as_str().unwrap()
+        }
+        fn said(&self, what: &str) -> Option<&Value> {
+            self.lines.iter().find(|l| l["ota"] == what)
+        }
+    }
+
+    /// Updates a fake watch (proto 0.`minor`, reporting `fw`, running `running`) to `new`, with `cached`
+    /// in the image cache. The watch answers a patched `fw_begin` with bad `refuse` when given, and
+    /// otherwise rebuilds the image from the patch like the firmware: a wrong base gives a wrong sha.
+    async fn update(
+        name: &str,
+        minor: u64,
+        fw: &str,
+        running: Vec<u8>,
+        cached: &[&[u8]],
+        new: &[u8],
+        refuse: Option<&'static str>,
+    ) -> (Seen, PathBuf) {
+        let dir = crate::fwcache::scratch(name);
+        let cache = FwCache::new(dir.join("fw"));
+        for c in cached {
+            cache.store(c, &Sha256::digest(c).into()).unwrap();
+        }
+        std::fs::write(dir.join("new.bin"), new).unwrap();
+        let ota = Arc::new(Ota::with_fw_dir(Trace::null(), dir.join("fw")));
+        ota.hello("w", 1, minor, fw, true);
+        let (tx, mut dev) = unbounded_channel();
+        ota.attach(1, tx);
+
+        let watch = {
+            let ota = ota.clone();
+            tokio::spawn(async move {
+                let (mut begins, mut offs, mut buf) = (Vec::new(), Vec::new(), Vec::new());
+                let ack = |st, next, msg: Option<&str>| {
+                    let msg = msg.map(str::to_owned);
+                    ota.on_ack("w", FwAck { st, next, msg });
+                };
+                while let Some(m) = dev.recv().await {
+                    match m {
+                        Message::FwBegin(b) => {
+                            let refused = b.patch.is_some() && refuse.is_some();
+                            begins.push(b);
+                            if refused {
+                                ack(FwStatus::Bad, 0, refuse);
+                            } else {
+                                buf.clear();
+                                ack(FwStatus::Go, 0, None);
+                            }
+                        }
+                        Message::FwChunk(c) => {
+                            offs.push(c.off);
+                            if c.off == buf.len() as u64 {
+                                buf.extend_from_slice(&c.data);
+                            }
+                            let b: &FwBegin = begins.last().unwrap();
+                            let total = b.patch.as_ref().map_or(b.size, |p| p.psize);
+                            if (buf.len() as u64) < total {
+                                ack(FwStatus::Go, buf.len() as u64, None);
+                                continue;
+                            }
+                            let image = match &b.patch {
+                                Some(p) => {
+                                    agentlink_delta::apply_patch(&running[..p.bsize as usize], &buf)
+                                        .unwrap_or_default()
+                                }
+                                None => buf.clone(),
+                            };
+                            let sha: [u8; 32] = Sha256::digest(&image).into();
+                            if sha != b.sha {
+                                ack(FwStatus::Bad, buf.len() as u64, Some("Checksum mismatch"));
+                                continue;
+                            }
+                            ack(FwStatus::Done, buf.len() as u64, None);
+                            let ver = b.ver.clone().unwrap();
+                            ota.link_down(1);
+                            ota.hello("w", 2, minor, &ver, true);
+                            let (tx2, _keep) = unbounded_channel();
+                            ota.attach(2, tx2);
+                            return (begins, offs);
+                        }
+                        _ => {}
+                    }
+                }
+                (begins, offs)
+            })
+        };
+        let (otx, mut orx) = unbounded_channel();
+        let req = Request {
+            path: dir.join("new.bin").to_string_lossy().into_owned(),
+            unsigned: true,
+            device: None,
+        };
+        tokio::time::timeout(Duration::from_secs(30), ota.run(req, otx))
+            .await
+            .unwrap();
+        let mut lines = Vec::new();
+        while let Ok(l) = orx.try_recv() {
+            lines.push(l);
+        }
+        let (begins, offs) = watch.await.unwrap();
+        (
+            Seen {
+                begins,
+                offs,
+                lines,
+            },
+            dir,
+        )
+    }
+
+    /// The watch's image and a new one a few changes away.
+    fn old_and_new() -> (Vec<u8>, Vec<u8>) {
+        let old = app_image("old", 1, 256 * 1024);
+        let mut new = old.clone();
+        new[48..51].copy_from_slice(b"new");
+        for (i, at) in [5000usize, 70000, 150000, 200000].into_iter().enumerate() {
+            let junk = app_image("", 50 + i as u32, 3000);
+            new[at..at + 3000].copy_from_slice(&junk);
+        }
+        new.splice(100_000..100_000, app_image("", 9, 5000));
+        (old, new)
+    }
+
+    #[tokio::test]
+    async fn a_watch_running_a_cached_image_gets_a_patch() {
+        let (old, new) = old_and_new();
+        let other = app_image("other", 2, 64 * 1024);
+        let (seen, dir) = update(
+            "ota-delta",
+            21,
+            "old",
+            old.clone(),
+            &[&other, &old],
+            &new,
+            None,
+        )
+        .await;
+        assert_eq!(seen.end(), "ok", "{:?}", seen.lines);
+        assert_eq!(seen.begins.len(), 1);
+        let p = seen.begins[0].patch.as_ref().expect("a patch");
+        assert_eq!(p.base, <[u8; 32]>::from(Sha256::digest(&old)));
+        assert_eq!(p.bsize, old.len() as u64);
+        assert_eq!(seen.begins[0].size, new.len() as u64);
+        assert!(p.psize < new.len() as u64 / 4 && p.psize > 2 * C);
+        // the chunks walk the patch, not the image
+        let want: Vec<u64> = (0..p.psize.div_ceil(C)).map(|i| i * C).collect();
+        assert_eq!(seen.offs, want);
+        let begin = seen.said("begin").unwrap();
+        assert_eq!(begin["patch"]["size"], p.psize);
+        assert_eq!(begin["patch"]["base"], "old");
+        assert_eq!(
+            seen.lines
+                .iter()
+                .rev()
+                .find(|l| l["ota"] == "progress")
+                .unwrap()["size"],
+            p.psize
+        );
+        // the sent image is kept as the next base
+        let sha = hex::encode(Sha256::digest(&new));
+        assert!(dir.join("fw").join(format!("{sha}.bin")).exists());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn without_a_base_the_whole_image_goes() {
+        let (old, new) = old_and_new();
+        let (seen, dir) = update("ota-nobase", 21, "unknown", old, &[], &new, None).await;
+        assert_eq!(seen.end(), "ok");
+        assert!(seen.begins[0].patch.is_none());
+        assert!(seen.said("begin").unwrap().get("patch").is_none());
+        assert_eq!(seen.offs.len() as u64, (new.len() as u64).div_ceil(C));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn a_proto_0_20_watch_gets_the_whole_image() {
+        let (old, new) = old_and_new();
+        let (seen, dir) = update("ota-020", 20, "old", old.clone(), &[&old], &new, None).await;
+        assert_eq!(seen.end(), "ok");
+        assert_eq!(seen.begins.len(), 1);
+        assert!(seen.begins[0].patch.is_none());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn a_refused_base_falls_back_to_the_whole_image() {
+        let (old, new) = old_and_new();
+        let (seen, dir) = update(
+            "ota-mismatch",
+            21,
+            "old",
+            old.clone(),
+            &[&old],
+            &new,
+            Some("Base mismatch"),
+        )
+        .await;
+        assert_eq!(seen.end(), "ok", "{:?}", seen.lines);
+        assert_eq!(seen.begins.len(), 2);
+        assert!(seen.begins[0].patch.is_some() && seen.begins[1].patch.is_none());
+        assert!(seen.said("fallback").unwrap()["msg"]
+            .as_str()
+            .unwrap()
+            .contains("Base mismatch"));
+        assert_eq!(seen.offs.len() as u64, (new.len() as u64).div_ceil(C));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn a_patch_that_rebuilds_the_wrong_image_falls_back_once() {
+        let (old, new) = old_and_new();
+        // the watch reports the cached version but runs other bytes: the rebuilt sha is wrong
+        let mut running = old.clone();
+        running[60000] ^= 1;
+        let (seen, dir) = update("ota-badsha", 21, "old", running, &[&old], &new, None).await;
+        assert_eq!(seen.end(), "ok", "{:?}", seen.lines);
+        assert_eq!(seen.begins.len(), 2);
+        assert!(seen.said("fallback").unwrap()["msg"]
+            .as_str()
+            .unwrap()
+            .contains("Checksum mismatch"));
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

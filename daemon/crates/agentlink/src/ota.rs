@@ -28,7 +28,7 @@ pub fn run(
     writeln!(s, "{req}")?;
 
     let tty = std::io::stderr().is_terminal() && !json;
-    let t0 = Instant::now();
+    let mut t0 = Instant::now();
     let (mut size, mut line_open) = (0u64, false);
     let mut next_decile = 0;
     let close_line = |open: &mut bool| {
@@ -46,17 +46,43 @@ pub fn run(
         match v["ota"].as_str().unwrap_or("") {
             "begin" => {
                 size = v["size"].as_u64().unwrap_or(0);
+                let patch = v["patch"]["size"].as_u64();
                 if !json {
                     eprintln!(
                         "sending {} ({} KB) to {}, replacing {}",
                         v["ver"].as_str().unwrap_or("?"),
-                        size / 1024,
+                        size.div_ceil(1024),
                         v["device"].as_str().unwrap_or("the watch"),
                         v["from"].as_str().unwrap_or("?")
+                    );
+                    if let Some(p) = patch {
+                        eprintln!(
+                            "  as a delta: {} KB against {}",
+                            p.div_ceil(1024),
+                            v["patch"]["base"].as_str().unwrap_or("?")
+                        );
+                    }
+                }
+                size = patch.unwrap_or(size);
+            }
+            "fallback" => {
+                close_line(&mut line_open);
+                size = v["size"].as_u64().unwrap_or(size);
+                t0 = Instant::now();
+                next_decile = 0;
+                if !json {
+                    eprintln!(
+                        "{}; sending the whole image ({} KB)",
+                        v["msg"]
+                            .as_str()
+                            .unwrap_or("the watch did not take the delta"),
+                        size.div_ceil(1024)
                     );
                 }
             }
             "progress" if !json => {
+                // the bytes being sent: the image, or the patch that rebuilds it
+                size = v["size"].as_u64().unwrap_or(size);
                 let next = v["next"].as_u64().unwrap_or(0);
                 let pct = next * 100 / size.max(1);
                 let kbs = next as f64 / 1024.0 / t0.elapsed().as_secs_f64().max(0.001);

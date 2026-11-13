@@ -74,6 +74,7 @@ enum Cmd {
         shell: String,
     },
     /// Send a signed firmware image to the connected watch over the air (PROTOCOL §6c).
+    /// When ~/.agentlink/fw holds the image the watch runs, only a patch against it is sent.
     Ota {
         /// The signed app image (build/agentlink.bin).
         image: std::path::PathBuf,

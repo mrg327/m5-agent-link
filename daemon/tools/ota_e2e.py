@@ -1,16 +1,18 @@
 # Firmware update end to end (PROTOCOL §6c): `agentlink ota` -> agentlinkd -> a fake watch on WebSocket.
 # Checks: a whole transfer with one dropped chunk (the daemon rewinds), the sha the device computes, done, the
 # restart (disconnect, hello with the new fw) and the CLI's exit 0; a busy device (CLI fails with the message);
-# a proto 0.14 device (refused before anything is sent); an unsigned image; and that no image byte reaches the
-# trace. It starts its own daemon on another port with a scratch AGENTLINK_HOME (under daemon/target); the user's
-# daemon is not touched.
+# a proto 0.14 device (refused before anything is sent); an unsigned image; that no image byte reaches the
+# trace; and the delta path (proto 0.21): a patch against the cached image the watch runs, rebuilt here with the
+# reference detools, and the fall back to the whole image when the watch refuses the base. It starts its own
+# daemon on another port with a scratch AGENTLINK_HOME (under daemon/target); the user's daemon is not touched.
 #
 #   cd daemon && cargo build --workspace
-#   uv run --with cbor2 --with websockets python daemon/tools/ota_e2e.py "$PWD/.."     # the repo root
+#   uv run --with cbor2 --with websockets --with detools==0.53.1 python daemon/tools/ota_e2e.py "$PWD/.."  # the repo root
 #
-# Takes about fifteen seconds. Needs a Unix.
+# Takes about twenty seconds. Needs a Unix.
 import asyncio, hashlib, json, os, signal, subprocess, sys, tempfile, time
-import cbor2, websockets
+import io
+import cbor2, detools, websockets
 
 REPO = os.path.abspath(sys.argv[1])
 BIN = f"{REPO}/daemon/target/debug"
@@ -65,9 +67,11 @@ async def finish(p, t=60):
     return p.returncode, out.decode(), err.decode()
 
 class Watch:
-    """A fake watch: answers fw_begin / fw_chunk like the firmware does."""
-    def __init__(self, ws, uid):
-        self.ws, self.uid = ws, uid
+    """A fake watch: answers fw_begin / fw_chunk like the firmware does. `running` is its image (the base of
+    a patch)."""
+    def __init__(self, ws, uid, running=None):
+        self.ws, self.uid, self.running = ws, uid, running
+        self.patch = None
         self.mid = 100
         self.buf = bytearray()
         self.begun = None
@@ -83,7 +87,7 @@ class Watch:
         await self.ws.send(cbor2.dumps({0: 26, 1: self.mid, 3: b}))
 
     async def serve(self, mode="ok"):
-        """mode ok: take the image. busy: refuse."""
+        """mode ok: take the image or patch. busy: refuse. nobase: refuse a patch (Base mismatch)."""
         while True:
             try: raw = await self.ws.recv()
             except websockets.ConnectionClosed: return
@@ -95,7 +99,12 @@ class Watch:
                     await self.ack(5, len(self.buf)); continue
                 if mode == "busy":
                     await self.ack(2, 0, "recording"); continue
+                patch = m[3].get(3)
+                if patch and (mode == "nobase" or hashlib.sha256(self.running[:patch[2]]).digest() != patch[1]):
+                    self.begins.append("patch refused")
+                    await self.ack(3, 0, "Base mismatch"); continue
                 self.begun = (size, m[3][1], m[3].get(2))
+                self.patch = patch
                 self.buf = bytearray()
                 await self.ack(0, 0)
             elif m[0] == 25:
@@ -106,7 +115,12 @@ class Watch:
                     continue
                 if off == len(self.buf):
                     self.buf += data
-                if len(self.buf) == self.begun[0]:
+                if len(self.buf) == (self.patch[0] if self.patch else self.begun[0]):
+                    if self.patch:
+                        out = io.BytesIO()
+                        detools.apply_patch(io.BytesIO(self.running[:self.patch[2]]), io.BytesIO(bytes(self.buf)), out)
+                        self.received_patch = bytes(self.buf)
+                        self.buf = bytearray(out.getvalue())
                     good = hashlib.sha256(self.buf).digest() == self.begun[1]
                     await self.ack(1 if good else 3, len(self.buf), None if good else "sha")
                     return "done"
@@ -198,13 +212,58 @@ async def main():
     check("closing the CLI makes the daemon send fw_begin size 0", w.begins and w.begins[-1] == 0)
     await ws.close(); await t
 
-    # nothing of the image in the trace
+    # delta (proto 0.21): the watch runs an image this machine has (in fw/, as the firmware build leaves it)
+    old_ver, delta_ver = "8.8.8-base", "8.8.9-delta"
+    base = bytearray(make_image(ver=old_ver))
+    new = bytearray(base)
+    new[48:80] = delta_ver.encode().ljust(32, b"\0")
+    new[20000:20000 + 3000] = os.urandom(3000)
+    new[90000:90000 + 500] = os.urandom(500)
+    base, new = bytes(base), bytes(new)
+    os.makedirs(f"{HOME}/fw", exist_ok=True)
+    open(f"{HOME}/fw/{hashlib.sha256(base).hexdigest()}.bin", "wb").write(base)
+    new_path = f"{HOME}/delta.bin"
+    open(new_path, "wb").write(new)
+
+    ws = await connect(21, old_ver, "cc00000000000003")
+    w = Watch(ws, "cc00000000000003", running=base)
+    w.drop_at = 1 * CH
+    p = await cli("ota", new_path)
+    r = await w.serve("ok")
+    check("delta: begin carried a patch against the running image",
+          w.patch and w.patch[1] == hashlib.sha256(base).digest() and w.patch[2] == len(base))
+    check("delta: the patch is small", w.patch and w.patch[0] < len(new) // 10)
+    check("delta: the watch rebuilt the new image (sha)", r == "done" and bytes(w.buf) == new)
+    check("delta: chunks carried patch bytes (resent after the drop)",
+          w.chunks > w.patch[0] // CH and w.chunks < len(new) // CH)
+    await ws.close(); await asyncio.sleep(1.5)
+    ws2 = await connect(21, delta_ver, "cc00000000000003")
+    rc, out, err = await finish(p)
+    check("delta: CLI exits 0 and says it sent a delta", rc == 0 and delta_ver in out and "delta" in err and old_ver in err)
+    check("delta: the sent image is kept in fw/", os.path.exists(f"{HOME}/fw/{hashlib.sha256(new).hexdigest()}.bin"))
+    await ws2.close(); await asyncio.sleep(0.3)
+
+    # the watch says it runs that version but refuses the base: the whole image follows
+    ws = await connect(21, old_ver, "cc00000000000003")
+    w = Watch(ws, "cc00000000000003", running=base)
+    p = await cli("ota", new_path)
+    r = await w.serve("nobase")
+    check("Base mismatch: refused, then the whole image", "patch refused" in w.begins and w.patch is None
+          and r == "done" and bytes(w.buf) == new)
+    await ws.close(); await asyncio.sleep(1.5)
+    ws2 = await connect(21, delta_ver, "cc00000000000003")
+    rc, out, err = await finish(p)
+    check("Base mismatch: CLI exits 0 and reports the fall back", rc == 0 and "Base mismatch" in err and "whole image" in err)
+    await ws2.close(); await asyncio.sleep(0.3)
+
+    # nothing of the image in the trace (fw/ is the image cache)
     leak = False
     needle = IMG[5000:5032]
     seen_len = False
     for root, _, files in os.walk(HOME):
+        if os.path.basename(root) == "fw": continue
         for f in files:
-            if f in ("agentlink.bin", "unsigned.bin", "hook.sock", "remote.sock"): continue
+            if f in ("agentlink.bin", "unsigned.bin", "delta.bin", "hook.sock", "remote.sock"): continue
             data = open(os.path.join(root, f), "rb").read()
             if needle.hex().encode() in data or needle in data: leak = True
             if b"fw_chunk" in data and b'"len"' in data: seen_len = True
