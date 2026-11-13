@@ -33,7 +33,7 @@ export const MSG_TYPES = {
   hello: 1, welcome: 2, snapshot: 3, session_upd: 4, gone: 5, attention: 6, clear: 7, cmd: 8,
   result: 9, detail: 10, cfg: 11, batt: 12, ping: 13, pong: 14, log: 15, audio_start: 16,
   audio: 17, audio_end: 18, transcript: 19, kb_start: 20, kb_stroke: 21, kb_cands: 22,
-  usage: 23, fw_begin: 24, fw_chunk: 25, fw_ack: 26,
+  usage: 23, fw_begin: 24, fw_chunk: 25, fw_ack: 26, power: 27,
   dbg_ui_state_req: 64, dbg_ui_state: 65,
   dbg_screenshot_req: 66, dbg_screenshot_chunk: 67, dbg_inject_input: 68, dbg_set_log_level: 69,
 };
@@ -97,6 +97,10 @@ const SPECS = {
   fw_begin: { size: [0, 'uint'], sha: [1, 'hex'], ver: [2, 'tstr'] },
   fw_chunk: { off: [0, 'uint'], data: [1, 'hex'] },
   fw_ack: { st: [0, 'enum:fw_status'], next: [1, 'uint'], msg: [2, 'tstr'] },
+  // proto 0.19 (POWER.md): battery and the ms spent in each power state since the previous report
+  power: { mv: [0, 'uint'], mvf: [1, 'uint'], vin: [2, 'uint'], chg: [3, 'bool'], usb: [4, 'bool'], pct: [5, 'uint'],
+    on: [6, 'uint'], dim: [7, 'uint'], off: [8, 'uint'], deep: [9, 'uint'], lk: [10, 'uint'], ble: [11, 'uint'],
+    itvl: [12, 'uint'], seq: [13, 'uint'], nd: [14, 'uint'] },
   kb_cands: { kid: [0, 'uint'], seq: [1, 'uint'], cands: [2, 'tstrs'], typed: [3, 'uint'], err: [4, 'enum:result_err'] },
   dbg_ui_state: { screen: [0, 'tstr'], sel_sid: [1, 'uint'], rid: [2, 'uint'], visible: [3, 'tstrs'], power: [4, 'tstr'], fps: [5, 'uint'] },
   dbg_screenshot_chunk: { w: [0, 'uint'], h: [1, 'uint'], offset: [2, 'uint'], data: [3, 'bstr'], last: [4, 'bool'] },
@@ -248,6 +252,7 @@ export function describe(msg, dir) {
     case 'ping': what = 'ping (keepalive)'; break;
     case 'pong': what = 'pong (link is alive)'; break;
     case 'batt': what = `battery ${b.pct}%${b.chg ? ' charging' : ''}`; break;
+    case 'power': what = `power report: ${b.mv} mV${b.chg ? ' charging' : ''}, ${Math.round(((b.on ?? 0) + (b.dim ?? 0) + (b.off ?? 0) + (b.deep ?? 0)) / 1000)} s covered`; break;
     case 'log': what = `log: ${b.msg}`; break;
     case 'detail': what = `full text for ${b.rid !== undefined ? 'request ' + b.rid : 'session ' + b.sid}${b.total !== undefined ? `, bytes ${b.off ?? 0}-${(b.off ?? 0) + new TextEncoder().encode(b.text ?? '').length} of ${b.total}` : ''}`; break;
     case 'cfg': what = 'new device settings'; break;

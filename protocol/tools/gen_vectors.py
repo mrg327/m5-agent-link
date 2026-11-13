@@ -27,7 +27,7 @@ MT = dict(hello=1, welcome=2, snapshot=3, session_upd=4, gone=5, attention=6, cl
           cmd=8, result=9, detail=10, cfg=11, batt=12, ping=13, pong=14, log=15,
           audio_start=16, audio=17, audio_end=18, transcript=19,
           kb_start=20, kb_stroke=21, kb_cands=22, usage=23,
-          fw_begin=24, fw_chunk=25, fw_ack=26,
+          fw_begin=24, fw_chunk=25, fw_ack=26, power=27,
           dbg_ui_state=65, dbg_inject_input=68)
 
 
@@ -405,6 +405,22 @@ VECTORS = {
         "Device refuses the finished image: its signature does not match the running firmware's key",
         {"t": "fw_ack", "id": 41, "re": 35, "b": {"st": "bad", "next": 1388032, "msg": "Signature not trusted"}},
         env("fw_ack", 41, {0: 3, 1: 1388032, 2: "Signature not trusted"}, re_=35),
+    ),
+    "power_battery": (
+        "Power report (proto 0.19) on battery over BLE: 3.87 V, 5 minutes mostly in standby at a 30 ms interval",
+        {"t": "power", "id": 42, "b": {"mv": 3871, "mvf": 3880, "vin": 0, "chg": False, "usb": False, "pct": 63,
+         "on": 41200, "dim": 30000, "off": 228800, "deep": 0, "lk": 300000, "ble": 300000, "itvl": 30000,
+         "seq": 7, "nd": 0}},
+        env("power", 42, {0: 3871, 1: 3880, 2: 0, 3: False, 4: False, 5: 63, 6: 41200, 7: 30000, 8: 228800,
+                          9: 0, 10: 300000, 11: 300000, 12: 30000, 13: 7, 14: 0}),
+    ),
+    "power_after_deep": (
+        "Power report (proto 0.19) right after the welcome that follows a deep sleep of 2 h, on USB and charging",
+        {"t": "power", "id": 2, "b": {"mv": 4012, "mvf": 4012, "vin": 5080, "chg": True, "usb": True, "pct": 78,
+         "on": 3500, "dim": 0, "off": 612000, "deep": 7200000, "lk": 1200, "ble": 0, "itvl": 0,
+         "seq": 12, "nd": 1}},
+        env("power", 2, {0: 4012, 1: 4012, 2: 5080, 3: True, 4: True, 5: 78, 6: 3500, 7: 0, 8: 612000,
+                         9: 7200000, 10: 1200, 11: 0, 12: 0, 13: 12, 14: 1}),
     ),
     "welcome_keys": (
         "Welcome (proto 0.7): quick replies and the 71002100a6002800300077004900a60028003000200099003601a0003000 swipe keyboard (the daemon decodes strokes)",

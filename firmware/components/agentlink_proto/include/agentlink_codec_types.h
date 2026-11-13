@@ -1147,6 +1147,29 @@ struct msg_fw_ack {
 	struct fw_ack msg_fw_ack_fw_ack_m;
 };
 
+struct power {
+	uint32_t power_uint0uint;
+	uint32_t power_uint1uint;
+	uint32_t power_uint2uint;
+	bool power_uint3bool;
+	bool power_uint4bool;
+	uint32_t power_uint5uint;
+	uint32_t power_uint6uint;
+	uint32_t power_uint7uint;
+	uint32_t power_uint8uint;
+	uint32_t power_uint9uint;
+	uint32_t power_uint10uint;
+	uint32_t power_uint11uint;
+	uint32_t power_uint12uint;
+	uint32_t power_uint13uint;
+	uint32_t power_uint14uint;
+};
+
+struct msg_power {
+	struct hdr_r msg_power_hdr_m;
+	struct power msg_power_power_m;
+};
+
 struct msg_dbg_ui_state_req {
 	struct hdr_r msg_dbg_ui_state_req_hdr_m;
 };
@@ -1274,6 +1297,7 @@ struct envelope_r {
 		struct msg_fw_begin envelope_msg_fw_begin_m;
 		struct msg_fw_chunk envelope_msg_fw_chunk_m;
 		struct msg_fw_ack envelope_msg_fw_ack_m;
+		struct msg_power envelope_msg_power_m;
 		struct msg_dbg_ui_state_req envelope_msg_dbg_ui_state_req_m;
 		struct msg_dbg_ui_state envelope_msg_dbg_ui_state_m;
 		struct msg_dbg_screenshot_req envelope_msg_dbg_screenshot_req_m;
@@ -1308,6 +1332,7 @@ struct envelope_r {
 		envelope_msg_fw_begin_m_c,
 		envelope_msg_fw_chunk_m_c,
 		envelope_msg_fw_ack_m_c,
+		envelope_msg_power_m_c,
 		envelope_msg_dbg_ui_state_req_m_c,
 		envelope_msg_dbg_ui_state_m_c,
 		envelope_msg_dbg_screenshot_req_m_c,

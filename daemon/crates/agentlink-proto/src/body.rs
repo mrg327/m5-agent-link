@@ -525,6 +525,41 @@ body!(FwAck {
     #[n(2)] #[serde(skip_serializing_if = "Option::is_none")] msg: Option<String>,
 });
 
+// ── power report (proto 0.19, POWER.md) ──
+body!(
+    /// The device's battery and the time it spent in each power state since its previous report.
+    Power {
+        /// Battery voltage, the last raw reading (mV); 0 = no reading.
+        #[n(0)] mv: u64,
+        /// Battery voltage as filtered for the device's own percent (mV).
+        #[n(1)] mvf: u64,
+        /// Input (USB / charger) voltage (mV).
+        #[n(2)] vin: u64,
+        #[n(3)] chg: bool,
+        #[n(4)] usb: bool,
+        /// Battery percent as the device shows it (linear 3.3-4.2 V).
+        #[n(5)] pct: u64,
+        /// ms with the display on at full look.
+        #[n(6)] on: u64,
+        /// ms with the display on, dimmed to the ambient face.
+        #[n(7)] dim: u64,
+        /// ms with the display off (standby).
+        #[n(8)] off: u64,
+        /// ms in deep sleep.
+        #[n(9)] deep: u64,
+        /// ms welcomed by a daemon.
+        #[n(10)] lk: u64,
+        /// ms with a BLE central connected.
+        #[n(11)] ble: u64,
+        /// BLE connection interval in force (us); 0 = no BLE connection.
+        #[n(12)] itvl: u64,
+        /// Report number since power-on; 0 = the first.
+        #[n(13)] seq: u64,
+        /// Deep sleeps that ended within these times.
+        #[n(14)] nd: u64,
+    }
+);
+
 // ── keyboard (proto 0.7) ──
 body!(KbStart {
     #[n(0)] kid: u64,

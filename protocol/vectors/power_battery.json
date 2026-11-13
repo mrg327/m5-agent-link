@@ -1,0 +1,25 @@
+{
+  "desc": "Power report (proto 0.19) on battery over BLE: 3.87 V, 5 minutes mostly in standby at a 30 ms interval",
+  "symbolic": {
+    "t": "power",
+    "id": 42,
+    "b": {
+      "mv": 3871,
+      "mvf": 3880,
+      "vin": 0,
+      "chg": false,
+      "usb": false,
+      "pct": 63,
+      "on": 41200,
+      "dim": 30000,
+      "off": 228800,
+      "deep": 0,
+      "lk": 300000,
+      "ble": 300000,
+      "itvl": 30000,
+      "seq": 7,
+      "nd": 0
+    }
+  },
+  "cbor_hex": "a300181b01182a03af00190f1f01190f28020003f404f405183f0619a0f007197530081a00037dc009000a1a000493e00b1a000493e00c1975300d070e00"
+}

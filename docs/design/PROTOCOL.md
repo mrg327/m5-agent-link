@@ -27,7 +27,7 @@
   | MTU | 247 requested |
   | PHY | 2M preferred |
 
-  `Device Information Service` and `Battery Service` are standard 0x180A/0x180F.
+  `Device Information Service` and `Battery Service` are standard 0x180A/0x180F. Battery Level (0x2A19) is read and notify: the device notifies a subscribed central when the percent changes by 1 or more (the device's own linear 3.3-4.2 V figure, sampled at least once a minute; [POWER.md](POWER.md)).
   - **Fragmentation:** each write/notification is `[FIRST|LAST|seq:6] data…` (`FIRST=0x80`, `LAST=0x40`). `seq` starts at 0 on the FIRST fragment and wraps mod 64. A `seq` gap, a continuation without a FIRST, or a message over `max_msg` drops the partial message. A FIRST in the middle of a message drops the partial and starts a new one.
   - **Fragment size:** both sides send fragments of MTU−3 bytes (ATT header 3; the 1-byte fragment header leaves MTU−4 data bytes). The daemon reads the negotiated MTU from its BLE stack per frame and caps writes at 244 B; until the MTU exchange is reported (MTU 23) it writes 20 B, and after a failed large write it falls back to 20 B for the rest of the link. `AGENTLINK_BLE_WRITE_LEN` pins the daemon's write size. Receivers reassemble by header only, so any fragment size up to MTU−3 is valid. The device also requests LE Data Length 251 so that one MTU-sized fragment fits one link-layer packet. A central without data length extension (the BCM4350C0 in some Linux laptops) refuses that; the device then answers the MTU exchange with 239 instead of 247, so that each ATT packet (243 B with L2CAP) fills nine 27-byte link-layer packets exactly instead of ten with an 8-byte tail.
   - **Discovery:** the daemon connects to devices that advertise the service or a name starting with `AgentLink-`. `AGENTLINK_BLE_NAME` pins one device by name.
@@ -72,7 +72,7 @@ device                                 daemon
 ### `hello` (device → daemon)
 ```cddl
 hello = {
-  proto: [uint, uint],             ; [major, minor] = [0, 18]
+  proto: [uint, uint],             ; [major, minor] = [0, 19]
   dev: { class: tstr,              ; "watch" | "desk" | "pad" | "sim" | ...
          board: tstr,              ; "m5stopwatch"
          fw: tstr,                 ; semver
@@ -384,8 +384,27 @@ the daemon types it the next time the session can.
   holds a question. A device below 0.18 gets no `qs`: one single-choice question keeps `opts` (`reply`, or
   `dictate` with the `rid`), anything else is Open on PC only.
 
+## 6f. Power report (proto 0.19, [POWER.md](POWER.md))
+```
+power { mv, mvf, vin, chg, usb, pct, on, dim, off, deep, lk, ble, itvl, seq, nd }   device → daemon (type 27)
+```
+- The device sends it only to a daemon whose `welcome` says proto ≥ 0.19: right after the welcome, then every 5
+  minutes while welcomed (a send that fails is tried again 30 s later). Nothing is sent, and nothing extra wakes
+  the device, while no daemon listens: the figures add up until the next report goes out.
+- `mv` is the last raw battery reading and `mvf` the filtered one the device's own percent `pct` comes from (linear
+  3.3-4.2 V); `vin` the input voltage, `chg` charging, `usb` external power present. All in mV. Voltage only: the
+  device cannot measure current.
+- `on`, `dim`, `off` and `deep` are the ms since the previous report with the display on at full look, on and
+  dimmed to the ambient face, off (standby), and in deep sleep. Their sum is the time the report covers. Deep sleep
+  is measured by the RTC across the wake reboot; the not-yet-sent figures survive it in RTC memory (`nd` deep sleeps
+  ended in this span). A power-on or reset loses them: `seq` (the report number since power-on) starts at 0 again.
+- `lk` is the ms welcomed by a daemon (any transport), `ble` the ms with a BLE central connected, and `itvl` the BLE
+  connection interval in force now in µs (0 = no BLE connection).
+- The daemon appends each report to `~/.agentlink/power-reports.csv` and keeps the last one per device for
+  `agentlink status`; `agentlink power` reads the file. An older daemon ignores the message type.
+
 ## 7. Misc
-- `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray.
+- `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray. The current firmware does not send it; the power report (§6f) carries more.
 - `cfg { … }` (daemon → device) is a partial update of the `welcome.cfg` fields.
 - `ping {}` / `pong {}`.
 - `log { lvl, msg }` (device → daemon) is debug only and is enabled from the daemon.
