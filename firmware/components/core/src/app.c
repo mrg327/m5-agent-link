@@ -343,6 +343,9 @@ static void act_scroll_open(uint32_t sid)
     else ui_toast("Offline", RGB_AMBER);
 }
 
+/* GRAPH: a background fetch (GRAPH.md §4), silent when it cannot go out; the screen asks again. */
+static void act_graph(uint32_t sid) { (void)link_send_graph(sid); }
+
 static void act_scroll(uint32_t sid, nav_scroll_unit_t unit, int delta)
 {
     static uint32_t seq;
@@ -382,6 +385,7 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .scroll_open = act_scroll_open,
                                        .scroll = act_scroll,
                                        .scroll_stop = feedback_scroll_stop,
+                                       .graph = act_graph,
                                        .quiet_toggled = feedback_quiet_toggled,
                                        .volume_changed = feedback_volume_preview,
                                        .tick = feedback_tick,
@@ -457,6 +461,7 @@ static void on_session(const session_t *before, const session_t *now, uint32_t p
 
 static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, const char *msg)
 {
+    if (op == LINK_OP_GRAPH) return; /* a background fetch: stale means the session is gone, GRAPH closes with it */
     if (op == LINK_OP_DETAIL) { /* a background fetch: ASK shows what it means, no toast */
         detail_on_result(sid, rid, ok, err);
         return;

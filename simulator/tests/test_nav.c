@@ -51,7 +51,7 @@ int main(void)
     EXPECT(n == 3 && it[2].id == ASK_OPEN_PC, "short list keeps Open on PC last");
 
     /* UI-V3 §5: a swipe right in the centre goes back from every deeper mode except KEYS, never deny */
-    static const nav_mode_t deeper[] = {MODE_AGENT, MODE_ASK, MODE_WATCH, MODE_SCROLL, MODE_STATUS, MODE_VOICE};
+    static const nav_mode_t deeper[] = {MODE_AGENT, MODE_ASK, MODE_WATCH, MODE_SCROLL, MODE_STATUS, MODE_VOICE, MODE_GRAPH};
     for (unsigned i = 0; i < sizeof deeper / sizeof deeper[0]; i++) {
         nav_mode_t m = deeper[i];
         for (int req = 0; req < 2; req++)
@@ -72,6 +72,22 @@ int main(void)
         EXPECT(nav_job_items(SESS_IDLE, it, 4) == 1 && it[0].id == AG_DISMISS, "anything else can only be dismissed");
     }
     EXPECT(nav_lookup(MODE_KEYS, G_SWIPE_RIGHT, ZONE_CENTRE, false, false) == NAV_NONE, "KEYS keeps touch for strokes");
+    {
+        /* GRAPH.md §4: Graph follows Activity for a daemon at 0.22, in any state; the screen goes back like the others */
+        agent_item_t it[8];
+        int n = nav_agent_items(SESS_WORK, true, true, true, false, false, true, it, 8);
+        EXPECT(n >= 2 && it[0].id == AG_WATCH && it[1].id == AG_GRAPH && !it[1].hold, "Graph right after Activity");
+        n = nav_agent_items(SESS_DONE, false, false, false, false, true, true, it, 8);
+        EXPECT(n == 3 && it[0].id == AG_READ && it[1].id == AG_WATCH && it[2].id == AG_GRAPH, "after Read on a finished session");
+        n = nav_agent_items(SESS_WORK, true, true, true, false, false, false, it, 8);
+        for (int i = 0; i < n; i++) EXPECT(it[i].id != AG_GRAPH, "no Graph for an older daemon");
+        EXPECT(nav_lookup(MODE_GRAPH, G_BTN_B_LONG, ZONE_ANY, false, false) == NAV_BACK, "B long goes back");
+        EXPECT(nav_lookup(MODE_GRAPH, G_LONG_PRESS, ZONE_CENTRE, false, false) == NAV_BACK, "a long press goes back");
+        EXPECT(nav_lookup(MODE_GRAPH, G_CHORD, ZONE_ANY, false, false) == NAV_HOME, "the chord goes home");
+        EXPECT(nav_lookup(MODE_GRAPH, G_SCRUB, ZONE_RIM, false, false) == NAV_SCRUB, "the rim scrubs the rows");
+        EXPECT(nav_lookup(MODE_GRAPH, G_DRAG, ZONE_CENTRE, false, false) == NAV_SCROLL_DRAG, "a centre drag scrolls");
+        EXPECT(!strcmp(nav_mode_name(MODE_GRAPH), "graph"), "ui_state names it graph");
+    }
 
     printf("%s\n", failures ? "nav: FAILED" : "nav: ok");
     return failures ? 1 : 0;

@@ -43,6 +43,7 @@ typedef struct {
     void (*scroll_open)(uint32_t sid); /* entering SCROLL: bring the terminal to the front, quietly */
     void (*scroll)(uint32_t sid, nav_scroll_unit_t unit, int delta); /* SCROLL: one coalesced cmd_op_scroll */
     void (*scroll_stop)(void); /* SCROLL reached the bottom or the top */
+    void (*graph)(uint32_t sid); /* GRAPH: ask for the session's agent graph (proto 0.22) */
     void (*quiet_toggled)(void); /* STATUS: quiet mode turned on, extended or off */
     void (*volume_changed)(void); /* STATUS: the speaker level was stepped (prefs.h): play a preview */
     void (*tick)(void);   /* light haptic tick: selection by tap or button */

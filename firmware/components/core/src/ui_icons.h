@@ -35,3 +35,21 @@
 #define ICON_LIVE "\xEE\x81\x9C"       /* arrow-line-down e05c */
 #define ICON_BACKSPACE "\xEE\x82\xAE"  /* backspace e0ae */
 #define ICON_HOLD "\xEE\x86\x8A"       /* circle e18a: the hold ring is drawn as an outline, see ui_wheel.c */
+#define ICON_GRAPH             "\xEE\x89\xBE" /* git-fork e27e: the AGENT wheel's Graph item */
+/* The GRAPH screen's node and lane glyphs (GRAPH.md §4): in font_phosphor_20 only. */
+#define ICON_G_DOT             "\xEE\xB3\x9E" /* dot ecde: other */
+#define ICON_G_READ            "\xEE\x88\xA0" /* eye e220 */
+#define ICON_G_EDIT            "\xEE\x8E\xB4" /* pencil-simple e3b4 */
+#define ICON_G_SHELL           "\xEE\xAB\xA8" /* terminal-window eae8 */
+#define ICON_G_SEARCH          "\xEE\x8C\x8C" /* magnifying-glass e30c */
+#define ICON_G_WEB             "\xEE\x8A\x88" /* globe e288 */
+#define ICON_G_ROBOT           "\xEE\x9D\xA2" /* robot e762: agent; general-purpose and unknown lanes */
+#define ICON_G_PLAN            "\xEE\xAB\x9C" /* list-checks eadc */
+#define ICON_G_GIT             "\xEE\x89\xBA" /* git-commit e27a */
+#define ICON_G_TEST            "\xEE\x9E\x9E" /* flask e79e */
+#define ICON_G_MCP             "\xEE\xA5\x86" /* plug e946 */
+#define ICON_G_EXPLORE         "\xEE\xA9\xA4" /* binoculars ea64 */
+#define ICON_G_TASK            "\xEE\x8B\x9E" /* lightning e2de */
+#define ICON_G_REVIEW          "\xEE\x98\x86" /* seal-check e606 */
+#define ICON_G_RESEARCH        "\xEE\x9D\x98" /* books e758 */
+#define ICON_G_MAP             "\xEE\x8C\x9A" /* map-trifold e31a: the plan lane */

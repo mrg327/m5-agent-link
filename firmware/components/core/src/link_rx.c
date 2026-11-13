@@ -4,6 +4,7 @@
 
 #include "detail.h"
 #include "gauges.h"
+#include "graph.h"
 #include "link_internal.h"
 #include "ota.h"
 #include "voice.h"
@@ -19,6 +20,7 @@ static const struct hdr_r *env_hdr(const struct envelope_r *e)
     H(msg_log) H(msg_audio_start) H(msg_audio) H(msg_audio_end) H(msg_transcript)
     H(msg_dbg_ui_state_req) H(msg_dbg_ui_state) H(msg_dbg_screenshot_req) H(msg_dbg_screenshot_chunk)
     H(msg_dbg_inject_input) H(msg_dbg_set_log_level) H(msg_kb_start) H(msg_kb_stroke) H(msg_kb_cands) H(msg_usage) H(msg_fw_begin) H(msg_fw_chunk) H(msg_fw_ack) H(msg_power)
+    H(msg_graph)
     }
 #undef H
     return NULL;
@@ -354,6 +356,17 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
             detail_on_chunk(d->detail_uint0uint.detail_uint0uint, d->detail_uint1uint_present ? d->detail_uint1uint.detail_uint1uint : 0,
                             d->detail_uint3uint.detail_uint3uint, d->detail_uint4uint.detail_uint4uint, d->detail_uint2tstr.value,
                             (uint32_t)d->detail_uint2tstr.len, now_ms);
+        break;
+    }
+    case envelope_msg_graph_m_c: {
+        /* the agent graph (proto 0.22, GRAPH.md): no agent content, so it may be traced */
+        const struct graph *g = &e->envelope_msg_graph_m.msg_graph_graph_m;
+        uint32_t drop = g->graph_uint3uint_present ? g->graph_uint3uint.graph_uint3uint : 0;
+        dbg_event("link", "graph", "\"sid\":%u,\"n\":%u,\"drop\":%u", (unsigned)g->graph_uint0uint,
+                  (unsigned)g->graph_node_l_node_count, (unsigned)drop);
+        graph_on_msg(g->graph_uint0uint, g->graph_node_l_node, g->graph_node_l_node_count, g->graph_la_l.graph_la_l_la,
+                     g->graph_la_l_present ? g->graph_la_l.graph_la_l_la_count : 0, drop,
+                     g->graph_uint4uint_present ? g->graph_uint4uint.graph_uint4uint : 0);
         break;
     }
     case envelope_msg_result_m_c: on_result(&e->envelope_msg_result_m, re, has_re); break;

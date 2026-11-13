@@ -33,6 +33,7 @@ void ui_go_voice(uint32_t rid, bool queue); /* "Dictate...": open VOICE on the s
  * recording back to ASK (ui_ask_other_done) instead of sending it, unless it is the last question's. */
 void ui_go_voice_answer(uint32_t rid, int qi, bool last);
 void ui_go_read(void);    /* READ: the selected session's last message (LAST-MESSAGE.md) */
+void ui_go_graph(void);   /* GRAPH: the selected session's agent graph (GRAPH.md) */
 void ui_go_replies(void); /* AGENT, straight into the Reply list of the selected session */
 /* The KEYS screen (ui_keys.c). */
 lv_obj_t *ui_keys_init(lv_obj_t *screen);
@@ -119,6 +120,15 @@ bool ui_read_act(nav_action_t a, const gesture_evt_t *g);
 bool ui_read_back(void);               /* true: the end picker was open and the last page is back */
 void ui_read_tick(uint32_t now_ms);
 void ui_read_report(ui_report_t *r);
+
+/* GRAPH (ui_graph.c, GRAPH.md §4) */
+lv_obj_t *ui_graph_init(lv_obj_t *screen);
+void ui_graph_open(uint32_t sid, uint32_t now_ms);
+void ui_graph_close(void);
+bool ui_graph_refresh(uint32_t now_ms); /* false: the session is gone */
+bool ui_graph_act(nav_action_t a, const gesture_evt_t *g);
+void ui_graph_tick(uint32_t now_ms);
+void ui_graph_report(ui_report_t *r);
 
 /* The STATUS screen (ui_status.c). */
 lv_obj_t *ui_status_init(lv_obj_t *screen);

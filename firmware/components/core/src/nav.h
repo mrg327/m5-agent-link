@@ -9,7 +9,7 @@
 #include "model.h"
 
 typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_STATUS, MODE_WATCH, MODE_VOICE, MODE_KEYS, MODE_READ, MODE_LABS, MODE_TRACKPAD,
-               MODE_COUNT } nav_mode_t;
+               MODE_GRAPH, MODE_COUNT } nav_mode_t;
 
 /* Where a touch gesture happened, by its press (or swipe start) point. */
 typedef enum { ZONE_ANY, ZONE_CENTRE, ZONE_RIM } nav_zone_t;
@@ -112,7 +112,7 @@ bool nav_long_swipe_down(int y_start, int y_end);
 
 /* ── AGENT: which actions a session offers, in wheel order, default first (UI-V2 §4.2) ── */
 typedef enum {
-    AG_FOCUS, AG_DISMISS, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_REPLY, AG_INTERRUPT, AG_RERUN, AG_QUEUE, AG_UNQUEUE, AG_READ, AG_COUNT
+    AG_FOCUS, AG_DISMISS, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_REPLY, AG_INTERRUPT, AG_RERUN, AG_QUEUE, AG_UNQUEUE, AG_READ, AG_GRAPH, AG_COUNT
 } agent_action_t;
 
 typedef struct {
@@ -125,9 +125,10 @@ typedef struct {
  * session (a hold), and "Reply..." where the agent waits for you when there are replies to offer. */
 /* `queue_ok`: a reply can be queued (daemon proto >= 0.17 and quick replies or voice); `queued`: the
  * session holds a queued message, which any state can cancel; `message`: the agent's last message can be read
- * (proto 0.18, LAST-MESSAGE.md): "Read" leads a finished session's list. */
-int nav_agent_items(sess_state_t state, bool typing, bool replies, bool queue_ok, bool queued, bool message, agent_item_t *out,
-                    int cap);
+ * (proto 0.18, LAST-MESSAGE.md): "Read" leads a finished session's list; `graph`: the daemon serves the agent
+ * graph (proto 0.22, GRAPH.md): "Graph" follows "Activity". */
+int nav_agent_items(sess_state_t state, bool typing, bool replies, bool queue_ok, bool queued, bool message, bool graph,
+                    agent_item_t *out, int cap);
 /* A job's menu (JOBS.md §5): Stop while it runs; Run again and Dismiss once it ended. Stop and Run again are
  * hold items: one interrupts a process, the other starts one. */
 int nav_job_items(sess_state_t state, agent_item_t *out, int cap);

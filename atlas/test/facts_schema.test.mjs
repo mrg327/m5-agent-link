@@ -41,8 +41,8 @@ test('ring facts: screens, per-kind shapes, pills and the gesture cases', () => 
   const cases = facts.gesture_map.cases.map((c) => c.gesture);
   for (const c of ['G_TAP', 'G_LONG_PRESS', 'G_SWIPE_DOWN', 'G_SCRUB', 'G_BTN_A', 'G_BTN_A_DOUBLE', 'G_BTN_B', 'G_DRAG']) assert.ok(cases.includes(c), c);
   // the drag stream scrolls the terminal (SCROLL, and WATCH where it opens SCROLL, issue 5cbb) and moves the lists
-  // (AGENT, ASK: UI-V3 §5.1); the deck has no press binding
-  assert.deepEqual(facts.gesture_map.cases.filter((c) => c.gesture === 'G_DRAG').map((c) => c.mode), ['agent', 'ask', 'scroll', 'watch', 'read']);
+  // (AGENT, ASK: UI-V3 §5.1) and the graph rows (GRAPH.md §4); the deck has no press binding
+  assert.deepEqual(facts.gesture_map.cases.filter((c) => c.gesture === 'G_DRAG').map((c) => c.mode), ['agent', 'ask', 'scroll', 'watch', 'read', 'graph']);
   assert.ok(!facts.gesture_map.cases.some((c) => c.mode === 'home' && c.gesture === 'G_PRESS'));
   // no swipe denies anywhere; the deck's swipe down opens STATUS, which has its own timeout and the quiet steps
   assert.deepEqual(facts.gesture_map.cases.filter((c) => c.nav === 'NAV_DENY').map((c) => c.mode), []); // no swipe denies: deny is only its hold

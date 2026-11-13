@@ -72,6 +72,8 @@ One table, every input × mode. "—" means ignored (and logged). Thresholds: lo
 | Lift (IMU, later) | wake; during a glow opens ASK | — | — | — | — | — | — |
 | Shake (IMU) | — | — | — | — | — | — | — |
 
+GRAPH (proto 0.22, [GRAPH.md](GRAPH.md) §4; UI-V3 §4.11) is not a column above: it has no tap, swipe up/down/left or A binding. Rim scrub and a vertical centre drag move one row per detent, B short moves one row older, and back is swipe right, a centre long-press or B long (to HOME); the A+B chord is Home.
+
 Why this is conflict-free:
 - The centre and the rim are disjoint hit regions (r < 150 vs r ≥ 160); a press between them is a rim press. A scrub that starts in the annulus never becomes a swipe; a swipe or drag that starts in the centre never becomes a scrub.
 - **The centre's vertical motion has one meaning per mode:** HOME opens things (up = AGENT, down = STATUS), AGENT/ASK go back or deny (down only), STATUS goes back (up only, the reverse of the swipe that opened it; down is ignored there). Session switching is horizontal (left/right) or on the rim, so it can never be mistaken for a deny or a scroll drag. Deny exists only in ASK, and only as the strict swipe or the hold item.

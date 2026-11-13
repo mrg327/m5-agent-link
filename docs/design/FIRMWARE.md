@@ -100,6 +100,7 @@ With 450 mAh, STANDBY at 2.5 mA is about 7 days, and 40 lifts × 10 s/day at 100
 - Buttons: KEYA (yellow, G2) and KEYB (blue, G1) with debounce. A short = default action, A double (≤ 300 ms) = next attention, B short/long = next/previous session, A+B chord = detected and logged only. A single press is therefore delayed by ~300 ms to wait for a possible double (B is immediate).
 - Haptics (`feedback.c`): scrub detent = 15 ms kick (the board runs ≤ 15 ms pulses at kick duty), rate-limited to 45 ms; approve-hold ramp = 13 steps (~1 s); per-state entry patterns.
 - UI is a single Ring screen (`ui_home.c` + `ui_ring.c`, per-segment invalidation). `ui_glance/list/detail.c` were removed.
+- GRAPH (proto 0.22, [GRAPH.md](GRAPH.md) §4, UI-V3 §4.11): `graph.c` keeps the one watched session's graph (64 nodes, 8 lane kinds, about 160 B, no LVGL) and its fetch schedule; `ui_graph.c` draws it with one object and an `LV_EVENT_DRAW_MAIN` callback (lines, arcs, glyph labels; no per-node objects, no canvas), so it costs no frame buffer. Opened from AGENT's `Graph` when the daemon speaks ≥ 0.22; it sends `cmd graph` on open, at most once a second when the session's `n`/`ok` change, and every 3 s while open.
 - Touch-panel wake is optional (off in STANDBY to save power; lift or a button wakes the device).
 
 ## 7. Link manager

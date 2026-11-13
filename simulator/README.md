@@ -48,12 +48,14 @@ scrub DEG0 DEG1 [MS [RADIUS]] | session SID STATE REPO [BRANCH [SUMMARY]] | drop
 lift | shake | connect | disconnect | rx HEX | ui | shot FILE.png
 attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OPT...
 result ok | result err stale|denied|... | clear RID [WHY]
+graph SID KIND:STATE:LANE[:f][:m]... [la=K,K..] [drop=N] [gen=N] | graph off
 expect_screen NAME | expect_label TEXT | expect_no_label TEXT | px_reset | expect_px_max PX | quit
 ```
 
 `rx` feeds a CBOR envelope (e.g. `cbor_hex` from `protocol/vectors`) as if the daemon sent it;
 `attention`, `result` (answers the device's last command) and `clear` build such envelopes with the
-firmware's own codec. `connect` fakes the transport being up for `--no-ws` runs. A failed `expect_*`
+firmware's own codec. `graph` is a stand-in daemon for `cmd graph` (GRAPH.md): it answers every one for that session with
+this graph (state `run`/`ok`/`fail`, `f` fork, `m` merge, `la` the lane kinds, lane 0 first). `connect` fakes the transport being up for `--no-ws` runs. A failed `expect_*`
 exits with code 1. `shot` writes a PNG of the framebuffer (round mask applied); `press` without a
 `release` keeps the finger down, so a hold can be photographed mid-way.
 `px_reset` / `expect_px_max` bound the pixels LVGL flushed in between (`core_px_flushed()`); see

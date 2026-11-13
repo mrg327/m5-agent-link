@@ -1,0 +1,35 @@
+# The agent graph (proto 0.22, GRAPH.md): AGENT offers Graph after Activity when the daemon speaks 0.22; the
+# screen asks for the graph (cmd graph, op 21) on open, draws it with no text, and the rim and B move through
+# the rows. Main lane, a sub-agent forked off and merged back, a failed call and a running one.
+connect
+rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 1 work webapp feat/login Running the test suite
+graph 1 read:ok:0 search:ok:0 agent:ok:0 search:ok:1:f read:ok:1 shell:ok:2:f read:ok:1:m git:ok:2 edit:ok:0 test:fail:2:m shell:fail:0 edit:ok:0 agent:ok:0 web:ok:3:f mcp:run:3 plan:run:0 la=0,1,4,5 drop=3 gen=1
+wait 300
+tap 233 233
+wait 300
+expect_screen agent
+expect_label > Activity
+btn B
+wait 150
+expect_label > Graph
+tap 233 233
+wait 500
+expect_screen graph
+expect_label nodes 16 lanes 4 top 0
+expect_label running 2 failed 2 forks 3 merges 2 drop 3
+shot graph.png
+btn B
+wait 150
+expect_label top 1
+scrub 0 60 400
+wait 300
+expect_screen graph
+drag 233 300 -120
+wait 300
+expect_screen graph
+shot graph_scrolled.png
+swipe 150 233 380 233 200
+wait 350
+expect_screen ring
+quit

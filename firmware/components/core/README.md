@@ -15,6 +15,7 @@ Single-threaded by design: HAL callbacks (buttons, motion, link) only push into 
 | `feedback.c` | haptic/sound patterns per event, respecting alert mode |
 | `power.c` | display idle-off, wake, alert glow |
 | `debug.c` | JSON debug lines, `ui_state`, screenshot streaming, injected input |
+| `graph.c` | the watched session's agent graph (proto 0.22, GRAPH.md) and its fetch schedule (pure C, unit tested) |
 | `ui*.c` | LVGL screens: glance, list, detail (+ attention card), theme, ring widget |
 
 Test: `ctest --test-dir build/sim -j 16` (gesture recognizer; protocol round trip lives in `agentlink_proto`).

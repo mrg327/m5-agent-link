@@ -14,7 +14,7 @@
 #define TOAST_MS 1800
 
 const ui_actions_t *g_ui_actions;
-static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch, *s_voice, *s_keys, *s_read, *s_labs, *s_trackpad;
+static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch, *s_voice, *s_keys, *s_read, *s_labs, *s_trackpad, *s_graph;
 static nav_mode_t s_mode = MODE_HOME;
 static int s_rel_y;
 static bool s_link_up, s_animate = true;
@@ -102,6 +102,7 @@ void ui_init(const ui_actions_t *actions)
     s_voice = ui_voice_init(s_home);
     s_keys = ui_keys_init(s_home);
     s_read = ui_read_init(s_home);
+    s_graph = ui_graph_init(s_home);
     s_labs = ui_labs_init(s_home);
     s_trackpad = ui_trackpad_init(s_home);
     ui_countdown_init(s_home); /* over every mode's content, under the toast and the glow */
@@ -175,6 +176,7 @@ static void enter_mode(nav_mode_t m)
     if (s_mode == MODE_READ) ui_read_close();
     if (s_mode == MODE_LABS) ui_labs_close();
     if (s_mode == MODE_TRACKPAD) ui_trackpad_close();
+    if (s_mode == MODE_GRAPH) ui_graph_close();
     s_mode = m;
     ui_home_set_card_shown(m == MODE_HOME);
     if (m == MODE_AGENT) ui_agent_open(ui_home_sel_sid(), s_now_ms);
@@ -193,9 +195,10 @@ static void enter_mode(nav_mode_t m)
         ui_labs_open(s_now_ms);
     }
     else if (m == MODE_TRACKPAD) ui_trackpad_open(s_now_ms);
+    else if (m == MODE_GRAPH) ui_graph_open(ui_home_sel_sid(), s_now_ms);
     else ui_home_refresh(s_now_ms); /* the ring shows sessions again */
     if (m != MODE_HOME && m != MODE_KEYS) { /* deeper modes rise into place; KEYS records strokes at once */
-        lv_obj_t *const roots[MODE_COUNT] = {NULL, s_agent, s_ask, s_scroll, s_status, s_watch, s_voice, s_keys, s_read, s_labs, s_trackpad};
+        lv_obj_t *const roots[MODE_COUNT] = {NULL, s_agent, s_ask, s_scroll, s_status, s_watch, s_voice, s_keys, s_read, s_labs, s_trackpad, s_graph};
         ui_motion_enter(roots[m]);
     }
     dbg_event("ui", "mode", "\"mode\":\"%s\"", nav_mode_name(m));
@@ -248,6 +251,7 @@ void ui_go_voice_answer(uint32_t rid, int qi, bool last)
     enter_mode(MODE_VOICE);
 }
 void ui_go_read(void) { enter_mode(MODE_READ); }
+void ui_go_graph(void) { enter_mode(MODE_GRAPH); }
 void ui_go_replies(void)
 {
     enter_mode(MODE_AGENT);
@@ -322,6 +326,7 @@ void ui_report(ui_report_t *r)
     else if (s_mode == MODE_VOICE) ui_voice_report(r);
     else if (s_mode == MODE_KEYS) ui_keys_report(r);
     else if (s_mode == MODE_READ) ui_read_report(r);
+    else if (s_mode == MODE_GRAPH) ui_graph_report(r);
     else if (s_mode == MODE_LABS) ui_labs_report(r);
     else if (s_mode == MODE_TRACKPAD) ui_trackpad_report(r);
     else ui_home_report(r);
@@ -391,6 +396,7 @@ void ui_tick(uint32_t now_ms)
         if (s_mode == MODE_VOICE && !ui_voice_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_KEYS && !ui_keys_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_READ && !ui_read_refresh(now_ms)) enter_mode(MODE_HOME);
+        if (s_mode == MODE_GRAPH && !ui_graph_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_LABS) ui_labs_refresh(now_ms);
         if (s_mode == MODE_TRACKPAD) ui_trackpad_refresh(now_ms);
         if (s_mode == MODE_WATCH && !ui_watch_refresh(now_ms)) {
@@ -416,6 +422,7 @@ void ui_tick(uint32_t now_ms)
     }
     if (s_mode == MODE_KEYS) ui_keys_tick(now_ms);
     if (s_mode == MODE_READ) ui_read_tick(now_ms);
+    if (s_mode == MODE_GRAPH) ui_graph_tick(now_ms);
     if (s_mode == MODE_LABS && ui_labs_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_TRACKPAD) ui_trackpad_tick(now_ms);
     /* the answer window runs on the request it belongs to: on ASK, and on its card on the deck */
@@ -536,6 +543,10 @@ bool ui_on_gesture(const gesture_evt_t *g)
     if (s_mode == MODE_WATCH) {
         ui_home_note_input();
         return ui_watch_act(a, g);
+    }
+    if (s_mode == MODE_GRAPH) {
+        ui_home_note_input();
+        return ui_graph_act(a, g);
     }
     if (s_mode == MODE_LABS) {
         ui_home_note_input();

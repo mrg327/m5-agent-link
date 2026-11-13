@@ -6,6 +6,7 @@
 
 #include "debug.h"
 #include "detail.h"
+#include "graph.h"
 #include "nav.h"
 #include "ui_gauges.h"
 #include "ui_internal.h"
@@ -45,12 +46,14 @@ static const char *const s_labels[AG_COUNT] = {
     [AG_SNOOZE] = "Snooze 30 min", [AG_NOTIFY] = "Notify when done", [AG_WATCH] = "Activity",
     [AG_REPLY] = "Reply",          [AG_INTERRUPT] = "Stop",       [AG_RERUN] = "Run again",
     [AG_QUEUE] = "Reply now",      [AG_UNQUEUE] = "Cancel queued", [AG_READ] = "Read",
+    [AG_GRAPH] = "Graph",
 };
 
 static const char *const s_icons[AG_COUNT] = {
     [AG_FOCUS] = ICON_OPEN,   [AG_DISMISS] = ICON_DENIED, [AG_SNOOZE] = ICON_IDLE,  [AG_NOTIFY] = ICON_BELL,
     [AG_WATCH] = ICON_ACTIVITY, [AG_REPLY] = ICON_REPLY,  [AG_INTERRUPT] = ICON_STOP, [AG_RERUN] = ICON_WORKING,
     [AG_QUEUE] = ICON_REPLY,    [AG_UNQUEUE] = ICON_DENIED, [AG_READ] = ICON_QUESTION, /* a speech bubble: what it said */
+    [AG_GRAPH] = ICON_GRAPH,
 };
 
 static const session_t *session(void) { return model_find(s_sid); }
@@ -116,7 +119,8 @@ bool ui_agent_refresh(uint32_t now)
         else {
             bool queue_ok = model_peer_minor() >= QUEUE_MIN_MINOR && model_can_type() && (model_reply_count() > 0 || model_voice());
             n = nav_agent_items(s->state, model_can_type(), model_reply_count() > 0 || s->n_rp > 0 || model_voice() || model_keys(),
-                                queue_ok, s->queued[0] != 0, detail_msg_fetchable(s), items, WHEEL_MAX_ITEMS);
+                                queue_ok, s->queued[0] != 0, detail_msg_fetchable(s), model_peer_minor() >= GRAPH_MINOR, items,
+                                WHEEL_MAX_ITEMS);
         }
         for (int i = 0; i < n; i++)
             w[i] = (wheel_item_t){label_of(items[i].id, s), items[i].id == AG_INTERRUPT ? RGB_DANGER : items[i].id == AG_RERUN ? RGB_WORKING : rgb, items[i].hold,
@@ -255,6 +259,10 @@ static void commit(const wheel_item_t *it)
     case AG_READ: /* what the agent said (LAST-MESSAGE.md) */
         g_ui_actions->tick();
         ui_go_read();
+        return;
+    case AG_GRAPH: /* the agent graph (GRAPH.md §4) */
+        g_ui_actions->tick();
+        ui_go_graph();
         return;
     case AG_WATCH: /* the monitor for this session (UI-V2 §4.7) */
         g_ui_actions->tick();

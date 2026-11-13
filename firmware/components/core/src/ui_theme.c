@@ -24,6 +24,14 @@ uint32_t theme_session_rgb(const session_t *s)
     return s->state == SESS_INPUT && s->sub == 0 ? RGB_PERMISSION : theme_state_rgb(s->state);
 }
 
+uint32_t theme_lane_rgb(const session_t *s, int lane)
+{
+    /* violet, blue, lime, reddish purple, teal, tan, light grey */
+    static const uint32_t lanes[7] = {0x9b7bff, 0x0072b2, 0x8fd14f, 0xcc79a7, 0x00b5ad, 0xc9a26b, 0xd9d9d9};
+    if (lane <= 0) return s ? theme_session_rgb(s) : RGB_IDLE;
+    return lanes[(lane - 1) % 7];
+}
+
 bool theme_is_job(const session_t *s) { return s->agent == AGENT_SHELL; }
 
 const char *theme_state_word(const session_t *s)

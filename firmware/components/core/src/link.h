@@ -16,7 +16,8 @@ typedef enum {
     LINK_OP_RERUN = 17, /* JOBS: run a finished job again */
     LINK_OP_UNQUEUE = 18, /* proto 0.17: drop the session's queued message */
     LINK_OP_ANSWER = 19,  /* proto 0.18: answer a request's questions at once (picks / aids) */
-    LINK_OP_POINTER = 20  /* proto 0.20: the trackpad moves / clicks / scrolls the daemon's pointer */
+    LINK_OP_POINTER = 20, /* proto 0.20: the trackpad moves / clicks / scrolls the daemon's pointer */
+    LINK_OP_GRAPH = 21    /* proto 0.22: ask for a session's agent graph (GRAPH.md) */
 } link_op_t;
 #define LINK_OP_UNKNOWN (-1)
 
@@ -83,6 +84,9 @@ bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq);
  * 1 right) with click count n (2 = the second click of a double click), then scroll wheel notches (down > 0). Returns
  * false unless welcomed by a daemon that offered the pointer. */
 bool link_send_pointer(int dx, int dy, int btn, int n, int wheel);
+/* cmd_op_graph (proto 0.22, GRAPH.md §3): ask for session sid's agent graph. Returns false unless welcomed by a
+ * daemon with proto >= 0.22. */
+bool link_send_graph(uint32_t sid);
 /* Firmware update (proto 0.15): fw_ack {st, next, msg}; st is the wire value (0 go, 1 done, 2 busy, 3 bad, 4 fail, 5 stopped). */
 bool link_send_fw_ack(int st, uint32_t next, const char *msg);
 /* Power report (proto 0.19, POWER.md): voltages in mV, times in ms, itvl in us; field names as in the CDDL. */

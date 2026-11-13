@@ -718,6 +718,7 @@ struct cmd_op_r {
 		cmd_op_unqueue_m_c = 18,
 		cmd_op_answer_m_c = 19,
 		cmd_op_pointer_m_c = 20,
+		cmd_op_graph_m_c = 21,
 	} cmd_op_choice;
 };
 
@@ -1235,6 +1236,36 @@ struct msg_power {
 	struct power msg_power_power_m;
 };
 
+struct graph_la_l_r {
+	uint32_t graph_la_l_la[8];
+	size_t graph_la_l_la_count;
+};
+
+struct graph_uint3uint {
+	uint32_t graph_uint3uint;
+};
+
+struct graph_uint4uint {
+	uint32_t graph_uint4uint;
+};
+
+struct graph {
+	uint32_t graph_uint0uint;
+	uint32_t graph_node_l_node[64];
+	size_t graph_node_l_node_count;
+	struct graph_la_l_r graph_la_l;
+	bool graph_la_l_present;
+	struct graph_uint3uint graph_uint3uint;
+	bool graph_uint3uint_present;
+	struct graph_uint4uint graph_uint4uint;
+	bool graph_uint4uint_present;
+};
+
+struct msg_graph {
+	struct hdr_r msg_graph_hdr_m;
+	struct graph msg_graph_graph_m;
+};
+
 struct msg_dbg_ui_state_req {
 	struct hdr_r msg_dbg_ui_state_req_hdr_m;
 };
@@ -1363,6 +1394,7 @@ struct envelope_r {
 		struct msg_fw_chunk envelope_msg_fw_chunk_m;
 		struct msg_fw_ack envelope_msg_fw_ack_m;
 		struct msg_power envelope_msg_power_m;
+		struct msg_graph envelope_msg_graph_m;
 		struct msg_dbg_ui_state_req envelope_msg_dbg_ui_state_req_m;
 		struct msg_dbg_ui_state envelope_msg_dbg_ui_state_m;
 		struct msg_dbg_screenshot_req envelope_msg_dbg_screenshot_req_m;
@@ -1398,6 +1430,7 @@ struct envelope_r {
 		envelope_msg_fw_chunk_m_c,
 		envelope_msg_fw_ack_m_c,
 		envelope_msg_power_m_c,
+		envelope_msg_graph_m_c,
 		envelope_msg_dbg_ui_state_req_m_c,
 		envelope_msg_dbg_ui_state_m_c,
 		envelope_msg_dbg_screenshot_req_m_c,

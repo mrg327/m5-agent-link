@@ -73,6 +73,9 @@ LV_FONT_DECLARE(font_phosphor_44)
 lv_color_t theme_dim(uint32_t rgb, int pct);
 
 uint32_t theme_state_rgb(sess_state_t s);
+/* GRAPH (GRAPH.md §4): lane 0 is the session's own colour; lanes 1-7 a fixed palette, distinct from it and from
+ * the failed red. */
+uint32_t theme_lane_rgb(const session_t *s, int lane);
 /* Colour of a session: like theme_state_rgb, but approval requests (orange) differ from questions (yellow). */
 uint32_t theme_session_rgb(const session_t *s);
 /* Title-case state word for the deck ("Working", "Has a question", "Needs approval", ...). */

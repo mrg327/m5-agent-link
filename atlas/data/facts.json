@@ -70,14 +70,14 @@
       "color": "#999999",
       "palette": "idle",
       "label": "Idle",
-      "source": "firmware/components/core/src/ui_theme.c:42"
+      "source": "firmware/components/core/src/ui_theme.c:50"
     },
     "ended": {
       "id": 6,
       "color": "#999999",
       "palette": "idle",
       "label": "Ended",
-      "source": "firmware/components/core/src/ui_theme.c:43"
+      "source": "firmware/components/core/src/ui_theme.c:51"
     }
   },
   "gesture": {
@@ -1294,6 +1294,87 @@
         "nav": "NAV_HOME",
         "action": "A+B chord: straight back to the deck",
         "source": "firmware/components/core/src/nav.c:157"
+      },
+      {
+        "gesture": "G_DRAG",
+        "mode": "graph",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_SCROLL_DRAG",
+        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "source": "firmware/components/core/src/nav.c:159"
+      },
+      {
+        "gesture": "G_SCRUB_START",
+        "mode": "graph",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:160"
+      },
+      {
+        "gesture": "G_SCRUB",
+        "mode": "graph",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:161"
+      },
+      {
+        "gesture": "G_SCRUB_END",
+        "mode": "graph",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:162"
+      },
+      {
+        "gesture": "G_LONG_PRESS",
+        "mode": "graph",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "source": "firmware/components/core/src/nav.c:163"
+      },
+      {
+        "gesture": "G_SWIPE_RIGHT",
+        "mode": "graph",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "source": "firmware/components/core/src/nav.c:164"
+      },
+      {
+        "gesture": "G_BTN_B",
+        "mode": "graph",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_NEXT",
+        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "source": "firmware/components/core/src/nav.c:165"
+      },
+      {
+        "gesture": "G_BTN_B_LONG",
+        "mode": "graph",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "source": "firmware/components/core/src/nav.c:166"
+      },
+      {
+        "gesture": "G_CHORD",
+        "mode": "graph",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_HOME",
+        "action": "A+B chord: straight back to the deck",
+        "source": "firmware/components/core/src/nav.c:167"
       }
     ],
     "chord": "A + B held together: Home from any mode (logged on the deck, no action there)",
@@ -1303,7 +1384,7 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:111"
+      "source": "firmware/components/core/src/ui.c:112"
     },
     {
       "id": "attention",
@@ -1313,7 +1394,7 @@
     {
       "id": "agent",
       "title": "Agent wheel",
-      "source": "firmware/components/core/src/ui_agent.c:358"
+      "source": "firmware/components/core/src/ui_agent.c:366"
     },
     {
       "id": "ask",
@@ -1650,7 +1731,7 @@
           "name": "batt_pct"
         }
       ],
-      "source": "protocol/agentlink.cddl:57"
+      "source": "protocol/agentlink.cddl:58"
     },
     {
       "name": "welcome",
@@ -1708,7 +1789,7 @@
           "name": "pointer"
         }
       ],
-      "source": "protocol/agentlink.cddl:58"
+      "source": "protocol/agentlink.cddl:59"
     },
     {
       "name": "snapshot",
@@ -1731,7 +1812,7 @@
           "name": "away"
         }
       ],
-      "source": "protocol/agentlink.cddl:59"
+      "source": "protocol/agentlink.cddl:60"
     },
     {
       "name": "session_upd",
@@ -1992,7 +2073,7 @@
           "name": "lp"
         }
       ],
-      "source": "protocol/agentlink.cddl:60"
+      "source": "protocol/agentlink.cddl:61"
     },
     {
       "name": "gone",
@@ -2000,7 +2081,7 @@
       "dir": "pc→dev",
       "summary": "A session ended and left the list",
       "fields": [],
-      "source": "protocol/agentlink.cddl:61"
+      "source": "protocol/agentlink.cddl:62"
     },
     {
       "name": "attention",
@@ -2128,7 +2209,7 @@
           "name": "qs"
         }
       ],
-      "source": "protocol/agentlink.cddl:62"
+      "source": "protocol/agentlink.cddl:63"
     },
     {
       "name": "clear",
@@ -2151,7 +2232,7 @@
           "name": "why"
         }
       ],
-      "source": "protocol/agentlink.cddl:63"
+      "source": "protocol/agentlink.cddl:64"
     },
     {
       "name": "cmd",
@@ -2230,7 +2311,7 @@
           "name": "ptr"
         }
       ],
-      "source": "protocol/agentlink.cddl:64"
+      "source": "protocol/agentlink.cddl:65"
     },
     {
       "name": "result",
@@ -2267,7 +2348,7 @@
           "name": "pos"
         }
       ],
-      "source": "protocol/agentlink.cddl:65"
+      "source": "protocol/agentlink.cddl:66"
     },
     {
       "name": "detail",
@@ -2318,7 +2399,7 @@
           "name": "lm"
         }
       ],
-      "source": "protocol/agentlink.cddl:66"
+      "source": "protocol/agentlink.cddl:67"
     },
     {
       "name": "cfg",
@@ -2362,7 +2443,7 @@
           "name": "badge_handle"
         }
       ],
-      "source": "protocol/agentlink.cddl:67"
+      "source": "protocol/agentlink.cddl:68"
     },
     {
       "name": "batt",
@@ -2385,7 +2466,7 @@
           "name": "chg"
         }
       ],
-      "source": "protocol/agentlink.cddl:68"
+      "source": "protocol/agentlink.cddl:69"
     },
     {
       "name": "ping",
@@ -2393,7 +2474,7 @@
       "dir": "both",
       "summary": "Link-liveness probe",
       "fields": [],
-      "source": "protocol/agentlink.cddl:69"
+      "source": "protocol/agentlink.cddl:70"
     },
     {
       "name": "pong",
@@ -2401,7 +2482,7 @@
       "dir": "both",
       "summary": "Answer to a ping",
       "fields": [],
-      "source": "protocol/agentlink.cddl:70"
+      "source": "protocol/agentlink.cddl:71"
     },
     {
       "name": "log",
@@ -2424,7 +2505,7 @@
           "name": "msg"
         }
       ],
-      "source": "protocol/agentlink.cddl:71"
+      "source": "protocol/agentlink.cddl:72"
     },
     {
       "name": "audio_start",
@@ -2454,7 +2535,7 @@
           "name": "sid"
         }
       ],
-      "source": "protocol/agentlink.cddl:72"
+      "source": "protocol/agentlink.cddl:73"
     },
     {
       "name": "audio",
@@ -2484,7 +2565,7 @@
           "name": "data"
         }
       ],
-      "source": "protocol/agentlink.cddl:73"
+      "source": "protocol/agentlink.cddl:74"
     },
     {
       "name": "audio_end",
@@ -2521,7 +2602,7 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:74"
+      "source": "protocol/agentlink.cddl:75"
     },
     {
       "name": "transcript",
@@ -2551,7 +2632,7 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:75"
+      "source": "protocol/agentlink.cddl:76"
     },
     {
       "name": "kb_start",
@@ -2581,7 +2662,7 @@
           "name": "keys"
         }
       ],
-      "source": "protocol/agentlink.cddl:76"
+      "source": "protocol/agentlink.cddl:77"
     },
     {
       "name": "kb_stroke",
@@ -2611,7 +2692,7 @@
           "name": "pts"
         }
       ],
-      "source": "protocol/agentlink.cddl:77"
+      "source": "protocol/agentlink.cddl:78"
     },
     {
       "name": "kb_cands",
@@ -2655,7 +2736,7 @@
           "name": "err"
         }
       ],
-      "source": "protocol/agentlink.cddl:78"
+      "source": "protocol/agentlink.cddl:79"
     },
     {
       "name": "usage",
@@ -2713,7 +2794,7 @@
           "name": "wko"
         }
       ],
-      "source": "protocol/agentlink.cddl:79"
+      "source": "protocol/agentlink.cddl:80"
     },
     {
       "name": "fw_begin",
@@ -2750,7 +2831,7 @@
           "name": "patch"
         }
       ],
-      "source": "protocol/agentlink.cddl:80"
+      "source": "protocol/agentlink.cddl:81"
     },
     {
       "name": "fw_chunk",
@@ -2773,7 +2854,7 @@
           "name": "data"
         }
       ],
-      "source": "protocol/agentlink.cddl:81"
+      "source": "protocol/agentlink.cddl:82"
     },
     {
       "name": "fw_ack",
@@ -2803,7 +2884,7 @@
           "name": "msg"
         }
       ],
-      "source": "protocol/agentlink.cddl:82"
+      "source": "protocol/agentlink.cddl:83"
     },
     {
       "name": "power",
@@ -2917,7 +2998,51 @@
           "name": "nd"
         }
       ],
-      "source": "protocol/agentlink.cddl:83"
+      "source": "protocol/agentlink.cddl:84"
+    },
+    {
+      "name": "graph",
+      "type": 28,
+      "dir": "pc→dev",
+      "summary": "Agent graph: one session's recent tool calls as lanes of glyph nodes (GRAPH.md)",
+      "fields": [
+        {
+          "key": 0,
+          "optional": false,
+          "type": "uint",
+          "note": "sid",
+          "name": "sid"
+        },
+        {
+          "key": 1,
+          "optional": false,
+          "type": "[0*64 node: uint]",
+          "note": "nodes",
+          "name": "nodes"
+        },
+        {
+          "key": 2,
+          "optional": true,
+          "type": "[0*8 la: uint]",
+          "note": "la     per lane, the sub-agent's kind: 0 unknown / own, 1 explore, 2 task,",
+          "name": "la"
+        },
+        {
+          "key": 3,
+          "optional": true,
+          "type": "uint",
+          "note": "drop   older calls of this turn not in `nodes`",
+          "name": "drop"
+        },
+        {
+          "key": 4,
+          "optional": true,
+          "type": "uint",
+          "note": "gen    changes whenever the graph does (a device may skip an unchanged one)",
+          "name": "gen"
+        }
+      ],
+      "source": "protocol/agentlink.cddl:85"
     },
     {
       "name": "dbg_ui_state_req",
@@ -2925,7 +3050,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask which screen is showing",
       "fields": [],
-      "source": "protocol/agentlink.cddl:84"
+      "source": "protocol/agentlink.cddl:86"
     },
     {
       "name": "dbg_ui_state",
@@ -2976,7 +3101,7 @@
           "name": "fps"
         }
       ],
-      "source": "protocol/agentlink.cddl:85"
+      "source": "protocol/agentlink.cddl:87"
     },
     {
       "name": "dbg_screenshot_req",
@@ -2984,7 +3109,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask for a screenshot",
       "fields": [],
-      "source": "protocol/agentlink.cddl:86"
+      "source": "protocol/agentlink.cddl:88"
     },
     {
       "name": "dbg_screenshot_chunk",
@@ -3028,7 +3153,7 @@
           "name": "last"
         }
       ],
-      "source": "protocol/agentlink.cddl:87"
+      "source": "protocol/agentlink.cddl:89"
     },
     {
       "name": "dbg_inject_input",
@@ -3058,7 +3183,7 @@
           "name": "y"
         }
       ],
-      "source": "protocol/agentlink.cddl:88"
+      "source": "protocol/agentlink.cddl:90"
     },
     {
       "name": "dbg_set_log_level",
@@ -3074,7 +3199,7 @@
           "name": ""
         }
       ],
-      "source": "protocol/agentlink.cddl:89"
+      "source": "protocol/agentlink.cddl:91"
     }
   ],
   "sounds": {
@@ -5625,8 +5750,8 @@
     "gesture.hold_show_ms": "firmware/components/core/src/nav.h:71",
     "gesture.long_press_ms": "firmware/components/core/src/gesture.h:7",
     "gesture.long_swipe_px": "firmware/components/core/src/nav.h:75",
-    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:174",
-    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:175",
+    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:175",
+    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:176",
     "gesture.rim_in_px": "firmware/components/core/src/gesture.h:24",
     "gesture.rim_out_px": "firmware/components/core/src/gesture.h:25",
     "gesture.rim_track_in_px": "firmware/components/core/src/gesture.h:26",
@@ -5643,13 +5768,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:913",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:855",
-    "gesture_map.chord": "firmware/components/core/src/app.c:527",
+    "gesture_map.chord": "firmware/components/core/src/app.c:532",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:196",
-    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:198",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:413",
+    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:208",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:417",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:9",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:554",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:559",
     "haptics.approved": "firmware/components/core/src/feedback.c:80",
     "haptics.denied": "firmware/components/core/src/feedback.c:87",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:67",
@@ -5671,8 +5796,8 @@
     "haptics.reply_sent": "firmware/components/core/src/feedback.c:102",
     "haptics.scroll_stop": "firmware/components/core/src/feedback.c:115",
     "haptics.tick": "firmware/components/core/src/feedback.c:42",
-    "link.hello_retry_ms": "firmware/components/core/src/link.c:10",
-    "link.idle_ping_ms": "firmware/components/core/src/link.c:16",
+    "link.hello_retry_ms": "firmware/components/core/src/link.c:11",
+    "link.idle_ping_ms": "firmware/components/core/src/link.c:17",
     "link.ping_interval_ms": "daemon/crates/agentlinkd/src/usb.rs:26",
     "link.silence_timeout_ms": "firmware/boards/stopwatch/link_usb.cpp:32",
     "messages": "protocol/agentlink.cddl:1",
@@ -5727,7 +5852,7 @@
     "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:23",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:33",
     "screens": "firmware/components/core/src/ui_home.c:360",
-    "screens.agent": "firmware/components/core/src/ui_agent.c:358",
+    "screens.agent": "firmware/components/core/src/ui_agent.c:366",
     "screens.ask": "firmware/components/core/src/ui_ask.c:944",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:299",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:55",
@@ -5785,7 +5910,7 @@
     "sounds.updated-flourish": "firmware/components/core/src/sound_bank.c:169",
     "sounds.waves": "firmware/components/core/src/sound_bank.h:30",
     "states": "firmware/components/core/src/ui_theme.c:11",
-    "states.input_words": "firmware/components/core/src/ui_theme.c:39",
+    "states.input_words": "firmware/components/core/src/ui_theme.c:47",
     "states.permission_colour": "firmware/components/core/src/ui_theme.c:24",
     "usb.baud": "daemon/crates/agentlinkd/src/usb.rs:23",
     "usb.crc": "daemon/crates/agentlinkd/src/usb/frame.rs:11",

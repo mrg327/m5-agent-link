@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "graph.h"
 #include "link_internal.h"
 
 link_state_t g_link;
@@ -191,6 +192,12 @@ bool link_send_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms)
 {
     if (!begin_cmd(op, sid, rid, hold_ms)) return false;
     return finish_cmd(op, sid, rid, hold_ms, -1);
+}
+
+bool link_send_graph(uint32_t sid)
+{
+    if (!sid || model_peer_minor() < GRAPH_MINOR) return false;
+    return link_send_cmd(LINK_OP_GRAPH, sid, 0, 0);
 }
 
 bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg, uint32_t hold_ms)

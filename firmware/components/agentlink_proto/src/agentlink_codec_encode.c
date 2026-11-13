@@ -217,6 +217,11 @@ static bool encode_fw_ack(zcbor_state_t *state, const struct fw_ack *input);
 static bool encode_msg_fw_ack(zcbor_state_t *state, const struct msg_fw_ack *input);
 static bool encode_power(zcbor_state_t *state, const struct power *input);
 static bool encode_msg_power(zcbor_state_t *state, const struct msg_power *input);
+static bool encode_repeated_graph_la_l(zcbor_state_t *state, const struct graph_la_l_r *input);
+static bool encode_repeated_graph_uint3uint(zcbor_state_t *state, const struct graph_uint3uint *input);
+static bool encode_repeated_graph_uint4uint(zcbor_state_t *state, const struct graph_uint4uint *input);
+static bool encode_graph(zcbor_state_t *state, const struct graph *input);
+static bool encode_msg_graph(zcbor_state_t *state, const struct msg_graph *input);
 static bool encode_msg_dbg_ui_state_req(zcbor_state_t *state, const struct msg_dbg_ui_state_req *input);
 static bool encode_repeated_dbg_ui_state_uint1uint(zcbor_state_t *state, const struct dbg_ui_state_uint1uint *input);
 static bool encode_repeated_dbg_ui_state_uint2uint(zcbor_state_t *state, const struct dbg_ui_state_uint2uint *input);
@@ -1695,7 +1700,8 @@ static bool encode_cmd_op(
 	: (((*input).cmd_op_choice == cmd_op_unqueue_m_c) ? ((zcbor_uint32_put(state, (18))))
 	: (((*input).cmd_op_choice == cmd_op_answer_m_c) ? ((zcbor_uint32_put(state, (19))))
 	: (((*input).cmd_op_choice == cmd_op_pointer_m_c) ? ((zcbor_uint32_put(state, (20))))
-	: false)))))))))))))))))))))));
+	: (((*input).cmd_op_choice == cmd_op_graph_m_c) ? ((zcbor_uint32_put(state, (21))))
+	: false))))))))))))))))))))))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -2946,6 +2952,74 @@ static bool encode_msg_power(
 	return res;
 }
 
+static bool encode_repeated_graph_la_l(
+		zcbor_state_t *state, const struct graph_la_l_r *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (2))))
+	&& (zcbor_list_start_encode(state, 8) && ((zcbor_multi_encode_minmax(0, 8, &(*input).graph_la_l_la_count, (zcbor_encoder_t *)zcbor_uint32_encode, state, (*&(*input).graph_la_l_la), sizeof(uint32_t))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_list_end_encode(state, 8))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_graph_uint3uint(
+		zcbor_state_t *state, const struct graph_uint3uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (3))))
+	&& (zcbor_uint32_encode(state, (&(*input).graph_uint3uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_graph_uint4uint(
+		zcbor_state_t *state, const struct graph_uint4uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (4))))
+	&& (zcbor_uint32_encode(state, (&(*input).graph_uint4uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_graph(
+		zcbor_state_t *state, const struct graph *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_encode(state, 5) && (((((zcbor_uint32_put(state, (0))))
+	&& (zcbor_uint32_encode(state, (&(*input).graph_uint0uint))))
+	&& (((zcbor_uint32_put(state, (1))))
+	&& (zcbor_list_start_encode(state, 64) && ((zcbor_multi_encode_minmax(0, 64, &(*input).graph_node_l_node_count, (zcbor_encoder_t *)zcbor_uint32_encode, state, (*&(*input).graph_node_l_node), sizeof(uint32_t))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_list_end_encode(state, 64)))
+	&& (!(*input).graph_la_l_present || encode_repeated_graph_la_l(state, (&(*input).graph_la_l)))
+	&& (!(*input).graph_uint3uint_present || encode_repeated_graph_uint3uint(state, (&(*input).graph_uint3uint)))
+	&& (!(*input).graph_uint4uint_present || encode_repeated_graph_uint4uint(state, (&(*input).graph_uint4uint)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 5))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_msg_graph(
+		zcbor_state_t *state, const struct msg_graph *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_encode(state, 4) && (((((zcbor_uint32_put(state, (0))))
+	&& (zcbor_uint32_put(state, (28))))
+	&& ((encode_hdr(state, (&(*input).msg_graph_hdr_m))))
+	&& (((zcbor_uint32_put(state, (3))))
+	&& (encode_graph(state, (&(*input).msg_graph_graph_m))))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 4))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_msg_dbg_ui_state_req(
 		zcbor_state_t *state, const struct msg_dbg_ui_state_req *input)
 {
@@ -3217,13 +3291,14 @@ static bool encode_envelope(
 	: (((*input).envelope_choice == envelope_msg_fw_chunk_m_c) ? ((encode_msg_fw_chunk(state, (&(*input).envelope_msg_fw_chunk_m))))
 	: (((*input).envelope_choice == envelope_msg_fw_ack_m_c) ? ((encode_msg_fw_ack(state, (&(*input).envelope_msg_fw_ack_m))))
 	: (((*input).envelope_choice == envelope_msg_power_m_c) ? ((encode_msg_power(state, (&(*input).envelope_msg_power_m))))
+	: (((*input).envelope_choice == envelope_msg_graph_m_c) ? ((encode_msg_graph(state, (&(*input).envelope_msg_graph_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_ui_state_req_m_c) ? ((encode_msg_dbg_ui_state_req(state, (&(*input).envelope_msg_dbg_ui_state_req_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_ui_state_m_c) ? ((encode_msg_dbg_ui_state(state, (&(*input).envelope_msg_dbg_ui_state_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_screenshot_req_m_c) ? ((encode_msg_dbg_screenshot_req(state, (&(*input).envelope_msg_dbg_screenshot_req_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_screenshot_chunk_m_c) ? ((encode_msg_dbg_screenshot_chunk(state, (&(*input).envelope_msg_dbg_screenshot_chunk_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_inject_input_m_c) ? ((encode_msg_dbg_inject_input(state, (&(*input).envelope_msg_dbg_inject_input_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_set_log_level_m_c) ? ((encode_msg_dbg_set_log_level(state, (&(*input).envelope_msg_dbg_set_log_level_m))))
-	: false)))))))))))))))))))))))))))))))))));
+	: false))))))))))))))))))))))))))))))))))));
 
 	log_result(state, res, __func__);
 	return res;

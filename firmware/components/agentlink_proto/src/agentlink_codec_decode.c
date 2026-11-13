@@ -217,6 +217,11 @@ static bool decode_fw_ack(zcbor_state_t *state, struct fw_ack *result);
 static bool decode_msg_fw_ack(zcbor_state_t *state, struct msg_fw_ack *result);
 static bool decode_power(zcbor_state_t *state, struct power *result);
 static bool decode_msg_power(zcbor_state_t *state, struct msg_power *result);
+static bool decode_repeated_graph_la_l(zcbor_state_t *state, struct graph_la_l_r *result);
+static bool decode_repeated_graph_uint3uint(zcbor_state_t *state, struct graph_uint3uint *result);
+static bool decode_repeated_graph_uint4uint(zcbor_state_t *state, struct graph_uint4uint *result);
+static bool decode_graph(zcbor_state_t *state, struct graph *result);
+static bool decode_msg_graph(zcbor_state_t *state, struct msg_graph *result);
 static bool decode_msg_dbg_ui_state_req(zcbor_state_t *state, struct msg_dbg_ui_state_req *result);
 static bool decode_repeated_dbg_ui_state_uint1uint(zcbor_state_t *state, struct dbg_ui_state_uint1uint *result);
 static bool decode_repeated_dbg_ui_state_uint2uint(zcbor_state_t *state, struct dbg_ui_state_uint2uint *result);
@@ -1843,7 +1848,8 @@ static bool decode_cmd_op(
 	|| (((*result).cmd_op_choice == cmd_op_rerun_m_c) && ((1)))
 	|| (((*result).cmd_op_choice == cmd_op_unqueue_m_c) && ((1)))
 	|| (((*result).cmd_op_choice == cmd_op_answer_m_c) && ((1)))
-	|| (((*result).cmd_op_choice == cmd_op_pointer_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
+	|| (((*result).cmd_op_choice == cmd_op_pointer_m_c) && ((1)))
+	|| (((*result).cmd_op_choice == cmd_op_graph_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -3206,6 +3212,91 @@ static bool decode_msg_power(
 	return res;
 }
 
+static bool decode_repeated_graph_la_l(
+		zcbor_state_t *state, struct graph_la_l_r *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (2))))
+	&& (zcbor_list_start_decode(state) && ((zcbor_multi_decode(0, 8, &(*result).graph_la_l_la_count, (zcbor_decoder_t *)zcbor_uint32_decode, state, (*&(*result).graph_la_l_la), sizeof(uint32_t))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_list_end_decode(state))));
+
+	if (false) {
+		/* For testing that the types of the arguments are correct.
+		 * A compiler error here means a bug in zcbor.
+		 */
+		zcbor_uint32_decode(state, (*&(*result).graph_la_l_la));
+	}
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_graph_uint3uint(
+		zcbor_state_t *state, struct graph_uint3uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (3))))
+	&& (zcbor_uint32_decode(state, (&(*result).graph_uint3uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_graph_uint4uint(
+		zcbor_state_t *state, struct graph_uint4uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (4))))
+	&& (zcbor_uint32_decode(state, (&(*result).graph_uint4uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_graph(
+		zcbor_state_t *state, struct graph *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_decode(state, (&(*result).graph_uint0uint))))
+	&& (((zcbor_uint32_expect(state, (1))))
+	&& (zcbor_list_start_decode(state) && ((zcbor_multi_decode(0, 64, &(*result).graph_node_l_node_count, (zcbor_decoder_t *)zcbor_uint32_decode, state, (*&(*result).graph_node_l_node), sizeof(uint32_t))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_list_end_decode(state)))
+	&& zcbor_present_decode(&((*result).graph_la_l_present), (zcbor_decoder_t *)decode_repeated_graph_la_l, state, (&(*result).graph_la_l))
+	&& zcbor_present_decode(&((*result).graph_uint3uint_present), (zcbor_decoder_t *)decode_repeated_graph_uint3uint, state, (&(*result).graph_uint3uint))
+	&& zcbor_present_decode(&((*result).graph_uint4uint_present), (zcbor_decoder_t *)decode_repeated_graph_uint4uint, state, (&(*result).graph_uint4uint))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	if (false) {
+		/* For testing that the types of the arguments are correct.
+		 * A compiler error here means a bug in zcbor.
+		 */
+		zcbor_uint32_decode(state, (*&(*result).graph_node_l_node));
+		decode_repeated_graph_la_l(state, (&(*result).graph_la_l));
+		decode_repeated_graph_uint3uint(state, (&(*result).graph_uint3uint));
+		decode_repeated_graph_uint4uint(state, (&(*result).graph_uint4uint));
+	}
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_msg_graph(
+		zcbor_state_t *state, struct msg_graph *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_expect(state, (28))))
+	&& ((decode_hdr(state, (&(*result).msg_graph_hdr_m))))
+	&& (((zcbor_uint32_expect(state, (3))))
+	&& (decode_graph(state, (&(*result).msg_graph_graph_m))))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_msg_dbg_ui_state_req(
 		zcbor_state_t *state, struct msg_dbg_ui_state_req *result)
 {
@@ -3495,6 +3586,7 @@ static bool decode_envelope(
 	|| (zcbor_union_elem_code(state) && (((decode_msg_fw_chunk(state, (&(*result).envelope_msg_fw_chunk_m)))) && (((*result).envelope_choice = envelope_msg_fw_chunk_m_c), true)))
 	|| (zcbor_union_elem_code(state) && (((decode_msg_fw_ack(state, (&(*result).envelope_msg_fw_ack_m)))) && (((*result).envelope_choice = envelope_msg_fw_ack_m_c), true)))
 	|| (zcbor_union_elem_code(state) && (((decode_msg_power(state, (&(*result).envelope_msg_power_m)))) && (((*result).envelope_choice = envelope_msg_power_m_c), true)))
+	|| (zcbor_union_elem_code(state) && (((decode_msg_graph(state, (&(*result).envelope_msg_graph_m)))) && (((*result).envelope_choice = envelope_msg_graph_m_c), true)))
 	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_ui_state_req(state, (&(*result).envelope_msg_dbg_ui_state_req_m)))) && (((*result).envelope_choice = envelope_msg_dbg_ui_state_req_m_c), true)))
 	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_ui_state(state, (&(*result).envelope_msg_dbg_ui_state_m)))) && (((*result).envelope_choice = envelope_msg_dbg_ui_state_m_c), true)))
 	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_screenshot_req(state, (&(*result).envelope_msg_dbg_screenshot_req_m)))) && (((*result).envelope_choice = envelope_msg_dbg_screenshot_req_m_c), true)))

@@ -65,6 +65,11 @@ add_executable(test_detail tests/test_detail.c ${FW}/core/src/detail.c ${FW}/cor
 target_include_directories(test_detail PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
 target_link_libraries(test_detail PRIVATE m)
 add_test(NAME detail_model COMMAND test_detail)
+# GRAPH.md: the agent graph through the codec, the one-session store and the fetch schedule.
+add_executable(test_graph tests/test_graph.c ${FW}/core/src/graph.c)
+target_include_directories(test_graph PRIVATE ${FW}/core/src)
+target_link_libraries(test_graph PRIVATE agentlink_proto)
+add_test(NAME graph_model COMMAND test_graph)
 
 add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
 target_include_directories(test_ring PRIVATE ${FW}/core/src)
@@ -428,6 +433,10 @@ sim_script_test(sim_last_message_card last_message_card.txt
 sim_script_test(sim_last_message_reply last_message_reply.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"op\":12,\"sid\":1,\"rid\":0,\"hold_ms\":[0-9]+,\"arg\":[0-9]+,\"q\":0")
+# The agent graph (proto 0.22, GRAPH.md): Graph on the AGENT wheel, cmd graph on open, the text-free screen.
+sim_script_test(sim_graph graph.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"op\":21,\"sid\":1,\"rid\":0.*\"ev\":\"graph\",\"sid\":1,\"n\":16,\"drop\":3")
 sim_script_test(sim_last_message_meta last_message_meta.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":7")
 sim_script_test(sim_last_message_cleared last_message_cleared.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 # Questions (AskUserQuestion, proto 0.18): a hold picks a single-choice option, taps tick multi-select ones and
@@ -483,7 +492,7 @@ sim_script_test(sim_presence_hush_done presence_hush_done.txt
 # Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
 add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c
                ${FW}/core/src/link_tx.c ${FW}/core/src/model.c ${FW}/core/src/steps.c ${FW}/core/src/gauges.c
-               ${FW}/core/src/detail.c)
+               ${FW}/core/src/detail.c ${FW}/core/src/graph.c)
 target_include_directories(test_link_arb PRIVATE ${FW}/core/src)
 target_link_libraries(test_link_arb PRIVATE agentlink_hal agentlink_proto lvgl::lvgl m)
 add_test(NAME link_arbitration COMMAND test_link_arb)

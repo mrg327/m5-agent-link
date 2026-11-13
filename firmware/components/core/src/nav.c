@@ -155,6 +155,16 @@ const nav_binding_t nav_bindings[] = {
     {MODE_TRACKPAD, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_TRACKPAD, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_TRACKPAD, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
+    /* GRAPH (GRAPH.md §4): the rim and a centre drag move through the rows; everything else goes back */
+    {MODE_GRAPH, G_DRAG, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_DRAG},
+    {MODE_GRAPH, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_GRAPH, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_GRAPH, G_SCRUB_END, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_GRAPH, G_LONG_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK},
+    {MODE_GRAPH, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK},
+    {MODE_GRAPH, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_NEXT}, /* one row older */
+    {MODE_GRAPH, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
+    {MODE_GRAPH, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
 };
 const int nav_n_bindings = (int)(sizeof nav_bindings / sizeof nav_bindings[0]);
 
@@ -176,7 +186,7 @@ nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool
 
 const char *nav_mode_name(nav_mode_t m)
 {
-    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll", "status", "watch", "voice", "keys", "read", "labs", "trackpad"};
+    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll", "status", "watch", "voice", "keys", "read", "labs", "trackpad", "graph"};
     return (unsigned)m < MODE_COUNT ? names[m] : "?";
 }
 
@@ -210,8 +220,8 @@ int nav_scroll_lines(int dy_px)
     return dy_px / GESTURE_DRAG_STEP_PX * NAV_SCROLL_LINES_PER_STEP;
 }
 
-int nav_agent_items(sess_state_t state, bool typing, bool replies, bool queue_ok, bool queued, bool message, agent_item_t *out,
-                    int cap)
+int nav_agent_items(sess_state_t state, bool typing, bool replies, bool queue_ok, bool queued, bool message, bool graph,
+                    agent_item_t *out, int cap)
 {
     /* UI-V2 §4.2: Focus is button A on HOME and WATCH, Status the swipe down on HOME, so neither takes
      * a row; a session that waits for input keeps Focus. Quick replies and Interrupt need a daemon that
@@ -223,6 +233,7 @@ int nav_agent_items(sess_state_t state, bool typing, bool replies, bool queue_ok
     /* what the agent said comes first once it has finished (LAST-MESSAGE.md): it is why the user looks */
     if (message && state != SESS_START && state != SESS_WORK) ADD(AG_READ, false);
     ADD(AG_WATCH, false); /* first otherwise: tap, tap opens the monitor, a third tap focuses */
+    if (graph) ADD(AG_GRAPH, false);
     switch (state) {
     case SESS_DONE:
         if (reply) ADD(AG_REPLY, false);

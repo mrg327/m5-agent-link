@@ -33,15 +33,22 @@ const ICONS = {
   microphone: 0xe326, keyboard: 0xe2d8, bell: 0xe0ce, "bell-slash": 0xe0d4, "speaker-high": 0xe44a,
   "speaker-slash": 0xe45a, "arrow-square-out": 0xe5de, pulse: 0xe000, "stop-circle": 0xe46e,
   "arrow-bend-up-left": 0xe024, "paper-plane-tilt": 0xe398, info: 0xe2ce, "arrow-line-down": 0xe05c,
-  backspace: 0xe0ae, circle: 0xe18a,
+  backspace: 0xe0ae, circle: 0xe18a, "git-fork": 0xe27e,
+};
+// The GRAPH screen's node and lane glyphs (GRAPH.md §4): drawn inside a node disc, so 20 px only.
+const GRAPH_ICONS = {
+  dot: 0xecde, eye: 0xe220, "pencil-simple": 0xe3b4, "terminal-window": 0xeae8, "magnifying-glass": 0xe30c,
+  globe: 0xe288, robot: 0xe762, "list-checks": 0xeadc, "git-commit": 0xe27a, flask: 0xe79e, plug: 0xe946,
+  binoculars: 0xea64, lightning: 0xe2de, "seal-check": 0xe606, books: 0xe758, "map-trifold": 0xe31a,
 };
 
 const css = readFileSync(join(here, phDir, "style.css"), "utf8");
-for (const [name, code] of Object.entries(ICONS)) {
+for (const [name, code] of Object.entries({ ...ICONS, ...GRAPH_ICONS })) {
   const m = css.match(new RegExp(`\\.ph-fill\\.ph-${name}:before\\s*{\\s*content:\\s*"\\\\([0-9a-f]+)"`));
   if (!m || parseInt(m[1], 16) !== code) throw new Error(`icon ${name}: expected ${code.toString(16)}, stylesheet says ${m && m[1]}`);
 }
-const ICON_RANGE = Object.values(ICONS).map((c) => "0x" + c.toString(16)).join(",");
+const hex = (o) => Object.values(o).map((c) => "0x" + c.toString(16)).join(",");
+const ICON_RANGE = hex(ICONS);
 
 function make(name, file, size, range, fallback) {
   const args = ["--font", file, "--range", range, "--size", String(size), "--bpp", "4", "--no-compress", "--format", "lvgl",
@@ -52,7 +59,7 @@ function make(name, file, size, range, fallback) {
 
 mkdirSync(join(here, out), { recursive: true });
 const ph = join(phDir, "Phosphor-Fill.ttf");
-for (const s of [20, 28, 44]) make(`font_phosphor_${s}`, ph, s, ICON_RANGE);
+for (const s of [20, 28, 44]) make(`font_phosphor_${s}`, ph, s, s === 20 ? ICON_RANGE + "," + hex(GRAPH_ICONS) : ICON_RANGE);
 // Each text font falls back to the icon font of the nearest size.
 make("font_figtree_20_500", fig(500), 20, TEXT_RANGE, "font_phosphor_20");
 make("font_figtree_20_400", fig(400), 20, TEXT_RANGE, "font_phosphor_20");

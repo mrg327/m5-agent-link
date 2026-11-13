@@ -91,6 +91,13 @@ squares, so step marks use the circle variants.) No built-in `LV_SYMBOL_*` remai
 | `ICON_LIVE` | arrow-line-down | e05c | SCROLL at the bottom |
 | `ICON_BACKSPACE` | backspace | e0ae | KEYS |
 | `ICON_HOLD` | circle | e18a | drawn as an outline ring, see §3.3 |
+| `ICON_GRAPH` | git-fork | e27e | AGENT `Graph` (§4.11) |
+
+GRAPH glyphs (`ICON_G_*`, 20 px only, [GRAPH.md](GRAPH.md) §3): node kinds dot ecde (other), eye e220 (read),
+pencil-simple e3b4 (edit), terminal-window eae8 (shell), magnifying-glass e30c (search), globe e288 (web),
+robot e762 (agent), chat-circle-dots e16c (ask), list-checks eadc (plan), git-commit e27a (git), flask e79e (test),
+plug e946 (mcp); lane kinds binoculars ea64 (explore), lightning e2de (task), robot (general-purpose, other),
+seal-check e606 (code-review), books e758 (research), map-trifold e31a (plan).
 
 ### 2.3 Colour
 
@@ -267,6 +274,7 @@ Caption y 72: the project (host first when remote). The list (§3.2) centred on 
 order as v2 §4.2, relabelled: **Activity** (was Watch), **Notify when done** / **Don't notify**,
 **Snooze 30 min** / **Unsnooze**, **Stop** (was Interrupt, hold), **Reply**, **Dismiss** (was
 Dismiss error), **Open on PC** (was Focus terminal), **Dictate**, **Keyboard** (was Type…).
+**Graph** (proto 0.22, §4.11) follows Activity for an agent session when the daemon speaks ≥ 0.22.
 In the Reply list with a question, the question sits at y 64–112 (`FONT_BODY_STRONG` white, two
 lines), the context caption is hidden (the question owns the top of the screen) and the list is
 centred on y 246. Legends: A `Select`, B `Next`.
@@ -509,17 +517,37 @@ open except the B hold. The ring is drawn with `lv_draw_arc`; `LV_USE_ARC` and `
 - Back (swipe right, B held, a finger held still) closes the end picker first, then READ. A leaves to the PC.
   A new prompt (the message is cleared) or a new message closes READ.
 
+### 4.11 GRAPH: the agent graph (proto 0.22, [GRAPH.md](GRAPH.md) §4)
+
+No text at all (principle 7): the header at y 44 is the session's state glyph in its colour; below it, one
+object draws the graph in its `LV_EVENT_DRAW_MAIN` callback. Newest call at the top, one row per call (44 px,
+about seven rows show); lanes are columns 38 px apart, centred. A node is a filled disc (r 15) in the lane colour
+with its kind glyph in black; a failed one is vermillion (`RGB_DANGER`); a running one is a hollow disc with the
+glyph in the lane colour and a pulsing ring. Lane 0 is the session's state colour, lanes 1–7 a fixed palette
+(`theme_lane_rgb`). Lanes are vertical lines; a fork curves out of lane 0 one row older, a merge curves back in
+one row newer, and the fork node shows its lane kind's glyph beside it. Dropped older calls fade out below the
+oldest row.
+
+- Opened by AGENT's `Graph` (after Activity, agent sessions only, daemon ≥ 0.22). It asks `cmd graph` on open,
+  when the session's `n` or `ok` change (≤ 1/s) and every 3 s while open; new calls keep the top anchored.
+- The rim (one detent per row) and a centre drag scroll the rows; B moves one row older. Back is swipe right,
+  B held or a finger held still (to HOME); A+B is Home. The session going away returns HOME.
+
 ## 5. Interaction changes (`nav.c`)
 
 | Change | Rows | Why |
 |---|---|---|
-| **Swipe right in the centre = back** in AGENT, ASK, WATCH, SCROLL, STATUS and VOICE | `{MODE_x, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}` | X2. In ASK it leaves the request pending, exactly like B held. It is never deny. In SCROLL it is ignored when the same touch already scrolled (a sideways flick is not a back). |
+| **Swipe right in the centre = back** in AGENT, ASK, WATCH, SCROLL, STATUS, VOICE and GRAPH | `{MODE_x, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}` | X2. In ASK it leaves the request pending, exactly like B held. It is never deny. In SCROLL it is ignored when the same touch already scrolled (a sideways flick is not a back). |
 | Every v2 way back stays as an alias | none removed | principle 6 |
 | A tap on a list row acts on that row | handled in the screen via `wheel_hit`; the binding stays `NAV_COMMIT` | X3 |
 | `NAV_PICK_RIM` leaves AGENT and ASK | two rows removed | the rim no longer shows rows (§3.1) |
 
 Nothing else in the gesture table changes. HOME keeps left/right for sessions; KEYS keeps touch for
 strokes and B held for back.
+
+GRAPH (§4.11) rows: `G_DRAG` centre → `NAV_SCROLL_DRAG`; `G_SCRUB_START/SCRUB/SCRUB_END` → `NAV_SCRUB`; `G_BTN_B` →
+`NAV_NEXT` (one row older); `G_SWIPE_RIGHT` centre, `G_LONG_PRESS` centre and `G_BTN_B_LONG` → `NAV_BACK`; `G_CHORD` →
+`NAV_HOME`. Nothing else: no tap, no A, no other swipe.
 
 ### 5.1 Moving through a list, and back (2026-11-11)
 

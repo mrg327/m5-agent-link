@@ -47,6 +47,11 @@
  *                                   (lp = TEXT's first paragraph, <= 160 bytes; \n = line break), and a stand-in
  *                                   daemon for `cmd detail` without a rid on SID, in 1024-byte chunks carrying lm;
  *                                   `off` clears it (lm 0); message_meta: lm and ll only, lp "" (privacy meta)
+ *   graph SID NODE... [la=K,K,...] [drop=N] [gen=N] | graph off
+ *                                   a stand-in daemon for `cmd graph` (proto 0.22, GRAPH.md): answers SID's with this
+ *                                   graph (another sid: result stale). NODE = KIND:STATE:LANE[:f|m|fm], KIND a name
+ *                                   (other read edit shell search web agent ask plan git test mcp) or 0-15, STATE
+ *                                   run|ok|fail, f = fork, m = merge; la = the lane kinds, lane 0 first
  *   ask RID SID LEFT_MS WIN_MS Q ;; Q ...   an AskUserQuestion `attention` with qs (proto 0.18): each Q is
  *                                   HEADER|QUESTION|single|multi|LABEL[=DESCRIPTION]|LABEL...; one single-choice
  *                                   question also carries opts + reply, as the daemon sends it for older devices
@@ -91,7 +96,7 @@
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_PATCH, E_FW_EXPECT_SLOT, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_GRAPH, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_PATCH, E_FW_EXPECT_SLOT, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -411,6 +416,8 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "detail") && arg[0]) {
         add(*t, E_DETAIL, 0, 0, 0, arg);
         *t += 50;
+    } else if (!strcmp(cmd, "graph") && arg[0]) {
+        add(*t, E_GRAPH, 0, 0, 0, arg);
     } else if ((!strcmp(cmd, "message") || !strcmp(cmd, "message_meta")) && arg[0]) {
         add(*t, E_MESSAGE, !strcmp(cmd, "message_meta"), 0, 0, arg);
         *t += 50;
@@ -1052,6 +1059,80 @@ static void serve_message(const struct cmd *c, uint32_t id)
     inject_result(id, true);
 }
 
+/* The stand-in daemon's agent graph (`graph`), kept encoded-ready. */
+static struct envelope_r s_graph_env;
+static bool s_graph_on;
+
+/* `cmd graph {sid}`: the graph for the served session, else stale. */
+static void serve_graph(const struct cmd *c, uint32_t id)
+{
+    uint32_t sid = c->cmd_uint1uint_present ? c->cmd_uint1uint.cmd_uint1uint : 0;
+    struct graph *g = &s_graph_env.envelope_msg_graph_m.msg_graph_graph_m;
+    sim_log("fake_daemon_graph", "\"sid\":%u,\"nodes\":%u", (unsigned)sid, (unsigned)g->graph_node_l_node_count);
+    if (!s_graph_on || sid != g->graph_uint0uint) {
+        inject_result(id, false);
+        return;
+    }
+    struct hdr_r *h = &s_graph_env.envelope_msg_graph_m.msg_graph_hdr_m;
+    h->hdr_uint1uint = ++s_rx_id;
+    h->hdr_uint2uint_present = true;
+    h->hdr_uint2uint.hdr_uint2uint = id;
+    inject_env(&s_graph_env, "graph");
+}
+
+static void run_graph(const char *spec)
+{
+    static const char *const kinds[] = {"other", "read", "edit", "shell", "search", "web", "agent", "ask", "plan", "git", "test", "mcp"};
+    if (!strcmp(spec, "off")) {
+        s_graph_on = false;
+        return;
+    }
+    memset(&s_graph_env, 0, sizeof s_graph_env);
+    s_graph_env.envelope_choice = envelope_msg_graph_m_c;
+    struct graph *g = &s_graph_env.envelope_msg_graph_m.msg_graph_graph_m;
+    char buf[1024];
+    snprintf(buf, sizeof buf, "%s", spec);
+    char *save = NULL, *tok = strtok_r(buf, " ", &save);
+    if (!tok || !(g->graph_uint0uint = (uint32_t)strtoul(tok, NULL, 10))) {
+        fail("bad graph", spec);
+        return;
+    }
+    while ((tok = strtok_r(NULL, " ", &save))) {
+        if (!strncmp(tok, "la=", 3)) {
+            g->graph_la_l_present = true;
+            for (char *p = tok + 3; *p && g->graph_la_l.graph_la_l_la_count < 8; p += *p == ',') {
+                char *end;
+                g->graph_la_l.graph_la_l_la[g->graph_la_l.graph_la_l_la_count++] = (uint32_t)strtoul(p, &end, 10);
+                p = end;
+            }
+        } else if (!strncmp(tok, "drop=", 5)) {
+            g->graph_uint3uint_present = true;
+            g->graph_uint3uint.graph_uint3uint = (uint32_t)strtoul(tok + 5, NULL, 10);
+        } else if (!strncmp(tok, "gen=", 4)) {
+            g->graph_uint4uint_present = true;
+            g->graph_uint4uint.graph_uint4uint = (uint32_t)strtoul(tok + 4, NULL, 10);
+        } else {
+            char kind[16] = "", st[8] = "", fl[4] = "";
+            unsigned lane = 0;
+            int got = sscanf(tok, "%15[^:]:%7[^:]:%u:%3s", kind, st, &lane, fl);
+            int k = enum_of(kind, kinds, 12);
+            if (k < 0 && kind[0] >= '0' && kind[0] <= '9') k = atoi(kind) & 15;
+            int state = !strcmp(st, "run") ? 0 : !strcmp(st, "ok") ? 1 : !strcmp(st, "fail") ? 2 : -1;
+            if (got < 3 || k < 0 || state < 0 || lane > 7 || g->graph_node_l_node_count >= 64) {
+                fail("bad graph node", tok);
+                return;
+            }
+            uint32_t v = (uint32_t)k | (uint32_t)state << 4 | lane << 6;
+            if (strchr(fl, 'f')) v |= 1u << 9;
+            if (strchr(fl, 'm')) v |= 1u << 10;
+            g->graph_node_l_node[g->graph_node_l_node_count++] = v;
+        }
+    }
+    s_graph_on = true;
+    sim_link_set_tx_tap(on_device_tx);
+    sim_log("fake_daemon_graph_set", "\"sid\":%u,\"nodes\":%u", (unsigned)g->graph_uint0uint, (unsigned)g->graph_node_l_node_count);
+}
+
 /* message SID LM TEXT | message SID off | message_meta SID LM LEN: the session delta the daemon sends at a stop. */
 static void run_message(const char *spec, bool meta)
 {
@@ -1193,6 +1274,10 @@ static void on_device_tx(const uint8_t *frame, size_t len)
     memset(&env, 0, sizeof env);
     if (cbor_decode_envelope(frame, len, &env, &used) != ZCBOR_SUCCESS || env.envelope_choice != envelope_msg_cmd_m_c) return;
     const struct cmd *c = &env.envelope_msg_cmd_m.msg_cmd_cmd_m;
+    if (c->cmd_op_m.cmd_op_choice == cmd_op_graph_m_c) { /* the agent graph (proto 0.22) */
+        serve_graph(c, env.envelope_msg_cmd_m.msg_cmd_hdr_m.hdr_uint1uint);
+        return;
+    }
     if (c->cmd_op_m.cmd_op_choice == 7 && !c->cmd_uint2uint_present) { /* no rid: a last message (proto 0.18) */
         serve_message(c, env.envelope_msg_cmd_m.msg_cmd_hdr_m.hdr_uint1uint);
         return;
@@ -1401,6 +1486,7 @@ static void run(const ev_t *e)
     case E_SERVE_DETAIL: run_serve_detail(e->text); break;
     case E_DETAIL: run_detail(e->text); break;
     case E_MESSAGE: run_message(e->text, e->a != 0); break;
+    case E_GRAPH: run_graph(e->text); break;
     case E_ASK: run_ask(e->text); break;
     case E_EXPECT_COUNTDOWN: {
         int left = ui_countdown_left_s();
