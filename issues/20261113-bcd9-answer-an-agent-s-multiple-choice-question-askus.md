@@ -1,11 +1,11 @@
 ---
 id: 20261113-bcd9
 title: Answer an agent's multiple-choice question (AskUserQuestion) on the watch
-status: open
+status: claimed
 severity: med
 area: daemon
 platforms: esp32,linux
-owner:
+owner: claude-code@linux-dev
 created: 2026-11-13T01:56:36Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -44,3 +44,4 @@ watch has no way to pick an option.
 ## Log
 
 - 2026-11-13T01:56:36Z · claude-code@linux-dev · linux-x86_64 · fce1a1d: filed
+- 2026-11-13T01:56:36Z · claude-code@linux-dev · linux-x86_64 · bf451bb: claimed

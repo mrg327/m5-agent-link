@@ -1,11 +1,11 @@
 ---
 id: 20261113-da11
 title: Read the agent's last message on the watch, then reply or dictate
-status: open
+status: claimed
 severity: med
 area: protocol
 platforms: esp32,linux
-owner:
+owner: claude-code@linux-dev
 created: 2026-11-13T01:56:16Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -42,3 +42,4 @@ dictation from across the room. The daemon already receives the whole final mess
 ## Log
 
 - 2026-11-13T01:56:16Z · claude-code@linux-dev · linux-x86_64 · fce1a1d: filed
+- 2026-11-13T01:56:36Z · claude-code@linux-dev · linux-x86_64 · bf451bb: claimed
