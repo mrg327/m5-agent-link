@@ -1,11 +1,11 @@
 ---
 id: 20261111-4843
 title: Settings menu on the watch: volume and quiet mode
-status: open
+status: claimed
 severity: med
 area: firmware
 platforms: any
-owner:
+owner: copilot-cli/opus@mac-work
 created: 2026-11-11T01:47:28Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -44,3 +44,5 @@ To decide/do:
 
 - 2026-11-11T01:47:28Z · claude-code@linux-dev · linux-x86_64 · b1ecbce: filed
 - 2026-11-13T18:07:54Z · copilot-cli/opus@mac-work · macos-arm64 · b9535d5: Mute model review (copilot-cli/opus, for the user to decide; nothing implemented). Today's silencers: Quiet (STATUS toggle 1, timed off/30 min/1 h: no buzz, sound, glow or nag on new alerts), Mute (STATUS toggle 2: alert FULL<->QUIET, i.e. sounds off, vibration kept), SILENT (daemon config only: no vibration either), volume 0-5 (prefs, NVS; no control on the watch), face down (silences everything), palm cover (stops current playback + that request's reminders), per-session snooze (agent menu), presence hush (daemon, SF_HUSH). Proposal B: toggle 1 'Alerts' bell/bell-slash cycling off -> 30 min -> 1 h -> until I turn it off; toggle 2 'Sound' speaker stepping Off/Low/Med/High over the existing volume pref (vibration always on); About unchanged; SILENT stays daemon-only. Concern: stepping volume makes muting take several taps, so an alternative is to keep a one-tap Mute and add volume as the fourth STATUS control UI-V3 4.6 reserves for this issue. Other options: A) keep the current model (icons now show state, c36c); C) B plus a separate Vibration toggle.
+- 2026-11-13T18:09:11Z · copilot-cli/opus@mac-work · macos-arm64 · e74cdc8: claimed
+- 2026-11-13T18:09:11Z · copilot-cli/opus@mac-work · macos-arm64 · e74cdc8: Scope (user 2026-11-13: 'We should also be able to adjust the volume to different levels'): keep the one-tap Mute and add a Volume control on STATUS stepping the existing prefs volume levels, with a preview cue. Quiet 'until off' left for later.
