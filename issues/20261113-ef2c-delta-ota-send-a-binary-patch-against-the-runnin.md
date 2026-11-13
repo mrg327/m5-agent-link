@@ -1,7 +1,7 @@
 ---
 id: 20261113-ef2c
 title: Delta OTA: send a binary patch against the running image instead of the whole image
-status: claimed
+status: fixed
 severity: med
 area: protocol
 platforms: any
@@ -9,7 +9,7 @@ owner: copilot-cli/opus@mac-work
 created: 2026-11-13T20:14:40Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -61,3 +61,11 @@ bsdiff-style delta handles shifts. Over BLE that is ~1 s (mac) / ~3-10 s (Linux)
 
 - 2026-11-13T20:14:40Z · copilot-cli/opus@mac-work · macos-arm64 · e8a5f5c+dirty: filed
 - 2026-11-13T20:14:45Z · copilot-cli/opus@mac-work · macos-arm64 · e8a5f5c+dirty: claimed
+- 2026-11-13T20:47:24Z · copilot-cli/opus@mac-work · macos-arm64 · 3741845: Live on the watch over USB: 3741845 -> 3741845-dirty and back, 1314816 B image sent as 4115 B patches; base hash 0.7 s; patch apply plus flash write about 11 s; agentlink ota 13.3 s / 14.0 s end to end including restart. Time is now bound by rebuilding and writing the 1.3 MB image, not the link, so BLE and the Linux central (2047) should land near the same figure. Follow-ups: the main loop is blocked while a chunk rebuilds image bytes (up to 6 s per 2 KB chunk at the start), and progress counts patch bytes so it jumps 49/99%.
+- 2026-11-13T20:47:24Z · copilot-cli/opus@mac-work · macos-arm64 · 3741845: fixed: commits 0834fe8, 9b63666, ed724b9, 3741845; checks: sim 196/196, idf build, check_dram 182257 B free, cargo fmt/clippy/test, ota_e2e 24/24, vectors, atlas 218; live delta OTA both ways on the watch
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: 3741845 main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74
