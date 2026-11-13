@@ -409,8 +409,8 @@ cmd_op_pointer = 20 ; Trackpad (proto 0.20, EXPERIMENTS.md): move / click / scro
 pointer_arg = {
   ? 0 => int,          ; dx      pointer pixels, positive = right
   ? 1 => int,          ; dy      pointer pixels, positive = down
-  ? 2 => pointer_btn,  ; btn     click this button `n` times at the pointer
-  ? 3 => uint,         ; n       clicks (1 = click, 2 = double click); with btn, default 1
+  ? 2 => pointer_btn,  ; btn     press and release this button once at the pointer
+  ? 3 => uint,         ; n       its click count: 1 = a click, 2 = the second click of a double click; default 1
   ? 4 => int          ; wheel   scroll notches, positive = down (towards newer content)
 }
 pointer_btn = pointer_left / pointer_right

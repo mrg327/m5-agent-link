@@ -296,7 +296,7 @@ VECTORS = {
         env("cmd", 26, {0: 20, 9: {0: 12, 1: -5}}),
     ),
     "cmd_pointer_double_click": (
-        "Trackpad: a double tap, a double click of the left button where the pointer is (proto 0.20)",
+        "Trackpad: the second tap of a double tap, the second click of a double click (left button, proto 0.20)",
         {"t": "cmd", "id": 27, "b": {"op": "pointer", "ptr": {"btn": "left", "n": 2}}},
         env("cmd", 27, {0: 20, 9: {2: 0, 3: 2}}),
     ),

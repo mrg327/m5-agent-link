@@ -1,5 +1,5 @@
 {
-  "desc": "Trackpad: a double tap, a double click of the left button where the pointer is (proto 0.20)",
+  "desc": "Trackpad: the second tap of a double tap, the second click of a double click (left button, proto 0.20)",
   "symbolic": {
     "t": "cmd",
     "id": 27,

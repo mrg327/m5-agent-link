@@ -22,7 +22,8 @@ pub trait Pointer: Send + Sync {
     fn apply(&self, a: &PointerArg) -> Result<(), PointerError>;
 }
 
-/// Clicks per command at most (a double click is 2); wheel notches and pixels per command at most.
+/// The highest click count (`n`: 2 = the second click of a double click, 3 a triple); wheel notches and
+/// pixels per command at most. Every command presses once: the watch sends each tap as it lands.
 const MAX_CLICKS: u64 = 3;
 const MAX_WHEEL: i64 = 20;
 const MAX_MOVE: i64 = 2000;
@@ -234,16 +235,15 @@ mod mac {
                     PointerBtn::Left => (1, 2, 0),
                     PointerBtn::Right => (3, 4, 1),
                 };
-                for i in 1..=n as i64 {
-                    for t in [down, up] {
-                        // SAFETY: as above; the click state makes a second pair a double click.
-                        unsafe {
-                            let e = CGEventCreateMouseEvent(std::ptr::null(), t, at, b);
-                            if !e.is_null() {
-                                CGEventSetIntegerValueField(e, CLICK_STATE, i);
-                            }
-                            post(e)?;
+                for t in [down, up] {
+                    // SAFETY: as above. Posted events get no click count from the OS, so the watch's
+                    // count goes into the click state: 2 makes this press the second of a double click.
+                    unsafe {
+                        let e = CGEventCreateMouseEvent(std::ptr::null(), t, at, b);
+                        if !e.is_null() {
+                            CGEventSetIntegerValueField(e, CLICK_STATE, n as i64);
                         }
+                        post(e)?;
                     }
                 }
             }
@@ -297,15 +297,14 @@ mod win {
             if dx != 0 || dy != 0 {
                 ins.push(mouse(dx as i32, dy as i32, 0, MOUSEEVENTF_MOVE));
             }
-            if let Some((btn, n)) = click {
+            // One press; Windows counts a double click itself from the timing of two.
+            if let Some((btn, _)) = click {
                 let (down, up) = match btn {
                     PointerBtn::Left => (MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP),
                     PointerBtn::Right => (MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP),
                 };
-                for _ in 0..n {
-                    ins.push(mouse(0, 0, 0, down));
-                    ins.push(mouse(0, 0, 0, up));
-                }
+                ins.push(mouse(0, 0, 0, down));
+                ins.push(mouse(0, 0, 0, up));
             }
             if wheel != 0 {
                 // WHEEL_DELTA (120) per notch; positive rotates away from the user (up).
@@ -360,12 +359,13 @@ mod x11 {
                     dy.to_string(),
                 ])?;
             }
-            if let Some((btn, n)) = click {
+            // One press; X11 clients count a double click themselves from the timing of two.
+            if let Some((btn, _)) = click {
                 let b = match btn {
                     PointerBtn::Left => "1",
                     PointerBtn::Right => "3",
                 };
-                xdotool(&[s("click"), s("--repeat"), n.to_string(), s(b)])?;
+                xdotool(&[s("click"), s(b)])?;
             }
             if wheel != 0 {
                 let b = if wheel > 0 { "5" } else { "4" };

@@ -410,8 +410,11 @@ power { mv, mvf, vin, chg, usb, pct, on, dim, off, deep, lk, ble, itvl, seq, nd 
 cmd { op: "pointer", ptr: { dx?: int, dy?: int, btn?: "left"/"right", n?: uint, wheel?: int } }   device → daemon
 ```
 - The daemon moves the pointer of **its own machine** (not the host a session runs on): by (`dx`, `dy`) pixels
-  (positive = right / down), then clicks `btn` `n` times (default 1; 2 = double click), then scrolls `wheel`
-  notches (positive = down, towards newer content). It clamps one command to ±2000 px, 3 clicks and ±20 notches.
+  (positive = right / down), then presses and releases `btn` once, then scrolls `wheel` notches (positive = down,
+  towards newer content). It clamps one command to ±2000 px, click count 3 and ±20 notches.
+- `n` is the click count of that press: 1 = a click, 2 = the second click of a double click (default 1). The watch
+  sends every tap at once and sets 2 on a tap that follows the last one closely. macOS gets the count as the
+  event's click state; Windows and X11 count double clicks themselves from the timing.
 - `welcome.pointer` (key 7) is sent to a device with proto ≥ 0.20 when the daemon has a backend: macOS
   (CoreGraphics events), Windows (`SendInput`), Linux on X11 with `xdotool` (not under Wayland).
 - No `result` when it works. A failure is answered at most once per second: `unsupported` (no backend) or `denied`
