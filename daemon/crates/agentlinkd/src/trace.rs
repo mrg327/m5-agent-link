@@ -34,8 +34,8 @@ pub fn redact_sum(v: &mut Value) -> bool {
 }
 
 /// A shell job's hook line carries the command line the user typed (`payload.cmd`), Claude Code's
-/// `Stop` the agent's last message (`payload.last_assistant_message`): replaced before the line is
-/// traced, like `sum`. Returns whether anything was replaced.
+/// `Stop` and Copilot's `agentStop` the agent's last message (`payload.last_assistant_message`; the
+/// hook adds Copilot's): replaced before the line is traced, like `sum`. Returns whether anything was replaced.
 pub fn redact_hook(v: &mut Value) -> bool {
     let key = if v["agent"].as_str() == Some("shell") {
         "/payload/cmd"

@@ -12,12 +12,13 @@ with `AskUserQuestion`, the watch "was only able to 'open on PC', not able to re
 
 | Where | What |
 |---|---|
-| The finished card (HOME, a Claude session that is done) | The first lines of the agent's final message in place of the step text, and a `Read` button. No pop-up, no extra buzz. |
+| The finished card (HOME, a Claude Code or Copilot CLI session that is done) | The first lines of the agent's final message in place of the step text, and a `Read` button. No pop-up, no extra buzz. |
 | `Read` (the button, or `Read` in the agent menu) | The message in the paged reader (seven lines a page, `2 of 6`), fetched from the daemon as it is read. Markdown is cleaned to plain text. |
 | The end of the message | `Reply` and `Dictate` under the last page: the Reply list (the closing question's answers first, then the user's quick replies) or the voice flow, which types into the session (or queues it if the agent is working again, proto 0.17). |
 | A question from the agent (`AskUserQuestion`) | One question at a time: its header and text, its options as rows. Single choice: hold the row you want. Several choices: tap rows to tick them, then hold `Send`. `Other` dictates a free answer. With several questions, each answer moves to the next one and the last sends them all together. The terminal's own question appears if the watch does not answer within the answer window. |
 
-Copilot CLI's stop hook carries no final message, so nothing new appears for it. Under privacy `meta` the card
+Copilot CLI's `agentStop` carries no final message; `agentlink-hook` reads it from the session transcript
+(§2.1, issue 20261113-be4e). Under privacy `meta` the card
 shows no text and the reader is not offered (the daemon says only that a message exists).
 
 ## 2. The last message (issue da11)
@@ -27,6 +28,12 @@ shows no text and the reader is not offered (the daemon says only that a message
 - Claude Code's `Stop` hook input has `last_assistant_message`: "the text content of Claude's final response"
   ([hooks](https://code.claude.com/docs/en/hooks), checked 2026-11-12). Only `Stop` is used: `StopFailure`
   carries the API error string in that field, and a sub-agent's stop is not its parent's.
+- Copilot CLI's `agentStop` input has no message, but names the session transcript (`transcriptPath`, the
+  session's `events.jsonl`, checked with Copilot CLI 1.0.106), which already holds the turn's end when the hook
+  fires. `agentlink-hook` reads the last 512 KB and puts the newest final message since the last `user.message`
+  into `last_assistant_message`: an `assistant.message` with text and no tool call, or a `session.task_complete`
+  summary (autopilot ends with that tool). Sub-agent events (`parentToolCallId`) are skipped. The hook reads it,
+  not the daemon, because on a remote session only the hook can see the file.
 - The daemon keeps **one message per session**, the last one, in memory only (lost on a daemon restart, dropped
   with the session). A new `Stop` replaces it. A new prompt (`UserPromptSubmit`) **clears** it: from then on the
   message describes a turn that is over, and the card shows the agent working instead. (Decided 2026-11-12. The
@@ -161,11 +168,11 @@ confirm it.
 
 ## 4. Tests
 
-- daemon: `lastmsg.rs` (cleaning, caps, preview), `hook_source.rs` (Stop sets, prompt clears, StopFailure and
-  Copilot do not), `device.rs` (gating by minor and privacy, detail of a last message, stale / denied /
+- daemon: `lastmsg.rs` (cleaning, caps, preview), `hook_source.rs` (Stop and Copilot's agentStop set, prompt clears,
+  StopFailure does not), `device.rs` (gating by minor and privacy, detail of a last message, stale / denied /
   unsupported, chunks bound to `lm`, the trace never holds the text), `broker.rs` (the question request, the
   answer's validation and its `answers`, old-device fallbacks), the hook (`updatedInput` only for the request's own
-  questions).
+  questions; Copilot's final message from a transcript).
 - simulator: `sim_last_message_card`, `sim_last_message_read`, `sim_last_message_reply`, `sim_last_message_meta`,
   `sim_question_single`, `sim_question_multi`, `sim_question_two`, `sim_question_other`, `sim_question_tap_never_sends`.
 - end to end: `daemon/tools/last_message_e2e.py` (the real hook and daemon, a fake 0.18 device and a 0.17 one).

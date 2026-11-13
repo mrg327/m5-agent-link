@@ -404,10 +404,59 @@ fn process_identity(_ppid: u32) -> (Vec<u32>, Option<String>) {
     (Vec::new(), None)
 }
 
+/// How much of a Copilot CLI transcript's end is read for the turn's final message. The message and
+/// the few events after it (turn end, the hook's own start) are a small part of this; one event line
+/// is at most a few tens of KB.
+const TRANSCRIPT_TAIL: u64 = 512 * 1024;
+
+/// The final message of the turn that just ended, from a Copilot CLI session transcript
+/// (`agentStop`'s `transcriptPath`, the session's `events.jsonl`): Copilot's stop hook carries no
+/// message, unlike Claude Code's `Stop` (`last_assistant_message`, docs/design/LAST-MESSAGE.md).
+/// The newest `assistant.message` with text and no tool call, or `session.task_complete` summary
+/// (autopilot ends with the task_complete tool), since the last `user.message`; a sub-agent's
+/// (`parentToolCallId`) is skipped.
+fn copilot_last_message(path: &std::path::Path) -> Option<String> {
+    use std::io::{Seek, SeekFrom};
+    let mut f = std::fs::File::open(path).ok()?;
+    let len = f.metadata().ok()?.len();
+    let start = len.saturating_sub(TRANSCRIPT_TAIL);
+    f.seek(SeekFrom::Start(start)).ok()?;
+    let mut buf = Vec::with_capacity((len - start) as usize);
+    f.take(TRANSCRIPT_TAIL).read_to_end(&mut buf).ok()?;
+    let mut lines: Vec<&[u8]> = buf.split(|&b| b == b'\n').collect();
+    if start > 0 && !lines.is_empty() {
+        lines.remove(0); /* begins mid-line */
+    }
+    for line in lines.into_iter().rev() {
+        let Ok(e) = serde_json::from_slice::<Value>(line) else {
+            continue;
+        };
+        let d = &e["data"];
+        if !d["parentToolCallId"].is_null() {
+            continue;
+        }
+        let text = match e["type"].as_str() {
+            Some("user.message") => return None,
+            Some("session.task_complete") => d["summary"].as_str(),
+            // text alongside a tool call is running commentary, not the final message
+            Some("assistant.message")
+                if d["toolRequests"].as_array().is_none_or(|r| r.is_empty()) =>
+            {
+                d["content"].as_str()
+            }
+            _ => None,
+        };
+        if let Some(t) = text.filter(|t| !t.trim().is_empty()) {
+            return Some(t.to_owned());
+        }
+    }
+    None
+}
+
 /// The line for the daemon, plus the hook's event name and payload (for formatting a reply)
 /// and how long it waits for one (0: no wait).
 fn build_line(agent: &str, event: &str, stdin: &str, remote: bool) -> (String, String, Value, u64) {
-    let payload: Value = serde_json::from_str(stdin).unwrap_or(Value::Null);
+    let mut payload: Value = serde_json::from_str(stdin).unwrap_or(Value::Null);
     let env: Map<String, Value> = ENV_KEYS
         .iter()
         .filter_map(|k| Some((k.to_string(), Value::String(std::env::var(k).ok()?))))
@@ -432,10 +481,20 @@ fn build_line(agent: &str, event: &str, stdin: &str, remote: bool) -> (String, S
         .map(|d| d.as_secs())
         .unwrap_or(0);
     let event = if event.is_empty() {
-        payload["hook_event_name"].as_str().unwrap_or("")
+        payload["hook_event_name"].as_str().unwrap_or("").to_owned()
     } else {
-        event
+        event.to_owned()
     };
+    let event = event.as_str();
+    if agent == "copilot" && event == "agentStop" && payload["last_assistant_message"].is_null() {
+        // read here, not in the daemon: on a remote session only the hook can see the transcript
+        if let Some(text) = payload["transcriptPath"]
+            .as_str()
+            .and_then(|p| copilot_last_message(std::path::Path::new(p)))
+        {
+            payload["last_assistant_message"] = json!(text);
+        }
+    }
     let (wait, pinned) = if blocks_for_watch(agent, event) {
         wait_ms()
     } else {
@@ -1372,6 +1431,79 @@ mod tests {
         let v: Value =
             serde_json::from_str(&build_line("copilot", "x", &payload, false).0).unwrap();
         assert!(v.get("branch").is_none());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn copilot_stop_gets_the_turns_final_message_from_its_transcript() {
+        let d = scratch("transcript");
+        let t = d.join("events.jsonl");
+        let ev = |ty: &str, data: Value| json!({"type": ty, "data": data}).to_string();
+        let mut lines = vec![
+            ev("assistant.message", json!({"content": "Old turn."})),
+            ev("user.message", json!({"content": "go"})),
+            ev(
+                "assistant.message",
+                json!({"content": "Looking.", "toolRequests": [{}]}),
+            ),
+            ev(
+                "assistant.message",
+                json!({"content": "Sub-agent done.", "parentToolCallId": "t1"}),
+            ),
+            ev("assistant.message", json!({"content": "Built and tested."})),
+            ev(
+                "assistant.message",
+                json!({"content": "", "toolRequests": [{}]}),
+            ),
+            ev(
+                "assistant.message",
+                json!({"content": "Now checking.", "toolRequests": [{}]}),
+            ),
+            ev("assistant.turn_end", json!({})),
+        ];
+        std::fs::write(&t, lines.join("\n") + "\n").unwrap();
+        let stop = json!({"sessionId": "s", "transcriptPath": t}).to_string();
+        let line = |p: &str| -> Value {
+            serde_json::from_str(&build_line("copilot", "agentStop", p, false).0).unwrap()
+        };
+        assert_eq!(
+            line(&stop)["payload"]["last_assistant_message"],
+            "Built and tested."
+        );
+        // autopilot: the task_complete summary is the final word
+        lines.push(ev("session.task_complete", json!({"summary": "All done."})));
+        std::fs::write(&t, lines.join("\n")).unwrap();
+        assert_eq!(copilot_last_message(&t).as_deref(), Some("All done."));
+        // a new prompt and nothing said since: no message, not the previous turn's
+        lines.push(ev(
+            "user.message",
+            json!({"content": "", "source": "autopilot"}),
+        ));
+        std::fs::write(&t, lines.join("\n")).unwrap();
+        assert!(line(&stop)["payload"]
+            .get("last_assistant_message")
+            .is_none());
+        // the tail starts mid-line: that partial line is skipped, not mistaken for an event
+        let pad = "x".repeat(TRANSCRIPT_TAIL as usize);
+        let msg = ev("assistant.message", json!({"content": "Tail."}));
+        std::fs::write(
+            &t,
+            format!("{{\"type\":\"user.message\",\"p\":\"{pad}\"}}\n{msg}\n"),
+        )
+        .unwrap();
+        assert_eq!(copilot_last_message(&t).as_deref(), Some("Tail."));
+        // other events, other agents, a missing file: the payload is left as it came
+        assert!(
+            line(&json!({"transcriptPath": d.join("none")}).to_string())["payload"]
+                .get("last_assistant_message")
+                .is_none()
+        );
+        let v: Value =
+            serde_json::from_str(&build_line("copilot", "postToolUse", &stop, false).0).unwrap();
+        assert!(v["payload"].get("last_assistant_message").is_none());
+        let v: Value =
+            serde_json::from_str(&build_line("claude", "agentStop", &stop, false).0).unwrap();
+        assert!(v["payload"].get("last_assistant_message").is_none());
         let _ = std::fs::remove_dir_all(&d);
     }
 

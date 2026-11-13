@@ -585,11 +585,15 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
         }
         "agentstop" | "stop" => {
             p.state = Some(SessState::Done);
-            // Claude Code hands the turn's last message to Stop: its closing question feeds Reply
+            // Claude Code hands the turn's last message to Stop; for Copilot's agentStop, agentlink-hook
+            // reads it from the session transcript. Its closing question feeds Reply
             if let Some(text) = payload["last_assistant_message"].as_str() {
                 p.ask = Some(crate::ask::ask_of(text));
-                // the message itself, for the watch's reader (LAST-MESSAGE.md); Copilot's agentStop has none
-                if event == "stop" && agent_name == "claude" {
+                // the message itself, for the watch's reader (LAST-MESSAGE.md)
+                if matches!(
+                    (event.as_str(), agent_name),
+                    ("stop", "claude") | ("agentstop", "copilot")
+                ) {
                     let clean = crate::lastmsg::clean(text);
                     p.last = if clean.is_empty() {
                         LastMsg::Clear
@@ -1138,7 +1142,7 @@ mod tests {
     }
 
     #[test]
-    fn an_error_a_sub_agent_or_copilot_leaves_no_last_message() {
+    fn an_error_or_a_sub_agent_leaves_no_last_message_and_copilot_sets_one() {
         let p = patch_of(cl(
             "StopFailure",
             json!({"last_assistant_message": "API Error: 529"}),
@@ -1148,8 +1152,12 @@ mod tests {
             LastMsg::Keep,
             "the error text is not the agent's message"
         );
+        // agentlink-hook reads Copilot's from the transcript into the same field
         let p = patch_of(json!({"agent":"copilot","event":"agentStop","cwd":"/r",
-            "payload":{"sessionId":"c","last_assistant_message":"x"}}));
+            "payload":{"sessionId":"c","last_assistant_message":"**Done.**"}}));
+        assert_eq!(p.last, LastMsg::Set("Done.".into()));
+        let p = patch_of(json!({"agent":"copilot","event":"agentStop","cwd":"/r",
+            "payload":{"sessionId":"c"}}));
         assert_eq!(p.last, LastMsg::Keep);
         let p = patch_of(cl("Stop", json!({})));
         assert_eq!(
