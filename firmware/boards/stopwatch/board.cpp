@@ -12,6 +12,7 @@
 #include "esp_app_desc.h"
 #include "esp_log.h"
 #include "esp_mac.h"
+#include "esp_rtc_time.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -54,6 +55,33 @@ const char *hal_reset_reason(void)
     }
 }
 void hal_retained_set(uint32_t v) { s_retained = v; }
+
+/* The power report's unsent figures (power_report.c) and the start of a deep sleep, in RTC slow memory too. */
+static RTC_DATA_ATTR uint32_t s_retained_words[HAL_RETAINED_WORDS];
+uint32_t *hal_retained_words(void) { return s_retained_words; }
+#define DEEP_MARK 0x44454550u /* "DEEP": the two times below belong to a sleep that was entered */
+static RTC_DATA_ATTR uint32_t s_deep_mark;
+static RTC_DATA_ATTR uint64_t s_deep_rtc_us; /* the RTC timer: counts through deep sleep, on the internal RC */
+static RTC_DATA_ATTR uint32_t s_deep_unix;   /* the RX8130 clock (crystal), 0 if it was not set */
+static uint32_t s_slept_ms;
+
+/* At boot: how long the DEEP that ended here lasted. The RX8130 keeps crystal time but counts whole seconds;
+ * the chip's RTC timer runs on the internal RC oscillator (a few % off). The crystal wins when both are set. */
+static void deep_slept_init(void)
+{
+    if (s_deep_mark != DEEP_MARK) return;
+    s_deep_mark = 0;
+    esp_sleep_wakeup_cause_t c = esp_sleep_get_wakeup_cause();
+    if (c != ESP_SLEEP_WAKEUP_EXT1 && c != ESP_SLEEP_WAKEUP_TIMER) return;
+    uint64_t now = esp_rtc_get_time_us();
+    uint64_t rtc_ms = now > s_deep_rtc_us ? (now - s_deep_rtc_us) / 1000u : 0;
+    uint32_t unix_now = hal_rtc_get_unix();
+    uint64_t ms = rtc_ms;
+    if (s_deep_unix && unix_now >= s_deep_unix) ms = (uint64_t)(unix_now - s_deep_unix) * 1000u;
+    s_slept_ms = ms > UINT32_MAX ? UINT32_MAX : (uint32_t)ms;
+    ESP_LOGI(TAG, "deep sleep lasted %u ms (rtc timer %u ms)", (unsigned)s_slept_ms, (unsigned)rtc_ms);
+}
+uint32_t hal_deep_slept_ms(void) { return s_slept_ms; }
 
 hal_wake_t hal_wake_reason(void)
 {
@@ -102,6 +130,9 @@ static bool deep_sleep(uint32_t wake_after_s)
              (unsigned)wake_after_s);
     hal_debug_line(line);
     vTaskDelay(pdMS_TO_TICKS(50)); /* let the line drain */
+    s_deep_unix = hal_rtc_get_unix();
+    s_deep_rtc_us = esp_rtc_get_time_us();
+    s_deep_mark = DEEP_MARK;
     esp_deep_sleep_start();
     return true; /* not reached */
 }
@@ -169,6 +200,7 @@ void hal_board_init(void)
     sw_power_init(s_bus);
     vTaskDelay(pdMS_TO_TICKS(50));
     sw_rtc_init();
+    deep_slept_init(); /* needs the RX8130 */
     s_info.has_imu = sw_imu_init();
     sw_input_init();
     /* Display and touch are created by hal_display_create / hal_touch_create. */
@@ -233,6 +265,9 @@ static uint8_t mv_to_percent(uint16_t mv)
     return (uint8_t)(((uint32_t)(mv - 3300) * 100U) / (4200 - 3300));
 }
 
+static hal_battery_mv_t s_mv; /* the voltages behind the cached reading (power report) */
+hal_battery_mv_t hal_battery_mv(void) { return s_mv; }
+
 hal_battery_t hal_battery_read(void)
 {
     static hal_battery_t cached = {0, false, false};
@@ -247,9 +282,13 @@ hal_battery_t hal_battery_read(void)
             if (vbat > 0) {
                 filtered_mv = filtered_mv ? (uint16_t)((filtered_mv * 7U + vbat + 4U) / 8U) : vbat;
                 cached.percent = mv_to_percent(filtered_mv);
+                s_mv.mv = vbat;
+                s_mv.mv_filt = filtered_mv;
             }
+            s_mv.vin_mv = vin;
             cached.usb_present = vin > 4000;
             cached.charging = cached.usb_present && chg_active;
+            sw_ble_battery_level(cached.percent); /* Battery Level notifies on a 1 % change */
         }
         last_us = now;
     }

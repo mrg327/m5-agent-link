@@ -58,6 +58,7 @@ int ui_last_release_y(void);    /* where the last touch lifted, for the long-swi
 lv_obj_t *ui_home_init(void);
 void ui_home_refresh(uint32_t now_ms);
 void ui_home_tick(uint32_t now_ms);
+bool ui_home_ambient(void);
 bool ui_home_act(nav_action_t a, const gesture_evt_t *g);
 void ui_home_note_input(void);  /* any input anywhere resets the ambient timer and the nag */
 bool ui_home_request_pending(void); /* the selected session has an unanswered approvable request on screen */

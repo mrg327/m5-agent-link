@@ -4,6 +4,7 @@
 #include "hal.h"
 #include "link.h"
 #include "motion.h"
+#include "power_report.h"
 #include "ui.h"
 
 #define GLOW_MS 2000
@@ -127,7 +128,9 @@ void power_tick(uint32_t now_ms)
         hal_retained_set(s_tries + 1);
         s_deep = true;
         dbg_event("power", "deep", "\"wake_after_s\":%u,\"tries\":%u", (unsigned)wake_after_s, (unsigned)s_tries);
+        preport_save(now_ms); /* the unsent power report figures wait in RTC memory for the next boot */
         if (hal_power_enter(HAL_POWER_DEEP, wake_after_s) != HAL_POWER_DEEP) { /* on the device DEEP does not return */
+            preport_unsave();
             s_deep = false; /* refused (USB present, button held): count again from now and retry */
             s_off_since = now_ms;
             hal_retained_set(s_tries);

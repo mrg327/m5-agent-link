@@ -1,0 +1,6 @@
+# Power report after a deep sleep (run with --battery --wake button --slept 7200): the first report carries the
+# 2 hours asleep and one deep sleep ended.
+connect
+wait 300
+rx a400020101020103a60082001301a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 500

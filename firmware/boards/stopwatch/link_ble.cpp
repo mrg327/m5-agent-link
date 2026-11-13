@@ -131,6 +131,7 @@ enum { ITVL_BASE, ITVL_FAST, ITVL_BULK };
 #define BLE_FAST_TIMEOUT 400  /* 10 ms units: 4 s */
 #define BLE_IDLE_ITVL 24      /* 30 ms (to 45 ms): the base after a connect at a remembered bulk interval */
 static uint16_t s_base_itvl, s_base_latency, s_base_timeout;
+static volatile uint16_t s_cur_itvl; /* the interval in force (1.25 ms units), 0 = no central: power report */
 static bool s_fast, s_bulk;      /* wanted */
 static uint8_t s_applied;        /* ITVL_*: last granted (or, while s_req_pending, requested) */
 static uint8_t s_prev_applied;   /* before the pending request */
@@ -143,6 +144,7 @@ static void conn_params(const char *why, bool save_base)
     if (s_conn == BLE_HS_CONN_HANDLE_NONE || ble_gap_conn_find(s_conn, &d) != 0) return;
     ESP_LOGI(TAG, "%s: interval %u.%02u ms, latency %u, timeout %u ms", why, d.conn_itvl * 125 / 100,
              d.conn_itvl * 125 % 100, d.conn_latency, d.supervision_timeout * 10);
+    s_cur_itvl = d.conn_itvl;
     if (save_base) {
         s_base_itvl = d.conn_itvl;
         s_base_latency = d.conn_latency;
@@ -186,6 +188,8 @@ void sw_ble_link_interactive(bool on)
     s_fast = on;
     apply_interval();
 }
+
+uint32_t sw_ble_link_interval_us(void) { return s_conn == BLE_HS_CONN_HANDLE_NONE ? 0 : s_cur_itvl * 1250u; }
 
 void sw_ble_link_bulk(bool on)
 {
@@ -257,6 +261,7 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
         s_conn = BLE_HS_CONN_HANDLE_NONE;
         s_subscribed = false;
         s_base_itvl = 0;
+        s_cur_itvl = 0;
         report_state(false);
         advertise();
         break;
@@ -360,9 +365,22 @@ static int str_access(uint16_t, uint16_t, struct ble_gatt_access_ctxt *ctxt, voi
     return os_mbuf_append(ctxt->om, s, strlen(s)) == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
 
+/* Battery Level (0x2A19): read, and notified to a subscribed central when the percent moves by 1 or more.
+ * The value is the one the core task last read (hal_battery_read, at least once a minute); the host task
+ * never touches the PM1 itself. */
+static uint16_t s_bat_handle;
+static volatile uint8_t s_bat_pct;
+
+void sw_ble_battery_level(uint8_t percent)
+{
+    if (percent == s_bat_pct) return;
+    s_bat_pct = percent;
+    if (s_bat_handle && s_conn != BLE_HS_CONN_HANDLE_NONE) ble_gatts_chr_updated(s_bat_handle);
+}
+
 static int bat_access(uint16_t, uint16_t, struct ble_gatt_access_ctxt *ctxt, void *)
 {
-    uint8_t pct = hal_battery_read().percent;
+    uint8_t pct = s_bat_pct;
     return os_mbuf_append(ctxt->om, &pct, 1) == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
 
@@ -390,7 +408,8 @@ static const struct ble_gatt_chr_def kInfoChrs[] = {
     {},
 };
 static const struct ble_gatt_chr_def kBatChrs[] = {
-    {.uuid = &kBatLvlUuid.u, .access_cb = bat_access, .flags = BLE_GATT_CHR_F_READ},
+    {.uuid = &kBatLvlUuid.u, .access_cb = bat_access, .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+     .val_handle = &s_bat_handle},
     {},
 };
 
@@ -424,6 +443,7 @@ void sw_ble_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state)
     s_on_rx = on_rx;
     s_on_state = on_state;
     s_send_lock = xSemaphoreCreateMutex();
+    s_bat_pct = hal_battery_read().percent; /* the core task, before the host runs */
     esp_err_t err = nimble_port_init();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "nimble_port_init: %s", esp_err_to_name(err));

@@ -84,4 +84,6 @@ void ui_glow_hide(void);
 bool ui_glow_active(void);
 /* The wrist was raised: counts as looking at the watch (ends the ambient dim and the nagging), like a touch but without any action. */
 void ui_note_motion(void);
+/* The display shows the dimmed ambient face (HOME after 30 s without input, nothing waiting): the power report's "dim". */
+bool ui_dimmed(void);
 void ui_set_animations(bool enabled);

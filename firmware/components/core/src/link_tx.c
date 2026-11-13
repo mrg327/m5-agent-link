@@ -260,3 +260,29 @@ bool link_send_fw_ack(int st, uint32_t next, const char *msg)
     dbg_event("ota", "ota_ack", "\"st\":%d,\"next\":%u", st, (unsigned)next);
     return send_env(g_link.kind, "fw_ack");
 }
+
+bool link_send_power(const link_power_t *p)
+{
+    if (!g_link.welcomed || model_peer_minor() < LINK_POWER_MINOR) return false;
+    memset(&g_tx_env, 0, sizeof g_tx_env);
+    g_tx_env.envelope_choice = envelope_msg_power_m_c;
+    struct msg_power *m = &g_tx_env.envelope_msg_power_m;
+    set_hdr(&m->msg_power_hdr_m, false, 0);
+    struct power *b = &m->msg_power_power_m;
+    b->power_uint0uint = p->mv;
+    b->power_uint1uint = p->mvf;
+    b->power_uint2uint = p->vin;
+    b->power_uint3bool = p->chg;
+    b->power_uint4bool = p->usb;
+    b->power_uint5uint = p->pct;
+    b->power_uint6uint = p->on;
+    b->power_uint7uint = p->dim;
+    b->power_uint8uint = p->off;
+    b->power_uint9uint = p->deep;
+    b->power_uint10uint = p->lk;
+    b->power_uint11uint = p->ble;
+    b->power_uint12uint = p->itvl;
+    b->power_uint13uint = p->seq;
+    b->power_uint14uint = p->nd;
+    return send_env(g_link.kind, "power");
+}

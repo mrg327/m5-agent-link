@@ -1,0 +1,14 @@
+# Power report: where the time went (run with --idle-off 100). After report 0: about 31 s on, the ambient dim
+# from 30 s without input (80 s dimmed), the display off at 100 s (188 s off); report 1 comes 5 minutes on.
+connect
+wait 300
+rx a400020101020103a60082001301a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 300
+skip 31000
+wait 300
+skip 60000
+wait 300
+skip 20000
+wait 300
+skip 188000
+wait 500

@@ -18,7 +18,7 @@ static const struct hdr_r *env_hdr(const struct envelope_r *e)
     H(msg_clear) H(msg_cmd) H(msg_result) H(msg_detail) H(msg_cfg) H(msg_batt) H(msg_ping) H(msg_pong)
     H(msg_log) H(msg_audio_start) H(msg_audio) H(msg_audio_end) H(msg_transcript)
     H(msg_dbg_ui_state_req) H(msg_dbg_ui_state) H(msg_dbg_screenshot_req) H(msg_dbg_screenshot_chunk)
-    H(msg_dbg_inject_input) H(msg_dbg_set_log_level) H(msg_kb_start) H(msg_kb_stroke) H(msg_kb_cands) H(msg_usage) H(msg_fw_begin) H(msg_fw_chunk) H(msg_fw_ack)
+    H(msg_dbg_inject_input) H(msg_dbg_set_log_level) H(msg_kb_start) H(msg_kb_stroke) H(msg_kb_cands) H(msg_usage) H(msg_fw_begin) H(msg_fw_chunk) H(msg_fw_ack) H(msg_power)
     }
 #undef H
     return NULL;

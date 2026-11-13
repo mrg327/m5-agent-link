@@ -142,6 +142,7 @@ void ui_set_link_transport(int kind)
 }
 
 nav_mode_t ui_mode(void) { return s_mode; }
+bool ui_dimmed(void) { return s_mode == MODE_HOME && ui_home_ambient(); }
 int ui_last_release_y(void) { return s_rel_y; }
 
 /* The toast has one slot on every screen: centred on the legend row, replacing the legends while it shows. */

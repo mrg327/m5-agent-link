@@ -80,3 +80,12 @@ bool link_send_answer(uint32_t sid, uint32_t rid, const uint32_t *picks, const u
 bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq);
 /* Firmware update (proto 0.15): fw_ack {st, next, msg}; st is the wire value (0 go, 1 done, 2 busy, 3 bad, 4 fail, 5 stopped). */
 bool link_send_fw_ack(int st, uint32_t next, const char *msg);
+/* Power report (proto 0.19, POWER.md): voltages in mV, times in ms, itvl in us; field names as in the CDDL. */
+typedef struct {
+    uint32_t mv, mvf, vin, pct;
+    bool chg, usb;
+    uint32_t on, dim, off, deep, lk, ble, itvl, seq, nd;
+} link_power_t;
+/* Returns false unless welcomed by a daemon with proto >= 0.19, or when the transport refused the frame. */
+bool link_send_power(const link_power_t *p);
+#define LINK_POWER_MINOR 19

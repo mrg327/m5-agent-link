@@ -587,3 +587,29 @@ sim_script_test(sim_ota_updated_tone ota_updated_tone.txt
 set_tests_properties(sim_ota_updated_tone PROPERTIES ENVIRONMENT "AGENTLINK_SIM_UNCONFIRMED=1")
 sim_script_test(sim_ota_updated_tone_silent ota_updated_tone_silent.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_updated_tone|\"ev\":\"sound\"")
+
+# ── Power report (docs/design/POWER.md, proto 0.19) ──
+# State-time accounting, cadence, refused sends, unlinked time and the figures a deep sleep keeps, against
+# stubbed HAL / link / UI.
+add_executable(test_power_report tests/test_power_report.c ${FW}/core/src/power_report.c)
+target_include_directories(test_power_report PRIVATE ${FW}/core/src)
+target_link_libraries(test_power_report PRIVATE agentlink_proto lvgl::lvgl m)
+target_include_directories(test_power_report PRIVATE ${FW}/agentlink_hal/include)
+add_test(NAME power_report_logic COMMAND test_power_report)
+# The whole firmware: a report right after a 0.19 welcome (none before), the next 5 minutes later, over BLE with
+# the interval; none to a 0.18 daemon; on / dim / off split; the deep sleep a boot ended; time while unlinked.
+sim_script_test(sim_power_report_cadence power_report_cadence.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"report\".*\"ev\":\"welcome\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"welcome\".*\"ev\":\"report\",\"sent\":true,\"seq\":0,.*\"msg\":\"power\".*\"ev\":\"report\",\"sent\":true,\"seq\":1,\"mv\":4020,\"on\":30[0-9][0-9][0-9][0-9],\"dim\":[0-9]+,\"off\":0,\"deep\":0,\"lk\":30[0-9][0-9][0-9][0-9],\"ble\":30[0-9][0-9][0-9][0-9],\"itvl\":30000,\"nd\":0")
+sim_script_test(sim_power_report_old_daemon power_report_old_daemon.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"report\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"welcome\"")
+sim_power_test(sim_power_report_states power_report_states.txt ARGS --idle-off 100
+               PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"report\",\"sent\":true,\"seq\":1,\"mv\":[0-9]+,\"on\":3[01][0-9][0-9][0-9],\"dim\":8[01][0-9][0-9][0-9],\"off\":18[89][0-9][0-9][0-9],\"deep\":0,")
+sim_power_test(sim_power_report_deep power_report_deep.txt ARGS --battery --wake button --slept 7200
+               PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"report_restored\",\"kept\":false,\"seq\":0,\"deep\":7200000.*\"ev\":\"report\",\"sent\":true,\"seq\":0,\"mv\":[0-9]+,\"on\":[0-9]+,\"dim\":[0-9]+,\"off\":[0-9]+,\"deep\":7200000,.*\"nd\":1")
+sim_script_test(sim_power_report_unlinked power_report_unlinked.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"report\",\"sent\":true,\"seq\":1,\"mv\":[0-9]+,\"on\":60[0-9][0-9][0-9][0-9],\"dim\":[0-9]+,\"off\":0,\"deep\":0,\"lk\":[0-9][0-9][0-9][0-9]?,")

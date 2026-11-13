@@ -162,6 +162,20 @@ hal_battery_t hal_battery_read(void)
     return (hal_battery_t){.percent = (uint8_t)s_batt_pct, .charging = false, .usb_present = !s_on_battery};
 }
 
+/* The power report's voltages, derived from the scripted percent (the device's own linear 3.3-4.2 V map). */
+hal_battery_mv_t hal_battery_mv(void)
+{
+    hal_battery_t b = hal_battery_read();
+    uint16_t mv = (uint16_t)(3300 + 9 * (b.percent > 100 ? 100 : b.percent));
+    return (hal_battery_mv_t){.mv = mv, .mv_filt = mv, .vin_mv = b.usb_present ? 5000 : 0};
+}
+
+static uint32_t s_slept_ms;
+void sim_set_deep_slept_ms(uint32_t ms) { s_slept_ms = ms; }
+uint32_t hal_deep_slept_ms(void) { return s_wake == HAL_WAKE_POWER_ON ? 0 : s_slept_ms; }
+static uint32_t s_retained_words[HAL_RETAINED_WORDS];
+uint32_t *hal_retained_words(void) { return s_retained_words; }
+
 void hal_debug_line(const char *json)
 {
     fputs(json, stdout);

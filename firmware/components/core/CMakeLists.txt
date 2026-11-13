@@ -1,5 +1,5 @@
 set(CORE_SRCS
-    src/app.c src/debug.c src/detail.c src/feedback.c src/gauges.c src/gesture.c src/model.c src/steps.c src/power.c src/ring.c
+    src/app.c src/debug.c src/detail.c src/feedback.c src/gauges.c src/gesture.c src/model.c src/steps.c src/power.c src/power_report.c src/ring.c
     src/link.c src/link_rx.c src/link_tx.c src/ota.c src/sha256.c src/ui_ota.c
     src/motion.c src/prefs.c
     src/nav.c src/ui.c src/ui_theme.c src/ui_ring.c src/ui_ring_draw.c src/ui_wheel.c src/ui_home.c src/ui_home_card.c

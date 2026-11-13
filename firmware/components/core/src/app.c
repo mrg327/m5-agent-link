@@ -15,6 +15,7 @@
 #include "keys.h"
 #include "voice.h"
 #include "power.h"
+#include "power_report.h"
 #include "ring.h"
 #include "model.h"
 #include "motion.h"
@@ -395,6 +396,7 @@ static void on_link(bool welcomed)
     if (welcomed) app_clock_resync(); /* the welcome has just set the RTC */
     ui_set_link_state(welcomed);
     ota_on_link(welcomed, app_now_ms());
+    preport_on_link(welcomed, app_now_ms());
 }
 
 static void on_attention(const attention_t *a)
@@ -691,6 +693,7 @@ void core_init(void)
     if (!power_woke_by_timer()) feedback_hello(); /* a reconnect attempt stays silent and dark */
 #endif
     power_start(app_now_ms());
+    preport_init(app_now_ms());
     ota_init(app_now_ms());
     s_fps_t0 = app_now_ms();
 }
@@ -698,6 +701,7 @@ void core_init(void)
 uint32_t core_step(void)
 {
     uint32_t now = app_now_ms();
+    preport_tick(now); /* first: the time since the last step goes to the state that held during it */
     drain_input(now);
     if (motion_take_raise()) on_raise(now);
     cover_step();
