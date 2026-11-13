@@ -35,12 +35,68 @@ fn accuracy_gate_on_common_words() {
     );
     assert!(r.top4_pct() >= 90.0, "top4 {}", r.top4_pct());
     assert!(r.top1_pct() >= 70.0, "top1 {}", r.top1_pct());
-    // debug builds are an order of magnitude slower than the 20 ms release target
-    assert!(r.max_ms < 200.0, "max {} ms", r.max_ms);
 
     let t = eval_taps(&dec, &words, 3, &sp);
     assert!(t.top4_pct() >= 95.0, "tap top4 {}", t.top4_pct());
     assert!(t.top1_pct() >= 85.0, "tap top1 {}", t.top1_pct());
+}
+
+/// CPU time of the calling thread, so time-slicing with other processes does not count.
+#[cfg(unix)]
+fn thread_cpu_ms() -> f64 {
+    let mut ts = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    // SAFETY: `ts` is a valid, writable timespec.
+    let rc = unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut ts) };
+    assert_eq!(rc, 0, "clock_gettime");
+    ts.tv_sec as f64 * 1000.0 + ts.tv_nsec as f64 / 1e6
+}
+
+#[cfg(not(unix))]
+fn thread_cpu_ms() -> f64 {
+    use std::sync::OnceLock;
+    static T0: OnceLock<std::time::Instant> = OnceLock::new();
+    T0.get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_secs_f64()
+        * 1000.0
+}
+
+/// Kept apart from the accuracy gate, which is deterministic: wall-clock latency depends on
+/// machine load (issue 20261111-5617), so this measures thread CPU time and takes the best of a
+/// few runs per word to drop cache and frequency noise.
+#[test]
+fn stroke_latency_budget() {
+    let lex = Lexicon::english();
+    let words: Vec<String> = lex
+        .top_words(2000)
+        .iter()
+        .step_by(7)
+        .map(|w| w.to_string())
+        .collect();
+    let dec = Decoder::new(Layout::stopwatch_qwerty(), lex);
+    let mut worst = (0.0f64, String::new());
+    for (i, w) in words.iter().enumerate() {
+        let mut rng = Rng::new(i as u64);
+        let Some(s) = synth_stroke(dec.layout(), w, &mut rng, &SynthParams::default()) else {
+            continue;
+        };
+        let best = (0..3)
+            .map(|_| {
+                let t0 = thread_cpu_ms();
+                std::hint::black_box(dec.decode_stroke(&s, 4));
+                thread_cpu_ms() - t0
+            })
+            .fold(f64::MAX, f64::min);
+        if best > worst.0 {
+            worst = (best, w.clone());
+        }
+    }
+    println!("stroke latency: worst {:.2} ms CPU ({})", worst.0, worst.1);
+    // unoptimised builds are an order of magnitude slower than the 20 ms release target
+    assert!(worst.0 < 200.0, "{:.2} ms CPU on {:?}", worst.0, worst.1);
 }
 
 #[test]
