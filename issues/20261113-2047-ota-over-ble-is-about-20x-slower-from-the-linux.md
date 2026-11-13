@@ -1,11 +1,11 @@
 ---
 id: 20261113-2047
 title: OTA over BLE is about 20x slower from the Linux host than from macOS
-status: open
+status: claimed
 severity: med
 area: daemon
 platforms: esp32,linux
-owner:
+owner: claude-code@linux-dev
 created: 2026-11-13T03:12:11Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -53,3 +53,5 @@ much faster. Over USB the update takes about 13 s.
 ## Log
 
 - 2026-11-13T03:12:12Z · claude-code@linux-dev · linux-x86_64 · 95b2543: filed
+- 2026-11-13T05:06:26Z · claude-code@linux-dev · linux-x86_64 · c6ab57b: claimed
+- 2026-11-13T05:06:26Z · claude-code@linux-dev · linux-x86_64 · c6ab57b: Measured from the 19:11-19:23 OTA trace: 928 fw_acks, one per 2 KB chunk every ~1.1 s (881 of 928 gaps between 1.0 and 1.2 s), so the rate is set by a ~1 s wait, not by link bandwidth. Writes stayed at 244 B (no 20 B fallback). Work on branch ota-speed.
