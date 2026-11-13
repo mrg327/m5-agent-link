@@ -61,6 +61,10 @@
  *   fw_begin [VER] | fw_stop        a daemon `fw_begin` for that image (with a version), or size 0 to stop
  *   fw_send OFF LEN [COUNT]         COUNT (default 1) `fw_chunk`s of LEN bytes from OFF on, 20 ms apart; the data is
  *                                   the image's, cut at its end (a LEN over 2048 is a protocol error to try)
+ *   fw_patch [otherbase|corrupt]    delta OTA (proto 0.21): the patch file in $AGENTLINK_SIM_PATCH, next to base.bin
+ *                                   (now the running slot; otherbase: one byte differs) and new.bin (the image);
+ *                                   fw_begin then carries the patch, fw_send sends it (corrupt: one byte flipped)
+ *   fw_expect_slot                  the spare slot holds exactly the image
  *   battery PCT [chg]               the battery reading (chg = charging and on USB)
  *   skip MS                         jump the clock forward (the script's own timeline stays put): long timeouts
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
@@ -87,7 +91,7 @@
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_PATCH, E_FW_EXPECT_SLOT, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -422,6 +426,12 @@ static bool parse_line(char *line, uint32_t *t)
         add(*t, E_EXPECT_PX_MAX, a, 0, 0, NULL);
     } else if (!strcmp(cmd, "fw_image") && arg[0]) {
         add(*t, E_FW_IMAGE, 0, 0, 0, arg);
+        *t += 20;
+    } else if (!strcmp(cmd, "fw_patch")) {
+        add(*t, E_FW_PATCH, 0, 0, 0, arg);
+        *t += 20;
+    } else if (!strcmp(cmd, "fw_expect_slot")) {
+        add(*t, E_FW_EXPECT_SLOT, 0, 0, 0, NULL);
         *t += 20;
     } else if (!strcmp(cmd, "fw_begin")) {
         add(*t, E_FW_BEGIN, 0, 0, 0, arg);
@@ -1288,20 +1298,27 @@ static void run_fw_begin(bool stop, const char *ver)
         b->fw_begin_uint2tstr_present = true;
         b->fw_begin_uint2tstr.fw_begin_uint2tstr = zs(ver);
     }
+    if (!stop && sim_fw_is_patch()) {
+        struct fw_patch *p = &b->fw_begin_fw_patch_m.fw_begin_fw_patch_m;
+        b->fw_begin_fw_patch_m_present = true;
+        p->fw_patch_uint0uint = sim_fw_xfer_size();
+        p->fw_patch_uint1bstr = (struct zcbor_string){.value = sim_fw_base_sha(), .len = 32};
+        p->fw_patch_uint2uint = sim_fw_base_size();
+    }
     inject_fw(&env, "fw_begin");
 }
 
 static void run_fw_chunk(uint32_t off, uint32_t len)
 {
-    if (off >= sim_fw_size()) return;
-    if (len > sim_fw_size() - off) len = sim_fw_size() - off;
+    if (off >= sim_fw_xfer_size()) return;
+    if (len > sim_fw_xfer_size() - off) len = sim_fw_xfer_size() - off;
     static struct envelope_r env;
     memset(&env, 0, sizeof env);
     env.envelope_choice = envelope_msg_fw_chunk_m_c;
     env.envelope_msg_fw_chunk_m.msg_fw_chunk_hdr_m.hdr_uint1uint = ++s_rx_id;
     struct fw_chunk *c = &env.envelope_msg_fw_chunk_m.msg_fw_chunk_fw_chunk_m;
     c->fw_chunk_uint0uint = off;
-    c->fw_chunk_uint1bstr = (struct zcbor_string){.value = sim_fw_data() + off, .len = len};
+    c->fw_chunk_uint1bstr = (struct zcbor_string){.value = sim_fw_xfer_data() + off, .len = len};
     inject_fw(&env, "fw_chunk");
 }
 
@@ -1431,6 +1448,14 @@ static void run(const ev_t *e)
         if (sscanf(e->text, "%u %15s", &size, mode) < 1 || !sim_fw_image(size, mode)) fail("bad fw_image", e->text);
         break;
     }
+    case E_FW_PATCH: {
+        const char *path = getenv("AGENTLINK_SIM_PATCH");
+        if (!path || !path[0] || !sim_fw_patch(path, e->text ? e->text : "")) fail("bad fw_patch", path ? path : "");
+        break;
+    }
+    case E_FW_EXPECT_SLOT:
+        if (!sim_fw_slot_matches()) fail("spare slot is not the image", "");
+        break;
     case E_FW_BEGIN: run_fw_begin(e->a != 0, e->text); break;
     case E_FW_CHUNK: run_fw_chunk((uint32_t)e->a, (uint32_t)e->b); break;
     case E_BATTERY: {

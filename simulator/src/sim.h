@@ -60,6 +60,22 @@ bool sim_fw_image(uint32_t size, const char *mode);
 uint32_t sim_fw_size(void);
 const uint8_t *sim_fw_sha(void);
 const uint8_t *sim_fw_data(void);
+/* A delta-OTA fixture (mode: "", "otherbase", "corrupt"): `path` is a patch next to base.bin and new.bin. The
+ * image is new.bin, the running slot base.bin; fw_send then sends the patch. */
+bool sim_fw_patch(const char *path, const char *mode);
+bool sim_fw_is_patch(void);
+const uint8_t *sim_fw_base_sha(void);
+uint32_t sim_fw_base_size(void);
+/* What fw_send sends: the patch in patch mode, else the image. */
+uint32_t sim_fw_xfer_size(void);
+const uint8_t *sim_fw_xfer_data(void);
+/* The spare slot holds exactly the image. */
+bool sim_fw_slot_matches(void);
+/* sim_ota.c: the running slot a patch applies to; raw = no header or signature checks (fixtures);
+ * the spare slot's bytes so far. */
+void sim_ota_set_running(const uint8_t *img, uint32_t size);
+void sim_ota_set_raw(bool raw);
+const uint8_t *sim_ota_slot(uint32_t *size);
 /* sim_board.c: the battery reading (`battery PCT [chg]`) and a jump of the monotonic clock (`skip MS`). */
 void sim_set_battery_pct(unsigned pct, bool charging);
 void sim_skip_time(uint32_t ms);

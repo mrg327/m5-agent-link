@@ -1,0 +1,14 @@
+# Delta OTA (proto 0.21): a fixture patch ($AGENTLINK_SIM_PATCH) against the running slot (base.bin) arrives in
+# 2 KB chunks; the device rebuilds new.bin into the spare slot, the SHA checks out, done, restart.
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 300
+fw_patch
+fw_begin 2.1.0
+wait 300
+expect_screen ota
+fw_send 0 2048 32
+wait 400
+fw_expect_slot
+wait 1500
+expect_screen ring

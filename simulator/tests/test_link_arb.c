@@ -9,6 +9,7 @@
 #include "debug.h"
 #include "link.h"
 #include "model.h"
+#include "ota.h"
 
 /* welcome (id 1) copied from scripts/link_indicator.txt */
 static const char *WELCOME_HEX =
@@ -33,9 +34,10 @@ void dbg_event(const char *c, const char *e, const char *f, ...) { (void)c; (voi
 void dbg_event_at(dbg_level_t l, const char *c, const char *e, const char *f, ...) { (void)l; (void)c; (void)e; (void)f; }
 const char *dbg_q(const char *s) { return s; }
 void dbg_set_level(dbg_level_t l) { (void)l; }
-void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sl, const char *v, size_t vl, uint32_t now)
+void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sl, const char *v, size_t vl, const ota_patch_t *p,
+                  uint32_t now)
 {
-    (void)size; (void)sha; (void)sl; (void)v; (void)vl; (void)now;
+    (void)size; (void)sha; (void)sl; (void)v; (void)vl; (void)p; (void)now;
 }
 void ota_on_chunk(uint32_t off, const uint8_t *d, size_t n, uint32_t now) { (void)off; (void)d; (void)n; (void)now; }
 void dbg_on_ui_state_req(uint32_t r) { (void)r; }

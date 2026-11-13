@@ -1,5 +1,6 @@
 /* hal_ota_* for the simulator: the image is buffered in RAM and checked the way the watch does, with a
- * stand-in trust rule (the last 4 KB of an image start with E7 02 when it is "signed"). */
+ * stand-in trust rule (the last 4 KB of an image start with E7 02 when it is "signed"). The running slot a
+ * delta update reads as its base is whatever sim_ota_set_running() was given (none by default). */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +16,35 @@ static bool s_open;
 static char s_err[48] = "";
 
 static bool s_unconfirmed_init, s_unconfirmed;
+static uint8_t *s_run;
+static uint32_t s_run_size;
+static bool s_raw;
+
+void sim_ota_set_running(const uint8_t *img, uint32_t size)
+{
+    free(s_run);
+    s_run = size ? malloc(size) : NULL;
+    s_run_size = s_run ? size : 0;
+    if (s_run) memcpy(s_run, img, size);
+}
+
+void sim_ota_set_raw(bool raw) { s_raw = raw; }
+
+const uint8_t *sim_ota_slot(uint32_t *size)
+{
+    *size = s_got;
+    return s_buf;
+}
+
+hal_ota_result_t hal_ota_base_read(uint32_t off, void *buf, size_t len)
+{
+    if (!s_run) return HAL_OTA_UNSUPPORTED;
+    if (off > s_run_size || len > s_run_size - off) return HAL_OTA_BAD;
+    memcpy(buf, s_run + off, len);
+    return HAL_OTA_OK;
+}
+
+uint32_t hal_ota_base_size(void) { return s_run_size; }
 
 hal_ota_result_t hal_ota_begin(uint32_t size)
 {
@@ -44,7 +74,7 @@ hal_ota_result_t hal_ota_write(const uint8_t *data, size_t len)
         snprintf(s_err, sizeof s_err, "Write past the end");
         return HAL_OTA_BAD;
     }
-    if (s_got == 0 && len && data[0] != 0xE9) {
+    if (!s_raw && s_got == 0 && len && data[0] != 0xE9) {
         snprintf(s_err, sizeof s_err, "Not an app image");
         return HAL_OTA_BAD;
     }
@@ -59,7 +89,7 @@ hal_ota_result_t hal_ota_finish(void)
         snprintf(s_err, sizeof s_err, "Incomplete image");
         return HAL_OTA_BAD;
     }
-    if (s_size < SIG_TAIL || s_buf[s_size - SIG_TAIL] != 0xE7 || s_buf[s_size - SIG_TAIL + 1] != 0x02) {
+    if (!s_raw && (s_size < SIG_TAIL || s_buf[s_size - SIG_TAIL] != 0xE7 || s_buf[s_size - SIG_TAIL + 1] != 0x02)) {
         snprintf(s_err, sizeof s_err, "Signature not trusted");
         return HAL_OTA_BAD;
     }

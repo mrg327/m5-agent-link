@@ -1,0 +1,21 @@
+# Delta OTA: the link drops after the first patch chunk; the same fw_begin (same patch) carries on from next.
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 300
+fw_patch
+fw_begin 2.1.0
+wait 200
+fw_send 0 2048 1
+wait 200
+disconnect
+wait 300
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 300
+fw_begin 2.1.0
+wait 200
+fw_send 2048 2048 31
+wait 400
+fw_expect_slot
+wait 1500
+expect_screen ring

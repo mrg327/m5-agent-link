@@ -405,8 +405,12 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
         const struct fw_begin *b = &e->envelope_msg_fw_begin_m.msg_fw_begin_fw_begin_m;
         const struct zcbor_string *v = &b->fw_begin_uint2tstr.fw_begin_uint2tstr;
         bool has_ver = b->fw_begin_uint2tstr_present;
+        const struct fw_patch *fp = &b->fw_begin_fw_patch_m.fw_begin_fw_patch_m;
+        ota_patch_t patch = {.psize = fp->fw_patch_uint0uint, .base = fp->fw_patch_uint1bstr.value,
+                             .base_len = fp->fw_patch_uint1bstr.len, .bsize = fp->fw_patch_uint2uint};
         ota_on_begin(b->fw_begin_uint0uint, b->fw_begin_uint1bstr.value, b->fw_begin_uint1bstr.len,
-                     has_ver ? (const char *)v->value : NULL, has_ver ? v->len : 0, now_ms);
+                     has_ver ? (const char *)v->value : NULL, has_ver ? v->len : 0,
+                     b->fw_begin_fw_patch_m_present ? &patch : NULL, now_ms);
         break;
     }
     case envelope_msg_fw_chunk_m_c: {

@@ -212,6 +212,11 @@ const char *hal_ota_error(void);
 bool hal_ota_unconfirmed(void);
 /* Keeps the running image (cancels the rollback). No-op when it is already confirmed. */
 void hal_ota_confirm(void);
+/* Delta update (proto 0.21): the running app slot, read back as the base a patch applies to. Reads `len` bytes
+ * at `off`; HAL_OTA_BAD past the slot's end, HAL_OTA_UNSUPPORTED on a board without OTA. */
+hal_ota_result_t hal_ota_base_read(uint32_t off, void *buf, size_t len);
+/* The running app slot's size in bytes; 0 when there is none to read (no OTA). */
+uint32_t hal_ota_base_size(void);
 /* Restarts the device (into the new image after hal_ota_finish(), else the same one). Does not return on
  * the watch; the simulator logs it and carries on. */
 void hal_restart(void);

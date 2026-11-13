@@ -127,6 +127,16 @@ With 450 mAh, STANDBY at 2.5 mA is about 7 days, and 40 lifts × 10 s/day at 100
   for and connects with it next time; a connect below 15 ms makes the watch ask for 30–45 ms again. The
   watch refuses an update while it records, or below 15% battery unless it is charging, and stays out of
   standby while one runs.
+- **Delta updates** (proto 0.21, issue ef2c). The daemon may send a patch against the running image instead
+  of the image. Before it answers, the watch reads the first `bsize` bytes of its running slot
+  (`hal_ota_base_read`) and compares their SHA-256 with `base`; a mismatch is `bad` "Base mismatch" and the
+  daemon sends the whole image. Otherwise core feeds each patch chunk to the vendored detools decoder
+  (`core/third_party/detools`, sequential bsdiff + heatshrink, window 2^11 / lookahead 2^10 only), which reads
+  the base and writes the rebuilt image through `hal_ota_write` in 4 KB pieces. The decoder (about 2.3 KB,
+  mostly heatshrink's window) and the 4 KB buffer sit in PSRAM. After the last patch byte the image length
+  must equal `size`; then the SHA-256, signature, rollback and resume work as for a whole image. A patch that
+  does not decode is `bad` "Bad patch". Hashing the base blocks the main loop for well under a second on a
+  1.3 MB image (`hash_ms` in the `ota_begin` event).
 - **Signing.** Images are signed (ESP-IDF "Require signed app images" without hardware secure boot, RSA-3072
   Secure Boot V2 format; `sdkconfig.defaults`). Nothing is burned into eFuses: a USB flash still boots any
   image. An update is accepted only if it is signed by the key in the running image's signature block, so

@@ -146,6 +146,27 @@ void hal_ota_confirm(void)
     ESP_LOGI(TAG, "image confirmed: %s", esp_err_to_name(err));
 }
 
+// The base of a delta update: the slot this image runs from, read through the flash driver (the bytes as
+// written, not the cache's mapping).
+hal_ota_result_t hal_ota_base_read(uint32_t off, void *buf, size_t len)
+{
+    const esp_partition_t *run = esp_ota_get_running_partition();
+    if (!run) return HAL_OTA_UNSUPPORTED;
+    if (off > run->size || len > run->size - off) return HAL_OTA_BAD;
+    esp_err_t err = esp_partition_read(run, off, buf, len);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "base read at %lu: %s", (unsigned long)off, esp_err_to_name(err));
+        return HAL_OTA_FAIL;
+    }
+    return HAL_OTA_OK;
+}
+
+uint32_t hal_ota_base_size(void)
+{
+    const esp_partition_t *run = esp_ota_get_running_partition();
+    return run ? run->size : 0;
+}
+
 void hal_restart(void)
 {
     esp_restart();

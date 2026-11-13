@@ -587,6 +587,29 @@ sim_script_test(sim_ota_rollback_timeout ota_rollback_timeout.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_confirm\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"ota_rollback\".*\"ev\":\"restart\"")
 set_tests_properties(sim_ota_rollback_timeout PROPERTIES ENVIRONMENT "AGENTLINK_SIM_UNCONFIRMED=1")
+# Delta OTA (proto 0.21, issue ef2c): every patch in protocol/fixtures/ota (the reference detools' and the
+# daemon's) rebuilds new.bin from base.bin on the device; a wrong base, a damaged patch and a resume.
+# Events: ota_base_mismatch, ota_patch_error; ota_begin carries "patch".
+file(GLOB OTA_PATCHES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../protocol/fixtures/ota/*.patch)
+foreach(patch ${OTA_PATCHES})
+    get_filename_component(pname ${patch} NAME_WE)
+    sim_script_test(sim_ota_patch_${pname} ota_patch.txt
+                    FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_bad|ota_patch_error"
+                    PASS_REGULAR_EXPRESSION "\"ev\":\"ota_begin\",[^}]*\"patch\":[1-9].*\"ev\":\"ota_slot_ready\".*\"ev\":\"ota_done\".*\"ev\":\"ota_ack\",\"st\":1.*\"ev\":\"restart\""
+                    ENVIRONMENT "AGENTLINK_SIM_PATCH=${patch}")
+    sim_script_test(sim_ota_patch_${pname}_base_mismatch ota_patch_base_mismatch.txt
+                    FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_slot_open|ota_begin"
+                    PASS_REGULAR_EXPRESSION "\"ev\":\"ota_base_mismatch\".*\"ev\":\"ota_ack\",\"st\":3,\"next\":0}"
+                    ENVIRONMENT "AGENTLINK_SIM_PATCH=${patch}")
+    sim_script_test(sim_ota_patch_${pname}_corrupt ota_patch_corrupt.txt
+                    FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_done|ota_slot_ready|\"ev\":\"restart\""
+                    PASS_REGULAR_EXPRESSION "\"ev\":\"ota_bad\",\"st\":3,\"msg\":\"(Bad patch|Checksum mismatch|Too much data)\""
+                    ENVIRONMENT "AGENTLINK_SIM_PATCH=${patch}")
+    sim_script_test(sim_ota_patch_${pname}_resume ota_patch_resume.txt
+                    FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"ota_begin\".*\"ev\":\"ota_begin\"|ota_bad"
+                    PASS_REGULAR_EXPRESSION "\"ev\":\"ota_resume\",\"next\":2048.*\"ev\":\"ota_done\""
+                    ENVIRONMENT "AGENTLINK_SIM_PATCH=${patch}")
+endforeach()
 # "Updated" tone (sound role `updated`): once, on the first welcome of an unconfirmed
 # (OTA) boot; never on a normal boot, never again on a re-welcome.
 sim_script_test(sim_ota_updated_tone ota_updated_tone.txt
