@@ -59,6 +59,15 @@ static bool is_on(int i, uint32_t now)
     return false;
 }
 
+/* The icon shows the current state, not the action: a bell while alerts are on, a crossed-out bell while
+ * quiet runs; a speaker while sounds are on, a crossed-out speaker while they are off. */
+static const char *icon_of(int i, bool on)
+{
+    if (i == T_QUIET) return on ? ICON_QUIET : ICON_BELL;
+    if (i == T_MUTE) return on ? ICON_MUTE : ICON_SOUND;
+    return ICON_INFO;
+}
+
 static void quiet_line(char *dst, size_t cap, uint32_t now)
 {
     const settings_t *st = model_settings();
@@ -188,6 +197,8 @@ static void render(void)
         bool on = is_on(i, now);
         theme_set_bg_color(s_disc[i], on ? lv_color_hex(RGB_WORKING) : COL_FILL1);
         theme_set_text_color(s_icon[i], on ? COL_ON_ACCENT : COL_TEXT);
+        const char *icon = icon_of(i, on);
+        if (strcmp(lv_label_get_text(s_icon[i]), icon)) lv_label_set_text(s_icon[i], icon); /* only on a change */
     }
     int rx = k_tx[s_sel] - SEL_RING_D / 2;
     if (lv_obj_get_x(s_ring) != rx) lv_obj_set_x(s_ring, rx);
@@ -313,6 +324,15 @@ void ui_status_report(ui_report_t *r)
     if (nl) *nl = 0;
     ui_report_add(r, "> %s", tmp);
     if (nl) ui_report_add(r, "%s", nl + 1);
+    /* the toggles' icons by their Phosphor names, so a script can check that each shows its state;
+       last, as the report drops lines once it is full */
+    const char *names[N_TOGGLES];
+    for (int i = 0; i < N_TOGGLES; i++) {
+        const char *ic = lv_label_get_text(s_icon[i]);
+        names[i] = !strcmp(ic, ICON_BELL) ? "bell" : !strcmp(ic, ICON_QUIET) ? "bell-slash" : !strcmp(ic, ICON_SOUND) ? "speaker"
+                   : !strcmp(ic, ICON_MUTE) ? "speaker-slash" : "info";
+    }
+    ui_report_add(r, "icons %s %s %s", names[0], names[1], names[2]);
 }
 
 static lv_obj_t *centred(lv_obj_t *parent, const lv_font_t *font, lv_color_t col, int cy, int w, int lines)
@@ -366,7 +386,6 @@ lv_obj_t *ui_status_init(lv_obj_t *screen)
     }
 
     for (int i = 0; i < N_TOGGLES; i++) {
-        static const char *const icons[N_TOGGLES] = {ICON_QUIET, ICON_MUTE, ICON_INFO};
         s_disc[i] = circle(s_root, TOGGLE_D);
         lv_obj_set_pos(s_disc[i], k_tx[i] - TOGGLE_D / 2, TOGGLE_Y - TOGGLE_D / 2);
         lv_obj_set_style_bg_opa(s_disc[i], LV_OPA_COVER, 0);
@@ -374,7 +393,7 @@ lv_obj_t *ui_status_init(lv_obj_t *screen)
         s_icon[i] = lv_label_create(s_disc[i]);
         lv_obj_set_style_text_font(s_icon[i], FONT_ICON_L, 0);
         lv_obj_set_style_text_color(s_icon[i], COL_TEXT, 0);
-        lv_label_set_text(s_icon[i], icons[i]);
+        lv_label_set_text(s_icon[i], icon_of(i, false));
         lv_obj_center(s_icon[i]);
     }
     s_ring = circle(s_root, SEL_RING_D);

@@ -13,6 +13,8 @@ expect_screen status
 expect_label dev-mac
 expect_label 80%
 expect_label > Quiet: off
+# each icon shows the current state: a bell and a speaker while alerts and sounds are on
+expect_label icons bell speaker info
 shot status.png
 # the selection walks Quiet, Mute, About; the description names the selected toggle
 btn B
@@ -33,6 +35,7 @@ expect_label > Quiet: off
 btn A
 wait 200
 expect_label > Quiet until
+expect_label icons bell-slash speaker info
 shot status_quiet.png
 tap 143 246
 wait 200
@@ -40,6 +43,7 @@ expect_label > Quiet until
 tap 233 300
 wait 200
 expect_label > Quiet: off
+expect_label icons bell speaker info
 btn A
 wait 200
 expect_label > Quiet until
@@ -50,10 +54,12 @@ expect_label > Sounds: on
 btn A
 wait 200
 expect_label > Sounds: off
+expect_label icons bell-slash speaker-slash info
 shot status_muted.png
 btn A
 wait 200
 expect_label > Sounds: on
+expect_label icons bell-slash speaker info
 btn B
 wait 150
 expect_label > 2 sessions

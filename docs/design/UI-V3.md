@@ -409,13 +409,16 @@ one line. No chevrons, no hint. Legends: A `Bottom`, B `Page`, both hidden while
 ```
             y 116   12:30                             FONT_NUM white (clock unset: host name, FONT_TITLE)
             y 168   🖥 dev-mac   ▮ 80%                 chip row, COL_TEXT2 (amber `Offline · 4m`)
-            y 246   ( 🔕 )  ( 🔇 )  ( i )             three round toggles, Ø 76, centres x 143 / 233 / 323
+            y 246   ( 🔔 )  ( 🔊 )  ( i )             three round toggles, Ø 76, centres x 143 / 233 / 323
             y 316   Quiet: off                        FONT_BODY COL_TEXT2: what the selected toggle is
             y 364   Ⓐ Quiet 30 min            Next Ⓑ
 ```
 
-- Toggles: **Quiet** (`ICON_QUIET`), **Mute** (`ICON_MUTE`), **About** (`ICON_INFO`). Off:
-  `COL_FILL1` disc, white icon. On: filled sky, black icon. Selected: a 2 px white ring 5 px outside
+- Toggles: **Quiet**, **Mute**, **About** (`ICON_INFO`). Each icon shows the current state, not the
+  action (issue 20261113-c36c): Quiet is a bell (`ICON_BELL`) while alerts are on and a crossed-out bell
+  (`ICON_QUIET`) while quiet runs; Mute is a speaker (`ICON_SOUND`) while sounds are on and a crossed-out
+  speaker (`ICON_MUTE`) while they are off or silent. Off: `COL_FILL1` disc, white icon. On (silenced):
+  filled sky, black icon. Selected: a 2 px white ring 5 px outside
   the disc. Tapping a toggle selects and commits it; scrub and B move the selection; A commits.
 - Quiet cycles off → 30 min → 1 h → off; the line reads `Quiet: off` / `Quiet until 14:30`.
   Mute toggles the alert mode; the line reads `Sounds: on` / `Sounds: off` / `Silent`. About shows
