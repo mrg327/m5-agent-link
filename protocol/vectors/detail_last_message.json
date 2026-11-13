@@ -1,0 +1,15 @@
+{
+  "desc": "A chunk of session 3's last message 7: bytes 1024-1061 of 1834 (proto 0.18)",
+  "symbolic": {
+    "t": "detail",
+    "id": 41,
+    "b": {
+      "sid": 3,
+      "text": "• flash with idf.py, then check the log",
+      "off": 1024,
+      "total": 1834,
+      "lm": 7
+    }
+  },
+  "cbor_hex": "a3000a01182903a50103027829e280a220666c6173682077697468206964662e70792c207468656e20636865636b20746865206c6f67031904000419072a0507"
+}

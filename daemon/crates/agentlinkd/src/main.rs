@@ -14,6 +14,7 @@ mod ipc;
 mod jobs;
 mod keepawake;
 mod keys;
+mod lastmsg;
 mod ota;
 mod paths;
 mod presence;

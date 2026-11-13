@@ -17,8 +17,8 @@ pub fn redact_sum(v: &mut Value) -> bool {
     let mut hit = false;
     if let Some(o) = v.as_object_mut() {
         // sum: command lines and paths; q / rp: the agent's closing question and its answers;
-        // qd: the start of a queued message
-        for k in ["sum", "q", "rp", "qd"] {
+        // qd: the start of a queued message; lp: the start of the agent's last message
+        for k in ["sum", "q", "rp", "qd", "lp"] {
             if o.contains_key(k) {
                 o.insert(k.into(), "<private>".into());
                 hit = true;
@@ -33,13 +33,16 @@ pub fn redact_sum(v: &mut Value) -> bool {
     hit
 }
 
-/// A shell job's hook line carries the command line the user typed (`payload.cmd`): replaced
-/// before it is traced, like `sum`. Returns whether anything was replaced.
+/// A shell job's hook line carries the command line the user typed (`payload.cmd`), Claude Code's
+/// `Stop` the agent's last message (`payload.last_assistant_message`): replaced before the line is
+/// traced, like `sum`. Returns whether anything was replaced.
 pub fn redact_hook(v: &mut Value) -> bool {
-    if v["agent"].as_str() != Some("shell") {
-        return false;
-    }
-    match v.pointer_mut("/payload/cmd") {
+    let key = if v["agent"].as_str() == Some("shell") {
+        "/payload/cmd"
+    } else {
+        "/payload/last_assistant_message"
+    };
+    match v.pointer_mut(key) {
         Some(c) => {
             *c = Value::String("<private>".into());
             true
@@ -214,6 +217,13 @@ impl Trace {
                 }
             }
         }
+        // the agent's last message, read on the watch (LAST-MESSAGE.md §2.3)
+        if kind == "detail" && msg["b"].get("lm").is_some() {
+            if let Some(x) = msg.pointer_mut("/b/text") {
+                *x = Value::String("<private>".into());
+                private = true;
+            }
+        }
         private |= redact_keys(&kind, &mut msg);
         private |= redact_fw(&kind, &mut msg);
         let sid = msg["b"]["sid"].as_u64();
@@ -288,6 +298,64 @@ mod tests {
         let mut other = json!({"agent": "claude", "payload": {"cmd": "x"}});
         assert!(!redact_hook(&mut other));
         assert_eq!(other["payload"]["cmd"], "x");
+    }
+
+    #[test]
+    fn the_agents_last_message_never_reaches_the_trace() {
+        let mut v = json!({"agent": "claude", "event": "Stop",
+            "payload": {"session_id": "s", "last_assistant_message": "secret plan"}});
+        assert!(redact_hook(&mut v));
+        assert_eq!(v["payload"]["last_assistant_message"], "<private>");
+        assert_eq!(v["payload"]["session_id"], "s");
+        let mut s = json!({"sid": 1, "lm": 7, "ll": 11, "lp": "secret plan"});
+        assert!(redact_sum(&mut s));
+        assert_eq!(
+            (s["lp"].as_str(), s["lm"].as_u64()),
+            (Some("<private>"), Some(7))
+        );
+        let mut snap = json!({"sessions": [{"sid": 1, "lp": "secret plan"}]});
+        assert!(redact_sum(&mut snap));
+        assert!(!snap.to_string().contains("secret"));
+    }
+
+    #[test]
+    fn a_last_message_chunk_is_traced_without_its_text_or_bytes() {
+        use agentlink_proto::{Detail, Message};
+        let d = std::env::temp_dir().join(format!("agentlink-lm-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let t = Trace::new(d.join("trace"), d.join("audit.jsonl"));
+        let chunk = |lm: Option<u64>, rid: Option<u64>| {
+            Envelope::new(
+                3,
+                Message::Detail(Detail {
+                    rid,
+                    sid: Some(1),
+                    text: "secret plan".into(),
+                    off: Some(0),
+                    total: Some(11),
+                    lm,
+                }),
+            )
+        };
+        let env = chunk(Some(9), None);
+        t.proto("ws", Dir::Out, &env, &env.to_bytes().unwrap());
+        let env = chunk(None, Some(4));
+        t.proto("ws", Dir::Out, &env, &env.to_bytes().unwrap());
+        let text = std::fs::read_dir(d.join("trace"))
+            .unwrap()
+            .map(|f| std::fs::read_to_string(f.unwrap().path()).unwrap())
+            .collect::<String>();
+        let _ = std::fs::remove_dir_all(&d);
+        let lines: Vec<Value> = text
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect();
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0]["msg"]["b"]["text"], "<private>");
+        assert!(lines[0].get("bytes").is_none(), "nor the raw bytes");
+        assert_eq!(lines[0]["msg"]["b"]["lm"], 9);
+        // a request's own text (by rid) is traced as before
+        assert_eq!(lines[1]["msg"]["b"]["text"], "secret plan");
     }
 
     #[test]

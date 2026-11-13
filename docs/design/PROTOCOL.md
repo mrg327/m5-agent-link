@@ -72,7 +72,7 @@ device                                 daemon
 ### `hello` (device → daemon)
 ```cddl
 hello = {
-  proto: [uint, uint],             ; [major, minor] = [0, 14]
+  proto: [uint, uint],             ; [major, minor] = [0, 18]
   dev: { class: tstr,              ; "watch" | "desk" | "pad" | "sim" | ...
          board: tstr,              ; "m5stopwatch"
          fw: tstr,                 ; semver
@@ -139,7 +139,10 @@ session = {
   ? lr: uint,                ; lines removed                                          │ (DONE-SUMMARY.md)
   ? tp: bool,                ; the last recognised test run: true passed, false failed │ key 30-34
   ? dur: uint,               ; the turn's length in seconds                           ┘
-  ? qd: tstr                 ; the queued message's start, <= 48 chars; "" = none (proto 0.17, key 35, §6d)
+  ? qd: tstr,                ; the queued message's start, <= 48 chars; "" = none (proto 0.17, key 35, §6d)
+  ? lm: uint,                ; the agent's last message: its id, 0 = none        ┐ proto ≥ 0.18, keys 36-38
+  ? ll: uint,                ; its length in bytes as cleaned (≤ 4096)           │ (§6e, LAST-MESSAGE.md)
+  ? lp: tstr                 ; its start, ≤ 160 bytes; "" under privacy meta     ┘
 }
 ```
 - `q` / `rp` (keys 17, 18, proto 0.5): when an agent's turn ends on a question, the daemon reads it from the turn's last message (Claude Code's Stop hook carries `last_assistant_message`) and sends the question (≤ 120 chars) with up to 3 answers (≤ 24 chars): the options of an "A or B?" question, else `Yes, go ahead` / `No` for a yes/no one, else none. The watch lists them first under Reply, with the question above. They are cleared (`""`, `[]`: a delta cannot remove a key) as soon as the agent works again. Agent content: never sent under privacy `meta`, and only to devices with proto ≥ 0.5.
@@ -184,8 +187,10 @@ attention = {
   ? hush: bool,              ; no buzz, glow or reminders for this request; proto ≥ 0.12 (PRESENCE.md)
   ? rule: tstr,              ; the standing rule, exactly as Claude Code saves it   ┐ proto ≥ 0.13,
   ? scope: uint,             ; 0 this session, 1 this project (local settings)      │ always together
-  ? wide: bool               ; the rule ends in a wildcard                           ┘ (STANDING-RULES.md)
+  ? wide: bool,              ; the rule ends in a wildcard                           ┘ (STANDING-RULES.md)
+  ? qs: [1*4 ask_q]          ; AskUserQuestion's questions; proto ≥ 0.18, key 16 (§6e, LAST-MESSAGE.md)
 }
+ask_q = { h: tstr, q: tstr, o: [1*4 { l: tstr, ? d: tstr }], ? m: bool }   ; header, question, options, multi
 clear = { rid: uint, why: "answered_pc"/"answered_dev"/"expired"/"cancelled"/"handed_back" }
 ```
 - **Answer window (proto 0.11, [ANSWER-WINDOW.md](ANSWER-WINDOW.md)).** `left` and `win` let the device count
@@ -221,7 +226,7 @@ The device must show approve/deny **only if** they are in `acts`. The daemon inc
 
 ```cddl
 cmd = {
-  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end"/"rerun"/"unqueue",
+  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end"/"rerun"/"unqueue"/"answer",
   ? sid: uint,
   ? rid: uint,               ; required for approve/deny/reply
   ? arg: uint / tstr / scroll_arg,  ; snooze minutes (the watch sends 30), reply option index, quiet duration,
@@ -229,7 +234,9 @@ cmd = {
   hold_ms?: uint,            ; for approve: measured hold-to-confirm duration (daemon enforces ≥ 1000)
   ? rh: uint,                ; with approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of
                              ; the rule, a 0 byte, scope and wide (0/1) as the device showed them; hold ≥ 1500
-  ? q: bool                  ; with type / dictate (proto 0.17, key 6): queue it if the session can't take input (§6d)
+  ? q: bool,                 ; with type / dictate (proto 0.17, key 6): queue it if the session can't take input (§6d)
+  ? picks: [1*4 uint],       ; with answer (proto 0.18, key 7): per question, the options picked (bit mask)  ┐ §6e
+  ? aids: [1*4 uint]         ; with answer (key 8): per question, the recording of a free answer, 0 = none  ┘
 }
 scroll_arg = { unit: "lines"/"pages"/"to_end", delta: int, ? seq: uint }   ; delta < 0 = up (older); to_end: sign = top / bottom
 result = { ok: bool, ? err: "stale"/"denied"/"unsupported"/"no_window"/"timeout", ? msg: tstr, ? pos: scroll_pos }
@@ -261,6 +268,7 @@ scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tst
   `denied` under privacy `meta`, past 4096 bytes or for an offset inside a character, `unsupported` from a device
   below 0.11. The text keeps line breaks and spells out control and undrawable characters (`^[`, `\u{a0}`). The
   device keeps a chunk only for the rid it asked for, at the offset it has reached, with the announced total.
+  Without a `rid` (proto 0.18, §6e) it asks for session `sid`'s last message.
 - `approve` with `rh` (proto 0.13, [STANDING-RULES.md](STANDING-RULES.md)): approve, and have the hook pass the
   request's standing rule back to Claude Code as `updatedPermissions`. `denied` when the request offers no rule,
   when `rh` is not the hash of the rule it offers (another request's, another scope, a broader rule), or when
@@ -355,6 +363,26 @@ the daemon types it the next time the session can.
 - The message is dropped with its session (`gone`). It lives in the daemon's memory only and is lost when the
   daemon restarts. It never expires otherwise. Audited when typed, with the source (reply index or recording),
   not the text.
+
+## 6e. Last message and questions (proto 0.18, [LAST-MESSAGE.md](LAST-MESSAGE.md))
+- **Last message.** When a Claude Code turn ends (`Stop`, `last_assistant_message`), the daemon keeps the final
+  message, markdown cleaned to plain text and cut at 4096 bytes, one per session, in memory, and sends `lm` (a new
+  id), `ll` (its length) and `lp` (its start, ≤ 160 bytes) with the delta that enters done; a new prompt clears them
+  (`0`, `0`, `""`). `cmd detail {sid, arg: off}` **without a rid** asks for it: `detail {sid, text, off, total, lm}`
+  chunks of ≤ 1024 bytes, then `result ok`; `stale` with no message, `denied` under privacy `meta`. The device keeps
+  a chunk only for the session and `lm` it asked for. Agent content: `lp` and the chunks' text never reach the
+  trace or the audit log; under `meta`, `lp` is `""` (`lm` and `ll` still say a message exists). Keys 36-38 and
+  `detail.lm` (key 5) only to devices with proto ≥ 0.18.
+- **Questions.** Claude Code's `PermissionRequest` for `AskUserQuestion` is a held request (the answer window) of
+  kind `question` with `qs`: every question's header (≤ 16 bytes), text (≤ 160), options (label ≤ 48, description
+  ≤ 120) and `m` for multi-select. `cmd answer {sid, rid, picks, aids, hold_ms}` (op 19) answers them all at once,
+  one entry per question: a bit mask of options, or the recording (`aid`) of a dictated free answer. `denied`
+  without a 1000 ms hold, for a wrong count, no or several picks on a single-choice question, a bit past the
+  options or both a pick and a recording; `stale` for a request that is not open or a recording without a
+  transcript; nothing is used up by a refusal. The hook answers `allow` with `updatedInput` = the tool's input plus
+  `answers` (`{question: label}`, several labels joined with `", "`, or the transcript). `PreToolUse` no longer
+  holds a question. A device below 0.18 gets no `qs`: one single-choice question keeps `opts` (`reply`, or
+  `dictate` with the `rid`), anything else is Open on PC only.
 
 ## 7. Misc
 - `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray.

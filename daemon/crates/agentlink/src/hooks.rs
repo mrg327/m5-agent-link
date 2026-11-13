@@ -27,11 +27,12 @@ const CLAUDE_EVENTS: &[&str] = &[
     "Stop",
     "StopFailure",
 ];
-/// Hooks that may block while the watch answers (UI-V2 §7): `PermissionRequest`, and
-/// `PreToolUse` for `AskUserQuestion`. Their timeout must cover the daemon's longest answer window
-/// (300 s, ANSWER-WINDOW.md) with margin: Claude Code kills a hook at its timeout, and the daemon
-/// shortens the window to fit a smaller one. The others return at once.
-const CLAUDE_BLOCKING: &[&str] = &["PreToolUse", "PermissionRequest"];
+/// The hook that may block while the watch answers (UI-V2 §7): `PermissionRequest`, a question's
+/// (`AskUserQuestion`, LAST-MESSAGE.md §3) included. Its timeout must cover the daemon's longest answer
+/// window (300 s, ANSWER-WINDOW.md) with margin: Claude Code kills a hook at its timeout, and the daemon
+/// shortens the window to fit a smaller one. The others return at once (`PreToolUse` too since proto 0.18:
+/// a question is held at its permission, never twice).
+const CLAUDE_BLOCKING: &[&str] = &["PermissionRequest"];
 /// Claude Code `timeout` (seconds) for the blocking hooks: the longest window plus 30 s.
 const BLOCKING_TIMEOUT_S: u64 = 330;
 
@@ -147,6 +148,10 @@ mod tests {
             assert_eq!(h["timeout"], 5, "{e}: non-blocking");
         }
         assert_eq!(hooks["PermissionRequest"][0]["hooks"][0]["timeout"], 330);
+        assert_eq!(
+            hooks["PreToolUse"][0]["hooks"][0]["timeout"], 5,
+            "a question waits at its permission only"
+        );
     }
 
     #[test]

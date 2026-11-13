@@ -179,6 +179,12 @@ body!(
         #[n(34)] #[serde(skip_serializing_if = "Option::is_none")] dur: Option<u64>,
         /// The message queued for this session (proto 0.17): the start of its text, <= 48 chars; "" = none.
         #[n(35)] #[serde(skip_serializing_if = "Option::is_none")] qd: Option<String>,
+        /// The agent's last message (proto 0.18, LAST-MESSAGE.md): its id, new for each message; 0 = none.
+        #[n(36)] #[serde(skip_serializing_if = "Option::is_none")] lm: Option<u64>,
+        /// Its length in bytes as the reader shows it (markdown cleaned, <= 4096).
+        #[n(37)] #[serde(skip_serializing_if = "Option::is_none")] ll: Option<u64>,
+        /// Its start, one paragraph, <= 160 bytes; "" under privacy meta.
+        #[n(38)] #[serde(skip_serializing_if = "Option::is_none")] lp: Option<String>,
     }
 );
 impl Session {
@@ -218,6 +224,9 @@ impl Session {
             tp: None,
             dur: None,
             qd: None,
+            lm: None,
+            ll: None,
+            lp: None,
         }
     }
 
@@ -226,7 +235,7 @@ impl Session {
         macro_rules! m { ($($f:ident),*) => { $(if d.$f.is_some() { self.$f = d.$f.clone(); })* }; }
         m!(
             ag, st, sub, repo, br, tool, t0, tst, sum, seen, host, hn, snz, ntf, n, ok, eta, exit,
-            ctx, mdl, pm, pr, prs, hush, fc, la, lr, tp, dur, qd
+            ctx, mdl, pm, pr, prs, hush, fc, la, lr, tp, dur, qd, lm, ll, lp
         );
     }
 }
@@ -279,7 +288,32 @@ body!(Attention {
     #[n(14)] #[serde(skip_serializing_if = "Option::is_none")] scope: Option<RuleScope>,
     /// The rule matches more than this exact request (it ends in a wildcard).
     #[n(15)] #[serde(skip_serializing_if = "Option::is_none")] wide: Option<bool>,
+    /// An agent's multiple-choice questions (Claude Code AskUserQuestion; proto 0.18, LAST-MESSAGE.md),
+    /// answered all at once with `cmd answer`. Only to devices whose hello says minor >= 18.
+    #[n(16)] #[serde(skip_serializing_if = "Option::is_none")] qs: Option<Vec<AskQ>>,
 });
+body!(
+    /// One question of `attention.qs` (proto 0.18).
+    AskQ {
+        /// Header, <= 16 bytes ("Framework").
+        #[n(0)] h: String,
+        /// The question, <= 160 bytes.
+        #[n(1)] q: String,
+        /// Its options, 1-4, in the agent's order.
+        #[n(2)] o: Vec<AskOpt>,
+        /// Multi-select: any number of options, at least one.
+        #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] m: Option<bool>,
+    }
+);
+body!(
+    /// One option of an [`AskQ`].
+    AskOpt {
+        /// Label, <= 48 bytes: what the agent receives.
+        #[n(0)] l: String,
+        /// Description, <= 120 bytes.
+        #[n(1)] #[serde(skip_serializing_if = "Option::is_none")] d: Option<String>,
+    }
+);
 body!(Clear {
     #[n(0)]
     rid: u64,
@@ -389,6 +423,10 @@ body!(Cmd {
     #[n(5)] #[serde(skip_serializing_if = "Option::is_none")] rh: Option<u64>,
     /// With `type` / `dictate` (proto 0.17): queue the message if the session cannot take input now.
     #[n(6)] #[serde(skip_serializing_if = "Option::is_none")] q: Option<bool>,
+    /// With `answer` (proto 0.18): per question of the request's `qs`, the options picked as a bit mask.
+    #[n(7)] #[serde(skip_serializing_if = "Option::is_none")] picks: Option<Vec<u64>>,
+    /// With `answer`: per question, the recording whose transcript is the free answer; 0 = none.
+    #[n(8)] #[serde(skip_serializing_if = "Option::is_none")] aids: Option<Vec<u64>>,
 });
 body!(CmdResult {
     #[n(0)] ok: bool,
@@ -427,6 +465,8 @@ body!(
         #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] off: Option<u64>,
         /// The full text's length in bytes.
         #[n(4)] #[serde(skip_serializing_if = "Option::is_none")] total: Option<u64>,
+        /// With no `rid` (proto 0.18): the id of the session's last message this chunk is from.
+        #[n(5)] #[serde(skip_serializing_if = "Option::is_none")] lm: Option<u64>,
     }
 );
 body!(Batt {

@@ -15,16 +15,16 @@
 //! sends nothing. After `--` it runs the user's own status-line command with the same stdin and passes
 //! its output and exit status through, so installing it never takes a status line away.
 //!
-//! Two Claude Code hooks block for the watch (UI-V2 §7, DESIGN §6a "first answer wins"):
-//! `PermissionRequest` (fires when Claude Code is about to show its permission prompt) and
-//! `PreToolUse` for `AskUserQuestion`. The hook holds the prompt back for the daemon's answer
+//! One Claude Code hook blocks for the watch (UI-V2 §7, DESIGN §6a "first answer wins"):
+//! `PermissionRequest`, which fires when Claude Code is about to show its permission prompt, and also
+//! for `AskUserQuestion`'s questions (docs/design/LAST-MESSAGE.md §3). The hook holds the prompt back for the daemon's answer
 //! window (docs/design/ANSWER-WINDOW.md: 60 s by default, a daemon setting) while the watch shows the
 //! request: the daemon names the window in a first reply line and keeps the connection alive. An older
 //! daemon does not, and holds for `wait_ms` (15 s, or `AGENTLINK_WAIT_MS`, which also pins the window
 //! for a new daemon). A device answer becomes the event's own hook output; no answer (window over,
 //! terminal, Open on PC, daemon down) prints nothing and exits 0, which Claude Code documents as "no
 //! decision": its normal prompt appears. Silence never approves. Format: https://code.claude.com/docs/en/hooks (PermissionRequest
-//! `hookSpecificOutput.decision.behavior`; PreToolUse `permissionDecision` + `updatedInput`).
+//! `hookSpecificOutput.decision.behavior`, and `updatedInput` with the answers to a question).
 
 use serde_json::{json, Map, Value};
 use std::io::{BufRead, Read};
@@ -86,12 +86,10 @@ fn branch_of(cwd: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// Which Claude Code hooks wait for a decision: the permission prompt, and a question.
-fn blocks_for_watch(agent: &str, event: &str, payload: &Value) -> bool {
-    agent == "claude"
-        && (event.eq_ignore_ascii_case("permissionrequest")
-            || (event.eq_ignore_ascii_case("pretooluse")
-                && payload["tool_name"].as_str() == Some("AskUserQuestion")))
+/// Which Claude Code hooks wait for a decision: the permission prompt (a question's included). The
+/// question's `PreToolUse` no longer waits: one wait per question.
+fn blocks_for_watch(agent: &str, event: &str) -> bool {
+    agent == "claude" && event.eq_ignore_ascii_case("permissionrequest")
 }
 
 /// The wait for an older daemon, and whether the user pinned it with `AGENTLINK_WAIT_MS`.
@@ -150,8 +148,12 @@ fn line_reader(r: impl std::io::Read + Send + 'static) -> mpsc::Receiver<String>
     rx
 }
 
-/// Turns the daemon's `{"decision": "allow"|"deny"|"none", "permissions"?, "answer"?}` into the
-/// hook output Claude Code expects for `event`. `None` = print nothing (no decision).
+/// Turns the daemon's `{"decision": "allow"|"deny"|"none", "permissions"?, "answer"?, "answers"?}` into
+/// the hook output Claude Code expects for `event`. `None` = print nothing (no decision).
+///
+/// `answers` (AskUserQuestion answered on the watch) becomes `updatedInput` = the tool's own input plus
+/// `answers`, only when every key is one of this request's own questions and every question has an
+/// answer; an `allow` for AskUserQuestion without them is no decision (allow alone answers nothing).
 ///
 /// `permissions` (a standing rule granted on the watch, docs/design/STANDING-RULES.md) becomes
 /// `updatedPermissions` only when every entry is, exactly, one of the `permission_suggestions` Claude
@@ -163,6 +165,17 @@ fn hook_output(event: &str, payload: &Value, reply: &Value) -> Option<Value> {
         return None;
     }
     if event.eq_ignore_ascii_case("permissionrequest") {
+        let question = payload["tool_name"].as_str() == Some("AskUserQuestion");
+        if decision == "allow" && (question || reply.get("answers").is_some()) {
+            if reply.get("permissions").is_some() {
+                return None;
+            }
+            let input = with_answers(payload, reply.get("answers")?)?;
+            return Some(
+                json!({"hookSpecificOutput": {"hookEventName": "PermissionRequest",
+                "decision": {"behavior": "allow", "updatedInput": input}}}),
+            );
+        }
         let mut d = json!({"behavior": decision});
         if decision == "allow" {
             if let Some(p) = reply.get("permissions") {
@@ -185,7 +198,8 @@ fn hook_output(event: &str, payload: &Value, reply: &Value) -> Option<Value> {
         );
     }
     if event.eq_ignore_ascii_case("pretooluse") {
-        // AskUserQuestion: "allow" alone is not an answer; the chosen label goes in updatedInput.answers
+        // an older daemon's answer to AskUserQuestion's PreToolUse (this hook no longer waits on it):
+        // "allow" alone is not an answer; the chosen label goes in updatedInput.answers
         let answer = reply["answer"].as_str()?;
         let mut input = payload["tool_input"].clone();
         let question = input["questions"][0]["question"].as_str()?.to_owned();
@@ -198,6 +212,31 @@ fn hook_output(event: &str, payload: &Value, reply: &Value) -> Option<Value> {
         }}));
     }
     None
+}
+
+/// AskUserQuestion's input with `answers` added, if `answers` answers exactly its questions: a
+/// non-empty object whose every key is one of `tool_input.questions[].question`, with a string answer for
+/// each of them.
+fn with_answers(payload: &Value, answers: &Value) -> Option<Value> {
+    if payload["tool_name"].as_str() != Some("AskUserQuestion") {
+        return None;
+    }
+    let answers = answers.as_object().filter(|a| !a.is_empty())?;
+    let questions: Vec<&str> = payload["tool_input"]["questions"]
+        .as_array()?
+        .iter()
+        .map(|q| q["question"].as_str())
+        .collect::<Option<_>>()?;
+    let whole = answers.keys().all(|k| questions.contains(&k.as_str()))
+        && questions
+            .iter()
+            .all(|q| answers.get(*q).is_some_and(Value::is_string));
+    if !whole {
+        return None;
+    }
+    let mut input = payload["tool_input"].clone();
+    input["answers"] = Value::Object(answers.clone());
+    Some(input)
 }
 
 fn read_stdin() -> String {
@@ -397,7 +436,7 @@ fn build_line(agent: &str, event: &str, stdin: &str, remote: bool) -> (String, S
     } else {
         event
     };
-    let (wait, pinned) = if blocks_for_watch(agent, event, &payload) {
+    let (wait, pinned) = if blocks_for_watch(agent, event) {
         wait_ms()
     } else {
         (0, false)
@@ -1112,15 +1151,80 @@ mod tests {
         assert!(hook_output("PreToolUse", &payload, &json!({"decision": "none"})).is_none());
     }
 
+    fn two_questions() -> Value {
+        json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
+            {"question": "Which framework?", "header": "Framework", "multiSelect": false,
+             "options": [{"label": "React"}, {"label": "Vue"}]},
+            {"question": "Which parts?", "header": "Parts", "multiSelect": true,
+             "options": [{"label": "Router"}, {"label": "Store"}, {"label": "Tests"}]}]}})
+    }
+
     #[test]
-    fn only_claude_permission_and_question_hooks_block() {
+    fn answers_to_a_question_permission_go_into_updated_input() {
+        let payload = two_questions();
+        let out = |reply: Value| hook_output("PermissionRequest", &payload, &reply);
+        let ok = out(json!({"decision": "allow",
+            "answers": {"Which framework?": "React", "Which parts?": "Router, Tests"}}))
+        .unwrap();
+        let h = &ok["hookSpecificOutput"];
+        assert_eq!(h["hookEventName"], "PermissionRequest");
+        assert_eq!(h["decision"]["behavior"], "allow");
+        let input = &h["decision"]["updatedInput"];
+        assert_eq!(
+            input["questions"], payload["tool_input"]["questions"],
+            "the input, whole"
+        );
+        assert_eq!(
+            input["answers"],
+            json!({"Which framework?": "React", "Which parts?": "Router, Tests"})
+        );
+        assert!(h["decision"].get("updatedPermissions").is_none());
+        assert_eq!(
+            ok.to_string(),
+            json!({"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision":
+                {"behavior": "allow", "updatedInput": input.clone()}}})
+            .to_string()
+        );
+        // a key that is not one of its questions, a question left out, a non-string answer, no answers,
+        // or a rule along with them: no decision, the terminal asks
+        for bad in [
+            json!({"decision": "allow", "answers": {"Which framework?": "React", "Which parts?": "x",
+                "Delete everything?": "Yes"}}),
+            json!({"decision": "allow", "answers": {"Which framework?": "React"}}),
+            json!({"decision": "allow", "answers": {"Which framework?": "React", "Which parts?": ["x"]}}),
+            json!({"decision": "allow", "answers": {}}),
+            json!({"decision": "allow", "answers": "React"}),
+            json!({"decision": "allow"}),
+            json!({"decision": "allow", "answer": "React"}),
+            json!({"decision": "allow", "permissions": [], "answers": {"Which framework?": "React",
+                "Which parts?": "Router"}}),
+            json!({"decision": "none"}),
+        ] {
+            assert!(out(bad.clone()).is_none(), "{bad}");
+        }
+        // answers for another tool's permission are not passed on
+        let bash = json!({"tool_name": "Bash", "tool_input": {"command": "ls"}});
+        assert!(hook_output(
+            "PermissionRequest",
+            &bash,
+            &json!({"decision": "allow", "answers": {"x": "y"}})
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn only_claude_permission_hooks_block() {
         let ask = json!({"tool_name": "AskUserQuestion"});
         let bash = json!({"tool_name": "Bash"});
-        assert!(blocks_for_watch("claude", "PermissionRequest", &bash));
-        assert!(blocks_for_watch("claude", "PreToolUse", &ask));
-        assert!(!blocks_for_watch("claude", "PreToolUse", &bash));
-        assert!(!blocks_for_watch("claude", "Notification", &bash));
-        assert!(!blocks_for_watch("copilot", "permissionRequest", &bash));
+        assert!(blocks_for_watch("claude", "PermissionRequest"));
+        assert!(
+            !blocks_for_watch("claude", "PreToolUse"),
+            "a question waits on its PermissionRequest only"
+        );
+        assert!(!blocks_for_watch("claude", "Notification"));
+        assert!(!blocks_for_watch("copilot", "permissionRequest"));
+        let (_, _, _, wait) = build_line("claude", "PreToolUse", &ask.to_string(), false);
+        assert_eq!(wait, 0);
         let (line, event, _, wait) =
             build_line("claude", "PermissionRequest", &bash.to_string(), false);
         assert_eq!(event, "PermissionRequest");

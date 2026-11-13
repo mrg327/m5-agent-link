@@ -52,6 +52,19 @@ pub struct SessionPatch {
     pub pm: Option<PermMode>,
     /// What this event did to the turn's done summary (turn.rs; Claude Code only).
     pub turn: Turn,
+    /// The agent's last message (LAST-MESSAGE.md, lastmsg.rs).
+    pub last: LastMsg,
+}
+
+/// What an event did to the session's last message.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub enum LastMsg {
+    #[default]
+    Keep,
+    /// A turn ended with this message, already cleaned (`lastmsg::clean`, never empty).
+    Set(String),
+    /// A new prompt: the message described a turn that is over.
+    Clear,
 }
 
 /// An event's part in the turn summary (DONE-SUMMARY.md).
@@ -95,6 +108,7 @@ impl SessionPatch {
             pm: None,
             turn: Turn::None,
             step: Step::None,
+            last: LastMsg::Keep,
         }
     }
 }
@@ -175,6 +189,8 @@ struct Record {
     origin: Origin,
     /// The running turn's tally; none until a prompt of a Claude Code session is seen (turn.rs).
     tally: Option<crate::turn::Tally>,
+    /// The agent's last message: its id (`session.lm`) and cleaned text, for `detail` without a rid.
+    last: Option<(u64, String)>,
 }
 
 struct RemoteHost {
@@ -196,6 +212,8 @@ struct State {
     hosts: Vec<RemoteHost>,
     next_attach: u64,
     attaches: BTreeMap<u64, Attach>,
+    /// The next last-message id (`session.lm`).
+    next_lm: u64,
 }
 
 pub struct Registry {
@@ -260,6 +278,7 @@ impl Registry {
             state: Mutex::new(State {
                 next_sid: 1,
                 next_attach: 1,
+                next_lm: crate::broker::first_rid(),
                 ..Default::default()
             }),
             usage: Mutex::default(),
@@ -445,9 +464,16 @@ impl Registry {
                     ctx: HostCtx::default(),
                     origin,
                     tally: None,
+                    last: None,
                 },
             );
         }
+        // a new message's id, never 0 and never reused in a daemon run (like a rid)
+        let lm = matches!(p.last, LastMsg::Set(_)).then(|| {
+            let id = st.next_lm;
+            st.next_lm = if id >= u64::from(u32::MAX) { 1 } else { id + 1 };
+            id
+        });
         let rec = st.sessions.get_mut(&sid)?;
         rec.origin = origin; // the latest attach a session's lines arrived on wins
         let old = std::mem::replace(&mut rec.ctx, ctx);
@@ -554,6 +580,25 @@ impl Registry {
                 }
             }
         }
+        match (&p.last, lm) {
+            (LastMsg::Set(text), Some(id)) => {
+                (s.lm, s.ll, s.lp) = (
+                    Some(id),
+                    Some(text.len() as u64),
+                    Some(crate::lastmsg::preview(text)),
+                );
+                (d.lm, d.ll, d.lp) = (s.lm, s.ll, s.lp.clone());
+                rec.last = Some((id, text.clone()));
+                changed = true;
+            }
+            (LastMsg::Clear, _) if rec.last.take().is_some() => {
+                // stored as absent (a snapshot leaves the keys out); a delta cannot remove a key
+                (s.lm, s.ll, s.lp) = (None, None, None);
+                (d.lm, d.ll, d.lp) = (Some(0), Some(0), Some(String::new()));
+                changed = true;
+            }
+            _ => {}
+        }
         if matches!(d.st, Some(SessState::Done | SessState::Error)) {
             s.seen = Some(false);
             d.seen = Some(false);
@@ -620,6 +665,11 @@ impl Registry {
             d.snz = s.snz;
             true
         })
+    }
+
+    /// The session's last message: its id and cleaned text (LAST-MESSAGE.md).
+    pub fn last_message(&self, sid: u64) -> Option<(u64, String)> {
+        self.state.lock().unwrap().sessions.get(&sid)?.last.clone()
     }
 
     /// Sets `qd`, the start of the session's queued message (`""` = none).

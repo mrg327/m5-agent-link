@@ -1,0 +1,22 @@
+{
+  "desc": "Device answers request 21: React for the first question, Router and Tests for the second, after a hold (proto 0.18)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 24,
+    "b": {
+      "op": "answer",
+      "sid": 3,
+      "rid": 21,
+      "hold_ms": 1250,
+      "picks": [
+        1,
+        3
+      ],
+      "aids": [
+        0,
+        0
+      ]
+    }
+  },
+  "cbor_hex": "a3000801181803a6001301030215041904e20782010308820000"
+}

@@ -1,18 +1,21 @@
 //! Approval broker: one pending hook response per request id (DESIGN §6a, UI-V2 §7).
 //!
-//! A blocking agent hook (Claude Code `PermissionRequest`, or `PreToolUse` for
-//! `AskUserQuestion`) opens a request here and waits on the returned channel. Devices see
-//! it as an `attention` with the agent's own choices (`opts`, `grant_mask`); their
-//! `approve` / `deny` / `reply` commands land in [`Broker::answer`]. **First answer wins**:
+//! A blocking agent hook (Claude Code `PermissionRequest`, `AskUserQuestion`'s questions included)
+//! opens a request here and waits on the returned channel. Devices see it as an `attention` with
+//! the agent's own choices (`opts`, `grant_mask`, `qs`); their `approve` / `deny` / `reply` commands
+//! land in [`Broker::answer`], `answer` in [`Broker::answer_questions`]. **First answer wins**:
 //! the request is removed the moment it is decided, cancelled or expired, so a late command
 //! gets `stale`, and a hook whose channel closes without a decision reports *no* decision,
 //! never an approval.
 
 use crate::registry::{clip, now_unix, Registry, Update};
 use crate::standing::Standing;
-use agentlink_proto::{Action, AttKind, Attention, Clear, ClearWhy, ResultErr, RuleScope};
+use agentlink_proto::{
+    Action, AskOpt, AskQ, AttKind, Attention, Clear, ClearWhy, Envelope, Message, ResultErr,
+    RuleScope,
+};
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -24,6 +27,15 @@ use tokio::sync::oneshot;
 pub const DETAIL_CAP: usize = 4096;
 /// Bytes of text per `detail` chunk: one chunk is a fraction of the watch's 4096-byte message limit.
 pub const DETAIL_CHUNK: usize = 1024;
+/// Bytes an attention with questions may take encoded (LAST-MESSAGE.md §3.2): descriptions are
+/// shortened, then dropped, to stay well inside the watch's 4096-byte message limit.
+const QS_BUDGET: usize = 3000;
+/// Byte limits of a question's parts as the watch shows them (`attention.qs`).
+const QS_HEADER: usize = 16;
+const QS_QUESTION: usize = 160;
+const QS_LABEL: usize = 48;
+const QS_DESC: usize = 120;
+const QS_DESC_SHORT: usize = 60;
 
 /// What the device answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -70,6 +82,10 @@ pub struct Outcome {
     pub permissions: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub answer: Option<String>,
+    /// With `allow` on a question request (AskUserQuestion): `{question text: answer}` for every
+    /// question, which the hook passes on as `updatedInput.answers` (LAST-MESSAGE.md §3.2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub answers: Option<Map<String, Value>>,
     /// Index of the option the decision stands for (Approve: the first allow, Deny: the first
     /// deny), so a typed answer knows which key to press. Not sent to hooks.
     #[serde(skip)]
@@ -84,6 +100,7 @@ impl Outcome {
         decision: "none",
         permissions: None,
         answer: None,
+        answers: None,
         choice: None,
         saved: None,
     };
@@ -93,10 +110,31 @@ impl Outcome {
             decision,
             permissions: None,
             answer,
+            answers: None,
             choice,
             saved: None,
         }
     }
+
+    /// `allow` with answers to a question request.
+    fn answers(answers: Map<String, Value>, choice: Option<usize>) -> Self {
+        Outcome {
+            answers: Some(answers),
+            ..Outcome::of("allow", None, choice)
+        }
+    }
+}
+
+/// One question of an `AskUserQuestion` request as the agent asked it. Nothing here is clipped: the
+/// answers are keyed by the exact question text and carry the exact labels.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Question {
+    pub header: String,
+    pub question: String,
+    /// Label and description, in the agent's order.
+    pub options: Vec<(String, Option<String>)>,
+    /// Multi-select: any number of options, at least one.
+    pub multi: bool,
 }
 
 /// A request as the hook describes it, before it has a `rid`.
@@ -122,6 +160,8 @@ pub struct Request {
     pub notice: bool,
     /// The standing rule the device may grant with an approve (STANDING-RULES.md).
     pub standing: Option<Standing>,
+    /// An agent's questions, answered all at once with `cmd answer` (proto 0.18); empty = none.
+    pub questions: Vec<Question>,
 }
 
 struct Pending {
@@ -136,6 +176,8 @@ struct Pending {
     deadline: Option<Instant>,
     /// The standing rule a grant saves; `att.rule` is its text.
     standing: Option<Standing>,
+    /// The questions `att.qs` shows, unclipped.
+    questions: Vec<Question>,
 }
 
 #[derive(Default)]
@@ -213,7 +255,7 @@ pub fn tidy(s: &str) -> String {
 /// earlier run, and its answer names only the rid, so a reused rid could approve a different
 /// request (issue 20261109-1173). Kept below 2^31 so a run has room before the device's
 /// 32-bit rid limit.
-fn first_rid() -> u64 {
+pub(crate) fn first_rid() -> u64 {
     use std::hash::{BuildHasher, Hasher};
     let r = std::collections::hash_map::RandomState::new()
         .build_hasher()
@@ -292,7 +334,7 @@ impl Broker {
         let standing = req
             .standing
             .filter(|_| req.kind == AttKind::Approval && !req.focus_only && !req.notice);
-        let att = Attention {
+        let mut att = Attention {
             rid,
             sid: req.sid,
             kind: req.kind,
@@ -310,7 +352,11 @@ impl Broker {
             rule: standing.as_ref().map(|s| s.text.clone()),
             scope: standing.as_ref().map(|s| s.scope),
             wide: standing.as_ref().map(|s| s.wide),
+            qs: None,
         };
+        if !req.questions.is_empty() {
+            fit_qs(&mut att, &req.questions);
+        }
         g.pending.insert(
             rid,
             Pending {
@@ -322,6 +368,7 @@ impl Broker {
                 full: full.filter(|f| f.len() <= DETAIL_CAP),
                 deadline: (!req.notice).then(|| Instant::now() + req.ttl),
                 standing,
+                questions: req.questions,
             },
         );
         drop(g);
@@ -369,7 +416,11 @@ impl Broker {
             Decision::Reply(i) => match p.meanings.get(i) {
                 Some(Meaning::Allow) => Outcome::of("allow", None, Some(i)),
                 Some(Meaning::Deny) => Outcome::of("deny", None, Some(i)),
-                Some(Meaning::Answer(a)) => Outcome::of("allow", Some(a.clone()), Some(i)),
+                // AskUserQuestion's one question, from a device that knows no `qs`
+                Some(Meaning::Answer(a)) => match p.questions.first() {
+                    Some(q) => Outcome::answers(answer_of(q, a.clone()), Some(i)),
+                    None => Outcome::of("allow", Some(a.clone()), Some(i)),
+                },
                 None => return Err((ResultErr::Denied, "no such option")),
             },
             _ => return Err((ResultErr::Denied, "not a permission request")),
@@ -398,7 +449,59 @@ impl Broker {
         if !p.att.acts.contains(&Action::Dictate) {
             return Err((ResultErr::Denied, "this card takes no dictation"));
         }
-        self.settle(g, rid, Outcome::of("allow", Some(text), None))
+        let outcome = match p.questions.first() {
+            Some(q) => Outcome::answers(answer_of(q, text), None),
+            None => Outcome::of("allow", Some(text), None),
+        };
+        self.settle(g, rid, outcome)
+    }
+
+    /// A device's answers to request `rid`'s questions (`cmd answer`, LAST-MESSAGE.md §3.2): per
+    /// question, the options picked as a bit mask or the free answer's text (a transcript). Refused,
+    /// with the request left open, unless there is one entry per question and each is either a pick
+    /// (exactly one option on a single-choice question, only bits of its options) or a non-empty
+    /// text, never both. Several labels are joined with `", "` in option order.
+    pub fn answer_questions(
+        &self,
+        rid: u64,
+        picks: &[u64],
+        texts: &[Option<String>],
+    ) -> Result<Outcome, (ResultErr, &'static str)> {
+        let g = self.inner.lock().unwrap();
+        let Some(p) = g.pending.get(&rid) else {
+            return Err((ResultErr::Stale, "no pending request for rid"));
+        };
+        if p.questions.is_empty() {
+            return Err((ResultErr::Denied, "no questions to answer"));
+        }
+        if picks.len() != p.questions.len() || texts.len() != picks.len() {
+            return Err((ResultErr::Denied, "one entry per question"));
+        }
+        let mut answers = Map::new();
+        for ((q, &pick), text) in p.questions.iter().zip(picks).zip(texts) {
+            let value = match text.as_deref().map(str::trim) {
+                Some(_) if pick != 0 => return Err((ResultErr::Denied, "a pick and a recording")),
+                Some("") => return Err((ResultErr::Denied, "an empty answer")),
+                Some(t) => t.to_owned(),
+                None if pick == 0 => return Err((ResultErr::Denied, "nothing picked")),
+                None if pick >> q.options.len() != 0 => {
+                    return Err((ResultErr::Denied, "no such option"))
+                }
+                None if !q.multi && pick.count_ones() != 1 => {
+                    return Err((ResultErr::Denied, "one option on this question"))
+                }
+                None => q
+                    .options
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| pick & (1 << i) != 0)
+                    .map(|(_, (label, _))| label.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            };
+            answers.insert(q.question.clone(), Value::String(value));
+        }
+        self.settle(g, rid, Outcome::answers(answers, None))
     }
 
     fn settle(
@@ -465,6 +568,16 @@ impl Broker {
         }
     }
 
+    /// The session of open request `rid`.
+    pub fn sid_of(&self, rid: u64) -> Option<u64> {
+        self.inner
+            .lock()
+            .unwrap()
+            .pending
+            .get(&rid)
+            .map(|p| p.att.sid)
+    }
+
     /// Whether `sid` has a request waiting for an answer (typing into it is refused then).
     pub fn open_for(&self, sid: u64) -> bool {
         let g = self.inner.lock().unwrap();
@@ -519,12 +632,12 @@ impl Broker {
     }
 }
 
-/// Builds the request a blocking hook line describes, or `None` when the watch cannot answer
-/// it (then the hook gets `none` at once and the agent prompts as usual).
 /// How long a notice card (a question only the terminal can answer) may stay up if the session
 /// never moves on; normally the next hook event clears it.
 pub const NOTICE_TTL: Duration = Duration::from_secs(600);
 
+/// Builds the request a blocking hook line describes, or `None` when the watch cannot answer
+/// it (then the hook gets `none` at once and the agent prompts as usual).
 pub fn request_of(
     sid: u64,
     key: String,
@@ -539,10 +652,12 @@ pub fn request_of(
     let tool = payload["tool_name"].as_str().map(str::to_owned);
     let input = &payload["tool_input"];
     match event.to_ascii_lowercase().as_str() {
-        // Claude Code also asks permission to *show* a question (AskUserQuestion) once the
-        // PreToolUse hook gave no answer. That is not a tool to approve: the question was already
-        // offered on the watch, so no card and no wait; the terminal shows the question at once.
-        "permissionrequest" if tool.as_deref() == Some("AskUserQuestion") => None,
+        // Claude Code asks AskUserQuestion's questions through PermissionRequest; the answers go back
+        // in `updatedInput` (LAST-MESSAGE.md §3). Its PreToolUse holds nothing (an older hook that still
+        // waits on it gets no decision at once), so a question is never held twice.
+        "permissionrequest" if tool.as_deref() == Some("AskUserQuestion") => {
+            question_request(sid, key, tool, input, ttl)
+        }
         "permissionrequest" => {
             let tool_name = tool.as_deref().unwrap_or("Tool");
             let (title, text) = describe_tool(tool_name, input);
@@ -562,88 +677,159 @@ pub fn request_of(
                 dictate: false,
                 notice: false,
                 standing: crate::standing::pick(payload),
-            })
-        }
-        "pretooluse" if tool.as_deref() == Some("AskUserQuestion") => {
-            let qs = input["questions"].as_array()?;
-            // One question with single-select options is what a wheel can answer. Anything else
-            // (several questions, multi-select, no options) is shown as a notice: the question
-            // and Focus, while the terminal shows it at once.
-            let notice = |q: &Value| {
-                let header = q["header"]
-                    .as_str()
-                    .filter(|h| !h.is_empty())
-                    .unwrap_or("Question");
-                let multi = q["multiSelect"].as_bool() == Some(true);
-                let text = q["question"].as_str().map(|t| {
-                    format!(
-                        "{t} ({})",
-                        if multi {
-                            "pick on the PC"
-                        } else {
-                            "answer on the PC"
-                        }
-                    )
-                });
-                Request {
-                    sid,
-                    key: key.clone(),
-                    tool: tool.clone(),
-                    kind: AttKind::Question,
-                    title: Some(if qs.len() > 1 {
-                        format!("{} questions", qs.len())
-                    } else {
-                        header.to_owned()
-                    }),
-                    text,
-                    opts: Vec::new(),
-                    ttl: NOTICE_TTL,
-                    focus_only: true,
-                    dictate: false,
-                    notice: true,
-                    standing: None,
-                }
-            };
-            let [q] = qs.as_slice() else {
-                return qs.first().map(notice);
-            };
-            if q["multiSelect"].as_bool() == Some(true) {
-                return Some(notice(q));
-            }
-            let opts: Vec<(String, Meaning)> = q["options"]
-                .as_array()
-                .map(|a| a.as_slice())
-                .unwrap_or(&[])
-                .iter()
-                .filter_map(|o| o["label"].as_str())
-                .take(4)
-                .map(|l| (l.to_owned(), Meaning::Answer(l.to_owned())))
-                .collect();
-            if opts.is_empty() {
-                return Some(notice(q));
-            }
-            Some(Request {
-                sid,
-                key,
-                tool,
-                kind: AttKind::Question,
-                title: Some(
-                    q["header"]
-                        .as_str()
-                        .filter(|h| !h.is_empty())
-                        .unwrap_or("Question")
-                        .to_owned(),
-                ),
-                text: q["question"].as_str().map(str::to_owned),
-                opts,
-                ttl,
-                focus_only: false,
-                dictate: false,
-                notice: false,
-                standing: None,
+                questions: Vec::new(),
             })
         }
         _ => None,
+    }
+}
+
+/// AskUserQuestion's request: every question for a device that answers them (`qs`), and for an older
+/// one the options of a lone single-choice question (`opts`, as the old PreToolUse path offered) or
+/// Open on PC only. A malformed question (no options, more than four of anything, two alike) is a
+/// notice: shown with Open on PC while the terminal asks at once.
+fn question_request(
+    sid: u64,
+    key: String,
+    tool: Option<String>,
+    input: &Value,
+    ttl: Duration,
+) -> Option<Request> {
+    let qs = input["questions"].as_array().filter(|a| !a.is_empty())?;
+    let header = |q: &Value| {
+        q["header"]
+            .as_str()
+            .map(str::trim)
+            .filter(|h| !h.is_empty())
+            .unwrap_or("Question")
+            .to_owned()
+    };
+    let title = if qs.len() > 1 {
+        format!("{} questions", qs.len())
+    } else {
+        header(&qs[0])
+    };
+    let parse = |q: &Value| {
+        let question = q["question"].as_str().filter(|t| !t.trim().is_empty())?;
+        let options = q["options"]
+            .as_array()
+            .filter(|o| (1..=4).contains(&o.len()))?
+            .iter()
+            .map(|o| {
+                let label = o["label"].as_str().filter(|l| !l.trim().is_empty())?;
+                Some((
+                    label.to_owned(),
+                    o["description"].as_str().map(str::to_owned),
+                ))
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some(Question {
+            header: header(q),
+            question: question.to_owned(),
+            options,
+            multi: q["multiSelect"].as_bool() == Some(true),
+        })
+    };
+    let questions = (qs.len() <= 4)
+        .then(|| qs.iter().map(parse).collect::<Option<Vec<_>>>())
+        .flatten()
+        // answers are keyed by the question's text: two alike could not both be answered
+        .filter(|v| {
+            v.iter()
+                .enumerate()
+                .all(|(i, q)| v[..i].iter().all(|o| o.question != q.question))
+        });
+    let Some(questions) = questions else {
+        let first = &qs[0];
+        let multi = first["multiSelect"].as_bool() == Some(true);
+        return Some(Request {
+            sid,
+            key,
+            tool,
+            kind: AttKind::Question,
+            title: Some(title),
+            text: first["question"].as_str().map(|t| {
+                let how = if multi { "pick" } else { "answer" };
+                format!("{t} ({how} on the PC)")
+            }),
+            opts: Vec::new(),
+            ttl: NOTICE_TTL,
+            focus_only: true,
+            dictate: false,
+            notice: true,
+            standing: None,
+            questions: Vec::new(),
+        });
+    };
+    let single = match questions.as_slice() {
+        [q] if !q.multi => Some(q),
+        _ => None,
+    };
+    let opts = single
+        .map(|q| {
+            q.options
+                .iter()
+                .map(|(l, _)| (l.clone(), Meaning::Answer(l.clone())))
+                .collect()
+        })
+        .unwrap_or_default();
+    Some(Request {
+        sid,
+        key,
+        tool,
+        kind: AttKind::Question,
+        title: Some(title),
+        text: Some(questions[0].question.clone()),
+        opts,
+        ttl,
+        focus_only: single.is_none(),
+        dictate: single.is_some(),
+        notice: false,
+        standing: None,
+        questions,
+    })
+}
+
+/// `{question: answer}` for a request's one question.
+fn answer_of(q: &Question, answer: String) -> Map<String, Value> {
+    Map::from_iter([(q.question.clone(), Value::String(answer))])
+}
+
+/// `qs` as the watch shows it: each part tidied and clipped to its byte limit, descriptions at most
+/// `desc` bytes (0 = none).
+fn ask_qs(questions: &[Question], desc: usize) -> Vec<AskQ> {
+    let fit = |s: &str, max: usize| crate::voice::fit(&tidy(s), max);
+    questions
+        .iter()
+        .map(|q| AskQ {
+            h: fit(&q.header, QS_HEADER),
+            q: fit(&q.question, QS_QUESTION),
+            o: q.options
+                .iter()
+                .map(|(l, d)| AskOpt {
+                    l: fit(l, QS_LABEL),
+                    d: d.as_deref()
+                        .filter(|_| desc > 0)
+                        .map(|d| fit(d, desc))
+                        .filter(|d| !d.is_empty()),
+                })
+                .collect(),
+            m: q.multi.then_some(true),
+        })
+        .collect()
+}
+
+/// Sets `att.qs`, shortening and then dropping the descriptions until the encoded attention fits
+/// [`QS_BUDGET`].
+fn fit_qs(att: &mut Attention, questions: &[Question]) {
+    for desc in [QS_DESC, QS_DESC_SHORT, 0] {
+        att.qs = Some(ask_qs(questions, desc));
+        let len = Envelope::new(u64::from(u32::MAX), Message::Attention(att.clone()))
+            .to_bytes()
+            .map_or(usize::MAX, |b| b.len());
+        if len <= QS_BUDGET {
+            return;
+        }
     }
 }
 
@@ -746,33 +932,46 @@ mod tests {
         assert_eq!(new.pending().len(), 1, "the new request is untouched");
     }
 
-    #[test]
-    fn showing_a_question_is_not_an_approval() {
-        let payload = json!({"tool_name": "AskUserQuestion",
-            "tool_input": {"questions": [{"question": "Which?", "header": "Pick", "multiSelect": false,
-                "options": [{"label": "A"}, {"label": "B"}]}]}});
-        let r = request_of(
-            2,
+    fn ask(questions: Value) -> Option<Request> {
+        request_of(
+            1,
             "claude:s".into(),
             "claude",
             "PermissionRequest",
-            &payload,
+            &json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": questions}}),
             Duration::from_secs(15),
-        );
-        assert!(r.is_none(), "no approval card for the question tool");
-        let r = request_of(
+        )
+    }
+
+    fn two_questions() -> Value {
+        json!([
+            {"question": "Which framework?", "header": "Framework", "multiSelect": false,
+             "options": [{"label": "React", "description": "Component model"}, {"label": "Vue"}]},
+            {"question": "Which parts?", "header": "Parts", "multiSelect": true,
+             "options": [{"label": "Router"}, {"label": "Store"}, {"label": "Tests"}]}])
+    }
+
+    #[test]
+    fn showing_a_question_is_not_an_approval() {
+        let r = ask(
+            json!([{"question": "Which?", "header": "Pick", "multiSelect": false,
+            "options": [{"label": "A"}, {"label": "B"}]}]),
+        )
+        .unwrap();
+        assert_eq!(r.kind, AttKind::Question, "never an approval card");
+        assert!(r.standing.is_none());
+        // its PreToolUse holds nothing: the PermissionRequest is the one request
+        let payload = json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
+            {"question": "Which?", "options": [{"label": "A"}]}]}});
+        assert!(request_of(
             2,
             "claude:s".into(),
             "claude",
             "PreToolUse",
             &payload,
-            Duration::from_secs(15),
-        );
-        assert_eq!(
-            r.map(|r| r.kind),
-            Some(AttKind::Question),
-            "the question itself is still offered"
-        );
+            Duration::from_secs(15)
+        )
+        .is_none());
     }
 
     #[tokio::test]
@@ -986,86 +1185,215 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn question_reply_carries_the_label() {
+    async fn an_older_device_answers_a_lone_question_by_index_or_dictation() {
         let (b, mut rx) = broker();
-        let payload = json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
-            {"question": "Which framework?", "header": "Framework",
-             "options": [{"label": "React"}, {"label": "Vue"}, {"label": "Keep vanilla"}]}]}});
-        let req = request_of(
-            1,
-            "claude:s".into(),
-            "claude",
-            "PreToolUse",
-            &payload,
-            Duration::from_secs(15),
-        )
-        .unwrap();
-        let (rid, wait) = b.open(req);
+        let one = json!([{"question": "Which framework?", "header": "Framework",
+             "options": [{"label": "React"}, {"label": "Vue"}, {"label": "Keep vanilla"}]}]);
+        let (rid, wait) = b.open(ask(one.clone()).unwrap());
         let Update::Attention(att) = next_update(&mut rx) else {
             panic!()
         };
         assert_eq!((att.kind, att.grant_mask), (AttKind::Question, Some(0)));
-        assert_eq!(att.acts, vec![Action::Focus, Action::Reply]);
-        assert_eq!(att.title.as_deref(), Some("Framework"));
-        let out = b.answer(rid, Decision::Reply(1)).unwrap();
         assert_eq!(
-            (out.decision, out.answer.as_deref()),
-            ("allow", Some("Vue"))
+            att.acts,
+            vec![Action::Focus, Action::Reply, Action::Dictate]
         );
-        assert_eq!(wait.await.unwrap().answer.as_deref(), Some("Vue"));
+        assert_eq!(att.title.as_deref(), Some("Framework"));
+        assert_eq!(att.text.as_deref(), Some("Which framework?"));
+        assert_eq!(
+            att.qs.as_ref().map(Vec::len),
+            Some(1),
+            "and the question for 0.18"
+        );
+        assert!(
+            !b.grants(rid, &Decision::Reply(1)),
+            "an answer is not a grant"
+        );
+        let out = b.answer(rid, Decision::Reply(1)).unwrap();
+        assert_eq!((out.decision, out.answer.as_deref()), ("allow", None));
+        let line = serde_json::to_value(wait.await.unwrap()).unwrap();
+        assert_eq!(
+            line,
+            json!({"decision": "allow", "answers": {"Which framework?": "Vue"}})
+        );
         // approve is not an answer to a question
-        let (rid, _w) = b.open(
-            request_of(
-                1,
-                "claude:s".into(),
-                "claude",
-                "PreToolUse",
-                &payload,
-                Duration::from_secs(1),
-            )
-            .unwrap(),
-        );
+        let (rid, wait) = b.open(ask(one).unwrap());
         assert_eq!(
             b.answer(rid, Decision::Approve).unwrap_err().0,
+            ResultErr::Denied
+        );
+        // a dictated answer (dictate with the rid) is the question's free answer
+        assert!(b.takes_dictation(rid));
+        b.answer_text(rid, "Svelte, please".into()).unwrap();
+        assert_eq!(
+            wait.await.unwrap().answers.unwrap()["Which framework?"],
+            "Svelte, please"
+        );
+    }
+
+    #[tokio::test]
+    async fn several_questions_are_answered_at_once_and_only_whole() {
+        let (b, mut rx) = broker();
+        let (rid, wait) = b.open(ask(two_questions()).unwrap());
+        let Update::Attention(att) = next_update(&mut rx) else {
+            panic!()
+        };
+        // an older device: Open on PC only
+        assert_eq!(att.acts, vec![Action::Focus]);
+        assert_eq!((att.opts.as_ref(), att.grant_mask), (None, None));
+        assert_eq!(att.title.as_deref(), Some("2 questions"));
+        assert_eq!(att.text.as_deref(), Some("Which framework?"));
+        assert_eq!(att.win, Some(15_000), "held with the answer window");
+        let qs = att.qs.unwrap();
+        assert_eq!(qs[0].h, "Framework");
+        assert_eq!(qs[0].o[0].d.as_deref(), Some("Component model"));
+        assert_eq!((qs[0].m, qs[1].m), (None, Some(true)));
+        assert_eq!(
+            qs[1].o.iter().map(|o| o.l.as_str()).collect::<Vec<_>>(),
+            ["Router", "Store", "Tests"]
+        );
+        assert_eq!(
+            b.answer(rid, Decision::Reply(0)).unwrap_err().0,
+            ResultErr::Denied
+        );
+        let none = [None, None];
+        for (picks, texts, why) in [
+            (&[1u64][..], &none[..1], "one entry per question"),
+            (
+                &[1, 1, 1],
+                &[None, None, None][..],
+                "one entry per question",
+            ),
+            (&[0, 1], &none[..], "nothing picked"),
+            (&[3, 1], &none[..], "one option on this question"),
+            (&[1, 0b1000], &none[..], "no such option"),
+            (&[4, 1], &none[..], "no such option"),
+            (
+                &[1, 1],
+                &[None, Some("both".to_owned())][..],
+                "a pick and a recording",
+            ),
+            (
+                &[1, 0],
+                &[None, Some("  ".to_owned())][..],
+                "an empty answer",
+            ),
+        ] {
+            assert_eq!(
+                b.answer_questions(rid, picks, texts).unwrap_err(),
+                (ResultErr::Denied, why)
+            );
+        }
+        assert_eq!(b.pending().len(), 1, "a refused answer leaves it open");
+        let out = b.answer_questions(rid, &[1, 0b101], &none).unwrap();
+        let line = serde_json::to_value(&out).unwrap();
+        assert_eq!(
+            line,
+            json!({"decision": "allow", "answers": {"Which framework?": "React", "Which parts?": "Router, Tests"}})
+        );
+        assert_eq!(wait.await.unwrap(), out);
+        let Update::Clear(c) = next_update(&mut rx) else {
+            panic!()
+        };
+        assert_eq!((c.rid, c.why), (rid, ClearWhy::AnsweredDev));
+        assert_eq!(
+            b.answer_questions(rid, &[1, 1], &none).unwrap_err().0,
+            ResultErr::Stale
+        );
+        // a free answer, and a request without questions
+        let (rid, wait) = b.open(ask(two_questions()).unwrap());
+        b.answer_questions(rid, &[0, 2], &[Some(" Svelte ".into()), None])
+            .unwrap();
+        let a = wait.await.unwrap().answers.unwrap();
+        assert_eq!(
+            (&a["Which framework?"], &a["Which parts?"]),
+            (&json!("Svelte"), &json!("Store"))
+        );
+        let (rid, _w) = b.open(perm(false));
+        assert_eq!(
+            b.answer_questions(rid, &[1], &[None]).unwrap_err().0,
             ResultErr::Denied
         );
     }
 
     #[test]
-    fn questions_the_wheel_cannot_answer_become_notices() {
-        let ask = |v: Value| {
-            request_of(
-                1,
-                "k".into(),
-                "claude",
-                "PreToolUse",
-                &v,
-                Duration::from_secs(15),
-            )
-        };
-        // two questions, or a multi-select one: shown with Focus only, and the hook is not held
-        let two = json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
-            {"question": "a", "options": [{"label": "x"}]}, {"question": "b", "options": [{"label": "y"}]}]}});
-        let r = ask(two).expect("a notice");
-        assert!(r.notice && r.focus_only && r.opts.is_empty());
-        assert_eq!(
-            (r.title.as_deref(), r.ttl),
-            (Some("2 questions"), NOTICE_TTL)
+    fn long_questions_are_clipped_for_the_watch_and_kept_whole_for_the_agent() {
+        let (b, _rx) = broker();
+        let long = |n: usize| "é".repeat(n);
+        let qs: Vec<Value> = (0..4)
+            .map(|i| json!({"question": format!("{i}{}", long(200)), "header": long(30),
+                "options": (0..4).map(|j| json!({"label": format!("{j}{}", long(60)), "description": long(200)}))
+                    .collect::<Vec<_>>()}))
+            .collect();
+        let (rid, _w) = b.open(ask(json!(qs)).unwrap());
+        let att = b.pending().pop().unwrap();
+        let shown = att.qs.clone().unwrap();
+        assert_eq!(shown.len(), 4);
+        for q in &shown {
+            assert!(q.h.len() <= QS_HEADER && q.h.ends_with('…'));
+            assert!(q.q.len() <= QS_QUESTION && q.q.ends_with('…'));
+            for o in &q.o {
+                assert!(o.l.len() <= QS_LABEL && o.l.ends_with('…'));
+            }
+        }
+        let bytes = Envelope::new(1, Message::Attention(att))
+            .to_bytes()
+            .unwrap();
+        assert!(bytes.len() <= QS_BUDGET, "{} bytes", bytes.len());
+        assert!(
+            shown
+                .iter()
+                .flat_map(|q| &q.o)
+                .all(|o| o.d.as_deref().is_none_or(|d| d.len() <= QS_DESC_SHORT)),
+            "descriptions shortened or dropped to fit"
         );
-        let multi = json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
-            {"question": "Which parts?", "header": "Parts", "multiSelect": true, "options": [{"label": "x"}]}]}});
-        let r = ask(multi).expect("a notice");
-        assert!(r.notice && r.focus_only);
+        // the answer uses the whole label, keyed by the whole question
+        let out = b
+            .answer_questions(rid, &[2, 1, 1, 8], &[None, None, None, None])
+            .unwrap();
+        let a = out.answers.unwrap();
+        assert_eq!(a[&format!("0{}", long(200))], format!("1{}", long(60)));
+        assert_eq!(a[&format!("3{}", long(200))], format!("3{}", long(60)));
+    }
+
+    #[test]
+    fn malformed_questions_become_notices() {
+        for bad in [
+            json!([{"question": "a", "options": []}]),
+            json!([{"question": "a"}]),
+            json!([{"question": "a", "options": [{"label": "x"}, {"description": "no label"}]}]),
+            json!([{"question": "a", "options": [{"label": "1"}, {"label": "2"}, {"label": "3"},
+                {"label": "4"}, {"label": "5"}]}]),
+            json!([{"question": "", "options": [{"label": "x"}]}]),
+            json!([{"question": "a", "options": [{"label": "x"}]}, {"question": "a", "options": [{"label": "y"}]}]),
+            json!((0..5)
+                .map(|i| json!({"question": format!("q{i}"), "options": [{"label": "x"}]}))
+                .collect::<Vec<_>>()),
+        ] {
+            let r = ask(bad.clone()).expect("a notice");
+            assert!(r.notice && r.focus_only && r.opts.is_empty(), "{bad}");
+            assert!(r.questions.is_empty(), "{bad}: no qs");
+            assert_eq!(r.ttl, NOTICE_TTL);
+        }
+        let multi = json!([{"question": "Which parts?", "header": "Parts", "multiSelect": true,
+            "options": [{"label": "x"}, {}]}]);
+        let r = ask(multi).unwrap();
         assert_eq!(r.title.as_deref(), Some("Parts"));
         assert_eq!(r.text.as_deref(), Some("Which parts? (pick on the PC)"));
-        // a single-select question is still answered on the watch
-        let one = json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
-            {"question": "a", "options": [{"label": "x"}, {"label": "y"}]}]}});
-        let r = ask(one).expect("a question");
-        assert!(!r.notice && !r.focus_only && r.opts.len() == 2);
+        // no questions at all: nothing to show
+        assert!(ask(json!([])).is_none());
+        assert!(ask(json!(null)).is_none());
         // nothing for other tools' PreToolUse, or for agents without a decision path
         let other_tool = json!({"tool_name": "Bash", "tool_input": {}});
-        assert!(ask(other_tool.clone()).is_none());
+        assert!(request_of(
+            1,
+            "k".into(),
+            "claude",
+            "PreToolUse",
+            &other_tool,
+            Duration::from_secs(1)
+        )
+        .is_none());
         assert!(request_of(
             1,
             "k".into(),
@@ -1216,22 +1544,11 @@ mod tests {
     #[tokio::test]
     async fn a_notice_has_no_countdown() {
         let (b, mut rx) = broker();
-        let payload = json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
-            {"question": "a", "options": [{"label": "x"}]}, {"question": "b", "options": [{"label": "y"}]}]}});
-        let req = request_of(
-            1,
-            "claude:s".into(),
-            "claude",
-            "PreToolUse",
-            &payload,
-            Duration::from_secs(60),
-        )
-        .unwrap();
-        b.open(req);
+        b.open(ask(json!([{"question": "a", "options": []}])).unwrap());
         let Update::Attention(att) = next_update(&mut rx) else {
             panic!()
         };
-        assert_eq!((att.left, att.win), (None, None));
+        assert_eq!((att.left, att.win, &att.qs), (None, None, &None));
     }
 
     #[tokio::test]
@@ -1349,6 +1666,7 @@ mod tests {
             dictate,
             notice: false,
             standing: None,
+            questions: Vec::new(),
         };
         let (plain, _w1) = b.open(card(false));
         let (text, w2) = b.open(card(true));
@@ -1390,6 +1708,7 @@ mod tests {
             dictate: false,
             notice: false,
             standing: None,
+            questions: Vec::new(),
         };
         let (ask, _w1) = b.open(card(Some("ask_user")));
         let (screen, w2) = b.open(card(None));
