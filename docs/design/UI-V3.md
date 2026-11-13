@@ -248,6 +248,15 @@ A terminal command that runs longer than ten seconds is a session like an agent'
 - Not for jobs, a request, a merged slot or "On your computer". The Activity footer (y 322, `FONT_CAPTION`)
   shows the same line for a finished session.
 
+### 4.1e The last message on the deck (2026-11-12, [LAST-MESSAGE.md](LAST-MESSAGE.md))
+
+- A finished Claude session whose daemon sent its last message (proto 0.18, not under privacy meta) shows the
+  message's start in place of the step text and the done summary line: `FONT_BODY` **white**, two lines from y 232,
+  dotted. The exception slot holds a neutral `Read` button (`COL_FILL2`, white `FONT_HEAD`, 160 × 44 on y 320) when
+  nothing outranks it (offline, low battery, a request).
+- A tap on the button opens READ (§4.10); a tap anywhere else on the card opens AGENT as before, where `Read` leads
+  the list (`ICON_QUESTION`, the speech bubble). No pop-up and no extra buzz: the finished buzz is as before.
+
 ### 4.2 AGENT
 
 Caption y 72: the project (host first when remote). The list (§3.2) centred on y 232 (250 under a question). Items and
@@ -351,6 +360,32 @@ A permission whose request carries a standing rule (proto 0.13) has a third opti
 - Answered: `Always allowed` (`FONT_TITLE`), then the rule's first line and the scope in the caption, held at
   least 2.5 s (900 ms for the other answers).
 
+#### 4.3d Questions (2026-11-12, [LAST-MESSAGE.md](LAST-MESSAGE.md) §3)
+
+An `AskUserQuestion` request (proto 0.18, `qs`) is shown one question at a time:
+
+```
+            y 58    Claude Code · webapp · 1 of 2     caption; "1 of 2" only with several questions
+            y 80    Framework                         FONT_HEAD white: the question's header
+            y 112…  Which UI framework should the     FONT_BODY COL_TEXT2, up to 3 lines (question style, no
+            dashboard use?  Read all                  platter); "Read all" when an option has a description
+            y 226   Other                             picker neighbour
+            y 280   ██████ React ○ ██████             73 high, yellow, hold ring: a single-choice option
+            y 334   Vue                               picker neighbour
+```
+
+- Rows: the options in the agent's order, then `Other` (dictation, when the daemon transcribes), then `Send`
+  (`Next` before the last question; multi-select only), then `Open on PC`. All yellow except Open on PC.
+- Single choice: the option is a hold row (`NAV_HOLD_MS` 1.2 s, the rising ramp); a tap only selects it and says
+  `Hold to choose`. Multi-select: options are tap rows that tick (`ICON_DONE` before the label) and untick; `Send`
+  is the hold row, `Tick at least one` while nothing is ticked.
+- `Other` opens VOICE (`Answer for webapp`), whose hold button reads `Use` (`Send` on the last question) and hands
+  the recording back; the transcript paging rule of §4.7 applies.
+- Each answer moves to the next question (re-armed: taps ignored 300 ms); swipe right goes to the previous one,
+  its answer kept, and from the first leaves ASK. The last answer sends all of them; the answered state reads
+  `Sent` with `"Vue"` (one question) or `2 answers`.
+- The reader (`Read all`) shows the question and each option's description, `React: Component library`.
+
 ### 4.4 WATCH (shown to the user as "Activity")
 
 Caption y 72. Up to three earlier steps from y 108, pitch 26, `FONT_CAPTION` `COL_TEXT2`, each led
@@ -439,6 +474,27 @@ hint `Hold B to cancel` on the legend line. Link loss adds an amber `Waiting for
 On done the title becomes `Restarting…` and the watch restarts after 1 s. On bad, failed, cancelled or
 timed-out transfers the overlay closes and a toast shows the reason. All gestures are swallowed while
 open except the B hold. The ring is drawn with `lv_draw_arc`; `LV_USE_ARC` and `LV_USE_BAR` stay off.
+
+### 4.10 READ: the last message (2026-11-12, [LAST-MESSAGE.md](LAST-MESSAGE.md))
+
+```
+            y 58    Claude Code · webapp              caption
+            y 80    Last message                      FONT_HEAD white
+            y 112…  Built and flashed the new         FONT_BODY white, left-aligned, 320 wide, seven lines a page
+                    reader. The watch now shows …
+            y 300   1 of 3                            FONT_CAPTION COL_TEXT2: "2 of 5+" / "5 of 5 · loading" while it arrives
+            y 364   Ⓐ Open                    More Ⓑ  B reads "Reply" on the last page
+```
+
+- Opened by the card's `Read` or AGENT's `Read`; it marks a done session seen. The text is the daemon's cleaned
+  message, fetched by session (`cmd detail` without a rid) as the reader opens; the preview shows until it arrives.
+- A tap, swipe up or B turns the page; a drag down goes back a page; a tap within 300 ms of a page appearing is
+  ignored. Past the last page: the end picker (title `Answer it`, the message's last words above it in
+  `FONT_BODY` `COL_TEXT2`, the ASK picker below): `Dictate` (yellow, opens VOICE on the session; it types, or
+  queues when the agent works again), `Reply` (yellow, the AGENT Reply list), `Read again`, `Open on PC`. These
+  rows only open screens: a tap is enough, and nothing is sent from READ itself.
+- Back (swipe right, B held, a finger held still) closes the end picker first, then READ. A leaves to the PC.
+  A new prompt (the message is cleared) or a new message closes READ.
 
 ## 5. Interaction changes (`nav.c`)
 

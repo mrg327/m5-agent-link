@@ -81,7 +81,7 @@ int main(void)
     EXPECT(detail_got(7) == 6 && !strcmp(detail_text(7), "first "), "the first chunk");
     chunk(7, 0, 12, "first ", 1040);
     EXPECT(detail_got(7) == 6, "a repeat after a resume adds nothing");
-    detail_on_result(7, true, -1); /* ok, but short: a chunk went missing */
+    detail_on_result(2, 7, true, -1); /* ok, but short: a chunk went missing */
     EXPECT(detail_state(7) == DETAIL_LOADING, "still loading");
     detail_tick(1040 + DETAIL_STALL_MS);
     EXPECT(s_sent == 2 && s_last_off == 6, "a stall asks again from where it got to");
@@ -104,7 +104,7 @@ int main(void)
     EXPECT(detail_state(10) == DETAIL_FAILED, "a NUL would hide the rest: failed");
     attention_t d = request(11, 3);
     detail_want(&d, 8000);
-    detail_on_result(11, false, 0);
+    detail_on_result(2, 11, false, 0);
     EXPECT(detail_state(11) == DETAIL_FAILED, "stale / denied / unsupported: failed");
 
     /* a link that never comes back: a few tries, then failed */
@@ -148,6 +148,58 @@ int main(void)
     EXPECT(model_attention_went_back(21, BACK_EXPIRED), "cleared");
     EXPECT(!model_find(2)->back, "an answer already sent says Waiting, not On your computer");
     EXPECT(model_attention_left_ms(NULL, 0) == UINT32_MAX, "no window known");
+
+    /* A session's last message (LAST-MESSAGE.md §2.3): its own slot, bound to the session and the message id */
+    model_init();
+    detail_reset();
+    model_set_peer_minor(18);
+    model_settings()->privacy = PRIVACY_PREVIEW;
+    session_t m = {.sid = 3, .state = SESS_DONE, .lm = 40, .ll = 11, .lm_keys = 7};
+    snprintf(m.lp, sizeof m.lp, "Built it.");
+    model_upsert(&m, SF_STATE | SF_LM);
+    const session_t *ms = model_find(3);
+    EXPECT(ms->lm == 40 && ms->ll == 11 && !strcmp(ms->lp, "Built it."), "the delta's keys land");
+    EXPECT(detail_msg_fetchable(ms), "a message with a preview, in reach");
+    model_set_peer_minor(17);
+    EXPECT(!detail_msg_fetchable(ms), "an older daemon serves no message");
+    model_set_peer_minor(18);
+    model_settings()->privacy = PRIVACY_META;
+    EXPECT(!detail_msg_fetchable(ms), "privacy meta withholds it");
+    model_settings()->privacy = PRIVACY_PREVIEW;
+    s_sent = 0;
+    detail_want_msg(ms, 20000);
+    EXPECT(s_sent == 1 && s_last_rid == 0 && s_last_off == 0, "asked by session, no rid");
+    detail_on_msg_chunk(3, 39, 0, 11, (const uint8_t *)"Old message", 11, 20010);
+    EXPECT(detail_msg_got(3, 40) == 0, "a chunk of another message is dropped");
+    detail_on_msg_chunk(4, 40, 0, 11, (const uint8_t *)"Other sess.", 11, 20010);
+    EXPECT(detail_msg_got(3, 40) == 0, "a chunk of another session is dropped");
+    detail_on_chunk(40, 3, 0, 11, (const uint8_t *)"As request!", 11, 20010);
+    EXPECT(detail_msg_got(3, 40) == 0, "a request's chunk never lands in the message");
+    detail_on_msg_chunk(3, 40, 0, 11, (const uint8_t *)"Built it.\n\n", 11, 20020);
+    EXPECT(detail_msg_state(3, 40) == DETAIL_DONE && !strcmp(detail_msg_text(3, 40), "Built it.\n\n"), "whole");
+    /* a request transfer meanwhile does not touch the message */
+    session_t s2 = {.sid = 2, .state = SESS_INPUT};
+    model_upsert(&s2, SF_STATE);
+    attention_t r = request(30, 5);
+    detail_want(&r, 21000);
+    chunk(30, 0, 5, "abcde", 21010);
+    EXPECT(detail_state(30) == DETAIL_DONE && detail_msg_state(3, 40) == DETAIL_DONE, "two slots");
+    /* a new message replaces it; the old text is gone */
+    session_t m2 = {.sid = 3, .lm = 41, .ll = 3, .lm_keys = 3};
+    model_upsert(&m2, SF_LM);
+    detail_tick(21100);
+    EXPECT(detail_msg_text(3, 40) == NULL && detail_msg_state(3, 41) == DETAIL_NONE, "replaced: forgotten");
+    detail_want_msg(model_find(3), 21200);
+    detail_on_msg_chunk(3, 41, 0, 4, (const uint8_t *)"abcd", 4, 21210);
+    EXPECT(detail_msg_state(3, 41) == DETAIL_FAILED, "a length other than the session's: failed");
+    session_t m3 = {.sid = 3, .lm = 42, .ll = 3, .lm_keys = 3};
+    model_upsert(&m3, SF_LM);
+    detail_want_msg(model_find(3), 21300);
+    detail_on_result(3, 0, false, 0);
+    EXPECT(detail_msg_state(3, 42) == DETAIL_FAILED, "refused: failed");
+    session_t cleared = {.sid = 3, .lm = 0, .ll = 0, .lm_keys = 7};
+    model_upsert(&cleared, SF_LM);
+    EXPECT(!detail_msg_fetchable(model_find(3)), "cleared by a new prompt");
 
     if (failures) printf("%d failure(s)\n", failures);
     else printf("detail: all passed\n");

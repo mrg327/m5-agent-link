@@ -410,6 +410,18 @@ struct session_uint35tstr {
 	struct zcbor_string session_uint35tstr;
 };
 
+struct session_uint36uint {
+	uint32_t session_uint36uint;
+};
+
+struct session_uint37uint {
+	uint32_t session_uint37uint;
+};
+
+struct session_uint38tstr {
+	struct zcbor_string session_uint38tstr;
+};
+
 struct session {
 	uint32_t session_uint0uint;
 	struct session_agent_m session_agent_m;
@@ -476,6 +488,12 @@ struct session {
 	bool session_uint34uint_present;
 	struct session_uint35tstr session_uint35tstr;
 	bool session_uint35tstr_present;
+	struct session_uint36uint session_uint36uint;
+	bool session_uint36uint_present;
+	struct session_uint37uint session_uint37uint;
+	bool session_uint37uint_present;
+	struct session_uint38tstr session_uint38tstr;
+	bool session_uint38tstr_present;
 };
 
 struct att_kind_r {
@@ -584,6 +602,34 @@ struct attention_uint15bool {
 	bool attention_uint15bool;
 };
 
+struct ask_opt_uint1tstr {
+	struct zcbor_string ask_opt_uint1tstr;
+};
+
+struct ask_opt {
+	struct zcbor_string ask_opt_uint0tstr;
+	struct ask_opt_uint1tstr ask_opt_uint1tstr;
+	bool ask_opt_uint1tstr_present;
+};
+
+struct ask_q_uint3bool {
+	bool ask_q_uint3bool;
+};
+
+struct ask_q {
+	struct zcbor_string ask_q_uint0tstr;
+	struct zcbor_string ask_q_uint1tstr;
+	struct ask_opt ask_q_ask_opt_m_l_ask_opt_m[4];
+	size_t ask_q_ask_opt_m_l_ask_opt_m_count;
+	struct ask_q_uint3bool ask_q_uint3bool;
+	bool ask_q_uint3bool_present;
+};
+
+struct attention_ask_q_m_l_r {
+	struct ask_q attention_ask_q_m_l_ask_q_m[4];
+	size_t attention_ask_q_m_l_ask_q_m_count;
+};
+
 struct attention {
 	uint32_t attention_uint0uint;
 	uint32_t attention_uint1uint;
@@ -614,6 +660,8 @@ struct attention {
 	bool attention_uint14uint_present;
 	struct attention_uint15bool attention_uint15bool;
 	bool attention_uint15bool_present;
+	struct attention_ask_q_m_l_r attention_ask_q_m_l;
+	bool attention_ask_q_m_l_present;
 };
 
 struct msg_attention {
@@ -662,6 +710,7 @@ struct cmd_op_r {
 		cmd_op_kb_end_m_c = 16,
 		cmd_op_rerun_m_c = 17,
 		cmd_op_unqueue_m_c = 18,
+		cmd_op_answer_m_c = 19,
 	} cmd_op_choice;
 };
 
@@ -721,6 +770,24 @@ struct cmd_uint6bool {
 	bool cmd_uint6bool;
 };
 
+struct answer_picks {
+	uint32_t answer_picks_picks[4];
+	size_t answer_picks_picks_count;
+};
+
+struct cmd_answer_picks_m {
+	struct answer_picks cmd_answer_picks_m;
+};
+
+struct answer_aids {
+	uint32_t answer_aids_aids[4];
+	size_t answer_aids_aids_count;
+};
+
+struct cmd_answer_aids_m {
+	struct answer_aids cmd_answer_aids_m;
+};
+
 struct cmd {
 	struct cmd_op_r cmd_op_m;
 	struct cmd_uint1uint cmd_uint1uint;
@@ -735,6 +802,10 @@ struct cmd {
 	bool cmd_uint5uint_present;
 	struct cmd_uint6bool cmd_uint6bool;
 	bool cmd_uint6bool_present;
+	struct cmd_answer_picks_m cmd_answer_picks_m;
+	bool cmd_answer_picks_m_present;
+	struct cmd_answer_aids_m cmd_answer_aids_m;
+	bool cmd_answer_aids_m_present;
 };
 
 struct msg_cmd {
@@ -813,6 +884,10 @@ struct detail_uint4uint {
 	uint32_t detail_uint4uint;
 };
 
+struct detail_uint5uint {
+	uint32_t detail_uint5uint;
+};
+
 struct detail {
 	struct detail_uint0uint detail_uint0uint;
 	bool detail_uint0uint_present;
@@ -823,6 +898,8 @@ struct detail {
 	bool detail_uint3uint_present;
 	struct detail_uint4uint detail_uint4uint;
 	bool detail_uint4uint_present;
+	struct detail_uint5uint detail_uint5uint;
+	bool detail_uint5uint_present;
 };
 
 struct msg_detail {
@@ -1070,6 +1147,29 @@ struct msg_fw_ack {
 	struct fw_ack msg_fw_ack_fw_ack_m;
 };
 
+struct power {
+	uint32_t power_uint0uint;
+	uint32_t power_uint1uint;
+	uint32_t power_uint2uint;
+	bool power_uint3bool;
+	bool power_uint4bool;
+	uint32_t power_uint5uint;
+	uint32_t power_uint6uint;
+	uint32_t power_uint7uint;
+	uint32_t power_uint8uint;
+	uint32_t power_uint9uint;
+	uint32_t power_uint10uint;
+	uint32_t power_uint11uint;
+	uint32_t power_uint12uint;
+	uint32_t power_uint13uint;
+	uint32_t power_uint14uint;
+};
+
+struct msg_power {
+	struct hdr_r msg_power_hdr_m;
+	struct power msg_power_power_m;
+};
+
 struct msg_dbg_ui_state_req {
 	struct hdr_r msg_dbg_ui_state_req_hdr_m;
 };
@@ -1197,6 +1297,7 @@ struct envelope_r {
 		struct msg_fw_begin envelope_msg_fw_begin_m;
 		struct msg_fw_chunk envelope_msg_fw_chunk_m;
 		struct msg_fw_ack envelope_msg_fw_ack_m;
+		struct msg_power envelope_msg_power_m;
 		struct msg_dbg_ui_state_req envelope_msg_dbg_ui_state_req_m;
 		struct msg_dbg_ui_state envelope_msg_dbg_ui_state_m;
 		struct msg_dbg_screenshot_req envelope_msg_dbg_screenshot_req_m;
@@ -1231,6 +1332,7 @@ struct envelope_r {
 		envelope_msg_fw_begin_m_c,
 		envelope_msg_fw_chunk_m_c,
 		envelope_msg_fw_ack_m_c,
+		envelope_msg_power_m_c,
 		envelope_msg_dbg_ui_state_req_m_c,
 		envelope_msg_dbg_ui_state_m_c,
 		envelope_msg_dbg_screenshot_req_m_c,

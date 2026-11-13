@@ -179,6 +179,7 @@ MSG_EDITORIAL = {
     "fw_begin": ("pc→dev", "Firmware update: opens (or resumes, or with size 0 stops) a signed image transfer"),
     "fw_chunk": ("pc→dev", "Firmware update: 2 KB of the image at an offset"),
     "fw_ack": ("dev→pc", "Firmware update: go / done / busy / bad / fail / stopped, and the next offset wanted"),
+    "power": ("dev→pc", "Power report: battery voltage and the time spent in each power state (POWER.md)"),
     "dbg_ui_state_req": ("pc→dev", "Debug: ask which screen is showing"),
     "dbg_ui_state": ("dev→pc", "Debug: the current screen and visible labels"),
     "dbg_screenshot_req": ("pc→dev", "Debug: ask for a screenshot"),

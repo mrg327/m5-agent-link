@@ -23,7 +23,9 @@ use crate::broker::{request_of, Broker, Outcome};
 use crate::ipc;
 use crate::jobs::Jobs;
 use crate::prompt;
-use crate::registry::{clip, HostCtx, Registry, SessionEvent, SessionPatch, Step, Turn, Via};
+use crate::registry::{
+    clip, HostCtx, LastMsg, Registry, SessionEvent, SessionPatch, Step, Turn, Via,
+};
 use crate::remote;
 use crate::source::AgentSource;
 use crate::trace::{Dir, Trace};
@@ -128,8 +130,8 @@ where
     let mut attach_guard = None;
     while let Ok(Some(line)) = lines.next_line().await {
         let Ok(v) = serde_json::from_str::<Value>(&line) else {
-            // a malformed shell line may still hold the command line
-            let line = if line.contains("\"shell\"") {
+            // a malformed shell line may still hold the command line, a Stop line the agent's message
+            let line = if line.contains("\"shell\"") || line.contains("last_assistant_message") {
                 "<private>".into()
             } else {
                 line
@@ -305,7 +307,7 @@ struct Ctx<'a> {
 
 /// How a wait for an answer ended.
 enum Ended {
-    Answer(Outcome),
+    Answer(Box<Outcome>),
     /// The request was settled elsewhere (terminal answer, hand-back): no decision.
     Cancelled,
     Timeout,
@@ -409,7 +411,7 @@ async fn await_decision<W: AsyncWrite + Unpin>(
     );
     let ended = wait_for(rx, window, talks, w).await;
     let (from, why, outcome) = match ended {
-        Ended::Answer(o) => ("device", None, o),
+        Ended::Answer(o) => ("device", None, *o),
         Ended::Cancelled => ("none", Some("cancelled"), Outcome::NONE),
         Ended::Timeout => {
             broker.cancel(rid, ClearWhy::Expired);
@@ -420,8 +422,16 @@ async fn await_decision<W: AsyncWrite + Unpin>(
             ("none", Some("hook_gone"), Outcome::NONE)
         }
     };
+    // an answer's labels and dictated words are the user's content: the audit line says only that
+    // there was one
+    let mut said = serde_json::to_value(&outcome).unwrap_or_default();
+    for k in ["answer", "answers"] {
+        if let Some(x) = said.get_mut(k) {
+            *x = Value::String("<private>".into());
+        }
+    }
     let detail = match why {
-        None => json!({"from": from, "outcome": outcome, "host": host}),
+        None => json!({"from": from, "outcome": said, "host": host}),
         Some(why) => json!({"from": from, "why": why, "host": host}),
     };
     trace.audit("decision", Some(sid), Some(rid), detail);
@@ -447,7 +457,7 @@ async fn wait_for<W: AsyncWrite + Unpin>(
     loop {
         tokio::select! {
             r = &mut rx => return match r {
-                Ok(o) => Ended::Answer(o),
+                Ok(o) => Ended::Answer(Box::new(o)),
                 Err(_) => Ended::Cancelled,
             },
             _ = tokio::time::sleep_until(deadline) => return Ended::Timeout,
@@ -550,6 +560,7 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
             p.step = Step::Reset;
             p.ask = Some(Default::default()); /* the question was answered (or moved past) */
             p.turn = Turn::Prompt;
+            p.last = LastMsg::Clear; /* it described a turn that is over */
         }
         "posttooluse" | "posttoolusefailure" => {
             p.state = Some(SessState::Work);
@@ -577,6 +588,15 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
             // Claude Code hands the turn's last message to Stop: its closing question feeds Reply
             if let Some(text) = payload["last_assistant_message"].as_str() {
                 p.ask = Some(crate::ask::ask_of(text));
+                // the message itself, for the watch's reader (LAST-MESSAGE.md); Copilot's agentStop has none
+                if event == "stop" && agent_name == "claude" {
+                    let clean = crate::lastmsg::clean(text);
+                    p.last = if clean.is_empty() {
+                        LastMsg::Clear
+                    } else {
+                        LastMsg::Set(clean)
+                    };
+                }
             }
         }
         "erroroccurred" | "stopfailure" => p.state = Some(SessState::Error),
@@ -1064,6 +1084,128 @@ mod tests {
             json!({"agent":"claude","event":"Stop","cwd":"/r","payload":{"session_id":"s"}}),
         );
         assert_eq!(p.ask, None, "no message: leave whatever was there");
+    }
+
+    #[test]
+    fn a_stop_keeps_the_last_message_and_a_new_prompt_clears_it() {
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        feed(&reg, &cl("UserPromptSubmit", json!({"prompt": "go"})));
+        let _ = drain(&mut rx);
+        assert!(reg.snapshot()[0].lm.is_none(), "nothing to clear: no keys");
+        let msg = "## Done\n\nBuilt **it**. 🎉\n\n- tests pass";
+        feed(&reg, &cl("Stop", json!({"last_assistant_message": msg})));
+        let ds = drain(&mut rx);
+        let d = ds.last().unwrap();
+        assert_eq!(d.st, Some(SessState::Done), "in the delta that enters done");
+        let lm = d.lm.unwrap();
+        assert!(lm > 0 && lm <= u64::from(u32::MAX));
+        let sid = d.sid;
+        let (id, text) = reg.last_message(sid).unwrap();
+        assert_eq!(
+            (id, text.as_str()),
+            (lm, "Done\n\nBuilt it.\n\n• tests pass")
+        );
+        assert_eq!(
+            (d.ll, d.lp.as_deref()),
+            (Some(text.len() as u64), Some("Done Built it."))
+        );
+        let snap = &reg.snapshot()[0];
+        assert_eq!((snap.lm, snap.ll), (Some(lm), Some(text.len() as u64)));
+        // another stop: another id
+        feed(
+            &reg,
+            &cl("Stop", json!({"last_assistant_message": "Again."})),
+        );
+        let d = drain(&mut rx).pop().unwrap();
+        assert!(d.lm.is_some_and(|n| n != lm && n != 0));
+        // the next prompt clears it, once
+        feed(&reg, &cl("UserPromptSubmit", json!({"prompt": "more"})));
+        let d = drain(&mut rx).pop().unwrap();
+        assert_eq!((d.lm, d.ll, d.lp.as_deref()), (Some(0), Some(0), Some("")));
+        assert!(reg.last_message(sid).is_none());
+        assert_eq!(reg.snapshot()[0].lm, None);
+        feed(&reg, &cl("UserPromptSubmit", json!({"prompt": "more"})));
+        assert!(drain(&mut rx).iter().all(|d| d.lm.is_none()));
+        // a stop with nothing readable leaves no message
+        feed(&reg, &cl("Stop", json!({"last_assistant_message": "🎉"})));
+        assert!(reg.last_message(sid).is_none());
+        // gone with the session
+        feed(&reg, &cl("Stop", json!({"last_assistant_message": "kept"})));
+        assert!(reg.last_message(sid).is_some());
+        feed(&reg, &cl("SessionEnd", json!({})));
+        assert!(reg.last_message(sid).is_none());
+    }
+
+    #[test]
+    fn an_error_a_sub_agent_or_copilot_leaves_no_last_message() {
+        let p = patch_of(cl(
+            "StopFailure",
+            json!({"last_assistant_message": "API Error: 529"}),
+        ));
+        assert_eq!(
+            p.last,
+            LastMsg::Keep,
+            "the error text is not the agent's message"
+        );
+        let p = patch_of(json!({"agent":"copilot","event":"agentStop","cwd":"/r",
+            "payload":{"sessionId":"c","last_assistant_message":"x"}}));
+        assert_eq!(p.last, LastMsg::Keep);
+        let p = patch_of(cl("Stop", json!({})));
+        assert_eq!(
+            p.last,
+            LastMsg::Keep,
+            "no message: leave whatever was there"
+        );
+        // a Copilot sub-agent's stop never reaches its parent at all
+        let sub = json!({"agent":"copilot","event":"agentStop","payload":{"sessionId":"child",
+            "parentAgentId":"parent","last_assistant_message":"x"}});
+        assert!(to_session_event(&sub, &Via::Local).is_none());
+    }
+
+    #[tokio::test]
+    async fn a_question_is_held_and_its_answers_go_to_the_hook_but_not_to_the_audit_log() {
+        isolate();
+        let dir = std::env::temp_dir().join(format!("al-hq-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let trace = Trace::new(dir.join("trace"), dir.join("audit.jsonl"));
+        let registry = Arc::new(Registry::new(trace.clone()));
+        let rig = Rig {
+            broker: Arc::new(Broker::new(registry.clone())),
+            registry,
+            trace,
+        };
+        let _dev = rig.broker.link();
+        let v = json!({"agent": "claude", "event": "PermissionRequest", "cwd": "/nonexistent/p",
+            "payload": {"session_id": "s1", "cwd": "/nonexistent/p", "tool_name": "AskUserQuestion",
+                "tool_input": {"questions": [{"question": "Which framework?", "header": "Framework",
+                    "options": [{"label": "React"}, {"label": "Vue"}]}]}},
+            "await": {"wait_ms": 30_000, "window": true}});
+        rig.registry
+            .apply(to_session_event(&v, &Via::Local).unwrap());
+        let key = session_key(&v, &Via::Local);
+        let broker = rig.broker.clone();
+        let answer = tokio::spawn(async move {
+            loop {
+                if let Some(a) = broker.pending().pop() {
+                    return broker
+                        .answer_questions(a.rid, &[2], &[None])
+                        .map(|o| o.decision);
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        });
+        let (mut w, _r) = tokio::io::duplex(4096);
+        let out = run(&rig, &v, key, &mut w).await;
+        assert_eq!(answer.await.unwrap(), Ok("allow"));
+        assert_eq!(
+            serde_json::to_value(&out).unwrap(),
+            json!({"decision": "allow", "answers": {"Which framework?": "Vue"}})
+        );
+        let log = std::fs::read_to_string(dir.join("audit.jsonl")).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(log.contains("\"decision\"") && log.contains("<private>"));
+        assert!(!log.contains("Vue"), "{log}");
     }
 
     #[test]

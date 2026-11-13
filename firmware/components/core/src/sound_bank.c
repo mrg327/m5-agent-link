@@ -16,6 +16,7 @@ const snd_role_t snd_roles[] = {
     {"input", "An agent asks a question or needs your approval", "input-ff", 3, 90},
     {"approved", "An approval hold completes and the answer goes out (rises)", "approved-rise", 1, 0},
     {"denied", "A deny or stop hold completes and the answer goes out (falls)", "denied-fall", 1, 0},
+    {"updated", "The first welcome after an OTA update: the new image is running and confirmed", "updated-flourish", 1, 0},
 };
 const unsigned snd_role_count = sizeof snd_roles / sizeof snd_roles[0];
 
@@ -163,6 +164,14 @@ static const snd_step_t denied_drop[] = {/* G4 gliding down to G3 */
                                          S(TRI, 67, 55, 12, 220, 1)};
 static const snd_step_t denied_fall[] = {/* D5 G4 C4, triangle */
                                          S(TRI, 74, 0, 12, 70, 0), S(TRI, 67, 0, 12, 70, 0), S(TRI, 60, 0, 12, 200, 1)};
+/* Updated: a longer, brighter four-note climb ending on a ringing bell-like top note (about 560 ms), so it is
+ * never mistaken for the short square-wave approved arpeggio. */
+static const snd_step_t updated_flourish[] = {/* C5 E5 G5 C6, then E6 ringing out */
+                                              S(FM, 72, 0, 9, 80, 0), S(FM, 76, 0, 9, 80, 0), S(FM, 79, 0, 9, 80, 0),
+                                              S(FM, 84, 0, 9, 80, 0), S(BELL, 88, 0, 10, 240, 1)};
+static const snd_step_t updated_chime[] = {/* G4 C5 E5 G5 as a triangle run, then a held C6 bell: the audition alternative */
+                                           S(TRI, 67, 0, 10, 70, 0), S(TRI, 72, 0, 10, 70, 0), S(TRI, 76, 0, 10, 70, 0),
+                                           S(TRI, 79, 0, 10, 70, 0), S(BELL, 84, 0, 10, 260, 1)};
 
 const snd_sound_t snd_bank[] = {
     {"done-coin", "done", "Coin", {T(done_coin)}, 0, 0},
@@ -213,6 +222,8 @@ const snd_sound_t snd_bank[] = {
     {"approved-rise", "approved", "Rising", {T(approved_rise)}, 0, 0},
     {"denied-fall", "denied", "Falling", {T(denied_fall)}, 0, 0},
     {"denied-drop", "denied", "Drop", {T(denied_drop)}, 0, 0},
+    {"updated-flourish", "updated", "Flourish", {T(updated_flourish)}, 0, 0},
+    {"updated-chime", "updated", "Chime", {T(updated_chime)}, 0, 0},
 };
 const unsigned snd_bank_count = sizeof snd_bank / sizeof snd_bank[0];
 

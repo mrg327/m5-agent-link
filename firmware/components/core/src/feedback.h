@@ -10,6 +10,7 @@ void feedback_deny_ramp(void); /* deny hold started: falling pulses over ~0.6 s 
 void feedback_reply_sent(void); /* a question option went out: three ticks */
 void feedback_hold_stop(void); /* approve hold released early */
 void feedback_approved(void); /* approve sent: one long pulse */
+void feedback_updated(void);  /* first welcome after an OTA update: the "updated" tone, no haptic */
 void feedback_denied(void);   /* deny sent: two medium pulses */
 void feedback_reject(void);   /* command could not be sent: three short pulses */
 void feedback_scroll_stop(void); /* SCROLL reached the bottom or the top: one 40 ms thud */

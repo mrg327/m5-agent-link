@@ -18,7 +18,7 @@ static const struct hdr_r *env_hdr(const struct envelope_r *e)
     H(msg_clear) H(msg_cmd) H(msg_result) H(msg_detail) H(msg_cfg) H(msg_batt) H(msg_ping) H(msg_pong)
     H(msg_log) H(msg_audio_start) H(msg_audio) H(msg_audio_end) H(msg_transcript)
     H(msg_dbg_ui_state_req) H(msg_dbg_ui_state) H(msg_dbg_screenshot_req) H(msg_dbg_screenshot_chunk)
-    H(msg_dbg_inject_input) H(msg_dbg_set_log_level) H(msg_kb_start) H(msg_kb_stroke) H(msg_kb_cands) H(msg_usage) H(msg_fw_begin) H(msg_fw_chunk) H(msg_fw_ack)
+    H(msg_dbg_inject_input) H(msg_dbg_set_log_level) H(msg_kb_start) H(msg_kb_stroke) H(msg_kb_cands) H(msg_usage) H(msg_fw_begin) H(msg_fw_chunk) H(msg_fw_ack) H(msg_power)
     }
 #undef H
     return NULL;
@@ -67,6 +67,15 @@ static uint32_t convert_session(const struct session *in, session_t *out)
         utf8_drop_partial(out->queued);
         p |= SF_QD;
     }
+    /* The last message (proto 0.18): a delta carries only the keys that changed. */
+    if (in->session_uint36uint_present) { out->lm = in->session_uint36uint.session_uint36uint; out->lm_keys |= 1; }
+    if (in->session_uint37uint_present) { out->ll = in->session_uint37uint.session_uint37uint; out->lm_keys |= 2; }
+    if (in->session_uint38tstr_present) {
+        STR(in->session_uint38tstr.session_uint38tstr, out->lp);
+        utf8_drop_partial(out->lp);
+        out->lm_keys |= 4;
+    }
+    if (out->lm_keys) p |= SF_LM;
     if (in->session_tstr_l_present) {
         size_t n = in->session_tstr_l.session_tstr_l_tstr_count;
         for (size_t i = 0; i < n && i < 3; i++) STR(in->session_tstr_l.session_tstr_l_tstr[i], out->rp[i]);
@@ -225,6 +234,35 @@ static void on_attention(const struct attention *in, uint32_t now_ms)
                                  in->attention_uint13tstr.attention_uint13tstr.len, in->attention_uint14uint.attention_uint14uint,
                                  in->attention_uint15bool_present && in->attention_uint15bool.attention_uint15bool);
     model_attention_add(&a);
+    /* Multiple-choice questions (proto 0.18), kept with the request in PSRAM; a request without valid ones
+     * is shown as before (title, text, opts). */
+    if (model_peer_minor() >= 18 && in->attention_ask_q_m_l_present) {
+        MODEL_EXT_BSS static ask_q_t qs[MODEL_MAX_QS];
+        int n = 0;
+        const struct attention_ask_q_m_l_r *l = &in->attention_ask_q_m_l;
+        for (size_t i = 0; i < l->attention_ask_q_m_l_ask_q_m_count && n < MODEL_MAX_QS; i++) {
+            const struct ask_q *w = &l->attention_ask_q_m_l_ask_q_m[i];
+            ask_q_t *q = &qs[n];
+            memset(q, 0, sizeof *q);
+            STR(w->ask_q_uint0tstr, q->h);
+            STR(w->ask_q_uint1tstr, q->q);
+            utf8_drop_partial(q->h);
+            utf8_drop_partial(q->q);
+            q->multi = w->ask_q_uint3bool_present && w->ask_q_uint3bool.ask_q_uint3bool;
+            for (size_t k = 0; k < w->ask_q_ask_opt_m_l_ask_opt_m_count && q->n_opts < MODEL_MAX_QOPTS; k++) {
+                const struct ask_opt *o = &w->ask_q_ask_opt_m_l_ask_opt_m[k];
+                STR(o->ask_opt_uint0tstr, q->label[q->n_opts]);
+                utf8_drop_partial(q->label[q->n_opts]);
+                if (o->ask_opt_uint1tstr_present) {
+                    STR(o->ask_opt_uint1tstr.ask_opt_uint1tstr, q->desc[q->n_opts]);
+                    utf8_drop_partial(q->desc[q->n_opts]);
+                }
+                if (q->label[q->n_opts][0]) q->n_opts++;
+            }
+            if (q->n_opts) n++; /* a question with no options cannot be answered here */
+        }
+        if (n == (int)l->attention_ask_q_m_l_ask_q_m_count) model_attention_set_questions(a.rid, qs, n);
+    }
     if (g_link.hooks.on_attention) g_link.hooks.on_attention(model_attention_find(a.rid));
 }
 
@@ -303,9 +341,15 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
         break;
     }
     case envelope_msg_detail_m_c: {
-        /* a chunk of a request's full text (proto 0.11): detail.c checks it belongs to the request asked for */
+        /* a chunk of a request's full text (proto 0.11), or of a session's last message (no rid, proto 0.18):
+         * detail.c checks it belongs to what was asked for */
         const struct detail *d = &e->envelope_msg_detail_m.msg_detail_detail_m;
-        if (d->detail_uint0uint_present && d->detail_uint3uint_present && d->detail_uint4uint_present)
+        if (!d->detail_uint0uint_present && d->detail_uint1uint_present && d->detail_uint5uint_present &&
+            d->detail_uint3uint_present && d->detail_uint4uint_present)
+            detail_on_msg_chunk(d->detail_uint1uint.detail_uint1uint, d->detail_uint5uint.detail_uint5uint,
+                                d->detail_uint3uint.detail_uint3uint, d->detail_uint4uint.detail_uint4uint, d->detail_uint2tstr.value,
+                                (uint32_t)d->detail_uint2tstr.len, now_ms);
+        else if (d->detail_uint0uint_present && d->detail_uint3uint_present && d->detail_uint4uint_present)
             detail_on_chunk(d->detail_uint0uint.detail_uint0uint, d->detail_uint1uint_present ? d->detail_uint1uint.detail_uint1uint : 0,
                             d->detail_uint3uint.detail_uint3uint, d->detail_uint4uint.detail_uint4uint, d->detail_uint2tstr.value,
                             (uint32_t)d->detail_uint2tstr.len, now_ms);

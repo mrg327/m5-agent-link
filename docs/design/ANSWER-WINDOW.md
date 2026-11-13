@@ -24,7 +24,8 @@ From [hooks](https://code.claude.com/docs/en/hooks) and [hooks guide](https://co
 
 - The broker uses `PermissionRequest`: it "runs when Claude Code is about to ask you for permission to use a
   tool", and the transcript shows "Allowed by PermissionRequest hook" *where the dialog would have appeared*.
-  `PreToolUse` on `AskUserQuestion` is the other blocking hook (the answer goes in `updatedInput.answers`).
+  `PreToolUse` on `AskUserQuestion` was the other blocking hook until proto 0.18; a question is now held at its
+  `PermissionRequest` too, with the answers in `updatedInput.answers` ([LAST-MESSAGE.md](LAST-MESSAGE.md) §3).
 - "By default, hooks block Claude's execution until they complete." The dialog appears only after the hook
   returns without a decision. A hook that "exits 2 without a `decision` object leaves the permission flow
   unchanged"; exiting 0 with no output does the same.

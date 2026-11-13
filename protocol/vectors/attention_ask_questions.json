@@ -1,0 +1,50 @@
+{
+  "desc": "AskUserQuestion with two questions, the second multi-select; older devices see title, text, focus (proto 0.18)",
+  "symbolic": {
+    "t": "attention",
+    "id": 42,
+    "b": {
+      "rid": 21,
+      "sid": 3,
+      "kind": "question",
+      "title": "2 questions",
+      "text": "Which framework?",
+      "acts": [
+        "focus"
+      ],
+      "exp": 1793995500,
+      "left": 60000,
+      "win": 60000,
+      "qs": [
+        {
+          "h": "Framework",
+          "q": "Which framework?",
+          "o": [
+            {
+              "l": "React",
+              "d": "Component library"
+            },
+            {
+              "l": "Vue"
+            }
+          ]
+        },
+        {
+          "h": "Extras",
+          "q": "Which extras?",
+          "m": true,
+          "o": [
+            {
+              "l": "Router"
+            },
+            {
+              "l": "Tests",
+              "d": "Vitest and Playwright"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "cbor_hex": "a3000601182a03aa001501030201036b32207175657374696f6e7304705768696368206672616d65776f726b3f068102071a6aee32ec0919ea600a19ea601082a300694672616d65776f726b01705768696368206672616d65776f726b3f0282a2006552656163740171436f6d706f6e656e74206c696272617279a10063567565a40066457874726173016d5768696368206578747261733f0282a10066526f75746572a200655465737473017556697465737420616e6420506c617977726967687403f5"
+}

@@ -27,9 +27,9 @@
   | MTU | 247 requested |
   | PHY | 2M preferred |
 
-  `Device Information Service` and `Battery Service` are standard 0x180A/0x180F.
+  `Device Information Service` and `Battery Service` are standard 0x180A/0x180F. Battery Level (0x2A19) is read and notify: the device notifies a subscribed central when the percent changes by 1 or more (the device's own linear 3.3-4.2 V figure, sampled at least once a minute; [POWER.md](POWER.md)).
   - **Fragmentation:** each write/notification is `[FIRST|LAST|seq:6] data…` (`FIRST=0x80`, `LAST=0x40`). `seq` starts at 0 on the FIRST fragment and wraps mod 64. A `seq` gap, a continuation without a FIRST, or a message over `max_msg` drops the partial message. A FIRST in the middle of a message drops the partial and starts a new one.
-  - **Fragment size:** both sides send fragments of MTU−3 bytes (ATT header 3; the 1-byte fragment header leaves MTU−4 data bytes). The daemon reads the negotiated MTU from its BLE stack per frame and caps writes at 244 B; until the MTU exchange is reported (MTU 23) it writes 20 B, and after a failed large write it falls back to 20 B for the rest of the link. `AGENTLINK_BLE_WRITE_LEN` pins the daemon's write size. Receivers reassemble by header only, so any fragment size up to MTU−3 is valid. The device also requests LE Data Length 251 so that one MTU-sized fragment fits one link-layer packet.
+  - **Fragment size:** both sides send fragments of MTU−3 bytes (ATT header 3; the 1-byte fragment header leaves MTU−4 data bytes). The daemon reads the negotiated MTU from its BLE stack per frame and caps writes at 244 B; until the MTU exchange is reported (MTU 23) it writes 20 B, and after a failed large write it falls back to 20 B for the rest of the link. `AGENTLINK_BLE_WRITE_LEN` pins the daemon's write size. Receivers reassemble by header only, so any fragment size up to MTU−3 is valid. The device also requests LE Data Length 251 so that one MTU-sized fragment fits one link-layer packet. A central without data length extension (the BCM4350C0 in some Linux laptops) refuses that; the device then answers the MTU exchange with 239 instead of 247, so that each ATT packet (243 B with L2CAP) fills nine 27-byte link-layer packets exactly instead of ten with an 8-byte tail.
   - **Discovery:** the daemon connects to devices that advertise the service or a name starting with `AgentLink-`. `AGENTLINK_BLE_NAME` pins one device by name.
   - **Security (current state):** no bonding and no encryption yet (`sm_bonding = 0`, no-IO capability). The LESC passkey and app-layer AEAD in §8 are planned, not implemented.
 - **USB CDC:** each frame is `0x00 ‖ COBS(payload ‖ crc16_be) ‖ 0x00`. The CRC is CRC-16/CCITT-FALSE (poly `0x1021`, init `0xFFFF`, no reflection, xorout 0), and the payload is at most 4096 B.
@@ -72,7 +72,7 @@ device                                 daemon
 ### `hello` (device → daemon)
 ```cddl
 hello = {
-  proto: [uint, uint],             ; [major, minor] = [0, 14]
+  proto: [uint, uint],             ; [major, minor] = [0, 19]
   dev: { class: tstr,              ; "watch" | "desk" | "pad" | "sim" | ...
          board: tstr,              ; "m5stopwatch"
          fw: tstr,                 ; semver
@@ -139,7 +139,10 @@ session = {
   ? lr: uint,                ; lines removed                                          │ (DONE-SUMMARY.md)
   ? tp: bool,                ; the last recognised test run: true passed, false failed │ key 30-34
   ? dur: uint,               ; the turn's length in seconds                           ┘
-  ? qd: tstr                 ; the queued message's start, <= 48 chars; "" = none (proto 0.17, key 35, §6d)
+  ? qd: tstr,                ; the queued message's start, <= 48 chars; "" = none (proto 0.17, key 35, §6d)
+  ? lm: uint,                ; the agent's last message: its id, 0 = none        ┐ proto ≥ 0.18, keys 36-38
+  ? ll: uint,                ; its length in bytes as cleaned (≤ 4096)           │ (§6e, LAST-MESSAGE.md)
+  ? lp: tstr                 ; its start, ≤ 160 bytes; "" under privacy meta     ┘
 }
 ```
 - `q` / `rp` (keys 17, 18, proto 0.5): when an agent's turn ends on a question, the daemon reads it from the turn's last message (Claude Code's Stop hook carries `last_assistant_message`) and sends the question (≤ 120 chars) with up to 3 answers (≤ 24 chars): the options of an "A or B?" question, else `Yes, go ahead` / `No` for a yes/no one, else none. The watch lists them first under Reply, with the question above. They are cleared (`""`, `[]`: a delta cannot remove a key) as soon as the agent works again. Agent content: never sent under privacy `meta`, and only to devices with proto ≥ 0.5.
@@ -184,8 +187,10 @@ attention = {
   ? hush: bool,              ; no buzz, glow or reminders for this request; proto ≥ 0.12 (PRESENCE.md)
   ? rule: tstr,              ; the standing rule, exactly as Claude Code saves it   ┐ proto ≥ 0.13,
   ? scope: uint,             ; 0 this session, 1 this project (local settings)      │ always together
-  ? wide: bool               ; the rule ends in a wildcard                           ┘ (STANDING-RULES.md)
+  ? wide: bool,              ; the rule ends in a wildcard                           ┘ (STANDING-RULES.md)
+  ? qs: [1*4 ask_q]          ; AskUserQuestion's questions; proto ≥ 0.18, key 16 (§6e, LAST-MESSAGE.md)
 }
+ask_q = { h: tstr, q: tstr, o: [1*4 { l: tstr, ? d: tstr }], ? m: bool }   ; header, question, options, multi
 clear = { rid: uint, why: "answered_pc"/"answered_dev"/"expired"/"cancelled"/"handed_back" }
 ```
 - **Answer window (proto 0.11, [ANSWER-WINDOW.md](ANSWER-WINDOW.md)).** `left` and `win` let the device count
@@ -221,7 +226,7 @@ The device must show approve/deny **only if** they are in `acts`. The daemon inc
 
 ```cddl
 cmd = {
-  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end"/"rerun"/"unqueue",
+  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end"/"rerun"/"unqueue"/"answer",
   ? sid: uint,
   ? rid: uint,               ; required for approve/deny/reply
   ? arg: uint / tstr / scroll_arg,  ; snooze minutes (the watch sends 30), reply option index, quiet duration,
@@ -229,7 +234,9 @@ cmd = {
   hold_ms?: uint,            ; for approve: measured hold-to-confirm duration (daemon enforces ≥ 1000)
   ? rh: uint,                ; with approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of
                              ; the rule, a 0 byte, scope and wide (0/1) as the device showed them; hold ≥ 1500
-  ? q: bool                  ; with type / dictate (proto 0.17, key 6): queue it if the session can't take input (§6d)
+  ? q: bool,                 ; with type / dictate (proto 0.17, key 6): queue it if the session can't take input (§6d)
+  ? picks: [1*4 uint],       ; with answer (proto 0.18, key 7): per question, the options picked (bit mask)  ┐ §6e
+  ? aids: [1*4 uint]         ; with answer (key 8): per question, the recording of a free answer, 0 = none  ┘
 }
 scroll_arg = { unit: "lines"/"pages"/"to_end", delta: int, ? seq: uint }   ; delta < 0 = up (older); to_end: sign = top / bottom
 result = { ok: bool, ? err: "stale"/"denied"/"unsupported"/"no_window"/"timeout", ? msg: tstr, ? pos: scroll_pos }
@@ -261,6 +268,7 @@ scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tst
   `denied` under privacy `meta`, past 4096 bytes or for an offset inside a character, `unsupported` from a device
   below 0.11. The text keeps line breaks and spells out control and undrawable characters (`^[`, `\u{a0}`). The
   device keeps a chunk only for the rid it asked for, at the offset it has reached, with the announced total.
+  Without a `rid` (proto 0.18, §6e) it asks for session `sid`'s last message.
 - `approve` with `rh` (proto 0.13, [STANDING-RULES.md](STANDING-RULES.md)): approve, and have the hook pass the
   request's standing rule back to Claude Code as `updatedPermissions`. `denied` when the request offers no rule,
   when `rh` is not the hash of the rule it offers (another request's, another scope, a broader rule), or when
@@ -356,8 +364,47 @@ the daemon types it the next time the session can.
   daemon restarts. It never expires otherwise. Audited when typed, with the source (reply index or recording),
   not the text.
 
+## 6e. Last message and questions (proto 0.18, [LAST-MESSAGE.md](LAST-MESSAGE.md))
+- **Last message.** When a Claude Code turn ends (`Stop`, `last_assistant_message`), the daemon keeps the final
+  message, markdown cleaned to plain text and cut at 4096 bytes, one per session, in memory, and sends `lm` (a new
+  id), `ll` (its length) and `lp` (its start, ≤ 160 bytes) with the delta that enters done; a new prompt clears them
+  (`0`, `0`, `""`). `cmd detail {sid, arg: off}` **without a rid** asks for it: `detail {sid, text, off, total, lm}`
+  chunks of ≤ 1024 bytes, then `result ok`; `stale` with no message, `denied` under privacy `meta`. The device keeps
+  a chunk only for the session and `lm` it asked for. Agent content: `lp` and the chunks' text never reach the
+  trace or the audit log; under `meta`, `lp` is `""` (`lm` and `ll` still say a message exists). Keys 36-38 and
+  `detail.lm` (key 5) only to devices with proto ≥ 0.18.
+- **Questions.** Claude Code's `PermissionRequest` for `AskUserQuestion` is a held request (the answer window) of
+  kind `question` with `qs`: every question's header (≤ 16 bytes), text (≤ 160), options (label ≤ 48, description
+  ≤ 120) and `m` for multi-select. `cmd answer {sid, rid, picks, aids, hold_ms}` (op 19) answers them all at once,
+  one entry per question: a bit mask of options, or the recording (`aid`) of a dictated free answer. `denied`
+  without a 1000 ms hold, for a wrong count, no or several picks on a single-choice question, a bit past the
+  options or both a pick and a recording; `stale` for a request that is not open or a recording without a
+  transcript; nothing is used up by a refusal. The hook answers `allow` with `updatedInput` = the tool's input plus
+  `answers` (`{question: label}`, several labels joined with `", "`, or the transcript). `PreToolUse` no longer
+  holds a question. A device below 0.18 gets no `qs`: one single-choice question keeps `opts` (`reply`, or
+  `dictate` with the `rid`), anything else is Open on PC only.
+
+## 6f. Power report (proto 0.19, [POWER.md](POWER.md))
+```
+power { mv, mvf, vin, chg, usb, pct, on, dim, off, deep, lk, ble, itvl, seq, nd }   device → daemon (type 27)
+```
+- The device sends it only to a daemon whose `welcome` says proto ≥ 0.19: right after the welcome, then every 5
+  minutes while welcomed (a send that fails is tried again 30 s later). Nothing is sent, and nothing extra wakes
+  the device, while no daemon listens: the figures add up until the next report goes out.
+- `mv` is the last raw battery reading and `mvf` the filtered one the device's own percent `pct` comes from (linear
+  3.3-4.2 V); `vin` the input voltage, `chg` charging, `usb` external power present. All in mV. Voltage only: the
+  device cannot measure current.
+- `on`, `dim`, `off` and `deep` are the ms since the previous report with the display on at full look, on and
+  dimmed to the ambient face, off (standby), and in deep sleep. Their sum is the time the report covers. Deep sleep
+  is measured by the RTC across the wake reboot; the not-yet-sent figures survive it in RTC memory (`nd` deep sleeps
+  ended in this span). A power-on or reset loses them: `seq` (the report number since power-on) starts at 0 again.
+- `lk` is the ms welcomed by a daemon (any transport), `ble` the ms with a BLE central connected, and `itvl` the BLE
+  connection interval in force now in µs (0 = no BLE connection).
+- The daemon appends each report to `~/.agentlink/power-reports.csv` and keeps the last one per device for
+  `agentlink status`; `agentlink power` reads the file. An older daemon ignores the message type.
+
 ## 7. Misc
-- `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray.
+- `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray. The current firmware does not send it; the power report (§6f) carries more.
 - `cfg { … }` (daemon → device) is a partial update of the `welcome.cfg` fields.
 - `ping {}` / `pong {}`.
 - `log { lvl, msg }` (device → daemon) is debug only and is enabled from the daemon.

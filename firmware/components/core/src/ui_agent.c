@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "debug.h"
+#include "detail.h"
 #include "nav.h"
 #include "ui_gauges.h"
 #include "ui_internal.h"
@@ -42,13 +43,13 @@ static const char *const s_labels[AG_COUNT] = {
     [AG_FOCUS] = "Open on PC", [AG_DISMISS] = "Dismiss",
     [AG_SNOOZE] = "Snooze 30 min", [AG_NOTIFY] = "Notify when done", [AG_WATCH] = "Activity",
     [AG_REPLY] = "Reply",          [AG_INTERRUPT] = "Stop",       [AG_RERUN] = "Run again",
-    [AG_QUEUE] = "Queue reply",    [AG_UNQUEUE] = "Cancel queued",
+    [AG_QUEUE] = "Queue reply",    [AG_UNQUEUE] = "Cancel queued", [AG_READ] = "Read",
 };
 
 static const char *const s_icons[AG_COUNT] = {
     [AG_FOCUS] = ICON_OPEN,   [AG_DISMISS] = ICON_DENIED, [AG_SNOOZE] = ICON_IDLE,  [AG_NOTIFY] = ICON_BELL,
     [AG_WATCH] = ICON_ACTIVITY, [AG_REPLY] = ICON_REPLY,  [AG_INTERRUPT] = ICON_STOP, [AG_RERUN] = ICON_WORKING,
-    [AG_QUEUE] = ICON_REPLY,    [AG_UNQUEUE] = ICON_DENIED,
+    [AG_QUEUE] = ICON_REPLY,    [AG_UNQUEUE] = ICON_DENIED, [AG_READ] = ICON_QUESTION, /* a speech bubble: what it said */
 };
 
 static const session_t *session(void) { return model_find(s_sid); }
@@ -114,7 +115,7 @@ bool ui_agent_refresh(uint32_t now)
         else {
             bool queue_ok = model_peer_minor() >= QUEUE_MIN_MINOR && model_can_type() && (model_reply_count() > 0 || model_voice());
             n = nav_agent_items(s->state, model_can_type(), model_reply_count() > 0 || s->n_rp > 0 || model_voice() || model_keys(),
-                                queue_ok, s->queued[0] != 0, items, WHEEL_MAX_ITEMS);
+                                queue_ok, s->queued[0] != 0, detail_msg_fetchable(s), items, WHEEL_MAX_ITEMS);
         }
         for (int i = 0; i < n; i++)
             w[i] = (wheel_item_t){label_of(items[i].id, s), items[i].id == AG_INTERRUPT ? RGB_DANGER : items[i].id == AG_RERUN ? RGB_WORKING : rgb, items[i].hold,
@@ -168,6 +169,16 @@ void ui_agent_open(uint32_t sid, uint32_t now)
     if (s && s->state == SESS_DONE && !s->seen && !theme_is_job(s)) g_ui_actions->ack(sid);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     dbg_event("ui", "agent", "\"sid\":%u,\"items\":%d", (unsigned)sid, wheel_count(s_wheel));
+}
+
+/* Straight into the Reply list (from the end of the last message): Back goes to the deck. */
+void ui_agent_show_replies(void)
+{
+    s_replies = true;
+    s_queue = false;
+    wheel_set(s_wheel, NULL, 0, 0);
+    ui_agent_refresh(s_now);
+    dbg_event("ui", "replies", "\"sid\":%u,\"n\":%d", (unsigned)s_sid, model_reply_count());
 }
 
 void ui_agent_close(void)
@@ -240,6 +251,10 @@ static void commit(const wheel_item_t *it)
     case AG_UNQUEUE: g_ui_actions->unqueue(s->sid); break;
     case AG_INTERRUPT: g_ui_actions->interrupt(s->sid, s_hold_ms); break; /* only ever after the hold */
     case AG_RERUN: g_ui_actions->rerun(s->sid, s_hold_ms); break;         /* only ever after the hold */
+    case AG_READ: /* what the agent said (LAST-MESSAGE.md) */
+        g_ui_actions->tick();
+        ui_go_read();
+        return;
     case AG_WATCH: /* the monitor for this session (UI-V2 §4.7) */
         g_ui_actions->tick();
         ui_go_watch();

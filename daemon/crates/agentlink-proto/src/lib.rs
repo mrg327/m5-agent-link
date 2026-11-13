@@ -5,6 +5,7 @@
 //! `serde::Serialize` using the *symbolic* names from the vectors, which is what
 //! the trace log and `agentlink decode` print.
 
+pub mod battery;
 mod body;
 mod enums;
 mod envelope;
@@ -14,7 +15,7 @@ pub use enums::*;
 pub use envelope::{DecodeError, EncodeError, Envelope, Message, Unknown};
 
 /// Protocol version spoken by this crate: `[major, minor]`.
-pub const PROTO: Version = Version(0, 17);
+pub const PROTO: Version = Version(0, 19);
 
 fn ser_hex<S: serde::Serializer, T: AsRef<[u8]>>(v: &T, s: S) -> Result<S::Ok, S::Error> {
     s.serialize_str(&hex::encode(v.as_ref()))

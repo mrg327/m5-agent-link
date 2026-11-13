@@ -152,6 +152,19 @@ const char *hal_reset_reason(void);
 typedef struct { uint8_t percent; bool charging; bool usb_present; } hal_battery_t;
 hal_battery_t hal_battery_read(void);
 
+/* ── power report (docs/design/POWER.md, proto 0.19) ── */
+/* The voltages behind the last hal_battery_read(), in mV: the last raw battery reading (0 before the first),
+ * the filtered one the percent comes from, and the input (USB / charger) voltage. No bus traffic of its own. */
+typedef struct { uint16_t mv; uint16_t mv_filt; uint16_t vin_mv; } hal_battery_mv_t;
+hal_battery_mv_t hal_battery_mv(void);
+/* How long the DEEP that ended with this boot lasted, in ms (the board's clock across the sleep); 0 when this
+ * boot did not end a DEEP, or the time is not known. */
+uint32_t hal_deep_slept_ms(void);
+/* A few more words that survive DEEP like hal_retained_get() (RTC memory, zero after a power-on or reset).
+ * Core keeps the power report's unsent figures here (power_report.c). */
+#define HAL_RETAINED_WORDS 10
+uint32_t *hal_retained_words(void);
+
 /* ───────────── link transports ───────────── */
 
 /* A transport carries opaque protocol frames (already CBOR+envelope encoded).
@@ -166,6 +179,11 @@ bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len);
 /* While the watch drives the PC live (SCROLL), ask the links for low latency: BLE requests a
  * 15–30 ms connection interval; false returns to the interval the central chose. No-op elsewhere. */
 void hal_link_interactive(bool on);
+/* While a firmware update streams in, ask the links for throughput: BLE requests the shortest connection
+ * interval (7.5 ms), or the interactive one if the central refuses it; false undoes it. No-op elsewhere. */
+void hal_link_bulk(bool on);
+/* The BLE connection interval in force, in microseconds; 0 when no central is connected (or no BLE). */
+uint32_t hal_link_ble_interval_us(void);
 
 /* ───────────── firmware update (OTA, FIRMWARE.md §9, proto 0.15) ───────────── */
 

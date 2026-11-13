@@ -412,6 +412,30 @@ sim_script_test(sim_queue_reply queue_reply.txt
 sim_script_test(sim_queue_dictate queue_dictate.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"op\":12,\"sid\":1,\"rid\":0,\"hold_ms\":[0-9]+,\"arg\":[0-9]+,\"q\":1")
+# The agent's last message (proto 0.18, LAST-MESSAGE.md): the card's preview and Read, the reader fetching it by
+# session with no rid, the end picker; under privacy meta no text and no fetch; a new prompt closes the reader.
+sim_script_test(sim_last_message_card last_message_card.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":(11|12|19)"
+                PASS_REGULAR_EXPRESSION "\"op\":7,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":0.*\"ev\":\"done\",\"rid\":0,\"bytes\":[0-9]+,\"lm\":7")
+sim_script_test(sim_last_message_reply last_message_reply.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"op\":12,\"sid\":1,\"rid\":0,\"hold_ms\":[0-9]+,\"arg\":[0-9]+,\"q\":0")
+sim_script_test(sim_last_message_meta last_message_meta.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":7")
+sim_script_test(sim_last_message_cleared last_message_cleared.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# Questions (AskUserQuestion, proto 0.18): a hold picks a single-choice option, taps tick multi-select ones and
+# Send is held; "Other" dictates; every answer goes out at once (cmd answer, op 19); a tap never sends one.
+sim_script_test(sim_question_single question_single.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":5"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_answer\",\"rid\":31,\"n\":1,\"picks\":\\[2,")
+sim_script_test(sim_question_multi question_multi.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":19.*\"op\":19"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_answer\",\"rid\":32,\"n\":2,\"picks\":\\[1,5,")
+sim_script_test(sim_question_other question_other.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":12"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_answer\",\"rid\":33,\"n\":1,\"picks\":\\[0,0,0,0\\],\"aids\":\\[[1-9]")
+sim_script_test(sim_question_tap_never_sends question_tap_never_sends.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":19"
+                PASS_REGULAR_EXPRESSION "\"op\":0,\"sid\":2,\"rid\":34")
 sim_script_test(sim_queue_show_cancel queue_show_cancel.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"op\":18,\"sid\":1")
@@ -555,3 +579,37 @@ sim_script_test(sim_ota_rollback_timeout ota_rollback_timeout.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_confirm\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"ota_rollback\".*\"ev\":\"restart\"")
 set_tests_properties(sim_ota_rollback_timeout PROPERTIES ENVIRONMENT "AGENTLINK_SIM_UNCONFIRMED=1")
+# "Updated" tone (sound role `updated`): once, on the first welcome of an unconfirmed
+# (OTA) boot; never on a normal boot, never again on a re-welcome.
+sim_script_test(sim_ota_updated_tone ota_updated_tone.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"ota_updated_tone\".*\"ev\":\"ota_updated_tone\"|\"ev\":\"sound\".*\"ev\":\"sound\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_confirm\".*\"ev\":\"ota_updated_tone\".*\"ev\":\"sound\"")
+set_tests_properties(sim_ota_updated_tone PROPERTIES ENVIRONMENT "AGENTLINK_SIM_UNCONFIRMED=1")
+sim_script_test(sim_ota_updated_tone_silent ota_updated_tone_silent.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_updated_tone|\"ev\":\"sound\"")
+
+# ── Power report (docs/design/POWER.md, proto 0.19) ──
+# State-time accounting, cadence, refused sends, unlinked time and the figures a deep sleep keeps, against
+# stubbed HAL / link / UI.
+add_executable(test_power_report tests/test_power_report.c ${FW}/core/src/power_report.c)
+target_include_directories(test_power_report PRIVATE ${FW}/core/src)
+target_link_libraries(test_power_report PRIVATE agentlink_proto lvgl::lvgl m)
+target_include_directories(test_power_report PRIVATE ${FW}/agentlink_hal/include)
+add_test(NAME power_report_logic COMMAND test_power_report)
+# The whole firmware: a report right after a 0.19 welcome (none before), the next 5 minutes later, over BLE with
+# the interval; none to a 0.18 daemon; on / dim / off split; the deep sleep a boot ended; time while unlinked.
+sim_script_test(sim_power_report_cadence power_report_cadence.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"report\".*\"ev\":\"welcome\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"welcome\".*\"ev\":\"report\",\"sent\":true,\"seq\":0,.*\"msg\":\"power\".*\"ev\":\"report\",\"sent\":true,\"seq\":1,\"mv\":4020,\"on\":30[0-9][0-9][0-9][0-9],\"dim\":[0-9]+,\"off\":0,\"deep\":0,\"lk\":30[0-9][0-9][0-9][0-9],\"ble\":30[0-9][0-9][0-9][0-9],\"itvl\":30000,\"nd\":0")
+sim_script_test(sim_power_report_old_daemon power_report_old_daemon.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"report\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"welcome\"")
+sim_power_test(sim_power_report_states power_report_states.txt ARGS --idle-off 100
+               PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"report\",\"sent\":true,\"seq\":1,\"mv\":[0-9]+,\"on\":3[01][0-9][0-9][0-9],\"dim\":8[01][0-9][0-9][0-9],\"off\":18[89][0-9][0-9][0-9],\"deep\":0,")
+sim_power_test(sim_power_report_deep power_report_deep.txt ARGS --battery --wake button --slept 7200
+               PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"report_restored\",\"kept\":false,\"seq\":0,\"deep\":7200000.*\"ev\":\"report\",\"sent\":true,\"seq\":0,\"mv\":[0-9]+,\"on\":[0-9]+,\"dim\":[0-9]+,\"off\":[0-9]+,\"deep\":7200000,.*\"nd\":1")
+sim_script_test(sim_power_report_unlinked power_report_unlinked.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"report\",\"sent\":true,\"seq\":1,\"mv\":[0-9]+,\"on\":60[0-9][0-9][0-9][0-9],\"dim\":[0-9]+,\"off\":0,\"deep\":0,\"lk\":[0-9][0-9][0-9][0-9]?,")

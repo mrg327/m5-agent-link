@@ -12,6 +12,8 @@ void sim_input_button(int btn, bool down);
 /* Power tests: run on battery (no USB), and pretend this boot ended a DEEP. */
 void sim_set_battery(bool on_battery);
 void sim_set_wake(hal_wake_t why, uint32_t retained);
+/* `--slept S`: the DEEP this boot ended lasted S seconds (the power report's deep time). */
+void sim_set_deep_slept_ms(uint32_t ms);
 void sim_input_motion(hal_motion_kind_t kind);
 /* The pose the simulated IMU reports (milli-g, screen axes) and the palm-cover flag of the touch controller. */
 void sim_set_pose(int x, int y, int z);

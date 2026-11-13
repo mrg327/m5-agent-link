@@ -1,0 +1,30 @@
+# AskUserQuestion on the watch (proto 0.18, LAST-MESSAGE.md §3): one single-choice question. Its options are
+# rows; a tap only selects one and says how to choose it; a hold on the option's own row picks it and sends the
+# answer at once (cmd answer, op 19, picks [bit of that option]).
+connect
+rx a400020101020103a60082001201a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 2 ask webapp feat/login
+ask 31 2 60000 60000 Framework|Which UI framework should the dashboard use?|single|React=Component library, large ecosystem|Vue=Progressive framework|Svelte=Compiles away
+wait 600
+expect_screen ask
+expect_label Framework
+expect_label Which UI framework
+expect_label > React HOLD
+expect_label Other
+shot question_single.png
+tap 233 334
+wait 300
+expect_label Hold to choose
+expect_label > Vue HOLD
+tap 233 150
+wait 400
+expect_label Reading 1 of 1
+shot question_desc.png
+btn B
+wait 400
+hold 233 282 1500
+wait 400
+expect_label Sent
+expect_label "Vue"
+shot question_sent.png
+quit

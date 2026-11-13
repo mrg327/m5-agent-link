@@ -29,6 +29,7 @@ static const char *TAG = "link_ble";
  * MTU-sized write/notification goes in one LL PDU instead of ten 27-octet ones. 0 disables. */
 #define BLE_DATA_LEN_OCTETS 251
 #define BLE_DATA_LEN_TIME_US 2120
+#define BLE_SHORT_LL_MTU 239 /* 239 + 4 (L2CAP) = 243 = 9 × 27: whole 27-octet LL packets without DLE */
 #define BLE_HDR_FIRST 0x80
 #define BLE_HDR_LAST 0x40
 #define BLE_HDR_SEQ 0x3f
@@ -116,15 +117,26 @@ static void report_state(bool up)
 
 static void advertise(void);
 
-/* ── connection interval: the central's choice, or 15–30 ms while interactive (DESIGN §7) ── */
+/* ── connection interval: the central's choice, 15–30 ms while interactive (DESIGN §7), or as short as
+ * the central allows during a bulk transfer (an update, FIRMWARE.md §9) ── */
 
+enum { ITVL_BASE, ITVL_FAST, ITVL_BULK };
 #define BLE_FAST_ITVL_MIN 12  /* 1.25 ms units: 15 ms, Apple's floor */
 #define BLE_FAST_ITVL_MAX 24  /* 30 ms; Apple wants max ≥ min + 15 ms */
+/* A central that cannot do long LL packets (no data length extension, e.g. the BCM4350C0) moves a few
+ * 27-byte packets per connection event, so the interval sets the rate: ~3 KB/s at 30 ms, ~13 KB/s at
+ * 7.5 ms. A central that refuses this gets the fast request instead. */
+#define BLE_BULK_ITVL_MIN 6   /* 7.5 ms, the minimum */
+#define BLE_BULK_ITVL_MAX 6
 #define BLE_FAST_TIMEOUT 400  /* 10 ms units: 4 s */
+#define BLE_IDLE_ITVL 24      /* 30 ms (to 45 ms): the base after a connect at a remembered bulk interval */
 static uint16_t s_base_itvl, s_base_latency, s_base_timeout;
-static bool s_fast;         /* wanted */
-static bool s_applied_fast; /* last requested */
-static bool s_req_pending;  /* one update at a time; the next is sent when it completes */
+static volatile uint16_t s_cur_itvl; /* the interval in force (1.25 ms units), 0 = no central: power report */
+static bool s_fast, s_bulk;      /* wanted */
+static uint8_t s_applied;        /* ITVL_*: last granted (or, while s_req_pending, requested) */
+static uint8_t s_prev_applied;   /* before the pending request */
+static bool s_bulk_refused;      /* this central refused the bulk interval */
+static bool s_req_pending;       /* one update at a time; the next is sent when it completes */
 
 static void conn_params(const char *why, bool save_base)
 {
@@ -132,6 +144,7 @@ static void conn_params(const char *why, bool save_base)
     if (s_conn == BLE_HS_CONN_HANDLE_NONE || ble_gap_conn_find(s_conn, &d) != 0) return;
     ESP_LOGI(TAG, "%s: interval %u.%02u ms, latency %u, timeout %u ms", why, d.conn_itvl * 125 / 100,
              d.conn_itvl * 125 % 100, d.conn_latency, d.supervision_timeout * 10);
+    s_cur_itvl = d.conn_itvl;
     if (save_base) {
         s_base_itvl = d.conn_itvl;
         s_base_latency = d.conn_latency;
@@ -139,26 +152,50 @@ static void conn_params(const char *why, bool save_base)
     }
 }
 
-static void request_interval(bool fast)
+static uint8_t wanted_level(void)
+{
+    uint8_t lv = s_bulk && !s_bulk_refused ? ITVL_BULK : (s_fast || s_bulk) ? ITVL_FAST : ITVL_BASE;
+    uint16_t min = lv == ITVL_BULK ? BLE_BULK_ITVL_MIN : BLE_FAST_ITVL_MIN;
+    if (lv == ITVL_BULK && s_base_itvl <= min) lv = ITVL_FAST; /* the central already runs this fast */
+    if (lv == ITVL_FAST && s_base_itvl <= BLE_FAST_ITVL_MIN) lv = ITVL_BASE;
+    return lv;
+}
+
+/* Asks the central for the interval that is wanted now, if that is not the one it runs. */
+static void apply_interval(void)
 {
     if (s_conn == BLE_HS_CONN_HANDLE_NONE || !s_base_itvl || s_req_pending) return;
-    if (s_base_itvl <= BLE_FAST_ITVL_MIN) return; /* the central already runs as fast as we would ask */
+    uint8_t lv = wanted_level();
+    if (lv == s_applied) return;
+    static const char *const kName[] = {"base", "fast", "bulk"};
     struct ble_gap_upd_params p = {};
-    p.itvl_min = fast ? BLE_FAST_ITVL_MIN : s_base_itvl;
-    p.itvl_max = fast ? BLE_FAST_ITVL_MAX : (uint16_t)(s_base_itvl + 12);
-    p.latency = fast ? 0 : s_base_latency;
-    p.supervision_timeout = fast ? BLE_FAST_TIMEOUT : s_base_timeout;
+    p.itvl_min = lv == ITVL_BULK ? BLE_BULK_ITVL_MIN : lv == ITVL_FAST ? BLE_FAST_ITVL_MIN : s_base_itvl;
+    p.itvl_max = lv == ITVL_BULK ? BLE_BULK_ITVL_MAX : lv == ITVL_FAST ? BLE_FAST_ITVL_MAX : (uint16_t)(s_base_itvl + 12);
+    p.latency = lv == ITVL_BASE ? s_base_latency : 0;
+    p.supervision_timeout = lv == ITVL_BASE ? s_base_timeout : BLE_FAST_TIMEOUT;
     int rc = ble_gap_update_params(s_conn, &p);
     s_req_pending = rc == 0;
-    if (rc == 0) s_applied_fast = fast;
-    ESP_LOGI(TAG, "interval request %s (%u–%u units): rc=%d", fast ? "fast" : "base", p.itvl_min, p.itvl_max, rc);
+    if (rc == 0) {
+        s_prev_applied = s_applied;
+        s_applied = lv;
+    }
+    ESP_LOGI(TAG, "interval request %s (%u–%u units): rc=%d", kName[lv], p.itvl_min, p.itvl_max, rc);
 }
 
 void sw_ble_link_interactive(bool on)
 {
     if (on == s_fast) return;
     s_fast = on;
-    request_interval(on);
+    apply_interval();
+}
+
+uint32_t sw_ble_link_interval_us(void) { return s_conn == BLE_HS_CONN_HANDLE_NONE ? 0 : s_cur_itvl * 1250u; }
+
+void sw_ble_link_bulk(bool on)
+{
+    if (on == s_bulk) return;
+    s_bulk = on;
+    apply_interval();
 }
 
 static int gap_event(struct ble_gap_event *ev, void *arg)
@@ -166,23 +203,53 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
     (void)arg;
     switch (ev->type) {
     case BLE_GAP_EVENT_CONNECT:
-        if (ev->connect.status == 0) {
+    {
+        /* NimBLE reports a peripheral's connect only after reading the central's features, and passes
+         * that read's status on: a central that refuses it (the BCM4350C0, HCI 0x1a "unsupported remote
+         * feature") yields status 26 for a link that is up. Treated as failed, the link skipped the
+         * setup below (data length, PHY, fast interval) and ran at ~1.7 KB/s (issue 2047). */
+        struct ble_gap_conn_desc cd;
+        bool up = ev->connect.status == 0 || (ev->connect.conn_handle != BLE_HS_CONN_HANDLE_NONE &&
+                                              ble_gap_conn_find(ev->connect.conn_handle, &cd) == 0);
+        if (up) {
+            if (ev->connect.status != 0)
+                ESP_LOGW(TAG, "connect status %d, but the link is up: using it", ev->connect.status);
             s_conn = ev->connect.conn_handle;
             s_subscribed = false;
             s_rx_frag_max = 0;
             ESP_LOGI(TAG, "central connected (handle %u)", ev->connect.conn_handle);
             ble_gap_set_prefered_le_phy(s_conn, BLE_GAP_LE_PHY_2M_MASK, BLE_GAP_LE_PHY_2M_MASK, 0);
+            ble_att_set_preferred_mtu(BLE_PREFERRED_MTU);
             if (BLE_DATA_LEN_OCTETS) {
                 int rc = ble_gap_set_data_len(s_conn, BLE_DATA_LEN_OCTETS, BLE_DATA_LEN_TIME_US);
-                if (rc != 0) ESP_LOGW(TAG, "data length request rc=%d", rc);
+                if (rc != 0) {
+                    /* No long LL packets (the central lacks data length extension): an ATT packet then
+                     * goes in 27-byte LL packets, and MTU 247 (251 B with L2CAP) needs ten, the last one
+                     * 8 B. MTU 239 fills nine exactly. The central exchanges the MTU right after this. */
+                    ESP_LOGW(TAG, "data length request rc=%d: asking for MTU %d", rc, BLE_SHORT_LL_MTU);
+                    ble_att_set_preferred_mtu(BLE_SHORT_LL_MTU);
+                }
             }
-            s_req_pending = s_applied_fast = false;
+            s_req_pending = s_bulk_refused = false;
+            s_applied = ITVL_BASE;
             conn_params("connected", true);
-            if (s_fast) request_interval(true);
+            if (s_base_itvl && s_base_itvl < BLE_FAST_ITVL_MIN) {
+                /* No central picks this on its own: BlueZ keeps the parameters a peripheral last asked
+                 * for and connects with them, so an update that ended in a restart left the bulk
+                 * interval behind. Ask for the usual 30–45 ms instead of staying there. */
+                s_base_itvl = BLE_IDLE_ITVL;
+                s_applied = ITVL_BULK; /* what the link runs: apply_interval() asks for the base */
+            }
+            apply_interval();
         } else {
             ESP_LOGW(TAG, "connect failed: %d", ev->connect.status);
             advertise();
         }
+        break;
+    }
+    case BLE_GAP_EVENT_PHY_UPDATE_COMPLETE:
+        ESP_LOGI(TAG, "phy: tx %u rx %u (status %d)", ev->phy_updated.tx_phy, ev->phy_updated.rx_phy,
+                 ev->phy_updated.status);
         break;
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "central disconnected (handle %u, reason 0x%x)", ev->disconnect.conn.conn_handle,
@@ -194,6 +261,7 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
         s_conn = BLE_HS_CONN_HANDLE_NONE;
         s_subscribed = false;
         s_base_itvl = 0;
+        s_cur_itvl = 0;
         report_state(false);
         advertise();
         break;
@@ -213,9 +281,20 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
     {
         bool ours = s_req_pending;
         s_req_pending = false;
-        if (ev->conn_update.status == 0) conn_params("updated", !ours && !s_applied_fast); /* the central's own change: new base */
-        else ESP_LOGW(TAG, "interval update failed: %d", ev->conn_update.status);
-        if (ev->conn_update.status == 0 && s_applied_fast != s_fast) request_interval(s_fast); /* changed meanwhile */
+        if (ev->conn_update.status == 0) {
+            conn_params("updated", !ours && s_applied == ITVL_BASE); /* the central's own change: new base */
+            apply_interval();                                       /* wanted something else meanwhile */
+        } else {
+            ESP_LOGW(TAG, "interval update failed: %d", ev->conn_update.status);
+            if (ours) {
+                bool bulk = s_applied == ITVL_BULK;
+                s_applied = s_prev_applied;
+                if (bulk) { /* refused: ask for what every central takes */
+                    s_bulk_refused = true;
+                    apply_interval();
+                }
+            }
+        }
         break;
     }
     case BLE_GAP_EVENT_MTU:
@@ -286,9 +365,22 @@ static int str_access(uint16_t, uint16_t, struct ble_gatt_access_ctxt *ctxt, voi
     return os_mbuf_append(ctxt->om, s, strlen(s)) == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
 
+/* Battery Level (0x2A19): read, and notified to a subscribed central when the percent moves by 1 or more.
+ * The value is the one the core task last read (hal_battery_read, at least once a minute); the host task
+ * never touches the PM1 itself. */
+static uint16_t s_bat_handle;
+static volatile uint8_t s_bat_pct;
+
+void sw_ble_battery_level(uint8_t percent)
+{
+    if (percent == s_bat_pct) return;
+    s_bat_pct = percent;
+    if (s_bat_handle && s_conn != BLE_HS_CONN_HANDLE_NONE) ble_gatts_chr_updated(s_bat_handle);
+}
+
 static int bat_access(uint16_t, uint16_t, struct ble_gatt_access_ctxt *ctxt, void *)
 {
-    uint8_t pct = hal_battery_read().percent;
+    uint8_t pct = s_bat_pct;
     return os_mbuf_append(ctxt->om, &pct, 1) == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
 
@@ -316,7 +408,8 @@ static const struct ble_gatt_chr_def kInfoChrs[] = {
     {},
 };
 static const struct ble_gatt_chr_def kBatChrs[] = {
-    {.uuid = &kBatLvlUuid.u, .access_cb = bat_access, .flags = BLE_GATT_CHR_F_READ},
+    {.uuid = &kBatLvlUuid.u, .access_cb = bat_access, .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+     .val_handle = &s_bat_handle},
     {},
 };
 
@@ -350,6 +443,7 @@ void sw_ble_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state)
     s_on_rx = on_rx;
     s_on_state = on_state;
     s_send_lock = xSemaphoreCreateMutex();
+    s_bat_pct = hal_battery_read().percent; /* the core task, before the host runs */
     esp_err_t err = nimble_port_init();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "nimble_port_init: %s", esp_err_to_name(err));

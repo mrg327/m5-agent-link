@@ -225,6 +225,27 @@ bool link_send_approve_rule(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32
     return finish_cmd(LINK_OP_APPROVE, sid, rid, hold_ms, -1);
 }
 
+bool link_send_answer(uint32_t sid, uint32_t rid, const uint32_t *picks, const uint32_t *aids, int n, uint32_t hold_ms)
+{
+    if (n < 1 || n > 4) return false;
+    struct cmd *c = begin_cmd(LINK_OP_ANSWER, sid, rid, hold_ms);
+    if (!c) return false;
+    c->cmd_answer_picks_m_present = true;
+    c->cmd_answer_aids_m_present = true;
+    struct answer_picks *p = &c->cmd_answer_picks_m.cmd_answer_picks_m;
+    struct answer_aids *a = &c->cmd_answer_aids_m.cmd_answer_aids_m;
+    for (int i = 0; i < n; i++) {
+        p->answer_picks_picks[i] = picks[i];
+        a->answer_aids_aids[i] = aids[i];
+    }
+    p->answer_picks_picks_count = a->answer_aids_aids_count = (size_t)n;
+    dbg_event("link", "tx_answer", "\"rid\":%u,\"n\":%d,\"picks\":[%u,%u,%u,%u],\"aids\":[%u,%u,%u,%u]", (unsigned)rid, n,
+              (unsigned)picks[0], (unsigned)(n > 1 ? picks[1] : 0), (unsigned)(n > 2 ? picks[2] : 0),
+              (unsigned)(n > 3 ? picks[3] : 0), (unsigned)aids[0], (unsigned)(n > 1 ? aids[1] : 0),
+              (unsigned)(n > 2 ? aids[2] : 0), (unsigned)(n > 3 ? aids[3] : 0));
+    return finish_cmd(LINK_OP_ANSWER, sid, rid, hold_ms, -1);
+}
+
 bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq)
 {
     struct cmd *c = begin_cmd(LINK_OP_SCROLL, sid, 0, 0);

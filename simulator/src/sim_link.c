@@ -50,6 +50,9 @@ bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 }
 
 void hal_link_interactive(bool on) { (void)on; }
+void hal_link_bulk(bool on) { (void)on; }
+/* A fake BLE link runs at the 30 ms interval a Linux central settles on. */
+uint32_t hal_link_ble_interval_us(void) { return s_fake_up[HAL_LINK_BLE] ? 30000u : 0u; }
 
 void sim_link_enable_ws(bool enable) { s_ws_enabled = enable; }
 

@@ -84,7 +84,7 @@ bool link_tx_hello(hal_link_kind_t to)
     set_hdr(&m->msg_hello_hdr_m, false, 0);
     struct hello *h = &m->msg_hello_hello_m;
     h->hello_major_l_major = 0;
-    h->hello_major_l_minor = 17; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice; 0.7: keys;
+    h->hello_major_l_minor = 18; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice; 0.7: keys;
                                   * 0.8: action_dictate on attention, dictate with rid answers that card;
                                   * 0.9: jobs (agent_shell, session eta / exit, cmd_op_rerun);
                                   * 0.10: gauges (usage message, session ctx / mdl / pm / pr / prs);
@@ -95,7 +95,9 @@ bool link_tx_hello(hal_link_kind_t to)
                                   * 0.14: done summary (session fc / la / lr / tp / dur);
                                   * 0.15: firmware update (fw_begin / fw_chunk / fw_ack);
                                   * 0.16: transcripts up to 2047 bytes (VOICE_TEXT_MAX);
-                                  * 0.17: queued messages (session qd, type / dictate with q, cmd_op_unqueue) */
+                                  * 0.17: queued messages (session qd, type / dictate with q, cmd_op_unqueue);
+                                  * 0.18: last message (session lm / ll / lp, detail without a rid) and
+                                  *       questions (attention qs, cmd_op_answer) */
     h->hello_device_info_m.device_info_device_class_m.device_class_choice = device_class(bi);
     h->hello_device_info_m.device_info_uint1tstr = zstr(bi->board);
     h->hello_device_info_m.device_info_uint2tstr = zstr(bi->fw_version);
@@ -257,4 +259,30 @@ bool link_send_fw_ack(int st, uint32_t next, const char *msg)
     }
     dbg_event("ota", "ota_ack", "\"st\":%d,\"next\":%u", st, (unsigned)next);
     return send_env(g_link.kind, "fw_ack");
+}
+
+bool link_send_power(const link_power_t *p)
+{
+    if (!g_link.welcomed || model_peer_minor() < LINK_POWER_MINOR) return false;
+    memset(&g_tx_env, 0, sizeof g_tx_env);
+    g_tx_env.envelope_choice = envelope_msg_power_m_c;
+    struct msg_power *m = &g_tx_env.envelope_msg_power_m;
+    set_hdr(&m->msg_power_hdr_m, false, 0);
+    struct power *b = &m->msg_power_power_m;
+    b->power_uint0uint = p->mv;
+    b->power_uint1uint = p->mvf;
+    b->power_uint2uint = p->vin;
+    b->power_uint3bool = p->chg;
+    b->power_uint4bool = p->usb;
+    b->power_uint5uint = p->pct;
+    b->power_uint6uint = p->on;
+    b->power_uint7uint = p->dim;
+    b->power_uint8uint = p->off;
+    b->power_uint9uint = p->deep;
+    b->power_uint10uint = p->lk;
+    b->power_uint11uint = p->ble;
+    b->power_uint12uint = p->itvl;
+    b->power_uint13uint = p->seq;
+    b->power_uint14uint = p->nd;
+    return send_env(g_link.kind, "power");
 }

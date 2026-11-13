@@ -31,8 +31,8 @@ void detail_want(const attention_t *a, uint32_t now_ms);
 /* One `detail` chunk off the wire. */
 void detail_on_chunk(uint32_t rid, uint32_t sid, uint32_t off, uint32_t total, const uint8_t *text, uint32_t len,
                      uint32_t now_ms);
-/* The daemon's result for a `cmd detail`. */
-void detail_on_result(uint32_t rid, bool ok, int err);
+/* The daemon's result for a `cmd detail` (rid 0: a last message's, for session sid). */
+void detail_on_result(uint32_t sid, uint32_t rid, bool ok, int err);
 /* Resumes a stalled transfer; forgets one whose request is gone. Call every step. */
 void detail_tick(uint32_t now_ms);
 
@@ -42,6 +42,20 @@ const char *detail_text(uint32_t rid);
 uint32_t detail_got(uint32_t rid);
 uint32_t detail_total(uint32_t rid);
 void detail_reset(void);
-/* How a request goes out (the app wires it to link_send_cmd_arg(LINK_OP_DETAIL, …)); false = not sent. */
+
+/* A session's last message (proto 0.18, LAST-MESSAGE.md §2.3), in a slot of its own: asked for with `cmd detail
+ * {sid, arg: offset}` and no rid; its chunks carry the message id `lm` and are kept only for the session and
+ * message asked for, in order, with the announced length (session.ll). A replaced or cleared message is
+ * forgotten. */
+bool detail_msg_fetchable(const session_t *s);
+void detail_want_msg(const session_t *s, uint32_t now_ms);
+void detail_on_msg_chunk(uint32_t sid, uint32_t lm, uint32_t off, uint32_t total, const uint8_t *text, uint32_t len,
+                         uint32_t now_ms);
+detail_state_t detail_msg_state(uint32_t sid, uint32_t lm);
+const char *detail_msg_text(uint32_t sid, uint32_t lm);
+uint32_t detail_msg_got(uint32_t sid, uint32_t lm);
+uint32_t detail_msg_total(uint32_t sid, uint32_t lm);
+/* How a request goes out (the app wires it to link_send_cmd_arg(LINK_OP_DETAIL, …); rid 0 for a last message);
+ * false = not sent. */
 typedef bool (*detail_send_fn)(uint32_t sid, uint32_t rid, uint32_t off);
 void detail_set_sender(detail_send_fn send);

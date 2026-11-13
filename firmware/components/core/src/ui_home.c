@@ -339,6 +339,8 @@ void ui_home_tick(uint32_t now)
     }
 }
 
+bool ui_home_ambient(void) { return s_ambient; }
+
 void ui_home_refresh(uint32_t now)
 {
     s_now = now;

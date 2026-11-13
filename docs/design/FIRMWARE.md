@@ -70,6 +70,8 @@ Measured rails (from vendor docs): **L0** = M5PM1 only. **L1** = + IMU + RTC. **
 - **Touch-to-wake [D]:** off in STANDBY. Only lifting or a button wakes the device.
 - **As built (2026-11-08):** `core/power.c` owns the policy and `boards/stopwatch/board.cpp` the mechanism. Display off after 60 s without input. DEEP = ESP32-S3 deep sleep (PM1, IOE1 and the RTC domain stay up), entered only on battery with no link, 10 min after display-off; never with USB present (checked twice: `may_deep()` and the board guard). Wake: either button (G1/G2 via EXT1, any low) or the retry timer (5, 10, 20, 40, 60, 60, 60 min, the count kept in RTC memory, then buttons only); a wake is a reboot. A timer wake boots dark and silent, tries to reconnect for 90 s, then sleeps again; a link or any input resets the ladder. A held button aborts the sleep. Recovery: one click of the PM1 power button resets. Lift-to-wake waits for the IMU driver. Simulator: `--battery`, `--deep-after S`, `--wake timer|button --tries N`; tests `sim_deep_*`.
 
+- **Measured (proto 0.19):** the watch reports its battery voltages and the time in each state (display on, dimmed, off, deep) every 5 minutes while linked; `agentlink power` fits a drain rate per state ([POWER.md](POWER.md)).
+
 **Budget estimate (to be measured in spike S4):**
 
 | State | Est. avg current | Notes |
@@ -117,8 +119,14 @@ With 450 mAh, STANDBY at 2.5 mA is about 7 days, and 40 lifts × 10 s/day at 100
   ([PROTOCOL.md](PROTOCOL.md) §6c). Core (`core/ota.c`) runs the transfer from the main loop, checks the
   SHA-256 and shows the Updating screen (B held cancels); the board (`boards/stopwatch/ota.cpp`) writes the
   slot with `esp_ota_*`, erasing sector by sector as the image arrives. A dropped link resumes from the last
-  written byte if the daemon asks again within 30 s. The watch refuses an update while it records, or below
-  15% battery unless it is charging, and stays out of standby while one runs.
+  written byte if the daemon asks again within 30 s. Over BLE the watch asks for a 7.5 ms connection interval
+  for the transfer (the interactive 15–30 ms if the central refuses) and its usual one afterwards. A central
+  without data length extension moves only a few 27-byte link-layer packets per connection event, so the
+  interval sets the rate: on the Linux laptop with the BCM4350C0 a 1.3 MB image took 12 min at the central's
+  48.75 ms and takes about 100 s at 7.5 ms (issue 2047). BlueZ remembers the last interval a peripheral asked
+  for and connects with it next time; a connect below 15 ms makes the watch ask for 30–45 ms again. The
+  watch refuses an update while it records, or below 15% battery unless it is charging, and stays out of
+  standby while one runs.
 - **Signing.** Images are signed (ESP-IDF "Require signed app images" without hardware secure boot, RSA-3072
   Secure Boot V2 format; `sdkconfig.defaults`). Nothing is burned into eFuses: a USB flash still boots any
   image. An update is accepted only if it is signed by the key in the running image's signature block, so
@@ -129,6 +137,7 @@ With 450 mAh, STANDBY at 2.5 mA is about 7 days, and 40 lifts × 10 s/day at 100
 - **Rollback** (`CONFIG_APP_ROLLBACK_ENABLE`). A new image boots unconfirmed. Core confirms it once a daemon
   welcomes it; if that does not happen within 5 minutes, or the image resets first (a panic, a watchdog), the
   bootloader boots the previous image again. The daemon reads the result from the `fw` in the next `hello`.
+  That confirmation (and only that one) plays the `updated` tone and toasts "Updated to <fw>" (MOTION.md, confirmation tones).
 
 ## 10. Spikes to de-risk
 | ID | Spike | Exit criteria |

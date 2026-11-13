@@ -1,0 +1,29 @@
+# Safety (UI-V3 §1): taps never answer a question. The tap that opened ASK and one right behind it, taps that tick
+# options, a tap on Send, a hold that starts on a neighbour row, and button A (Open on PC hands it back): no cmd
+# answer (op 19).
+connect
+rx a400020101020103a60082001201a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 2 ask webapp feat/login
+ask 34 2 60000 60000 Extras|Which extras?|multi|Router|Tests
+wait 100
+tap 233 280
+tap 233 282
+wait 400
+tap 233 334
+wait 300
+tap 233 282
+wait 300
+btn B
+wait 200
+btn B
+wait 200
+expect_label > Send HOLD
+tap 233 282
+wait 300
+expect_label Hold to send
+hold 233 226 1500
+wait 300
+expect_no_label Sent
+btn A
+wait 400
+quit

@@ -27,14 +27,15 @@ static void usage(const char *argv0)
 {
     fprintf(stderr,
             "usage: %s [--headless] [--no-ws] [--script FILE] [--idle-off SECONDS] [--battery] [--deep-after SECONDS]\n"
-            "          [--wake timer|button [--tries N]]\n"
+            "          [--wake timer|button [--tries N] [--slept S]]\n"
             "  --headless   no window (framebuffer still rendered, screenshots work)\n"
             "  --no-ws      do not connect to ws://127.0.0.1:7878 (scripts can inject frames)\n"
             "  --script F   run scripted input; exits when done (code 1 if an expect failed)\n"
             "  --idle-off S turn the display off after S seconds without input\n"
             "  --battery    no USB power, so DEEP is allowed (with no link)\n"
             "  --deep-after S  display-off seconds before DEEP (default 600)\n"
-            "  --wake W     boot as if a DEEP ended by W; --tries N = retained retry count\n",
+            "  --wake W     boot as if a DEEP ended by W; --tries N = retained retry count\n"
+            "  --slept S    with --wake: that DEEP lasted S seconds (power report)\n",
             argv0);
 }
 
@@ -42,7 +43,7 @@ int main(int argc, char **argv)
 {
     bool headless = false, no_ws = false;
     const char *script = NULL;
-    uint32_t idle_s = 0, deep_s = 0, tries = 0;
+    uint32_t idle_s = 0, deep_s = 0, tries = 0, slept_s = 0;
     hal_wake_t wake = HAL_WAKE_POWER_ON;
     bool battery = false;
     for (int i = 1; i < argc; i++) {
@@ -53,6 +54,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--battery")) battery = true;
         else if (!strcmp(argv[i], "--deep-after") && i + 1 < argc) deep_s = (uint32_t)atoi(argv[++i]);
         else if (!strcmp(argv[i], "--tries") && i + 1 < argc) tries = (uint32_t)atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--slept") && i + 1 < argc) slept_s = (uint32_t)atoi(argv[++i]);
         else if (!strcmp(argv[i], "--wake") && i + 1 < argc) {
             const char *w = argv[++i];
             if (!strcmp(w, "timer")) wake = HAL_WAKE_TIMER;
@@ -66,6 +68,7 @@ int main(int argc, char **argv)
     sim_link_enable_ws(!no_ws);
     sim_set_battery(battery);
     sim_set_wake(wake, tries);
+    sim_set_deep_slept_ms(slept_s * 1000u);
     hal_board_init();
     core_init();
     core_set_idle_timeout_ms(idle_s * 1000);

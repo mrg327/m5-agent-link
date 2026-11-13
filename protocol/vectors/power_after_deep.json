@@ -1,0 +1,25 @@
+{
+  "desc": "Power report (proto 0.19) right after the welcome that follows a deep sleep of 2 h, on USB and charging",
+  "symbolic": {
+    "t": "power",
+    "id": 2,
+    "b": {
+      "mv": 4012,
+      "mvf": 4012,
+      "vin": 5080,
+      "chg": true,
+      "usb": true,
+      "pct": 78,
+      "on": 3500,
+      "dim": 0,
+      "off": 612000,
+      "deep": 7200000,
+      "lk": 1200,
+      "ble": 0,
+      "itvl": 0,
+      "seq": 12,
+      "nd": 1
+    }
+  },
+  "cbor_hex": "a300181b010203af00190fac01190fac021913d803f504f505184e06190dac0700081a000956a0091a006ddd000a1904b00b000c000d0c0e01"
+}

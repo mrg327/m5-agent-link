@@ -1,0 +1,20 @@
+{
+  "desc": "Device answers request 22's one question with recording 9's transcript (\"Other\"), after a hold (proto 0.18)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 25,
+    "b": {
+      "op": "answer",
+      "sid": 3,
+      "rid": 22,
+      "hold_ms": 1300,
+      "picks": [
+        0
+      ],
+      "aids": [
+        9
+      ]
+    }
+  },
+  "cbor_hex": "a3000801181903a600130103021604190514078100088109"
+}

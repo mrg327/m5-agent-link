@@ -113,6 +113,23 @@ const nav_binding_t nav_bindings[] = {
     {MODE_KEYS, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_ERASE},
     {MODE_KEYS, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_KEYS, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
+    /* READ: the agent's last message in the reader (LAST-MESSAGE.md §1), then Dictate / Reply. Nothing on a page
+     * sends anything: a tap, swipe up or B turns the page; the last one leads to the end picker, whose rows only
+     * open VOICE or the Reply list (the commits are there). */
+    {MODE_READ, G_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_HOLD_PRESS},
+    {MODE_READ, G_RELEASE, ZONE_ANY, WHEN_ALWAYS, NAV_HOLD_RELEASE},
+    {MODE_READ, G_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
+    {MODE_READ, G_DOUBLE_TAP, ZONE_CENTRE, WHEN_ALWAYS, NAV_COMMIT},
+    {MODE_READ, G_DRAG, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_DRAG}, /* a page per drag; the picker follows the finger */
+    {MODE_READ, G_LONG_PRESS, ZONE_CENTRE, WHEN_ALWAYS, NAV_HOLD_LONG}, /* held still: back */
+    {MODE_READ, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK}, /* UI-V3 §5: swipe right goes back */
+    {MODE_READ, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_READ, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_READ, G_SCRUB_END, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_READ, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_FOCUS}, /* Open on PC, as on the deck */
+    {MODE_READ, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_NEXT},
+    {MODE_READ, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
+    {MODE_READ, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
 };
 const int nav_n_bindings = (int)(sizeof nav_bindings / sizeof nav_bindings[0]);
 
@@ -134,7 +151,7 @@ nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool
 
 const char *nav_mode_name(nav_mode_t m)
 {
-    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll", "status", "watch", "voice", "keys"};
+    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll", "status", "watch", "voice", "keys", "read"};
     return (unsigned)m < MODE_COUNT ? names[m] : "?";
 }
 
@@ -168,16 +185,19 @@ int nav_scroll_lines(int dy_px)
     return dy_px / GESTURE_DRAG_STEP_PX * NAV_SCROLL_LINES_PER_STEP;
 }
 
-int nav_agent_items(sess_state_t state, bool typing, bool replies, bool queue_ok, bool queued, agent_item_t *out, int cap)
+int nav_agent_items(sess_state_t state, bool typing, bool replies, bool queue_ok, bool queued, bool message, agent_item_t *out,
+                    int cap)
 {
     /* UI-V2 §4.2: Focus is button A on HOME and WATCH, Status the swipe down on HOME, so neither takes
      * a row; a session that waits for input keeps Focus. Quick replies and Interrupt need a daemon that
      * types into terminals (issue b150). */
-    agent_item_t list[7];
+    agent_item_t list[8];
     int n = 0;
     bool reply = typing && replies;
 #define ADD(id, hold) list[n++] = (agent_item_t){(id), (hold)}
-    ADD(AG_WATCH, false); /* always first: tap, tap opens the monitor, a third tap focuses */
+    /* what the agent said comes first once it has finished (LAST-MESSAGE.md): it is why the user looks */
+    if (message && state != SESS_START && state != SESS_WORK) ADD(AG_READ, false);
+    ADD(AG_WATCH, false); /* first otherwise: tap, tap opens the monitor, a third tap focuses */
     switch (state) {
     case SESS_DONE:
         if (reply) ADD(AG_REPLY, false);
@@ -243,6 +263,19 @@ int nav_ask_items(const attention_t *a, bool voice, ask_item_t *out, int cap)
     }
     /* opens VOICE on this request; the hold-to-send there is the commit */
     if (voice && (a->acts & (1u << ACT_DICTATE)) && n < cap - 1) out[n++] = (ask_item_t){ASK_DICTATE, -1, 0, false};
+    out[n++] = (ask_item_t){ASK_OPEN_PC, -1, 0, false}; /* always: the escape to the terminal */
+    return n;
+}
+
+int nav_question_items(const ask_q_t *q, bool voice, uint32_t picks, ask_item_t *out, int cap)
+{
+    int n = 0;
+    if (!q || cap < 1) return 0;
+    for (int i = 0; i < q->n_opts && i < MODEL_MAX_QOPTS && n < cap - 1; i++)
+        out[n++] = (ask_item_t){ASK_QOPT, i, q->multi ? 0 : NAV_HOLD_MS, false};
+    if (voice && n < cap - 1) out[n++] = (ask_item_t){ASK_OTHER, -1, 0, false}; /* opens VOICE; its own hold commits */
+    (void)picks; /* Send stays put while ticks change, so the list never jumps under the finger */
+    if (q->multi && n < cap - 1) out[n++] = (ask_item_t){ASK_SEND, -1, NAV_HOLD_MS, false};
     out[n++] = (ask_item_t){ASK_OPEN_PC, -1, 0, false}; /* always: the escape to the terminal */
     return n;
 }

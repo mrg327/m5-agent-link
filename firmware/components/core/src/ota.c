@@ -18,7 +18,7 @@ typedef enum { OTA_IDLE, OTA_RECV, OTA_RESTART } ota_state_t;
 
 static struct {
     ota_state_t st;
-    uint32_t size, next, last_ms, restart_at;
+    uint32_t size, next, last_ms, restart_at, begin_ms;
     uint8_t sha[32];
     char ver[32];
     sha256_t ctx;
@@ -48,7 +48,7 @@ static void ack(int st, const char *msg)
  * display timer back. A reason the user should see goes out as a toast. */
 static void close_transfer(const char *toast)
 {
-    if (s.st != OTA_IDLE) hal_link_interactive(false);
+    if (s.st != OTA_IDLE) hal_link_bulk(false);
     s.st = OTA_IDLE;
     ui_ota_hide();
     if (toast && toast[0]) ui_toast(toast, RGB_AMBER);
@@ -133,10 +133,10 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
         size_t n = ver_len < sizeof s.ver - 1 ? ver_len : sizeof s.ver - 1;
         memcpy(s.ver, ver, n);
     }
-    s.last_ms = now_ms;
+    s.last_ms = s.begin_ms = now_ms;
     s.waiting = !link_welcomed();
     sha256_init(&s.ctx);
-    hal_link_interactive(true);
+    hal_link_bulk(true);
     ui_ota_show(s.ver);
     ui_ota_progress(0, false);
     feedback_tick();
@@ -157,7 +157,8 @@ static void finish(uint32_t now_ms)
         fail_transfer(r == HAL_OTA_FAIL ? 4 : 3, r == HAL_OTA_FAIL ? err_text("Flash error") : err_text("Update refused"));
         return;
     }
-    dbg_event("ota", "ota_done", "\"size\":%u,\"ver\":%s", (unsigned)s.size, dbg_q(s.ver));
+    dbg_event("ota", "ota_done", "\"size\":%u,\"ver\":%s,\"ms\":%u", (unsigned)s.size, dbg_q(s.ver),
+              (unsigned)(now_ms - s.begin_ms));
     ack(1, NULL);
     s.st = OTA_RESTART;
     s.restart_at = now_ms + OTA_RESTART_DELAY_MS;
@@ -206,6 +207,12 @@ void ota_on_link(bool welcomed, uint32_t now_ms)
         hal_ota_confirm();
         s_unconfirmed = false;
         dbg_event("ota", "ota_confirm", "\"after_ms\":%u", (unsigned)(now_ms - s_boot_ms));
+        /* Only here: a power-on or USB flash boots a confirmed image, a re-welcome finds s_unconfirmed cleared. */
+        char msg[40];
+        snprintf(msg, sizeof msg, "Updated to %s", hal_board_info()->fw_version);
+        dbg_event("ota", "ota_updated_tone", "\"fw\":%s", dbg_q(hal_board_info()->fw_version));
+        ui_toast(msg, RGB_SUCCESS);
+        feedback_updated();
     }
     if (s.st == OTA_RECV) {
         s.waiting = !welcomed;

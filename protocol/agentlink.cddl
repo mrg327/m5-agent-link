@@ -13,7 +13,7 @@ envelope = msg_hello / msg_welcome / msg_snapshot / msg_session_upd / msg_gone
          / msg_cfg / msg_batt / msg_ping / msg_pong / msg_log
          / msg_audio_start / msg_audio / msg_audio_end / msg_transcript
          / msg_kb_start / msg_kb_stroke / msg_kb_cands / msg_usage
-         / msg_fw_begin / msg_fw_chunk / msg_fw_ack
+         / msg_fw_begin / msg_fw_chunk / msg_fw_ack / msg_power
          / msg_dbg_ui_state_req / msg_dbg_ui_state / msg_dbg_screenshot_req
          / msg_dbg_screenshot_chunk / msg_dbg_inject_input / msg_dbg_set_log_level
 
@@ -45,6 +45,7 @@ msg_usage                = { 0 => mt_usage, hdr, 3 => usage }
 msg_fw_begin             = { 0 => mt_fw_begin, hdr, 3 => fw_begin }
 msg_fw_chunk             = { 0 => mt_fw_chunk, hdr, 3 => fw_chunk }
 msg_fw_ack               = { 0 => mt_fw_ack, hdr, 3 => fw_ack }
+msg_power                = { 0 => mt_power, hdr, 3 => power }
 msg_dbg_ui_state_req     = { 0 => mt_dbg_ui_state_req, hdr, 3 => empty }
 msg_dbg_ui_state         = { 0 => mt_dbg_ui_state, hdr, 3 => dbg_ui_state }
 msg_dbg_screenshot_req   = { 0 => mt_dbg_screenshot_req, hdr, 3 => empty }
@@ -79,6 +80,7 @@ mt_usage = 23
 mt_fw_begin = 24
 mt_fw_chunk = 25
 mt_fw_ack = 26
+mt_power = 27
 mt_dbg_ui_state_req = 64
 mt_dbg_ui_state = 65
 mt_dbg_screenshot_req = 66
@@ -235,10 +237,16 @@ session = {
   ? 32 => uint,             ; lr    lines removed
   ? 33 => bool,             ; tp    the turn's last recognised test run: true passed, false failed; absent = unknown
   ? 34 => uint,             ; dur   the turn's length in seconds, prompt to stop
-  ? 35 => tstr              ; qd    the message queued for this session (proto 0.17, PROTOCOL.md §4b): the
+  ? 35 => tstr,            ; qd    the message queued for this session (proto 0.17, PROTOCOL.md §4b): the
                             ;       start of its text, <= 48 chars, cut with "…"; "" = none. Only to devices with
                             ;       proto >= 0.17. The daemon types the message the next time the session can take
                             ;       input and then sends qd: "". The user's own words: the trace shows <private>
+  ? 36 => uint,             ; lm    the agent's last message (proto 0.18, LAST-MESSAGE.md): its id, new for each
+                            ;       message (never reused in a daemon run); 0 = none. Keys 36-38 only to devices with
+                            ;       proto >= 0.18. The whole text: cmd_op_detail {sid, arg: off} with no rid
+  ? 37 => uint,             ; ll    its length in bytes as the reader shows it (markdown cleaned, <= 4096)
+  ? 38 => tstr              ; lp    its start, one paragraph, <= 160 bytes; "" under privacy meta (agent content:
+                            ;       the trace shows <private>)
 }
 perm_mode = perm_mode_default / perm_mode_plan / perm_mode_accept_edits / perm_mode_auto /
   perm_mode_dont_ask / perm_mode_bypass
@@ -303,7 +311,22 @@ attention = {
                          ;        devices with proto >= 0.13; granted by cmd_op_approve with `rh`
   ? 14 => uint,          ; scope  where it is saved, a rule_scope value. A uint, not the enum, so that a value a
                          ;        device does not know drops the rule, not the whole request
-  ? 15 => bool           ; wide   the rule ends in a wildcard: it matches more than this exact request
+  ? 15 => bool,          ; wide   the rule ends in a wildcard: it matches more than this exact request
+  ? 16 => [1*4 ask_q]    ; qs     an agent's multiple-choice questions (Claude Code AskUserQuestion; proto 0.18,
+                         ;        LAST-MESSAGE.md): the device answers them all at once with cmd_op_answer. Only
+                         ;        to devices with proto >= 0.18; an older device gets title / text / opts as before
+}
+; One question of `qs`: header (<= 16 bytes), the question (<= 160 bytes), its options, and whether several
+; may be picked. The device may also offer a free answer ("Other") by dictation.
+ask_q = {
+  0 => tstr,             ; h     header, e.g. "Framework"
+  1 => tstr,             ; q     the question
+  2 => [1*4 ask_opt],    ; o     options in the agent's order
+  ? 3 => bool            ; m     multi-select: any number of options (at least one)
+}
+ask_opt = {
+  0 => tstr,             ; l     label (<= 48 bytes), what the agent receives
+  ? 1 => tstr            ; d     description (<= 120 bytes), readable on the device
 }
 rule_scope = rule_scope_session / rule_scope_project
 rule_scope_session = 0   ; this session only (Claude Code destination "session")
@@ -337,16 +360,22 @@ cmd = {
   ? 5 => uint,    ; rh  with cmd_op_approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of
                   ;     the rule's bytes, 0x00, the scope's value and the wide flag (0/1), as the device showed
                   ;     them; hold_ms >= 1500 (STANDING-RULES.md)
-  ? 6 => bool     ; q   with cmd_op_type / cmd_op_dictate (proto 0.17): queue the message if the session cannot
+  ? 6 => bool,    ; q   with cmd_op_type / cmd_op_dictate (proto 0.17): queue the message if the session cannot
                   ;     take input now; the daemon types it the next time it can. One per session: a new one
                   ;     replaces the old. Not with a `rid`
+  ? 7 => answer_picks, ; picks  with cmd_op_answer (proto 0.18): per question of the request's `qs`, in order, the
+                  ;     options picked as a bit mask (bit i = option i); 0 when that question has a dictated answer
+  ? 8 => answer_aids   ; aids   with cmd_op_answer: per question, the recording (aid) whose transcript is the free
+                  ;     answer ("Other"); 0 = none
 }
+answer_picks = [1*4 picks: uint]
+answer_aids = [1*4 aids: uint]
 ; Scalars for snooze / reply / quiet; a map for scroll. Further structured arguments ({aid}) join this union when they land.
 cmd_arg = uint / tstr / scroll_arg
 cmd_op = cmd_op_focus / cmd_op_ack / cmd_op_snooze / cmd_op_approve / cmd_op_deny /
   cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet / cmd_op_scroll /
   cmd_op_type / cmd_op_dictate / cmd_op_kb_pick / cmd_op_kb_del / cmd_op_kb_send / cmd_op_kb_end /
-  cmd_op_rerun / cmd_op_unqueue
+  cmd_op_rerun / cmd_op_unqueue / cmd_op_answer
 cmd_op_focus = 0    ; with a `rid` (proto 0.11): also hand that request back to the terminal at once
 cmd_op_ack = 1
 cmd_op_snooze = 2
@@ -354,7 +383,8 @@ cmd_op_approve = 3
 cmd_op_deny = 4
 cmd_op_reply = 5
 cmd_op_cancel = 6   ; interrupt the session's running turn (the daemon sends Esc to its terminal)
-cmd_op_detail = 7   ; send request `rid`'s full text from byte `arg` (0 = from the start) as detail chunks (proto 0.11)
+cmd_op_detail = 7   ; send request `rid`'s full text from byte `arg` (0 = from the start) as detail chunks (proto 0.11);
+                    ; with no rid (proto 0.18): session `sid`'s last message, its chunks carry `lm`
 cmd_op_notify_done = 8
 cmd_op_quiet = 9
 cmd_op_scroll = 10
@@ -366,6 +396,8 @@ cmd_op_kb_send = 15 ; KEYS: press Enter (hold_ms >= 1000); the composition is se
 cmd_op_kb_end = 16  ; KEYS: the keyboard closed; `arg` 1 erases what it typed and was not sent, 0 keeps it
 cmd_op_rerun = 17   ; JOBS: run a finished job's command again in its own terminal (hold_ms >= 1000; proto 0.9)
 cmd_op_unqueue = 18 ; drop session `sid`'s queued message (proto 0.17); stale when there is none
+cmd_op_answer = 19  ; answer request `rid`'s questions (`qs`) at once with `picks` / `aids`, after a hold (hold_ms
+                    ; >= 1000; proto 0.18)
 
 ; cmd_op_scroll argument (UI-V2 §6.1): move the session's terminal scrollback.
 scroll_arg = {
@@ -400,7 +432,8 @@ detail = {
   ? 1 => uint,   ; sid
   2 => tstr,     ; text   this chunk
   ? 3 => uint,   ; off    byte offset of this chunk in the full text
-  ? 4 => uint    ; total  the full text's length in bytes (<= 4096)
+  ? 4 => uint,   ; total  the full text's length in bytes (<= 4096)
+  ? 5 => uint    ; lm     with no rid (proto 0.18): the id of the session's last message this chunk is from
 }
 
 
@@ -496,6 +529,28 @@ fw_status_bad = 3       ; the image was refused (size, not an app image, signatu
 fw_status_fail = 4      ; writing the flash failed; the transfer is over
 fw_status_stopped = 5   ; the transfer ended without an image: a begin with size 0, the user cancelled on the
                         ; device, or no chunk came for 30 s. May be sent unasked
+
+; ───────────────────────── power report (proto 0.19, POWER.md) ─────────────────────────
+; Device → daemon, only to a daemon whose welcome says proto >= 0.19: right after the welcome, then every
+; 5 minutes while welcomed. The times cover everything since the previous report that went out: they add up
+; while no daemon listens, and across a deep sleep (RTC memory). on + dim + off + deep is the time covered.
+power = {
+  0 => uint,     ; mv     battery voltage, the last raw reading (mV); 0 = no reading
+  1 => uint,     ; mvf    battery voltage as filtered for the device's own percent (mV)
+  2 => uint,     ; vin    input (USB / charger) voltage (mV)
+  3 => bool,     ; chg    charging
+  4 => bool,     ; usb    external power present
+  5 => uint,     ; pct    battery percent as the device shows it (linear 3.3-4.2 V)
+  6 => uint,     ; on     ms with the display on at full look
+  7 => uint,     ; dim    ms with the display on and dimmed to the ambient face
+  8 => uint,     ; off    ms with the display off (standby)
+  9 => uint,     ; deep   ms in deep sleep, measured across the wake reboot
+  10 => uint,    ; lk     ms welcomed by a daemon, on any transport
+  11 => uint,    ; ble    ms with a BLE central connected
+  12 => uint,    ; itvl   BLE connection interval in force now (us); 0 = no BLE connection
+  13 => uint,    ; seq    report number since power-on (kept across deep sleep); 0 = the first
+  14 => uint     ; nd     deep sleeps that ended within these times
+}
 
 ; ───────────────────────── debug / observability ─────────────────────────
 dbg_ui_state = {

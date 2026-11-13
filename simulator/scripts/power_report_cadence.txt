@@ -1,0 +1,8 @@
+# Power report (POWER.md, proto 0.19) over a BLE link: nothing before the welcome, one right after it, the next
+# 5 minutes later with the time since (display on, no input yet) and the 30 ms interval of the fake BLE link.
+connect ble
+wait 2000
+rx ble a400020101020103a60082001301a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 300
+skip 300000
+wait 500

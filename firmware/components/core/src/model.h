@@ -65,6 +65,12 @@ typedef struct {
     uint8_t n_rp;
     /* The start of the message queued for when the session can take input (proto 0.17); "" = none. */
     char queued[97];
+    /* The agent's last message (proto 0.18, LAST-MESSAGE.md): its id (0 = none), its length in bytes as the
+     * reader shows it, and its start (one paragraph, "" under privacy meta). The text itself is fetched with
+     * detail_want_msg() when the reader opens. */
+    uint32_t lm, ll;
+    char lp[164];
+    uint8_t lm_keys; /* in a delta with SF_LM: which of lm (1), ll (2), lp (4) it carried */
     /* A job (AGENT_SHELL): the expected total run time, 0 = unknown, and the exit status once it ended. */
     uint32_t eta;
     uint8_t exit_code;
@@ -106,8 +112,21 @@ enum {
     SF_BACK = 1 << 26, /* not on the wire: set by the device (model_attention_went_back) */
     SF_HUSH = 1 << 27, /* proto 0.12: with the delta that enters done / error, `hush` says whether to stay quiet */
     SF_DONE = 1 << 28, /* proto 0.14: any of keys 30-34 was present: `sum` replaces the session's whole summary */
-    SF_QD = 1 << 29    /* proto 0.17: the queued message's start */
+    SF_QD = 1 << 29,   /* proto 0.17: the queued message's start */
+    SF_LM = 1 << 30    /* proto 0.18: the last message (lm, ll, lp; any of keys 36-38) */
 };
+
+/* One question of a multiple-choice request (Claude Code AskUserQuestion; proto 0.18, LAST-MESSAGE.md §3). The
+ * buffers have room past the daemon's caps (header 16, question 160, label 48, description 120 bytes). */
+#define MODEL_MAX_QS 4
+#define MODEL_MAX_QOPTS 4
+typedef struct {
+    char h[20], q[164];
+    char label[MODEL_MAX_QOPTS][52];
+    char desc[MODEL_MAX_QOPTS][124];
+    uint8_t n_opts;
+    bool multi; /* any number of options, at least one */
+} ask_q_t;
 
 typedef struct {
     uint32_t rid, sid;
@@ -138,11 +157,14 @@ typedef struct {
     uint8_t rule_scope; /* MODEL_RULE_SESSION / MODEL_RULE_PROJECT */
     char rule[MODEL_RULE_CAP + 1];
     uint32_t rule_hash;
+    /* Multiple-choice questions (proto 0.18): how many; their text is model_attention_question(). */
+    uint8_t n_qs;
     bool answer_sent; /* an answer (approve/deny/reply/dictate) is out; waiting for clear */
     uint8_t answer;   /* what was sent: ATT_ANSWER_* */
     uint8_t answer_opt; /* option index for ATT_ANSWER_REPLY */
 } attention_t;
-enum { ATT_ANSWER_NONE = 0, ATT_ANSWER_APPROVE, ATT_ANSWER_DENY, ATT_ANSWER_REPLY, ATT_ANSWER_DICTATE, ATT_ANSWER_GRANT };
+enum { ATT_ANSWER_NONE = 0, ATT_ANSWER_APPROVE, ATT_ANSWER_DENY, ATT_ANSWER_REPLY, ATT_ANSWER_DICTATE, ATT_ANSWER_GRANT,
+       ATT_ANSWER_QUESTIONS };
 enum { MODEL_RULE_SESSION = 0, MODEL_RULE_PROJECT = 1 };
 /* FNV-1a 32 over the rule's bytes, a 0 byte, the scope and the wide flag (the daemon's standing::hash). */
 uint32_t model_rule_hash(const char *rule, uint8_t scope, bool wide);
@@ -183,6 +205,11 @@ void model_set_session_hook(model_session_hook_t hook);
 model_counts_t model_counts(void);
 
 void model_attention_add(const attention_t *a);
+/* The questions of request `rid` (proto 0.18), stored with it: call after model_attention_add(); n is clamped to
+ * MODEL_MAX_QS and the request's n_qs set to it. */
+void model_attention_set_questions(uint32_t rid, const ask_q_t *qs, int n);
+/* Question i of request `rid`, or NULL. */
+const ask_q_t *model_attention_question(uint32_t rid, int i);
 bool model_attention_clear(uint32_t rid);
 /* Drops every request (a new link: the daemon re-sends the open ones after its welcome). */
 void model_attention_clear_all(void);

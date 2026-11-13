@@ -27,7 +27,7 @@ MT = dict(hello=1, welcome=2, snapshot=3, session_upd=4, gone=5, attention=6, cl
           cmd=8, result=9, detail=10, cfg=11, batt=12, ping=13, pong=14, log=15,
           audio_start=16, audio=17, audio_end=18, transcript=19,
           kb_start=20, kb_stroke=21, kb_cands=22, usage=23,
-          fw_begin=24, fw_chunk=25, fw_ack=26,
+          fw_begin=24, fw_chunk=25, fw_ack=26, power=27,
           dbg_ui_state=65, dbg_inject_input=68)
 
 
@@ -246,6 +246,50 @@ VECTORS = {
          "off": 512, "total": 612}},
         env("detail", 31, {0: 10, 1: 2, 2: "./scripts/deploy.sh --env prod --yes", 3: 512, 4: 612}),
     ),
+    "session_last_message": (
+        "Delta: session 3 finished; its last message (id 7, 1834 bytes) starts like this (proto 0.18)",
+        {"t": "session_upd", "id": 40, "b": {"sid": 3, "st": "done", "lm": 7, "ll": 1834,
+         "lp": "Built and flashed. The watch now shows the agent's last message."}},
+        env("session_upd", 40, {0: 3, 2: 4, 36: 7, 37: 1834,
+            38: "Built and flashed. The watch now shows the agent's last message."}),
+    ),
+    "cmd_detail_last_message": (
+        "Device asks for session 3's last message from byte 1024: no rid (proto 0.18)",
+        {"t": "cmd", "id": 23, "b": {"op": "detail", "sid": 3, "arg": 1024}},
+        env("cmd", 23, {0: 7, 1: 3, 3: 1024}),
+    ),
+    "detail_last_message": (
+        "A chunk of session 3's last message 7: bytes 1024-1061 of 1834 (proto 0.18)",
+        {"t": "detail", "id": 41, "b": {"sid": 3, "text": "• flash with idf.py, then check the log",
+         "off": 1024, "total": 1834, "lm": 7}},
+        env("detail", 41, {1: 3, 2: "• flash with idf.py, then check the log", 3: 1024, 4: 1834, 5: 7}),
+    ),
+    "attention_ask_questions": (
+        "AskUserQuestion with two questions, the second multi-select; older devices see title, text, focus (proto 0.18)",
+        {"t": "attention", "id": 42, "b": {"rid": 21, "sid": 3, "kind": "question",
+         "title": "2 questions", "text": "Which framework?", "acts": ["focus"], "exp": 1793995500,
+         "left": 60000, "win": 60000,
+         "qs": [{"h": "Framework", "q": "Which framework?",
+                 "o": [{"l": "React", "d": "Component library"}, {"l": "Vue"}]},
+                {"h": "Extras", "q": "Which extras?", "m": True,
+                 "o": [{"l": "Router"}, {"l": "Tests", "d": "Vitest and Playwright"}]}]}},
+        env("attention", 42, {0: 21, 1: 3, 2: 1, 3: "2 questions", 4: "Which framework?", 6: [2],
+            7: 1793995500, 9: 60000, 10: 60000,
+            16: [{0: "Framework", 1: "Which framework?", 2: [{0: "React", 1: "Component library"}, {0: "Vue"}]},
+                 {0: "Extras", 1: "Which extras?", 2: [{0: "Router"}, {0: "Tests", 1: "Vitest and Playwright"}], 3: True}]}),
+    ),
+    "cmd_answer": (
+        "Device answers request 21: React for the first question, Router and Tests for the second, after a hold (proto 0.18)",
+        {"t": "cmd", "id": 24, "b": {"op": "answer", "sid": 3, "rid": 21, "hold_ms": 1250,
+         "picks": [1, 3], "aids": [0, 0]}},
+        env("cmd", 24, {0: 19, 1: 3, 2: 21, 4: 1250, 7: [1, 3], 8: [0, 0]}),
+    ),
+    "cmd_answer_dictated": (
+        "Device answers request 22's one question with recording 9's transcript (\"Other\"), after a hold (proto 0.18)",
+        {"t": "cmd", "id": 25, "b": {"op": "answer", "sid": 3, "rid": 22, "hold_ms": 1300,
+         "picks": [0], "aids": [9]}},
+        env("cmd", 25, {0: 19, 1: 3, 2: 22, 4: 1300, 7: [0], 8: [9]}),
+    ),
     "cmd_focus_handback": (
         "Open on PC from the request itself: focus session 2 and hand request 10 back to the terminal (proto 0.11)",
         {"t": "cmd", "id": 14, "b": {"op": "focus", "sid": 2, "rid": 10}},
@@ -361,6 +405,22 @@ VECTORS = {
         "Device refuses the finished image: its signature does not match the running firmware's key",
         {"t": "fw_ack", "id": 41, "re": 35, "b": {"st": "bad", "next": 1388032, "msg": "Signature not trusted"}},
         env("fw_ack", 41, {0: 3, 1: 1388032, 2: "Signature not trusted"}, re_=35),
+    ),
+    "power_battery": (
+        "Power report (proto 0.19) on battery over BLE: 3.87 V, 5 minutes mostly in standby at a 30 ms interval",
+        {"t": "power", "id": 42, "b": {"mv": 3871, "mvf": 3880, "vin": 0, "chg": False, "usb": False, "pct": 63,
+         "on": 41200, "dim": 30000, "off": 228800, "deep": 0, "lk": 300000, "ble": 300000, "itvl": 30000,
+         "seq": 7, "nd": 0}},
+        env("power", 42, {0: 3871, 1: 3880, 2: 0, 3: False, 4: False, 5: 63, 6: 41200, 7: 30000, 8: 228800,
+                          9: 0, 10: 300000, 11: 300000, 12: 30000, 13: 7, 14: 0}),
+    ),
+    "power_after_deep": (
+        "Power report (proto 0.19) right after the welcome that follows a deep sleep of 2 h, on USB and charging",
+        {"t": "power", "id": 2, "b": {"mv": 4012, "mvf": 4012, "vin": 5080, "chg": True, "usb": True, "pct": 78,
+         "on": 3500, "dim": 0, "off": 612000, "deep": 7200000, "lk": 1200, "ble": 0, "itvl": 0,
+         "seq": 12, "nd": 1}},
+        env("power", 2, {0: 4012, 1: 4012, 2: 5080, 3: True, 4: True, 5: 78, 6: 3500, 7: 0, 8: 612000,
+                         9: 7200000, 10: 1200, 11: 0, 12: 0, 13: 12, 14: 1}),
     ),
     "welcome_keys": (
         "Welcome (proto 0.7): quick replies and the 71002100a6002800300077004900a60028003000200099003601a0003000 swipe keyboard (the daemon decodes strokes)",

@@ -1,0 +1,15 @@
+{
+  "desc": "Delta: session 3 finished; its last message (id 7, 1834 bytes) starts like this (proto 0.18)",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 40,
+    "b": {
+      "sid": 3,
+      "st": "done",
+      "lm": 7,
+      "ll": 1834,
+      "lp": "Built and flashed. The watch now shows the agent's last message."
+    }
+  },
+  "cbor_hex": "a3000401182803a500030204182407182519072a182678404275696c7420616e6420666c61736865642e20546865207761746368206e6f772073686f777320746865206167656e742773206c617374206d6573736167652e"
+}

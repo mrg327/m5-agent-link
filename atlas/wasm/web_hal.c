@@ -205,6 +205,11 @@ size_t hal_mic_read(int16_t *pcm, size_t max)
 }
 void hal_mic_stop(void) {}
 hal_battery_t hal_battery_read(void) { return (hal_battery_t){.percent = 80, .charging = false, .usb_present = true}; }
+/* Power report (POWER.md): the browser watch is on USB at 80 % (4.02 V), never sleeps deep. */
+hal_battery_mv_t hal_battery_mv(void) { return (hal_battery_mv_t){.mv = 4020, .mv_filt = 4020, .vin_mv = 5000}; }
+uint32_t hal_deep_slept_ms(void) { return 0; }
+static uint32_t s_retained_words[HAL_RETAINED_WORDS];
+uint32_t *hal_retained_words(void) { return s_retained_words; }
 void hal_debug_line(const char *json) { js_debug(json); }
 
 /* ── link: frames are raw CBOR envelopes, one per call (same as the simulator's WebSocket) ── */
@@ -223,6 +228,8 @@ bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 }
 
 void hal_link_interactive(bool on) { (void)on; }
+void hal_link_bulk(bool on) { (void)on; }
+uint32_t hal_link_ble_interval_us(void) { return 0; }
 
 void web_link_up(int kind, bool up)
 {

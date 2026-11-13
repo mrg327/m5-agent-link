@@ -254,11 +254,17 @@ impl Transcripts {
 
     /// The text recording `aid` became, if it was for `sid` and is still fresh; it is used up.
     pub fn take(&mut self, aid: u64, sid: u64) -> Option<String> {
-        let (s, text, at) = self.map.get(&aid)?.clone();
+        let text = self.peek(aid, sid)?.to_owned();
+        self.map.remove(&aid);
+        Some(text)
+    }
+
+    /// What [`Self::take`] would give, left in place.
+    pub fn peek(&self, aid: u64, sid: u64) -> Option<&str> {
+        let (s, text, at) = self.map.get(&aid)?;
         if at.elapsed() >= KEEP || s.is_some_and(|s| s != sid) || text.is_empty() {
             return None;
         }
-        self.map.remove(&aid);
         Some(text)
     }
 }
@@ -430,7 +436,13 @@ mod tests {
         let mut t = Transcripts::default();
         t.put(4, Some(3), "run the tests".into());
         assert_eq!(t.take(4, 9), None, "another session");
-        assert_eq!(t.take(4, 3).as_deref(), Some("run the tests"));
+        assert_eq!(t.peek(4, 9), None);
+        assert_eq!(t.peek(4, 3), Some("run the tests"));
+        assert_eq!(
+            t.take(4, 3).as_deref(),
+            Some("run the tests"),
+            "a peek uses nothing up"
+        );
         assert_eq!(t.take(4, 3), None, "used up");
         t.put(5, Some(3), String::new());
         assert_eq!(t.take(5, 3), None, "nothing heard: nothing to send");

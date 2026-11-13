@@ -15,6 +15,7 @@
 #include "keys.h"
 #include "voice.h"
 #include "power.h"
+#include "power_report.h"
 #include "ring.h"
 #include "model.h"
 #include "motion.h"
@@ -87,14 +88,13 @@ static void on_rx(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 {
     MODEL_EXT_BSS static frame_t f;
     if (len > FRAME_MAX) return;
-    while (atomic_flag_test_and_set_explicit(&s_rx_lock, memory_order_acquire)) {
-    }
+    ring_spin_lock(&s_rx_lock);
     f.kind = kind;
     f.len = (uint16_t)len;
     memcpy(f.data, frame, len);
     /* only the message itself is copied, not the 4 KB slot */
     if (!ring_push_n(&s_frames, &f, frame_used(&f))) atomic_fetch_add(&s_frames_dropped, 1);
-    atomic_flag_clear_explicit(&s_rx_lock, memory_order_release);
+    ring_spin_unlock(&s_rx_lock);
 }
 
 static void on_state(hal_link_kind_t kind, bool connected)
@@ -231,6 +231,19 @@ static void act_reply(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms)
     if (!sent) toast_cmd_result(false, "");
 }
 
+/* cmd_op_answer (proto 0.18): every question of an AskUserQuestion request at once, after the last hold. */
+static void act_answer(uint32_t sid, uint32_t rid, const uint32_t *picks, const uint32_t *aids, int n, uint32_t hold_ms)
+{
+    bool sent = link_send_answer(sid, rid, picks, aids, n, hold_ms);
+    if (sent) {
+        model_attention_set_answer(rid, ATT_ANSWER_QUESTIONS, 0);
+        feedback_reply_sent();
+    } else {
+        feedback_reject();
+        toast_cmd_result(false, "");
+    }
+}
+
 /* The daemon stores seen and echoes it to every device; the local update makes the segment dim at once. */
 static void act_ack(uint32_t sid)
 {
@@ -352,6 +365,7 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .grant = act_grant,
                                        .deny = act_deny,
                                        .reply = act_reply,
+                                       .answer = act_answer,
                                        .ack = act_ack,
                                        .snooze = act_snooze,
                                        .notify_done = act_notify_done,
@@ -382,6 +396,7 @@ static void on_link(bool welcomed)
     if (welcomed) app_clock_resync(); /* the welcome has just set the RTC */
     ui_set_link_state(welcomed);
     ota_on_link(welcomed, app_now_ms());
+    preport_on_link(welcomed, app_now_ms());
 }
 
 static void on_attention(const attention_t *a)
@@ -435,7 +450,7 @@ static void on_session(const session_t *before, const session_t *now, uint32_t p
 static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, const char *msg)
 {
     if (op == LINK_OP_DETAIL) { /* a background fetch: ASK shows what it means, no toast */
-        detail_on_result(rid, ok, err);
+        detail_on_result(sid, rid, ok, err);
         return;
     }
     if (ok) {
@@ -444,7 +459,7 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
         return;
     }
     /* The daemon refused an answer: the request is unanswered again, so ASK restores its options. */
-    if (rid && (op == LINK_OP_APPROVE || op == LINK_OP_DENY || op == LINK_OP_REPLY || op == LINK_OP_DICTATE))
+    if (rid && (op == LINK_OP_APPROVE || op == LINK_OP_DENY || op == LINK_OP_REPLY || op == LINK_OP_DICTATE || op == LINK_OP_ANSWER))
         model_attention_set_answer(rid, ATT_ANSWER_NONE, 0);
     if (op == LINK_OP_SCROLL && sid) {
         if (err == 2) { /* unsupported: this terminal has no scroll API; the item disappears for the session */
@@ -678,6 +693,7 @@ void core_init(void)
     if (!power_woke_by_timer()) feedback_hello(); /* a reconnect attempt stays silent and dark */
 #endif
     power_start(app_now_ms());
+    preport_init(app_now_ms());
     ota_init(app_now_ms());
     s_fps_t0 = app_now_ms();
 }
@@ -685,6 +701,7 @@ void core_init(void)
 uint32_t core_step(void)
 {
     uint32_t now = app_now_ms();
+    preport_tick(now); /* first: the time since the last step goes to the state that held during it */
     drain_input(now);
     if (motion_take_raise()) on_raise(now);
     cover_step();

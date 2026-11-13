@@ -14,7 +14,7 @@ const ENUMS = {
   input_sub: { approval: 0, question: 1 },
   att_kind: { approval: 0, question: 1, error: 2, done: 3 },
   action: { approve: 0, deny: 1, focus: 2, reply: 3, ack: 4, dictate: 5 },
-  cmd_op: { focus: 0, ack: 1, snooze: 2, approve: 3, deny: 4, reply: 5, cancel: 6, detail: 7, notify_done: 8, quiet: 9, scroll: 10, type: 11, dictate: 12, kb_pick: 13, kb_del: 14, kb_send: 15, kb_end: 16, rerun: 17, unqueue: 18 },
+  cmd_op: { focus: 0, ack: 1, snooze: 2, approve: 3, deny: 4, reply: 5, cancel: 6, detail: 7, notify_done: 8, quiet: 9, scroll: 10, type: 11, dictate: 12, kb_pick: 13, kb_del: 14, kb_send: 15, kb_end: 16, rerun: 17, unqueue: 18, answer: 19 },
   scroll_unit: { lines: 0, pages: 1, to_end: 2 },
   disp_shape: { round: 0, rect: 1 },
   host_os: { mac: 0, win: 1, linux: 2 },
@@ -33,7 +33,7 @@ export const MSG_TYPES = {
   hello: 1, welcome: 2, snapshot: 3, session_upd: 4, gone: 5, attention: 6, clear: 7, cmd: 8,
   result: 9, detail: 10, cfg: 11, batt: 12, ping: 13, pong: 14, log: 15, audio_start: 16,
   audio: 17, audio_end: 18, transcript: 19, kb_start: 20, kb_stroke: 21, kb_cands: 22,
-  usage: 23, fw_begin: 24, fw_chunk: 25, fw_ack: 26,
+  usage: 23, fw_begin: 24, fw_chunk: 25, fw_ack: 26, power: 27,
   dbg_ui_state_req: 64, dbg_ui_state: 65,
   dbg_screenshot_req: 66, dbg_screenshot_chunk: 67, dbg_inject_input: 68, dbg_set_log_level: 69,
 };
@@ -64,6 +64,7 @@ const SPECS = {
     hush: [26, 'bool'], // proto 0.12 (PRESENCE.md)
     fc: [30, 'uint'], la: [31, 'uint'], lr: [32, 'uint'], tp: [33, 'bool'], dur: [34, 'uint'], // proto 0.14 (DONE-SUMMARY.md)
     qd: [35, 'tstr'], // proto 0.17: the queued message's start
+    lm: [36, 'uint'], ll: [37, 'uint'], lp: [38, 'tstr'], // proto 0.18: the last message (LAST-MESSAGE.md)
   },
   snapshot: { sessions: [0, 'objs:session'], away: [1, 'objs:away_event'] },
   gone: { sid: [0, 'uint'] },
@@ -73,14 +74,17 @@ const SPECS = {
     left: [9, 'uint'], win: [10, 'uint'], len: [11, 'uint'], // proto 0.11 (ANSWER-WINDOW.md)
     hush: [12, 'bool'], // proto 0.12 (PRESENCE.md)
     rule: [13, 'tstr'], scope: [14, 'enum:rule_scope'], wide: [15, 'bool'], // proto 0.13 (STANDING-RULES.md)
+    qs: [16, 'objs:ask_q'], // proto 0.18: AskUserQuestion's questions (LAST-MESSAGE.md)
   },
   clear: { rid: [0, 'uint'], why: [1, 'enum:clear_why'] },
   // cmd_arg = uint / tstr / scroll_arg: a map argument is the scroll one
   scroll_arg: { unit: [0, 'enum:scroll_unit'], delta: [1, 'int'], seq: [2, 'uint'] },
-  cmd: { op: [0, 'enum:cmd_op'], sid: [1, 'uint'], rid: [2, 'uint'], arg: [3, 'cmd_arg'], hold_ms: [4, 'uint'], rh: [5, 'uint'], q: [6, 'bool'] }, // rh: proto 0.13 (STANDING-RULES.md); q: proto 0.17
+  cmd: { op: [0, 'enum:cmd_op'], sid: [1, 'uint'], rid: [2, 'uint'], arg: [3, 'cmd_arg'], hold_ms: [4, 'uint'], rh: [5, 'uint'], q: [6, 'bool'], picks: [7, 'ints'], aids: [8, 'ints'] }, // rh: proto 0.13 (STANDING-RULES.md); q: proto 0.17; picks / aids: proto 0.18
   scroll_pos: { lines_above: [0, 'uint'], at_bottom: [1, 'bool'], total: [2, 'uint'], preview: [3, 'tstr'] },
   result: { ok: [0, 'bool'], err: [1, 'enum:result_err'], msg: [2, 'tstr'], pos: [3, 'obj:scroll_pos'] },
-  detail: { rid: [0, 'uint'], sid: [1, 'uint'], text: [2, 'tstr'], off: [3, 'uint'], total: [4, 'uint'] },
+  detail: { rid: [0, 'uint'], sid: [1, 'uint'], text: [2, 'tstr'], off: [3, 'uint'], total: [4, 'uint'], lm: [5, 'uint'] },
+  ask_q: { h: [0, 'tstr'], q: [1, 'tstr'], o: [2, 'objs:ask_opt'], m: [3, 'bool'] },
+  ask_opt: { l: [0, 'tstr'], d: [1, 'tstr'] },
   batt: { pct: [0, 'uint'], chg: [1, 'bool'] },
   log: { lvl: [0, 'enum:log_level'], msg: [1, 'tstr'] },
   audio_start: { aid: [0, 'uint'], codec: [1, 'enum:audio_codec'], sid: [2, 'uint'] },
@@ -93,6 +97,10 @@ const SPECS = {
   fw_begin: { size: [0, 'uint'], sha: [1, 'hex'], ver: [2, 'tstr'] },
   fw_chunk: { off: [0, 'uint'], data: [1, 'hex'] },
   fw_ack: { st: [0, 'enum:fw_status'], next: [1, 'uint'], msg: [2, 'tstr'] },
+  // proto 0.19 (POWER.md): battery and the ms spent in each power state since the previous report
+  power: { mv: [0, 'uint'], mvf: [1, 'uint'], vin: [2, 'uint'], chg: [3, 'bool'], usb: [4, 'bool'], pct: [5, 'uint'],
+    on: [6, 'uint'], dim: [7, 'uint'], off: [8, 'uint'], deep: [9, 'uint'], lk: [10, 'uint'], ble: [11, 'uint'],
+    itvl: [12, 'uint'], seq: [13, 'uint'], nd: [14, 'uint'] },
   kb_cands: { kid: [0, 'uint'], seq: [1, 'uint'], cands: [2, 'tstrs'], typed: [3, 'uint'], err: [4, 'enum:result_err'] },
   dbg_ui_state: { screen: [0, 'tstr'], sel_sid: [1, 'uint'], rid: [2, 'uint'], visible: [3, 'tstrs'], power: [4, 'tstr'], fps: [5, 'uint'] },
   dbg_screenshot_chunk: { w: [0, 'uint'], h: [1, 'uint'], offset: [2, 'uint'], data: [3, 'bstr'], last: [4, 'bool'] },
@@ -244,6 +252,7 @@ export function describe(msg, dir) {
     case 'ping': what = 'ping (keepalive)'; break;
     case 'pong': what = 'pong (link is alive)'; break;
     case 'batt': what = `battery ${b.pct}%${b.chg ? ' charging' : ''}`; break;
+    case 'power': what = `power report: ${b.mv} mV${b.chg ? ' charging' : ''}, ${Math.round(((b.on ?? 0) + (b.dim ?? 0) + (b.off ?? 0) + (b.deep ?? 0)) / 1000)} s covered`; break;
     case 'log': what = `log: ${b.msg}`; break;
     case 'detail': what = `full text for ${b.rid !== undefined ? 'request ' + b.rid : 'session ' + b.sid}${b.total !== undefined ? `, bytes ${b.off ?? 0}-${(b.off ?? 0) + new TextEncoder().encode(b.text ?? '').length} of ${b.total}` : ''}`; break;
     case 'cfg': what = 'new device settings'; break;

@@ -1,0 +1,47 @@
+# Two questions, the second multi-select. A hold picks the first question's option and moves on (nothing is
+# sent yet); swipe right goes back to it and keeps the answer; taps tick the second's options; Send is held and
+# sends both answers at once: picks [1 (React), 5 (Router + Tests)].
+connect
+rx a400020101020103a60082001201a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 2 ask webapp feat/login
+ask 32 2 60000 60000 Framework|Which framework?|single|React|Vue ;; Extras|Which extras should I add?|multi|Router|State store|Tests=Vitest and Playwright
+wait 600
+expect_screen ask
+expect_label 1 of 2
+expect_label > React HOLD
+hold 233 282 1500
+wait 500
+expect_label 2 of 2
+expect_label Extras
+expect_label > Router
+swipe 150 233 380 233 200
+wait 400
+expect_label 1 of 2
+swipe 150 233 380 233 200
+wait 400
+expect_screen attention
+tap 233 320
+wait 500
+expect_label 1 of 2
+hold 233 282 1500
+wait 500
+expect_label 2 of 2
+tap 233 282
+wait 300
+btn B
+wait 200
+btn B
+wait 200
+tap 233 282
+wait 300
+shot question_multi.png
+btn B
+wait 200
+btn B
+wait 200
+expect_label > Send HOLD
+hold 233 282 1500
+wait 400
+expect_label Sent
+expect_label 2 answers
+quit

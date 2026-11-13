@@ -85,6 +85,13 @@ and `feedback_denied`, i.e. when a hold completes and the answer went out (appro
 deny, stop), only in alert mode "Sounds: on", not face down. Grant-option replies (`feedback_reply_sent`) keep their
 three ticks and have no tone.
 
+A third confirmation role, `updated` (`updated-flourish`, about 560 ms: FM C5 E5 G5 C6 at 80 ms each, then a bell E6 ringing
+out for 240 ms), tells you the watch flashed. `ota.c` plays it from `feedback_updated` in `ota_on_link`, at the
+first welcome of an unconfirmed (just-OTA'd) image, together with the toast "Updated to <fw>" (the toast shows even when
+muted). A power-on or a USB flash boots an already confirmed image and a later re-welcome finds it cleared, so neither
+plays it. Same gates as the other tones (Sounds on, volume above 0, not face down). Simulator: `sim_ota_updated_tone`
+(`AGENTLINK_SIM_UNCONFIRMED=1`) and `sim_ota_updated_tone_silent`.
+
 Volume (`prefs.c`, key `volume`): steps 0..5 map to 0, 10, 25, 45, 70, 100 %; default 5, which is the level the speaker
 always had. `hal_audio_set_volume` converts to the ES8311 DAC attenuation (0.5 dB steps, 100 % = 0 dB, each
 halving -6 dB) and the speaker task applies it before each sound; step 0 plays nothing. Stored in NVS.

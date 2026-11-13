@@ -8,6 +8,7 @@
 MODEL_EXT_BSS static session_t s_sessions[MODEL_MAX_SESSIONS];
 static bool s_used[MODEL_MAX_SESSIONS];
 MODEL_EXT_BSS static attention_t s_att[MODEL_MAX_ATTENTION]; /* PSRAM: a standing rule makes each ~0.5 KB */
+MODEL_EXT_BSS static ask_q_t s_att_qs[MODEL_MAX_ATTENTION][MODEL_MAX_QS]; /* each request's questions, by slot: ~3.4 KB */
 static bool s_att_used[MODEL_MAX_ATTENTION];
 static settings_t s_settings;
 static uint32_t s_rev;
@@ -150,6 +151,11 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
     if (present & SF_OK) dst->step = src->step;
     if (present & SF_Q) memcpy(dst->q, src->q, sizeof dst->q);
     if (present & SF_QD) memcpy(dst->queued, src->queued, sizeof dst->queued);
+    if (present & SF_LM) { /* a delta carries only the keys that changed */
+        if (src->lm_keys & 1) dst->lm = src->lm;
+        if (src->lm_keys & 2) dst->ll = src->ll;
+        if (src->lm_keys & 4) memcpy(dst->lp, src->lp, sizeof dst->lp);
+    }
     if (present & SF_RP) {
         memcpy(dst->rp, src->rp, sizeof dst->rp);
         dst->n_rp = src->n_rp;
@@ -336,6 +342,7 @@ void model_attention_add(const attention_t *a)
     bool sent = s_att[slot].answer_sent; /* only these three, not a copy: attention_t is ~0.5 KB of stack */
     uint8_t answer = s_att[slot].answer, answer_opt = s_att[slot].answer_opt;
     s_att[slot] = *a;
+    s_att[slot].n_qs = 0; /* the questions follow with model_attention_set_questions() */
     if (had) { /* a re-sent request keeps the answer already given */
         s_att[slot].answer_sent = sent;
         s_att[slot].answer = answer;
@@ -346,6 +353,26 @@ void model_attention_add(const attention_t *a)
     if (ss >= 0 && !had) s_sessions[ss].back = false; /* a new request is on the watch again */
     s_rev++;
     dbg_event("model", "attention", "\"rid\":%u,\"sid\":%u,\"kind\":%d", (unsigned)a->rid, (unsigned)a->sid, (int)a->kind);
+}
+
+void model_attention_set_questions(uint32_t rid, const ask_q_t *qs, int n)
+{
+    if (n > MODEL_MAX_QS) n = MODEL_MAX_QS;
+    for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
+        if (!s_att_used[i] || s_att[i].rid != rid) continue;
+        for (int k = 0; k < n; k++) s_att_qs[i][k] = qs[k];
+        s_att[i].n_qs = (uint8_t)(n < 0 ? 0 : n);
+        s_rev++;
+        dbg_event("model", "questions", "\"rid\":%u,\"n\":%d", (unsigned)rid, n);
+        return;
+    }
+}
+
+const ask_q_t *model_attention_question(uint32_t rid, int i)
+{
+    for (int k = 0; k < MODEL_MAX_ATTENTION; k++)
+        if (s_att_used[k] && s_att[k].rid == rid) return i >= 0 && i < s_att[k].n_qs ? &s_att_qs[k][i] : NULL;
+    return NULL;
 }
 
 bool model_attention_clear(uint32_t rid)

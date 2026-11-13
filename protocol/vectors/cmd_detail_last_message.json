@@ -1,0 +1,13 @@
+{
+  "desc": "Device asks for session 3's last message from byte 1024: no rid (proto 0.18)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 23,
+    "b": {
+      "op": "detail",
+      "sid": 3,
+      "arg": 1024
+    }
+  },
+  "cbor_hex": "a30008011703a30007010303190400"
+}

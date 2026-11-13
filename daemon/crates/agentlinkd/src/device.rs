@@ -48,6 +48,8 @@ pub struct Shared {
     pub devices: Mutex<BTreeMap<String, Value>>,
     /// The firmware update in progress, and the links it can reach (ota.rs).
     pub ota: Arc<crate::ota::Ota>,
+    /// Power reports: the CSV log and the last report per device (power.rs, POWER.md).
+    pub power: crate::power::PowerLog,
     next_link: AtomicU64,
 }
 
@@ -78,6 +80,7 @@ impl Shared {
             host: host_info(),
             devices: Mutex::default(),
             ota: Arc::new(crate::ota::Ota::new(ota_trace)),
+            power: crate::power::PowerLog::new(),
             next_link: AtomicU64::new(1),
         }
     }
@@ -126,6 +129,9 @@ struct Conn {
     hidden: HashSet<u64>,
     /// Counts this device as linked for the answer window (window.rs) once it has handshaken.
     linked: Option<crate::broker::Linked>,
+    /// The device's board and firmware as its hello named them, for the power log.
+    board: String,
+    fw: String,
 }
 
 /// Terminal content leaves the daemon only when the device may show it (UI-V2 §4.4).
@@ -202,6 +208,13 @@ impl Conn {
                 s.qd.take()
                     .map(|q| if q.is_empty() { q } else { "…".into() });
         }
+        // the agent's last message: proto 0.18 (LAST-MESSAGE.md). Under meta the device learns only that
+        // there is one (id and length), never its start.
+        if self.peer_minor < ANSWER_MINOR {
+            (s.lm, s.ll, s.lp) = (None, None, None);
+        } else if self.privacy == Privacy::Meta {
+            s.lp = s.lp.map(|_| String::new());
+        }
         if self.privacy == Privacy::Meta {
             s.sum = None;
             // which pull request a session works on says what it works on
@@ -261,6 +274,10 @@ impl Conn {
             // the standing rule: proto 0.13 (STANDING-RULES.md); an older device offers Approve / Deny
             if self.peer_minor < RULES_MINOR {
                 (a.rule, a.scope, a.wide) = (None, None, None);
+            }
+            // the questions: proto 0.18; an older device answers by `opts` or not at all
+            if self.peer_minor < ANSWER_MINOR {
+                a.qs = None;
             }
         }
         if let Message::Clear(cl) = &mut msg {
@@ -381,6 +398,9 @@ pub const FW_MINOR: u64 = 15;
 const LONG_TRANSCRIPT_MINOR: u64 = 16;
 /// Queued messages: `session.qd`, `cmd.q` and `cmd unqueue` (PROTOCOL §6d).
 const QUEUE_MINOR: u64 = 17;
+/// The last message (`session.lm` / `ll` / `lp`, `detail` without a rid) and questions answered on the
+/// watch (`attention.qs`, `cmd answer`), LAST-MESSAGE.md.
+const ANSWER_MINOR: u64 = 18;
 
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
@@ -430,6 +450,8 @@ pub async fn run_link(
         deltas: DeltaQueue::default(),
         hidden: HashSet::new(),
         linked: None,
+        board: String::new(),
+        fw: String::new(),
     };
 
     let hello = loop {
@@ -500,6 +522,8 @@ async fn handshake(
     }
     c.next_id = 1;
     c.peer_minor = hello.1.proto.1;
+    c.board = hello.1.dev.board.clone();
+    c.fw = hello.1.dev.fw.clone();
     c.linked.get_or_insert_with(|| shared.broker.link());
     c.deltas.clear(); // the snapshot below carries them
     c.hidden.clear();
@@ -587,6 +611,13 @@ async fn serve(
                 Some(Envelope { msg: Message::FwAck(a), .. }) => {
                     if let Some(key) = dev_key.as_deref() {
                         shared.ota.on_ack(key, a);
+                    }
+                }
+                Some(Envelope { msg: Message::Power(p), .. }) => {
+                    // POWER.md: one CSV row per report, and the last one for `agentlink status`
+                    if let Some(key) = dev_key.as_deref() {
+                        let src = crate::power::Source { uid: key, board: &c.board, fw: &c.fw, transport };
+                        shared.power.record(&src, &p, now_unix());
                     }
                 }
                 Some(env) => handle(shared, c, env, &mut sc, &mut inflight, &mut vs).await?,
@@ -791,6 +822,10 @@ async fn handle(
             scroll_cmd(shared, c, sc, inflight, env.id, &cmd).await
         }
         Message::Cmd(cmd) if cmd.op == CmdOp::Detail => detail_cmd(shared, c, env.id, &cmd).await,
+        Message::Cmd(cmd) if cmd.op == CmdOp::Answer => {
+            let res = answer_cmd(shared, c.peer_minor, &cmd);
+            c.send(Some(env.id), Message::Result(res)).await
+        }
         Message::Cmd(cmd) => {
             if cmd.op == CmdOp::Focus && c.peer_minor >= WINDOW_MINOR {
                 hand_back(shared, &cmd);
@@ -822,40 +857,54 @@ fn hand_back(shared: &Shared, cmd: &Cmd) {
 
 /// `cmd detail {rid, arg: off}` (proto 0.11, ANSWER-WINDOW.md §4): the full text of an open request
 /// from byte `off`, as `detail` chunks of at most [`DETAIL_CHUNK`](crate::broker::DETAIL_CHUNK) bytes
-/// cut on character boundaries, then one `result`. Withheld under privacy `meta`.
+/// cut on character boundaries, then one `result`. Without a rid (proto 0.18, LAST-MESSAGE.md §2.3): the
+/// session's last message, its chunks naming the message (`lm`). Withheld under privacy `meta`.
 async fn detail_cmd(shared: &Shared, c: &mut Conn, id: u64, cmd: &Cmd) -> Result<()> {
     let off = match cmd.arg {
         None => Some(0),
         Some(Arg::Uint(o)) => usize::try_from(o).ok(),
         Some(_) => None,
     };
+    let at = |text: String, off: usize| {
+        if text.is_char_boundary(off) {
+            Ok((text, off))
+        } else {
+            Err((ResultErr::Denied, "bad offset"))
+        }
+    };
+    // (rid, sid, lm, text, off)
     let res = if c.peer_minor < WINDOW_MINOR {
         Err((ResultErr::Unsupported, "detail needs proto 0.11"))
     } else if !preview_allowed(c.privacy) {
         Err((ResultErr::Denied, "content is withheld"))
     } else {
         match (cmd.rid, off) {
-            (None, _) => Err((ResultErr::Denied, "rid required")),
             (_, None) => Err((ResultErr::Denied, "bad offset")),
-            (Some(rid), Some(off)) => shared.broker.detail(rid).and_then(|(sid, text)| {
-                if text.is_char_boundary(off) {
-                    Ok((rid, sid, text, off))
-                } else {
-                    Err((ResultErr::Denied, "bad offset"))
-                }
-            }),
+            (None, _) if c.peer_minor < ANSWER_MINOR => Err((ResultErr::Denied, "rid required")),
+            (None, Some(off)) => match cmd.sid {
+                None => Err((ResultErr::Denied, "sid required")),
+                Some(sid) => match shared.registry.last_message(sid) {
+                    None => Err((ResultErr::Stale, "no last message")),
+                    Some((lm, text)) => at(text, off).map(|(t, o)| (None, sid, Some(lm), t, o)),
+                },
+            },
+            (Some(rid), Some(off)) => shared
+                .broker
+                .detail(rid)
+                .and_then(|(sid, text)| at(text, off).map(|(t, o)| (Some(rid), sid, None, t, o))),
         }
     };
     let res = match res {
-        Ok((rid, sid, text, off)) => {
+        Ok((rid, sid, lm, text, off)) => {
             let total = text.len() as u64;
             for (at, chunk) in chunks(&text, off, crate::broker::DETAIL_CHUNK) {
                 let d = Detail {
-                    rid: Some(rid),
+                    rid,
                     sid: Some(sid),
                     text: chunk.to_owned(),
                     off: Some(at as u64),
                     total: Some(total),
+                    lm,
                 };
                 c.send(None, Message::Detail(d)).await?;
             }
@@ -864,6 +913,65 @@ async fn detail_cmd(shared: &Shared, c: &mut Conn, id: u64, cmd: &Cmd) -> Result
         Err((err, msg)) => fail(err, msg),
     };
     c.send(Some(id), Message::Result(res)).await
+}
+
+/// `cmd answer {sid, rid, picks, aids}` (proto 0.18, LAST-MESSAGE.md §3.2): every answer to a request's
+/// questions at once, after a hold. A recording's transcript is the free answer to its question; the
+/// transcripts are used up only when the broker took the answer, so a refused one costs nothing.
+fn answer_cmd(shared: &Shared, minor: u64, cmd: &Cmd) -> CmdResult {
+    let detail = serde_json::to_value(cmd).unwrap_or_default();
+    let res = (|| {
+        if minor < ANSWER_MINOR {
+            return fail(ResultErr::Unsupported, "answer needs proto 0.18");
+        }
+        if cmd.hold_ms.unwrap_or(0) < MIN_APPROVE_HOLD_MS {
+            return fail(ResultErr::Denied, "hold-to-confirm too short");
+        }
+        let Some(rid) = cmd.rid else {
+            return fail(ResultErr::Denied, "rid required");
+        };
+        let picks = cmd.picks.clone().unwrap_or_default();
+        let aids = cmd.aids.clone().unwrap_or_else(|| vec![0; picks.len()]);
+        if aids.len() != picks.len() {
+            return fail(ResultErr::Denied, "one entry per question");
+        }
+        let Some(sid) = shared.broker.sid_of(rid) else {
+            return fail(ResultErr::Stale, "no pending request for rid");
+        };
+        if cmd.sid.is_some_and(|s| s != sid) {
+            return fail(ResultErr::Stale, "not that session's request");
+        }
+        let mut transcripts = shared.transcripts.lock().unwrap();
+        let mut texts = Vec::with_capacity(aids.len());
+        for &aid in &aids {
+            if aid == 0 {
+                texts.push(None);
+                continue;
+            }
+            match transcripts.peek(aid, sid) {
+                Some(t) => texts.push(Some(t.to_owned())),
+                None => return fail(ResultErr::Stale, "no transcript for that recording"),
+            }
+        }
+        match shared.broker.answer_questions(rid, &picks, &texts) {
+            Ok(_) => {
+                for &aid in aids.iter().filter(|a| **a != 0) {
+                    transcripts.take(aid, sid);
+                }
+                tracing::info!("rid {rid} answered from device: {} questions", picks.len());
+                CmdResult::ok()
+            }
+            Err((err, msg)) => fail(err, msg),
+        }
+    })();
+    // indices and recording ids only: never a label or a transcript
+    shared.trace.audit(
+        "approval",
+        cmd.sid,
+        cmd.rid,
+        json!({"cmd": detail, "result": res}),
+    );
+    res
 }
 
 /// `text[off..]` in pieces of at most `max` bytes, each cut on a character boundary, with its offset.
@@ -1547,6 +1655,8 @@ mod tests {
             hold_ms: None,
             rh: None,
             q: None,
+            picks: None,
+            aids: None,
         }
     }
 
@@ -1602,6 +1712,8 @@ mod tests {
             hold_ms,
             rh: None,
             q: None,
+            picks: None,
+            aids: None,
         }
     }
 
@@ -1692,6 +1804,8 @@ mod tests {
                 deltas: DeltaQueue::default(),
                 hidden: HashSet::new(),
                 linked: None,
+                board: String::new(),
+                fw: String::new(),
             };
             let out = c.for_peer(s.clone());
             assert_eq!(
@@ -1907,6 +2021,8 @@ mod tests {
                 deltas: DeltaQueue::default(),
                 hidden: HashSet::new(),
                 linked: None,
+                board: String::new(),
+                fw: String::new(),
             };
             assert_eq!(c.for_peer(s.clone()).qd.as_deref(), want, "minor {minor}");
         }
@@ -1923,6 +2039,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         };
         s.qd = Some(String::new());
         assert_eq!(
@@ -2082,6 +2200,8 @@ mod tests {
             hold_ms,
             rh: None,
             q: None,
+            picks: None,
+            aids: None,
         }
     }
 
@@ -2112,6 +2232,7 @@ mod tests {
             dictate: false,
             notice: false,
             standing: None,
+            questions: Vec::new(),
         };
         let (rid, wait) = shared.broker.open(req(vec![]));
         let mut d = spawn_link(&shared);
@@ -2207,6 +2328,7 @@ mod tests {
             dictate: false,
             notice: false,
             standing: None,
+            questions: Vec::new(),
         }
     }
 
@@ -2519,6 +2641,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         };
         c.send(
             None,
@@ -2547,6 +2671,339 @@ mod tests {
             panic!("no detail under meta, got {:?}", env.msg)
         };
         assert_eq!(r.err, Some(ResultErr::Denied));
+    }
+
+    /// Ends the turn of session `claude:s` with `text` as its last message (LAST-MESSAGE.md).
+    fn stop_with(shared: &Shared, text: &str) {
+        use crate::registry::{LastMsg, SessionEvent, SessionPatch};
+        let mut p = SessionPatch::new(Agent::Claude);
+        p.state = Some(SessState::Done);
+        p.last = LastMsg::Set(crate::lastmsg::clean(text));
+        shared.registry.apply(SessionEvent::Update {
+            key: "claude:s".into(),
+            via: crate::registry::Via::Local,
+            patch: p,
+            ctx: crate::registry::HostCtx::default(),
+        });
+    }
+
+    fn last_cmd(id: u64, sid: Option<u64>, off: u64) -> Vec<u8> {
+        cmd_bytes(
+            id,
+            Cmd {
+                sid,
+                ..cmd(CmdOp::Detail, None, Some(Arg::Uint(off)), None)
+            },
+        )
+    }
+
+    #[test]
+    fn the_last_message_reaches_only_0_18_and_only_its_existence_under_meta() {
+        let mut s = Session::delta(1);
+        (s.lm, s.ll, s.lp) = (Some(7), Some(300), Some("Built and flashed.".into()));
+        let mut c = test_conn(17);
+        let out = c.for_peer(s.clone());
+        assert_eq!((out.lm, out.ll, out.lp), (None, None, None));
+        c.peer_minor = 18;
+        assert_eq!(c.for_peer(s.clone()), s);
+        c.privacy = Privacy::Meta;
+        let out = c.for_peer(s.clone());
+        assert_eq!(
+            (out.lm, out.ll, out.lp.as_deref()),
+            (Some(7), Some(300), Some("")),
+            "a message exists, nothing of what it says"
+        );
+        // the clear still clears
+        (s.lm, s.ll, s.lp) = (Some(0), Some(0), Some(String::new()));
+        assert_eq!(c.for_peer(s.clone()).lp.as_deref(), Some(""));
+    }
+
+    #[tokio::test]
+    async fn the_last_message_is_read_in_chunks_bound_to_its_id() {
+        let shared = shared();
+        let sid = add_session(&shared);
+        let md = format!("## Done\n\n{}", "Ça marche — **très** bien. ".repeat(100));
+        stop_with(&shared, &md);
+        let (lm, text) = shared.registry.last_message(sid).unwrap();
+        assert!(text.starts_with("Done\n\nÇa marche — très bien."));
+        let mut d = spawn_link(&shared);
+        d.to_daemon.send(hello_with_minor("1.0.0", 18)).unwrap();
+        d.next().await; // welcome
+        let Message::Snapshot(snap) = d.next().await.msg else {
+            panic!("snapshot")
+        };
+        let s = &snap.sessions[0];
+        assert_eq!((s.lm, s.ll), (Some(lm), Some(text.len() as u64)));
+        assert!(s.lp.as_deref().unwrap().starts_with("Done Ça marche"));
+        assert!(s.lp.as_ref().unwrap().len() <= crate::lastmsg::PREVIEW_MAX);
+        d.to_daemon.send(last_cmd(5, Some(sid), 0)).unwrap();
+        let (chunks, r) = detail_chunks(&mut d).await;
+        assert!(r.ok && chunks.len() >= 3);
+        let mut whole = String::new();
+        for c in &chunks {
+            assert_eq!(
+                (c.rid, c.sid, c.lm, c.total),
+                (None, Some(sid), Some(lm), Some(text.len() as u64))
+            );
+            assert_eq!(c.off, Some(whole.len() as u64));
+            assert!(c.text.len() <= crate::broker::DETAIL_CHUNK);
+            whole.push_str(&c.text);
+        }
+        assert_eq!(whole, text);
+        // resumed from where the reader got to
+        let resume = chunks[0].text.len() as u64;
+        d.to_daemon.send(last_cmd(6, Some(sid), resume)).unwrap();
+        let (rest, r) = detail_chunks(&mut d).await;
+        assert!(r.ok);
+        assert_eq!(rest[0].off, Some(resume));
+        // inside a character, another session, no session: nothing
+        let inside = text
+            .char_indices()
+            .find(|(_, c)| c.len_utf8() > 1)
+            .unwrap()
+            .0 as u64
+            + 1;
+        for (id, sid, off, err) in [
+            (7, Some(sid), inside, ResultErr::Denied),
+            (8, Some(sid + 9), 0, ResultErr::Stale),
+            (9, None, 0, ResultErr::Denied),
+        ] {
+            d.to_daemon.send(last_cmd(id, sid, off)).unwrap();
+            let (none, r) = detail_chunks(&mut d).await;
+            assert!(none.is_empty());
+            assert_eq!(r.err, Some(err), "cmd {id}");
+        }
+        // a new message has a new id; a new prompt clears it and the delta says so
+        stop_with(&shared, "Second answer.");
+        let (lm2, _) = shared.registry.last_message(sid).unwrap();
+        assert_ne!(lm2, lm);
+        let Message::SessionUpd(u) = d.next().await.msg else {
+            panic!("delta")
+        };
+        assert_eq!(
+            (u.lm, u.ll, u.lp.as_deref()),
+            (Some(lm2), Some(14), Some("Second answer."))
+        );
+        {
+            use crate::registry::{LastMsg, SessionEvent, SessionPatch};
+            let mut p = SessionPatch::new(Agent::Claude);
+            p.state = Some(SessState::Work);
+            p.last = LastMsg::Clear;
+            shared.registry.apply(SessionEvent::Update {
+                key: "claude:s".into(),
+                via: crate::registry::Via::Local,
+                patch: p,
+                ctx: crate::registry::HostCtx::default(),
+            });
+        }
+        let Message::SessionUpd(u) = d.next().await.msg else {
+            panic!("delta")
+        };
+        assert_eq!((u.lm, u.ll, u.lp.as_deref()), (Some(0), Some(0), Some("")));
+        assert_eq!(
+            shared.registry.snapshot()[0].lm,
+            None,
+            "a snapshot leaves it out"
+        );
+        d.to_daemon.send(last_cmd(10, Some(sid), 0)).unwrap();
+        let (none, r) = detail_chunks(&mut d).await;
+        assert!(none.is_empty());
+        assert_eq!(r.err, Some(ResultErr::Stale), "no message: stale");
+    }
+
+    #[tokio::test]
+    async fn the_last_message_needs_0_18_and_content_privacy() {
+        let shared = shared();
+        let sid = add_session(&shared);
+        stop_with(&shared, "All done.");
+        // a 0.17 device: no keys, and detail without a rid is what it always was
+        let mut d = spawn_link(&shared);
+        d.to_daemon.send(hello_with_minor("1.0.0", 17)).unwrap();
+        d.next().await;
+        let Message::Snapshot(snap) = d.next().await.msg else {
+            panic!()
+        };
+        assert_eq!((snap.sessions[0].lm, snap.sessions[0].ll), (None, None));
+        assert_eq!(snap.sessions[0].lp, None);
+        d.to_daemon.send(last_cmd(1, Some(sid), 0)).unwrap();
+        let (none, r) = detail_chunks(&mut d).await;
+        assert!(none.is_empty());
+        assert_eq!(
+            (r.err, r.msg.as_deref()),
+            (Some(ResultErr::Denied), Some("rid required"))
+        );
+        let mut old = linked(&shared, 10).await;
+        old.to_daemon.send(last_cmd(1, Some(sid), 0)).unwrap();
+        assert_eq!(result_of(&mut old).await.err, Some(ResultErr::Unsupported));
+        // privacy meta: refused, nothing sent
+        let (_tx, rx) = mpsc::unbounded_channel();
+        let (tx, mut out) = mpsc::unbounded_channel();
+        let mut c = Conn {
+            privacy: Privacy::Meta,
+            link: Box::new(ChanLink { rx, tx }),
+            ..test_conn(18)
+        };
+        let ask = Cmd {
+            sid: Some(sid),
+            ..cmd(CmdOp::Detail, None, Some(Arg::Uint(0)), None)
+        };
+        detail_cmd(&shared, &mut c, 3, &ask).await.unwrap();
+        let Message::Result(r) = Envelope::from_bytes(&out.recv().await.unwrap())
+            .unwrap()
+            .msg
+        else {
+            panic!("no detail under meta")
+        };
+        assert_eq!(r.err, Some(ResultErr::Denied));
+    }
+
+    fn two_questions(sid: u64) -> crate::broker::Request {
+        let payload = json!({"tool_name": "AskUserQuestion", "tool_input": {"questions": [
+            {"question": "Which framework?", "header": "Framework", "multiSelect": false,
+             "options": [{"label": "React"}, {"label": "Vue"}]},
+            {"question": "Which parts?", "header": "Parts", "multiSelect": true,
+             "options": [{"label": "Router"}, {"label": "Store"}, {"label": "Tests"}]}]}});
+        crate::broker::request_of(
+            sid,
+            "claude:s".into(),
+            "claude",
+            "PermissionRequest",
+            &payload,
+            std::time::Duration::from_secs(30),
+        )
+        .unwrap()
+    }
+
+    fn answer_of(rid: Option<u64>, picks: &[u64], aids: Option<&[u64]>, hold_ms: u64) -> Cmd {
+        Cmd {
+            picks: Some(picks.to_vec()),
+            aids: aids.map(<[u64]>::to_vec),
+            ..cmd(CmdOp::Answer, rid, None, Some(hold_ms))
+        }
+    }
+
+    #[tokio::test]
+    async fn questions_are_answered_with_a_hold_and_a_refusal_costs_no_transcript() {
+        let dir = std::env::temp_dir().join(format!("al-answer-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let audit = dir.join("audit.jsonl");
+        let trace = Trace::new(dir.join("trace"), audit.clone());
+        let registry = Arc::new(Registry::new(trace.clone()));
+        let shared = Arc::new(Shared::new(
+            registry.clone(),
+            Arc::new(Broker::new(registry)),
+            trace,
+            Arc::new(NoFocus),
+            Arc::new(FakeScroll::default()),
+        ));
+        let sid = add_session(&shared);
+        let (rid, wait) = shared.broker.open(two_questions(sid));
+        let mut old = linked(&shared, 17).await;
+        let Message::Attention(a) = old.next().await.msg else {
+            panic!()
+        };
+        assert_eq!(
+            (a.qs, a.acts),
+            (None, vec![Action::Focus]),
+            "Open on PC only"
+        );
+        let mut new = linked(&shared, 18).await;
+        let Message::Attention(a) = new.next().await.msg else {
+            panic!()
+        };
+        assert_eq!(a.qs.as_ref().map(Vec::len), Some(2));
+        old.to_daemon
+            .send(cmd_bytes(1, answer_of(Some(rid), &[1, 1], None, 1250)))
+            .unwrap();
+        assert_eq!(result_of(&mut old).await.err, Some(ResultErr::Unsupported));
+        shared
+            .transcripts
+            .lock()
+            .unwrap()
+            .put(5, Some(sid), "Svelte".into());
+        for (c, want) in [
+            (answer_of(Some(rid), &[1, 1], None, 0), ResultErr::Denied),
+            (answer_of(Some(rid), &[1, 1], None, 900), ResultErr::Denied),
+            (answer_of(None, &[1, 1], None, 1250), ResultErr::Denied),
+            (
+                answer_of(Some(rid), &[1, 1], Some(&[0]), 1250),
+                ResultErr::Denied,
+            ),
+            (answer_of(Some(rid), &[1], None, 1250), ResultErr::Denied),
+            (answer_of(Some(rid), &[3, 1], None, 1250), ResultErr::Denied),
+            (
+                answer_of(Some(rid), &[1, 1], Some(&[5, 0]), 1250),
+                ResultErr::Denied,
+            ),
+            (
+                answer_of(Some(rid), &[0, 1], Some(&[9, 0]), 1250),
+                ResultErr::Stale,
+            ),
+            (
+                answer_of(Some(rid + 1), &[1, 1], None, 1250),
+                ResultErr::Stale,
+            ),
+            (
+                Cmd {
+                    sid: Some(sid + 1),
+                    ..answer_of(Some(rid), &[1, 1], None, 1250)
+                },
+                ResultErr::Stale,
+            ),
+        ] {
+            new.to_daemon.send(cmd_bytes(2, c.clone())).unwrap();
+            let r = result_of(&mut new).await;
+            assert_eq!((r.ok, r.err), (false, Some(want)), "{c:?}");
+            assert_eq!(
+                shared.transcripts.lock().unwrap().peek(5, sid),
+                Some("Svelte"),
+                "nothing used up by {c:?}"
+            );
+        }
+        assert_eq!(shared.broker.pending().len(), 1, "still open");
+        new.to_daemon
+            .send(cmd_bytes(
+                3,
+                answer_of(Some(rid), &[0, 0b101], Some(&[5, 0]), 1250),
+            ))
+            .unwrap();
+        assert!(result_of(&mut new).await.ok);
+        assert_eq!(
+            shared.transcripts.lock().unwrap().peek(5, sid),
+            None,
+            "used up"
+        );
+        let out = wait.await.unwrap();
+        assert_eq!(
+            serde_json::to_value(&out).unwrap(),
+            json!({"decision": "allow", "answers": {"Which framework?": "Svelte", "Which parts?": "Router, Tests"}})
+        );
+        let Message::Clear(c) = new.next().await.msg else {
+            panic!()
+        };
+        assert_eq!((c.rid, c.why), (rid, ClearWhy::AnsweredDev));
+        new.to_daemon
+            .send(cmd_bytes(4, answer_of(Some(rid), &[1, 1], None, 1250)))
+            .unwrap();
+        assert_eq!(result_of(&mut new).await.err, Some(ResultErr::Stale));
+        // the audit log has the commands (indices, recording ids), never a label or the words
+        let log = std::fs::read_to_string(&audit).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        let lines: Vec<Value> = log
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .filter(|v: &Value| v["kind"] == "approval")
+            .collect();
+        assert_eq!(lines.len(), 13);
+        assert!(
+            lines
+                .iter()
+                .any(|l| l["msg"]["cmd"]["picks"] == json!([0, 5])
+                    && l["msg"]["result"]["ok"] == true)
+        );
+        for word in ["Svelte", "Router", "React", "Which"] {
+            assert!(!log.contains(word), "{word} in the audit log");
+        }
     }
 
     #[test]
@@ -2714,6 +3171,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         };
         let mut s = Session::delta(1);
         (s.snz, s.ntf, s.n, s.ok, s.sum) = (
@@ -2747,6 +3206,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         }
     }
 
@@ -2957,6 +3418,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         };
         let mut s = Session::delta(1);
         (s.eta, s.exit) = (Some(60), Some(1));
@@ -2982,6 +3445,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         };
         let mut s = Session::delta(1);
         (s.ctx, s.mdl, s.pm, s.pr, s.prs) = (
@@ -3018,6 +3483,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         };
         let mut s = Session::delta(1);
         (s.fc, s.la, s.lr, s.tp, s.dur) = (Some(3), Some(120), Some(14), Some(false), Some(252));
@@ -3268,5 +3735,64 @@ mod tests {
         assert_eq!(*drv.0.lock().unwrap(), 0);
         assert!(handle_cmd(&shared, &c(local)).await.ok);
         assert_eq!(*drv.0.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn power_reports_are_logged_with_the_device_and_kept_for_status() {
+        let dir = std::env::temp_dir().join(format!("al-power-dev-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let trace = Trace::null();
+        let registry = Arc::new(Registry::new(trace.clone()));
+        let mut sh = Shared::new(
+            registry.clone(),
+            Arc::new(Broker::new(registry)),
+            trace,
+            Arc::new(NoFocus),
+            Arc::new(FakeScroll::default()),
+        );
+        sh.power = crate::power::PowerLog::at(dir.join("power-reports.csv"));
+        let shared = Arc::new(sh);
+        let d = linked(&shared, 19).await;
+        let p = |seq, mv| Power {
+            mv,
+            mvf: mv,
+            vin: 0,
+            chg: false,
+            usb: false,
+            pct: 60,
+            on: 1000,
+            dim: 2000,
+            off: 297000,
+            deep: 0,
+            lk: 300000,
+            ble: 300000,
+            itvl: 30000,
+            seq,
+            nd: 0,
+        };
+        for (seq, mv) in [(0, 3900), (1, 3890)] {
+            let env = Envelope::new(10 + seq, Message::Power(p(seq, mv)));
+            d.to_daemon.send(env.to_bytes().unwrap()).unwrap();
+        }
+        let path = dir.join("power-reports.csv");
+        for _ in 0..100 {
+            if std::fs::read_to_string(&path).is_ok_and(|t| t.lines().count() == 3) {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        let text = std::fs::read_to_string(&path).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 3, "{text}");
+        assert_eq!(lines[0], crate::power::header());
+        assert!(
+            lines[2].contains(",0102030405060708,sim,1.0.0,test,1,3890,"),
+            "{}",
+            lines[2]
+        );
+        let st = shared.power.status();
+        assert_eq!(st[0]["report"]["mv"], 3890);
+        assert_eq!(st[0]["transport"], "test");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

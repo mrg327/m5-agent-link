@@ -42,6 +42,14 @@
  *                                   asked for, then `result ok`; MAXCHUNKS > 0 sends only that many per request and
  *                                   no result (a link lost mid-transfer); `serve_detail off` stops answering
  *   detail RID SID OFF TOTAL TEXT   one raw `detail` chunk (for a wrong id, a gap, a different total)
+ *   message SID LM TEXT | message SID off | message_meta SID LM LEN
+ *                                   the agent's last message (proto 0.18, LAST-MESSAGE.md): a delta with lm / ll / lp
+ *                                   (lp = TEXT's first paragraph, <= 160 bytes; \n = line break), and a stand-in
+ *                                   daemon for `cmd detail` without a rid on SID, in 1024-byte chunks carrying lm;
+ *                                   `off` clears it (lm 0); message_meta: lm and ll only, lp "" (privacy meta)
+ *   ask RID SID LEFT_MS WIN_MS Q ;; Q ...   an AskUserQuestion `attention` with qs (proto 0.18): each Q is
+ *                                   HEADER|QUESTION|single|multi|LABEL[=DESCRIPTION]|LABEL...; one single-choice
+ *                                   question also carries opts + reply, as the daemon sends it for older devices
  *   hush on|off                     from now on, `session` and `attention` carry hush (proto 0.12, PRESENCE.md): the
  *                                   user is looking at that terminal, so the watch must not buzz or glow
  *   rule session|project|N exact|wide TEXT   from now on, `attention` carries a standing rule (proto 0.13,
@@ -79,7 +87,7 @@
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -398,6 +406,12 @@ static bool parse_line(char *line, uint32_t *t)
         add(*t, E_SERVE_DETAIL, 0, 0, 0, arg);
     } else if (!strcmp(cmd, "detail") && arg[0]) {
         add(*t, E_DETAIL, 0, 0, 0, arg);
+        *t += 50;
+    } else if ((!strcmp(cmd, "message") || !strcmp(cmd, "message_meta")) && arg[0]) {
+        add(*t, E_MESSAGE, !strcmp(cmd, "message_meta"), 0, 0, arg);
+        *t += 50;
+    } else if (!strcmp(cmd, "ask") && arg[0]) {
+        add(*t, E_ASK, 0, 0, 0, arg);
         *t += 50;
     } else if (!strcmp(cmd, "expect_countdown") && sscanf(rest, "%d %d", &a, &b) == 2) {
         add(*t, E_EXPECT_COUNTDOWN, a, b, 0, NULL);
@@ -973,6 +987,194 @@ static void inject_detail(uint32_t rid, uint32_t sid, uint32_t off, uint32_t tot
     sim_link_inject_rx(buf, n);
 }
 
+static void on_device_tx(const uint8_t *frame, size_t len);
+
+/* The stand-in daemon's last message (`message`). */
+static char s_msg[SERVE_MAX + 1];
+static uint32_t s_msg_sid, s_msg_lm, s_msg_len;
+
+static void inject_result(uint32_t re, bool ok)
+{
+    static struct envelope_r res;
+    memset(&res, 0, sizeof res);
+    res.envelope_choice = envelope_msg_result_m_c;
+    res.envelope_msg_result_m.msg_result_hdr_m.hdr_uint1uint = ++s_rx_id;
+    res.envelope_msg_result_m.msg_result_hdr_m.hdr_uint2uint_present = true;
+    res.envelope_msg_result_m.msg_result_hdr_m.hdr_uint2uint.hdr_uint2uint = re;
+    res.envelope_msg_result_m.msg_result_result_m.result_uint0bool = ok;
+    res.envelope_msg_result_m.msg_result_result_m.result_err_m_present = !ok; /* stale */
+    inject_env(&res, "result");
+}
+
+/* `cmd detail {sid, arg: off}` without a rid: the session's last message in chunks carrying lm, then ok; stale
+ * for another session or none. */
+static void serve_message(const struct cmd *c, uint32_t id)
+{
+    uint32_t sid = c->cmd_uint1uint_present ? c->cmd_uint1uint.cmd_uint1uint : 0;
+    uint32_t off = c->cmd_arg_m_present && c->cmd_arg_m.cmd_arg_m.cmd_arg_choice == cmd_arg_uint_c ? c->cmd_arg_m.cmd_arg_m.cmd_arg_uint : 0;
+    sim_log("fake_daemon_message", "\"sid\":%u,\"off\":%u", (unsigned)sid, (unsigned)off);
+    if (!s_msg_lm || sid != s_msg_sid) {
+        inject_result(id, false);
+        return;
+    }
+    static struct envelope_r env;
+    static uint8_t buf[2048];
+    while (off < s_msg_len) {
+        uint32_t n = s_msg_len - off > 1024 ? 1024 : s_msg_len - off;
+        memset(&env, 0, sizeof env);
+        env.envelope_choice = envelope_msg_detail_m_c;
+        env.envelope_msg_detail_m.msg_detail_hdr_m.hdr_uint1uint = ++s_rx_id;
+        struct detail *d = &env.envelope_msg_detail_m.msg_detail_detail_m;
+        d->detail_uint1uint_present = d->detail_uint3uint_present = d->detail_uint4uint_present = d->detail_uint5uint_present = true;
+        d->detail_uint1uint.detail_uint1uint = sid;
+        d->detail_uint3uint.detail_uint3uint = off;
+        d->detail_uint4uint.detail_uint4uint = s_msg_len;
+        d->detail_uint5uint.detail_uint5uint = s_msg_lm;
+        d->detail_uint2tstr = (struct zcbor_string){.value = (const uint8_t *)s_msg + off, .len = n};
+        size_t len = 0;
+        if (cbor_encode_envelope(buf, sizeof buf, &env, &len) != ZCBOR_SUCCESS) {
+            fail("cannot encode", "detail");
+            return;
+        }
+        sim_link_inject_rx(buf, len);
+        off += n;
+    }
+    inject_result(id, true);
+}
+
+/* message SID LM TEXT | message SID off | message_meta SID LM LEN: the session delta the daemon sends at a stop. */
+static void run_message(const char *spec, bool meta)
+{
+    unsigned sid, lm = 0, len = 0;
+    char word[16] = "";
+    int n = 0;
+    if (sscanf(spec, "%u %15s %n", &sid, word, &n) < 2) {
+        fail("bad message", spec);
+        return;
+    }
+    static char lp[164];
+    lp[0] = 0;
+    if (strcmp(word, "off")) {
+        lm = (unsigned)strtoul(word, NULL, 10);
+        if (meta) {
+            len = (unsigned)strtoul(spec + n, NULL, 10);
+        } else {
+            size_t k = 0;
+            for (const char *p = spec + n; *p && k < SERVE_MAX; p++) {
+                if (p[0] == '\\' && p[1] == 'n') {
+                    s_msg[k++] = '\n';
+                    p++;
+                } else {
+                    s_msg[k++] = *p;
+                }
+            }
+            s_msg[k] = 0;
+            len = (unsigned)k;
+            /* the preview: the first paragraph, line breaks as spaces, <= 160 bytes */
+            const char *end = strstr(s_msg, "\n\n");
+            size_t pl = end ? (size_t)(end - s_msg) : k;
+            if (pl > 157) pl = 157;
+            for (size_t i = 0; i < pl; i++) lp[i] = s_msg[i] == '\n' ? ' ' : s_msg[i];
+            lp[pl] = 0;
+            if ((end ? (size_t)(end - s_msg) : k) > pl) strcat(lp, "\xE2\x80\xA6");
+            s_msg_sid = sid;
+            s_msg_lm = lm;
+            s_msg_len = len;
+            sim_link_set_tx_tap(on_device_tx);
+        }
+    } else {
+        s_msg_lm = 0;
+    }
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_session_upd_m_c;
+    env.envelope_msg_session_upd_m.msg_session_upd_hdr_m.hdr_uint1uint = ++s_rx_id;
+    struct session *se = &env.envelope_msg_session_upd_m.msg_session_upd_session_m;
+    se->session_uint0uint = sid;
+    se->session_uint36uint_present = se->session_uint37uint_present = se->session_uint38tstr_present = true;
+    se->session_uint36uint.session_uint36uint = lm;
+    se->session_uint37uint.session_uint37uint = len;
+    se->session_uint38tstr.session_uint38tstr = zs(lp);
+    sim_log("fake_daemon_message_set", "\"sid\":%u,\"lm\":%u,\"ll\":%u", sid, lm, len);
+    inject_env(&env, "session_upd");
+}
+
+/* ask RID SID LEFT_MS WIN_MS Q ;; Q ...: Q = HEADER|QUESTION|single|multi|LABEL[=DESC]|... */
+static void run_ask(char *spec)
+{
+    unsigned rid, sid, left, win;
+    int n = 0;
+    if (sscanf(spec, "%u %u %u %u %n", &rid, &sid, &left, &win, &n) != 4) {
+        fail("bad ask", spec);
+        return;
+    }
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_attention_m_c;
+    env.envelope_msg_attention_m.msg_attention_hdr_m.hdr_uint1uint = ++s_rx_id;
+    struct attention *a = &env.envelope_msg_attention_m.msg_attention_attention_m;
+    a->attention_uint0uint = rid;
+    a->attention_uint1uint = sid;
+    a->attention_att_kind_m.att_kind_choice = 1; /* question */
+    a->attention_action_m_l_action_m[a->attention_action_m_l_action_m_count++].action_choice = 2; /* focus */
+    a->attention_uint9uint_present = a->attention_uint10uint_present = true;
+    a->attention_uint9uint.attention_uint9uint = left;
+    a->attention_uint10uint.attention_uint10uint = win;
+    a->attention_ask_q_m_l_present = true;
+    struct attention_ask_q_m_l_r *l = &a->attention_ask_q_m_l;
+    char *save = NULL, *rest = spec + n;
+    /* questions are split on ";;" (strtok would also split on a lone ';') */
+    char *qs[4];
+    int nq = 0;
+    for (char *p = rest; p && nq < 4;) {
+        char *sep = strstr(p, ";;");
+        if (sep) *sep = 0;
+        qs[nq++] = p;
+        p = sep ? sep + 2 : NULL;
+    }
+    for (int qi = 0; qi < nq; qi++) {
+        struct ask_q *q = &l->attention_ask_q_m_l_ask_q_m[l->attention_ask_q_m_l_ask_q_m_count++];
+        int field = 0;
+        for (char *f = strtok_r(qs[qi], "|", &save); f; f = strtok_r(NULL, "|", &save), field++) {
+            while (*f == ' ') f++;
+            size_t fl = strlen(f);
+            while (fl && f[fl - 1] == ' ') f[--fl] = 0;
+            if (field == 0) q->ask_q_uint0tstr = zs(f);
+            else if (field == 1) q->ask_q_uint1tstr = zs(f);
+            else if (field == 2) {
+                q->ask_q_uint3bool_present = !strcmp(f, "multi");
+                q->ask_q_uint3bool.ask_q_uint3bool = q->ask_q_uint3bool_present;
+            } else if (q->ask_q_ask_opt_m_l_ask_opt_m_count < 4) {
+                struct ask_opt *o = &q->ask_q_ask_opt_m_l_ask_opt_m[q->ask_q_ask_opt_m_l_ask_opt_m_count++];
+                char *eq = strchr(f, '=');
+                if (eq) {
+                    *eq = 0;
+                    o->ask_opt_uint1tstr_present = true;
+                    o->ask_opt_uint1tstr.ask_opt_uint1tstr = zs(eq + 1);
+                }
+                o->ask_opt_uint0tstr = zs(f);
+            }
+        }
+    }
+    static char title[24];
+    struct ask_q *q0 = &l->attention_ask_q_m_l_ask_q_m[0];
+    if (nq > 1) snprintf(title, sizeof title, "%d questions", nq);
+    else snprintf(title, sizeof title, "%.*s", (int)q0->ask_q_uint0tstr.len, (const char *)q0->ask_q_uint0tstr.value);
+    a->attention_uint3tstr_present = a->attention_uint4tstr_present = true;
+    a->attention_uint3tstr.attention_uint3tstr = zs(title);
+    a->attention_uint4tstr.attention_uint4tstr = q0->ask_q_uint1tstr;
+    if (nq == 1 && !q0->ask_q_uint3bool_present) { /* what an older device answers by reply: the labels */
+        a->attention_tstr_l_present = true;
+        for (size_t i = 0; i < q0->ask_q_ask_opt_m_l_ask_opt_m_count; i++)
+            a->attention_tstr_l.attention_tstr_l_tstr[a->attention_tstr_l.attention_tstr_l_tstr_count++] =
+                q0->ask_q_ask_opt_m_l_ask_opt_m[i].ask_opt_uint0tstr;
+        a->attention_action_m_l_action_m[a->attention_action_m_l_action_m_count++].action_choice = 3; /* reply */
+        a->attention_uint8uint_present = true;
+    }
+    sim_log("fake_daemon_ask", "\"rid\":%u,\"questions\":%d", rid, nq);
+    inject_env(&env, "attention");
+}
+
 /* The device sent a frame: answer a `cmd detail` for the served request like the daemon does. */
 static void on_device_tx(const uint8_t *frame, size_t len)
 {
@@ -981,6 +1183,10 @@ static void on_device_tx(const uint8_t *frame, size_t len)
     memset(&env, 0, sizeof env);
     if (cbor_decode_envelope(frame, len, &env, &used) != ZCBOR_SUCCESS || env.envelope_choice != envelope_msg_cmd_m_c) return;
     const struct cmd *c = &env.envelope_msg_cmd_m.msg_cmd_cmd_m;
+    if (c->cmd_op_m.cmd_op_choice == 7 && !c->cmd_uint2uint_present) { /* no rid: a last message (proto 0.18) */
+        serve_message(c, env.envelope_msg_cmd_m.msg_cmd_hdr_m.hdr_uint1uint);
+        return;
+    }
     if (c->cmd_op_m.cmd_op_choice != 7 || !s_serve_rid) return;
     uint32_t rid = c->cmd_uint2uint_present ? c->cmd_uint2uint.cmd_uint2uint : 0;
     uint32_t off = c->cmd_arg_m_present && c->cmd_arg_m.cmd_arg_m.cmd_arg_choice == cmd_arg_uint_c ? c->cmd_arg_m.cmd_arg_m.cmd_arg_uint : 0;
@@ -1130,10 +1336,15 @@ static void run(const ev_t *e)
     case E_CONNECT: sim_link_set_connected_kind(e->b, e->a); break;
     case E_RX: send_hex_kind(e->b, e->text); break;
     case E_UI: core_dump_ui_state(); break;
-    case E_SHOT:
+    case E_SHOT: {
+        /* writing the PNG takes real time (a few hundred ms on a slow disk); the script's timeline waits for it,
+         * so the events behind it keep their spacing (a tap's press and release never land in one poll) */
+        uint64_t t0 = hal_time_us();
         if (!sim_save_png(e->text)) fail("cannot write", e->text);
         else sim_log("screenshot", "\"file\":\"%s\"", e->text);
+        s_t0 += (uint32_t)((hal_time_us() - t0) / 1000u);
         break;
+    }
     case E_EXPECT_SCREEN:
         if (strcmp(core_screen_name(), e->text)) fail("expected screen", e->text);
         break;
@@ -1172,6 +1383,8 @@ static void run(const ev_t *e)
     case E_ATTENTION_WIN: run_attention_win(e->text); break;
     case E_SERVE_DETAIL: run_serve_detail(e->text); break;
     case E_DETAIL: run_detail(e->text); break;
+    case E_MESSAGE: run_message(e->text, e->a != 0); break;
+    case E_ASK: run_ask(e->text); break;
     case E_EXPECT_COUNTDOWN: {
         int left = ui_countdown_left_s();
         if (left < e->a || left > e->b) {
@@ -1255,7 +1468,7 @@ bool sim_script_poll(uint32_t now_ms)
     while (s_next < s_n && now_ms - s_t0 >= s_ev[s_next].at_ms && !s_failed) {
         const ev_t *e = &s_ev[s_next++];
         run(e);
-        if (e->kind == E_QUIT || e->kind == E_SKIP) break; /* `now` is stale after a skip */
+        if (e->kind == E_QUIT || e->kind == E_SKIP || e->kind == E_SHOT) break; /* `now` is stale after a skip or a shot */
     }
     return s_next < s_n && !s_failed;
 }
