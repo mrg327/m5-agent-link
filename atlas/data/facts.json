@@ -979,6 +979,132 @@
         "nav": "NAV_HOME",
         "action": "A+B chord: straight back to the deck",
         "source": "firmware/components/core/src/nav.c:115"
+      },
+      {
+        "gesture": "G_PRESS",
+        "mode": "read",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_HOLD_PRESS",
+        "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
+        "source": "firmware/components/core/src/nav.c:119"
+      },
+      {
+        "gesture": "G_RELEASE",
+        "mode": "read",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_HOLD_RELEASE",
+        "action": "Lifting cancels a hold in progress",
+        "source": "firmware/components/core/src/nav.c:120"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "read",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_COMMIT",
+        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "source": "firmware/components/core/src/nav.c:121"
+      },
+      {
+        "gesture": "G_DOUBLE_TAP",
+        "mode": "read",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_COMMIT",
+        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "source": "firmware/components/core/src/nav.c:122"
+      },
+      {
+        "gesture": "G_DRAG",
+        "mode": "read",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_SCROLL_DRAG",
+        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "source": "firmware/components/core/src/nav.c:123"
+      },
+      {
+        "gesture": "G_LONG_PRESS",
+        "mode": "read",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_HOLD_LONG",
+        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "source": "firmware/components/core/src/nav.c:124"
+      },
+      {
+        "gesture": "G_SWIPE_RIGHT",
+        "mode": "read",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "source": "firmware/components/core/src/nav.c:125"
+      },
+      {
+        "gesture": "G_SCRUB_START",
+        "mode": "read",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:126"
+      },
+      {
+        "gesture": "G_SCRUB",
+        "mode": "read",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:127"
+      },
+      {
+        "gesture": "G_SCRUB_END",
+        "mode": "read",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:128"
+      },
+      {
+        "gesture": "G_BTN_A",
+        "mode": "read",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_FOCUS",
+        "action": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
+        "source": "firmware/components/core/src/nav.c:129"
+      },
+      {
+        "gesture": "G_BTN_B",
+        "mode": "read",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_NEXT",
+        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "source": "firmware/components/core/src/nav.c:130"
+      },
+      {
+        "gesture": "G_BTN_B_LONG",
+        "mode": "read",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "source": "firmware/components/core/src/nav.c:131"
+      },
+      {
+        "gesture": "G_CHORD",
+        "mode": "read",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_HOME",
+        "action": "A+B chord: straight back to the deck",
+        "source": "firmware/components/core/src/nav.c:132"
       }
     ],
     "chord": "A + B held together: Home from any mode (logged on the deck, no action there)",
@@ -988,7 +1114,7 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:108"
+      "source": "firmware/components/core/src/ui.c:109"
     },
     {
       "id": "attention",
@@ -998,12 +1124,12 @@
     {
       "id": "agent",
       "title": "Agent wheel",
-      "source": "firmware/components/core/src/ui_agent.c:342"
+      "source": "firmware/components/core/src/ui_agent.c:357"
     },
     {
       "id": "ask",
       "title": "Ask · the request and its options",
-      "source": "firmware/components/core/src/ui_ask.c:796"
+      "source": "firmware/components/core/src/ui_ask.c:944"
     },
     {
       "id": "scroll",
@@ -1647,6 +1773,27 @@
           "type": "tstr",
           "note": "qd    the message queued for this session (proto 0.17, PROTOCOL.md §4b): the",
           "name": "qd"
+        },
+        {
+          "key": 36,
+          "optional": true,
+          "type": "uint",
+          "note": "lm    the agent's last message (proto 0.18, LAST-MESSAGE.md): its id, new for each",
+          "name": "lm"
+        },
+        {
+          "key": 37,
+          "optional": true,
+          "type": "uint",
+          "note": "ll    its length in bytes as the reader shows it (markdown cleaned, <= 4096)",
+          "name": "ll"
+        },
+        {
+          "key": 38,
+          "optional": true,
+          "type": "tstr",
+          "note": "lp    its start, one paragraph, <= 160 bytes; \"\" under privacy meta (agent content:",
+          "name": "lp"
         }
       ],
       "source": "protocol/agentlink.cddl:59"
@@ -1776,6 +1923,13 @@
           "type": "bool",
           "note": "wide   the rule ends in a wildcard: it matches more than this exact request",
           "name": "wide"
+        },
+        {
+          "key": 16,
+          "optional": true,
+          "type": "[1*4 ask_q]",
+          "note": "qs     an agent's multiple-choice questions (Claude Code AskUserQuestion; proto 0.18,",
+          "name": "qs"
         }
       ],
       "source": "protocol/agentlink.cddl:61"
@@ -1857,6 +2011,20 @@
           "type": "bool",
           "note": "q   with cmd_op_type / cmd_op_dictate (proto 0.17): queue the message if the session cannot",
           "name": "q"
+        },
+        {
+          "key": 7,
+          "optional": true,
+          "type": "answer_picks",
+          "note": "picks  with cmd_op_answer (proto 0.18): per question of the request's `qs`, in order, the",
+          "name": "picks"
+        },
+        {
+          "key": 8,
+          "optional": true,
+          "type": "answer_aids",
+          "note": "aids   with cmd_op_answer: per question, the recording (aid) whose transcript is the free",
+          "name": "aids"
         }
       ],
       "source": "protocol/agentlink.cddl:63"
@@ -1938,6 +2106,13 @@
           "type": "uint",
           "note": "total  the full text's length in bytes (<= 4096)",
           "name": "total"
+        },
+        {
+          "key": 5,
+          "optional": true,
+          "type": "uint",
+          "note": "lm     with no rid (proto 0.18): the id of the session's last message this chunk is from",
+          "name": "lm"
         }
       ],
       "source": "protocol/agentlink.cddl:65"
@@ -2617,6 +2792,13 @@
         "id": "denied",
         "when": "A deny or stop hold completes and the answer goes out (falls)",
         "pick": "denied-fall",
+        "repeat": 1,
+        "gap_ms": 0
+      },
+      {
+        "id": "updated",
+        "when": "The first welcome after an OTA update: the new image is running and confirmed",
+        "pick": "updated-flourish",
         "repeat": 1,
         "gap_ms": 0
       }
@@ -4961,6 +5143,112 @@
           "ms": 0,
           "pct": 0
         }
+      },
+      {
+        "id": "updated-flourish",
+        "role": "updated",
+        "name": "Flourish",
+        "tracks": [
+          [
+            {
+              "wave": "fm",
+              "note": 72,
+              "slide": 0,
+              "vol": 9,
+              "ms": 80,
+              "decay": 0
+            },
+            {
+              "wave": "fm",
+              "note": 76,
+              "slide": 0,
+              "vol": 9,
+              "ms": 80,
+              "decay": 0
+            },
+            {
+              "wave": "fm",
+              "note": 79,
+              "slide": 0,
+              "vol": 9,
+              "ms": 80,
+              "decay": 0
+            },
+            {
+              "wave": "fm",
+              "note": 84,
+              "slide": 0,
+              "vol": 9,
+              "ms": 80,
+              "decay": 0
+            },
+            {
+              "wave": "bell",
+              "note": 88,
+              "slide": 0,
+              "vol": 10,
+              "ms": 240,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
+      },
+      {
+        "id": "updated-chime",
+        "role": "updated",
+        "name": "Chime",
+        "tracks": [
+          [
+            {
+              "wave": "tri",
+              "note": 67,
+              "slide": 0,
+              "vol": 10,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 72,
+              "slide": 0,
+              "vol": 10,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 76,
+              "slide": 0,
+              "vol": 10,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "tri",
+              "note": 79,
+              "slide": 0,
+              "vol": 10,
+              "ms": 70,
+              "decay": 0
+            },
+            {
+              "wave": "bell",
+              "note": 84,
+              "slide": 0,
+              "vol": 10,
+              "ms": 260,
+              "decay": 1
+            }
+          ]
+        ],
+        "echo": {
+          "ms": 0,
+          "pct": 0
+        }
       }
     ]
   },
@@ -5013,8 +5301,8 @@
     "gesture.hold_show_ms": "firmware/components/core/src/nav.h:68",
     "gesture.long_press_ms": "firmware/components/core/src/gesture.h:7",
     "gesture.long_swipe_px": "firmware/components/core/src/nav.h:72",
-    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:152",
-    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:153",
+    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:161",
+    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:162",
     "gesture.rim_in_px": "firmware/components/core/src/gesture.h:24",
     "gesture.rim_out_px": "firmware/components/core/src/gesture.h:25",
     "gesture.rim_track_in_px": "firmware/components/core/src/gesture.h:26",
@@ -5029,15 +5317,15 @@
     "gesture.swipe_max_ms": "firmware/components/core/src/gesture.h:9",
     "gesture.swipe_min_px": "firmware/components/core/src/gesture.h:8",
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
-    "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:765",
-    "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:707",
-    "gesture_map.chord": "firmware/components/core/src/app.c:498",
+    "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:913",
+    "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:855",
+    "gesture_map.chord": "firmware/components/core/src/app.c:512",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:196",
-    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:156",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:390",
+    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:173",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:404",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:525",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:539",
     "haptics.approved": "firmware/components/core/src/feedback.c:80",
     "haptics.denied": "firmware/components/core/src/feedback.c:87",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:67",
@@ -5046,7 +5334,7 @@
     "haptics.done": "firmware/components/core/src/feedback.c:31",
     "haptics.duty": "firmware/boards/stopwatch/input.cpp:17",
     "haptics.error": "firmware/components/core/src/feedback.c:30",
-    "haptics.hello": "firmware/components/core/src/feedback.c:142",
+    "haptics.hello": "firmware/components/core/src/feedback.c:149",
     "haptics.hold_ramp": "firmware/components/core/src/feedback.c:60",
     "haptics.kick_duty": "firmware/boards/stopwatch/input.cpp:18",
     "haptics.kick_ms": "firmware/boards/stopwatch/input.cpp:19",
@@ -5054,10 +5342,10 @@
     "haptics.kick_rule": "firmware/boards/stopwatch/input.cpp:108",
     "haptics.permission": "firmware/components/core/src/feedback.c:28",
     "haptics.question": "firmware/components/core/src/feedback.c:29",
-    "haptics.quiet_toggled": "firmware/components/core/src/feedback.c:116",
-    "haptics.reject": "firmware/components/core/src/feedback.c:101",
-    "haptics.reply_sent": "firmware/components/core/src/feedback.c:95",
-    "haptics.scroll_stop": "firmware/components/core/src/feedback.c:108",
+    "haptics.quiet_toggled": "firmware/components/core/src/feedback.c:123",
+    "haptics.reject": "firmware/components/core/src/feedback.c:108",
+    "haptics.reply_sent": "firmware/components/core/src/feedback.c:102",
+    "haptics.scroll_stop": "firmware/components/core/src/feedback.c:115",
     "haptics.tick": "firmware/components/core/src/feedback.c:42",
     "link.hello_retry_ms": "firmware/components/core/src/link.c:10",
     "link.idle_ping_ms": "firmware/components/core/src/link.c:16",
@@ -5088,8 +5376,8 @@
     "ring.band_out_px": "firmware/components/core/src/ui_ring_internal.h:15",
     "ring.band_w_px": "firmware/components/core/src/ui_ring_internal.h:16",
     "ring.done_sweep_ms": "firmware/components/core/src/ui_ring_internal.h:36",
-    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:475",
-    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:475",
+    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:495",
+    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:495",
     "ring.error_flicker_ms": "firmware/components/core/src/ui_ring_internal.h:37",
     "ring.hint_a_deg": "firmware/components/core/src/ui_theme.h:67",
     "ring.hint_b_deg": "firmware/components/core/src/ui_theme.h:68",
@@ -5102,8 +5390,8 @@
     "ring.nothing_else": "firmware/components/core/src/ui_home.c:214",
     "ring.others_pct": "firmware/components/core/src/ui_ring_internal.h:21",
     "ring.perm_period_ms": "firmware/components/core/src/ui_ring_internal.h:35",
-    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:327",
-    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:475",
+    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:347",
+    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:495",
     "ring.prog_out_px": "firmware/components/core/src/ui_ring_internal.h:27",
     "ring.prog_w_px": "firmware/components/core/src/ui_ring_internal.h:28",
     "ring.repo_px": "firmware/components/core/src/ui_theme.h:22",
@@ -5115,60 +5403,62 @@
     "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:23",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:33",
     "screens": "firmware/components/core/src/ui_home.c:358",
-    "screens.agent": "firmware/components/core/src/ui_agent.c:342",
-    "screens.ask": "firmware/components/core/src/ui_ask.c:796",
+    "screens.agent": "firmware/components/core/src/ui_agent.c:357",
+    "screens.ask": "firmware/components/core/src/ui_ask.c:944",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:299",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:55",
     "screens.status": "firmware/components/core/src/ui_status.c:304",
-    "sounds.approved-chime": "firmware/components/core/src/sound_bank.c:160",
-    "sounds.approved-rise": "firmware/components/core/src/sound_bank.c:158",
-    "sounds.denied-drop": "firmware/components/core/src/sound_bank.c:162",
-    "sounds.denied-fall": "firmware/components/core/src/sound_bank.c:164",
-    "sounds.done-achieve": "firmware/components/core/src/sound_bank.c:56",
-    "sounds.done-bonus": "firmware/components/core/src/sound_bank.c:41",
-    "sounds.done-clear": "firmware/components/core/src/sound_bank.c:25",
-    "sounds.done-coin": "firmware/components/core/src/sound_bank.c:23",
-    "sounds.done-contra": "firmware/components/core/src/sound_bank.c:109",
-    "sounds.done-fanfare": "firmware/components/core/src/sound_bank.c:49",
-    "sounds.done-ff": "firmware/components/core/src/sound_bank.c:125",
-    "sounds.done-ko": "firmware/components/core/src/sound_bank.c:68",
-    "sounds.done-levelup": "firmware/components/core/src/sound_bank.c:72",
-    "sounds.done-megaman": "firmware/components/core/src/sound_bank.c:116",
-    "sounds.done-metroid": "firmware/components/core/src/sound_bank.c:123",
-    "sounds.done-pacman": "firmware/components/core/src/sound_bank.c:132",
-    "sounds.done-pokemon": "firmware/components/core/src/sound_bank.c:99",
-    "sounds.done-powerup": "firmware/components/core/src/sound_bank.c:30",
-    "sounds.done-quest": "firmware/components/core/src/sound_bank.c:58",
-    "sounds.done-sf2": "firmware/components/core/src/sound_bank.c:113",
-    "sounds.done-sonic": "firmware/components/core/src/sound_bank.c:130",
-    "sounds.done-sparkle": "firmware/components/core/src/sound_bank.c:62",
-    "sounds.done-tetris": "firmware/components/core/src/sound_bank.c:135",
-    "sounds.done-treasure": "firmware/components/core/src/sound_bank.c:36",
-    "sounds.done-warp": "firmware/components/core/src/sound_bank.c:46",
-    "sounds.done-zelda": "firmware/components/core/src/sound_bank.c:106",
-    "sounds.input-bell": "firmware/components/core/src/sound_bank.c:90",
-    "sounds.input-blip": "firmware/components/core/src/sound_bank.c:81",
-    "sounds.input-bubble": "firmware/components/core/src/sound_bank.c:89",
-    "sounds.input-chk": "firmware/components/core/src/sound_bank.c:85",
-    "sounds.input-confirm": "firmware/components/core/src/sound_bank.c:83",
-    "sounds.input-contra": "firmware/components/core/src/sound_bank.c:144",
-    "sounds.input-ff": "firmware/components/core/src/sound_bank.c:151",
-    "sounds.input-jump": "firmware/components/core/src/sound_bank.c:86",
-    "sounds.input-lock": "firmware/components/core/src/sound_bank.c:91",
-    "sounds.input-megaman": "firmware/components/core/src/sound_bank.c:148",
-    "sounds.input-metroid": "firmware/components/core/src/sound_bank.c:149",
-    "sounds.input-pacman": "firmware/components/core/src/sound_bank.c:154",
-    "sounds.input-pew": "firmware/components/core/src/sound_bank.c:88",
-    "sounds.input-pokemon": "firmware/components/core/src/sound_bank.c:141",
-    "sounds.input-pop": "firmware/components/core/src/sound_bank.c:84",
-    "sounds.input-sf2": "firmware/components/core/src/sound_bank.c:146",
-    "sounds.input-soft": "firmware/components/core/src/sound_bank.c:87",
-    "sounds.input-sonic": "firmware/components/core/src/sound_bank.c:153",
-    "sounds.input-swish": "firmware/components/core/src/sound_bank.c:93",
-    "sounds.input-tetris": "firmware/components/core/src/sound_bank.c:155",
-    "sounds.input-tick": "firmware/components/core/src/sound_bank.c:82",
-    "sounds.input-zelda": "firmware/components/core/src/sound_bank.c:142",
+    "sounds.approved-chime": "firmware/components/core/src/sound_bank.c:161",
+    "sounds.approved-rise": "firmware/components/core/src/sound_bank.c:159",
+    "sounds.denied-drop": "firmware/components/core/src/sound_bank.c:163",
+    "sounds.denied-fall": "firmware/components/core/src/sound_bank.c:165",
+    "sounds.done-achieve": "firmware/components/core/src/sound_bank.c:57",
+    "sounds.done-bonus": "firmware/components/core/src/sound_bank.c:42",
+    "sounds.done-clear": "firmware/components/core/src/sound_bank.c:26",
+    "sounds.done-coin": "firmware/components/core/src/sound_bank.c:24",
+    "sounds.done-contra": "firmware/components/core/src/sound_bank.c:110",
+    "sounds.done-fanfare": "firmware/components/core/src/sound_bank.c:50",
+    "sounds.done-ff": "firmware/components/core/src/sound_bank.c:126",
+    "sounds.done-ko": "firmware/components/core/src/sound_bank.c:69",
+    "sounds.done-levelup": "firmware/components/core/src/sound_bank.c:73",
+    "sounds.done-megaman": "firmware/components/core/src/sound_bank.c:117",
+    "sounds.done-metroid": "firmware/components/core/src/sound_bank.c:124",
+    "sounds.done-pacman": "firmware/components/core/src/sound_bank.c:133",
+    "sounds.done-pokemon": "firmware/components/core/src/sound_bank.c:100",
+    "sounds.done-powerup": "firmware/components/core/src/sound_bank.c:31",
+    "sounds.done-quest": "firmware/components/core/src/sound_bank.c:59",
+    "sounds.done-sf2": "firmware/components/core/src/sound_bank.c:114",
+    "sounds.done-sonic": "firmware/components/core/src/sound_bank.c:131",
+    "sounds.done-sparkle": "firmware/components/core/src/sound_bank.c:63",
+    "sounds.done-tetris": "firmware/components/core/src/sound_bank.c:136",
+    "sounds.done-treasure": "firmware/components/core/src/sound_bank.c:37",
+    "sounds.done-warp": "firmware/components/core/src/sound_bank.c:47",
+    "sounds.done-zelda": "firmware/components/core/src/sound_bank.c:107",
+    "sounds.input-bell": "firmware/components/core/src/sound_bank.c:91",
+    "sounds.input-blip": "firmware/components/core/src/sound_bank.c:82",
+    "sounds.input-bubble": "firmware/components/core/src/sound_bank.c:90",
+    "sounds.input-chk": "firmware/components/core/src/sound_bank.c:86",
+    "sounds.input-confirm": "firmware/components/core/src/sound_bank.c:84",
+    "sounds.input-contra": "firmware/components/core/src/sound_bank.c:145",
+    "sounds.input-ff": "firmware/components/core/src/sound_bank.c:152",
+    "sounds.input-jump": "firmware/components/core/src/sound_bank.c:87",
+    "sounds.input-lock": "firmware/components/core/src/sound_bank.c:92",
+    "sounds.input-megaman": "firmware/components/core/src/sound_bank.c:149",
+    "sounds.input-metroid": "firmware/components/core/src/sound_bank.c:150",
+    "sounds.input-pacman": "firmware/components/core/src/sound_bank.c:155",
+    "sounds.input-pew": "firmware/components/core/src/sound_bank.c:89",
+    "sounds.input-pokemon": "firmware/components/core/src/sound_bank.c:142",
+    "sounds.input-pop": "firmware/components/core/src/sound_bank.c:85",
+    "sounds.input-sf2": "firmware/components/core/src/sound_bank.c:147",
+    "sounds.input-soft": "firmware/components/core/src/sound_bank.c:88",
+    "sounds.input-sonic": "firmware/components/core/src/sound_bank.c:154",
+    "sounds.input-swish": "firmware/components/core/src/sound_bank.c:94",
+    "sounds.input-tetris": "firmware/components/core/src/sound_bank.c:156",
+    "sounds.input-tick": "firmware/components/core/src/sound_bank.c:83",
+    "sounds.input-zelda": "firmware/components/core/src/sound_bank.c:143",
     "sounds.rate": "firmware/components/core/src/sound_bank.h:28",
+    "sounds.updated-chime": "firmware/components/core/src/sound_bank.c:172",
+    "sounds.updated-flourish": "firmware/components/core/src/sound_bank.c:169",
     "sounds.waves": "firmware/components/core/src/sound_bank.h:30",
     "states": "firmware/components/core/src/ui_theme.c:11",
     "states.input_words": "firmware/components/core/src/ui_theme.c:39",
