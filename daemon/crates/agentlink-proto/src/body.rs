@@ -554,6 +554,22 @@ body!(FwAck {
     #[n(2)] #[serde(skip_serializing_if = "Option::is_none")] msg: Option<String>,
 });
 
+// ── agent graph (proto 0.22, GRAPH.md) ──
+body!(
+    /// Session `sid`'s agent graph, the answer to `cmd graph`: the turn's tool calls, oldest first.
+    Graph {
+        #[n(0)] sid: u64,
+        /// At most the newest 64 calls; bits 0-3 kind, 4-5 state, 6-8 lane, 9 fork, 10 merge.
+        #[n(1)] nodes: Vec<u64>,
+        /// Per lane, the sub-agent's kind (0 unknown / own, 1 explore … 7 other).
+        #[n(2)] #[serde(skip_serializing_if = "Option::is_none")] la: Option<Vec<u64>>,
+        /// Older calls of this turn not in `nodes`.
+        #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] drop: Option<u64>,
+        /// Changes whenever the graph does.
+        #[n(4)] #[serde(skip_serializing_if = "Option::is_none")] gen: Option<u64>,
+    }
+);
+
 // ── power report (proto 0.19, POWER.md) ──
 body!(
     /// The device's battery and the time it spent in each power state since its previous report.

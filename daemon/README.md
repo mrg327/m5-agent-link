@@ -125,4 +125,6 @@ Delta coalescing: each link holds a session's `session_upd` for up to 100 ms and
 
 Done summary (docs/design/DONE-SUMMARY.md, proto 0.14): the daemon tallies each Claude Code turn's edited files, lines, last test verdict and length from the hook payloads and sends them with the delta that enters done / error. End to end: `uv run --with cbor2 --with websockets python daemon/tools/summary_e2e.py "$PWD/.."`.
 
-The printed Claude Code hooks (`agentlink hooks print`) include `PostToolUseFailure` and `StopFailure`, which the done summary needs (failed test runs, errored turns); re-merge the block into `~/.claude/settings.json` after upgrading.
+The printed Claude Code hooks (`agentlink hooks print`) include `PostToolUseFailure` and `StopFailure`, which the done summary needs (failed test runs, errored turns), and `SubagentStop`, which merges a sub-agent's lane of the agent graph; re-merge the block into `~/.claude/settings.json` after upgrading.
+
+Agent graph (docs/design/GRAPH.md, proto 0.22, PROTOCOL §6h): per session the daemon keeps the turn's tool calls (at most the newest 64) as nodes on lanes, lane 0 for the agent and 1-7 for its sub-agents, and answers `cmd graph` with a `graph` message. `agentlink graph SID` prints it newest first, one column per lane, a letter per kind (R read, E edit, $ shell, S search, W web, A agent, ? ask, P plan, G git, T test, M mcp, . other; `*` running, `!` failed); `--json` prints the `graph` body.

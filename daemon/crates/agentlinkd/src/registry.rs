@@ -220,6 +220,8 @@ pub struct Registry {
     state: Mutex<State>,
     /// The account's usage windows (usage.rs), fed by local status lines.
     usage: Mutex<crate::usage::Tracker>,
+    /// Every session's agent graph (graph.rs), fed by the raw hook lines.
+    graphs: Mutex<crate::graph::Graphs>,
     tx: broadcast::Sender<Update>,
     trace: Trace,
 }
@@ -282,6 +284,7 @@ impl Registry {
                 ..Default::default()
             }),
             usage: Mutex::default(),
+            graphs: Mutex::default(),
             tx,
             trace,
         }
@@ -403,6 +406,23 @@ impl Registry {
             None,
         );
         let _ = self.tx.send(u); // no receivers is fine
+    }
+
+    /// Feeds one raw hook line to the agent graphs (GRAPH.md).
+    pub fn graph_line(&self, v: &serde_json::Value, via: &Via) {
+        self.graphs.lock().unwrap().on_line(v, via);
+    }
+
+    /// Session `sid`'s agent graph; `None` for a session that is gone.
+    pub fn graph(&self, sid: u64) -> Option<agentlink_proto::Graph> {
+        let key = {
+            let st = self.state.lock().unwrap();
+            st.by_key
+                .iter()
+                .find(|(_, s)| **s == sid)
+                .map(|(k, _)| k.clone())?
+        };
+        Some(self.graphs.lock().unwrap().graph(&key, sid))
     }
 
     /// The device-visible id of a source session key, once it has been seen.

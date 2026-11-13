@@ -2,8 +2,9 @@
 
 use anyhow::Result;
 
+/// One control request (`{"ctl": ...}`) over the hook socket, and the daemon's one-line reply.
 #[cfg(unix)]
-pub fn run(json: bool) -> Result<()> {
+pub(crate) fn ctl(req: &serde_json::Value) -> Result<serde_json::Value> {
     use anyhow::Context;
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::net::UnixStream;
@@ -17,12 +18,22 @@ pub fn run(json: bool) -> Result<()> {
         )
     })?;
     s.set_read_timeout(Some(Duration::from_secs(3)))?;
-    s.write_all(b"{\"ctl\":\"status\"}\n")?;
+    s.write_all(format!("{req}\n").as_bytes())?;
     let mut line = String::new();
     BufReader::new(s)
         .read_line(&mut line)
         .context("no reply from daemon")?;
-    let v: serde_json::Value = serde_json::from_str(&line)?;
+    Ok(serde_json::from_str(&line)?)
+}
+
+// TODO(windows): named pipe client.
+#[cfg(not(unix))]
+pub(crate) fn ctl(_req: &serde_json::Value) -> Result<serde_json::Value> {
+    anyhow::bail!("control requests are not implemented on this platform yet")
+}
+
+pub fn run(json: bool) -> Result<()> {
+    let v = ctl(&serde_json::json!({"ctl": "status"}))?;
     if json {
         println!("{v}");
         return Ok(());
@@ -195,10 +206,4 @@ fn print_keep_awake(k: &serde_json::Value) {
             .unwrap_or_default(),
         detail
     );
-}
-
-// TODO(windows): named pipe client.
-#[cfg(not(unix))]
-pub fn run(_json: bool) -> Result<()> {
-    anyhow::bail!("status is not implemented on this platform yet")
 }

@@ -157,6 +157,7 @@ where
         }
         let reply = match v.get("ctl").and_then(Value::as_str) {
             Some("status") => Some(status()),
+            Some("graph") => Some(graph_reply(registry, &v)),
             Some("remote_attach") => {
                 let (reply, guard) = remote::open_attach(&env, &v);
                 attach_guard = guard.or(attach_guard); // dropping the old guard closes it
@@ -184,8 +185,12 @@ where
             continue;
         }
         let key = session_key(&v, &via);
+        registry.graph_line(&v, &via);
         if let Some(ev) = to_session_event(&v, &via) {
             registry.apply(ev);
+        }
+        if event.eq_ignore_ascii_case("subagentstop") {
+            continue; // a sub-agent ended: only the graph cares, the parent's cards stay
         }
         let Some(wait) = v["await"]["wait_ms"].as_u64() else {
             // The terminal moved on: whatever this session had pending was answered there.
@@ -234,6 +239,14 @@ where
         let _ = w.write_all(reply.as_bytes()).await;
     }
     drop(attach_guard);
+}
+
+/// `{"ctl":"graph","sid":N}` (`agentlink graph`): the session's agent graph as the `graph` message's body.
+fn graph_reply(registry: &Registry, v: &Value) -> Value {
+    match v["sid"].as_u64().and_then(|sid| registry.graph(sid)) {
+        Some(g) => serde_json::to_value(g).unwrap_or_default(),
+        None => json!({"error": "unknown session"}),
+    }
 }
 
 /// `{"ctl":"ota"}`: the update runs while this connection stays open, one progress line per event.
@@ -661,7 +674,7 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
 }
 
 /// Whether the tool that just ended succeeded.
-fn tool_ok(event: &str, payload: &Value) -> bool {
+pub(crate) fn tool_ok(event: &str, payload: &Value) -> bool {
     if event == "posttoolusefailure" {
         return false;
     }
@@ -673,7 +686,7 @@ fn tool_ok(event: &str, payload: &Value) -> bool {
 
 /// The tool's arguments: Copilot sends `toolArgs` as an object or a JSON-encoded string,
 /// Claude `tool_input` as an object.
-fn tool_args(payload: &Value) -> Value {
+pub(crate) fn tool_args(payload: &Value) -> Value {
     let raw = if payload.get("toolArgs").is_some() {
         &payload["toolArgs"]
     } else {
@@ -1169,6 +1182,29 @@ mod tests {
         let sub = json!({"agent":"copilot","event":"agentStop","payload":{"sessionId":"child",
             "parentAgentId":"parent","last_assistant_message":"x"}});
         assert!(to_session_event(&sub, &Via::Local).is_none());
+        // nor does a Claude Code sub-agent's (it only merges its lane of the graph)
+        let sub = cl(
+            "SubagentStop",
+            json!({"agent_id":"x","agent_type":"Explore","last_assistant_message":"x"}),
+        );
+        assert!(to_session_event(&sub, &Via::Local).is_none());
+    }
+
+    #[test]
+    fn the_graph_ctl_answers_with_the_graph_body() {
+        let reg = Registry::new(Trace::null());
+        let pre = cl("PreToolUse", json!({"tool_name":"Read","tool_use_id":"u"}));
+        reg.graph_line(&pre, &Via::Local);
+        feed(&reg, &pre);
+        let sid = reg.sid_of("claude:t").unwrap();
+        assert_eq!(
+            graph_reply(&reg, &json!({"ctl":"graph","sid":sid})),
+            json!({"sid": sid, "nodes": [1], "gen": 1})
+        );
+        assert_eq!(
+            graph_reply(&reg, &json!({"ctl":"graph","sid":sid + 1}))["error"],
+            "unknown session"
+        );
     }
 
     #[tokio::test]

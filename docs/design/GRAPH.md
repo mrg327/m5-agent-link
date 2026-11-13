@@ -40,7 +40,9 @@ running node with the same tool name in the same lane.
 | test | 10 | a shell call the daemon recognises as a test run (DONE-SUMMARY.md) |
 | mcp | 11 | `mcp__*` (Claude Code), or a name with a `-` server prefix (Copilot CLI) |
 
-**State:** 0 running, 1 ok, 2 failed (a failure, a denial or a rejection).
+**State:** 0 running, 1 ok, 2 failed (a failure, a denial or a rejection). Some calls never get a
+result, such as a Claude Code call denied at its permission prompt. When the parent's turn ends (`Stop`,
+`agentStop`, `StopFailure`, `errorOccurred`), every call still running becomes failed.
 
 ## 2. Lanes
 
@@ -48,7 +50,7 @@ running node with the same tool name in the same lane.
   from sub-agent `agentId` (type `agentType`). Claude Code: a tool hook with `agent_id` comes from that
   sub-agent (type `agent_type`).
 - **Fork.** A sub-agent's first node takes the lowest free lane from 1 to 7 and carries the fork bit.
-  When all seven are taken, further sub-agents share lane 7.
+  When all seven are taken, further sub-agents share lane 7, which merges when the last of them stops.
 - **Merge.** A sub-agent stops on Copilot's `agentStop` (from the sub-agent) or Claude Code's
   `SubagentStop`. Its last node gets the merge bit and its lane becomes free again. When the parent's own
   turn ends (`Stop`, `agentStop`), every lane still open merges.

@@ -420,6 +420,8 @@ const QUEUE_MINOR: u64 = 17;
 const ANSWER_MINOR: u64 = 18;
 /// The trackpad: `welcome.pointer` and `cmd pointer` (EXPERIMENTS.md).
 const POINTER_MINOR: u64 = 20;
+/// The agent graph: `cmd graph` and its `graph` answer (GRAPH.md).
+const GRAPH_MINOR: u64 = 22;
 
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
@@ -861,6 +863,20 @@ async fn handle(
             None => Ok(()),
         },
         Message::Cmd(cmd) if cmd.op == CmdOp::Detail => detail_cmd(shared, c, env.id, &cmd).await,
+        Message::Cmd(cmd) if cmd.op == CmdOp::Graph => {
+            let graph = cmd.sid.and_then(|sid| shared.registry.graph(sid));
+            match graph {
+                _ if c.peer_minor < GRAPH_MINOR => {
+                    let res = fail(ResultErr::Unsupported, "graph needs proto 0.22");
+                    c.send(Some(env.id), Message::Result(res)).await
+                }
+                Some(g) => c.send(Some(env.id), Message::Graph(g)).await,
+                None => {
+                    let res = fail(ResultErr::Stale, "unknown session");
+                    c.send(Some(env.id), Message::Result(res)).await
+                }
+            }
+        }
         Message::Cmd(cmd) if cmd.op == CmdOp::Answer => {
             let res = answer_cmd(shared, c.peer_minor, &cmd);
             c.send(Some(env.id), Message::Result(res)).await
@@ -2945,6 +2961,45 @@ mod tests {
         let (none, r) = detail_chunks(&mut d).await;
         assert!(none.is_empty());
         assert_eq!(r.err, Some(ResultErr::Stale), "no message: stale");
+    }
+
+    /// `cmd graph` (GRAPH.md): a reply to the cmd, stale for a gone session,
+    /// unsupported below proto 0.22.
+    #[tokio::test]
+    async fn the_graph_answers_its_cmd_from_0_22() {
+        let shared = shared();
+        let sid = add_session(&shared);
+        let line = json!({"agent": "claude", "event": "PreToolUse",
+            "payload": {"session_id": "s", "tool_use_id": "u1", "tool_name": "Bash",
+                        "tool_input": {"command": "git status"}}});
+        shared
+            .registry
+            .graph_line(&line, &crate::registry::Via::Local);
+        let ask = |id, sid| {
+            cmd_bytes(
+                id,
+                Cmd {
+                    sid: Some(sid),
+                    ..cmd(CmdOp::Graph, None, None, None)
+                },
+            )
+        };
+        let mut d = linked(&shared, 22).await;
+        d.to_daemon.send(ask(2, sid)).unwrap();
+        let env = d.next().await;
+        assert_eq!(env.re, Some(2));
+        let Message::Graph(g) = env.msg else {
+            panic!("expected graph, got {:?}", env.msg)
+        };
+        assert_eq!(
+            (g.sid, g.nodes, g.la, g.drop),
+            (sid, vec![crate::graph::GIT], None, None)
+        );
+        d.to_daemon.send(ask(3, sid + 1)).unwrap();
+        assert_eq!(result_of(&mut d).await.err, Some(ResultErr::Stale));
+        let mut old = linked(&shared, 21).await;
+        old.to_daemon.send(ask(1, sid)).unwrap();
+        assert_eq!(result_of(&mut old).await.err, Some(ResultErr::Unsupported));
     }
 
     #[tokio::test]

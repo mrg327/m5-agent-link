@@ -1,0 +1,26 @@
+{
+  "desc": "Session 3's agent graph (proto 0.22): read, agent call, an explore sub-agent on lane 1 (fork: shell, merge: search), a failed edit, a running git call; 3 older calls dropped",
+  "symbolic": {
+    "t": "graph",
+    "id": 43,
+    "re": 29,
+    "b": {
+      "sid": 3,
+      "nodes": [
+        17,
+        22,
+        595,
+        1108,
+        34,
+        9
+      ],
+      "la": [
+        0,
+        1
+      ],
+      "drop": 3,
+      "gen": 42
+    }
+  },
+  "cbor_hex": "a400181c01182b02181d03a500030186111619025319045418220902820001030304182a"
+}

@@ -27,7 +27,7 @@ MT = dict(hello=1, welcome=2, snapshot=3, session_upd=4, gone=5, attention=6, cl
           cmd=8, result=9, detail=10, cfg=11, batt=12, ping=13, pong=14, log=15,
           audio_start=16, audio=17, audio_end=18, transcript=19,
           kb_start=20, kb_stroke=21, kb_cands=22, usage=23,
-          fw_begin=24, fw_chunk=25, fw_ack=26, power=27,
+          fw_begin=24, fw_chunk=25, fw_ack=26, power=27, graph=28,
           dbg_ui_state=65, dbg_inject_input=68)
 
 
@@ -304,6 +304,18 @@ VECTORS = {
         "Trackpad: the bezel turned clockwise by three notches, scroll down (proto 0.20)",
         {"t": "cmd", "id": 28, "b": {"op": "pointer", "ptr": {"wheel": 3}}},
         env("cmd", 28, {0: 20, 9: {4: 3}}),
+    ),
+    "cmd_graph": (
+        "Device asks for session 3's agent graph (proto 0.22)",
+        {"t": "cmd", "id": 29, "b": {"op": "graph", "sid": 3}},
+        env("cmd", 29, {0: 21, 1: 3}),
+    ),
+    "graph": (
+        "Session 3's agent graph (proto 0.22): read, agent call, an explore sub-agent on lane 1 (fork: shell,"
+        " merge: search), a failed edit, a running git call; 3 older calls dropped",
+        {"t": "graph", "id": 43, "re": 29, "b": {"sid": 3, "nodes": [17, 22, 595, 1108, 34, 9],
+         "la": [0, 1], "drop": 3, "gen": 42}},
+        env("graph", 43, {0: 3, 1: [17, 22, 595, 1108, 34, 9], 2: [0, 1], 3: 3, 4: 42}, re_=29),
     ),
     "cmd_focus_handback": (
         "Open on PC from the request itself: focus session 2 and hand request 10 back to the terminal (proto 0.11)",

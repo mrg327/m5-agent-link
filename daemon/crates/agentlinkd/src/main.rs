@@ -10,6 +10,7 @@ mod deltas;
 mod device;
 mod focus;
 mod fwcache;
+mod graph;
 mod hook_source;
 mod ipc;
 mod jobs;

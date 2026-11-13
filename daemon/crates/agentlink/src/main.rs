@@ -1,5 +1,6 @@
 //! agentlink: the CLI window into the daemon (DESIGN §0: auditability).
 
+mod graph;
 mod hooks;
 mod ota;
 mod power;
@@ -39,6 +40,13 @@ enum Cmd {
         /// Only show events for this session id.
         #[arg(long)]
         sid: Option<u64>,
+    },
+    /// Print a session's agent graph (GRAPH.md), newest call first: one column per lane, a letter per
+    /// kind (R read, E edit, $ shell, S search, W web, A agent, ? ask, P plan, G git, T test, M mcp,
+    /// . other), `*` running, `!` failed.
+    Graph {
+        /// Session id, as `agentlink trace` shows it.
+        sid: u64,
     },
     /// Decode a hex-encoded CBOR envelope to JSON.
     Decode { hex: String },
@@ -198,6 +206,7 @@ fn main() -> Result<()> {
     match cli.cmd {
         Cmd::Status => status::run(cli.json),
         Cmd::Trace { follow, sid } => trace::run(cli.json, follow, sid),
+        Cmd::Graph { sid } => graph::run(cli.json, sid),
         Cmd::Decode { hex } => decode(&hex, cli.json),
         Cmd::Hooks { cmd } => match cmd {
             HooksCmd::Print => hooks::print(cli.json),

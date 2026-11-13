@@ -1,0 +1,12 @@
+{
+  "desc": "Device asks for session 3's agent graph (proto 0.22)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 29,
+    "b": {
+      "op": "graph",
+      "sid": 3
+    }
+  },
+  "cbor_hex": "a3000801181d03a200150103"
+}

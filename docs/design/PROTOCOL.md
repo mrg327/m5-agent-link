@@ -227,7 +227,7 @@ The device must show approve/deny **only if** they are in `acts`. The daemon inc
 
 ```cddl
 cmd = {
-  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end"/"rerun"/"unqueue"/"answer"/"pointer",
+  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end"/"rerun"/"unqueue"/"answer"/"pointer"/"graph",
   ? sid: uint,
   ? rid: uint,               ; required for approve/deny/reply
   ? arg: uint / tstr / scroll_arg,  ; snooze minutes (the watch sends 30), reply option index, quiet duration,
@@ -271,6 +271,8 @@ scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tst
   below 0.11. The text keeps line breaks and spells out control and undrawable characters (`^[`, `\u{a0}`). The
   device keeps a chunk only for the rid it asked for, at the offset it has reached, with the announced total.
   Without a `rid` (proto 0.18, §6e) it asks for session `sid`'s last message.
+- `graph` (proto 0.22, §6h): `{sid}` asks for session `sid`'s agent graph. The daemon answers with one `graph`
+  message (`re` = the cmd's id); `stale` for a session that is gone, `unsupported` from a device below 0.22.
 - `approve` with `rh` (proto 0.13, [STANDING-RULES.md](STANDING-RULES.md)): approve, and have the hook pass the
   request's standing rule back to Claude Code as `updatedPermissions`. `denied` when the request offers no rule,
   when `rh` is not the hash of the rule it offers (another request's, another scope, a broader rule), or when
@@ -432,6 +434,25 @@ cmd { op: "pointer", ptr: { dx?: int, dy?: int, btn?: "left"/"right", n?: uint, 
 - No `result` when it works. A failure is answered at most once per second: `unsupported` (no backend) or `denied`
   (the OS refused; on macOS the message asks to allow agentlinkd under Privacy & Security > Accessibility).
 - The trace leaves out commands that only move; clicks and scrolls are traced. Nothing is audited.
+
+## 6h. Agent graph (proto 0.22, [GRAPH.md](GRAPH.md))
+```
+cmd { op: "graph", sid }                                   device → daemon
+graph { sid, nodes: [0*64 uint], ? la: [0*8 uint], ? drop: uint, ? gen: uint }   daemon → device (type 28)
+```
+- `nodes` are the current turn's tool calls of the session and its sub-agents, oldest first, at most the newest
+  64; `drop` counts the older ones. One uint per node, bits low to high: 0-3 kind (0 other, 1 read, 2 edit,
+  3 shell, 4 search, 5 web, 6 agent, 7 ask, 8 plan, 9 git, 10 test, 11 mcp), 4-5 state (0 running, 1 ok,
+  2 failed), 6-8 lane (0 = the session's own agent), 9 fork, 10 merge.
+- `la[lane]` is the sub-agent kind of a lane: 0 unknown, 1 explore, 2 task, 3 general-purpose, 4 code-review,
+  5 research, 6 plan, 7 other. Absent when no node is on a sub-agent lane.
+- `gen` changes whenever the graph does; a session with no calls yet has `nodes: []`, `gen: 0`.
+- The daemon builds it from the hook lines (Claude Code needs `SubagentStop` for merges): a `PreToolUse` adds a
+  running node, its result settles it, the parent's prompt clears the graph. Sub-agents fork the lowest free lane
+  1-7 (lane 7 is shared past seven) and merge on their stop, or all at once when the parent's turn ends
+  (`Stop`, `agentStop`, `StopFailure`, `errorOccurred`), which also settles every call still running as failed.
+- No agent content: sent under every privacy level, traced. Only on request; a daemon below 0.22 has no `cmd graph`.
+  `agentlink graph SID [--json]` prints the same graph.
 
 ## 7. Misc
 - `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray. The current firmware does not send it; the power report (§6f) carries more.

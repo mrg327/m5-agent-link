@@ -26,6 +26,7 @@ const CLAUDE_EVENTS: &[&str] = &[
     "Notification",
     "Stop",
     "StopFailure",
+    "SubagentStop",
 ];
 /// The hook that may block while the watch answers (UI-V2 §7): `PermissionRequest`, a question's
 /// (`AskUserQuestion`, LAST-MESSAGE.md §3) included. Its timeout must cover the daemon's longest answer
@@ -141,8 +142,15 @@ mod tests {
     fn the_printed_claude_config_has_every_event_the_daemon_uses() {
         let hooks = &claude()["hooks"];
         // PostToolUseFailure carries a failed test run's exit code and StopFailure ends a turn in error
-        // (DONE-SUMMARY.md): without them "tests failed" and the summary of an errored turn never arrive
-        for e in ["PostToolUse", "PostToolUseFailure", "Stop", "StopFailure"] {
+        // (DONE-SUMMARY.md): without them "tests failed" and the summary of an errored turn never arrive.
+        // SubagentStop merges a sub-agent's lane of the agent graph (GRAPH.md)
+        for e in [
+            "PostToolUse",
+            "PostToolUseFailure",
+            "Stop",
+            "StopFailure",
+            "SubagentStop",
+        ] {
             let h = &hooks[e][0]["hooks"][0];
             assert_eq!(h["command"], format!("agentlink-hook claude {e}"), "{e}");
             assert_eq!(h["timeout"], 5, "{e}: non-blocking");

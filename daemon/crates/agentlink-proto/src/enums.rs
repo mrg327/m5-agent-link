@@ -59,7 +59,7 @@ uint_enum!(CmdOp {
     Focus = 0, Ack = 1, Snooze = 2, Approve = 3, Deny = 4, Reply = 5, Cancel = 6,
     Detail = 7, NotifyDone = 8, Quiet = 9, Scroll = 10, Type = 11, Dictate = 12,
     KbPick = 13, KbDel = 14, KbSend = 15, KbEnd = 16, Rerun = 17, Unqueue = 18, Answer = 19,
-    Pointer = 20,
+    Pointer = 20, Graph = 21,
 });
 uint_enum!(PointerBtn { Left = 0, Right = 1 });
 uint_enum!(ScrollUnit { Lines = 0, Pages = 1, ToEnd = 2 });
