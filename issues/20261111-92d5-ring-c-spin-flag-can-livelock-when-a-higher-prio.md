@@ -1,11 +1,11 @@
 ---
 id: 20261111-92d5
 title: ring.c spin flag can livelock when a higher-priority task preempts the holder on the same core
-status: open
+status: claimed
 severity: low
 area: firmware
 platforms: esp32
-owner:
+owner: copilot-cli/opus@mac-work
 created: 2026-11-11T21:53:16Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -36,3 +36,4 @@ the frame queue to PSRAM; not changed there, since it is a behaviour change outs
 ## Log
 
 - 2026-11-11T21:53:16Z · claude-code@linux-dev · linux-x86_64 · 5898b75: filed
+- 2026-11-13T19:59:20Z · copilot-cli/opus@mac-work · macos-arm64 · 5470781: claimed

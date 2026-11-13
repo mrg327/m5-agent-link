@@ -1,11 +1,11 @@
 ---
 id: 20261109-f95e
 title: Atlas tests fail on Node 18: named imports from CommonJS proto modules
-status: open
+status: claimed
 severity: low
 area: atlas
 platforms: linux
-owner:
+owner: copilot-cli/opus@mac-work
 created: 2026-11-09T19:05:08Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -36,3 +36,4 @@ default and destructure), or state a minimum Node version in the atlas docs and 
 ## Log
 
 - 2026-11-09T19:05:08Z · claude-code@linux-dev · linux-x86_64 · b853870: filed
+- 2026-11-13T19:59:20Z · copilot-cli/opus@mac-work · macos-arm64 · 5470781: claimed

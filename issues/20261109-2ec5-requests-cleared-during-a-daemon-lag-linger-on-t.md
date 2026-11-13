@@ -1,11 +1,11 @@
 ---
 id: 20261109-2ec5
 title: Requests cleared during a daemon lag linger on the device
-status: open
+status: claimed
 severity: low
 area: firmware
 platforms: any
-owner:
+owner: copilot-cli/opus@mac-work
 created: 2026-11-09T17:14:24Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
@@ -29,3 +29,4 @@ Found while fixing 20261109-1d5b. After a broadcast lag the daemon now resends a
 ## Log
 
 - 2026-11-09T17:14:24Z · copilot-cli/opus@mac-work · macos-arm64 · aa1a69e: filed
+- 2026-11-13T19:59:20Z · copilot-cli/opus@mac-work · macos-arm64 · 5470781: claimed
