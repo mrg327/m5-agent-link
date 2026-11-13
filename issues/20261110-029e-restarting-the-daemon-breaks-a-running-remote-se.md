@@ -1,15 +1,15 @@
 ---
 id: 20261110-029e
 title: Restarting the daemon breaks a running remote session, which then has to be restarted
-status: open
+status: fixed
 severity: low
 area: daemon
 platforms: any
-owner:
+owner: copilot-cli/opus@mac-work
 created: 2026-11-10T20:41:45Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -43,3 +43,11 @@ anything in the remote agent that fires a hook.
 ## Log
 
 - 2026-11-10T20:41:45Z · copilot-cli/opus@mac-work · macos-arm64 · a5a6da5: filed
+- 2026-11-13T19:34:08Z · copilot-cli/opus@mac-work · macos-arm64 · 204d2ff: claimed
+- 2026-11-13T19:37:15Z · copilot-cli/opus@mac-work · macos-arm64 · 66d92a8: fixed: commit 66d92a8; checks: daemon fmt, clippy, tests (309 agentlinkd incl. reattach unit + e2e), windows msvc clippy unchanged; live on the Mac: agentlink ssh with a fake ssh, launchctl kickstart -k of agentlinkd, the attach socket came back and a remote hook through it registered @reattachtest; ssh exit removed socket and session
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: 66d92a8 main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74
