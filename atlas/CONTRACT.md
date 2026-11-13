@@ -85,7 +85,8 @@ daemon.attach(watch); daemon.play(name); daemon.pause(); daemon.scenarios  // [{
 daemon.inject(sessionPatch)  // used by replay
 ```
 Codecs live in `atlas/js/proto/` (cbor.js, cobs.js, crc16.js, blefrag.js, messages.js).
-They are pure functions with tests in `atlas/test/` (`node --test atlas/test/*.test.mjs`).
+They are pure functions with tests in `atlas/test/` (`node --test atlas/test/*.test.mjs`, Node 18 or newer).
+`atlas/js/package.json` sets `"type": "module"` so Node older than 22 loads these `.js` files as ES modules.
 
 ## Stage API (owned by **shell**)
 ```js
