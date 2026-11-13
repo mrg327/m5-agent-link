@@ -1,7 +1,7 @@
 ---
 id: 20261113-82dc
 title: Queue a reply or dictation for a working agent; the daemon types it when the session can take input
-status: claimed
+status: fixed
 severity: med
 area: protocol
 platforms: any
@@ -9,7 +9,7 @@ owner: copilot-cli/opus@mac-work
 created: 2026-11-13T00:16:48Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -47,3 +47,10 @@ Design (proto 0.17, PROTOCOL.md §6d):
 - 2026-11-13T00:27:04Z · copilot-cli/opus@mac-work · macos-arm64 · 0fbec3f: On the watch: OTA to 0fbec3f, hello proto [0,17]; daemon reinstalled. Awaiting the user's live test before close.
 - 2026-11-13T18:18:55Z · copilot-cli/opus@mac-work · macos-arm64 · c9fc524: User 2026-11-13: queued replies go stale waiting for the turn to end; send them immediately and accept the consequences. Change: q:true types at once while the agent works (start/work no longer hold it); the daemon holds it only while typing would answer something (an open request, or input with approval/question), delivering when that clears. Watch labels drop 'Queue'.
 - 2026-11-13T18:23:30Z · copilot-cli/opus@mac-work · macos-arm64 · 3b4e6ce: commit 3b4e6ce: q types at once mid-turn; held only behind an approval/question/open request. Checks: cargo fmt/clippy/test (303 pass), simulator ctest 187/187, idf.py build + check_dram, atlas. Daemon reinstalled on mac-work (takes effect now with the old watch labels); new labels need a flash (Mac OTA key untrusted). Awaiting live test.
+- 2026-11-13T19:33:48Z · copilot-cli/opus@mac-work · macos-arm64 · ed9c889: fixed: user confirmed on the watch, 2026-11-13
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: ed9c889 main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74

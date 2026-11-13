@@ -1,7 +1,7 @@
 ---
 id: 20261110-1e57
 title: KEYS: swipe keyboard on the watch, decoded on the PC
-status: claimed
+status: fixed
 severity: med
 area: firmware
 platforms: any
@@ -9,7 +9,7 @@ owner: copilot-cli/opus@mac-work
 created: 2026-11-10T18:30:58Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -127,3 +127,10 @@ size, stroke thresholds, prior weights).
 - 2026-11-10T19:26:52Z · copilot@mac · macos-arm64 · 72997bd: commit 72997bd: keys 44x54 (y 170/224/278, bottom 332), badges r190 199/161 deg, double tap below keys (y>=386, 400 ms) goes back; sim 68/68, cargo test, atlas 130/130, DRAM free 133285 B; flashed
 - 2026-11-10T20:45:42Z · copilot-cli/opus@mac-work · macos-arm64 · e7b3aba: User on the StopWatch: typing works acceptably; leaving KEYS erases the uncommitted text in the agent's input box (desired, kb_end erase confirmed). Remaining: optional M4 (LLM rerank, initials mode).
 - 2026-11-11T05:20:23Z · claude-code@linux-dev · linux-x86_64 · 5681f17+dirty: From the UI v3 audit (issue 7732, docs/design/UI-PROFILE.md finding L2 on branch ui-v3): in the simulator shots keys_cands.png and keys_symbols.png the outer keys of the top row (q/p, 1/0) touch the rim and the candidate row is cut by it; v3 keeps content inside r <= 205 (theme_chord). ui-v3 does not edit ui_keys.c or keys.c; it only changes shared tokens (typeface Figtree via theme_font, legend look, toast slot on y 364), so KEYS will pick those up at merge. Worth checking the key grid against the new chord rule then.
+- 2026-11-13T19:33:47Z · copilot-cli/opus@mac-work · macos-arm64 · ed9c889: fixed: user confirmed on the watch, 2026-11-13
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: ed9c889 main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74

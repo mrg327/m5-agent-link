@@ -1,7 +1,7 @@
 ---
 id: 20261112-f97a
 title: VOICE: keep and show long dictations (2 KB transcript, 60 s recording)
-status: claimed
+status: fixed
 severity: med
 area: firmware
 platforms: any
@@ -9,7 +9,7 @@ owner: copilot-cli/opus@mac-work
 created: 2026-11-12T23:55:30Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -39,3 +39,10 @@ Plan (agreed with the user):
 - 2026-11-12T23:55:33Z · copilot-cli/opus@mac-work · macos-arm64 · 87b4bf2: claimed
 - 2026-11-13T00:04:47Z · copilot-cli/opus@mac-work · macos-arm64 · 87b4bf2+dirty: Built: proto 0.16. Watch holds 2047 B transcripts in PSRAM (link_rx, voice.c, ui_voice.c), VOICE_MAX_MS 60 s, VOICE_WAIT_MS 45 s. Daemon: clean() no longer cuts; device.rs fits the text per device (2047 or 255 B) and stores what it sent. Sim: new voice_minute_transcript (60 s auto-stop, 1515 B in 9 pages, hold locked until page 9); sim_script line and inject buffers raised to 4 KB. Also fixed atlas messages.js missing fw_* (types 24-26) from b769. Checks: sim ctest 168/168, cargo fmt/clippy/test, idf build + check_dram (DIRAM free 183629 B), vectors unchanged, atlas extract --check + node 186/186.
 - 2026-11-13T00:09:28Z · copilot-cli/opus@mac-work · macos-arm64 · 76a63d6: Pushed 5367d01; the watch runs it (OTA over USB, hello proto 0.16, clean boot). Daemon reinstalled. Waiting for the user's live test of a long dictation (over 15 s, transcript over 255 bytes) before closing.
+- 2026-11-13T19:33:48Z · copilot-cli/opus@mac-work · macos-arm64 · ed9c889: fixed: user confirmed on the watch, 2026-11-13
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: ed9c889 main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74

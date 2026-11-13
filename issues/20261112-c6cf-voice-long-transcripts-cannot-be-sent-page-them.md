@@ -1,7 +1,7 @@
 ---
 id: 20261112-c6cf
 title: VOICE: long transcripts cannot be sent (page them, then hold)
-status: claimed
+status: fixed
 severity: med
 area: firmware
 platforms: any
@@ -9,7 +9,7 @@ owner: copilot-cli/opus@mac-work
 created: 2026-11-12T22:53:05Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -32,3 +32,10 @@ A dictated reply longer than five lines on the VOICE screen cannot be sent: a ta
 - 2026-11-12T22:53:09Z · copilot-cli/opus@mac-work · macos-arm64 · a9cdcd0: claimed
 - 2026-11-12T23:00:13Z · copilot-cli/opus@mac-work · macos-arm64 · 819843e: Commit 819843e: VOICE pages a transcript longer than five lines (tap/A turns the page, button 'More n/m' until the last page was shown, then the Send hold; an early hold toasts 'Tap to read the rest' and sends nothing). Daemon caps transcripts at 255 UTF-8 bytes (watch buffer) as well as 240 chars. Checks on macos-arm64: ctest 153/153 (sim_voice_long_transcript rewritten), idf.py build 1.39 MB (78% free), check_dram 184213 B free, atlas extract, cargo fmt/clippy/test --workspace. Daemon reinstalled under launchd. Not yet done: flash and live 14 s dictation (watch not on USB).
 - 2026-11-12T23:28:37Z · copilot-cli/opus@mac-work · macos-arm64 · dfb58a4: Voice paging now flashed to the watch (with dfb58a4); live long-dictation check still pending with the user.
+- 2026-11-13T19:33:47Z · copilot-cli/opus@mac-work · macos-arm64 · ed9c889: fixed: user confirmed on the watch, 2026-11-13
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: ed9c889 main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74
