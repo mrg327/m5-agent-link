@@ -42,6 +42,10 @@ expect_label moved 0,167 wheel 0
 scrub 30 120 400 200
 wait 300
 expect_label moved 0,167 wheel 5
+# turning clockwise across 12 o'clock keeps scrolling down (it used to jump back, wrapping at 9 sectors)
+scrub 315 405 400 200
+wait 300
+expect_label moved 0,167 wheel 10
 expect_screen trackpad
 btn A
 wait 300

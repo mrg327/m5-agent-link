@@ -182,6 +182,9 @@ int nav_quiet_step(uint32_t quiet_until, uint32_t now_unix);
  * NAV_LIST_SECTORS rim sectors on opening; this returns how many items to move for one scrub event (clockwise
  * positive) and keeps the last sector in *last. */
 int nav_list_scrub(int *last, gesture_kind_t kind, int sector);
+/* The same for a screen that set `sectors` rim sectors (the difference wraps at that count, so crossing
+ * 12 o'clock is one step, not a jump the other way). */
+int nav_rim_scrub(int *last, gesture_kind_t kind, int sector, int sectors);
 /* A vertical drag in the centre of a list moves the list with the finger: dragging up brings the next item
  * in. Feed each G_DRAG step's dy; returns the items to move (next positive) and keeps the remainder in *acc. */
 int nav_list_drag(int *acc, int dy);

@@ -22,7 +22,7 @@ The watch drives the pointer of the machine `agentlinkd` runs on (protocol §6g,
 | Drag starting in the centre | moves the pointer |
 | Tap | left click; a second tap within 400 ms and 40 px of the last one is sent with `n` = 2 (a double click), up to 3 |
 | Hold still 600 ms | right click |
-| Turn on the bezel (scrub) | scrolls: clockwise = down, one notch per 15° (24 sectors), with a detent haptic |
+| Turn on the bezel (scrub) | scrolls: clockwise = down, one notch per 15° (24 sectors, wrapped at 24 so crossing 12 o'clock is one notch), with a detent haptic |
 | A, B long | back to LABS |
 | A+B chord | HOME |
 

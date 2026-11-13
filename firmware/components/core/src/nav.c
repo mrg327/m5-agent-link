@@ -329,7 +329,7 @@ uint32_t nav_quiet_next(uint32_t quiet_until, uint32_t now_unix)
     }
 }
 
-int nav_list_scrub(int *last, gesture_kind_t kind, int sector)
+int nav_rim_scrub(int *last, gesture_kind_t kind, int sector, int sectors)
 {
     if (kind == G_SCRUB_START) {
         *last = sector;
@@ -337,10 +337,15 @@ int nav_list_scrub(int *last, gesture_kind_t kind, int sector)
     }
     if (kind != G_SCRUB) return 0;
     int d = sector - *last;
-    if (d > NAV_LIST_SECTORS / 2) d -= NAV_LIST_SECTORS;
-    else if (d < -NAV_LIST_SECTORS / 2) d += NAV_LIST_SECTORS;
+    if (d > sectors / 2) d -= sectors;
+    else if (d < -sectors / 2) d += sectors;
     *last = sector;
     return d;
+}
+
+int nav_list_scrub(int *last, gesture_kind_t kind, int sector)
+{
+    return nav_rim_scrub(last, kind, sector, NAV_LIST_SECTORS);
 }
 
 int nav_list_drag(int *acc, int dy)

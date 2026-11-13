@@ -160,7 +160,7 @@ bool ui_trackpad_act(nav_action_t a, const gesture_evt_t *g)
         }
         return true;
     case NAV_SCRUB: {
-        int d = nav_list_scrub(&s_scrub_last, g->kind, g->x);
+        int d = nav_rim_scrub(&s_scrub_last, g->kind, g->x, NAV_POINTER_SECTORS);
         if (!d) return true;
         if (!send(-1, 0, d)) {
             refused();
