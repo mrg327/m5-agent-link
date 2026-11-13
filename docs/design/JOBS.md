@@ -32,7 +32,7 @@ eval "$(agentlink shell-init zsh)"     # or bash
 - **One job per shell.** The session key is the shell (`shell:<pid>`). A new long command in the same
   shell takes the card over (same `sid`, `t0` reset); the card is removed when it is dismissed (`ack`),
   10 minutes after the job ended, or when the shell exits.
-- **Never shown:** interactive programs (editors, pagers, `ssh`, `tmux`, REPLs started without
+- **Never shown:** interactive programs (editors, pagers, `ssh` and `agentlink ssh`, `tmux`, REPLs started without
   arguments, `fg`, …; built-in list plus `~/.agentlink/jobs-ignore.txt`, one program name per line), and
   any command in a terminal that already hosts an agent session (the agent's own card covers it).
 - **Interrupted by the user** (exit 130, SIGINT): the card is removed without a buzz. The user is at

@@ -40,6 +40,9 @@ const IGNORED_BARE: &[&str] = &[
     "python", "ipython", "node", "irb", "psql", "sqlite3", "lua", "ghci", "sh", "bash", "zsh",
     "fish", "dash", "ksh",
 ];
+/// Ignored with this first argument: `agentlink ssh` is an ssh session (and its remote agents get
+/// their own cards).
+const IGNORED_SUB: &[(&str, &str)] = &[("agentlink", "ssh")];
 /// Words that only prepare the real command; the program name skips them.
 const WRAPPERS: &[&str] = &["sudo", "env", "time", "nohup", "nice", "command", "exec"];
 /// Builtins that open a compound command line without being what runs.
@@ -200,15 +203,19 @@ pub fn parse_ignore(text: &str) -> Vec<String> {
 
 /// Whether any simple command of the line is an interactive program.
 pub fn is_ignored(cmd: &str, extra: &[String]) -> bool {
-    segments(cmd)
-        .iter()
-        .filter_map(|s| program_of(s))
-        .any(|(p, nargs)| {
-            let n = normalize(&p);
-            IGNORED.contains(&n)
-                || extra.iter().any(|e| e == &p || e == n)
-                || (nargs == 0 && IGNORED_BARE.contains(&n))
-        })
+    segments(cmd).iter().any(|s| {
+        let Some((p, nargs)) = program_of(s) else {
+            return false;
+        };
+        let n = normalize(&p);
+        let first = (nargs > 0).then(|| s[s.len() - nargs].as_str());
+        IGNORED.contains(&n)
+            || extra.iter().any(|e| e == &p || e == n)
+            || (nargs == 0 && IGNORED_BARE.contains(&n))
+            || IGNORED_SUB
+                .iter()
+                .any(|&(prog, sub)| prog == n && first == Some(sub))
+    })
 }
 
 // ── history ──
@@ -898,6 +905,8 @@ mod tests {
             "psql",
             "bash",
             "watch -n1 ls",
+            "agentlink ssh speech-win",
+            "~/.cargo/bin/agentlink ssh host",
         ] {
             assert!(is_ignored(c, none), "{c}");
         }
@@ -909,6 +918,8 @@ mod tests {
             "tail -f log",
             "bash script.sh",
             "echo vim",
+            "agentlink ota fw.bin",
+            "echo agentlink ssh",
         ] {
             assert!(!is_ignored(c, none), "{c}");
         }
