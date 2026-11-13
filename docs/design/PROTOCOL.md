@@ -163,7 +163,7 @@ session = {
   line (`agentlink-hook statusline`), `pm` from the hooks' `permission_mode`. A status line only updates a session
   the hooks created. `ctx: 255` clears the figure (after `/compact`); `pr: 0` says no pull request is open. The
   pull request is withheld under privacy `meta`.
-- `snapshot { sessions: [* session], away?: [* event] }`: a full replacement. It is sent on connect and whenever the daemon thinks the device has drifted. The `away` list holds the events the device missed while disconnected; the device shows them as "while you were away".
+- `snapshot { sessions: [* session], away?: [* event] }`: a full replacement. It is sent on connect and whenever the daemon thinks the device has drifted (its link fell behind the daemon's update stream). A snapshot replaces sessions only: the device keeps the cards of sessions it still lists. So after a drift the daemon follows it with a `clear` `cancelled` for each request it had sent on this link that ended meanwhile (the real reason is lost), then re-sends every open request; a re-sent `rid` updates its card in place (issue 20261109-2ec5). The `away` list holds the events the device missed while disconnected; the device shows them as "while you were away".
 - `session { session }`: an upsert. The daemon sends only the changed keys plus `sid` (a delta).
 - `gone { sid }`: the session has been removed.
 

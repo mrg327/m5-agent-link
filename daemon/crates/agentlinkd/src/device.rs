@@ -133,6 +133,9 @@ struct Conn {
     deltas: DeltaQueue,
     /// Job sessions (proto 0.9) withheld from a device that cannot decode them.
     hidden: HashSet<u64>,
+    /// Requests this link has sent the device and not yet cleared: after a lag, the ones no longer
+    /// pending get the `clear` the device missed (issue 20261109-2ec5).
+    rids: HashSet<u64>,
     /// Counts this device as linked for the answer window (window.rs) once it has handshaken.
     linked: Option<crate::broker::Linked>,
     /// The device's board and firmware as its hello named them, for the power log.
@@ -267,6 +270,7 @@ impl Conn {
     /// Sends `msg`, after the held deltas so the device sees everything in order.
     async fn send(&mut self, re: Option<u64>, mut msg: Message) -> Result<()> {
         if let Message::Attention(a) = &mut msg {
+            self.rids.insert(a.rid);
             if !self.dictate {
                 a.acts.retain(|x| *x != Action::Dictate);
             }
@@ -287,6 +291,7 @@ impl Conn {
             }
         }
         if let Message::Clear(cl) = &mut msg {
+            self.rids.remove(&cl.rid);
             if cl.why == ClearWhy::HandedBack && self.peer_minor < WINDOW_MINOR {
                 cl.why = ClearWhy::Cancelled;
             }
@@ -465,6 +470,7 @@ pub async fn run_link(
         dictate: false,
         deltas: DeltaQueue::default(),
         hidden: HashSet::new(),
+        rids: HashSet::new(),
         linked: None,
         board: String::new(),
         fw: String::new(),
@@ -543,6 +549,7 @@ async fn handshake(
     c.linked.get_or_insert_with(|| shared.broker.link());
     c.deltas.clear(); // the snapshot below carries them
     c.hidden.clear();
+    c.rids.clear(); // the welcome drops the device's cards; the pending ones are re-sent below
 
     // Subscribe before taking the snapshot so no update is lost in between.
     let (sessions, updates) = shared.registry.subscribe();
@@ -685,7 +692,18 @@ async fn serve(
                     c.deltas.clear();
                     let sessions = c.sessions_for_peer(shared.registry.snapshot());
                     c.send(None, Message::Snapshot(Snapshot { sessions, away: None })).await?;
-                    for att in shared.broker.pending() {
+                    // A snapshot drops only the cards of sessions that are gone, so a request that
+                    // ended during the lag needs its own clear. Why it ended is lost: `cancelled`
+                    // removes the card without claiming an answer or a hand-back.
+                    let pending = shared.broker.pending();
+                    let open: HashSet<u64> = pending.iter().map(|a| a.rid).collect();
+                    let mut ended: Vec<u64> =
+                        c.rids.iter().copied().filter(|r| !open.contains(r)).collect();
+                    ended.sort_unstable();
+                    for rid in ended {
+                        c.send(None, Message::Clear(Clear { rid, why: ClearWhy::Cancelled })).await?;
+                    }
+                    for att in pending {
                         c.send(None, Message::Attention(att)).await?;
                     }
                     c.send_usage(shared.registry.usage()).await?;
@@ -1859,6 +1877,7 @@ mod tests {
                 dictate: false,
                 deltas: DeltaQueue::default(),
                 hidden: HashSet::new(),
+                rids: HashSet::new(),
                 linked: None,
                 board: String::new(),
                 fw: String::new(),
@@ -2100,6 +2119,7 @@ mod tests {
                 dictate: false,
                 deltas: DeltaQueue::default(),
                 hidden: HashSet::new(),
+                rids: HashSet::new(),
                 linked: None,
                 board: String::new(),
                 fw: String::new(),
@@ -2118,6 +2138,7 @@ mod tests {
             dictate: false,
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
+            rids: HashSet::new(),
             linked: None,
             board: String::new(),
             fw: String::new(),
@@ -2393,6 +2414,39 @@ mod tests {
             .send(cmd_bytes(6, cmd(CmdOp::Deny, Some(4242), None, None)))
             .unwrap();
         assert_eq!(result_of(&mut d).await.err, Some(ResultErr::Stale));
+    }
+
+    /// A request that ends while the link lags behind the broadcast is cleared on the device by the
+    /// resync, even though its session lives on (issue 20261109-2ec5).
+    #[tokio::test]
+    async fn a_lag_clears_the_requests_that_ended_meanwhile() {
+        let shared = shared();
+        let sid = add_session(&shared);
+        let mut d = linked(&shared, 1).await;
+        let mut req = long_req("npm test", 60);
+        req.sid = sid;
+        let (gone, _w1) = shared.broker.open(req.clone());
+        let (open, _w2) = shared.broker.open(req);
+        for rid in [gone, open] {
+            let Message::Attention(a) = d.next().await.msg else {
+                panic!("attention")
+            };
+            assert_eq!(a.rid, rid);
+        }
+        // the link task does not run until we await: the clear falls out of the full channel
+        shared.broker.cancel(gone, ClearWhy::AnsweredPc);
+        for _ in 0..300 {
+            shared.registry.publish(Update::Upsert(Session::delta(sid)));
+        }
+        assert!(matches!(d.next().await.msg, Message::Snapshot(_)));
+        let Message::Clear(c) = d.next().await.msg else {
+            panic!("the missed clear")
+        };
+        assert_eq!((c.rid, c.why), (gone, ClearWhy::Cancelled));
+        let Message::Attention(a) = d.next().await.msg else {
+            panic!("the open request again")
+        };
+        assert_eq!(a.rid, open);
     }
 
     fn long_req(text: &str, ttl_s: u64) -> crate::broker::Request {
@@ -2721,6 +2775,7 @@ mod tests {
             dictate: false,
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
+            rids: HashSet::new(),
             linked: None,
             board: String::new(),
             fw: String::new(),
@@ -3251,6 +3306,7 @@ mod tests {
             dictate: false,
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
+            rids: HashSet::new(),
             linked: None,
             board: String::new(),
             fw: String::new(),
@@ -3286,6 +3342,7 @@ mod tests {
             dictate: false,
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
+            rids: HashSet::new(),
             linked: None,
             board: String::new(),
             fw: String::new(),
@@ -3498,6 +3555,7 @@ mod tests {
             dictate: false,
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
+            rids: HashSet::new(),
             linked: None,
             board: String::new(),
             fw: String::new(),
@@ -3525,6 +3583,7 @@ mod tests {
             dictate: false,
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
+            rids: HashSet::new(),
             linked: None,
             board: String::new(),
             fw: String::new(),
@@ -3563,6 +3622,7 @@ mod tests {
             dictate: false,
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
+            rids: HashSet::new(),
             linked: None,
             board: String::new(),
             fw: String::new(),
