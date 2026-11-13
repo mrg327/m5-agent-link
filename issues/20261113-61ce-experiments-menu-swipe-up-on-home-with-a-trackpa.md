@@ -36,3 +36,4 @@ Drag (tap then hold and move) is deferred.
 
 - 2026-11-13T18:55:23Z · copilot-cli/opus@mac-work · macos-arm64 · d4fa4c2: filed
 - 2026-11-13T18:55:27Z · copilot-cli/opus@mac-work · macos-arm64 · d4fa4c2: claimed
+- 2026-11-13T19:20:23Z · copilot-cli/opus@mac-work · macos-arm64 · 95d85ba: firmware 95d85ba: LABS + Trackpad screens, G_MOVE, link_send_pointer; checks: sim ctest 188/188, idf build + check_dram (182 KB free), atlas --check + node 216/216
