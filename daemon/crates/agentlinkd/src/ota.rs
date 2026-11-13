@@ -184,6 +184,7 @@ struct Dev {
     link_id: u64,
     minor: u64,
     fw: String,
+    usb: bool,
 }
 
 #[derive(Default)]
@@ -234,15 +235,24 @@ impl Ota {
 
     // ── from the link tasks ──
 
-    /// A device said hello (also a re-hello on a live link).
-    pub fn hello(&self, key: &str, link_id: u64, minor: u64, fw: &str) {
+    /// A device said hello (also a re-hello on a live link). Like the watch (link.c), a live USB link is
+    /// preferred: a hello on another transport does not take the device from it.
+    pub fn hello(&self, key: &str, link_id: u64, minor: u64, fw: &str, usb: bool) {
         let mut g = self.inner.lock().unwrap();
+        if !usb
+            && g.devs
+                .get(key)
+                .is_some_and(|d| d.usb && d.link_id != link_id)
+        {
+            return;
+        }
         g.devs.insert(
             key.to_owned(),
             Dev {
                 link_id,
                 minor,
                 fw: fw.to_owned(),
+                usb,
             },
         );
         if g.txs.contains_key(&link_id) {
@@ -555,6 +565,20 @@ impl Transfer<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_watch_on_usb_and_ble_is_updated_over_usb() {
+        let ota = Ota::new(Trace::null());
+        let link = |ota: &Ota| ota.pick(None).map(|(_, l, _)| l);
+        ota.hello("w", 1, 16, "a", true);
+        ota.hello("w", 2, 16, "a", false); // BLE says hello last; the watch stays on USB
+        assert_eq!(link(&ota), Ok(1));
+        ota.link_down(1); // unplugged: the watch moves to BLE and says hello there again
+        ota.hello("w", 2, 16, "a", false);
+        assert_eq!(link(&ota), Ok(2));
+        ota.hello("w", 3, 16, "a", true); // plugged back in: USB takes over
+        assert_eq!(link(&ota), Ok(3));
+    }
 
     fn image(signed: bool, len: usize) -> Vec<u8> {
         let mut d = vec![0u8; len];

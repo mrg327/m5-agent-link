@@ -528,9 +528,13 @@ async fn handshake(
         key.clone(),
         json!({"transport": transport, "peer": peer, "dev": info, "link": link_id}),
     );
-    shared
-        .ota
-        .hello(&key, link_id, c.peer_minor, &hello.1.dev.fw);
+    shared.ota.hello(
+        &key,
+        link_id,
+        c.peer_minor,
+        &hello.1.dev.fw,
+        transport == "usb",
+    );
     *dev_key = Some(key);
     Ok(updates)
 }
