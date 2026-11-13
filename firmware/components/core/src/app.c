@@ -256,20 +256,30 @@ static void act_notify_done(uint32_t sid, bool arm)
 }
 
 /* Quick reply (issue b150): the device names the reply by index; the daemon holds the text. */
-static void act_type_reply(uint32_t sid, int idx)
+static void act_type_reply(uint32_t sid, int idx, bool queue)
 {
-    bool sent = idx >= 0 && link_send_cmd_arg(LINK_OP_TYPE, sid, 0, (uint32_t)idx, 0);
+    bool sent = idx >= 0 && (queue ? link_send_cmd_queued(LINK_OP_TYPE, sid, (uint32_t)idx, 0)
+                                   : link_send_cmd_arg(LINK_OP_TYPE, sid, 0, (uint32_t)idx, 0));
     if (sent) {
         feedback_reply_sent();
         char t[80];
         const session_t *s = model_find(sid);
         const char *text = idx >= 100 ? (s && idx - 100 < s->n_rp ? s->rp[idx - 100] : "") : model_reply(idx);
-        snprintf(t, sizeof t, "Sent \"%s\"", text);
+        snprintf(t, sizeof t, "%s \"%s\"", queue ? "Queued" : "Sent", text);
         ui_toast(t, RGB_SUCCESS);
     } else {
         feedback_reject();
         ui_toast("Offline", RGB_AMBER);
     }
+}
+
+/* Cancel queued: the daemon drops the session's queued message and clears its qd. */
+static void act_unqueue(uint32_t sid)
+{
+    bool sent = link_send_cmd(LINK_OP_UNQUEUE, sid, 0, 0);
+    if (sent) feedback_tick();
+    else feedback_reject();
+    toast_cmd_result(sent, "Unqueued");
 }
 
 /* Interrupt: Esc in the session's terminal, only after the hold (the daemon checks hold_ms). */
@@ -293,16 +303,17 @@ static void act_rerun(uint32_t sid, uint32_t hold_ms)
 
 /* Voice: type recording aid's transcript, only after the hold (the daemon checks hold_ms too). With a
  * rid the transcript answers that request instead (proto 0.8); the daemon then clears it. */
-static void act_dictate(uint32_t sid, uint32_t rid, uint32_t aid, uint32_t hold_ms)
+static void act_dictate(uint32_t sid, uint32_t rid, uint32_t aid, uint32_t hold_ms, bool queue)
 {
-    bool sent = link_send_cmd_arg(LINK_OP_DICTATE, sid, rid, aid, hold_ms);
+    bool sent = queue ? link_send_cmd_queued(LINK_OP_DICTATE, sid, aid, hold_ms)
+                      : link_send_cmd_arg(LINK_OP_DICTATE, sid, rid, aid, hold_ms);
     if (sent) {
         if (rid) model_attention_set_answer(rid, ATT_ANSWER_DICTATE, 0);
         feedback_approved();
     } else {
         feedback_reject();
     }
-    toast_cmd_result(sent, "Sent");
+    toast_cmd_result(sent, queue ? "Queued" : "Sent");
     voice_cancel(); /* done with it on the device */
 }
 
@@ -345,6 +356,7 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .snooze = act_snooze,
                                        .notify_done = act_notify_done,
                                        .type_reply = act_type_reply,
+                                       .unqueue = act_unqueue,
                                        .interrupt = act_interrupt,
                                        .rerun = act_rerun,
                                        .dictate = act_dictate,

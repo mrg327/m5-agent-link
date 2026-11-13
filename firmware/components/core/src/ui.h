@@ -32,10 +32,11 @@ typedef struct {
     void (*ack)(uint32_t sid);
     void (*snooze)(uint32_t sid, uint32_t minutes); /* AGENT: snooze this session (0 cancels) */
     void (*notify_done)(uint32_t sid, bool arm);    /* AGENT: buzz when this session finishes (false disarms) */
-    void (*type_reply)(uint32_t sid, int idx);       /* AGENT: type quick reply idx into the terminal */
+    void (*type_reply)(uint32_t sid, int idx, bool queue); /* AGENT: type quick reply idx into the terminal, or queue it (proto 0.17) */
+    void (*unqueue)(uint32_t sid);                   /* AGENT: drop the session's queued message (proto 0.17) */
     void (*interrupt)(uint32_t sid, uint32_t hold_ms); /* AGENT: stop the running turn (Esc) or job (Ctrl-C), after a hold */
     void (*rerun)(uint32_t sid, uint32_t hold_ms);     /* AGENT: run a finished job again, after a hold (JOBS.md) */
-    void (*dictate)(uint32_t sid, uint32_t rid, uint32_t aid, uint32_t hold_ms); /* VOICE: type recording aid's transcript, or answer request rid with it */
+    void (*dictate)(uint32_t sid, uint32_t rid, uint32_t aid, uint32_t hold_ms, bool queue); /* VOICE: type recording aid's transcript, answer request rid with it, or queue it */
     void (*scroll_open)(uint32_t sid); /* entering SCROLL: bring the terminal to the front, quietly */
     void (*scroll)(uint32_t sid, nav_scroll_unit_t unit, int delta); /* SCROLL: one coalesced cmd_op_scroll */
     void (*scroll_stop)(void); /* SCROLL reached the bottom or the top */

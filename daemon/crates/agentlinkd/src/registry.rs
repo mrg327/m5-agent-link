@@ -622,6 +622,17 @@ impl Registry {
         })
     }
 
+    /// Sets `qd`, the start of the session's queued message (`""` = none).
+    pub fn set_qd(&self, sid: u64, text: &str) -> Option<()> {
+        self.edit(sid, |s, d, _| {
+            if set(&mut s.qd, Some(text.to_owned())) {
+                d.qd = s.qd.clone();
+                return true;
+            }
+            false
+        })
+    }
+
     /// Device `notify_done`: arm or disarm the one-shot "tell me when it finishes".
     pub fn notify_done(&self, sid: u64, arm: bool) -> Option<()> {
         self.edit(sid, |s, d, _| {

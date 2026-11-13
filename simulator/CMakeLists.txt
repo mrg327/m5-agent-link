@@ -406,6 +406,15 @@ set_tests_properties(sim_voice_minute_transcript PROPERTIES TIMEOUT 120)
 sim_script_test(sim_voice_fit_transcript voice_fit_transcript.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"op\":12,\"sid\":1")
+sim_script_test(sim_queue_reply queue_reply.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"op\":11,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":0,\"q\":1")
+sim_script_test(sim_queue_dictate queue_dictate.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"op\":12,\"sid\":1,\"rid\":0,\"hold_ms\":[0-9]+,\"arg\":[0-9]+,\"q\":1")
+sim_script_test(sim_queue_show_cancel queue_show_cancel.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"op\":18,\"sid\":1")
 sim_script_test(sim_deck_v3_states deck_v3_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_deck_v3_ambient deck_v3_ambient.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_deck_v3_ambient PROPERTIES TIMEOUT 60)

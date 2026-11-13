@@ -63,6 +63,8 @@ typedef struct {
     char q[128];
     char rp[3][64];
     uint8_t n_rp;
+    /* The start of the message queued for when the session can take input (proto 0.17); "" = none. */
+    char queued[97];
     /* A job (AGENT_SHELL): the expected total run time, 0 = unknown, and the exit status once it ended. */
     uint32_t eta;
     uint8_t exit_code;
@@ -103,7 +105,8 @@ enum {
     SF_CTX = 1 << 21, SF_MDL = 1 << 22, SF_PM = 1 << 23, SF_PR = 1 << 24, SF_PRS = 1 << 25,
     SF_BACK = 1 << 26, /* not on the wire: set by the device (model_attention_went_back) */
     SF_HUSH = 1 << 27, /* proto 0.12: with the delta that enters done / error, `hush` says whether to stay quiet */
-    SF_DONE = 1 << 28  /* proto 0.14: any of keys 30-34 was present: `sum` replaces the session's whole summary */
+    SF_DONE = 1 << 28, /* proto 0.14: any of keys 30-34 was present: `sum` replaces the session's whole summary */
+    SF_QD = 1 << 29    /* proto 0.17: the queued message's start */
 };
 
 typedef struct {

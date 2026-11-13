@@ -18,6 +18,7 @@ mod ota;
 mod paths;
 mod presence;
 mod prompt;
+mod queue;
 mod registry;
 mod remote;
 mod scroll;
@@ -65,6 +66,7 @@ async fn main() -> Result<()> {
         stt.warm();
     }
     shared.jobs.spawn_ticker();
+    queue::spawn_delivery(shared.clone(), queue::SETTLE);
     let awake = keepawake::spawn(
         registry.clone(),
         Box::new(keepawake::ChildInhibitor::system()),

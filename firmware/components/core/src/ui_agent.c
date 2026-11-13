@@ -16,8 +16,8 @@
 #define LIST_Y_Q 250
 #define QUESTION_Y 62 /* two lines of FONT_BODY_STRONG span y 64-112 */
 
-static lv_obj_t *s_root, *s_header, *s_wheel, *s_wheel_main, *s_wheel_q, *s_question;
-static char s_question_txt[128];
+static lv_obj_t *s_root, *s_header, *s_wheel, *s_wheel_main, *s_wheel_q, *s_question, *s_queued;
+static char s_question_txt[128], s_queued_txt[112];
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static uint32_t s_sid, s_opened_ms, s_last_input, s_now;
 static bool s_holding, s_hold_fired, s_ramp_started;
@@ -26,6 +26,11 @@ static uint32_t s_hold_t0, s_hold_ms;
  * cmd type argument: the session's own answers to its closing question first (100 + i), then the
  * daemon's fixed replies (i). The question itself shows above the list. */
 static bool s_replies;
+/* "Queue reply" opens the same list in queue mode: the fixed replies and Dictate only (no Keyboard, no
+ * answers of the session's own); the daemon holds the pick until the session can take input (proto 0.17). */
+static bool s_queue;
+#define QUEUE_MIN_MINOR 17
+#define QUEUED_Y 134 /* between the gauge readout (y 108) and the first row */
 #define REPLY_ID 1000
 #define SESSION_REPLY 100
 #define KEYS_ID 998 /* "Keyboard" after "Dictate": opens KEYS (issue 1e57) */
@@ -37,11 +42,13 @@ static const char *const s_labels[AG_COUNT] = {
     [AG_FOCUS] = "Open on PC", [AG_DISMISS] = "Dismiss",
     [AG_SNOOZE] = "Snooze 30 min", [AG_NOTIFY] = "Notify when done", [AG_WATCH] = "Activity",
     [AG_REPLY] = "Reply",          [AG_INTERRUPT] = "Stop",       [AG_RERUN] = "Run again",
+    [AG_QUEUE] = "Queue reply",    [AG_UNQUEUE] = "Cancel queued",
 };
 
 static const char *const s_icons[AG_COUNT] = {
     [AG_FOCUS] = ICON_OPEN,   [AG_DISMISS] = ICON_DENIED, [AG_SNOOZE] = ICON_IDLE,  [AG_NOTIFY] = ICON_BELL,
     [AG_WATCH] = ICON_ACTIVITY, [AG_REPLY] = ICON_REPLY,  [AG_INTERRUPT] = ICON_STOP, [AG_RERUN] = ICON_WORKING,
+    [AG_QUEUE] = ICON_REPLY,    [AG_UNQUEUE] = ICON_DENIED,
 };
 
 static const session_t *session(void) { return model_find(s_sid); }
@@ -66,6 +73,16 @@ static void hold_cancel(void)
     wheel_set_progress(s_wheel, 0);
 }
 
+static void show_queued(const char *t)
+{
+    if (strcmp(t, s_queued_txt)) {
+        snprintf(s_queued_txt, sizeof s_queued_txt, "%s", t);
+        lv_label_set_text(s_queued, t);
+    }
+    if (t[0]) lv_obj_remove_flag(s_queued, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(s_queued, LV_OBJ_FLAG_HIDDEN);
+}
+
 bool ui_agent_refresh(uint32_t now)
 {
     s_now = now;
@@ -76,7 +93,7 @@ bool ui_agent_refresh(uint32_t now)
     char host[24];
     theme_host_prefix(host, sizeof host, s);
     /* the caption is the project (host first when remote); Reply says what the list is for */
-    snprintf(buf, sizeof buf, "%s%s", s_replies ? "Reply to " : host, base[0] ? base : "(no folder)");
+    snprintf(buf, sizeof buf, "%s%s", s_queue ? "Queue for " : s_replies ? "Reply to " : host, base[0] ? base : "(no folder)");
     if (strcmp(buf, s_header_txt)) {
         snprintf(s_header_txt, sizeof s_header_txt, "%s", buf);
         lv_label_set_text(s_header, buf);
@@ -85,21 +102,25 @@ bool ui_agent_refresh(uint32_t now)
     wheel_item_t w[WHEEL_MAX_ITEMS];
     int n = 0;
     if (s_replies) {
-        for (int i = 0; i < s->n_rp && n < WHEEL_MAX_ITEMS; i++)
+        for (int i = 0; !s_queue && i < s->n_rp && n < WHEEL_MAX_ITEMS; i++)
             w[n++] = (wheel_item_t){s->rp[i], RGB_ASK, false, REPLY_ID + SESSION_REPLY + i, ICON_REPLY};
         for (int i = 0; i < model_reply_count() && n < WHEEL_MAX_ITEMS; i++)
             w[n++] = (wheel_item_t){model_reply(i), RGB_ASK, false, REPLY_ID + i, ICON_REPLY};
         if (model_voice() && n < WHEEL_MAX_ITEMS) w[n++] = (wheel_item_t){"Dictate", RGB_ASK, false, DICTATE_ID, ICON_MIC};
-        if (model_keys() && n < WHEEL_MAX_ITEMS) w[n++] = (wheel_item_t){"Keyboard", RGB_ASK, false, KEYS_ID, ICON_KEYBOARD};
+        if (!s_queue && model_keys() && n < WHEEL_MAX_ITEMS) w[n++] = (wheel_item_t){"Keyboard", RGB_ASK, false, KEYS_ID, ICON_KEYBOARD};
     } else {
         agent_item_t items[WHEEL_MAX_ITEMS];
         if (theme_is_job(s)) n = nav_job_items(s->state, items, WHEEL_MAX_ITEMS);
-        else n = nav_agent_items(s->state, model_can_type(), model_reply_count() > 0 || s->n_rp > 0 || model_voice() || model_keys(), items, WHEEL_MAX_ITEMS);
+        else {
+            bool queue_ok = model_peer_minor() >= QUEUE_MIN_MINOR && model_can_type() && (model_reply_count() > 0 || model_voice());
+            n = nav_agent_items(s->state, model_can_type(), model_reply_count() > 0 || s->n_rp > 0 || model_voice() || model_keys(),
+                                queue_ok, s->queued[0] != 0, items, WHEEL_MAX_ITEMS);
+        }
         for (int i = 0; i < n; i++)
             w[i] = (wheel_item_t){label_of(items[i].id, s), items[i].id == AG_INTERRUPT ? RGB_DANGER : items[i].id == AG_RERUN ? RGB_WORKING : rgb, items[i].hold,
                                   (int)items[i].id, s_icons[items[i].id]};
     }
-    const char *q = s_replies ? s->q : "";
+    const char *q = s_replies && !s_queue ? s->q : "";
     lv_obj_t *want = q[0] ? s_wheel_q : s_wheel_main; /* a question pushes the list down */
     if (want != s_wheel) {
         int keep = wheel_sel(s_wheel);
@@ -123,6 +144,9 @@ bool ui_agent_refresh(uint32_t now)
         lv_obj_add_flag(s_question, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(s_header, LV_OBJ_FLAG_HIDDEN);
     }
+    char qd[sizeof s_queued_txt] = "";
+    if (!s_replies && s->queued[0] && !theme_is_job(s)) snprintf(qd, sizeof qd, "Queued: %s", s->queued);
+    show_queued(qd);
     ui_gauges_agent_update(s, !s_replies); /* GAUGES.md: model, mode and pull request under the caption */
     return true;
 }
@@ -132,7 +156,7 @@ void ui_agent_open(uint32_t sid, uint32_t now)
     s_sid = sid;
     s_opened_ms = s_last_input = s_now = now;
     s_holding = s_hold_fired = s_ramp_started = false;
-    s_replies = false;
+    s_replies = s_queue = false;
     s_question_txt[0] = 0;
     s_header_txt[0] = 0;
     ui_home_rim_mode(true); /* a rim drag dials through the items */
@@ -178,7 +202,7 @@ static void commit(const wheel_item_t *it)
     dbg_event("ui", "commit", "\"sid\":%u,\"id\":%d", (unsigned)s->sid, it->id);
     if (it->id == DICTATE_ID) {
         g_ui_actions->tick();
-        ui_go_voice(0);
+        ui_go_voice(0, s_queue);
         return;
     }
     if (it->id == KEYS_ID) {
@@ -187,7 +211,7 @@ static void commit(const wheel_item_t *it)
         return;
     }
     if (it->id >= REPLY_ID) { /* a quick reply: the daemon types it (it never takes text from here) */
-        g_ui_actions->type_reply(s->sid, it->id - REPLY_ID);
+        g_ui_actions->type_reply(s->sid, it->id - REPLY_ID, s_queue);
         ui_go_home();
         return;
     }
@@ -206,6 +230,14 @@ static void commit(const wheel_item_t *it)
         g_ui_actions->tick();
         dbg_event("ui", "replies", "\"sid\":%u,\"n\":%d", (unsigned)s->sid, model_reply_count());
         return;
+    case AG_QUEUE: /* the reply list again, to queue one */
+        s_replies = s_queue = true;
+        wheel_set(s_wheel, NULL, 0, 0);
+        ui_agent_refresh(s_now);
+        g_ui_actions->tick();
+        dbg_event("ui", "queue_replies", "\"sid\":%u,\"n\":%d", (unsigned)s->sid, wheel_count(s_wheel));
+        return;
+    case AG_UNQUEUE: g_ui_actions->unqueue(s->sid); break;
     case AG_INTERRUPT: g_ui_actions->interrupt(s->sid, s_hold_ms); break; /* only ever after the hold */
     case AG_RERUN: g_ui_actions->rerun(s->sid, s_hold_ms); break;         /* only ever after the hold */
     case AG_WATCH: /* the monitor for this session (UI-V2 §4.7) */
@@ -312,6 +344,7 @@ void ui_agent_report(ui_report_t *r)
     r->sel_sid = s_sid;
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
     ui_gauges_agent_report(r);
+    if (s_queued_txt[0]) ui_report_add(r, "%s", s_queued_txt);
     if (s_replies && s_question_txt[0]) ui_report_add(r, "%s", s_question_txt);
     int n = wheel_count(s_wheel), sel = wheel_sel(s_wheel);
     for (int k = 0; k < n && k < 5; k++) {
@@ -336,6 +369,15 @@ lv_obj_t *ui_agent_init(lv_obj_t *screen)
     lv_obj_set_style_text_align(s_header, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_pos(s_header, UI_CX - cw / 2, UI_Y_CAPTION - lh / 2);
     ui_gauges_agent_create(s_root);
+    int qdw = theme_chord(QUEUED_Y - lh / 2, 24);
+    s_queued = lv_label_create(s_root);
+    lv_obj_set_style_text_font(s_queued, FONT_CAPTION, 0);
+    lv_obj_set_style_text_color(s_queued, COL_TEXT2, 0);
+    lv_label_set_long_mode(s_queued, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_set_size(s_queued, qdw, lh);
+    lv_obj_set_style_text_align(s_queued, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_pos(s_queued, UI_CX - qdw / 2, QUEUED_Y - lh / 2);
+    lv_obj_add_flag(s_queued, LV_OBJ_FLAG_HIDDEN);
     s_wheel_main = s_wheel = wheel_create_at(s_root, WHEEL_LAYOUT_LIST_TALL(LIST_Y));
     s_wheel_q = wheel_create_at(s_root, WHEEL_LAYOUT_LIST_TALL(LIST_Y_Q));
     wheel_set_shown(s_wheel_q, false);

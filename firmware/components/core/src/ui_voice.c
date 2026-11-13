@@ -34,6 +34,7 @@ static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static char s_header_txt[64], s_low_txt[32], s_reason_txt[96], s_word_txt[16];
 MODEL_EXT_BSS static char s_text_txt[VOICE_TEXT_MAX];
 static uint32_t s_sid, s_rid, s_now, s_text_since;
+static bool s_queue; /* the hold queues the dictation ("Queue" instead of "Send") */
 static voice_state_t s_shown = (voice_state_t)-1;
 static bool s_holding, s_ramp_started;
 static bool s_lock_press; /* a press while pages are unread: says so once it has lasted NAV_HOLD_SHOW_MS */
@@ -113,7 +114,8 @@ static void set_transcript(const char *t)
 /* "Send" (the hold) once every page has been shown; until then "More 1/3", which a tap answers. */
 static void set_button(voice_state_t st)
 {
-    static const wheel_item_t send = {"Send", RGB_ASK, true, 1, NULL}, retry = {"Try again", 0, false, 2, NULL};
+    const wheel_item_t send = {s_queue ? "Queue" : "Send", RGB_ASK, true, 1, NULL};
+    static const wheel_item_t retry = {"Try again", 0, false, 2, NULL};
     char more[24];
     wheel_item_t next = {more, 0, false, 3, NULL};
     snprintf(more, sizeof more, "More %d/%d", s_page_i + 1, s_pages);
@@ -137,7 +139,7 @@ static void render(void)
     const session_t *s = model_find(s_sid);
     char buf[64];
     const char *base = s ? theme_basename(s->repo) : "";
-    snprintf(buf, sizeof buf, "Reply to %s", base[0] ? base : "(no folder)");
+    snprintf(buf, sizeof buf, "%s %s", s_queue ? "Queue for" : "Reply to", base[0] ? base : "(no folder)");
     theme_set_text(s_header, s_header_txt, sizeof s_header_txt, buf);
     if (st != s_shown) {
         if (st == VOICE_TEXT) s_text_since = s_now;
@@ -192,8 +194,9 @@ static void render(void)
     }
 }
 
-void ui_voice_open(uint32_t sid, uint32_t rid, uint32_t now)
+void ui_voice_open(uint32_t sid, uint32_t rid, bool queue, uint32_t now)
 {
+    s_queue = queue;
     s_sid = sid;
     s_rid = rid;
     s_now = now;
@@ -296,7 +299,7 @@ bool ui_voice_tick(uint32_t now)
         if (el >= NAV_HOLD_MS) {
             s_holding = s_ramp_started = false;
             hold_progress(0);
-            g_ui_actions->dictate(s_sid, s_rid, voice_aid(), el);
+            g_ui_actions->dictate(s_sid, s_rid, voice_aid(), el, s_queue);
             return true;
         }
     }
@@ -315,7 +318,7 @@ void ui_voice_report(ui_report_t *r)
     if (st == VOICE_TEXT) ui_report_add(r, "(transcript)");
     if (st == VOICE_FAILED) ui_report_add(r, "%s", s_reason_txt);
     if (st == VOICE_TEXT && !s_read_all) ui_report_add(r, "More %d/%d", s_page_i + 1, s_pages); /* the button */
-    else if (st == VOICE_TEXT || st == VOICE_FAILED) ui_report_add(r, "%s", st == VOICE_TEXT ? "Send" : "Try again");
+    else if (st == VOICE_TEXT || st == VOICE_FAILED) ui_report_add(r, "%s", st == VOICE_TEXT ? (s_queue ? "Queue" : "Send") : "Try again");
 }
 
 static lv_obj_t *label(lv_obj_t *parent, const lv_font_t *f, lv_color_t col, int cy, int w, int lines)

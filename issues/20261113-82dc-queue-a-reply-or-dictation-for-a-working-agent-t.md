@@ -43,3 +43,4 @@ Design (proto 0.17, PROTOCOL.md §6d):
 
 - 2026-11-13T00:16:48Z · copilot-cli/opus@mac-work · macos-arm64 · d1ad260+dirty: filed
 - 2026-11-13T00:16:53Z · copilot-cli/opus@mac-work · macos-arm64 · d1ad260+dirty: claimed
+- 2026-11-13T00:25:25Z · copilot-cli/opus@mac-work · macos-arm64 · e48296b+dirty: daemon: queue.rs (one delivery task on registry updates, settle 2 s, retry only on the session's next state change), set_qd, QUEUE_MINOR 17, qd redacted in trace, '…' under meta. watch: Queue reply / Cancel queued in agent menu, voice Queue mode, 'Queued: …' line, hello 0.17; sims queue_reply/queue_dictate/queue_show_cancel. Checks: cargo 329 pass; sim 171/171; idf build + check_dram free 183509 B; vectors unchanged; atlas 192/192.

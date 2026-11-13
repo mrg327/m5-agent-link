@@ -153,6 +153,7 @@ static void place_toast(void)
 /* The session WATCH was on when ASK or SCROLL took over; they return there instead of HOME. */
 static uint32_t s_resume_watch_sid;
 static uint32_t s_voice_rid; /* the request VOICE answers (ui_go_voice) */
+static bool s_voice_queue;   /* VOICE queues the dictation (ui_go_voice) */
 
 static void enter_mode(nav_mode_t m)
 {
@@ -175,7 +176,7 @@ static void enter_mode(nav_mode_t m)
         ui_status_open(s_now_ms);
     }
     else if (m == MODE_WATCH) ui_watch_open(ui_home_sel_sid(), s_now_ms);
-    else if (m == MODE_VOICE) ui_voice_open(ui_home_sel_sid(), s_voice_rid, s_now_ms);
+    else if (m == MODE_VOICE) ui_voice_open(ui_home_sel_sid(), s_voice_rid, s_voice_queue, s_now_ms);
     else if (m == MODE_KEYS) ui_keys_open(ui_home_sel_sid(), s_now_ms);
     else ui_home_refresh(s_now_ms); /* the ring shows sessions again */
     if (m != MODE_HOME && m != MODE_KEYS) { /* deeper modes rise into place; KEYS records strokes at once */
@@ -211,9 +212,10 @@ void ui_go_back(void)
     g_ui_actions->tick();
 }
 void ui_go_watch(void) { enter_mode(MODE_WATCH); }
-void ui_go_voice(uint32_t rid)
+void ui_go_voice(uint32_t rid, bool queue)
 {
     s_voice_rid = rid;
+    s_voice_queue = queue;
     enter_mode(MODE_VOICE);
 }
 void ui_go_keys(void) { enter_mode(MODE_KEYS); }

@@ -181,8 +181,9 @@ static bool finish_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_m
     uint8_t buf[64];
     size_t len = 0;
     if (cbor_encode_envelope(buf, sizeof buf, &g_tx_env, &len) != ZCBOR_SUCCESS) return false;
-    dbg_event("link", "tx_cmd", "\"id\":%u,\"op\":%d,\"sid\":%u,\"rid\":%u,\"hold_ms\":%u,\"arg\":%d", (unsigned)id,
-              (int)op, (unsigned)sid, (unsigned)rid, (unsigned)hold_ms, arg_log);
+    dbg_event("link", "tx_cmd", "\"id\":%u,\"op\":%d,\"sid\":%u,\"rid\":%u,\"hold_ms\":%u,\"arg\":%d,\"q\":%d",
+              (unsigned)id, (int)op, (unsigned)sid, (unsigned)rid, (unsigned)hold_ms, arg_log,
+              m->msg_cmd_cmd_m.cmd_uint6bool_present && m->msg_cmd_cmd_m.cmd_uint6bool.cmd_uint6bool);
     return hal_link_send(g_link.kind, buf, len);
 }
 
@@ -200,6 +201,18 @@ bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg, u
     c->cmd_arg_m.cmd_arg_m.cmd_arg_choice = cmd_arg_uint_c;
     c->cmd_arg_m.cmd_arg_m.cmd_arg_uint = arg;
     return finish_cmd(op, sid, rid, hold_ms, (int)arg);
+}
+
+bool link_send_cmd_queued(link_op_t op, uint32_t sid, uint32_t arg, uint32_t hold_ms)
+{
+    struct cmd *c = begin_cmd(op, sid, 0, hold_ms);
+    if (!c) return false;
+    c->cmd_arg_m_present = true;
+    c->cmd_arg_m.cmd_arg_m.cmd_arg_choice = cmd_arg_uint_c;
+    c->cmd_arg_m.cmd_arg_m.cmd_arg_uint = arg;
+    c->cmd_uint6bool_present = true;
+    c->cmd_uint6bool.cmd_uint6bool = true;
+    return finish_cmd(op, sid, 0, hold_ms, (int)arg);
 }
 
 bool link_send_approve_rule(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32_t rh)

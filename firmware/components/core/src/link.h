@@ -13,7 +13,8 @@ typedef enum {
     LINK_OP_FOCUS = 0, LINK_OP_ACK = 1, LINK_OP_SNOOZE = 2, LINK_OP_APPROVE = 3, LINK_OP_DENY = 4,
     LINK_OP_REPLY = 5, LINK_OP_CANCEL = 6, LINK_OP_DETAIL = 7, LINK_OP_NOTIFY_DONE = 8, LINK_OP_SCROLL = 10, LINK_OP_TYPE = 11,
     LINK_OP_DICTATE = 12, LINK_OP_KB_PICK = 13, LINK_OP_KB_DEL = 14, LINK_OP_KB_SEND = 15, LINK_OP_KB_END = 16,
-    LINK_OP_RERUN = 17 /* JOBS: run a finished job again */
+    LINK_OP_RERUN = 17, /* JOBS: run a finished job again */
+    LINK_OP_UNQUEUE = 18 /* proto 0.17: drop the session's queued message */
 } link_op_t;
 #define LINK_OP_UNKNOWN (-1)
 
@@ -67,6 +68,8 @@ bool link_send_log(int lvl, const char *msg);
 bool link_send_kb_start(uint32_t kid, uint32_t sid, const uint8_t *keys, size_t len);
 bool link_send_kb_stroke(uint32_t kid, uint32_t seq, const uint8_t *pts, size_t len);
 bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg, uint32_t hold_ms);
+/* type / dictate with q: the daemon queues it when the session cannot take input now (proto 0.17; never a rid). */
+bool link_send_cmd_queued(link_op_t op, uint32_t sid, uint32_t arg, uint32_t hold_ms);
 /* cmd_op_approve with rh (proto 0.13, STANDING-RULES.md): approve and save the standing rule whose hash is rh. */
 bool link_send_approve_rule(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32_t rh);
 /* cmd_op_scroll with scroll_arg {unit, delta, seq}; unit is a nav_scroll_unit_t wire value. */

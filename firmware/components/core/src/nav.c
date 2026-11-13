@@ -168,12 +168,12 @@ int nav_scroll_lines(int dy_px)
     return dy_px / GESTURE_DRAG_STEP_PX * NAV_SCROLL_LINES_PER_STEP;
 }
 
-int nav_agent_items(sess_state_t state, bool typing, bool replies, agent_item_t *out, int cap)
+int nav_agent_items(sess_state_t state, bool typing, bool replies, bool queue_ok, bool queued, agent_item_t *out, int cap)
 {
     /* UI-V2 §4.2: Focus is button A on HOME and WATCH, Status the swipe down on HOME, so neither takes
      * a row; a session that waits for input keeps Focus. Quick replies and Interrupt need a daemon that
      * types into terminals (issue b150). */
-    agent_item_t list[5];
+    agent_item_t list[7];
     int n = 0;
     bool reply = typing && replies;
 #define ADD(id, hold) list[n++] = (agent_item_t){(id), (hold)}
@@ -197,9 +197,13 @@ int nav_agent_items(sess_state_t state, bool typing, bool replies, agent_item_t 
     default:
         ADD(AG_NOTIFY, false);
         ADD(AG_SNOOZE, false);
+        if (queue_ok) ADD(AG_QUEUE, false);
+        if (queued) ADD(AG_UNQUEUE, false);
         if (typing) ADD(AG_INTERRUPT, true);
+        queued = false;
         break;
     }
+    if (queued) ADD(AG_UNQUEUE, false);
 #undef ADD
     int k = 0;
     for (int i = 0; i < n && k < cap; i++) out[k++] = list[i];

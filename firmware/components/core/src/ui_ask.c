@@ -527,7 +527,7 @@ static void commit(const attention_t *a, int idx, uint32_t hold_ms)
             g_ui_actions->reject();
         break;
     case ASK_DENY: g_ui_actions->deny(s_sid, a->rid); break;
-    case ASK_DICTATE: ui_go_voice(a->rid); break;
+    case ASK_DICTATE: ui_go_voice(a->rid, false); break;
     case ASK_OPEN_PC: /* the terminal shows its prompt at once (proto 0.11): the request is handed back */
         g_ui_actions->open_request(s_sid, a->rid);
         ui_go_home();

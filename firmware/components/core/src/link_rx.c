@@ -24,6 +24,17 @@ static const struct hdr_r *env_hdr(const struct envelope_r *e)
     return NULL;
 }
 
+/* A copy cut at the buffer's end may stop inside a multi-byte character: drop the stub. */
+static void utf8_drop_partial(char *s)
+{
+    size_t n = strlen(s), i = n;
+    while (i > 0 && ((uint8_t)s[i - 1] & 0xc0) == 0x80) i--;
+    if (i == 0) return;
+    uint8_t lead = (uint8_t)s[i - 1];
+    size_t need = lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : lead >= 0xc0 ? 2 : 1;
+    if (n - (i - 1) < need) s[i - 1] = 0;
+}
+
 /* Wire session → model session; returns the mask of fields that were present. */
 static uint32_t convert_session(const struct session *in, session_t *out)
 {
@@ -51,6 +62,11 @@ static uint32_t convert_session(const struct session *in, session_t *out)
     if (in->session_uint8uint_present) { out->tst = in->session_uint8uint.session_uint8uint; p |= SF_TST; }
     if (in->session_uint9tstr_present) { STR(in->session_uint9tstr.session_uint9tstr, out->summary); p |= SF_SUMMARY; }
     if (in->session_uint17tstr_present) { STR(in->session_uint17tstr.session_uint17tstr, out->q); p |= SF_Q; }
+    if (in->session_uint35tstr_present) {
+        STR(in->session_uint35tstr.session_uint35tstr, out->queued);
+        utf8_drop_partial(out->queued);
+        p |= SF_QD;
+    }
     if (in->session_tstr_l_present) {
         size_t n = in->session_tstr_l.session_tstr_l_tstr_count;
         for (size_t i = 0; i < n && i < 3; i++) STR(in->session_tstr_l.session_tstr_l_tstr[i], out->rp[i]);

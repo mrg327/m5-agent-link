@@ -39,6 +39,8 @@ pub struct Shared {
     pub stt: Option<crate::voice::Stt>,
     /// Transcripts waiting for the user's hold (`CmdOp::Dictate`), by recording id.
     pub transcripts: Mutex<crate::voice::Transcripts>,
+    /// Messages queued for sessions that cannot take input yet (queue.rs).
+    pub queue: crate::queue::Queue,
     pub host: HostInfo,
     /// Terminal commands shown as sessions (jobs.rs).
     pub jobs: Arc<crate::jobs::Jobs>,
@@ -72,6 +74,7 @@ impl Shared {
             replies: crate::typing::load_replies(&crate::paths::home()),
             stt: crate::voice::Stt::find(),
             transcripts: Mutex::default(),
+            queue: crate::queue::Queue::default(),
             host: host_info(),
             devices: Mutex::default(),
             ota: Arc::new(crate::ota::Ota::new(ota_trace)),
@@ -190,6 +193,14 @@ impl Conn {
         // `meta` does not withhold them; no file name is ever sent.
         if self.peer_minor < SUMMARY_MINOR {
             (s.fc, s.la, s.lr, s.tp, s.dur) = (None, None, None, None, None);
+        }
+        // the queued message's start: proto 0.17, agent content (`…` under meta: something is queued)
+        if self.peer_minor < QUEUE_MINOR {
+            s.qd = None;
+        } else if self.privacy == Privacy::Meta {
+            s.qd =
+                s.qd.take()
+                    .map(|q| if q.is_empty() { q } else { "…".into() });
         }
         if self.privacy == Privacy::Meta {
             s.sum = None;
@@ -368,6 +379,8 @@ const SUMMARY_MINOR: u64 = 14;
 pub const FW_MINOR: u64 = 15;
 /// A transcript of up to 2047 bytes (`voice::MAX_TEXT_BYTES`, issue f97a); older devices hold 255.
 const LONG_TRANSCRIPT_MINOR: u64 = 16;
+/// Queued messages: `session.qd`, `cmd.q` and `cmd unqueue` (PROTOCOL §6d).
+const QUEUE_MINOR: u64 = 17;
 
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
@@ -1122,6 +1135,22 @@ async fn handle_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
                 None => fail(ResultErr::Stale, "unknown session"),
             }
         }
+        CmdOp::Unqueue => {
+            let res = match cmd.sid {
+                Some(sid) if shared.queue.remove(sid) => {
+                    shared.registry.set_qd(sid, "");
+                    CmdResult::ok()
+                }
+                _ => fail(ResultErr::Stale, "nothing queued"),
+            };
+            shared.trace.audit(
+                "unqueue",
+                cmd.sid,
+                None,
+                json!({"cmd": detail, "ok": res.ok}),
+            );
+            res
+        }
         CmdOp::Type | CmdOp::Cancel | CmdOp::Dictate => type_cmd(shared, cmd).await,
         _ => fail(ResultErr::Unsupported, "command not implemented"),
     }
@@ -1185,6 +1214,14 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         Route::Unknown => return fail(ResultErr::Stale, "unknown session"),
         Route::Unsupported => return fail(ResultErr::Unsupported, "no terminal for this session"),
     };
+    let queueing = cmd.q == Some(true) && matches!(cmd.op, CmdOp::Type | CmdOp::Dictate);
+    if queueing && cmd.rid.is_some() {
+        return fail(ResultErr::Denied, "a queued message answers no request");
+    }
+    // a queued message waits for a session that cannot take input now; otherwise it types at once
+    let busy =
+        queueing && !crate::queue::can_take_input(&session, shared.broker.open_for(session.sid));
+    let mut source = String::new();
     let text = if cmd.op == CmdOp::Dictate {
         // a transcript is the user's own words, sent only after a hold, like an approval
         if cmd.hold_ms.unwrap_or(0) < MIN_APPROVE_HOLD_MS {
@@ -1198,9 +1235,13 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
             // an answer to that card (a form's free-text field), not a new prompt
             return dictate_answer(shared, &detail, session.sid, rid, aid);
         }
-        if let Some(why) = crate::typing::refusal(&session, shared.broker.open_for(session.sid)) {
-            return fail(ResultErr::Denied, why);
+        if !busy {
+            if let Some(why) = crate::typing::refusal(&session, shared.broker.open_for(session.sid))
+            {
+                return fail(ResultErr::Denied, why);
+            }
         }
+        source = format!("recording {aid}");
         let Some(text) = shared.transcripts.lock().unwrap().take(aid, session.sid) else {
             return fail(ResultErr::Stale, "no transcript for that recording");
         };
@@ -1220,8 +1261,14 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         let Some(text) = text else {
             return fail(ResultErr::Denied, "no such reply");
         };
-        if let Some(why) = crate::typing::refusal(&session, shared.broker.open_for(session.sid)) {
-            return fail(ResultErr::Denied, why);
+        if !busy {
+            if let Some(why) = crate::typing::refusal(&session, shared.broker.open_for(session.sid))
+            {
+                return fail(ResultErr::Denied, why);
+            }
+        }
+        if let Some(Arg::Uint(i)) = cmd.arg {
+            source = format!("reply {i}");
         }
         Some(text)
     } else {
@@ -1230,6 +1277,9 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         }
         None
     };
+    if let (true, Some(text)) = (busy, &text) {
+        return queue_message(shared, cmd, &ctx, text, source).await;
+    }
     let term = shared.term.clone();
     let res = tokio::task::spawn_blocking(move || match text {
         Some(t) => crate::typing::type_reply(term.as_ref(), &ctx, &t),
@@ -1249,6 +1299,37 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         json!({"cmd": detail, "ok": res.is_ok()}),
     );
     typing_result(res)
+}
+
+/// Holds `text` until the session can take input (queue.rs). The terminal must at least be one
+/// that can be typed into, so a hopeless queue fails now.
+async fn queue_message(
+    shared: &Shared,
+    cmd: &Cmd,
+    ctx: &crate::registry::HostCtx,
+    text: &str,
+    source: String,
+) -> CmdResult {
+    let (term, probe) = (shared.term.clone(), ctx.clone());
+    let screen = tokio::task::spawn_blocking(move || term.read_screen(&probe))
+        .await
+        .unwrap_or(Err(FocusError::Internal("typing task failed".into())));
+    if matches!(screen, Err(FocusError::Unsupported)) {
+        return fail(ResultErr::Unsupported, "this terminal cannot be typed into");
+    }
+    let Some(sid) = cmd.sid else {
+        return fail(ResultErr::Stale, "unknown session");
+    };
+    shared.queue.put(sid, text.to_owned(), source.clone());
+    shared.registry.set_qd(sid, &crate::queue::preview(text));
+    // the source (reply index or recording), never the text
+    shared.trace.audit(
+        "queue",
+        cmd.sid,
+        None,
+        json!({"cmd": serde_json::to_value(cmd).unwrap_or_default(), "source": source}),
+    );
+    CmdResult::ok()
 }
 
 fn typing_result(res: std::result::Result<(), String>) -> CmdResult {
@@ -1640,6 +1721,215 @@ mod tests {
         let r = handle_cmd(&shared, &type_cmd_of(CmdOp::Type, sid, Some(0), None)).await;
         assert!(!r.ok && r.err == Some(ResultErr::Denied), "{r:?}");
         assert!(term.sent.lock().unwrap().is_empty(), "nothing typed");
+    }
+
+    fn set_state(shared: &Shared, st: SessState) {
+        use crate::registry::{SessionEvent, SessionPatch};
+        let mut p = SessionPatch::new(Agent::Claude);
+        p.state = Some(st);
+        shared.registry.apply(SessionEvent::Update {
+            key: "claude:s".into(),
+            via: crate::registry::Via::Local,
+            patch: p,
+            ctx: crate::registry::HostCtx::default(),
+        });
+    }
+
+    fn qd_of(shared: &Shared, sid: u64) -> Option<String> {
+        shared
+            .registry
+            .snapshot()
+            .into_iter()
+            .find(|s| s.sid == sid)?
+            .qd
+    }
+
+    fn queue_cmd(op: CmdOp, sid: u64, arg: Option<u64>) -> Cmd {
+        Cmd {
+            q: Some(true),
+            ..type_cmd_of(op, sid, arg, Some(1250))
+        }
+    }
+
+    #[tokio::test]
+    async fn a_reply_queued_while_working_waits_and_shows_its_start() {
+        let term = Arc::new(FakeTerm::default());
+        let shared = shared_typing(term.clone());
+        let sid = add_session(&shared);
+        let r = handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(1))).await;
+        assert!(r.ok, "{r:?}");
+        assert!(term.sent.lock().unwrap().is_empty(), "not typed yet");
+        assert_eq!(qd_of(&shared, sid).as_deref(), Some("Run the tests"));
+        let r = handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(0))).await;
+        assert!(r.ok);
+        assert_eq!(
+            qd_of(&shared, sid).as_deref(),
+            Some("Continue"),
+            "a new one replaces the old"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_queued_reply_for_an_idle_session_types_at_once() {
+        let term = Arc::new(FakeTerm::default());
+        let shared = shared_typing(term.clone());
+        let sid = add_session(&shared);
+        set_state(&shared, SessState::Done);
+        let r = handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(0))).await;
+        assert!(r.ok, "{r:?}");
+        assert_eq!(*term.sent.lock().unwrap(), vec!["Continue", "\\r"]);
+        assert_eq!(qd_of(&shared, sid), None);
+    }
+
+    #[tokio::test]
+    async fn queueing_for_a_request_is_denied() {
+        let shared = shared_typing(Arc::new(FakeTerm::default()));
+        let sid = add_session(&shared);
+        let mut cmd = queue_cmd(CmdOp::Type, sid, Some(0));
+        cmd.rid = Some(7);
+        let r = handle_cmd(&shared, &cmd).await;
+        assert!(!r.ok && r.err == Some(ResultErr::Denied), "{r:?}");
+        assert_eq!(qd_of(&shared, sid), None);
+    }
+
+    #[tokio::test]
+    async fn queued_dictation_takes_the_transcript_now() {
+        let term = Arc::new(FakeTerm::default());
+        let shared = shared_typing(term.clone());
+        let sid = add_session(&shared);
+        let r = handle_cmd(&shared, &queue_cmd(CmdOp::Dictate, sid, Some(9))).await;
+        assert!(!r.ok && r.err == Some(ResultErr::Stale), "no transcript");
+        shared
+            .transcripts
+            .lock()
+            .unwrap()
+            .put(9, Some(sid), "fix the\nbug".into());
+        let r = handle_cmd(&shared, &queue_cmd(CmdOp::Dictate, sid, Some(9))).await;
+        assert!(r.ok, "{r:?}");
+        assert_eq!(qd_of(&shared, sid).as_deref(), Some("fix the bug"));
+        assert!(shared.transcripts.lock().unwrap().take(9, sid).is_none());
+    }
+
+    #[tokio::test]
+    async fn unqueue_clears_the_message_and_is_stale_without_one() {
+        let shared = shared_typing(Arc::new(FakeTerm::default()));
+        let sid = add_session(&shared);
+        let un = type_cmd_of(CmdOp::Unqueue, sid, None, None);
+        let r = handle_cmd(&shared, &un).await;
+        assert!(!r.ok && r.err == Some(ResultErr::Stale));
+        handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(0))).await;
+        let r = handle_cmd(&shared, &un).await;
+        assert!(r.ok, "{r:?}");
+        assert_eq!(qd_of(&shared, sid).as_deref(), Some(""));
+        assert!(shared.queue.is_empty_for(sid));
+        let r = handle_cmd(&shared, &type_cmd_of(CmdOp::Unqueue, 999, None, None)).await;
+        assert!(!r.ok && r.err == Some(ResultErr::Stale));
+    }
+
+    #[tokio::test]
+    async fn a_queued_message_is_typed_once_when_the_session_can_take_input() {
+        let term = Arc::new(FakeTerm::default());
+        let shared = shared_typing(term.clone());
+        crate::queue::spawn_delivery(shared.clone(), std::time::Duration::from_millis(20));
+        let sid = add_session(&shared);
+        handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(1))).await;
+        set_state(&shared, SessState::Work);
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+        assert!(term.sent.lock().unwrap().is_empty(), "still working");
+        set_state(&shared, SessState::Done);
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        assert_eq!(*term.sent.lock().unwrap(), vec!["Run the tests", "\\r"]);
+        assert_eq!(qd_of(&shared, sid).as_deref(), Some(""));
+        set_state(&shared, SessState::Idle);
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+        assert_eq!(term.sent.lock().unwrap().len(), 2, "not typed twice");
+    }
+
+    #[tokio::test]
+    async fn a_refused_delivery_keeps_the_message() {
+        #[derive(Default)]
+        struct Dialog {
+            reads: std::sync::atomic::AtomicUsize,
+        }
+        impl Terminal for Dialog {
+            fn read_screen(&self, _: &crate::registry::HostCtx) -> Result<String, FocusError> {
+                self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok("❯ 1. Yes\n  2. No".into())
+            }
+            fn send_keys(&self, _: &crate::registry::HostCtx, _: &str) -> Result<(), FocusError> {
+                panic!("typed into a dialog");
+            }
+        }
+        let mut shared = Arc::try_unwrap(shared_typing(Arc::new(FakeTerm::default())))
+            .ok()
+            .unwrap();
+        let dialog = Arc::new(Dialog::default());
+        shared.term = dialog.clone();
+        let shared = Arc::new(shared);
+        crate::queue::spawn_delivery(shared.clone(), std::time::Duration::from_millis(20));
+        let sid = add_session(&shared);
+        handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(0))).await;
+        set_state(&shared, SessState::Done);
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        assert!(!shared.queue.is_empty_for(sid), "kept for the next change");
+        assert_eq!(qd_of(&shared, sid).as_deref(), Some("Continue"));
+        let tries = || dialog.reads.load(std::sync::atomic::Ordering::SeqCst);
+        let first = tries();
+        // an unrelated update does not retry
+        shared.registry.set_qd(sid, "Continue ");
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert_eq!(tries(), first, "no retry without a state change");
+        set_state(&shared, SessState::Work);
+        set_state(&shared, SessState::Done);
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        assert!(tries() > first, "retried after the next state change");
+    }
+
+    #[test]
+    fn the_queued_start_reaches_only_devices_that_know_it() {
+        let mut s = Session::delta(1);
+        s.qd = Some("fix the bug".into());
+        for (minor, privacy, want) in [
+            (16, Privacy::Preview, None),
+            (17, Privacy::Preview, Some("fix the bug")),
+            (17, Privacy::Meta, Some("…")),
+        ] {
+            let (_tx, rx) = mpsc::unbounded_channel();
+            let (tx, _rx) = mpsc::unbounded_channel();
+            let c = Conn {
+                link: Box::new(ChanLink { rx, tx }),
+                trace: Trace::null(),
+                src: "t".into(),
+                next_id: 1,
+                privacy,
+                peer_minor: minor,
+                dictate: false,
+                deltas: DeltaQueue::default(),
+                hidden: HashSet::new(),
+                linked: None,
+            };
+            assert_eq!(c.for_peer(s.clone()).qd.as_deref(), want, "minor {minor}");
+        }
+        let (_tx, rx) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let c = Conn {
+            link: Box::new(ChanLink { rx, tx }),
+            trace: Trace::null(),
+            src: "t".into(),
+            next_id: 1,
+            privacy: Privacy::Meta,
+            peer_minor: 17,
+            dictate: false,
+            deltas: DeltaQueue::default(),
+            hidden: HashSet::new(),
+            linked: None,
+        };
+        s.qd = Some(String::new());
+        assert_eq!(
+            c.for_peer(s).qd.as_deref(),
+            Some(""),
+            "cleared stays cleared"
+        );
     }
 
     #[tokio::test]

@@ -149,6 +149,7 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
     }
     if (present & SF_OK) dst->step = src->step;
     if (present & SF_Q) memcpy(dst->q, src->q, sizeof dst->q);
+    if (present & SF_QD) memcpy(dst->queued, src->queued, sizeof dst->queued);
     if (present & SF_RP) {
         memcpy(dst->rp, src->rp, sizeof dst->rp);
         dst->n_rp = src->n_rp;

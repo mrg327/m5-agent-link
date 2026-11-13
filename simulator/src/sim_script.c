@@ -31,6 +31,7 @@
  *   step SID N [ok|fail] [TOOL · ARG...]   a delta with a new step count n (and its result ok): the step timeline
  *   snooze SID UNIX|off             a delta with snz (snoozed until UNIX, 0 = off)
  *   notify SID on|off               a delta with ntf (notify when done armed)
+ *   queued SID TEXT|off             a delta with qd (the queued message's start; off = "")
  *   rtc UNIX                        set the RTC (0 = clock unknown)
  *   clear RID [answered_pc|answered_dev|expired|cancelled|handed_back]
  *   attention_win LEFT_MS WIN_MS LEN|auto|- RID SID KIND ACTS GRANT_MASK TITLE|TEXT|...
@@ -290,7 +291,7 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "usage") && arg[0]) {
         add(*t, E_USAGE, 0, 0, 0, arg);
         *t += 50;
-    } else if ((!strcmp(cmd, "step") || !strcmp(cmd, "snooze") || !strcmp(cmd, "notify")) && arg[0]) {
+    } else if ((!strcmp(cmd, "step") || !strcmp(cmd, "snooze") || !strcmp(cmd, "notify") || !strcmp(cmd, "queued")) && arg[0]) {
         char line[160];
         snprintf(line, sizeof line, "%s %s", cmd, arg);
         add(*t, E_DELTA, 0, 0, 0, line);
@@ -697,6 +698,11 @@ static void run_delta(const char *spec)
         sscanf(spec, "%*s %*u %15s", w);
         d.ntf = !strcmp(w, "on");
         present |= SF_NTF;
+    } else if (!strcmp(cmd, "queued")) {
+        int off = 0;
+        sscanf(spec, "%*s %*u %n", &off);
+        if (strcmp(spec + off, "off")) snprintf(d.queued, sizeof d.queued, "%s", spec + off);
+        present |= SF_QD;
     }
     model_upsert(&d, present);
 }

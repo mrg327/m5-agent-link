@@ -16,8 +16,9 @@ use std::sync::{Arc, Mutex};
 pub fn redact_sum(v: &mut Value) -> bool {
     let mut hit = false;
     if let Some(o) = v.as_object_mut() {
-        // sum: command lines and paths; q / rp: the agent's closing question and its answers
-        for k in ["sum", "q", "rp"] {
+        // sum: command lines and paths; q / rp: the agent's closing question and its answers;
+        // qd: the start of a queued message
+        for k in ["sum", "q", "rp", "qd"] {
             if o.contains_key(k) {
                 o.insert(k.into(), "<private>".into());
                 hit = true;

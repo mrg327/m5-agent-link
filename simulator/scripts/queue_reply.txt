@@ -1,0 +1,27 @@
+# Queued messages (proto 0.17, issue 82dc). A working session offers "Queue reply" after Snooze when
+# the daemon is 0.17+ and can type. It opens the quick-reply list in queue mode (the fixed replies and
+# Dictate); picking one sends cmd type (op 11) with q true and no rid.
+connect
+rx a400020101020103a60082001101a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 1 work webapp feat/login Running the test suite
+wait 300
+tap 233 233
+wait 300
+expect_screen agent
+expect_label 5 items
+btn B
+wait 150
+btn B
+wait 150
+btn B
+wait 150
+expect_label > Queue reply
+btn A
+wait 200
+expect_label Queue for webapp
+expect_label > Continue
+expect_label Dictate
+btn A
+wait 300
+expect_screen ring
+quit
