@@ -43,3 +43,4 @@ Plan: agentlink-hook reads the tail of the transcript on `agentStop` and passes 
     - os: macOS 26.5 (Darwin 25.5.0)
     - git: 779794c main
     - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74
+- 2026-11-13T22:38:55Z · copilot-cli/opus@mac-work · macos-arm64 · 9e1fc0d: Live check: the watch showed no Copilot last message because the installed hooks were stale (~/.cargo/bin/agentlink-hook built just before 779794c, and the remote copies in ~/.agentlink/dist from Nov 9). Reinstalled locally, rebuilt both dist hooks and re-ran agentlink remote setup for both remotes. A replayed agentStop now carries last_assistant_message and the session gets its preview; in autopilot the text comes from session.task_complete, which is written before agentStop fires.
