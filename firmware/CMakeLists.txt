@@ -67,3 +67,21 @@ list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_BINARY_DIR}/sdkconfig.signing")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(agentlink)
+
+# Delta OTA (issue ef2c): each signed image built here is kept in $AGENTLINK_HOME/fw (default ~/.agentlink/fw),
+# where agentlinkd finds the image a watch runs and sends only a patch against it. AGENTLINK_FW_CACHE=0 turns it off.
+if(TARGET app AND NOT "$ENV{AGENTLINK_FW_CACHE}" STREQUAL "0" AND NOT AGENTLINK_NO_CORE)
+    if(DEFINED ENV{AGENTLINK_HOME})
+        set(_fw_cache "$ENV{AGENTLINK_HOME}/fw")
+    else()
+        set(_fw_cache "$ENV{HOME}/.agentlink/fw")
+    endif()
+    add_custom_target(fw_cache ALL
+        COMMAND ${CMAKE_COMMAND} -DBIN=${CMAKE_BINARY_DIR}/${PROJECT_NAME}.bin -DDIR=${_fw_cache}
+                -P ${CMAKE_CURRENT_LIST_DIR}/tools/fw_cache.cmake
+        VERBATIM)
+    add_dependencies(fw_cache app)
+    if(TARGET flash)
+        add_dependencies(flash fw_cache)
+    endif()
+endif()

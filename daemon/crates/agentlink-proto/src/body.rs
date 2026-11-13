@@ -535,7 +535,7 @@ body!(FwBegin {
     #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] patch: Option<FwPatch>,
 });
 body!(
-    /// A detools sequential patch (bsdiff, heatshrink 8/7) against the first `bsize` bytes of the device's
+    /// A detools sequential patch (bsdiff, heatshrink 11/10) against the first `bsize` bytes of the device's
     /// running app slot, whose SHA-256 is `base`.
     FwPatch {
         #[n(0)] psize: u64,

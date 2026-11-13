@@ -2,7 +2,7 @@
 # dependencies = ["detools==0.53.1"]
 # ///
 """Delta-OTA fixture (issue ef2c): base.bin -> new.bin, and python.patch made by the reference detools
-(sequential, bsdiff, heatshrink window 8 lookahead 7). Device and daemon tests apply every *.patch here to
+(sequential, bsdiff, heatshrink window 11 lookahead 10). Device and daemon tests apply every *.patch here to
 base.bin and expect new.bin. Regenerate: uv run protocol/fixtures/ota/gen.py (from this directory)."""
 # Deterministic synthetic "firmware" pair for delta-OTA tests; patch made by the reference detools.
 import random, struct, io, detools, hashlib
@@ -22,7 +22,7 @@ for i in range(20000, len(new) - 4, 64):          # shifted pointers
 del new[45000:45100]                              # removed code
 new += b'\x00' * 7 + blob(93)                     # odd tail
 p = io.BytesIO()
-detools.create_patch(io.BytesIO(bytes(base)), io.BytesIO(bytes(new)), p, compression='heatshrink')
+detools.create_patch(io.BytesIO(bytes(base)), io.BytesIO(bytes(new)), p, compression='heatshrink', heatshrink_window_sz2=11, heatshrink_lookahead_sz2=10)
 open('base.bin','wb').write(base); open('new.bin','wb').write(new); open('python.patch','wb').write(p.getvalue())
 assert detools.apply_patch(io.BytesIO(bytes(base)), io.BytesIO(p.getvalue()), io.BytesIO()) == len(new)
 print(len(base), len(new), len(p.getvalue()), hashlib.sha256(new).hexdigest())

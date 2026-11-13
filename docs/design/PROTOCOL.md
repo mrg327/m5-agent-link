@@ -349,8 +349,9 @@ st: go 0 | done 1 | busy 2 | bad 3 | fail 4 | stopped 5
 - **Delta update (proto 0.21, issue ef2c).** To a device with proto ≥ 0.21 the daemon may send a patch
   instead of the image: `fw_begin.patch` gives the patch length (`psize`) and the base it applies to, the first
   `bsize` bytes of the device's running app slot, by SHA-256 (`base`). `size` and `sha` still describe the
-  rebuilt image. The patch is a detools sequential patch (bsdiff, heatshrink window 8 lookahead 7, the format of
-  Espressif's esp_delta_ota). The device hashes its base before it answers; on a mismatch it acks `bad`
+  rebuilt image. The patch is a detools sequential patch (bsdiff, heatshrink window 11 lookahead 10: the format
+  of Espressif's esp_delta_ota with longer matches, so a 1.3 MB image that barely changed costs 4 KB, not 21 KB).
+  The device hashes its base before it answers; on a mismatch it acks `bad`
   "Base mismatch" and the daemon starts again with the whole image. Otherwise `fw_chunk.off` and `fw_ack.next`
   count patch bytes; the device rebuilds the image into the spare slot as the patch arrives and checks it
   exactly as a whole image (`sha`, signature, rollback). A transfer resumes as before (same `sha`, `size`

@@ -530,7 +530,7 @@ fw_begin = {
   ? 3 => fw_patch          ; patch  (proto 0.21) the chunks carry a patch against the running image, not
                            ;        the image itself; `size` and `sha` still describe the rebuilt image
 }
-; A detools sequential patch (bsdiff, heatshrink window 8 lookahead 7). The device rebuilds the image from the
+; A detools sequential patch (bsdiff, heatshrink window 11 lookahead 10). The device rebuilds the image from the
 ; first `bsize` bytes of its running app slot; if their SHA-256 is not `base` it acks bad "Base mismatch".
 fw_patch = {
   0 => uint,               ; psize  the patch's length in bytes
