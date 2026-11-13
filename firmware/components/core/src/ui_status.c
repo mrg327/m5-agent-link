@@ -1,7 +1,7 @@
 /* The STATUS screen, the control centre (UI-V3 §4.6): the clock, one chip row for link and battery
- * (status by exception: amber only when the link is down), and three round toggles: Quiet, Mute, About.
- * nav.c still owns the five v2 rows and the quiet cycle; the toggles are the first two rows plus the
- * Privacy row, which stands for About (it only informs). A tap on a disc selects and commits it, A
+ * (status by exception: amber only when the link is down), and four round toggles: Quiet, Mute, Volume,
+ * About. nav.c still owns the five v2 rows and the quiet cycle; Quiet and Mute are its first two rows, the
+ * Privacy row stands for About (it only informs), and Volume steps the stored speaker level (prefs.h). A tap on a disc selects and commits it, A
  * commits the selected one, scrub and B move the selection. The ring keeps showing the sessions. */
 #include <stdio.h>
 #include <string.h>
@@ -9,6 +9,7 @@
 #include "debug.h"
 #include "hal.h"
 #include "nav.h"
+#include "prefs.h"
 #include "ui_gauges.h"
 #include "ui_internal.h"
 #include "ui_theme.h"
@@ -20,15 +21,18 @@
 #define TIME_Y_G 84
 #define CHIP_Y_G 120
 #define TOGGLE_Y 246
-#define TOGGLE_D 76
-#define TOGGLE_HIT 46 /* tap radius: a little beyond the disc */
+#define TOGGLE_D 64
+#define TOGGLE_HIT 40 /* tap radius: a little beyond the disc, half the pitch */
+#define VOL_R 25      /* the volume disc's level arc: centred on this radius, VOL_W wide, a 300° dial */
+#define VOL_W 4
+#define VOL_SPAN 300
 #define SEL_RING_D (TOGGLE_D + 2 * 7) /* 2 px ring, 5 px clear of the disc */
 #define DESC_Y 316
 #define RENDER_MS 1000 /* the clock, battery and quiet end are re-read this often while open */
-#define N_TOGGLES 3
-enum { T_QUIET, T_MUTE, T_ABOUT };
+#define N_TOGGLES 4
+enum { T_QUIET, T_MUTE, T_VOLUME, T_ABOUT };
 
-static const int16_t k_tx[N_TOGGLES] = {143, 233, 323};
+static const int16_t k_tx[N_TOGGLES] = {107, 191, 275, 359};
 static lv_obj_t *s_root, *s_time, *s_chips, *s_link, *s_batt, *s_ring, *s_disc[N_TOGGLES], *s_icon[N_TOGGLES], *s_desc;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static uint32_t s_now, s_last_input, s_last_render;
@@ -43,10 +47,10 @@ static void show(lv_obj_t *o, bool on)
     else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
 }
 
-/* Toggle i's v2 row (About stands for Privacy). */
+/* Toggle i's v2 row (About stands for Privacy; Volume has none: ST_COUNT matches no row). */
 static const status_item_t *item_of(int i)
 {
-    static const status_row_t want[N_TOGGLES] = {ST_QUIET, ST_SOUNDS, ST_PRIVACY};
+    static const status_row_t want[N_TOGGLES] = {ST_QUIET, ST_SOUNDS, ST_COUNT, ST_PRIVACY};
     for (int k = 0; k < s_n; k++)
         if (s_items[k].id == want[i]) return &s_items[k];
     return NULL;
@@ -60,12 +64,49 @@ static bool is_on(int i, uint32_t now)
 }
 
 /* The icon shows the current state, not the action: a bell while alerts are on, a crossed-out bell while
- * quiet runs; a speaker while sounds are on, a crossed-out speaker while they are off. */
+ * quiet runs; a speaker while sounds are on, a crossed-out speaker while they are off; Volume shows its
+ * level as a digit (the arc around it draws the same level). */
 static const char *icon_of(int i, bool on)
 {
+    static const char *const digits[PREFS_VOL_MAX + 1] = {"0", "1", "2", "3", "4", "5"};
     if (i == T_QUIET) return on ? ICON_QUIET : ICON_BELL;
     if (i == T_MUTE) return on ? ICON_MUTE : ICON_SOUND;
+    if (i == T_VOLUME) return digits[prefs_volume()];
     return ICON_INFO;
+}
+
+/* The level is what the speaker plays at only while sounds are on; otherwise the digit and arc go grey. */
+static bool volume_heard(void) { return model_settings()->alert == ALERT_FULL && prefs_volume() > 0; }
+
+/* The next level a commit sets: up one step, from the top back to 1 (0 is Mute's job). */
+static uint8_t volume_next(void) { return prefs_volume() >= PREFS_VOL_MAX ? 1 : (uint8_t)(prefs_volume() + 1); }
+
+static void vol_arc(lv_layer_t *l, int cx, int cy, int a0, int a1, lv_color_t c)
+{
+    if (a1 <= a0) return;
+    lv_draw_arc_dsc_t d;
+    lv_draw_arc_dsc_init(&d);
+    d.center.x = cx;
+    d.center.y = cy;
+    d.radius = (uint16_t)(VOL_R + VOL_W / 2);
+    d.width = VOL_W;
+    d.color = c;
+    d.rounded = 1;
+    d.start_angle = (lv_value_precise_t)((a0 + 360 + 270) % 360); /* degrees clockwise from 12 o'clock */
+    d.end_angle = (lv_value_precise_t)((a1 + 360 + 270) % 360);
+    lv_draw_arc(l, &d);
+}
+
+/* The volume disc's dial: a dim track with the gap at 6 o'clock, filled clockwise up to the level. */
+static void on_draw_volume(lv_event_t *e)
+{
+    lv_layer_t *l = lv_event_get_layer(e);
+    lv_area_t a;
+    lv_obj_get_coords(lv_event_get_target_obj(e), &a);
+    int cx = a.x1 + lv_area_get_width(&a) / 2, cy = a.y1 + lv_area_get_height(&a) / 2, a0 = 180 - VOL_SPAN / 2;
+    vol_arc(l, cx, cy, a0, a0 + VOL_SPAN, COL_FILL2);
+    if (prefs_volume())
+        vol_arc(l, cx, cy, a0, a0 + VOL_SPAN * prefs_volume() / PREFS_VOL_MAX, volume_heard() ? lv_color_hex(RGB_WORKING) : COL_TEXT3);
 }
 
 static void quiet_line(char *dst, size_t cap, uint32_t now)
@@ -88,6 +129,9 @@ static void describe(char *dst, size_t cap, uint32_t now)
         quiet_line(dst, cap, now);
     } else if (s_sel == T_MUTE) {
         snprintf(dst, cap, "%s", st->alert == ALERT_FULL ? "Sounds: on" : st->alert == ALERT_QUIET ? "Sounds: off" : "Silent");
+    } else if (s_sel == T_VOLUME) {
+        snprintf(dst, cap, "Volume %u of %u%s", (unsigned)prefs_volume(), (unsigned)PREFS_VOL_MAX,
+                 st->alert == ALERT_FULL ? "" : st->alert == ALERT_QUIET ? " (muted)" : " (silent)");
     } else {
         model_counts_t c = model_counts();
         /* Bounded by MODEL_MAX_SESSIONS; the clamp tells -O2's format check the line fits. */
@@ -112,6 +156,9 @@ static void update_badge(void)
         word = step == 1 ? "Quiet 30 min" : step == 2 ? "Quiet 1 h" : "Quiet off";
     } else if (s_sel == T_MUTE) {
         word = st->alert == ALERT_FULL ? "Mute" : "Unmute";
+    } else if (s_sel == T_VOLUME) {
+        static const char *const words[PREFS_VOL_MAX + 1] = {"Volume 0", "Volume 1", "Volume 2", "Volume 3", "Volume 4", "Volume 5"};
+        word = words[volume_next()];
     }
     show(s_badge[0], word != NULL);
     if (word && strcmp(word, s_word_txt)) {
@@ -200,6 +247,13 @@ static void render(void)
         const char *icon = icon_of(i, on);
         if (strcmp(lv_label_get_text(s_icon[i]), icon)) lv_label_set_text(s_icon[i], icon); /* only on a change */
     }
+    static int s_vol_drawn = -1; /* level and audibility the dial was last drawn with */
+    int vol = prefs_volume() | (volume_heard() ? 0x100 : 0);
+    if (vol != s_vol_drawn) {
+        s_vol_drawn = vol;
+        theme_set_text_color(s_icon[T_VOLUME], volume_heard() ? COL_TEXT : COL_TEXT3);
+        lv_obj_invalidate(s_disc[T_VOLUME]);
+    }
     int rx = k_tx[s_sel] - SEL_RING_D / 2;
     if (lv_obj_get_x(s_ring) != rx) lv_obj_set_x(s_ring, rx);
 
@@ -262,6 +316,16 @@ static void commit(int sel)
         dbg_event("ui", "sounds_set", "\"alert\":%d", (int)st->alert);
         model_settings_changed();
         g_ui_actions->tick();
+    } else if (sel == T_VOLUME) {
+        /* Changing the level means the user wants to hear it: like a phone, it also unmutes. */
+        prefs_set_volume(volume_next());
+        bool unmuted = st->alert != ALERT_FULL;
+        if (unmuted) {
+            st->alert = ALERT_FULL;
+            model_settings_changed();
+        }
+        dbg_event("ui", "volume_set", "\"step\":%u,\"unmuted\":%s", (unsigned)prefs_volume(), unmuted ? "true" : "false");
+        g_ui_actions->volume_changed();
     } else {
         return; /* About only informs */
     }
@@ -329,10 +393,10 @@ void ui_status_report(ui_report_t *r)
     const char *names[N_TOGGLES];
     for (int i = 0; i < N_TOGGLES; i++) {
         const char *ic = lv_label_get_text(s_icon[i]);
-        names[i] = !strcmp(ic, ICON_BELL) ? "bell" : !strcmp(ic, ICON_QUIET) ? "bell-slash" : !strcmp(ic, ICON_SOUND) ? "speaker"
-                   : !strcmp(ic, ICON_MUTE) ? "speaker-slash" : "info";
+        names[i] = i == T_VOLUME ? ic : !strcmp(ic, ICON_BELL) ? "bell" : !strcmp(ic, ICON_QUIET) ? "bell-slash"
+                   : !strcmp(ic, ICON_SOUND) ? "speaker" : !strcmp(ic, ICON_MUTE) ? "speaker-slash" : "info";
     }
-    ui_report_add(r, "icons %s %s %s", names[0], names[1], names[2]);
+    ui_report_add(r, "icons %s %s volume-%s %s", names[0], names[1], names[2], names[3]);
 }
 
 static lv_obj_t *centred(lv_obj_t *parent, const lv_font_t *font, lv_color_t col, int cy, int w, int lines)
@@ -391,11 +455,12 @@ lv_obj_t *ui_status_init(lv_obj_t *screen)
         lv_obj_set_style_bg_opa(s_disc[i], LV_OPA_COVER, 0);
         theme_set_bg_color(s_disc[i], COL_FILL1);
         s_icon[i] = lv_label_create(s_disc[i]);
-        lv_obj_set_style_text_font(s_icon[i], FONT_ICON_L, 0);
+        lv_obj_set_style_text_font(s_icon[i], i == T_VOLUME ? FONT_TITLE : FONT_ICON_L, 0);
         lv_obj_set_style_text_color(s_icon[i], COL_TEXT, 0);
         lv_label_set_text(s_icon[i], icon_of(i, false));
         lv_obj_center(s_icon[i]);
     }
+    lv_obj_add_event_cb(s_disc[T_VOLUME], on_draw_volume, LV_EVENT_DRAW_POST, NULL);
     s_ring = circle(s_root, SEL_RING_D);
     lv_obj_set_style_border_width(s_ring, 2, 0);
     lv_obj_set_style_border_color(s_ring, COL_TEXT, 0);

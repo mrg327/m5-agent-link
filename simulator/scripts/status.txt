@@ -1,6 +1,6 @@
 # STATUS (UI-V2 §4.5): swipe down from HOME opens it; link, battery and the rows are shown; A or a tap
-# commits the selected toggle (Quiet cycles off → 30 min → 1 h → off, Mute toggles); About does
-# nothing; every exit path (swipe up, B long, chord, timeout) returns to HOME.
+# commits the selected toggle (Quiet cycles off → 30 min → 1 h → off, Mute toggles, Volume steps 1-5);
+# About does nothing; every exit path (swipe up, B long, chord, timeout) returns to HOME.
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 session 1 work webapp feat/login Running the test suite
@@ -13,14 +13,18 @@ expect_screen status
 expect_label dev-mac
 expect_label 80%
 expect_label > Quiet: off
-# each icon shows the current state: a bell and a speaker while alerts and sounds are on
-expect_label icons bell speaker info
+# each icon shows the current state: a bell and a speaker while alerts and sounds are on; Volume its level
+expect_label icons bell speaker volume-5 info
 shot status.png
-# the selection walks Quiet, Mute, About; the description names the selected toggle
+# the selection walks Quiet, Mute, Volume, About; the description names the selected toggle
 btn B
 wait 150
 expect_label > Sounds: on
 shot status_mute.png
+btn B
+wait 150
+expect_label > Volume 5 of 5
+shot status_volume.png
 btn B
 wait 150
 expect_label > 2 sessions
@@ -35,31 +39,51 @@ expect_label > Quiet: off
 btn A
 wait 200
 expect_label > Quiet until
-expect_label icons bell-slash speaker info
+expect_label icons bell-slash speaker volume-5 info
 shot status_quiet.png
-tap 143 246
+tap 107 246
 wait 200
 expect_label > Quiet until
-tap 233 300
+tap 233 320
 wait 200
 expect_label > Quiet: off
-expect_label icons bell speaker info
+expect_label icons bell speaker volume-5 info
 btn A
 wait 200
 expect_label > Quiet until
-# Mute toggles; the rim scrubs the toggles; About commits to nothing
+# Mute toggles; Volume steps the level (wrapping from 5 to 1) and plays a preview; the rim scrubs the
+# toggles; About commits to nothing
 btn B
 wait 150
 expect_label > Sounds: on
 btn A
 wait 200
 expect_label > Sounds: off
-expect_label icons bell-slash speaker-slash info
+expect_label icons bell-slash speaker-slash volume-5 info
 shot status_muted.png
 btn A
 wait 200
 expect_label > Sounds: on
-expect_label icons bell-slash speaker info
+expect_label icons bell-slash speaker volume-5 info
+btn B
+wait 150
+expect_label > Volume 5 of 5
+btn A
+wait 300
+expect_label > Volume 1 of 5
+expect_label icons bell-slash speaker volume-1 info
+btn A
+wait 300
+expect_label > Volume 2 of 5
+shot status_volume_2.png
+# muted, the level reads as muted; stepping it unmutes (the user wants to hear it)
+tap 191 246
+wait 200
+expect_label > Sounds: off
+tap 275 246
+wait 300
+expect_label > Volume 3 of 5
+expect_label icons bell-slash speaker volume-3 info
 btn B
 wait 150
 expect_label > 2 sessions
@@ -71,17 +95,21 @@ scrub 300 250 400
 wait 150
 expect_screen status
 # a tap on a disc selects and commits it: Mute on, then off; a tap on Quiet's disc cycles it (30 min to 1 h)
-tap 233 246
+tap 191 246
 wait 200
 expect_label > Sounds: off
-tap 233 246
+btn B
+wait 150
+expect_label > Volume 3 of 5 (muted)
+shot status_volume_muted.png
+tap 191 246
 wait 200
 expect_label > Sounds: on
-tap 143 246
+tap 107 246
 wait 200
 expect_label > Quiet until
 shot status_quiet_on.png
-tap 323 246
+tap 359 246
 wait 200
 expect_label > 2 sessions
 # swipe up goes back; the deck shows quiet mode subtly

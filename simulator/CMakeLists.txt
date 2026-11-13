@@ -270,7 +270,9 @@ sim_script_test(sim_agent_row_tap agent_row_tap.txt
   PASS_REGULAR_EXPRESSION "\"op\":8,\"sid\":1,")
 # UI-V2 Phase 5: STATUS. Swipe down from HOME (never deny there), the rows, the quiet cycle and every
 # exit path; quiet mode holds the permission buzz until it is turned off again, then it buzzes.
-sim_script_test(sim_status status.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4")
+# Volume: each step sets the speaker and plays the preview there; a step while muted unmutes
+sim_script_test(sim_status status.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":4"
+                PASS_REGULAR_EXPRESSION "\"volume_set\",\"step\":1,\"unmuted\":false.*\"ev\":\"volume\",\"percent\":10.*\"ev\":\"sound\".*\"volume_set\",\"step\":3,\"unmuted\":true")
 set_tests_properties(sim_status PROPERTIES TIMEOUT 120)
 sim_script_test(sim_status_quiet_no_clock status_quiet_no_clock.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"quiet_set\",\"step\":[12]")
 sim_script_test(sim_quiet_buzz quiet_buzz.txt

@@ -1139,7 +1139,7 @@
     {
       "id": "status",
       "title": "Status · link, battery, quiet mode",
-      "source": "firmware/components/core/src/ui_status.c:315"
+      "source": "firmware/components/core/src/ui_status.c:379"
     }
   ],
   "haptics": {
@@ -5433,13 +5433,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:913",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:855",
-    "gesture_map.chord": "firmware/components/core/src/app.c:513",
+    "gesture_map.chord": "firmware/components/core/src/app.c:514",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:196",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:173",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:405",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:406",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:540",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:541",
     "haptics.approved": "firmware/components/core/src/feedback.c:80",
     "haptics.denied": "firmware/components/core/src/feedback.c:87",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:67",
@@ -5448,7 +5448,7 @@
     "haptics.done": "firmware/components/core/src/feedback.c:31",
     "haptics.duty": "firmware/boards/stopwatch/input.cpp:17",
     "haptics.error": "firmware/components/core/src/feedback.c:30",
-    "haptics.hello": "firmware/components/core/src/feedback.c:149",
+    "haptics.hello": "firmware/components/core/src/feedback.c:157",
     "haptics.hold_ramp": "firmware/components/core/src/feedback.c:60",
     "haptics.kick_duty": "firmware/boards/stopwatch/input.cpp:18",
     "haptics.kick_ms": "firmware/boards/stopwatch/input.cpp:19",
@@ -5521,7 +5521,7 @@
     "screens.ask": "firmware/components/core/src/ui_ask.c:944",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:299",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:55",
-    "screens.status": "firmware/components/core/src/ui_status.c:315",
+    "screens.status": "firmware/components/core/src/ui_status.c:379",
     "sounds.approved-chime": "firmware/components/core/src/sound_bank.c:161",
     "sounds.approved-rise": "firmware/components/core/src/sound_bank.c:159",
     "sounds.denied-drop": "firmware/components/core/src/sound_bank.c:163",

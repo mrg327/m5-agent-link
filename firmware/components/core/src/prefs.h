@@ -1,4 +1,4 @@
-/* Stored preferences that have no row on the STATUS screen yet: speaker volume and display orientation.
+/* Stored preferences: speaker volume (stepped by STATUS's Volume toggle) and display orientation.
  * Read once at start from the HAL's persistent store (NVS on the watch), written when changed. */
 #pragma once
 #include <stdint.h>

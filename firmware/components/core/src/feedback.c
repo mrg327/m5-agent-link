@@ -124,6 +124,14 @@ void feedback_quiet_toggled(void)
     haptic(quiet, 3);
 }
 
+/* Volume stepped on STATUS: the cue heard most (an agent asking) at the new level, so the user hears what
+ * alerts will sound like; the tick confirms even where the speaker is held back (face down). */
+void feedback_volume_preview(void)
+{
+    feedback_tick();
+    sound("input");
+}
+
 /* A session finished (UI-V2 §5): done is two soft pulses with a long gap, error three firm pulses. */
 void feedback_finished(bool error)
 {

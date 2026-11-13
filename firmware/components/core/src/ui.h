@@ -44,6 +44,7 @@ typedef struct {
     void (*scroll)(uint32_t sid, nav_scroll_unit_t unit, int delta); /* SCROLL: one coalesced cmd_op_scroll */
     void (*scroll_stop)(void); /* SCROLL reached the bottom or the top */
     void (*quiet_toggled)(void); /* STATUS: quiet mode turned on, extended or off */
+    void (*volume_changed)(void); /* STATUS: the speaker level was stepped (prefs.h): play a preview */
     void (*tick)(void);   /* light haptic tick: selection by tap or button */
     void (*detent)(void); /* rim-scrub segment crossed */
     void (*hold_start)(void); /* approve hold passed the grace period: start the rising haptic ramp */

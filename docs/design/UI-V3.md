@@ -409,12 +409,12 @@ one line. No chevrons, no hint. Legends: A `Bottom`, B `Page`, both hidden while
 ```
             y 116   12:30                             FONT_NUM white (clock unset: host name, FONT_TITLE)
             y 168   🖥 dev-mac   ▮ 80%                 chip row, COL_TEXT2 (amber `Offline · 4m`)
-            y 246   ( 🔔 )  ( 🔊 )  ( i )             three round toggles, Ø 76, centres x 143 / 233 / 323
+            y 246   ( 🔔 ) ( 🔊 ) ( ⑤ ) ( i )      four round toggles, Ø 64, centres x 107 / 191 / 275 / 359
             y 316   Quiet: off                        FONT_BODY COL_TEXT2: what the selected toggle is
             y 364   Ⓐ Quiet 30 min            Next Ⓑ
 ```
 
-- Toggles: **Quiet**, **Mute**, **About** (`ICON_INFO`). Each icon shows the current state, not the
+- Toggles: **Quiet**, **Mute**, **Volume**, **About** (`ICON_INFO`). Each icon shows the current state, not the
   action (issue 20261113-c36c): Quiet is a bell (`ICON_BELL`) while alerts are on and a crossed-out bell
   (`ICON_QUIET`) while quiet runs; Mute is a speaker (`ICON_SOUND`) while sounds are on and a crossed-out
   speaker (`ICON_MUTE`) while they are off or silent. Off: `COL_FILL1` disc, white icon. On (silenced):
@@ -423,12 +423,18 @@ one line. No chevrons, no hint. Legends: A `Bottom`, B `Page`, both hidden while
 - Quiet cycles off → 30 min → 1 h → off; the line reads `Quiet: off` / `Quiet until 14:30`.
   Mute toggles the alert mode; the line reads `Sounds: on` / `Sounds: off` / `Silent`. About shows
   two lines: `2 sessions · 1 waiting` and `Privacy: preview · 0.4.2`; committing it does nothing. About
-  stands in for the v2 Privacy row (v2 had it as its own list entry; v3 has three toggles).
+  stands in for the v2 Privacy row (v2 had it as its own list entry; v3 has four toggles).
+- Volume (issue 20261111-4843) steps the stored speaker level (`prefs.h`, 1 → 5, then back to 1; 0, set
+  only by a script, steps to 1). The disc shows the level as a `FONT_TITLE` digit inside a 4 px, 300°
+  dial (gap at 6 o'clock) filled to the level in sky over a `COL_FILL2` track; both go `COL_TEXT3` while
+  sounds are off. The line reads `Volume 3 of 5`, with ` (muted)` / ` (silent)` while Mute is on. A
+  commit plays a tick and the `input` cue at the new level, and unmutes (stepping the level means the
+  user wants to hear it); Mute stays the one-tap way to silence. Volume is not a silencer, so its disc
+  is never filled.
 - With the clock unset the title is the host name, so the chip row drops the host text and shows only
   the link icon and the battery.
-- Legends: A names the commit (`Quiet 30 min`, `Quiet 1 h`, `Quiet off`, `Mute`, `Unmute`; hidden
+- Legends: A names the commit (`Quiet 30 min`, `Quiet 1 h`, `Quiet off`, `Mute`, `Unmute`, `Volume 4`; hidden
   on About), B `Next`.
-- Issue 4843 (volume) adds a fourth control here; the row has room at Ø 64.
 
 ### 4.6b STATUS with usage (2026-11-12, [GAUGES.md](GAUGES.md))
 
