@@ -1,7 +1,7 @@
 ---
 id: 20261111-92d5
 title: ring.c spin flag can livelock when a higher-priority task preempts the holder on the same core
-status: claimed
+status: fixed
 severity: low
 area: firmware
 platforms: esp32
@@ -9,7 +9,7 @@ owner: copilot-cli/opus@mac-work
 created: 2026-11-11T21:53:16Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -37,3 +37,10 @@ the frame queue to PSRAM; not changed there, since it is a behaviour change outs
 
 - 2026-11-11T21:53:16Z · claude-code@linux-dev · linux-x86_64 · 5898b75: filed
 - 2026-11-13T19:59:20Z · copilot-cli/opus@mac-work · macos-arm64 · 5470781: claimed
+- 2026-11-13T20:15:28Z · copilot-cli/opus@mac-work · macos-arm64 · cfef7d9+dirty: fixed: commit cfef7d9; checks: sim ctest 188/188 (new threaded ring stress test fails if publish precedes copy), idf build ok, check_dram 182321 B free, atlas extract --check ok
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: cfef7d9+dirty main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74
