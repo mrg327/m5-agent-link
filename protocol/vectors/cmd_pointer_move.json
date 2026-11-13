@@ -1,0 +1,15 @@
+{
+  "desc": "Trackpad: the device moves the daemon machine's pointer 12 px right and 5 px up (proto 0.20)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 26,
+    "b": {
+      "op": "pointer",
+      "ptr": {
+        "dx": 12,
+        "dy": -5
+      }
+    }
+  },
+  "cbor_hex": "a3000801181a03a2001409a2000c0124"
+}

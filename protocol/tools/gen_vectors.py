@@ -290,6 +290,21 @@ VECTORS = {
          "picks": [0], "aids": [9]}},
         env("cmd", 25, {0: 19, 1: 3, 2: 22, 4: 1300, 7: [0], 8: [9]}),
     ),
+    "cmd_pointer_move": (
+        "Trackpad: the device moves the daemon machine's pointer 12 px right and 5 px up (proto 0.20)",
+        {"t": "cmd", "id": 26, "b": {"op": "pointer", "ptr": {"dx": 12, "dy": -5}}},
+        env("cmd", 26, {0: 20, 9: {0: 12, 1: -5}}),
+    ),
+    "cmd_pointer_double_click": (
+        "Trackpad: a double tap, a double click of the left button where the pointer is (proto 0.20)",
+        {"t": "cmd", "id": 27, "b": {"op": "pointer", "ptr": {"btn": "left", "n": 2}}},
+        env("cmd", 27, {0: 20, 9: {2: 0, 3: 2}}),
+    ),
+    "cmd_pointer_wheel": (
+        "Trackpad: the bezel turned clockwise by three notches, scroll down (proto 0.20)",
+        {"t": "cmd", "id": 28, "b": {"op": "pointer", "ptr": {"wheel": 3}}},
+        env("cmd", 28, {0: 20, 9: {4: 3}}),
+    ),
     "cmd_focus_handback": (
         "Open on PC from the request itself: focus session 2 and hand request 10 back to the terminal (proto 0.11)",
         {"t": "cmd", "id": 14, "b": {"op": "focus", "sid": 2, "rid": 10}},
@@ -431,6 +446,16 @@ VECTORS = {
          "replies": ["Continue"], "keys": True}},
         env("welcome", 1, {0: [0, 7], 1: {0: bytes.fromhex("a1a2a3a4a5a6a7a8"), 1: "dev-mac", 2: 0},
             2: {0: 1793995200, 1: -480}, 3: {0: 1, 1: 0}, 4: ["Continue"], 6: True}, re_=1),
+    ),
+    "welcome_pointer": (
+        "Welcome (proto 0.20): this daemon moves its machine's pointer for the Trackpad",
+        {"t": "welcome", "id": 1, "re": 1, "b": {"proto": [0, 20],
+         "host": {"id": "a1a2a3a4a5a6a7a8", "name": "dev-mac", "os": "mac"},
+         "time": {"unix": 1793995200, "tz_off": -480},
+         "cfg": {"privacy": "preview", "alert": "full"},
+         "replies": ["Continue"], "pointer": True}},
+        env("welcome", 1, {0: [0, 20], 1: {0: bytes.fromhex("a1a2a3a4a5a6a7a8"), 1: "dev-mac", 2: 0},
+            2: {0: 1793995200, 1: -480}, 3: {0: 1, 1: 0}, 4: ["Continue"], 7: True}, re_=1),
     ),
     "kb_start": (
         "Keyboard 5 opens for session 3 with three keys (q, w, space): u16 cp, i16 x, i16 y, u16 w, u16 h each",

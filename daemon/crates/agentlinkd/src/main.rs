@@ -17,6 +17,7 @@ mod keys;
 mod lastmsg;
 mod ota;
 mod paths;
+mod pointer;
 mod power;
 mod presence;
 mod prompt;

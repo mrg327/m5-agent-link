@@ -14,7 +14,8 @@ const ENUMS = {
   input_sub: { approval: 0, question: 1 },
   att_kind: { approval: 0, question: 1, error: 2, done: 3 },
   action: { approve: 0, deny: 1, focus: 2, reply: 3, ack: 4, dictate: 5 },
-  cmd_op: { focus: 0, ack: 1, snooze: 2, approve: 3, deny: 4, reply: 5, cancel: 6, detail: 7, notify_done: 8, quiet: 9, scroll: 10, type: 11, dictate: 12, kb_pick: 13, kb_del: 14, kb_send: 15, kb_end: 16, rerun: 17, unqueue: 18, answer: 19 },
+  cmd_op: { focus: 0, ack: 1, snooze: 2, approve: 3, deny: 4, reply: 5, cancel: 6, detail: 7, notify_done: 8, quiet: 9, scroll: 10, type: 11, dictate: 12, kb_pick: 13, kb_del: 14, kb_send: 15, kb_end: 16, rerun: 17, unqueue: 18, answer: 19, pointer: 20 },
+  pointer_btn: { left: 0, right: 1 },
   scroll_unit: { lines: 0, pages: 1, to_end: 2 },
   disp_shape: { round: 0, rect: 1 },
   host_os: { mac: 0, win: 1, linux: 2 },
@@ -53,7 +54,7 @@ const SPECS = {
   host_info: { id: [0, 'hex'], name: [1, 'tstr'], os: [2, 'enum:host_os'] },
   time_sync: { unix: [0, 'uint'], tz_off: [1, 'int'] },
   device_cfg: { privacy: [0, 'enum:privacy'], alert: [1, 'enum:alert_mode'], quiet_until: [2, 'uint'], brightness: [3, 'uint'], badge_handle: [4, 'tstr'] },
-  welcome: { proto: [0, 'ints'], host: [1, 'obj:host_info'], time: [2, 'obj:time_sync'], cfg: [3, 'obj:device_cfg'], replies: [4, 'tstrs'], voice: [5, 'bool'], keys: [6, 'bool'] },
+  welcome: { proto: [0, 'ints'], host: [1, 'obj:host_info'], time: [2, 'obj:time_sync'], cfg: [3, 'obj:device_cfg'], replies: [4, 'tstrs'], voice: [5, 'bool'], keys: [6, 'bool'], pointer: [7, 'bool'] },
   away_event: { sid: [0, 'uint'], kind: [1, 'enum:att_kind'], ts: [2, 'uint'] },
   session: {
     sid: [0, 'uint'], ag: [1, 'enum:agent'], st: [2, 'enum:sess_state'], sub: [3, 'enum:input_sub'],
@@ -78,8 +79,9 @@ const SPECS = {
   },
   clear: { rid: [0, 'uint'], why: [1, 'enum:clear_why'] },
   // cmd_arg = uint / tstr / scroll_arg: a map argument is the scroll one
+  pointer_arg: { dx: [0, 'int'], dy: [1, 'int'], btn: [2, 'enum:pointer_btn'], n: [3, 'uint'], wheel: [4, 'int'] },
   scroll_arg: { unit: [0, 'enum:scroll_unit'], delta: [1, 'int'], seq: [2, 'uint'] },
-  cmd: { op: [0, 'enum:cmd_op'], sid: [1, 'uint'], rid: [2, 'uint'], arg: [3, 'cmd_arg'], hold_ms: [4, 'uint'], rh: [5, 'uint'], q: [6, 'bool'], picks: [7, 'ints'], aids: [8, 'ints'] }, // rh: proto 0.13 (STANDING-RULES.md); q: proto 0.17; picks / aids: proto 0.18
+  cmd: { op: [0, 'enum:cmd_op'], sid: [1, 'uint'], rid: [2, 'uint'], arg: [3, 'cmd_arg'], hold_ms: [4, 'uint'], rh: [5, 'uint'], q: [6, 'bool'], picks: [7, 'ints'], aids: [8, 'ints'], ptr: [9, 'obj:pointer_arg'] }, // rh: proto 0.13 (STANDING-RULES.md); q: proto 0.17; picks / aids: proto 0.18; ptr: proto 0.20
   scroll_pos: { lines_above: [0, 'uint'], at_bottom: [1, 'bool'], total: [2, 'uint'], preview: [3, 'tstr'] },
   result: { ok: [0, 'bool'], err: [1, 'enum:result_err'], msg: [2, 'tstr'], pos: [3, 'obj:scroll_pos'] },
   detail: { rid: [0, 'uint'], sid: [1, 'uint'], text: [2, 'tstr'], off: [3, 'uint'], total: [4, 'uint'], lm: [5, 'uint'] },

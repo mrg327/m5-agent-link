@@ -212,6 +212,10 @@ struct welcome_uint6bool {
 	bool welcome_uint6bool;
 };
 
+struct welcome_uint7bool {
+	bool welcome_uint7bool;
+};
+
 struct welcome {
 	uint32_t welcome_major_l_major;
 	uint32_t welcome_major_l_minor;
@@ -224,6 +228,8 @@ struct welcome {
 	bool welcome_uint5bool_present;
 	struct welcome_uint6bool welcome_uint6bool;
 	bool welcome_uint6bool_present;
+	struct welcome_uint7bool welcome_uint7bool;
+	bool welcome_uint7bool_present;
 };
 
 struct msg_welcome {
@@ -711,6 +717,7 @@ struct cmd_op_r {
 		cmd_op_rerun_m_c = 17,
 		cmd_op_unqueue_m_c = 18,
 		cmd_op_answer_m_c = 19,
+		cmd_op_pointer_m_c = 20,
 	} cmd_op_choice;
 };
 
@@ -788,6 +795,50 @@ struct cmd_answer_aids_m {
 	struct answer_aids cmd_answer_aids_m;
 };
 
+struct pointer_arg_uint0int {
+	int32_t pointer_arg_uint0int;
+};
+
+struct pointer_arg_uint1int {
+	int32_t pointer_arg_uint1int;
+};
+
+struct pointer_btn_r {
+	enum {
+		pointer_btn_pointer_left_m_c = 0,
+		pointer_btn_pointer_right_m_c = 1,
+	} pointer_btn_choice;
+};
+
+struct pointer_arg_pointer_btn_m {
+	struct pointer_btn_r pointer_arg_pointer_btn_m;
+};
+
+struct pointer_arg_uint3uint {
+	uint32_t pointer_arg_uint3uint;
+};
+
+struct pointer_arg_uint4int {
+	int32_t pointer_arg_uint4int;
+};
+
+struct pointer_arg {
+	struct pointer_arg_uint0int pointer_arg_uint0int;
+	bool pointer_arg_uint0int_present;
+	struct pointer_arg_uint1int pointer_arg_uint1int;
+	bool pointer_arg_uint1int_present;
+	struct pointer_arg_pointer_btn_m pointer_arg_pointer_btn_m;
+	bool pointer_arg_pointer_btn_m_present;
+	struct pointer_arg_uint3uint pointer_arg_uint3uint;
+	bool pointer_arg_uint3uint_present;
+	struct pointer_arg_uint4int pointer_arg_uint4int;
+	bool pointer_arg_uint4int_present;
+};
+
+struct cmd_pointer_arg_m {
+	struct pointer_arg cmd_pointer_arg_m;
+};
+
 struct cmd {
 	struct cmd_op_r cmd_op_m;
 	struct cmd_uint1uint cmd_uint1uint;
@@ -806,6 +857,8 @@ struct cmd {
 	bool cmd_answer_picks_m_present;
 	struct cmd_answer_aids_m cmd_answer_aids_m;
 	bool cmd_answer_aids_m_present;
+	struct cmd_pointer_arg_m cmd_pointer_arg_m;
+	bool cmd_pointer_arg_m_present;
 };
 
 struct msg_cmd {

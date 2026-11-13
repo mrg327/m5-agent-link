@@ -86,6 +86,10 @@ body!(Welcome {
     #[n(6)]
     #[serde(skip_serializing_if = "Option::is_none")]
     keys: Option<bool>,
+    /// Trackpad (proto 0.20, EXPERIMENTS.md): this daemon moves its own machine's pointer for `CmdOp::Pointer`.
+    #[n(7)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pointer: Option<bool>,
 });
 body!(HostInfo {
     #[n(0)]
@@ -332,6 +336,18 @@ body!(
     }
 );
 
+body!(
+    /// `cmd_op_pointer` argument (proto 0.20, EXPERIMENTS.md). Applied in order: move by (`dx`, `dy`)
+    /// pointer pixels, click `btn` `n` times (default 1), then scroll `wheel` notches (> 0 = down).
+    PointerArg {
+        #[n(0)] #[serde(skip_serializing_if = "Option::is_none")] dx: Option<i64>,
+        #[n(1)] #[serde(skip_serializing_if = "Option::is_none")] dy: Option<i64>,
+        #[n(2)] #[serde(skip_serializing_if = "Option::is_none")] btn: Option<PointerBtn>,
+        #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] n: Option<u64>,
+        #[n(4)] #[serde(skip_serializing_if = "Option::is_none")] wheel: Option<i64>,
+    }
+);
+
 /// The CDDL `cmd_arg` union (`uint / tstr / scroll_arg`): the typed members, plus `Int`, `Bool`
 /// and raw CBOR so an unknown argument from a newer peer survives a round trip.
 #[derive(Debug, Clone, PartialEq)]
@@ -427,6 +443,8 @@ body!(Cmd {
     #[n(7)] #[serde(skip_serializing_if = "Option::is_none")] picks: Option<Vec<u64>>,
     /// With `answer`: per question, the recording whose transcript is the free answer; 0 = none.
     #[n(8)] #[serde(skip_serializing_if = "Option::is_none")] aids: Option<Vec<u64>>,
+    /// With `pointer` (proto 0.20): move, click and scroll the daemon machine's pointer.
+    #[n(9)] #[serde(skip_serializing_if = "Option::is_none")] ptr: Option<PointerArg>,
 });
 body!(CmdResult {
     #[n(0)] ok: bool,

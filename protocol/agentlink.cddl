@@ -156,8 +156,10 @@ welcome = {
                                      ;          daemon types into terminals (cmd_op_type, cmd_op_cancel)
   ? 5 => bool,                       ; voice    the daemon transcribes audio_* and answers with transcript
                                      ;          (proto 0.6); cmd_op_dictate then types it
-  ? 6 => bool                        ; keys     the daemon decodes kb_stroke into kb_cands and types them
+  ? 6 => bool,                       ; keys     the daemon decodes kb_stroke into kb_cands and types them
                                      ;          (proto 0.7, cmd_op_kb_*)
+  ? 7 => bool                        ; pointer  the daemon moves its own machine's pointer for cmd_op_pointer
+                                     ;          (proto 0.20, EXPERIMENTS.md); absent or false = it cannot
 }
 host_info = {
   0 => bstr .size 8,                  ; id
@@ -365,8 +367,9 @@ cmd = {
                   ;     replaces the old. Not with a `rid`
   ? 7 => answer_picks, ; picks  with cmd_op_answer (proto 0.18): per question of the request's `qs`, in order, the
                   ;     options picked as a bit mask (bit i = option i); 0 when that question has a dictated answer
-  ? 8 => answer_aids   ; aids   with cmd_op_answer: per question, the recording (aid) whose transcript is the free
+  ? 8 => answer_aids, ; aids   with cmd_op_answer: per question, the recording (aid) whose transcript is the free
                   ;     answer ("Other"); 0 = none
+  ? 9 => pointer_arg  ; ptr  with cmd_op_pointer (proto 0.20)
 }
 answer_picks = [1*4 picks: uint]
 answer_aids = [1*4 aids: uint]
@@ -375,7 +378,7 @@ cmd_arg = uint / tstr / scroll_arg
 cmd_op = cmd_op_focus / cmd_op_ack / cmd_op_snooze / cmd_op_approve / cmd_op_deny /
   cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet / cmd_op_scroll /
   cmd_op_type / cmd_op_dictate / cmd_op_kb_pick / cmd_op_kb_del / cmd_op_kb_send / cmd_op_kb_end /
-  cmd_op_rerun / cmd_op_unqueue / cmd_op_answer
+  cmd_op_rerun / cmd_op_unqueue / cmd_op_answer / cmd_op_pointer
 cmd_op_focus = 0    ; with a `rid` (proto 0.11): also hand that request back to the terminal at once
 cmd_op_ack = 1
 cmd_op_snooze = 2
@@ -398,6 +401,21 @@ cmd_op_rerun = 17   ; JOBS: run a finished job's command again in its own termin
 cmd_op_unqueue = 18 ; drop session `sid`'s queued message (proto 0.17); stale when there is none
 cmd_op_answer = 19  ; answer request `rid`'s questions (`qs`) at once with `picks` / `aids`, after a hold (hold_ms
                     ; >= 1000; proto 0.18)
+cmd_op_pointer = 20 ; Trackpad (proto 0.20, EXPERIMENTS.md): move / click / scroll the pointer of the daemon's own
+                    ; machine with `ptr`. No `result` unless it fails (at most one per second): `unsupported` (no
+                    ; pointer backend) or `denied` (the OS refused, e.g. macOS Accessibility not granted)
+
+; cmd_op_pointer argument. Fields apply in order: move by (dx, dy), then click, then scroll. Absent = 0.
+pointer_arg = {
+  ? 0 => int,          ; dx      pointer pixels, positive = right
+  ? 1 => int,          ; dy      pointer pixels, positive = down
+  ? 2 => pointer_btn,  ; btn     click this button `n` times at the pointer
+  ? 3 => uint,         ; n       clicks (1 = click, 2 = double click); with btn, default 1
+  ? 4 => int          ; wheel   scroll notches, positive = down (towards newer content)
+}
+pointer_btn = pointer_left / pointer_right
+pointer_left = 0
+pointer_right = 1
 
 ; cmd_op_scroll argument (UI-V2 §6.1): move the session's terminal scrollback.
 scroll_arg = {

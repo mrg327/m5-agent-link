@@ -1,0 +1,14 @@
+{
+  "desc": "Trackpad: the bezel turned clockwise by three notches, scroll down (proto 0.20)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 28,
+    "b": {
+      "op": "pointer",
+      "ptr": {
+        "wheel": 3
+      }
+    }
+  },
+  "cbor_hex": "a3000801181c03a2001409a10403"
+}

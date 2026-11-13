@@ -1,0 +1,15 @@
+{
+  "desc": "Trackpad: a double tap, a double click of the left button where the pointer is (proto 0.20)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 27,
+    "b": {
+      "op": "pointer",
+      "ptr": {
+        "btn": "left",
+        "n": 2
+      }
+    }
+  },
+  "cbor_hex": "a3000801181b03a2001409a202000302"
+}

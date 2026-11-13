@@ -72,7 +72,7 @@ device                                 daemon
 ### `hello` (device → daemon)
 ```cddl
 hello = {
-  proto: [uint, uint],             ; [major, minor] = [0, 19]
+  proto: [uint, uint],             ; [major, minor] = [0, 20]
   dev: { class: tstr,              ; "watch" | "desk" | "pad" | "sim" | ...
          board: tstr,              ; "m5stopwatch"
          fw: tstr,                 ; semver
@@ -98,7 +98,8 @@ welcome = {
   cfg: { privacy: "meta"/"preview"/"full",
          alert: "full"/"quiet"/"silent",
          quiet_until?: uint },
-  ? replies: [0*6 tstr]       ; quick replies, each ≤ 24 chars (proto 0.4)
+  ? replies: [0*6 tstr],      ; quick replies, each ≤ 24 chars (proto 0.4)
+  ? pointer: bool             ; key 7 (proto 0.20): the daemon drives its machine's pointer (§6g)
 }
 ```
 - `replies` is sent only to a device whose `hello` says proto ≥ 0.4 (an older decoder rejects an unknown key). Its presence means the daemon can type into terminals: `cmd type` and `cmd cancel` (§5). The list is the user's own `~/.agentlink/replies.txt` (one per line, `#` comments, ≤ 6 × 24 chars), and empty without one: there are no built-in defaults.
@@ -226,7 +227,7 @@ The device must show approve/deny **only if** they are in `acts`. The daemon inc
 
 ```cddl
 cmd = {
-  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end"/"rerun"/"unqueue"/"answer",
+  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end"/"rerun"/"unqueue"/"answer"/"pointer",
   ? sid: uint,
   ? rid: uint,               ; required for approve/deny/reply
   ? arg: uint / tstr / scroll_arg,  ; snooze minutes (the watch sends 30), reply option index, quiet duration,
@@ -236,7 +237,8 @@ cmd = {
                              ; the rule, a 0 byte, scope and wide (0/1) as the device showed them; hold ≥ 1500
   ? q: bool,                 ; with type / dictate (proto 0.17, key 6): queue it if the session can't take input (§6d)
   ? picks: [1*4 uint],       ; with answer (proto 0.18, key 7): per question, the options picked (bit mask)  ┐ §6e
-  ? aids: [1*4 uint]         ; with answer (key 8): per question, the recording of a free answer, 0 = none  ┘
+  ? aids: [1*4 uint],        ; with answer (key 8): per question, the recording of a free answer, 0 = none  ┘
+  ? ptr: pointer_arg         ; with pointer (proto 0.20, key 9): move / click / scroll (§6g)
 }
 scroll_arg = { unit: "lines"/"pages"/"to_end", delta: int, ? seq: uint }   ; delta < 0 = up (older); to_end: sign = top / bottom
 result = { ok: bool, ? err: "stale"/"denied"/"unsupported"/"no_window"/"timeout", ? msg: tstr, ? pos: scroll_pos }
@@ -402,6 +404,19 @@ power { mv, mvf, vin, chg, usb, pct, on, dim, off, deep, lk, ble, itvl, seq, nd 
   connection interval in force now in µs (0 = no BLE connection).
 - The daemon appends each report to `~/.agentlink/power-reports.csv` and keeps the last one per device for
   `agentlink status`; `agentlink power` reads the file. An older daemon ignores the message type.
+
+## 6g. Trackpad (proto 0.20, [EXPERIMENTS.md](EXPERIMENTS.md))
+```
+cmd { op: "pointer", ptr: { dx?: int, dy?: int, btn?: "left"/"right", n?: uint, wheel?: int } }   device → daemon
+```
+- The daemon moves the pointer of **its own machine** (not the host a session runs on): by (`dx`, `dy`) pixels
+  (positive = right / down), then clicks `btn` `n` times (default 1; 2 = double click), then scrolls `wheel`
+  notches (positive = down, towards newer content). It clamps one command to ±2000 px, 3 clicks and ±20 notches.
+- `welcome.pointer` (key 7) is sent to a device with proto ≥ 0.20 when the daemon has a backend: macOS
+  (CoreGraphics events), Windows (`SendInput`), Linux on X11 with `xdotool` (not under Wayland).
+- No `result` when it works. A failure is answered at most once per second: `unsupported` (no backend) or `denied`
+  (the OS refused; on macOS the message asks to allow agentlinkd under Privacy & Security > Accessibility).
+- The trace leaves out commands that only move; clicks and scrolls are traced. Nothing is audited.
 
 ## 7. Misc
 - `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray. The current firmware does not send it; the power report (§6f) carries more.

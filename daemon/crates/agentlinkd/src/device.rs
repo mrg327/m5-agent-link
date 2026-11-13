@@ -50,6 +50,10 @@ pub struct Shared {
     pub ota: Arc<crate::ota::Ota>,
     /// Power reports: the CSV log and the last report per device (power.rs, POWER.md).
     pub power: crate::power::PowerLog,
+    /// The machine's pointer, driven by the watch's trackpad (pointer.rs, EXPERIMENTS.md).
+    pub pointer: Arc<dyn crate::pointer::Pointer>,
+    /// Trackpad failures answer at most once a second.
+    pointer_err: crate::pointer::ErrGate,
     next_link: AtomicU64,
 }
 
@@ -81,6 +85,8 @@ impl Shared {
             devices: Mutex::default(),
             ota: Arc::new(crate::ota::Ota::new(ota_trace)),
             power: crate::power::PowerLog::new(),
+            pointer: crate::pointer::system(),
+            pointer_err: crate::pointer::ErrGate::default(),
             next_link: AtomicU64::new(1),
         }
     }
@@ -337,7 +343,13 @@ impl Conn {
         while let Some(bytes) = self.link.recv().await? {
             match Envelope::from_bytes(&bytes) {
                 Ok(env) => {
-                    self.trace.proto(&self.src, Dir::In, &env, &bytes);
+                    // a trackpad stream is not traced move by move; clicks and scrolls are
+                    let pointer_move = matches!(&env.msg, Message::Cmd(c)
+                        if c.op == CmdOp::Pointer
+                            && c.ptr.as_ref().is_none_or(crate::pointer::is_move_only));
+                    if !pointer_move {
+                        self.trace.proto(&self.src, Dir::In, &env, &bytes);
+                    }
                     return Ok(Some(env));
                 }
                 Err(e) => {
@@ -401,6 +413,8 @@ const QUEUE_MINOR: u64 = 17;
 /// The last message (`session.lm` / `ll` / `lp`, `detail` without a rid) and questions answered on the
 /// watch (`attention.qs`, `cmd answer`), LAST-MESSAGE.md.
 const ANSWER_MINOR: u64 = 18;
+/// The trackpad: `welcome.pointer` and `cmd pointer` (EXPERIMENTS.md).
+const POINTER_MINOR: u64 = 20;
 
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
@@ -411,6 +425,7 @@ fn welcome(
     replies: Option<Vec<String>>,
     voice: Option<bool>,
     keys: Option<bool>,
+    pointer: Option<bool>,
 ) -> Welcome {
     let tz = chrono::Local::now().offset().local_minus_utc() / 60;
     Welcome {
@@ -430,6 +445,7 @@ fn welcome(
         replies,
         voice,
         keys,
+        pointer,
     }
 }
 
@@ -536,7 +552,8 @@ async fn handshake(
     c.dictate = voice.is_some()
         && c.peer_minor >= DICTATE_MINOR
         && hello.1.caps.feats.contains(&Feature::Voice);
-    let w = welcome(&shared.host, replies, voice, keys);
+    let pointer = (c.peer_minor >= POINTER_MINOR && shared.pointer.available()).then_some(true);
+    let w = welcome(&shared.host, replies, voice, keys, pointer);
     c.privacy = w.cfg.privacy.unwrap_or(Privacy::Meta);
     c.send(Some(hello.0), Message::Welcome(w)).await?;
     let sessions = c.sessions_for_peer(sessions);
@@ -821,6 +838,10 @@ async fn handle(
         Message::Cmd(cmd) if cmd.op == CmdOp::Scroll => {
             scroll_cmd(shared, c, sc, inflight, env.id, &cmd).await
         }
+        Message::Cmd(cmd) if cmd.op == CmdOp::Pointer => match pointer_cmd(shared, &cmd).await {
+            Some(res) => c.send(Some(env.id), Message::Result(res)).await,
+            None => Ok(()),
+        },
         Message::Cmd(cmd) if cmd.op == CmdOp::Detail => detail_cmd(shared, c, env.id, &cmd).await,
         Message::Cmd(cmd) if cmd.op == CmdOp::Answer => {
             let res = answer_cmd(shared, c.peer_minor, &cmd);
@@ -999,6 +1020,39 @@ fn fail(err: ResultErr, msg: &str) -> CmdResult {
         msg: Some(msg.into()),
         pos: None,
     }
+}
+
+/// `cmd pointer` (proto 0.20, EXPERIMENTS.md): moves the daemon machine's own pointer, whichever host the
+/// sessions run on. Answered only when it fails, and then at most once a second (`ErrGate`).
+async fn pointer_cmd(shared: &Shared, cmd: &Cmd) -> Option<CmdResult> {
+    use crate::pointer::PointerError;
+    let res = match cmd.ptr.clone() {
+        None => Err(PointerError::Internal("pointer needs ptr".into())),
+        Some(a) => {
+            let p = shared.pointer.clone();
+            tokio::task::spawn_blocking(move || p.apply(&a))
+                .await
+                .unwrap_or_else(|e| Err(PointerError::Internal(e.to_string())))
+        }
+    };
+    let e = res.err()?;
+    if !shared.pointer_err.pass(std::time::Instant::now()) {
+        return None;
+    }
+    shared.trace.record(
+        "pointer",
+        Dir::Internal,
+        "pointer_error",
+        None,
+        None,
+        json!({"err": format!("{e:?}")}),
+        None,
+    );
+    Some(match e {
+        PointerError::Unsupported => fail(ResultErr::Unsupported, "no pointer on this host"),
+        PointerError::Denied(m) => fail(ResultErr::Denied, &m),
+        PointerError::Internal(m) => fail(ResultErr::Internal, &m),
+    })
 }
 
 /// The batch a scroll command asks for, or the result that refuses it.
@@ -1657,6 +1711,7 @@ mod tests {
             q: None,
             picks: None,
             aids: None,
+            ptr: None,
         }
     }
 
@@ -1714,6 +1769,7 @@ mod tests {
             q: None,
             picks: None,
             aids: None,
+            ptr: None,
         }
     }
 
@@ -2226,6 +2282,7 @@ mod tests {
             q: None,
             picks: None,
             aids: None,
+            ptr: None,
         }
     }
 
@@ -3818,5 +3875,96 @@ mod tests {
         assert_eq!(st[0]["report"]["mv"], 3890);
         assert_eq!(st[0]["transport"], "test");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn pointer_cmd_bytes(id: u64, ptr: PointerArg) -> Vec<u8> {
+        cmd_bytes(
+            id,
+            Cmd {
+                ptr: Some(ptr),
+                ..cmd(CmdOp::Pointer, None, None, None)
+            },
+        )
+    }
+
+    fn ping_bytes(id: u64) -> Vec<u8> {
+        Envelope {
+            id,
+            re: None,
+            msg: Message::Ping(Empty {}),
+        }
+        .to_bytes()
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn the_trackpad_drives_the_pointer_and_answers_only_failures_once_a_second() {
+        let fake = Arc::new(crate::pointer::fake::Fake::default());
+        let trace = Trace::null();
+        let registry = Arc::new(Registry::new(trace.clone()));
+        let mut s = Shared::new(
+            registry.clone(),
+            Arc::new(Broker::new(registry)),
+            trace,
+            Arc::new(NoFocus),
+            Arc::new(FakeScroll::default()),
+        );
+        s.pointer = fake.clone();
+        let shared = Arc::new(s);
+
+        // offered only to a device that speaks 0.20
+        for (minor, offered) in [(19, None), (20, Some(true))] {
+            let mut d = spawn_link(&shared);
+            d.to_daemon.send(hello_with_minor("1.0.0", minor)).unwrap();
+            let Message::Welcome(w) = d.next().await.msg else {
+                panic!("welcome")
+            };
+            assert_eq!(w.pointer, offered, "minor {minor}");
+        }
+
+        let mut d = spawn_link(&shared);
+        d.to_daemon.send(hello_with_minor("1.0.0", 20)).unwrap();
+        d.next().await; // welcome
+        d.next().await; // snapshot
+        let mv = PointerArg {
+            dx: Some(12),
+            dy: Some(-5),
+            btn: None,
+            n: None,
+            wheel: None,
+        };
+        let dbl = PointerArg {
+            btn: Some(PointerBtn::Left),
+            n: Some(2),
+            dx: None,
+            dy: None,
+            wheel: None,
+        };
+        d.to_daemon.send(pointer_cmd_bytes(5, mv.clone())).unwrap();
+        d.to_daemon.send(pointer_cmd_bytes(6, dbl.clone())).unwrap();
+        d.to_daemon.send(ping_bytes(7)).unwrap();
+        let e = d.next().await;
+        assert!(
+            matches!(e.msg, Message::Pong(_)),
+            "no result for a pointer cmd that worked"
+        );
+        assert_eq!(e.re, Some(7));
+        assert_eq!(*fake.got.lock().unwrap(), vec![mv.clone(), dbl]);
+
+        // a refused stream answers once, not per command
+        *fake.fail.lock().unwrap() = Some(crate::pointer::PointerError::Denied("allow it".into()));
+        for id in 8..12 {
+            d.to_daemon.send(pointer_cmd_bytes(id, mv.clone())).unwrap();
+        }
+        d.to_daemon.send(ping_bytes(12)).unwrap();
+        let e = d.next().await;
+        let Message::Result(r) = e.msg else {
+            panic!("result")
+        };
+        assert_eq!(
+            (e.re, r.ok, r.err),
+            (Some(8), false, Some(ResultErr::Denied))
+        );
+        assert!(matches!(d.next().await.msg, Message::Pong(_)));
     }
 }

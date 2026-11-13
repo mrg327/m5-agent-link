@@ -53,6 +53,7 @@ static bool decode_device_cfg(zcbor_state_t *state, struct device_cfg *result);
 static bool decode_repeated_welcome_tstr_l(zcbor_state_t *state, struct welcome_tstr_l_r *result);
 static bool decode_repeated_welcome_uint5bool(zcbor_state_t *state, struct welcome_uint5bool *result);
 static bool decode_repeated_welcome_uint6bool(zcbor_state_t *state, struct welcome_uint6bool *result);
+static bool decode_repeated_welcome_uint7bool(zcbor_state_t *state, struct welcome_uint7bool *result);
 static bool decode_welcome(zcbor_state_t *state, struct welcome *result);
 static bool decode_msg_welcome(zcbor_state_t *state, struct msg_welcome *result);
 static bool decode_agent(zcbor_state_t *state, struct agent_r *result);
@@ -142,6 +143,14 @@ static bool decode_answer_picks(zcbor_state_t *state, struct answer_picks *resul
 static bool decode_repeated_cmd_answer_picks_m(zcbor_state_t *state, struct cmd_answer_picks_m *result);
 static bool decode_answer_aids(zcbor_state_t *state, struct answer_aids *result);
 static bool decode_repeated_cmd_answer_aids_m(zcbor_state_t *state, struct cmd_answer_aids_m *result);
+static bool decode_repeated_pointer_arg_uint0int(zcbor_state_t *state, struct pointer_arg_uint0int *result);
+static bool decode_repeated_pointer_arg_uint1int(zcbor_state_t *state, struct pointer_arg_uint1int *result);
+static bool decode_pointer_btn(zcbor_state_t *state, struct pointer_btn_r *result);
+static bool decode_repeated_pointer_arg_pointer_btn_m(zcbor_state_t *state, struct pointer_arg_pointer_btn_m *result);
+static bool decode_repeated_pointer_arg_uint3uint(zcbor_state_t *state, struct pointer_arg_uint3uint *result);
+static bool decode_repeated_pointer_arg_uint4int(zcbor_state_t *state, struct pointer_arg_uint4int *result);
+static bool decode_pointer_arg(zcbor_state_t *state, struct pointer_arg *result);
+static bool decode_repeated_cmd_pointer_arg_m(zcbor_state_t *state, struct cmd_pointer_arg_m *result);
 static bool decode_cmd(zcbor_state_t *state, struct cmd *result);
 static bool decode_msg_cmd(zcbor_state_t *state, struct msg_cmd *result);
 static bool decode_result_err(zcbor_state_t *state, struct result_err_r *result);
@@ -665,6 +674,18 @@ static bool decode_repeated_welcome_uint6bool(
 	return res;
 }
 
+static bool decode_repeated_welcome_uint7bool(
+		zcbor_state_t *state, struct welcome_uint7bool *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (7))))
+	&& (zcbor_bool_decode(state, (&(*result).welcome_uint7bool)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_welcome(
 		zcbor_state_t *state, struct welcome *result)
 {
@@ -681,7 +702,8 @@ static bool decode_welcome(
 	&& (decode_device_cfg(state, (&(*result).welcome_device_cfg_m))))
 	&& zcbor_present_decode(&((*result).welcome_tstr_l_present), (zcbor_decoder_t *)decode_repeated_welcome_tstr_l, state, (&(*result).welcome_tstr_l))
 	&& zcbor_present_decode(&((*result).welcome_uint5bool_present), (zcbor_decoder_t *)decode_repeated_welcome_uint5bool, state, (&(*result).welcome_uint5bool))
-	&& zcbor_present_decode(&((*result).welcome_uint6bool_present), (zcbor_decoder_t *)decode_repeated_welcome_uint6bool, state, (&(*result).welcome_uint6bool))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+	&& zcbor_present_decode(&((*result).welcome_uint6bool_present), (zcbor_decoder_t *)decode_repeated_welcome_uint6bool, state, (&(*result).welcome_uint6bool))
+	&& zcbor_present_decode(&((*result).welcome_uint7bool_present), (zcbor_decoder_t *)decode_repeated_welcome_uint7bool, state, (&(*result).welcome_uint7bool))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
 
 	if (false) {
 		/* For testing that the types of the arguments are correct.
@@ -690,6 +712,7 @@ static bool decode_welcome(
 		decode_repeated_welcome_tstr_l(state, (&(*result).welcome_tstr_l));
 		decode_repeated_welcome_uint5bool(state, (&(*result).welcome_uint5bool));
 		decode_repeated_welcome_uint6bool(state, (&(*result).welcome_uint6bool));
+		decode_repeated_welcome_uint7bool(state, (&(*result).welcome_uint7bool));
 	}
 
 	log_result(state, res, __func__);
@@ -1817,7 +1840,8 @@ static bool decode_cmd_op(
 	|| (((*result).cmd_op_choice == cmd_op_kb_end_m_c) && ((1)))
 	|| (((*result).cmd_op_choice == cmd_op_rerun_m_c) && ((1)))
 	|| (((*result).cmd_op_choice == cmd_op_unqueue_m_c) && ((1)))
-	|| (((*result).cmd_op_choice == cmd_op_answer_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
+	|| (((*result).cmd_op_choice == cmd_op_answer_m_c) && ((1)))
+	|| (((*result).cmd_op_choice == cmd_op_pointer_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -2016,6 +2040,116 @@ static bool decode_repeated_cmd_answer_aids_m(
 	return res;
 }
 
+static bool decode_repeated_pointer_arg_uint0int(
+		zcbor_state_t *state, struct pointer_arg_uint0int *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_int32_decode(state, (&(*result).pointer_arg_uint0int)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_pointer_arg_uint1int(
+		zcbor_state_t *state, struct pointer_arg_uint1int *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (1))))
+	&& (zcbor_int32_decode(state, (&(*result).pointer_arg_uint1int)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_pointer_btn(
+		zcbor_state_t *state, struct pointer_btn_r *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((((zcbor_uint_decode(state, &(*result).pointer_btn_choice, sizeof((*result).pointer_btn_choice)))) && ((((((*result).pointer_btn_choice == pointer_btn_pointer_left_m_c) && ((1)))
+	|| (((*result).pointer_btn_choice == pointer_btn_pointer_right_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_pointer_arg_pointer_btn_m(
+		zcbor_state_t *state, struct pointer_arg_pointer_btn_m *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (2))))
+	&& (decode_pointer_btn(state, (&(*result).pointer_arg_pointer_btn_m)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_pointer_arg_uint3uint(
+		zcbor_state_t *state, struct pointer_arg_uint3uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (3))))
+	&& (zcbor_uint32_decode(state, (&(*result).pointer_arg_uint3uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_pointer_arg_uint4int(
+		zcbor_state_t *state, struct pointer_arg_uint4int *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (4))))
+	&& (zcbor_int32_decode(state, (&(*result).pointer_arg_uint4int)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_pointer_arg(
+		zcbor_state_t *state, struct pointer_arg *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && ((zcbor_present_decode(&((*result).pointer_arg_uint0int_present), (zcbor_decoder_t *)decode_repeated_pointer_arg_uint0int, state, (&(*result).pointer_arg_uint0int))
+	&& zcbor_present_decode(&((*result).pointer_arg_uint1int_present), (zcbor_decoder_t *)decode_repeated_pointer_arg_uint1int, state, (&(*result).pointer_arg_uint1int))
+	&& zcbor_present_decode(&((*result).pointer_arg_pointer_btn_m_present), (zcbor_decoder_t *)decode_repeated_pointer_arg_pointer_btn_m, state, (&(*result).pointer_arg_pointer_btn_m))
+	&& zcbor_present_decode(&((*result).pointer_arg_uint3uint_present), (zcbor_decoder_t *)decode_repeated_pointer_arg_uint3uint, state, (&(*result).pointer_arg_uint3uint))
+	&& zcbor_present_decode(&((*result).pointer_arg_uint4int_present), (zcbor_decoder_t *)decode_repeated_pointer_arg_uint4int, state, (&(*result).pointer_arg_uint4int))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	if (false) {
+		/* For testing that the types of the arguments are correct.
+		 * A compiler error here means a bug in zcbor.
+		 */
+		decode_repeated_pointer_arg_uint0int(state, (&(*result).pointer_arg_uint0int));
+		decode_repeated_pointer_arg_uint1int(state, (&(*result).pointer_arg_uint1int));
+		decode_repeated_pointer_arg_pointer_btn_m(state, (&(*result).pointer_arg_pointer_btn_m));
+		decode_repeated_pointer_arg_uint3uint(state, (&(*result).pointer_arg_uint3uint));
+		decode_repeated_pointer_arg_uint4int(state, (&(*result).pointer_arg_uint4int));
+	}
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_cmd_pointer_arg_m(
+		zcbor_state_t *state, struct cmd_pointer_arg_m *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (9))))
+	&& (decode_pointer_arg(state, (&(*result).cmd_pointer_arg_m)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_cmd(
 		zcbor_state_t *state, struct cmd *result)
 {
@@ -2030,7 +2164,8 @@ static bool decode_cmd(
 	&& zcbor_present_decode(&((*result).cmd_uint5uint_present), (zcbor_decoder_t *)decode_repeated_cmd_uint5uint, state, (&(*result).cmd_uint5uint))
 	&& zcbor_present_decode(&((*result).cmd_uint6bool_present), (zcbor_decoder_t *)decode_repeated_cmd_uint6bool, state, (&(*result).cmd_uint6bool))
 	&& zcbor_present_decode(&((*result).cmd_answer_picks_m_present), (zcbor_decoder_t *)decode_repeated_cmd_answer_picks_m, state, (&(*result).cmd_answer_picks_m))
-	&& zcbor_present_decode(&((*result).cmd_answer_aids_m_present), (zcbor_decoder_t *)decode_repeated_cmd_answer_aids_m, state, (&(*result).cmd_answer_aids_m))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+	&& zcbor_present_decode(&((*result).cmd_answer_aids_m_present), (zcbor_decoder_t *)decode_repeated_cmd_answer_aids_m, state, (&(*result).cmd_answer_aids_m))
+	&& zcbor_present_decode(&((*result).cmd_pointer_arg_m_present), (zcbor_decoder_t *)decode_repeated_cmd_pointer_arg_m, state, (&(*result).cmd_pointer_arg_m))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
 
 	if (false) {
 		/* For testing that the types of the arguments are correct.
@@ -2044,6 +2179,7 @@ static bool decode_cmd(
 		decode_repeated_cmd_uint6bool(state, (&(*result).cmd_uint6bool));
 		decode_repeated_cmd_answer_picks_m(state, (&(*result).cmd_answer_picks_m));
 		decode_repeated_cmd_answer_aids_m(state, (&(*result).cmd_answer_aids_m));
+		decode_repeated_cmd_pointer_arg_m(state, (&(*result).cmd_pointer_arg_m));
 	}
 
 	log_result(state, res, __func__);
