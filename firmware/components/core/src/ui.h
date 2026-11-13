@@ -55,6 +55,9 @@ typedef struct {
     bool (*button_down)(int btn); /* KEYS: is physical button 0 (A) / 1 (B) still held */
     void (*nag)(void);    /* unanswered permission request: remind */
     void (*sectors)(int n); /* the rim now has n selectable segments */
+    /* TRACKPAD (proto 0.20, EXPERIMENTS.md): one cmd_op_pointer (btn -1 = no click); false when it could not go out */
+    bool (*pointer)(int dx, int dy, int btn, int n, int wheel);
+    void (*moves)(bool on); /* TRACKPAD: the recognizer streams G_MOVE while on */
 } ui_actions_t;
 
 void ui_init(const ui_actions_t *actions);
@@ -78,6 +81,8 @@ void ui_toast(const char *text, uint32_t rgb);
 /* A scroll result arrived (sid 0 = unknown): SCROLL updates its counter, track and preview. */
 /* A scroll failed (e.g. `unsupported`): SCROLL closes, back to WATCH. */
 void ui_scroll_failed(void);
+/* A pointer command failed (err a result_err value): TRACKPAD says why, e.g. the Accessibility permission. */
+void ui_pointer_failed(int err, const char *msg);
 void ui_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total, uint32_t total, const char *preview);
 /* Brief dim ring for alerts while the display is otherwise idle; text-free by design. */
 void ui_glow(uint32_t rgb);

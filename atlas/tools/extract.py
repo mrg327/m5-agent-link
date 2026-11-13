@@ -340,6 +340,8 @@ ACTION_TEXT = {
     "NAV_PAGE_NEWER": "SCROLL: button B moves one page toward newer output",
     "NAV_TO_BOTTOM": "SCROLL: button A jumps back to the live bottom and leaves the mode",
     "NAV_ERASE": "KEYS: button B deletes the last typed word",
+    "NAV_OPEN_LABS": "Open Experiments (swipe up on the deck): a wheel of experimental features, the first is the Trackpad",
+    "NAV_POINTER": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
 }
 WHEN_TEXT = {"WHEN_ALWAYS": "", "WHEN_REQUEST": "with an approvable request on screen", "WHEN_NO_REQUEST": "without an approvable request",
              "WHEN_ASKABLE": "with a permission or question pending", "WHEN_NOT_ASKABLE": "with nothing to answer"}

@@ -15,7 +15,8 @@ typedef enum {
     LINK_OP_DICTATE = 12, LINK_OP_KB_PICK = 13, LINK_OP_KB_DEL = 14, LINK_OP_KB_SEND = 15, LINK_OP_KB_END = 16,
     LINK_OP_RERUN = 17, /* JOBS: run a finished job again */
     LINK_OP_UNQUEUE = 18, /* proto 0.17: drop the session's queued message */
-    LINK_OP_ANSWER = 19   /* proto 0.18: answer a request's questions at once (picks / aids) */
+    LINK_OP_ANSWER = 19,  /* proto 0.18: answer a request's questions at once (picks / aids) */
+    LINK_OP_POINTER = 20  /* proto 0.20: the trackpad moves / clicks / scrolls the daemon's pointer */
 } link_op_t;
 #define LINK_OP_UNKNOWN (-1)
 
@@ -78,6 +79,10 @@ bool link_send_approve_rule(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32
 bool link_send_answer(uint32_t sid, uint32_t rid, const uint32_t *picks, const uint32_t *aids, int n, uint32_t hold_ms);
 /* cmd_op_scroll with scroll_arg {unit, delta, seq}; unit is a nav_scroll_unit_t wire value. */
 bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq);
+/* cmd_op_pointer with pointer_arg (proto 0.20, EXPERIMENTS.md): move by (dx, dy), then click btn (-1 none, 0 left,
+ * 1 right) with click count n (2 = the second click of a double click), then scroll wheel notches (down > 0). Returns
+ * false unless welcomed by a daemon that offered the pointer. */
+bool link_send_pointer(int dx, int dy, int btn, int n, int wheel);
 /* Firmware update (proto 0.15): fw_ack {st, next, msg}; st is the wire value (0 go, 1 done, 2 busy, 3 bad, 4 fail, 5 stopped). */
 bool link_send_fw_ack(int st, uint32_t next, const char *msg);
 /* Power report (proto 0.19, POWER.md): voltages in mV, times in ms, itvl in us; field names as in the CDDL. */

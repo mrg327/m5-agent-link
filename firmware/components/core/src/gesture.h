@@ -43,8 +43,11 @@ typedef enum {
     G_CHORD,                    /* A and B held together; the individual presses are swallowed */
     G_DRAG,                     /* a finger that started inside the rim moved GESTURE_DRAG_STEP_PX more vertically:
                                    x,y = press point, dy = the step (a multiple of the step size, up < 0) */
-    G_DRAG_END                  /* finger lifted after at least one G_DRAG (before any swipe): x,y = press point,
+    G_DRAG_END,                 /* finger lifted after at least one G_DRAG (before any swipe): x,y = press point,
                                    dx,dy = whole travel, vy = vertical release speed in px/s (up < 0) */
+    G_MOVE                      /* only with gesture_set_moves(): a finger that started inside the rim and left the
+                                   tap slop moved; x,y = where it is, dx,dy = travel since the previous G_MOVE
+                                   (the first counts from where it left the slop). The trackpad (EXPERIMENTS.md) */
 } gesture_kind_t;
 
 typedef struct {
@@ -78,6 +81,9 @@ typedef struct {
     bool centre_start, dragging; /* drag stream: press began inside the rim; at least one G_DRAG went out */
     bool drag_armed;             /* the finger left the tap slop: drag steps count from drag_y */
     int16_t drag_y;              /* y at the last G_DRAG */
+    bool moves;                  /* G_MOVE wanted (gesture_set_moves) */
+    bool move_armed;             /* the finger left the tap slop: G_MOVE counts from move_x/move_y */
+    int16_t move_x, move_y;      /* where the last G_MOVE left off */
     gesture_sample_t hist[GESTURE_HIST]; /* recent samples, for the release speed */
     uint8_t hist_n, hist_i;
     gesture_btn_t btn[2];
@@ -95,6 +101,8 @@ void gesture_tick(gesture_t *g, uint32_t t_ms);
 /* Number of equal sectors around the rim (0 = 12 o'clock, clockwise). Safe to call mid-scrub. */
 void gesture_set_sectors(gesture_t *g, int n);
 bool gesture_scrubbing(const gesture_t *g);
+/* G_MOVE on every sample of a centre drag (the trackpad); off by default, the other screens need no stream. */
+void gesture_set_moves(gesture_t *g, bool on);
 const char *gesture_name(gesture_kind_t k);
 /* Angle of a point around the centre, 0..360 degrees from 12 o'clock, clockwise; radius in px. */
 float gesture_angle_deg(int x, int y, float *radius);

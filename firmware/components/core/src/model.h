@@ -257,6 +257,9 @@ bool model_voice(void);
 /* The daemon decodes swipe strokes (welcome.keys, proto 0.7); reset by each welcome. */
 void model_set_keys(bool on);
 bool model_keys(void);
+/* The daemon can drive its machine's pointer (welcome.pointer, proto 0.20): the trackpad (EXPERIMENTS.md). */
+void model_set_pointer(bool on);
+bool model_pointer(void);
 
 const char *sess_state_name(sess_state_t s);
 const char *agent_name(agent_t a);

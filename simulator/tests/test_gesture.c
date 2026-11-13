@@ -261,6 +261,43 @@ int main(void)
     gesture_tick(&g, 1500);
     EXPECT(n_seen == 1 && seen[0].kind == G_CHORD, "A+B is one chord and swallows both presses");
 
+    /* the trackpad's G_MOVE: only when asked for, only after the tap slop, each step since the last */
+    reset(&g, 0);
+    gesture_touch(&g, true, 233, 233, 0);
+    gesture_touch(&g, true, 263, 233, 20);
+    gesture_touch(&g, true, 283, 223, 40);
+    gesture_touch(&g, false, 283, 223, 60);
+    EXPECT(count(G_MOVE) == 0, "no G_MOVE unless the trackpad asked for it");
+
+    reset(&g, 0);
+    gesture_set_moves(&g, true);
+    gesture_touch(&g, true, 233, 233, 0);
+    gesture_touch(&g, true, 243, 233, 10); /* inside the slop */
+    gesture_touch(&g, true, 263, 233, 20); /* leaves it: the stream starts here */
+    gesture_touch(&g, true, 283, 223, 40);
+    gesture_touch(&g, true, 283, 223, 50); /* no travel, no event */
+    gesture_touch(&g, true, 280, 230, 60);
+    EXPECT(count(G_MOVE) == 2, "a move per sample with travel, after the slop");
+    {
+        const gesture_evt_t *m[2] = {0};
+        for (int i = 0, k = 0; i < n_seen && k < 2; i++)
+            if (seen[i].kind == G_MOVE) m[k++] = &seen[i];
+        EXPECT(m[0] && m[0]->dx == 20 && m[0]->dy == -10 && m[0]->x == 283, "first step from the slop exit");
+        EXPECT(m[1] && m[1]->dx == -3 && m[1]->dy == 7, "second step since the first");
+    }
+    gesture_touch(&g, false, 280, 230, 900);
+    EXPECT(count(G_TAP) == 0, "a move is never a tap");
+
+    n_seen = 0;
+    tap(&g, 233, 233, 2000);
+    EXPECT(n_seen == 1 && seen[0].kind == G_TAP, "a tap with moves on is still a tap");
+
+    n_seen = 0;
+    gesture_touch(&g, true, 233, 13, 3000); /* on the rim: a scrub, not moves */
+    gesture_touch(&g, true, 389, 77, 3040);
+    gesture_touch(&g, false, 389, 77, 3080);
+    EXPECT(count(G_MOVE) == 0 && count(G_SCRUB_START) == 1, "a rim drag scrubs, it does not move");
+
     if (!failures) printf("gesture tests passed\n");
     return failures ? 1 : 0;
 }

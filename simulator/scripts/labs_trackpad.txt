@@ -1,0 +1,51 @@
+# Experiments (issue 61ce): a swipe up on HOME opens LABS; Trackpad is blocked until the daemon's welcome
+# carries `pointer`. On the trackpad a tap is a left click (a quick second tap a double click), a hold a
+# right click, a centre drag moves the pointer and turning on the bezel scrolls; A goes back to LABS.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite
+wait 300
+expect_screen ring
+swipe 233 300 233 180 160
+wait 300
+expect_screen labs
+expect_label Experiments
+expect_label > Trackpad
+# no pointer in the welcome: the item explains why and a commit stays put
+tap 233 233
+wait 300
+expect_screen labs
+# a daemon that offers the pointer unblocks it
+rx a400020101020103a60082001401a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a200010100048168436f6e74696e756507f5
+wait 300
+shot labs.png
+tap 233 233
+wait 300
+expect_screen trackpad
+expect_label Trackpad
+shot trackpad.png
+tap 233 233
+wait 600
+expect_label clicks left 1 right 0 double 0
+tap 233 233
+tap 233 233
+wait 600
+expect_label clicks left 3 right 0 double 1
+hold 233 233 900
+wait 300
+expect_label clicks left 3 right 1 double 1
+drag 233 160 120 300
+wait 300
+# moves are accelerated past the tap slop and coalesced
+expect_label moved 0,167 wheel 0
+# a clockwise turn on the bezel scrolls down, one notch per sector
+scrub 30 120 400 200
+wait 300
+expect_label moved 0,167 wheel 5
+expect_screen trackpad
+btn A
+wait 300
+expect_screen labs
+chord
+wait 300
+expect_screen ring

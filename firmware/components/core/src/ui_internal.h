@@ -129,6 +129,26 @@ bool ui_status_act(nav_action_t a, const gesture_evt_t *g);
 bool ui_status_tick(uint32_t now_ms);    /* true: wants to close */
 void ui_status_report(ui_report_t *r);
 
+/* The LABS screen (ui_labs.c): the experiments menu (EXPERIMENTS.md). */
+lv_obj_t *ui_labs_init(lv_obj_t *screen);
+void ui_labs_open(uint32_t now_ms);
+void ui_labs_close(void);
+void ui_labs_refresh(uint32_t now_ms);
+bool ui_labs_act(nav_action_t a, const gesture_evt_t *g);
+bool ui_labs_tick(uint32_t now_ms); /* true: wants to close */
+void ui_labs_report(ui_report_t *r);
+void ui_go_trackpad(void);
+
+/* The TRACKPAD screen (ui_trackpad.c): the glass drives the PC's pointer (proto 0.20). */
+lv_obj_t *ui_trackpad_init(lv_obj_t *screen);
+void ui_trackpad_open(uint32_t now_ms);
+void ui_trackpad_close(void);
+void ui_trackpad_refresh(uint32_t now_ms);
+bool ui_trackpad_act(nav_action_t a, const gesture_evt_t *g);
+void ui_trackpad_tick(uint32_t now_ms); /* flushes the coalesced moves; TRACKPAD never closes by itself */
+void ui_trackpad_failed(int err, const char *msg);
+void ui_trackpad_report(ui_report_t *r);
+
 /* The WATCH screen (ui_watch.c): a live monitor for the session the deck has selected. */
 lv_obj_t *ui_watch_init(lv_obj_t *screen);
 void ui_watch_open(uint32_t sid, uint32_t now_ms);

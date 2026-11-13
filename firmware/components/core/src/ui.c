@@ -14,7 +14,7 @@
 #define TOAST_MS 1800
 
 const ui_actions_t *g_ui_actions;
-static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch, *s_voice, *s_keys, *s_read;
+static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch, *s_voice, *s_keys, *s_read, *s_labs, *s_trackpad;
 static nav_mode_t s_mode = MODE_HOME;
 static int s_rel_y;
 static bool s_link_up, s_animate = true;
@@ -102,6 +102,8 @@ void ui_init(const ui_actions_t *actions)
     s_voice = ui_voice_init(s_home);
     s_keys = ui_keys_init(s_home);
     s_read = ui_read_init(s_home);
+    s_labs = ui_labs_init(s_home);
+    s_trackpad = ui_trackpad_init(s_home);
     ui_countdown_init(s_home); /* over every mode's content, under the toast and the glow */
     create_overlays();
     lv_screen_load(s_home);
@@ -171,6 +173,8 @@ static void enter_mode(nav_mode_t m)
     if (s_mode == MODE_VOICE) ui_voice_close();
     if (s_mode == MODE_KEYS) ui_keys_close();
     if (s_mode == MODE_READ) ui_read_close();
+    if (s_mode == MODE_LABS) ui_labs_close();
+    if (s_mode == MODE_TRACKPAD) ui_trackpad_close();
     s_mode = m;
     ui_home_set_card_shown(m == MODE_HOME);
     if (m == MODE_AGENT) ui_agent_open(ui_home_sel_sid(), s_now_ms);
@@ -184,17 +188,27 @@ static void enter_mode(nav_mode_t m)
     else if (m == MODE_VOICE) ui_voice_open(ui_home_sel_sid(), s_voice_rid, s_voice_queue, s_voice_qi, s_voice_qlast, s_now_ms);
     else if (m == MODE_KEYS) ui_keys_open(ui_home_sel_sid(), s_now_ms);
     else if (m == MODE_READ) ui_read_open(ui_home_sel_sid(), s_now_ms);
+    else if (m == MODE_LABS) {
+        ui_home_refresh(s_now_ms);
+        ui_labs_open(s_now_ms);
+    }
+    else if (m == MODE_TRACKPAD) ui_trackpad_open(s_now_ms);
     else ui_home_refresh(s_now_ms); /* the ring shows sessions again */
     if (m != MODE_HOME && m != MODE_KEYS) { /* deeper modes rise into place; KEYS records strokes at once */
-        lv_obj_t *const roots[MODE_COUNT] = {NULL, s_agent, s_ask, s_scroll, s_status, s_watch, s_voice, s_keys, s_read};
+        lv_obj_t *const roots[MODE_COUNT] = {NULL, s_agent, s_ask, s_scroll, s_status, s_watch, s_voice, s_keys, s_read, s_labs, s_trackpad};
         ui_motion_enter(roots[m]);
     }
     dbg_event("ui", "mode", "\"mode\":\"%s\"", nav_mode_name(m));
 }
 
-/* ASK or SCROLL opened over WATCH goes back to WATCH when it closes, if the watched session is still there. */
+/* ASK or SCROLL opened over WATCH goes back to WATCH when it closes, if the watched session is still there.
+ * TRACKPAD goes back to the experiments it was opened from. */
 static void leave_mode(void)
 {
+    if (s_mode == MODE_TRACKPAD) {
+        enter_mode(MODE_LABS);
+        return;
+    }
     uint32_t sid = s_mode == MODE_ASK || s_mode == MODE_SCROLL ? s_resume_watch_sid : 0;
     const session_t *s = sid ? model_find(sid) : NULL;
     enter_mode(MODE_HOME);
@@ -240,11 +254,17 @@ void ui_go_replies(void)
     if (s_mode == MODE_AGENT) ui_agent_show_replies();
 }
 void ui_go_keys(void) { enter_mode(MODE_KEYS); }
+void ui_go_trackpad(void) { enter_mode(MODE_TRACKPAD); }
 uint32_t ui_watched_sid(void) { return s_mode == MODE_WATCH ? ui_watch_sid() : 0; }
 
 void ui_scroll_failed(void)
 {
     if (s_mode == MODE_SCROLL) leave_mode();
+}
+
+void ui_pointer_failed(int err, const char *msg)
+{
+    if (s_mode == MODE_TRACKPAD) ui_trackpad_failed(err, msg);
 }
 
 void ui_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total, uint32_t total, const char *preview)
@@ -302,6 +322,8 @@ void ui_report(ui_report_t *r)
     else if (s_mode == MODE_VOICE) ui_voice_report(r);
     else if (s_mode == MODE_KEYS) ui_keys_report(r);
     else if (s_mode == MODE_READ) ui_read_report(r);
+    else if (s_mode == MODE_LABS) ui_labs_report(r);
+    else if (s_mode == MODE_TRACKPAD) ui_trackpad_report(r);
     else ui_home_report(r);
 }
 
@@ -369,6 +391,8 @@ void ui_tick(uint32_t now_ms)
         if (s_mode == MODE_VOICE && !ui_voice_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_KEYS && !ui_keys_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_READ && !ui_read_refresh(now_ms)) enter_mode(MODE_HOME);
+        if (s_mode == MODE_LABS) ui_labs_refresh(now_ms);
+        if (s_mode == MODE_TRACKPAD) ui_trackpad_refresh(now_ms);
         if (s_mode == MODE_WATCH && !ui_watch_refresh(now_ms)) {
             enter_mode(MODE_HOME);
             ui_toast("Session ended", RGB_IDLE);
@@ -392,6 +416,8 @@ void ui_tick(uint32_t now_ms)
     }
     if (s_mode == MODE_KEYS) ui_keys_tick(now_ms);
     if (s_mode == MODE_READ) ui_read_tick(now_ms);
+    if (s_mode == MODE_LABS && ui_labs_tick(now_ms)) enter_mode(MODE_HOME);
+    if (s_mode == MODE_TRACKPAD) ui_trackpad_tick(now_ms);
     /* the answer window runs on the request it belongs to: on ASK, and on its card on the deck */
     ui_countdown_show(s_mode == MODE_ASK ? ui_ask_request() : s_mode == MODE_HOME ? ui_home_sel_request() : NULL, now_ms);
 }
@@ -403,7 +429,7 @@ bool ui_on_gesture(const gesture_evt_t *g)
     if (g->kind == G_RELEASE) s_rel_y = g->y;
     nav_zone_t zone = nav_centre(g->x, g->y) ? ZONE_CENTRE : ZONE_RIM;
     nav_action_t a = nav_lookup(s_mode, g->kind, zone, ui_home_request_pending(), ui_home_askable());
-    if (a != NAV_NONE && g->kind != G_PRESS && g->kind != G_RELEASE)
+    if (a != NAV_NONE && g->kind != G_PRESS && g->kind != G_RELEASE && g->kind != G_MOVE) /* moves: a stream */
         dbg_event("ui", "nav", "\"mode\":\"%s\",\"gesture\":\"%s\",\"action\":\"%s\"", nav_mode_name(s_mode),
                   gesture_name(g->kind), nav_action_name(a));
     switch (a) {
@@ -433,6 +459,11 @@ bool ui_on_gesture(const gesture_evt_t *g)
     case NAV_OPEN_STATUS:
         ui_home_note_input();
         enter_mode(MODE_STATUS);
+        g_ui_actions->tick();
+        return true;
+    case NAV_OPEN_LABS:
+        ui_home_note_input();
+        enter_mode(MODE_LABS);
         g_ui_actions->tick();
         return true;
     case NAV_BACK:
@@ -505,6 +536,14 @@ bool ui_on_gesture(const gesture_evt_t *g)
     if (s_mode == MODE_WATCH) {
         ui_home_note_input();
         return ui_watch_act(a, g);
+    }
+    if (s_mode == MODE_LABS) {
+        ui_home_note_input();
+        return ui_labs_act(a, g);
+    }
+    if (s_mode == MODE_TRACKPAD) {
+        ui_home_note_input();
+        return ui_trackpad_act(a, g);
     }
     return ui_home_act(a, g);
 }

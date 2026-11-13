@@ -43,8 +43,8 @@ tap 233 233
 wait 200
 expect_screen ring
 shot agent_commit_toast.png
-# swipe up opens it too; a swipe down never goes back (the centre drag moves the list); swipe right does
-swipe 233 300 233 180 160
+# a swipe down never goes back (the centre drag moves the list); swipe right does
+tap 233 233
 wait 300
 expect_screen agent
 swipe 233 200 233 260 160

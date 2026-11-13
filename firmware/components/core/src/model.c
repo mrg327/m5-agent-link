@@ -67,6 +67,14 @@ void model_set_keys(bool on)
 }
 bool model_keys(void) { return s_keys; }
 
+static bool s_pointer;
+void model_set_pointer(bool on)
+{
+    s_pointer = on;
+    s_rev++;
+}
+bool model_pointer(void) { return s_pointer; }
+
 uint32_t model_rev(void) { return s_rev; }
 
 void model_copy_str(char *dst, size_t cap, const uint8_t *src, size_t len)

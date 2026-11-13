@@ -177,6 +177,7 @@ static void on_welcome(const struct welcome *w)
     }
     model_set_voice(w->welcome_uint5bool_present && w->welcome_uint5bool.welcome_uint5bool);
     model_set_keys(w->welcome_uint6bool_present && w->welcome_uint6bool.welcome_uint6bool);
+    model_set_pointer(w->welcome_uint7bool_present && w->welcome_uint7bool.welcome_uint7bool); /* proto 0.20 */
     /* A welcome starts a new link, possibly with a restarted daemon whose request ids and
        session ids begin again. A card kept from before could then name a different request
        (issue 20261109-1173), so drop them all; the daemon re-sends the open ones next. */

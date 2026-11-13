@@ -168,7 +168,7 @@
         "when": "with a permission or question pending",
         "nav": "NAV_OPEN_ASK",
         "action": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
-        "source": "firmware/components/core/src/nav.c:8"
+        "source": "firmware/components/core/src/nav.c:9"
       },
       {
         "gesture": "G_TAP",
@@ -177,7 +177,7 @@
         "when": "with nothing to answer",
         "nav": "NAV_OPEN_AGENT",
         "action": "Open the per-agent wheel for the selected session",
-        "source": "firmware/components/core/src/nav.c:9"
+        "source": "firmware/components/core/src/nav.c:10"
       },
       {
         "gesture": "G_DOUBLE_TAP",
@@ -186,7 +186,7 @@
         "when": "with a permission or question pending",
         "nav": "NAV_OPEN_ASK",
         "action": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
-        "source": "firmware/components/core/src/nav.c:10"
+        "source": "firmware/components/core/src/nav.c:11"
       },
       {
         "gesture": "G_DOUBLE_TAP",
@@ -195,19 +195,10 @@
         "when": "with nothing to answer",
         "nav": "NAV_OPEN_AGENT",
         "action": "Open the per-agent wheel for the selected session",
-        "source": "firmware/components/core/src/nav.c:11"
-      },
-      {
-        "gesture": "G_TAP",
-        "mode": "home",
-        "zone": "rim",
-        "when": "",
-        "nav": "NAV_PICK_RIM",
-        "action": "Select the segment under the finger on the HOME ring (AGENT and ASK rows are tapped directly)",
         "source": "firmware/components/core/src/nav.c:12"
       },
       {
-        "gesture": "G_DOUBLE_TAP",
+        "gesture": "G_TAP",
         "mode": "home",
         "zone": "rim",
         "when": "",
@@ -216,21 +207,21 @@
         "source": "firmware/components/core/src/nav.c:13"
       },
       {
-        "gesture": "G_SWIPE_UP",
+        "gesture": "G_DOUBLE_TAP",
         "mode": "home",
-        "zone": "centre",
-        "when": "with a permission or question pending",
-        "nav": "NAV_OPEN_ASK",
-        "action": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
+        "zone": "rim",
+        "when": "",
+        "nav": "NAV_PICK_RIM",
+        "action": "Select the segment under the finger on the HOME ring (AGENT and ASK rows are tapped directly)",
         "source": "firmware/components/core/src/nav.c:14"
       },
       {
         "gesture": "G_SWIPE_UP",
         "mode": "home",
         "zone": "centre",
-        "when": "with nothing to answer",
-        "nav": "NAV_OPEN_AGENT",
-        "action": "Open the per-agent wheel for the selected session",
+        "when": "",
+        "nav": "NAV_OPEN_LABS",
+        "action": "Open Experiments (swipe up on the deck): a wheel of experimental features, the first is the Trackpad",
         "source": "firmware/components/core/src/nav.c:15"
       },
       {
@@ -1105,6 +1096,204 @@
         "nav": "NAV_HOME",
         "action": "A+B chord: straight back to the deck",
         "source": "firmware/components/core/src/nav.c:132"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "labs",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_COMMIT",
+        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "source": "firmware/components/core/src/nav.c:134"
+      },
+      {
+        "gesture": "G_DOUBLE_TAP",
+        "mode": "labs",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_COMMIT",
+        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "source": "firmware/components/core/src/nav.c:135"
+      },
+      {
+        "gesture": "G_SWIPE_DOWN",
+        "mode": "labs",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "source": "firmware/components/core/src/nav.c:136"
+      },
+      {
+        "gesture": "G_SWIPE_RIGHT",
+        "mode": "labs",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "source": "firmware/components/core/src/nav.c:137"
+      },
+      {
+        "gesture": "G_LONG_PRESS",
+        "mode": "labs",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_HOLD_LONG",
+        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "source": "firmware/components/core/src/nav.c:138"
+      },
+      {
+        "gesture": "G_SCRUB_START",
+        "mode": "labs",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:139"
+      },
+      {
+        "gesture": "G_SCRUB",
+        "mode": "labs",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:140"
+      },
+      {
+        "gesture": "G_SCRUB_END",
+        "mode": "labs",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:141"
+      },
+      {
+        "gesture": "G_BTN_A",
+        "mode": "labs",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_COMMIT",
+        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "source": "firmware/components/core/src/nav.c:142"
+      },
+      {
+        "gesture": "G_BTN_B",
+        "mode": "labs",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_NEXT",
+        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "source": "firmware/components/core/src/nav.c:143"
+      },
+      {
+        "gesture": "G_BTN_B_LONG",
+        "mode": "labs",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "source": "firmware/components/core/src/nav.c:144"
+      },
+      {
+        "gesture": "G_CHORD",
+        "mode": "labs",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_HOME",
+        "action": "A+B chord: straight back to the deck",
+        "source": "firmware/components/core/src/nav.c:145"
+      },
+      {
+        "gesture": "G_MOVE",
+        "mode": "trackpad",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_POINTER",
+        "action": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
+        "source": "firmware/components/core/src/nav.c:148"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "trackpad",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_POINTER",
+        "action": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
+        "source": "firmware/components/core/src/nav.c:149"
+      },
+      {
+        "gesture": "G_DOUBLE_TAP",
+        "mode": "trackpad",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_POINTER",
+        "action": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
+        "source": "firmware/components/core/src/nav.c:150"
+      },
+      {
+        "gesture": "G_LONG_PRESS",
+        "mode": "trackpad",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_POINTER",
+        "action": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
+        "source": "firmware/components/core/src/nav.c:151"
+      },
+      {
+        "gesture": "G_SCRUB_START",
+        "mode": "trackpad",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:152"
+      },
+      {
+        "gesture": "G_SCRUB",
+        "mode": "trackpad",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:153"
+      },
+      {
+        "gesture": "G_SCRUB_END",
+        "mode": "trackpad",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "A drag around the rim moves the selection with a detent per step",
+        "source": "firmware/components/core/src/nav.c:154"
+      },
+      {
+        "gesture": "G_BTN_A",
+        "mode": "trackpad",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "source": "firmware/components/core/src/nav.c:155"
+      },
+      {
+        "gesture": "G_BTN_B_LONG",
+        "mode": "trackpad",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "source": "firmware/components/core/src/nav.c:156"
+      },
+      {
+        "gesture": "G_CHORD",
+        "mode": "trackpad",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_HOME",
+        "action": "A+B chord: straight back to the deck",
+        "source": "firmware/components/core/src/nav.c:157"
       }
     ],
     "chord": "A + B held together: Home from any mode (logged on the deck, no action there)",
@@ -1114,7 +1303,7 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:109"
+      "source": "firmware/components/core/src/ui.c:111"
     },
     {
       "id": "attention",
@@ -1510,6 +1699,13 @@
           "type": "bool",
           "note": "keys     the daemon decodes kb_stroke into kb_cands and types them",
           "name": "keys"
+        },
+        {
+          "key": 7,
+          "optional": true,
+          "type": "bool",
+          "note": "pointer  the daemon moves its own machine's pointer for cmd_op_pointer",
+          "name": "pointer"
         }
       ],
       "source": "protocol/agentlink.cddl:58"
@@ -2025,6 +2221,13 @@
           "type": "answer_aids",
           "note": "aids   with cmd_op_answer: per question, the recording (aid) whose transcript is the free",
           "name": "aids"
+        },
+        {
+          "key": 9,
+          "optional": true,
+          "type": "pointer_arg",
+          "note": "ptr  with cmd_op_pointer (proto 0.20)",
+          "name": "ptr"
         }
       ],
       "source": "protocol/agentlink.cddl:64"
@@ -5400,46 +5603,46 @@
     "display.height": "firmware/boards/stopwatch/board_priv.h:28",
     "display.shape": "firmware/boards/stopwatch/display.cpp:1",
     "display.width": "firmware/boards/stopwatch/board_priv.h:27",
-    "gesture.agent_timeout_ms": "firmware/components/core/src/nav.h:73",
-    "gesture.b_immediate": "firmware/components/core/src/gesture.c:227",
+    "gesture.agent_timeout_ms": "firmware/components/core/src/nav.h:76",
+    "gesture.b_immediate": "firmware/components/core/src/gesture.c:250",
     "gesture.btn_double_ms": "firmware/components/core/src/gesture.h:12",
-    "gesture.card_arm_ms": "firmware/components/core/src/nav.h:71",
-    "gesture.centre_r_px": "firmware/components/core/src/nav.h:64",
+    "gesture.card_arm_ms": "firmware/components/core/src/nav.h:74",
+    "gesture.centre_r_px": "firmware/components/core/src/nav.h:67",
     "gesture.cx_px": "firmware/components/core/src/gesture.h:22",
     "gesture.cy_px": "firmware/components/core/src/gesture.h:23",
-    "gesture.deny_hold_ms": "firmware/components/core/src/nav.h:66",
+    "gesture.deny_hold_ms": "firmware/components/core/src/nav.h:69",
     "gesture.drag_step_px": "firmware/components/core/src/gesture.h:15",
     "gesture.flick_px_per_s": "firmware/components/core/src/gesture.h:17",
     "gesture.flick_window_ms": "firmware/components/core/src/gesture.h:18",
-    "gesture.hold_confirm_ms": "firmware/components/core/src/nav.h:65",
-    "gesture.hold_show_ms": "firmware/components/core/src/nav.h:68",
+    "gesture.hold_confirm_ms": "firmware/components/core/src/nav.h:68",
+    "gesture.hold_show_ms": "firmware/components/core/src/nav.h:71",
     "gesture.long_press_ms": "firmware/components/core/src/gesture.h:7",
-    "gesture.long_swipe_px": "firmware/components/core/src/nav.h:72",
-    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:161",
-    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:162",
+    "gesture.long_swipe_px": "firmware/components/core/src/nav.h:75",
+    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:174",
+    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:175",
     "gesture.rim_in_px": "firmware/components/core/src/gesture.h:24",
     "gesture.rim_out_px": "firmware/components/core/src/gesture.h:25",
     "gesture.rim_track_in_px": "firmware/components/core/src/gesture.h:26",
     "gesture.rim_track_out_px": "firmware/components/core/src/gesture.h:27",
-    "gesture.scroll_coalesce_ms": "firmware/components/core/src/nav.h:81",
-    "gesture.scroll_lines_per_step": "firmware/components/core/src/nav.h:80",
-    "gesture.scroll_timeout_ms": "firmware/components/core/src/nav.h:74",
+    "gesture.scroll_coalesce_ms": "firmware/components/core/src/nav.h:94",
+    "gesture.scroll_lines_per_step": "firmware/components/core/src/nav.h:93",
+    "gesture.scroll_timeout_ms": "firmware/components/core/src/nav.h:77",
     "gesture.scrub_hyst_deg": "firmware/components/core/src/gesture.h:29",
-    "gesture.scrub_hysteresis_cap": "firmware/components/core/src/gesture.c:70",
+    "gesture.scrub_hysteresis_cap": "firmware/components/core/src/gesture.c:90",
     "gesture.scrub_start_deg": "firmware/components/core/src/gesture.h:28",
-    "gesture.status_timeout_ms": "firmware/components/core/src/nav.h:75",
+    "gesture.status_timeout_ms": "firmware/components/core/src/nav.h:78",
     "gesture.swipe_max_ms": "firmware/components/core/src/gesture.h:9",
     "gesture.swipe_min_px": "firmware/components/core/src/gesture.h:8",
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:913",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:855",
-    "gesture_map.chord": "firmware/components/core/src/app.c:514",
+    "gesture_map.chord": "firmware/components/core/src/app.c:525",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:196",
-    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:173",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:406",
+    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:198",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:411",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:16",
-    "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:8",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:541",
+    "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:9",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:552",
     "haptics.approved": "firmware/components/core/src/feedback.c:80",
     "haptics.denied": "firmware/components/core/src/feedback.c:87",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:67",

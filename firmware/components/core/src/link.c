@@ -246,6 +246,40 @@ bool link_send_answer(uint32_t sid, uint32_t rid, const uint32_t *picks, const u
     return finish_cmd(LINK_OP_ANSWER, sid, rid, hold_ms, -1);
 }
 
+bool link_send_pointer(int dx, int dy, int btn, int n, int wheel)
+{
+    if (!model_pointer()) return false;
+    struct cmd *c = begin_cmd(LINK_OP_POINTER, 0, 0, 0);
+    if (!c) return false;
+    c->cmd_pointer_arg_m_present = true;
+    struct pointer_arg *p = &c->cmd_pointer_arg_m.cmd_pointer_arg_m;
+    if (dx) {
+        p->pointer_arg_uint0int_present = true;
+        p->pointer_arg_uint0int.pointer_arg_uint0int = dx;
+    }
+    if (dy) {
+        p->pointer_arg_uint1int_present = true;
+        p->pointer_arg_uint1int.pointer_arg_uint1int = dy;
+    }
+    if (btn >= 0) {
+        p->pointer_arg_pointer_btn_m_present = true;
+        p->pointer_arg_pointer_btn_m.pointer_arg_pointer_btn_m.pointer_btn_choice =
+            btn ? pointer_btn_pointer_right_m_c : pointer_btn_pointer_left_m_c;
+        if (n > 1) {
+            p->pointer_arg_uint3uint_present = true;
+            p->pointer_arg_uint3uint.pointer_arg_uint3uint = (uint32_t)n;
+        }
+    }
+    if (wheel) {
+        p->pointer_arg_uint4int_present = true;
+        p->pointer_arg_uint4int.pointer_arg_uint4int = wheel;
+    }
+    /* moves are many and small: only clicks and scrolls are logged */
+    if (btn >= 0 || wheel)
+        dbg_event("link", "tx_pointer", "\"dx\":%d,\"dy\":%d,\"btn\":%d,\"n\":%d,\"wheel\":%d", dx, dy, btn, n, wheel);
+    return finish_cmd(LINK_OP_POINTER, 0, 0, 0, -1);
+}
+
 bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq)
 {
     struct cmd *c = begin_cmd(LINK_OP_SCROLL, sid, 0, 0);

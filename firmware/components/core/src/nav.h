@@ -8,7 +8,8 @@
 #include "gesture.h"
 #include "model.h"
 
-typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_STATUS, MODE_WATCH, MODE_VOICE, MODE_KEYS, MODE_READ, MODE_COUNT } nav_mode_t;
+typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_STATUS, MODE_WATCH, MODE_VOICE, MODE_KEYS, MODE_READ, MODE_LABS, MODE_TRACKPAD,
+               MODE_COUNT } nav_mode_t;
 
 /* Where a touch gesture happened, by its press (or swipe start) point. */
 typedef enum { ZONE_ANY, ZONE_CENTRE, ZONE_RIM } nav_zone_t;
@@ -41,6 +42,8 @@ typedef enum {
     NAV_PAGE_NEWER,     /* SCROLL: a page toward newer output (button B) */
     NAV_TO_BOTTOM,      /* SCROLL: button A: back to the live bottom, then leave */
     NAV_ERASE,          /* KEYS: button B: delete the last typed word */
+    NAV_OPEN_LABS,      /* HOME → LABS (swipe up): the experiments menu (EXPERIMENTS.md) */
+    NAV_POINTER,        /* TRACKPAD: the gesture kind says move (G_MOVE), left click (G_TAP) or right click (G_LONG_PRESS) */
     NAV_COUNT
 } nav_action_t;
 
@@ -73,7 +76,17 @@ const char *nav_action_name(nav_action_t a);
 #define NAV_AGENT_TIMEOUT_MS 8000
 #define NAV_SCROLL_TIMEOUT_MS 8000 /* SCROLL closes this long after the last input */
 #define NAV_STATUS_TIMEOUT_MS 8000 /* STATUS closes this long after the last input */
-/* WATCH has no timeout: it monitors until the user leaves (UI-V2 §4.7). */
+#define NAV_LABS_TIMEOUT_MS 8000   /* LABS closes this long after the last input */
+/* WATCH has no timeout: it monitors until the user leaves (UI-V2 §4.7). TRACKPAD has none either. */
+
+/* ── TRACKPAD (EXPERIMENTS.md): the device side of cmd_op_pointer ── */
+#define NAV_POINTER_COALESCE_MS 30 /* moves are summed into one command per window (an idle link sends at once) */
+#define NAV_POINTER_SECTORS 24     /* the bezel: one wheel notch per 15 degrees, clockwise = down */
+#define NAV_DOUBLE_CLICK_MS 400    /* a tap this soon after the last one, near it, is the second click of a double click */
+#define NAV_DOUBLE_CLICK_PX 40
+/* Pointer pixels for a finger step: 1.2x, plus up to 4x for fast strokes (pointer acceleration). Scaled by 10 so
+ * the remainder can be carried: returns tenths of a pixel. */
+int nav_pointer_gain10(int dx, int dy);
 
 /* ── SCROLL (UI-V2 §4.4, §6): the device side of cmd_op_scroll ── */
 typedef enum { SCROLL_LINES = 0, SCROLL_PAGES = 1, SCROLL_TO_END = 2 } nav_scroll_unit_t; /* wire values */

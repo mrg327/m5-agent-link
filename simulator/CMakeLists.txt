@@ -178,6 +178,10 @@ set_tests_properties(sim_deck_ambient PROPERTIES TIMEOUT 60)
 # UI-V2 Phase 2: the AGENT wheel.
 sim_script_test(sim_actions_wheel actions_wheel.txt)
 sim_script_test(sim_agent_timeout agent_timeout.txt)
+# Experiments (issue 61ce): LABS and the Trackpad; a blocked item never opens, clicks and wheel go out as op 20.
+sim_script_test(sim_labs_trackpad labs_trackpad.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"btn\":0,\"n\":2.*\"btn\":1,\"n\":1.*\"wheel\":1")
 # UI-V2 Phase 3: ASK. Question options reply by tap; grants and Deny are holds; a tap never approves;
 # a rejected answer restores the options; a hold is bound to its request id.
 sim_script_test(sim_ask_reply ask_reply.txt

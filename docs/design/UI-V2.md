@@ -38,7 +38,7 @@ Six modes, one screen each. HOME is the only place you can stay, except WATCH, w
                                      └──────────┘
 ```
 
-- **HOME (deck).** One session card in the centre, a thin pinned index ring at the rim. Scrub, B or a side swipe changes the session. Button A does the state's default action (Focus). Tap centre or swipe up opens AGENT.
+- **HOME (deck).** One session card in the centre, a thin pinned index ring at the rim. Scrub, B or a side swipe changes the session. Button A does the state's default action (Focus). Tap centre opens AGENT; swipe up opens Experiments ([EXPERIMENTS.md](EXPERIMENTS.md), issue 61ce).
 - **AGENT.** The per-agent screen (user decision §9.1): a curved list ("wheel") of that session's actions, default item preselected, with gesture shortcuts layered on it. Scrub moves, tap commits a safe item, hold commits a destructive one.
 - **ASK.** Opened automatically when an attention (question, permission) arrives while the display is on, or on the first touch during a glow. It is AGENT with the agent's prompt text above the wheel and the agent's options as items. Done/error attentions do not open ASK; they update the card and buzz.
 - **STATUS.** Link, host, battery, quiet mode, sounds. Swipe down from HOME; the empty deck points at it (§4.5).
@@ -60,7 +60,7 @@ One table, every input × mode. "—" means ignored (and logged). Thresholds: lo
 | Rim scrub CW / CCW | wake | next / previous session (detent) | next / previous item (detent) | next / previous option (detent) | — | next / previous row | next / previous session |
 | Tap rim | wake | select the session under the finger | select the item at that angle (items are laid out on the ring) | same | — | — | watch the session under the finger |
 | Vertical drag in centre | wake | — | — | — | trackpad: 1 line per 10 px past the tap slop, a detent per 3 lines; a fast release glides on | — | opens SCROLL on the watched session and scrolls (issue 5cbb) |
-| Swipe up (centre) | wake | open AGENT (ASK when a request is pending) | — | — | its drag lines, then the glide (never a page) | back to HOME | its drag scrolls (SCROLL), it no longer leaves |
+| Swipe up (centre) | wake | open Experiments (LABS, issue 61ce) | — | — | its drag lines, then the glide (never a page) | back to HOME | its drag scrolls (SCROLL), it no longer leaves |
 | Swipe down (centre) | wake | open STATUS | back to HOME | **Deny** (permission only, strict) | its drag lines, then the glide (never a page, deny or back) | — | — |
 | Swipe left / right | wake | next / previous session | — | — | — | — | — |
 | Button A short | wake | default action (Focus; Done also acks) | commit selected item (safe only) | **Open on PC** (focus), whatever is selected: A never approves | to bottom (live), back to WATCH | commit row (Quiet: off → 30 min → 1 h → off; Sounds: on/off; information rows: nothing) | focus the terminal |
@@ -202,7 +202,7 @@ Items in *italics* need a daemon that types into terminals (decision 28: the wel
 - The prompt text is the top half of the screen; the options are the wheel in the bottom half (three rows, the selected one at y 272). Nothing is hidden behind a gesture. The `HOLD` tag has a fixed slot at the right end of the selected row, in place of the right chevron, so every hold item reads the same whatever its label length.
 - Order: `attention.opts` verbatim with the first option selected (the agent's own default); a bare permission shows Approve · Deny; "Open on PC" is always the last item. In a permission, an option that does not grant (the agent's "No") is a deny-class hold (0.8 s), never a tap.
 - Colour says what an item does, never alone: orange grants, vermillion denies, yellow answers a question, sky blue goes to the PC; the arc and the haptic ramp follow the item.
-- Opening ASK: a permission or question that arrives while the display is on opens it directly; during a glow the first touch reveals it; on the deck a tap, double tap or swipe up on a request's card opens it (the pill reads `TAP › ANSWER`). The deck itself has no hold: nothing on HOME can approve.
+- Opening ASK: a permission or question that arrives while the display is on opens it directly; during a glow the first touch reveals it; on the deck a tap or double tap on a request's card opens it (the pill reads `TAP › ANSWER`). The deck itself has no hold: nothing on HOME can approve.
 - **Approve-class options (anything that grants permission, including "don't ask again" variants, and `Always allow` with a longer 1.6 s hold, [STANDING-RULES.md](STANDING-RULES.md)) commit only by hold.** The hold starts after 250 ms, and only once the card has been on screen 300 ms (`CARD_ARM_MS`); it fills a 10 px arc in the item's colour from 12 o'clock over the index ring, with the escalating haptic ramp; early release cancels; the hold is bound to `rid` and cancels if the attention changes or is cleared.
 - Deny commits by hold (0.8 s, falling haptic) **or** by the strict swipe down (≥ 120 px, starting above the centre line). Both answer with `cmd_op_deny`.
 - Question options (`attention.opts`, ≤ 4 × 24 chars) commit by tap or A; they are not destructive. The reply is `cmd_op_reply` with `arg = option index`.
@@ -489,7 +489,7 @@ Safety is in the interaction layer, so every skin keeps it for free: a tap is ne
 
 ## 9. Decided (user answers, 2026-11-07)
 
-1. **Tap centre opens the per-agent screen.** It is the wheel with gesture shortcuts layered on it (§4.2 explains why not a bare gesture pad). Swipe up does the same. Button A stays the eyes-free default action.
+1. **Tap centre opens the per-agent screen.** It is the wheel with gesture shortcuts layered on it (§4.2 explains why not a bare gesture pad). Swipe up does the same. Button A stays the eyes-free default action. (Swipe up was later given to Experiments, issue 61ce.)
 2. **Deny: both** the 0.8 s hold item and the strict swipe (≥ 120 px, starting above the centre).
 3. **Scroll by vertical swipe/drag**, not by rim scrub. The rim is unused in SCROLL; session switching is horizontal or on the rim, so the two never meet (§3).
 4. **Scroll entry only from the AGENT wheel.** Long-press centre on HOME is reserved (no action).
@@ -502,7 +502,7 @@ Safety is in the interaction layer, so every skin keeps it for free: a tap is ne
 Phase 3 decisions (2026-11-08, implementation):
 
 10. **`grant_mask` is an optional key** (`attention` key 8), sent whenever `opts` is: an older daemon without it still works (no grants offered), and the existing vectors stay valid. `cmd.arg` becomes `uint / tstr` in the CDDL (zcbor encodes `any` as `nil`); the watch sends Snooze with `arg = 30` explicitly.
-11. **The deck no longer holds.** Approving is: open ASK (tap, swipe up, or automatically on arrival), then hold. One hold path to audit instead of two; §3's "HOME hold = —" now matches the code.
+11. **The deck no longer holds.** Approving is: open ASK (tap, or automatically on arrival), then hold. One hold path to audit instead of two; §3's "HOME hold = —" now matches the code.
 12. **Claude Code hooks: `PermissionRequest` + `PreToolUse`(`AskUserQuestion`), 15 s window, silence = no decision** (DESIGN §6a fallback 2). Multi-question / multi-select prompts and Copilot are not offered to the watch yet (multi-question and multi-select: proto 0.18, [LAST-MESSAGE.md](LAST-MESSAGE.md)). (2026-11-12: the window is a daemon setting, 60 s by default, shown on the watch as a countdown ring: [ANSWER-WINDOW.md](ANSWER-WINDOW.md). Silence still never decides.)
 13. **Question defaults**: the first option is preselected (the agent's own default); ASK has no idle timeout, it waits for the answer or the daemon's `clear`.
 
@@ -554,6 +554,9 @@ Swipe keyboard (2026-11-10, user decisions, issue 1e57):
 33. **KEYS: swipe on the watch, decode on the PC.** The watch only records strokes over a QWERTY layout; the daemon decodes them against a lexicon with the terminal's context and types the best word straight into the session's terminal, so the watch never shows the composed text. Candidates sit in the top cap; Enter needs a hold.
 
 34. **Watch leads every wheel; holding still leaves WATCH** (issue dd44, 2026-11-10). The user asked for "tap, tap" from the deck to the monitor, and a third tap focuses the terminal, so Watch is the first (default) item in every state. WATCH also needed a touch way back besides B long and the A+B chord: a long press on the centre (600 ms without moving) is unused everywhere else and cannot be mistaken for the drag that scrolls, which starts only once the finger moves.
+35. **Swipe up on HOME opens Experiments** (issue 61ce, 2026-11-13). The user gave the swipe up to a menu of
+    experimental features that are not part of the agent flow (the first is a Trackpad for the PC). Tap centre
+    still opens AGENT or ASK, so nothing lost a path. See [EXPERIMENTS.md](EXPERIMENTS.md).
 
 ## 10. Decisions that reconcile DESIGN.md and UI-RING.md
 

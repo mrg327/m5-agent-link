@@ -347,6 +347,9 @@ static void act_scroll(uint32_t sid, nav_scroll_unit_t unit, int delta)
     if (!link_send_scroll(sid, (int)unit, delta, ++seq)) ui_toast("Offline", RGB_AMBER);
 }
 
+static bool act_pointer(int dx, int dy, int btn, int n, int wheel) { return link_send_pointer(dx, dy, btn, n, wheel); }
+static void act_moves(bool on) { gesture_set_moves(&s_gesture, on); }
+
 /* The nag is an alert too: quiet mode holds it as it holds the arrival buzz. */
 static uint32_t s_muted_rid, s_muted_sid; /* the request a palm cover silenced (0 = none) */
 
@@ -388,7 +391,9 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .nag = act_nag,
                                        .sent = feedback_approved,
                                        .button_down = act_button_down,
-                                       .sectors = app_set_sectors};
+                                       .sectors = app_set_sectors,
+                                       .pointer = act_pointer,
+                                       .moves = act_moves};
 
 /* ── link → app ── */
 
@@ -468,6 +473,12 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
             model_upsert(&d, SF_NO_SCROLL);
         }
         ui_scroll_failed(); /* back to WATCH, where the toast explains */
+    }
+    if (op == LINK_OP_POINTER) { /* TRACKPAD says why (e.g. the Accessibility permission); one toast */
+        ui_pointer_failed(err, msg);
+        ui_toast(err == 1 ? "Not allowed on the PC" : err == 2 ? "Not supported" : "Failed", RGB_AMBER);
+        feedback_reject();
+        return;
     }
     static const char *const errs[] = {"Out of date", "Denied", "Not supported", "No window", "Timed out", "Failed"};
     const char *text = err >= 0 && err < 6 ? errs[err] : msg[0] ? msg : "Failed";
