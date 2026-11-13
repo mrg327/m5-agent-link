@@ -14,7 +14,8 @@ typedef enum {
     LINK_OP_REPLY = 5, LINK_OP_CANCEL = 6, LINK_OP_DETAIL = 7, LINK_OP_NOTIFY_DONE = 8, LINK_OP_SCROLL = 10, LINK_OP_TYPE = 11,
     LINK_OP_DICTATE = 12, LINK_OP_KB_PICK = 13, LINK_OP_KB_DEL = 14, LINK_OP_KB_SEND = 15, LINK_OP_KB_END = 16,
     LINK_OP_RERUN = 17, /* JOBS: run a finished job again */
-    LINK_OP_UNQUEUE = 18 /* proto 0.17: drop the session's queued message */
+    LINK_OP_UNQUEUE = 18, /* proto 0.17: drop the session's queued message */
+    LINK_OP_ANSWER = 19   /* proto 0.18: answer a request's questions at once (picks / aids) */
 } link_op_t;
 #define LINK_OP_UNKNOWN (-1)
 
@@ -72,6 +73,9 @@ bool link_send_cmd_arg(link_op_t op, uint32_t sid, uint32_t rid, uint32_t arg, u
 bool link_send_cmd_queued(link_op_t op, uint32_t sid, uint32_t arg, uint32_t hold_ms);
 /* cmd_op_approve with rh (proto 0.13, STANDING-RULES.md): approve and save the standing rule whose hash is rh. */
 bool link_send_approve_rule(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32_t rh);
+/* cmd_op_answer (proto 0.18, LAST-MESSAGE.md §3): per question of request rid, the options picked (a bit mask) and
+ * the recording whose transcript is a free answer (0 = none); after a hold. n is 1..4. */
+bool link_send_answer(uint32_t sid, uint32_t rid, const uint32_t *picks, const uint32_t *aids, int n, uint32_t hold_ms);
 /* cmd_op_scroll with scroll_arg {unit, delta, seq}; unit is a nav_scroll_unit_t wire value. */
 bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq);
 /* Firmware update (proto 0.15): fw_ack {st, next, msg}; st is the wire value (0 go, 1 done, 2 busy, 3 bad, 4 fail, 5 stopped). */

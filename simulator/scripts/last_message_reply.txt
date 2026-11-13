@@ -1,0 +1,41 @@
+# At the end of the last message: Reply opens the Reply list (the user's quick replies; a tap types one, op 11),
+# and Dictate opens VOICE, whose hold types the transcript into the session (op 12, no rid).
+connect
+rx a400020101020103a60082001201a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 1 done webapp feat/login
+message 1 7 Done. Should I push the branch?
+wait 400
+mic audio/tone_1s.wav
+tap 233 320
+wait 500
+expect_screen read
+expect_label Reading 1 of 1
+tap 233 200
+wait 400
+expect_label > Dictate
+tap 233 334
+wait 400
+expect_screen agent
+expect_label Reply to webapp
+expect_label > Continue
+btn B long
+wait 300
+tap 233 320
+wait 500
+tap 233 200
+wait 400
+expect_label > Dictate
+tap 233 280
+wait 400
+expect_screen voice
+expect_label Reply to webapp
+wait 1200
+tap 233 233
+wait 300
+transcript yes push it and open the pull request
+wait 300
+expect_label Send
+shot lastmsg_dictate.png
+hold 233 300 1600
+wait 400
+quit

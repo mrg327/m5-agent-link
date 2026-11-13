@@ -231,6 +231,19 @@ static void act_reply(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms)
     if (!sent) toast_cmd_result(false, "");
 }
 
+/* cmd_op_answer (proto 0.18): every question of an AskUserQuestion request at once, after the last hold. */
+static void act_answer(uint32_t sid, uint32_t rid, const uint32_t *picks, const uint32_t *aids, int n, uint32_t hold_ms)
+{
+    bool sent = link_send_answer(sid, rid, picks, aids, n, hold_ms);
+    if (sent) {
+        model_attention_set_answer(rid, ATT_ANSWER_QUESTIONS, 0);
+        feedback_reply_sent();
+    } else {
+        feedback_reject();
+        toast_cmd_result(false, "");
+    }
+}
+
 /* The daemon stores seen and echoes it to every device; the local update makes the segment dim at once. */
 static void act_ack(uint32_t sid)
 {
@@ -352,6 +365,7 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .grant = act_grant,
                                        .deny = act_deny,
                                        .reply = act_reply,
+                                       .answer = act_answer,
                                        .ack = act_ack,
                                        .snooze = act_snooze,
                                        .notify_done = act_notify_done,
@@ -435,7 +449,7 @@ static void on_session(const session_t *before, const session_t *now, uint32_t p
 static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, const char *msg)
 {
     if (op == LINK_OP_DETAIL) { /* a background fetch: ASK shows what it means, no toast */
-        detail_on_result(rid, ok, err);
+        detail_on_result(sid, rid, ok, err);
         return;
     }
     if (ok) {
@@ -444,7 +458,7 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
         return;
     }
     /* The daemon refused an answer: the request is unanswered again, so ASK restores its options. */
-    if (rid && (op == LINK_OP_APPROVE || op == LINK_OP_DENY || op == LINK_OP_REPLY || op == LINK_OP_DICTATE))
+    if (rid && (op == LINK_OP_APPROVE || op == LINK_OP_DENY || op == LINK_OP_REPLY || op == LINK_OP_DICTATE || op == LINK_OP_ANSWER))
         model_attention_set_answer(rid, ATT_ANSWER_NONE, 0);
     if (op == LINK_OP_SCROLL && sid) {
         if (err == 2) { /* unsupported: this terminal has no scroll API; the item disappears for the session */

@@ -42,7 +42,7 @@ static bool s_ambient, s_offline_dim, s_quiet_shown, s_clock_set;
 static uint32_t s_minute, s_batt_next;
 static look_t s_look = LOOK_CARD;
 
-static char s_cap_txt[64], s_title_txt[40], s_sicon_txt[8], s_sword_txt[24], s_stime_txt[40], s_sum_txt[88], s_chip_icon_txt[8],
+static char s_cap_txt[64], s_title_txt[40], s_sicon_txt[8], s_sword_txt[24], s_stime_txt[40], s_sum_txt[168], s_chip_icon_txt[8],
     s_chip_txt_txt[32], s_btn_txt[16], s_clock_txt[8], s_sub_txt[64], s_req_title_txt[48], s_req_text_txt[168];
 
 static lv_obj_t *mk(lv_obj_t *parent, const lv_font_t *f, lv_color_t c)
@@ -102,6 +102,22 @@ static void set_title(const char *t)
     theme_set_text(s_title, s_title_txt, sizeof s_title_txt, t);
 }
 
+/* The agent's last message can be read here (LAST-MESSAGE.md): a finished, unmerged agent session with a preview
+ * (none under privacy meta, none from an older daemon) and no request or hand-back on its card. */
+static bool has_message(const session_t *s, const home_slot_t *sl)
+{
+    return s && sl && !sl->n_merged && !s->back && !ui_home_askable_of(s) && !theme_is_job(s) && s->lm && s->lp[0] &&
+           s->state != SESS_WORK && s->state != SESS_START && s->state != SESS_ENDED;
+}
+
+bool ui_home_read_hit(int x, int y)
+{
+    if (lv_obj_has_flag(s_btn, LV_OBJ_FLAG_HIDDEN) || strcmp(s_btn_txt, "Read")) return false;
+    lv_area_t c;
+    lv_obj_get_coords(s_btn, &c);
+    return x >= c.x1 - 12 && x <= c.x2 + 12 && y >= c.y1 - 10 && y <= c.y2 + 10; /* a fingertip's slack */
+}
+
 /* Exception slot (§4.1), by precedence: Offline chip, low battery chip, the Answer / Review button,
  * a lone quiet glyph, nothing. `btn` is the button's text and colour when the session needs you. */
 static void update_slot(const char *btn, uint32_t btn_rgb)
@@ -144,8 +160,9 @@ static void update_slot(const char *btn, uint32_t btn_rgb)
         theme_set_text_color(s_chip_icon, lv_color_hex(rgb));
         theme_set_text_color(s_chip_txt, lv_color_hex(rgb));
     }
-    if (button) {
-        theme_set_bg_color(s_btn, lv_color_hex(btn_rgb));
+    if (button) { /* btn_rgb 0: a neutral button (Read), white on the raised platter */
+        theme_set_bg_color(s_btn, btn_rgb ? lv_color_hex(btn_rgb) : COL_FILL2);
+        theme_set_text_color(s_btn_lbl, btn_rgb ? COL_ON_ACCENT : COL_TEXT);
         theme_set_text(s_btn_lbl, s_btn_txt, sizeof s_btn_txt, btn);
     }
 }
@@ -313,18 +330,21 @@ void ui_home_card_update(void)
         show(s_req_title, true);
         show(s_req_text, req->text[0] != 0);
     } else {
-        char sum[sizeof s->summary + 4];
+        char sum[sizeof s->lp + 4];
+        /* LAST-MESSAGE.md: a finished agent shows the start of what it said, in its own words, and a Read button */
+        bool msg = has_message(s, sl);
         /* a job says what runs: its command line, or just the program when the daemon withholds that */
-        bool done_line = ui_done_update(s, !sl->n_merged && !back && !theme_is_job(s), offline());
-        theme_display_text(sum, sizeof sum, sl->n_merged ? "" : back ? "Answer it there" : theme_is_job(s) && !s->summary[0] ? s->tool : s->summary);
+        bool done_line = ui_done_update(s, !msg && !sl->n_merged && !back && !theme_is_job(s), offline());
+        theme_display_text(sum, sizeof sum, msg ? s->lp : sl->n_merged ? "" : back ? "Answer it there" : theme_is_job(s) && !s->summary[0] ? s->tool : s->summary);
         theme_set_text(s_sum, s_sum_txt, sizeof s_sum_txt, sum);
+        theme_set_text_color(s_sum, msg ? COL_TEXT : COL_TEXT2);
         show(s_sum, !done_line); /* DONE-SUMMARY.md: the summary line takes the stale last step's place */
         show(s_req_title, false);
         show(s_req_text, false);
     }
     /* GAUGES.md: the context capsule, in the job bar's row (a job has none); a request needs the room */
     ui_gauges_card_update(s, !sl->n_merged && !req && !theme_is_job(s), offline());
-    update_slot(req ? (req->kind == ATT_APPROVAL ? "Review" : "Answer") : NULL, rgb);
+    update_slot(req ? (req->kind == ATT_APPROVAL ? "Review" : "Answer") : has_message(s, sl) ? "Read" : NULL, req ? rgb : 0);
     show(s_badge[0], true);
     show(s_badge[1], n > 1);
     apply_dim();

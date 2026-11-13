@@ -8,7 +8,7 @@
 #include "gesture.h"
 #include "model.h"
 
-typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_STATUS, MODE_WATCH, MODE_VOICE, MODE_KEYS, MODE_COUNT } nav_mode_t;
+typedef enum { MODE_HOME, MODE_AGENT, MODE_ASK, MODE_SCROLL, MODE_STATUS, MODE_WATCH, MODE_VOICE, MODE_KEYS, MODE_READ, MODE_COUNT } nav_mode_t;
 
 /* Where a touch gesture happened, by its press (or swipe start) point. */
 typedef enum { ZONE_ANY, ZONE_CENTRE, ZONE_RIM } nav_zone_t;
@@ -99,7 +99,7 @@ bool nav_long_swipe_down(int y_start, int y_end);
 
 /* ── AGENT: which actions a session offers, in wheel order, default first (UI-V2 §4.2) ── */
 typedef enum {
-    AG_FOCUS, AG_DISMISS, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_REPLY, AG_INTERRUPT, AG_RERUN, AG_QUEUE, AG_UNQUEUE, AG_COUNT
+    AG_FOCUS, AG_DISMISS, AG_SNOOZE, AG_NOTIFY, AG_WATCH, AG_REPLY, AG_INTERRUPT, AG_RERUN, AG_QUEUE, AG_UNQUEUE, AG_READ, AG_COUNT
 } agent_action_t;
 
 typedef struct {
@@ -111,8 +111,10 @@ typedef struct {
  * typing: the daemon can type into terminals (welcome.replies present): Interrupt on a working
  * session (a hold), and "Reply..." where the agent waits for you when there are replies to offer. */
 /* `queue_ok`: a reply can be queued (daemon proto >= 0.17 and quick replies or voice); `queued`: the
- * session holds a queued message, which any state can cancel. */
-int nav_agent_items(sess_state_t state, bool typing, bool replies, bool queue_ok, bool queued, agent_item_t *out, int cap);
+ * session holds a queued message, which any state can cancel; `message`: the agent's last message can be read
+ * (proto 0.18, LAST-MESSAGE.md): "Read" leads a finished session's list. */
+int nav_agent_items(sess_state_t state, bool typing, bool replies, bool queue_ok, bool queued, bool message, agent_item_t *out,
+                    int cap);
 /* A job's menu (JOBS.md §5): Stop while it runs; Run again and Dismiss once it ended. Stop and Run again are
  * hold items: one interrupts a process, the other starts one. */
 int nav_job_items(sess_state_t state, agent_item_t *out, int cap);
@@ -124,7 +126,7 @@ int nav_job_items(sess_state_t state, agent_item_t *out, int cap);
  * the NAV_HOLD_MS hold; a deny-class option by the NAV_DENY_HOLD_MS hold (or the strict swipe); a
  * question option by a tap. A bare permission whose attention carries a standing rule (has_rule, proto 0.13)
  * also offers "Always allow" after Deny: a grant item held for NAV_GRANT_HOLD_MS (STANDING-RULES.md). */
-typedef enum { ASK_OPT, ASK_APPROVE, ASK_DENY, ASK_DICTATE, ASK_OPEN_PC, ASK_GRANT } ask_action_t;
+typedef enum { ASK_OPT, ASK_APPROVE, ASK_DENY, ASK_DICTATE, ASK_OPEN_PC, ASK_GRANT, ASK_QOPT, ASK_OTHER, ASK_SEND } ask_action_t;
 
 typedef struct {
     ask_action_t id;
@@ -135,6 +137,13 @@ typedef struct {
 
 #define ASK_MAX_ITEMS 7 /* 4 options + Approve + Deny + Dictate + Open on PC never all coexist, but keep room */
 int nav_ask_items(const attention_t *a, bool voice, ask_item_t *out, int cap);
+/* One question of a multiple-choice request (proto 0.18, LAST-MESSAGE.md §3.3), in wheel order: its options
+ * (ASK_QOPT, opt = index), then "Other" (ASK_OTHER, a dictated answer) when the daemon transcribes, then for a
+ * multi-select question "Send" / "Next" (ASK_SEND), then Open on PC. A
+ * single-choice option is picked only by the NAV_HOLD_MS hold; a multi-select option is ticked by a tap; Send is a
+ * hold, refused while nothing is ticked (it is listed regardless, so the list never jumps). Nothing here grants
+ * permission. */
+int nav_question_items(const ask_q_t *q, bool voice, uint32_t picks, ask_item_t *out, int cap);
 
 /* ── STATUS: the watch's own rows, in wheel order (UI-V2 §4.5) ──
  * Quiet first: it is what the screen is for. Rows that are not actionable only inform; committing

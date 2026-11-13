@@ -81,6 +81,20 @@ static char s_rule_txt[MODEL_RULE_CAP + 1];
 static uint32_t s_rule_hash_shown, s_hold_hash;
 static uint32_t s_answered_ms; /* when the answered state first showed; 0 = not showing */
 static bool s_keeping;         /* the request is gone but the answered state is still held on screen */
+/* Multiple-choice questions (proto 0.18, LAST-MESSAGE.md §3.3): one question at a time, its options as rows. A
+ * single-choice option is picked by a hold on its own row; a multi-select one is ticked by a tap and the ticks
+ * sent by holding Send; "Other" dictates a free answer. Each answer moves on to the next question and the last
+ * one sends them all (cmd answer). The answers so far belong to the request: kept while VOICE takes an "Other"
+ * answer, dropped when another request takes the screen. Nothing reaches the daemon before the last answer. */
+static struct {
+    uint32_t rid;
+    int qi; /* the question on screen */
+    uint32_t picks[MODEL_MAX_QS], aids[MODEL_MAX_QS];
+} s_q;
+static bool s_qmode; /* the request on screen has questions */
+static char s_qlabel[MODEL_MAX_QOPTS][64];
+MODEL_EXT_BSS static char s_qread[MODEL_MAX_QOPTS * 190 + 200]; /* the question and its options' descriptions */
+static bool s_qdesc; /* some option has a description: "Read all" shows them */
 
 /* The request this screen is about: the selected session's unanswered permission or question. */
 static const attention_t *req(void)
@@ -89,9 +103,15 @@ static const attention_t *req(void)
     return a && (a->kind == ATT_APPROVAL || a->kind == ATT_QUESTION) ? a : NULL;
 }
 
+static const ask_q_t *cur_q(const attention_t *a) { return s_qmode && a ? model_attention_question(a->rid, s_q.qi) : NULL; }
+static bool last_q(const attention_t *a) { return a && s_q.qi >= a->n_qs - 1; }
+
 static const char *label_of(const ask_item_t *it, const attention_t *a)
 {
     switch (it->id) {
+    case ASK_QOPT: return s_qlabel[it->opt % MODEL_MAX_QOPTS];
+    case ASK_OTHER: return "Other";
+    case ASK_SEND: return last_q(a) ? "Send" : "Next";
     case ASK_OPT: return a->opts[it->opt];
     case ASK_APPROVE: return "Approve";
     case ASK_DENY: return "Deny";
@@ -105,6 +125,7 @@ static const char *label_of(const ask_item_t *it, const attention_t *a)
  * the neutral button goes to the PC. Never the only cue: hold items show the hold ring. */
 static uint32_t rgb_of(const ask_item_t *it)
 {
+    if (it->id == ASK_QOPT || it->id == ASK_OTHER || it->id == ASK_SEND) return RGB_ASK; /* answers, never grants */
     if (it->grants) return RGB_PERMISSION;
     if (it->hold_ms) return RGB_ERROR;
     return it->id == ASK_OPEN_PC ? RGB_IDLE : RGB_ASK;
@@ -133,6 +154,7 @@ static void show(lv_obj_t *o, bool on)
 /* What the reader shows: the full text as far as it has arrived, else the request's own text. */
 static const char *reader_text(void)
 {
+    if (s_qmode) return s_qread; /* a question and its options' descriptions */
     detail_state_t st = s_fetch ? detail_state(s_rid) : DETAIL_NONE;
     const char *d = st == DETAIL_LOADING || st == DETAIL_DONE ? detail_text(s_rid) : NULL;
     return d ? d : s_text_txt; /* a failed transfer shows the preview, which ends in its ellipsis */
@@ -287,9 +309,13 @@ static void layout_text(bool perm, const char *text)
     s_cut = (tl >= 3 && !memcmp(text + tl - 3, "\xE2\x80\xA6", 3)) || tl >= sizeof(((attention_t *)0)->text) - 1;
     const attention_t *a = req();
     if (a && a->len_known && a->full_len > 0) s_cut = true; /* proto 0.11: the daemon says it is not the whole text */
+    if (s_qmode) { /* a question is all there is to it; its options' descriptions are what "Read all" adds */
+        s_cut = false;
+        s_long = s_long || s_qdesc;
+    }
     s_fetch = s_cut && detail_fetchable(a);
     bool more = s_long || s_cut; /* "Read all": a text that does not fit, or is not all of it */
-    lines = lines < 1 ? 1 : s_long ? MORE_LINES : lines;
+    lines = lines < 1 ? 1 : lines > TEXT_LINES ? MORE_LINES : lines;
     int more_h = more ? lv_font_get_line_height(FONT_CAPTION) + 4 : 0;
     if (strcmp(s_text_txt, text)) { /* a different text has not been read */
         s_read_ok = false;
@@ -341,6 +367,40 @@ static void show_back(const session_t *s, uint32_t now)
     dbg_event("ui", "ask_back", "\"rid\":%u,\"why\":%d", (unsigned)s_rid, (int)s->back_why);
 }
 
+/* What was sent, for the answered state: one question's answer, or how many. */
+static void answers_caption(const attention_t *a)
+{
+    const ask_q_t *q0 = model_attention_question(a->rid, 0);
+    if (a->n_qs != 1 || !q0 || s_q.rid != a->rid) {
+        snprintf(s_opt_txt, sizeof s_opt_txt, "%d answers", a->n_qs);
+        return;
+    }
+    if (s_q.aids[0]) {
+        snprintf(s_opt_txt, sizeof s_opt_txt, "Your own words");
+        return;
+    }
+    size_t n = 0;
+    s_opt_txt[0] = 0;
+    for (int i = 0; i < q0->n_opts && n < sizeof s_opt_txt; i++)
+        if ((s_q.picks[0] >> i) & 1u) n += (size_t)snprintf(s_opt_txt + n, sizeof s_opt_txt - n, "%s\"%s\"", n ? ", " : "", q0->label[i]);
+}
+
+/* The question on screen: its rows' labels (a tick before a ticked option) and the reader's text. */
+static void question_prep(const attention_t *a, const ask_q_t *q)
+{
+    uint32_t picks = s_q.picks[s_q.qi];
+    for (int i = 0; i < q->n_opts && i < MODEL_MAX_QOPTS; i++)
+        snprintf(s_qlabel[i], sizeof s_qlabel[i], "%s%s", q->multi && ((picks >> i) & 1u) ? ICON_DONE " " : "", q->label[i]);
+    size_t n = (size_t)snprintf(s_qread, sizeof s_qread, "%s", q->q);
+    s_qdesc = false;
+    for (int i = 0; i < q->n_opts && i < MODEL_MAX_QOPTS && n < sizeof s_qread; i++) {
+        if (!q->desc[i][0]) continue;
+        n += (size_t)snprintf(s_qread + n, sizeof s_qread - n, "%s%s: %s", s_qdesc ? "\n" : "\n\n", q->label[i], q->desc[i]);
+        s_qdesc = true;
+    }
+    (void)a;
+}
+
 const attention_t *ui_ask_request(void)
 {
     const attention_t *a = req();
@@ -382,17 +442,31 @@ bool ui_ask_refresh(uint32_t now)
         s_read_len = 0;
         wheel_set(s_wheel, NULL, 0, 0);
     }
+    if (s_q.rid != a->rid) { /* another request's answers are not this one's */
+        memset(&s_q, 0, sizeof s_q);
+        s_q.rid = a->rid;
+    }
+    s_qmode = a->n_qs > 0;
+    if (s_qmode && s_q.qi >= a->n_qs) s_q.qi = a->n_qs - 1;
+    const ask_q_t *q = cur_q(a);
+    if (q) question_prep(a, q);
     char buf[80];
     const char *base = theme_basename(s->repo);
     char host[24];
     theme_host_prefix(host, sizeof host, s);
     snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
+    if (q && a->n_qs > 1) { /* which question of how many */
+        size_t n = strlen(buf);
+        snprintf(buf + n, sizeof buf - n, "%s%d of %d", theme_sep(), s_q.qi + 1, a->n_qs);
+    }
     theme_set_text(s_header, s_header_txt, sizeof s_header_txt, buf);
     bool perm = a->kind == ATT_APPROVAL;
-    snprintf(s_req_title, sizeof s_req_title, "%s",
-             a->title[0] ? a->title : s->tool[0] ? s->tool : perm ? "Permission request" : "Question");
+    if (q) snprintf(s_req_title, sizeof s_req_title, "%s", q->h[0] ? q->h : "Question");
+    else
+        snprintf(s_req_title, sizeof s_req_title, "%s",
+                 a->title[0] ? a->title : s->tool[0] ? s->tool : perm ? "Permission request" : "Question");
     theme_set_text(s_title, s_title_txt, sizeof s_title_txt, s_req_title);
-    layout_text(perm, a->text);
+    layout_text(perm, q ? q->q : a->text);
     if (s_fetch && !a->answer_sent) detail_want(a, now); /* the full text, while the user looks at the request */
 
     if (!a->answer_sent) s_answered_ms = 0, s_answered_rule = false;
@@ -413,11 +487,12 @@ bool ui_ask_refresh(uint32_t now)
             word = "Denied";
             s_icon_txt = ICON_DENIED;
             rgb = RGB_ERROR;
-        } else if (a->answer == ATT_ANSWER_REPLY || a->answer == ATT_ANSWER_DICTATE) {
+        } else if (a->answer == ATT_ANSWER_REPLY || a->answer == ATT_ANSWER_DICTATE || a->answer == ATT_ANSWER_QUESTIONS) {
             word = "Sent";
             s_icon_txt = ICON_SENT;
             rgb = RGB_ASK;
             if (a->answer == ATT_ANSWER_REPLY) snprintf(s_opt_txt, sizeof s_opt_txt, "\"%s\"", a->opts[a->answer_opt % 4]);
+            if (a->answer == ATT_ANSWER_QUESTIONS) answers_caption(a);
         }
         char cap[sizeof s_cap_txt];
         snprintf(cap, sizeof cap, "%s%s%s", s_opt_txt, s_opt_txt[0] ? "\n" : "", after);
@@ -442,7 +517,8 @@ bool ui_ask_refresh(uint32_t now)
         hold_cancel();
         s_n = 0;
     } else {
-        s_n = nav_ask_items(a, model_voice(), s_items, ASK_MAX_ITEMS);
+        s_n = q ? nav_question_items(q, model_voice(), s_q.picks[s_q.qi], s_items, ASK_MAX_ITEMS)
+                : nav_ask_items(a, model_voice(), s_items, ASK_MAX_ITEMS);
         wheel_item_t w[ASK_MAX_ITEMS];
         for (int i = 0; i < s_n; i++) w[i] = (wheel_item_t){label_of(&s_items[i], a), fill_of(&s_items[i]), s_items[i].hold_ms > 0, i, NULL};
         int sel = wheel_count(s_wheel) == s_n ? wheel_sel(s_wheel) : 0;
@@ -510,6 +586,40 @@ static void select_item(int i, const char *via, void (*haptic)(void))
     if (haptic) haptic();
 }
 
+/* The question on screen is answered: on to the next one, re-armed like a new card (the hold that answered it
+ * cannot run on into the next one), or, after the last, every answer goes out at once. */
+static void question_answered(const attention_t *a, uint32_t hold_ms)
+{
+    if (!last_q(a)) {
+        s_q.qi++;
+        hold_cancel();
+        reader_close();
+        s_read_ok = false;
+        s_shown_ms = s_now;
+        wheel_set(s_wheel, NULL, 0, 0);
+        g_ui_actions->tick();
+        dbg_event("ui", "question", "\"rid\":%u,\"qi\":%d", (unsigned)a->rid, s_q.qi);
+        ui_ask_refresh(s_now);
+        return;
+    }
+    g_ui_actions->answer(s_sid, a->rid, s_q.picks, s_q.aids, a->n_qs, hold_ms);
+}
+
+/* VOICE took an "Other" answer for question qi of request rid: it stands for that question, and the screen
+ * moves on (or, for the last question, everything goes out with this hold). */
+void ui_ask_other_done(uint32_t rid, int qi, uint32_t aid, uint32_t hold_ms)
+{
+    const attention_t *a = model_attention_find(rid);
+    if (!a || a->answer_sent || s_q.rid != rid || qi != s_q.qi || qi >= a->n_qs) {
+        g_ui_actions->reject();
+        return;
+    }
+    s_q.aids[qi] = aid;
+    s_q.picks[qi] = 0;
+    s_sid = a->sid;
+    question_answered(a, hold_ms);
+}
+
 /* Sends the answer for item `idx` of request `a`. Approve-class and deny items only arrive here from
  * a completed hold (or an injected long press that covered it); never from a tap. */
 static void commit(const attention_t *a, int idx, uint32_t hold_ms)
@@ -517,7 +627,32 @@ static void commit(const attention_t *a, int idx, uint32_t hold_ms)
     const ask_item_t *it = &s_items[idx];
     dbg_event("ui", "commit", "\"sid\":%u,\"rid\":%u,\"item\":%d,\"opt\":%d,\"hold_ms\":%u", (unsigned)s_sid,
               (unsigned)a->rid, (int)it->id, it->opt, (unsigned)hold_ms);
+    const ask_q_t *q = cur_q(a);
     switch (it->id) {
+    case ASK_QOPT:
+        if (!q) break;
+        if (q->multi) { /* a tap ticks or unticks it; nothing is sent */
+            s_q.picks[s_q.qi] ^= 1u << it->opt;
+            s_q.aids[s_q.qi] = 0;
+            g_ui_actions->tick();
+            dbg_event("ui", "tick", "\"rid\":%u,\"qi\":%d,\"picks\":%u", (unsigned)a->rid, s_q.qi, (unsigned)s_q.picks[s_q.qi]);
+            ui_ask_refresh(s_now);
+            break;
+        }
+        s_q.picks[s_q.qi] = 1u << it->opt; /* only ever after the hold on this row */
+        s_q.aids[s_q.qi] = 0;
+        question_answered(a, hold_ms);
+        break;
+    case ASK_SEND:
+        if (!q || !s_q.picks[s_q.qi]) {
+            ui_toast("Tick at least one", RGB_AMBER);
+            g_ui_actions->reject();
+            break;
+        }
+        s_q.aids[s_q.qi] = 0;
+        question_answered(a, hold_ms);
+        break;
+    case ASK_OTHER: ui_go_voice_answer(a->rid, s_q.qi, last_q(a)); break;
     case ASK_OPT: g_ui_actions->reply(s_sid, a->rid, (uint8_t)it->opt, hold_ms); break;
     case ASK_APPROVE: g_ui_actions->approve(s_sid, a->rid, hold_ms); break;
     case ASK_GRANT: /* the rule on screen, and only if it is still the request's own */
@@ -538,6 +673,17 @@ static void commit(const attention_t *a, int idx, uint32_t hold_ms)
 /* Back closes the reader first; the request and what has been read stay as they are. */
 bool ui_ask_back(void)
 {
+    const attention_t *a = req();
+    if (!s_reading && s_qmode && a && !a->answer_sent && !s_back_ms && s_q.qi > 0) { /* the question before */
+        s_q.qi--;
+        hold_cancel();
+        s_read_ok = false;
+        s_shown_ms = s_now;
+        wheel_set(s_wheel, NULL, 0, 0);
+        dbg_event("ui", "question", "\"rid\":%u,\"qi\":%d", (unsigned)a->rid, s_q.qi);
+        ui_ask_refresh(s_now);
+        return true;
+    }
     if (!s_reading) return false;
     reader_close();
     ui_ask_refresh(s_now);
@@ -572,6 +718,8 @@ static const char *lock_word(const ask_item_t *it)
 /* What a tap on a hold item says: a tap never commits it. */
 static const char *hold_word(const ask_item_t *it)
 {
+    if (it->id == ASK_QOPT) return "Hold to choose";
+    if (it->id == ASK_SEND) return last_q(req()) ? "Hold to send" : "Hold for the next question";
     return it->id == ASK_GRANT ? "Hold to always allow" : it->grants ? "Hold to approve" : "Hold to deny";
 }
 
@@ -772,7 +920,7 @@ bool ui_ask_tick(uint32_t now)
         if (el >= NAV_HOLD_SHOW_MS) {
             if (!s_ramp_started) {
                 s_ramp_started = true;
-                if (it->grants) g_ui_actions->hold_start();
+                if (it->grants || it->id == ASK_QOPT || it->id == ASK_SEND) g_ui_actions->hold_start();
                 else g_ui_actions->deny_hold_start();
             }
             ring_set_progress(ui_home_ring(), (int)(el * 1000 / it->hold_ms), rgb);

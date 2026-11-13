@@ -14,7 +14,7 @@
 #define TOAST_MS 1800
 
 const ui_actions_t *g_ui_actions;
-static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch, *s_voice, *s_keys;
+static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch, *s_voice, *s_keys, *s_read;
 static nav_mode_t s_mode = MODE_HOME;
 static int s_rel_y;
 static bool s_link_up, s_animate = true;
@@ -101,6 +101,7 @@ void ui_init(const ui_actions_t *actions)
     s_watch = ui_watch_init(s_home);
     s_voice = ui_voice_init(s_home);
     s_keys = ui_keys_init(s_home);
+    s_read = ui_read_init(s_home);
     ui_countdown_init(s_home); /* over every mode's content, under the toast and the glow */
     create_overlays();
     lv_screen_load(s_home);
@@ -154,6 +155,8 @@ static void place_toast(void)
 static uint32_t s_resume_watch_sid;
 static uint32_t s_voice_rid; /* the request VOICE answers (ui_go_voice) */
 static bool s_voice_queue;   /* VOICE queues the dictation (ui_go_voice) */
+static int s_voice_qi = -1;  /* VOICE answers that question of s_voice_rid (ui_go_voice_answer) */
+static bool s_voice_qlast;
 
 static void enter_mode(nav_mode_t m)
 {
@@ -166,6 +169,7 @@ static void enter_mode(nav_mode_t m)
     if (s_mode == MODE_WATCH) ui_watch_close();
     if (s_mode == MODE_VOICE) ui_voice_close();
     if (s_mode == MODE_KEYS) ui_keys_close();
+    if (s_mode == MODE_READ) ui_read_close();
     s_mode = m;
     ui_home_set_card_shown(m == MODE_HOME);
     if (m == MODE_AGENT) ui_agent_open(ui_home_sel_sid(), s_now_ms);
@@ -176,11 +180,12 @@ static void enter_mode(nav_mode_t m)
         ui_status_open(s_now_ms);
     }
     else if (m == MODE_WATCH) ui_watch_open(ui_home_sel_sid(), s_now_ms);
-    else if (m == MODE_VOICE) ui_voice_open(ui_home_sel_sid(), s_voice_rid, s_voice_queue, s_now_ms);
+    else if (m == MODE_VOICE) ui_voice_open(ui_home_sel_sid(), s_voice_rid, s_voice_queue, s_voice_qi, s_voice_qlast, s_now_ms);
     else if (m == MODE_KEYS) ui_keys_open(ui_home_sel_sid(), s_now_ms);
+    else if (m == MODE_READ) ui_read_open(ui_home_sel_sid(), s_now_ms);
     else ui_home_refresh(s_now_ms); /* the ring shows sessions again */
     if (m != MODE_HOME && m != MODE_KEYS) { /* deeper modes rise into place; KEYS records strokes at once */
-        lv_obj_t *const roots[MODE_COUNT] = {NULL, s_agent, s_ask, s_scroll, s_status, s_watch, s_voice, s_keys};
+        lv_obj_t *const roots[MODE_COUNT] = {NULL, s_agent, s_ask, s_scroll, s_status, s_watch, s_voice, s_keys, s_read};
         ui_motion_enter(roots[m]);
     }
     dbg_event("ui", "mode", "\"mode\":\"%s\"", nav_mode_name(m));
@@ -208,7 +213,7 @@ void ui_go_home(void) { leave_mode(); }
 /* Back, as a screen asks for it (hold still off the rows): the ASK reader closes first. */
 void ui_go_back(void)
 {
-    if (!(s_mode == MODE_ASK && ui_ask_back())) leave_mode();
+    if (!(s_mode == MODE_ASK && ui_ask_back()) && !(s_mode == MODE_READ && ui_read_back())) leave_mode();
     g_ui_actions->tick();
 }
 void ui_go_watch(void) { enter_mode(MODE_WATCH); }
@@ -216,7 +221,22 @@ void ui_go_voice(uint32_t rid, bool queue)
 {
     s_voice_rid = rid;
     s_voice_queue = queue;
+    s_voice_qi = -1;
     enter_mode(MODE_VOICE);
+}
+void ui_go_voice_answer(uint32_t rid, int qi, bool last)
+{
+    s_voice_rid = rid;
+    s_voice_queue = false;
+    s_voice_qi = qi;
+    s_voice_qlast = last;
+    enter_mode(MODE_VOICE);
+}
+void ui_go_read(void) { enter_mode(MODE_READ); }
+void ui_go_replies(void)
+{
+    enter_mode(MODE_AGENT);
+    if (s_mode == MODE_AGENT) ui_agent_show_replies();
 }
 void ui_go_keys(void) { enter_mode(MODE_KEYS); }
 uint32_t ui_watched_sid(void) { return s_mode == MODE_WATCH ? ui_watch_sid() : 0; }
@@ -280,6 +300,7 @@ void ui_report(ui_report_t *r)
     else if (s_mode == MODE_WATCH) ui_watch_report(r);
     else if (s_mode == MODE_VOICE) ui_voice_report(r);
     else if (s_mode == MODE_KEYS) ui_keys_report(r);
+    else if (s_mode == MODE_READ) ui_read_report(r);
     else ui_home_report(r);
 }
 
@@ -346,6 +367,7 @@ void ui_tick(uint32_t now_ms)
         if (s_mode == MODE_STATUS) ui_status_refresh(now_ms);
         if (s_mode == MODE_VOICE && !ui_voice_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_KEYS && !ui_keys_refresh(now_ms)) enter_mode(MODE_HOME);
+        if (s_mode == MODE_READ && !ui_read_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_WATCH && !ui_watch_refresh(now_ms)) {
             enter_mode(MODE_HOME);
             ui_toast("Session ended", RGB_IDLE);
@@ -368,6 +390,7 @@ void ui_tick(uint32_t now_ms)
         }
     }
     if (s_mode == MODE_KEYS) ui_keys_tick(now_ms);
+    if (s_mode == MODE_READ) ui_read_tick(now_ms);
     /* the answer window runs on the request it belongs to: on ASK, and on its card on the deck */
     ui_countdown_show(s_mode == MODE_ASK ? ui_ask_request() : s_mode == MODE_HOME ? ui_home_sel_request() : NULL, now_ms);
 }
@@ -387,6 +410,11 @@ bool ui_on_gesture(const gesture_evt_t *g)
         ui_home_note_input();
         if (!ui_home_sel_sid()) {
             g_ui_actions->reject();
+            return true;
+        }
+        if (g->kind == G_TAP && ui_home_read_hit(g->x, g->y)) { /* the card's Read button (LAST-MESSAGE.md) */
+            enter_mode(MODE_READ);
+            g_ui_actions->tick();
             return true;
         }
         enter_mode(MODE_AGENT);
@@ -409,6 +437,10 @@ bool ui_on_gesture(const gesture_evt_t *g)
     case NAV_BACK:
         if (g->kind == G_SWIPE_DOWN && !nav_long_swipe_down(g->y, s_rel_y)) return true; /* too short: ignored */
         if (s_mode == MODE_ASK && ui_ask_back()) { /* the reader closes first; the request stays on screen */
+            g_ui_actions->tick();
+            return true;
+        }
+        if (s_mode == MODE_READ && ui_read_back()) { /* the end picker goes back to the last page */
             g_ui_actions->tick();
             return true;
         }
@@ -464,6 +496,10 @@ bool ui_on_gesture(const gesture_evt_t *g)
     if (s_mode == MODE_KEYS) {
         ui_home_note_input();
         return ui_keys_act(a, g);
+    }
+    if (s_mode == MODE_READ) {
+        ui_home_note_input();
+        return ui_read_act(a, g);
     }
     if (s_mode == MODE_WATCH) {
         ui_home_note_input();

@@ -29,6 +29,11 @@ void ui_go_home(void);          /* leave AGENT (commit, back, chord, timeout) */
 void ui_go_watch(void);
 void ui_go_keys(void);  /* the Reply list's "Type...": open KEYS on the selected session */
 void ui_go_voice(uint32_t rid, bool queue); /* "Dictate...": open VOICE on the selected session; rid != 0 answers that request; queue: the daemon holds it until the session can take input */
+/* ASK's "Other" (proto 0.18): VOICE takes a free answer to question qi of request rid; its hold hands the
+ * recording back to ASK (ui_ask_other_done) instead of sending it, unless it is the last question's. */
+void ui_go_voice_answer(uint32_t rid, int qi, bool last);
+void ui_go_read(void);    /* READ: the selected session's last message (LAST-MESSAGE.md) */
+void ui_go_replies(void); /* AGENT, straight into the Reply list of the selected session */
 /* The KEYS screen (ui_keys.c). */
 lv_obj_t *ui_keys_init(lv_obj_t *screen);
 void ui_keys_open(uint32_t sid, uint32_t now_ms);
@@ -39,7 +44,8 @@ void ui_keys_tick(uint32_t now_ms);
 void ui_keys_report(ui_report_t *r);
 /* The VOICE screen (ui_voice.c). */
 lv_obj_t *ui_voice_init(lv_obj_t *screen);
-void ui_voice_open(uint32_t sid, uint32_t rid, bool queue, uint32_t now_ms);
+/* qi >= 0: a free answer to question qi of request rid (proto 0.18); last: it is the request's last question */
+void ui_voice_open(uint32_t sid, uint32_t rid, bool queue, int qi, bool last, uint32_t now_ms);
 uint32_t ui_voice_rid(void); /* the request the dictation answers; 0 = typed into the terminal */
 void ui_voice_close(void);
 bool ui_voice_refresh(uint32_t now_ms); /* false: the session is gone */
@@ -56,6 +62,7 @@ bool ui_home_act(nav_action_t a, const gesture_evt_t *g);
 void ui_home_note_input(void);  /* any input anywhere resets the ambient timer and the nag */
 bool ui_home_request_pending(void); /* the selected session has an unanswered approvable request on screen */
 bool ui_home_askable(void);         /* the selected session has an unanswered permission or question */
+bool ui_home_read_hit(int x, int y); /* the point is on the card's Read button (LAST-MESSAGE.md) */
 uint32_t ui_home_sel_sid(void);
 const attention_t *ui_home_sel_request(void); /* the selected session's unanswered permission or question */
 lv_obj_t *ui_home_ring(void);
@@ -68,6 +75,7 @@ void ui_home_animations_changed(void);
 /* The AGENT screen (ui_agent.c). */
 lv_obj_t *ui_agent_init(lv_obj_t *screen);
 void ui_agent_open(uint32_t sid, uint32_t now_ms);
+void ui_agent_show_replies(void); /* the open AGENT shows the Reply list at once */
 void ui_agent_close(void);
 bool ui_agent_refresh(uint32_t now_ms); /* false: the session is gone */
 bool ui_agent_act(nav_action_t a, const gesture_evt_t *g);
@@ -98,6 +106,18 @@ bool ui_ask_tick(uint32_t now_ms);    /* true: wants to close */
 void ui_ask_report(ui_report_t *r);
 /* The request ASK shows and can still be answered (its countdown runs), or NULL. */
 const attention_t *ui_ask_request(void);
+/* VOICE's hold on an "Other" answer: recording aid answers question qi of request rid. */
+void ui_ask_other_done(uint32_t rid, int qi, uint32_t aid, uint32_t hold_ms);
+
+/* The READ screen (ui_read.c): the agent's last message, paged, then Dictate / Reply. */
+lv_obj_t *ui_read_init(lv_obj_t *screen);
+void ui_read_open(uint32_t sid, uint32_t now_ms);
+void ui_read_close(void);
+bool ui_read_refresh(uint32_t now_ms); /* false: the session or its message is gone */
+bool ui_read_act(nav_action_t a, const gesture_evt_t *g);
+bool ui_read_back(void);               /* true: the end picker was open and the last page is back */
+void ui_read_tick(uint32_t now_ms);
+void ui_read_report(ui_report_t *r);
 
 /* The STATUS screen (ui_status.c). */
 lv_obj_t *ui_status_init(lv_obj_t *screen);

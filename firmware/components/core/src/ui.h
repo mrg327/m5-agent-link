@@ -29,6 +29,9 @@ typedef struct {
     void (*grant)(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32_t rule_hash); /* ASK: approve + save the standing rule */
     void (*deny)(uint32_t sid, uint32_t rid);
     void (*reply)(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms); /* ASK: answer a question / pick a grant option */
+    /* ASK (proto 0.18): answer every question of request rid at once, after a hold: per question the options
+     * picked (a bit mask) or the recording of a free answer */
+    void (*answer)(uint32_t sid, uint32_t rid, const uint32_t *picks, const uint32_t *aids, int n, uint32_t hold_ms);
     void (*ack)(uint32_t sid);
     void (*snooze)(uint32_t sid, uint32_t minutes); /* AGENT: snooze this session (0 cancels) */
     void (*notify_done)(uint32_t sid, bool arm);    /* AGENT: buzz when this session finishes (false disarms) */

@@ -412,6 +412,30 @@ sim_script_test(sim_queue_reply queue_reply.txt
 sim_script_test(sim_queue_dictate queue_dictate.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"op\":12,\"sid\":1,\"rid\":0,\"hold_ms\":[0-9]+,\"arg\":[0-9]+,\"q\":1")
+# The agent's last message (proto 0.18, LAST-MESSAGE.md): the card's preview and Read, the reader fetching it by
+# session with no rid, the end picker; under privacy meta no text and no fetch; a new prompt closes the reader.
+sim_script_test(sim_last_message_card last_message_card.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":(11|12|19)"
+                PASS_REGULAR_EXPRESSION "\"op\":7,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":0.*\"ev\":\"done\",\"rid\":0,\"bytes\":[0-9]+,\"lm\":7")
+sim_script_test(sim_last_message_reply last_message_reply.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"op\":12,\"sid\":1,\"rid\":0,\"hold_ms\":[0-9]+,\"arg\":[0-9]+,\"q\":0")
+sim_script_test(sim_last_message_meta last_message_meta.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":7")
+sim_script_test(sim_last_message_cleared last_message_cleared.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# Questions (AskUserQuestion, proto 0.18): a hold picks a single-choice option, taps tick multi-select ones and
+# Send is held; "Other" dictates; every answer goes out at once (cmd answer, op 19); a tap never sends one.
+sim_script_test(sim_question_single question_single.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":5"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_answer\",\"rid\":31,\"n\":1,\"picks\":\\[2,")
+sim_script_test(sim_question_multi question_multi.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":19.*\"op\":19"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_answer\",\"rid\":32,\"n\":2,\"picks\":\\[1,5,")
+sim_script_test(sim_question_other question_other.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":12"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_answer\",\"rid\":33,\"n\":1,\"picks\":\\[0,0,0,0\\],\"aids\":\\[[1-9]")
+sim_script_test(sim_question_tap_never_sends question_tap_never_sends.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":19"
+                PASS_REGULAR_EXPRESSION "\"op\":0,\"sid\":2,\"rid\":34")
 sim_script_test(sim_queue_show_cancel queue_show_cancel.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"op\":18,\"sid\":1")

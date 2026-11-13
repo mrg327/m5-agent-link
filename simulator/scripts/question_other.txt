@@ -1,0 +1,31 @@
+# "Other": a dictated free answer. Other opens VOICE for that question; its Send hold (the last question) sends the
+# answer with the recording's id (picks [0], aids [the recording]).
+connect
+rx a400020101020103a60082001201a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 2 ask webapp feat/login
+ask 33 2 60000 60000 Name|What should the new command be called?|single|agentlink read|agentlink last
+wait 600
+mic audio/tone_1s.wav
+expect_screen ask
+btn B
+wait 200
+btn B
+wait 200
+expect_label > Other
+shot question_other.png
+tap 233 282
+wait 400
+expect_screen voice
+expect_label Answer for webapp
+wait 1200
+tap 233 233
+wait 300
+transcript call it agentlink say
+wait 300
+expect_label Send
+shot question_other_voice.png
+hold 233 300 1600
+wait 500
+expect_screen ask
+expect_label Sent
+quit

@@ -1,0 +1,38 @@
+# The agent's last message (proto 0.18, LAST-MESSAGE.md): the finished card shows its first lines and a Read
+# button. Read asks for the whole message by session, no rid (cmd detail, op 7), pages through it, and at its end
+# offers Dictate and Reply. Nothing is sent to the agent on the way.
+connect
+rx a400020101020103a60082001201a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 1 done webapp feat/login
+message 1 7 Built and flashed the new reader. The watch now shows what the agent said when a turn ends.\n\nWhat changed:\n• the daemon keeps the final message of each session\n• the finished card shows its first lines\n• Read opens all of it in pages\n• Reply and Dictate wait at the end\n\nChecks:\n  cargo test --workspace\n  ctest --test-dir build/sim\n\nThe firmware build fits: 183 KB of internal RAM left for BLE.\n\nShould I also show it on the Activity screen?
+wait 400
+expect_screen ring
+expect_label Built and flashed the new reader
+expect_label Read
+shot lastmsg_card.png
+tap 233 320
+wait 500
+expect_screen read
+expect_label Last message
+expect_label Reading 1 of 3
+shot lastmsg_reader.png
+btn B
+wait 350
+expect_label Reading 2 of 3
+btn B
+wait 350
+expect_label Reading 3 of 3
+shot lastmsg_reader_last.png
+btn B
+wait 350
+expect_label Answer it
+expect_label > Dictate
+expect_label Reply
+shot lastmsg_end.png
+swipe 150 233 380 233 200
+wait 350
+expect_label Reading 3 of 3
+swipe 150 233 380 233 200
+wait 350
+expect_screen ring
+quit
