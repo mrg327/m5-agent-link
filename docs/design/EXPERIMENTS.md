@@ -43,8 +43,8 @@ The watch drives the pointer of the machine `agentlinkd` runs on (protocol §6g,
 
 `daemon/crates/agentlinkd/src/pointer.rs` has three backends:
 
-- **macOS:** CoreGraphics events. Needs the Accessibility permission, which may have to be granted again after
-  `launchd.sh install` re-signs the binary.
+- **macOS:** CoreGraphics events. Needs the Accessibility permission. With an ad hoc signature it is lost on
+  every rebuild; `launchd.sh cert` (once) makes the signature stable so the grant survives (daemon/README.md).
 - **Windows:** `SendInput`.
 - **Linux on X11:** `xdotool`. There is no backend under Wayland.
 

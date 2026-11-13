@@ -49,8 +49,15 @@ cargo install --locked --path crates/agentlinkd && tools/launchd.sh install   # 
 
 Stop a daemon started by hand first. `install` takes the current `PATH` (kitty, osascript, caffeinate …),
 `RUST_LOG` and `AGENTLINK_*` variables into the agent, and re-signs the binary so the Info.plist that
-`build.rs` embeds is bound to it. Under launchd the daemon is not covered by the terminal's Bluetooth grant:
-macOS asks for its own, and asks again after a rebuild, so run `install` again after each `cargo install`.
+`build.rs` embeds is bound to it. Under launchd the daemon is not covered by the terminal's grants: macOS asks
+for its own Bluetooth and (for the trackpad) Accessibility grants. Run `install` again after each `cargo install`.
+
+macOS keeps those grants for the signature's designated requirement. An ad hoc signature changes with every
+build, so a rebuild silently loses them while System Settings still shows agentlinkd switched on. Run
+`tools/launchd.sh cert` once: it makes a self-signed code-signing certificate in the login keychain and asks
+for your password to trust it for code signing. From then on `install` signs with it, and after one more grant
+(remove the old agentlinkd entry under Privacy & Security > Accessibility, then allow it again) rebuilds keep
+the grants.
 
 Environment: `AGENTLINK_HOME` (default `~/.agentlink`), `AGENTLINK_ANSWER_WINDOW_S` (daemon: how long a blocking hook holds the terminal prompt for the watch, default 60, 5-300, 0 = never; also `~/.agentlink/answer_window`, read per request; see docs/design/ANSWER-WINDOW.md), `AGENTLINK_PRESENCE` (daemon: `on`/`off`, optionally with the idle limit in seconds, also `~/.agentlink/presence`; off = alerts and the window as before presence; see docs/design/PRESENCE.md), `AGENTLINK_KEEP_AWAKE` (daemon: `ac` (default), `always`, `off`; whether to hold an idle-sleep inhibitor while a session works or a job runs, also `~/.agentlink/keep_awake`), `AGENTLINK_PRESENCE_FILE` (TEST ONLY: a file that stands in for the presence and power sources, see PRESENCE.md section 4), `AGENTLINK_WAIT_MS` (hook: pins that hook's window, max 300000; an older daemon's whole window, default 15000), `AGENTLINK_WS_ADDR` (default `127.0.0.1:7878`), `AGENTLINK_USB=0` / `AGENTLINK_BLE=0` (disable a transport), `AGENTLINK_USB_PORT`, `AGENTLINK_BLE_NAME`, `AGENTLINK_BLE_WRITE_LEN` (see below), `AGENTLINK_PIPE` (Windows hook pipe name; default `\\.\pipe\agentlink-<USERNAME>-<fnv64 of socket path>`), `AGENTLINK_REMOTE` (hook: `tcp:<loopback>:<port>`, see docs/design/REMOTE.md), `AGENTLINK_SSH`, `RUST_LOG`.
 
