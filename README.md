@@ -39,6 +39,10 @@ scripts/atlas --open        # serves index.html at http://localhost:8700/
 2. **Readable.** Small modules with one concern each, and contracts written before code.
 3. **Device-agnostic.** The daemon sends semantic data, never pixels, and devices
    declare their capabilities.
+4. **Glyphs over words.** We should use the least amount of text possible and represent
+   information via an image or glyph whenever possible. A new screen starts as glyphs,
+   colours and shapes. Text is added only when a glyph can't carry the meaning
+   ([UI-V3](docs/design/UI-V3.md) §1, principle 7).
 
 ## Setup (user)
 

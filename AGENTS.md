@@ -13,3 +13,7 @@ scripts/issue close ID fixed "commit …; checks …"
 ```
 
 The design docs are under `docs/design/` and the repository map is in `README.md`.
+
+**Project tenet: glyphs over words.** We should use the least amount of text possible and represent
+information via an image or glyph whenever possible (`README.md` Principles 4, `docs/design/UI-V3.md`
+§1.7). Apply it to every watch screen you add or change.

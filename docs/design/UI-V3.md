@@ -19,6 +19,10 @@ document wins. Finding numbers (H1, R1, X2 …) refer to the profile.
    as a permanent caption (X1).
 6. **Nothing is lost.** Every v2 action is still there, and every v2 gesture still works. v3 adds
    paths; it removes none.
+7. **Glyphs over words (project tenet).** Use the least text possible. Show information as a glyph,
+   colour, shape or position wherever one can carry it. Use a word only when no glyph can. Check
+   every new screen against this first, and when a screen changes, look for text a glyph can
+   replace. The agent graph ([GRAPH.md](GRAPH.md)) is the reference: lanes and glyphs, no text.
 
 Safety invariants, unchanged and not negotiable in any later reskin: the approval card shows the
 request text; a tap never approves or denies; an approve-class commit is a 1.2 s hold bound to the

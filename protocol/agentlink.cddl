@@ -13,7 +13,7 @@ envelope = msg_hello / msg_welcome / msg_snapshot / msg_session_upd / msg_gone
          / msg_cfg / msg_batt / msg_ping / msg_pong / msg_log
          / msg_audio_start / msg_audio / msg_audio_end / msg_transcript
          / msg_kb_start / msg_kb_stroke / msg_kb_cands / msg_usage
-         / msg_fw_begin / msg_fw_chunk / msg_fw_ack / msg_power
+         / msg_fw_begin / msg_fw_chunk / msg_fw_ack / msg_power / msg_graph
          / msg_dbg_ui_state_req / msg_dbg_ui_state / msg_dbg_screenshot_req
          / msg_dbg_screenshot_chunk / msg_dbg_inject_input / msg_dbg_set_log_level
 
@@ -46,6 +46,7 @@ msg_fw_begin             = { 0 => mt_fw_begin, hdr, 3 => fw_begin }
 msg_fw_chunk             = { 0 => mt_fw_chunk, hdr, 3 => fw_chunk }
 msg_fw_ack               = { 0 => mt_fw_ack, hdr, 3 => fw_ack }
 msg_power                = { 0 => mt_power, hdr, 3 => power }
+msg_graph                = { 0 => mt_graph, hdr, 3 => graph }
 msg_dbg_ui_state_req     = { 0 => mt_dbg_ui_state_req, hdr, 3 => empty }
 msg_dbg_ui_state         = { 0 => mt_dbg_ui_state, hdr, 3 => dbg_ui_state }
 msg_dbg_screenshot_req   = { 0 => mt_dbg_screenshot_req, hdr, 3 => empty }
@@ -81,6 +82,7 @@ mt_fw_begin = 24
 mt_fw_chunk = 25
 mt_fw_ack = 26
 mt_power = 27
+mt_graph = 28
 mt_dbg_ui_state_req = 64
 mt_dbg_ui_state = 65
 mt_dbg_screenshot_req = 66
@@ -378,7 +380,7 @@ cmd_arg = uint / tstr / scroll_arg
 cmd_op = cmd_op_focus / cmd_op_ack / cmd_op_snooze / cmd_op_approve / cmd_op_deny /
   cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet / cmd_op_scroll /
   cmd_op_type / cmd_op_dictate / cmd_op_kb_pick / cmd_op_kb_del / cmd_op_kb_send / cmd_op_kb_end /
-  cmd_op_rerun / cmd_op_unqueue / cmd_op_answer / cmd_op_pointer
+  cmd_op_rerun / cmd_op_unqueue / cmd_op_answer / cmd_op_pointer / cmd_op_graph
 cmd_op_focus = 0    ; with a `rid` (proto 0.11): also hand that request back to the terminal at once
 cmd_op_ack = 1
 cmd_op_snooze = 2
@@ -404,6 +406,8 @@ cmd_op_answer = 19  ; answer request `rid`'s questions (`qs`) at once with `pick
 cmd_op_pointer = 20 ; Trackpad (proto 0.20, EXPERIMENTS.md): move / click / scroll the pointer of the daemon's own
                     ; machine with `ptr`. No `result` unless it fails (at most one per second): `unsupported` (no
                     ; pointer backend) or `denied` (the OS refused, e.g. macOS Accessibility not granted)
+cmd_op_graph = 21   ; Agent graph (proto 0.22, GRAPH.md): send session `sid`'s graph as one `graph` message (a reply
+                    ; to this cmd). `result` only on failure: `stale` for a session that is gone
 
 ; cmd_op_pointer argument. Fields apply in order: move by (dx, dy), then click, then scroll. Absent = 0.
 pointer_arg = {
@@ -454,6 +458,23 @@ detail = {
   ? 5 => uint    ; lm     with no rid (proto 0.18): the id of the session's last message this chunk is from
 }
 
+
+; The agent graph of session `sid` (proto 0.22, GRAPH.md), the answer to cmd_op_graph: the current turn's tool
+; calls, oldest first, at most the newest 64. Each node is one uint (bits, low first):
+;   0-3 kind   0 other, 1 read, 2 edit, 3 shell, 4 search, 5 web, 6 agent, 7 ask, 8 plan, 9 git, 10 test, 11 mcp
+;   4-5 state  0 running, 1 ok, 2 failed (failed, denied or rejected)
+;   6-8 lane   0 = the session's own agent; 1-7 = a sub-agent's lane
+;   9   fork   the first node of its lane's sub-agent (drawn branching off lane 0)
+;   10  merge  the last node of its lane's sub-agent: it stopped after this call (drawn joining lane 0)
+; No agent content: sent under every privacy level.
+graph = {
+  0 => uint,              ; sid
+  1 => [0*64 node: uint], ; nodes
+  ? 2 => [0*8 la: uint],   ; la     per lane, the sub-agent's kind: 0 unknown / own, 1 explore, 2 task,
+                          ;        3 general-purpose, 4 code-review, 5 research, 6 plan, 7 other
+  ? 3 => uint,            ; drop   older calls of this turn not in `nodes`
+  ? 4 => uint             ; gen    changes whenever the graph does (a device may skip an unchanged one)
+}
 
 batt = {
   0 => uint,   ; pct
