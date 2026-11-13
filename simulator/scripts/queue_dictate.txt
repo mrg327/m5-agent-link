@@ -1,5 +1,5 @@
-# Queue a dictation (proto 0.17): Queue reply -> Dictate opens VOICE in queue mode; the transcript's
-# button reads "Queue" and its hold sends cmd dictate (op 12) with q true, the recording id and no rid.
+# Dictate to a working agent (proto 0.17): Reply now -> Dictate opens VOICE in queue mode; the transcript's
+# button reads "Send" and its hold sends cmd dictate (op 12) with q true, the recording id and no rid.
 connect
 rx a400020101020103a60082001101a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
 session 1 work webapp feat/login Running the test suite
@@ -13,7 +13,7 @@ btn B
 wait 150
 btn B
 wait 150
-expect_label > Queue reply
+expect_label > Reply now
 btn A
 wait 200
 btn B
@@ -22,15 +22,15 @@ expect_label > Dictate
 btn A
 wait 300
 expect_screen voice
-expect_label Queue for webapp
+expect_label Reply to webapp
 wait 1200
 tap 233 233
 wait 300
 transcript run the tests again and push
 wait 300
 expect_label (transcript)
-expect_label Queue
-expect_no_label Send
+expect_label Send
+expect_no_label Queue
 shot voice_queue.png
 hold 233 300 1600
 wait 400

@@ -1,6 +1,8 @@
-//! Queued messages (PROTOCOL §6d, proto 0.17): a quick reply or a dictation the user asked for
-//! while the agent was working is held here, in memory, and typed the next time the session can
-//! take input. One delivery task serves the whole daemon, so two linked devices never type it twice.
+//! Queued messages (PROTOCOL §6d, proto 0.17): a quick reply or a dictation sent with `q` is typed at
+//! once, even while the agent works (waiting for the turn to end made replies stale; the agent takes
+//! what is typed mid-turn). Only while typing would answer something instead (an open request, an
+//! approval or a question) is it held here, in memory, and typed once that clears. One delivery task
+//! serves the whole daemon, so two linked devices never type it twice.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
@@ -83,10 +85,10 @@ pub fn preview(text: &str) -> String {
     clip(&one_line, PREVIEW_CHARS)
 }
 
-/// Whether the session can be typed into now (PROTOCOL §6d).
+/// Whether the session can be typed into now (PROTOCOL §6d): a working agent can (the user owns
+/// the consequences); one waiting on a request, an approval or a question cannot.
 pub fn can_take_input(session: &Session, request_open: bool) -> bool {
-    !matches!(session.st, Some(SessState::Start | SessState::Work))
-        && crate::typing::refusal(session, request_open).is_none()
+    crate::typing::refusal(session, request_open).is_none()
 }
 
 pub fn spawn_delivery(shared: Arc<Shared>, settle: Duration) {

@@ -34,7 +34,7 @@ static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static char s_header_txt[64], s_low_txt[32], s_reason_txt[96], s_word_txt[16];
 MODEL_EXT_BSS static char s_text_txt[VOICE_TEXT_MAX];
 static uint32_t s_sid, s_rid, s_now, s_text_since;
-static bool s_queue; /* the hold queues the dictation ("Queue" instead of "Send") */
+static bool s_queue; /* the hold sends the dictation with q (a working session: typed mid-turn, PROTOCOL §6d) */
 static int s_qi = -1;  /* >= 0: a free answer to that question of request s_rid (proto 0.18); the hold hands it to ASK */
 static bool s_qlast;   /* ... and it is the request's last question: the hold sends every answer ("Send", else "Use") */
 static voice_state_t s_shown = (voice_state_t)-1;
@@ -116,7 +116,7 @@ static void set_transcript(const char *t)
 /* "Send" (the hold) once every page has been shown; until then "More 1/3", which a tap answers. */
 static void set_button(voice_state_t st)
 {
-    const wheel_item_t send = {s_queue ? "Queue" : s_qi >= 0 && !s_qlast ? "Use" : "Send", RGB_ASK, true, 1, NULL};
+    const wheel_item_t send = {!s_queue && s_qi >= 0 && !s_qlast ? "Use" : "Send", RGB_ASK, true, 1, NULL};
     static const wheel_item_t retry = {"Try again", 0, false, 2, NULL};
     char more[24];
     wheel_item_t next = {more, 0, false, 3, NULL};
@@ -141,7 +141,7 @@ static void render(void)
     const session_t *s = model_find(s_sid);
     char buf[64];
     const char *base = s ? theme_basename(s->repo) : "";
-    snprintf(buf, sizeof buf, "%s %s", s_queue ? "Queue for" : s_qi >= 0 ? "Answer for" : "Reply to", base[0] ? base : "(no folder)");
+    snprintf(buf, sizeof buf, "%s %s", !s_queue && s_qi >= 0 ? "Answer for" : "Reply to", base[0] ? base : "(no folder)");
     theme_set_text(s_header, s_header_txt, sizeof s_header_txt, buf);
     if (st != s_shown) {
         if (st == VOICE_TEXT) s_text_since = s_now;
@@ -329,7 +329,7 @@ void ui_voice_report(ui_report_t *r)
     if (st == VOICE_FAILED) ui_report_add(r, "%s", s_reason_txt);
     if (st == VOICE_TEXT && !s_read_all) ui_report_add(r, "More %d/%d", s_page_i + 1, s_pages); /* the button */
     else if (st == VOICE_TEXT || st == VOICE_FAILED)
-        ui_report_add(r, "%s", st == VOICE_TEXT ? (s_queue ? "Queue" : s_qi >= 0 && !s_qlast ? "Use" : "Send") : "Try again");
+        ui_report_add(r, "%s", st == VOICE_TEXT ? (!s_queue && s_qi >= 0 && !s_qlast ? "Use" : "Send") : "Try again");
 }
 
 static lv_obj_t *label(lv_obj_t *parent, const lv_font_t *f, lv_color_t col, int cy, int w, int lines)

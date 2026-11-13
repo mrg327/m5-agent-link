@@ -278,7 +278,7 @@ static void act_type_reply(uint32_t sid, int idx, bool queue)
         char t[80];
         const session_t *s = model_find(sid);
         const char *text = idx >= 100 ? (s && idx - 100 < s->n_rp ? s->rp[idx - 100] : "") : model_reply(idx);
-        snprintf(t, sizeof t, "%s \"%s\"", queue ? "Queued" : "Sent", text);
+        snprintf(t, sizeof t, "Sent \"%s\"", text);
         ui_toast(t, RGB_SUCCESS);
     } else {
         feedback_reject();
@@ -326,7 +326,7 @@ static void act_dictate(uint32_t sid, uint32_t rid, uint32_t aid, uint32_t hold_
     } else {
         feedback_reject();
     }
-    toast_cmd_result(sent, queue ? "Queued" : "Sent");
+    toast_cmd_result(sent, "Sent");
     voice_cancel(); /* done with it on the device */
 }
 

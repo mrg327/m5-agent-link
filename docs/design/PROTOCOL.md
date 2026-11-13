@@ -346,18 +346,18 @@ st: go 0 | done 1 | busy 2 | bad 3 | fail 4 | stopped 5
 - Chunks never reach the trace (it shows the size only).
 
 ## 6d. Queued messages (proto 0.17)
-A quick reply or a dictation can be queued for a session that cannot take input now (its agent is working);
-the daemon types it the next time the session can.
-- `type` or `dictate` with `q: true` and no `rid`: when the session can take input now (not `start`/`work`, no
-  open request, not `input` with `sub` approval or question), the daemon types it at once, as without `q`.
+A quick reply or a dictation can be sent to a session whose agent is working; it is typed at once, mid-turn
+(the agent takes it in as it goes). Only while typing would answer something else is it held, and typed later.
+Until 2026-11-13 the daemon also held it through `start`/`work` until the turn ended; that made replies stale.
+- `type` or `dictate` with `q: true` and no `rid`: when the session can take input now (no open request, not
+  `input` with `sub` approval or question; `start` and `work` can), the daemon types it at once, as without `q`.
   Otherwise it keeps the text (a dictation's transcript is taken at once) and answers `ok`. A session holds one
   queued message; a new one replaces it. `q` with a `rid` is `denied`.
 - The daemon sets `session.qd` to the start of the text (≤ 48 chars, cut with `…`) and sends it to every device
   with proto ≥ 0.17; the device shows it and offers to cancel it. `qd` is agent content: never written to the
   audit log or the trace. Under privacy `meta` it is sent as `"…"` (something is queued, no text).
-- When the session can take input again (it enters `done`, `idle` or `error`, or `input` without an approval or
-  question, with no request open), the daemon waits about 2 s for the terminal to settle, then types the text
-  and Enter with the same checks as `type` (a numbered selection on screen refuses). On success it clears `qd`
+- When the session can take input again (the approval or question is answered and no request is open), the
+  daemon waits about 2 s for the terminal to settle, then types the text and Enter with the same checks as `type` (a numbered selection on screen refuses). On success it clears `qd`
   (`""`); on a refusal or a typing failure it keeps the message and tries again at the session's next change.
 - `unqueue` (`sid`): drops the session's queued message and clears `qd`; `stale` when none is queued.
 - The message is dropped with its session (`gone`). It lives in the daemon's memory only and is lost when the

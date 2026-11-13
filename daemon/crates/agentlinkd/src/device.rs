@@ -1326,7 +1326,7 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
     if queueing && cmd.rid.is_some() {
         return fail(ResultErr::Denied, "a queued message answers no request");
     }
-    // a queued message waits for a session that cannot take input now; otherwise it types at once
+    // a queued message types at once, even mid-turn; it waits only while typing would answer a prompt
     let busy =
         queueing && !crate::queue::can_take_input(&session, shared.broker.open_for(session.sid));
     let mut source = String::new();
@@ -1865,14 +1865,46 @@ mod tests {
         }
     }
 
+    fn set_asking(shared: &Shared) {
+        use crate::registry::{SessionEvent, SessionPatch};
+        let mut p = SessionPatch::new(Agent::Claude);
+        p.state = Some(SessState::Input);
+        p.sub = Some(InputSub::Approval);
+        shared.registry.apply(SessionEvent::Update {
+            key: "claude:s".into(),
+            via: crate::registry::Via::Local,
+            patch: p,
+            ctx: crate::registry::HostCtx::default(),
+        });
+    }
+
     #[tokio::test]
-    async fn a_reply_queued_while_working_waits_and_shows_its_start() {
+    async fn a_queued_reply_types_at_once_even_while_the_agent_works() {
+        let term = Arc::new(FakeTerm::default());
+        let shared = shared_typing(term.clone());
+        let sid = add_session(&shared); // working
+        let r = handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(0))).await;
+        assert!(r.ok, "{r:?}");
+        assert_eq!(*term.sent.lock().unwrap(), vec!["Continue", "\\r"]);
+        assert_eq!(qd_of(&shared, sid), None, "nothing held");
+        set_state(&shared, SessState::Done);
+        let r = handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(1))).await;
+        assert!(r.ok, "{r:?}");
+        assert_eq!(term.sent.lock().unwrap().len(), 4);
+    }
+
+    #[tokio::test]
+    async fn a_reply_queued_while_the_agent_asks_waits_and_shows_its_start() {
         let term = Arc::new(FakeTerm::default());
         let shared = shared_typing(term.clone());
         let sid = add_session(&shared);
+        set_asking(&shared);
         let r = handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(1))).await;
         assert!(r.ok, "{r:?}");
-        assert!(term.sent.lock().unwrap().is_empty(), "not typed yet");
+        assert!(
+            term.sent.lock().unwrap().is_empty(),
+            "typing would answer the approval"
+        );
         assert_eq!(qd_of(&shared, sid).as_deref(), Some("Run the tests"));
         let r = handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(0))).await;
         assert!(r.ok);
@@ -1881,18 +1913,6 @@ mod tests {
             Some("Continue"),
             "a new one replaces the old"
         );
-    }
-
-    #[tokio::test]
-    async fn a_queued_reply_for_an_idle_session_types_at_once() {
-        let term = Arc::new(FakeTerm::default());
-        let shared = shared_typing(term.clone());
-        let sid = add_session(&shared);
-        set_state(&shared, SessState::Done);
-        let r = handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(0))).await;
-        assert!(r.ok, "{r:?}");
-        assert_eq!(*term.sent.lock().unwrap(), vec!["Continue", "\\r"]);
-        assert_eq!(qd_of(&shared, sid), None);
     }
 
     #[tokio::test]
@@ -1911,6 +1931,7 @@ mod tests {
         let term = Arc::new(FakeTerm::default());
         let shared = shared_typing(term.clone());
         let sid = add_session(&shared);
+        set_asking(&shared);
         let r = handle_cmd(&shared, &queue_cmd(CmdOp::Dictate, sid, Some(9))).await;
         assert!(!r.ok && r.err == Some(ResultErr::Stale), "no transcript");
         shared
@@ -1931,6 +1952,7 @@ mod tests {
         let un = type_cmd_of(CmdOp::Unqueue, sid, None, None);
         let r = handle_cmd(&shared, &un).await;
         assert!(!r.ok && r.err == Some(ResultErr::Stale));
+        set_asking(&shared);
         handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(0))).await;
         let r = handle_cmd(&shared, &un).await;
         assert!(r.ok, "{r:?}");
@@ -1941,16 +1963,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_queued_message_is_typed_once_when_the_session_can_take_input() {
+    async fn a_held_message_is_typed_once_when_the_prompt_clears() {
         let term = Arc::new(FakeTerm::default());
         let shared = shared_typing(term.clone());
         crate::queue::spawn_delivery(shared.clone(), std::time::Duration::from_millis(20));
         let sid = add_session(&shared);
+        set_asking(&shared);
         handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(1))).await;
-        set_state(&shared, SessState::Work);
+        set_asking(&shared);
         tokio::time::sleep(std::time::Duration::from_millis(150)).await;
-        assert!(term.sent.lock().unwrap().is_empty(), "still working");
-        set_state(&shared, SessState::Done);
+        assert!(term.sent.lock().unwrap().is_empty(), "still asking");
+        set_state(&shared, SessState::Work); // answered: the agent works again and takes the message
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
         assert_eq!(*term.sent.lock().unwrap(), vec!["Run the tests", "\\r"]);
         assert_eq!(qd_of(&shared, sid).as_deref(), Some(""));
@@ -1982,6 +2005,7 @@ mod tests {
         let shared = Arc::new(shared);
         crate::queue::spawn_delivery(shared.clone(), std::time::Duration::from_millis(20));
         let sid = add_session(&shared);
+        set_asking(&shared);
         handle_cmd(&shared, &queue_cmd(CmdOp::Type, sid, Some(0))).await;
         set_state(&shared, SessState::Done);
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;

@@ -27,8 +27,9 @@ static uint32_t s_hold_t0, s_hold_ms;
  * cmd type argument: the session's own answers to its closing question first (100 + i), then the
  * daemon's fixed replies (i). The question itself shows above the list. */
 static bool s_replies;
-/* "Queue reply" opens the same list in queue mode: the fixed replies and Dictate only (no Keyboard, no
- * answers of the session's own); the daemon holds the pick until the session can take input (proto 0.17). */
+/* "Reply now" (a working session) opens the same list in queue mode: the fixed replies and Dictate only (no
+ * Keyboard, no answers of the session's own). The cmd carries q (proto 0.17): the daemon types it at once,
+ * mid-turn, and holds it only while the agent waits on an approval or a question (PROTOCOL §6d). */
 static bool s_queue;
 #define QUEUE_MIN_MINOR 17
 #define QUEUED_Y 134 /* between the gauge readout (y 108) and the first row */
@@ -43,7 +44,7 @@ static const char *const s_labels[AG_COUNT] = {
     [AG_FOCUS] = "Open on PC", [AG_DISMISS] = "Dismiss",
     [AG_SNOOZE] = "Snooze 30 min", [AG_NOTIFY] = "Notify when done", [AG_WATCH] = "Activity",
     [AG_REPLY] = "Reply",          [AG_INTERRUPT] = "Stop",       [AG_RERUN] = "Run again",
-    [AG_QUEUE] = "Queue reply",    [AG_UNQUEUE] = "Cancel queued", [AG_READ] = "Read",
+    [AG_QUEUE] = "Reply now",      [AG_UNQUEUE] = "Cancel queued", [AG_READ] = "Read",
 };
 
 static const char *const s_icons[AG_COUNT] = {
@@ -94,7 +95,7 @@ bool ui_agent_refresh(uint32_t now)
     char host[24];
     theme_host_prefix(host, sizeof host, s);
     /* the caption is the project (host first when remote); Reply says what the list is for */
-    snprintf(buf, sizeof buf, "%s%s", s_queue ? "Queue for " : s_replies ? "Reply to " : host, base[0] ? base : "(no folder)");
+    snprintf(buf, sizeof buf, "%s%s", s_queue || s_replies ? "Reply to " : host, base[0] ? base : "(no folder)");
     if (strcmp(buf, s_header_txt)) {
         snprintf(s_header_txt, sizeof s_header_txt, "%s", buf);
         lv_label_set_text(s_header, buf);
