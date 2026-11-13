@@ -1,0 +1,12 @@
+{
+  "desc": "Device drops session 3's queued message (proto 0.17)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 22,
+    "b": {
+      "op": "unqueue",
+      "sid": 3
+    }
+  },
+  "cbor_hex": "a30008011603a200120103"
+}

@@ -234,7 +234,11 @@ session = {
   ? 31 => uint,             ; la    lines added in the turn, sent with lr; absent = not known
   ? 32 => uint,             ; lr    lines removed
   ? 33 => bool,             ; tp    the turn's last recognised test run: true passed, false failed; absent = unknown
-  ? 34 => uint              ; dur   the turn's length in seconds, prompt to stop
+  ? 34 => uint,             ; dur   the turn's length in seconds, prompt to stop
+  ? 35 => tstr              ; qd    the message queued for this session (proto 0.17, PROTOCOL.md §4b): the
+                            ;       start of its text, <= 48 chars, cut with "…"; "" = none. Only to devices with
+                            ;       proto >= 0.17. The daemon types the message the next time the session can take
+                            ;       input and then sends qd: "". The user's own words: the trace shows <private>
 }
 perm_mode = perm_mode_default / perm_mode_plan / perm_mode_accept_edits / perm_mode_auto /
   perm_mode_dont_ask / perm_mode_bypass
@@ -330,16 +334,19 @@ cmd = {
   ? 2 => uint,     ; rid   (dictate: the card the transcript answers, proto 0.8)
   ? 3 => cmd_arg,  ; arg   snooze minutes, reply option index, quiet secs
   ? 4 => uint,    ; hold_ms  measured hold-to-confirm (approve)
-  ? 5 => uint     ; rh  with cmd_op_approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of
+  ? 5 => uint,    ; rh  with cmd_op_approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of
                   ;     the rule's bytes, 0x00, the scope's value and the wide flag (0/1), as the device showed
                   ;     them; hold_ms >= 1500 (STANDING-RULES.md)
+  ? 6 => bool     ; q   with cmd_op_type / cmd_op_dictate (proto 0.17): queue the message if the session cannot
+                  ;     take input now; the daemon types it the next time it can. One per session: a new one
+                  ;     replaces the old. Not with a `rid`
 }
 ; Scalars for snooze / reply / quiet; a map for scroll. Further structured arguments ({aid}) join this union when they land.
 cmd_arg = uint / tstr / scroll_arg
 cmd_op = cmd_op_focus / cmd_op_ack / cmd_op_snooze / cmd_op_approve / cmd_op_deny /
   cmd_op_reply / cmd_op_cancel / cmd_op_detail / cmd_op_notify_done / cmd_op_quiet / cmd_op_scroll /
   cmd_op_type / cmd_op_dictate / cmd_op_kb_pick / cmd_op_kb_del / cmd_op_kb_send / cmd_op_kb_end /
-  cmd_op_rerun
+  cmd_op_rerun / cmd_op_unqueue
 cmd_op_focus = 0    ; with a `rid` (proto 0.11): also hand that request back to the terminal at once
 cmd_op_ack = 1
 cmd_op_snooze = 2
@@ -358,6 +365,7 @@ cmd_op_kb_del = 14  ; KEYS: erase the last word typed from the watch
 cmd_op_kb_send = 15 ; KEYS: press Enter (hold_ms >= 1000); the composition is sent to the agent
 cmd_op_kb_end = 16  ; KEYS: the keyboard closed; `arg` 1 erases what it typed and was not sent, 0 keeps it
 cmd_op_rerun = 17   ; JOBS: run a finished job's command again in its own terminal (hold_ms >= 1000; proto 0.9)
+cmd_op_unqueue = 18 ; drop session `sid`'s queued message (proto 0.17); stale when there is none
 
 ; cmd_op_scroll argument (UI-V2 §6.1): move the session's terminal scrollback.
 scroll_arg = {

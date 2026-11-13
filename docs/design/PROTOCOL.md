@@ -138,7 +138,8 @@ session = {
   ? la: uint,                ; lines added, with lr                                  │ proto ≥ 0.14
   ? lr: uint,                ; lines removed                                          │ (DONE-SUMMARY.md)
   ? tp: bool,                ; the last recognised test run: true passed, false failed │ key 30-34
-  ? dur: uint                ; the turn's length in seconds                           ┘
+  ? dur: uint,               ; the turn's length in seconds                           ┘
+  ? qd: tstr                 ; the queued message's start, <= 48 chars; "" = none (proto 0.17, key 35, §6d)
 }
 ```
 - `q` / `rp` (keys 17, 18, proto 0.5): when an agent's turn ends on a question, the daemon reads it from the turn's last message (Claude Code's Stop hook carries `last_assistant_message`) and sends the question (≤ 120 chars) with up to 3 answers (≤ 24 chars): the options of an "A or B?" question, else `Yes, go ahead` / `No` for a yes/no one, else none. The watch lists them first under Reply, with the question above. They are cleared (`""`, `[]`: a delta cannot remove a key) as soon as the agent works again. Agent content: never sent under privacy `meta`, and only to devices with proto ≥ 0.5.
@@ -220,14 +221,15 @@ The device must show approve/deny **only if** they are in `acts`. The daemon inc
 
 ```cddl
 cmd = {
-  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end"/"rerun",
+  op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end"/"rerun"/"unqueue",
   ? sid: uint,
   ? rid: uint,               ; required for approve/deny/reply
   ? arg: uint / tstr / scroll_arg,  ; snooze minutes (the watch sends 30), reply option index, quiet duration,
                              ; or the scroll argument (the CDDL names the union cmd_arg)
   hold_ms?: uint,            ; for approve: measured hold-to-confirm duration (daemon enforces ≥ 1000)
-  ? rh: uint                 ; with approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of
+  ? rh: uint,                ; with approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of
                              ; the rule, a 0 byte, scope and wide (0/1) as the device showed them; hold ≥ 1500
+  ? q: bool                  ; with type / dictate (proto 0.17, key 6): queue it if the session can't take input (§6d)
 }
 scroll_arg = { unit: "lines"/"pages"/"to_end", delta: int, ? seq: uint }   ; delta < 0 = up (older); to_end: sign = top / bottom
 result = { ok: bool, ? err: "stale"/"denied"/"unsupported"/"no_window"/"timeout", ? msg: tstr, ? pos: scroll_pos }
@@ -334,6 +336,25 @@ st: go 0 | done 1 | busy 2 | bad 3 | fail 4 | stopped 5
   within 5 minutes, or resets before that, the previous image boots again (rollback). The daemon compares the
   `fw` in the next `hello` with the image's version to tell the two apart.
 - Chunks never reach the trace (it shows the size only).
+
+## 6d. Queued messages (proto 0.17)
+A quick reply or a dictation can be queued for a session that cannot take input now (its agent is working);
+the daemon types it the next time the session can.
+- `type` or `dictate` with `q: true` and no `rid`: when the session can take input now (not `start`/`work`, no
+  open request, not `input` with `sub` approval or question), the daemon types it at once, as without `q`.
+  Otherwise it keeps the text (a dictation's transcript is taken at once) and answers `ok`. A session holds one
+  queued message; a new one replaces it. `q` with a `rid` is `denied`.
+- The daemon sets `session.qd` to the start of the text (≤ 48 chars, cut with `…`) and sends it to every device
+  with proto ≥ 0.17; the device shows it and offers to cancel it. `qd` is agent content: never written to the
+  audit log or the trace. Under privacy `meta` it is sent as `"…"` (something is queued, no text).
+- When the session can take input again (it enters `done`, `idle` or `error`, or `input` without an approval or
+  question, with no request open), the daemon waits about 2 s for the terminal to settle, then types the text
+  and Enter with the same checks as `type` (a numbered selection on screen refuses). On success it clears `qd`
+  (`""`); on a refusal or a typing failure it keeps the message and tries again at the session's next change.
+- `unqueue` (`sid`): drops the session's queued message and clears `qd`; `stale` when none is queued.
+- The message is dropped with its session (`gone`). It lives in the daemon's memory only and is lost when the
+  daemon restarts. It never expires otherwise. Audited when typed, with the source (reply index or recording),
+  not the text.
 
 ## 7. Misc
 - `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray.

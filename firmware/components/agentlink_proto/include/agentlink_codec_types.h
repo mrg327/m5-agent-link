@@ -406,6 +406,10 @@ struct session_uint34uint {
 	uint32_t session_uint34uint;
 };
 
+struct session_uint35tstr {
+	struct zcbor_string session_uint35tstr;
+};
+
 struct session {
 	uint32_t session_uint0uint;
 	struct session_agent_m session_agent_m;
@@ -470,6 +474,8 @@ struct session {
 	bool session_uint33bool_present;
 	struct session_uint34uint session_uint34uint;
 	bool session_uint34uint_present;
+	struct session_uint35tstr session_uint35tstr;
+	bool session_uint35tstr_present;
 };
 
 struct att_kind_r {
@@ -655,6 +661,7 @@ struct cmd_op_r {
 		cmd_op_kb_send_m_c = 15,
 		cmd_op_kb_end_m_c = 16,
 		cmd_op_rerun_m_c = 17,
+		cmd_op_unqueue_m_c = 18,
 	} cmd_op_choice;
 };
 
@@ -710,6 +717,10 @@ struct cmd_uint5uint {
 	uint32_t cmd_uint5uint;
 };
 
+struct cmd_uint6bool {
+	bool cmd_uint6bool;
+};
+
 struct cmd {
 	struct cmd_op_r cmd_op_m;
 	struct cmd_uint1uint cmd_uint1uint;
@@ -722,6 +733,8 @@ struct cmd {
 	bool cmd_uint4uint_present;
 	struct cmd_uint5uint cmd_uint5uint;
 	bool cmd_uint5uint_present;
+	struct cmd_uint6bool cmd_uint6bool;
+	bool cmd_uint6bool_present;
 };
 
 struct msg_cmd {

@@ -91,6 +91,7 @@ static bool decode_repeated_session_uint31uint(zcbor_state_t *state, struct sess
 static bool decode_repeated_session_uint32uint(zcbor_state_t *state, struct session_uint32uint *result);
 static bool decode_repeated_session_uint33bool(zcbor_state_t *state, struct session_uint33bool *result);
 static bool decode_repeated_session_uint34uint(zcbor_state_t *state, struct session_uint34uint *result);
+static bool decode_repeated_session_uint35tstr(zcbor_state_t *state, struct session_uint35tstr *result);
 static bool decode_session(zcbor_state_t *state, struct session *result);
 static bool decode_att_kind(zcbor_state_t *state, struct att_kind_r *result);
 static bool decode_away_event(zcbor_state_t *state, struct away_event *result);
@@ -128,6 +129,7 @@ static bool decode_cmd_arg(zcbor_state_t *state, struct cmd_arg_r *result);
 static bool decode_repeated_cmd_arg_m(zcbor_state_t *state, struct cmd_arg_m *result);
 static bool decode_repeated_cmd_uint4uint(zcbor_state_t *state, struct cmd_uint4uint *result);
 static bool decode_repeated_cmd_uint5uint(zcbor_state_t *state, struct cmd_uint5uint *result);
+static bool decode_repeated_cmd_uint6bool(zcbor_state_t *state, struct cmd_uint6bool *result);
 static bool decode_cmd(zcbor_state_t *state, struct cmd *result);
 static bool decode_msg_cmd(zcbor_state_t *state, struct msg_cmd *result);
 static bool decode_result_err(zcbor_state_t *state, struct result_err_r *result);
@@ -1148,6 +1150,18 @@ static bool decode_repeated_session_uint34uint(
 	return res;
 }
 
+static bool decode_repeated_session_uint35tstr(
+		zcbor_state_t *state, struct session_uint35tstr *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (35))))
+	&& (zcbor_tstr_decode(state, (&(*result).session_uint35tstr)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_session(
 		zcbor_state_t *state, struct session *result)
 {
@@ -1185,7 +1199,8 @@ static bool decode_session(
 	&& zcbor_present_decode(&((*result).session_uint31uint_present), (zcbor_decoder_t *)decode_repeated_session_uint31uint, state, (&(*result).session_uint31uint))
 	&& zcbor_present_decode(&((*result).session_uint32uint_present), (zcbor_decoder_t *)decode_repeated_session_uint32uint, state, (&(*result).session_uint32uint))
 	&& zcbor_present_decode(&((*result).session_uint33bool_present), (zcbor_decoder_t *)decode_repeated_session_uint33bool, state, (&(*result).session_uint33bool))
-	&& zcbor_present_decode(&((*result).session_uint34uint_present), (zcbor_decoder_t *)decode_repeated_session_uint34uint, state, (&(*result).session_uint34uint))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+	&& zcbor_present_decode(&((*result).session_uint34uint_present), (zcbor_decoder_t *)decode_repeated_session_uint34uint, state, (&(*result).session_uint34uint))
+	&& zcbor_present_decode(&((*result).session_uint35tstr_present), (zcbor_decoder_t *)decode_repeated_session_uint35tstr, state, (&(*result).session_uint35tstr))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
 
 	if (false) {
 		/* For testing that the types of the arguments are correct.
@@ -1222,6 +1237,7 @@ static bool decode_session(
 		decode_repeated_session_uint32uint(state, (&(*result).session_uint32uint));
 		decode_repeated_session_uint33bool(state, (&(*result).session_uint33bool));
 		decode_repeated_session_uint34uint(state, (&(*result).session_uint34uint));
+		decode_repeated_session_uint35tstr(state, (&(*result).session_uint35tstr));
 	}
 
 	log_result(state, res, __func__);
@@ -1652,7 +1668,8 @@ static bool decode_cmd_op(
 	|| (((*result).cmd_op_choice == cmd_op_kb_del_m_c) && ((1)))
 	|| (((*result).cmd_op_choice == cmd_op_kb_send_m_c) && ((1)))
 	|| (((*result).cmd_op_choice == cmd_op_kb_end_m_c) && ((1)))
-	|| (((*result).cmd_op_choice == cmd_op_rerun_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
+	|| (((*result).cmd_op_choice == cmd_op_rerun_m_c) && ((1)))
+	|| (((*result).cmd_op_choice == cmd_op_unqueue_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
 
 	log_result(state, res, __func__);
 	return res;
@@ -1779,6 +1796,18 @@ static bool decode_repeated_cmd_uint5uint(
 	return res;
 }
 
+static bool decode_repeated_cmd_uint6bool(
+		zcbor_state_t *state, struct cmd_uint6bool *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (6))))
+	&& (zcbor_bool_decode(state, (&(*result).cmd_uint6bool)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_cmd(
 		zcbor_state_t *state, struct cmd *result)
 {
@@ -1790,7 +1819,8 @@ static bool decode_cmd(
 	&& zcbor_present_decode(&((*result).cmd_uint2uint_present), (zcbor_decoder_t *)decode_repeated_cmd_uint2uint, state, (&(*result).cmd_uint2uint))
 	&& zcbor_present_decode(&((*result).cmd_arg_m_present), (zcbor_decoder_t *)decode_repeated_cmd_arg_m, state, (&(*result).cmd_arg_m))
 	&& zcbor_present_decode(&((*result).cmd_uint4uint_present), (zcbor_decoder_t *)decode_repeated_cmd_uint4uint, state, (&(*result).cmd_uint4uint))
-	&& zcbor_present_decode(&((*result).cmd_uint5uint_present), (zcbor_decoder_t *)decode_repeated_cmd_uint5uint, state, (&(*result).cmd_uint5uint))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+	&& zcbor_present_decode(&((*result).cmd_uint5uint_present), (zcbor_decoder_t *)decode_repeated_cmd_uint5uint, state, (&(*result).cmd_uint5uint))
+	&& zcbor_present_decode(&((*result).cmd_uint6bool_present), (zcbor_decoder_t *)decode_repeated_cmd_uint6bool, state, (&(*result).cmd_uint6bool))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
 
 	if (false) {
 		/* For testing that the types of the arguments are correct.
@@ -1801,6 +1831,7 @@ static bool decode_cmd(
 		decode_repeated_cmd_arg_m(state, (&(*result).cmd_arg_m));
 		decode_repeated_cmd_uint4uint(state, (&(*result).cmd_uint4uint));
 		decode_repeated_cmd_uint5uint(state, (&(*result).cmd_uint5uint));
+		decode_repeated_cmd_uint6bool(state, (&(*result).cmd_uint6bool));
 	}
 
 	log_result(state, res, __func__);

@@ -1465,6 +1465,7 @@ mod tests {
             })),
             hold_ms: None,
             rh: None,
+            q: None,
         }
     }
 
@@ -1519,6 +1520,7 @@ mod tests {
             arg: arg.map(Arg::Uint),
             hold_ms,
             rh: None,
+            q: None,
         }
     }
 
@@ -1789,6 +1791,7 @@ mod tests {
             arg,
             hold_ms,
             rh: None,
+            q: None,
         }
     }
 

@@ -1640,6 +1640,13 @@
           "type": "uint",
           "note": "dur   the turn's length in seconds, prompt to stop",
           "name": "dur"
+        },
+        {
+          "key": 35,
+          "optional": true,
+          "type": "tstr",
+          "note": "qd    the message queued for this session (proto 0.17, PROTOCOL.md §4b): the",
+          "name": "qd"
         }
       ],
       "source": "protocol/agentlink.cddl:59"
@@ -1843,6 +1850,13 @@
           "type": "uint",
           "note": "rh  with cmd_op_approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of",
           "name": "rh"
+        },
+        {
+          "key": 6,
+          "optional": true,
+          "type": "bool",
+          "note": "q   with cmd_op_type / cmd_op_dictate (proto 0.17): queue the message if the session cannot",
+          "name": "q"
         }
       ],
       "source": "protocol/agentlink.cddl:63"

@@ -1,0 +1,14 @@
+{
+  "desc": "Device queues quick reply 2 for working session 3; the daemon types it when the session can take input (proto 0.17)",
+  "symbolic": {
+    "t": "cmd",
+    "id": 21,
+    "b": {
+      "op": "type",
+      "sid": 3,
+      "arg": 2,
+      "q": true
+    }
+  },
+  "cbor_hex": "a30008011503a4000b0103030206f5"
+}

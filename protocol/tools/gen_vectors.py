@@ -291,6 +291,21 @@ VECTORS = {
         {"t": "cmd", "id": 10, "b": {"op": "cancel", "sid": 3, "hold_ms": 1250}},
         env("cmd", 10, {0: 6, 1: 3, 4: 1250}),
     ),
+    "cmd_type_queued": (
+        "Device queues quick reply 2 for working session 3; the daemon types it when the session can take input (proto 0.17)",
+        {"t": "cmd", "id": 21, "b": {"op": "type", "sid": 3, "arg": 2, "q": True}},
+        env("cmd", 21, {0: 11, 1: 3, 3: 2, 6: True}),
+    ),
+    "cmd_unqueue": (
+        "Device drops session 3's queued message (proto 0.17)",
+        {"t": "cmd", "id": 22, "b": {"op": "unqueue", "sid": 3}},
+        env("cmd", 22, {0: 18, 1: 3}),
+    ),
+    "session_queued": (
+        "Delta: session 3 holds a queued message, shown by its start (proto 0.17); \"\" clears it",
+        {"t": "session_upd", "id": 32, "b": {"sid": 3, "qd": "run the tests again"}},
+        env("session_upd", 32, {0: 3, 35: "run the tests again"}),
+    ),
     "cmd_dictate": (
         "Device sends recording 4's transcript to session 3 after a hold (proto 0.6)",
         {"t": "cmd", "id": 11, "b": {"op": "dictate", "sid": 3, "arg": 4, "hold_ms": 1250}},

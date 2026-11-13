@@ -177,6 +177,8 @@ body!(
         #[n(33)] #[serde(skip_serializing_if = "Option::is_none")] tp: Option<bool>,
         /// The turn's length in seconds.
         #[n(34)] #[serde(skip_serializing_if = "Option::is_none")] dur: Option<u64>,
+        /// The message queued for this session (proto 0.17): the start of its text, <= 48 chars; "" = none.
+        #[n(35)] #[serde(skip_serializing_if = "Option::is_none")] qd: Option<String>,
     }
 );
 impl Session {
@@ -215,6 +217,7 @@ impl Session {
             lr: None,
             tp: None,
             dur: None,
+            qd: None,
         }
     }
 
@@ -223,7 +226,7 @@ impl Session {
         macro_rules! m { ($($f:ident),*) => { $(if d.$f.is_some() { self.$f = d.$f.clone(); })* }; }
         m!(
             ag, st, sub, repo, br, tool, t0, tst, sum, seen, host, hn, snz, ntf, n, ok, eta, exit,
-            ctx, mdl, pm, pr, prs, hush, fc, la, lr, tp, dur
+            ctx, mdl, pm, pr, prs, hush, fc, la, lr, tp, dur, qd
         );
     }
 }
@@ -384,6 +387,8 @@ body!(Cmd {
     /// With `approve` (proto 0.13): also save the request's standing rule. The hash of the rule as the device
     /// showed it (STANDING-RULES.md §5); the daemon grants only when it is the hash of its own rule.
     #[n(5)] #[serde(skip_serializing_if = "Option::is_none")] rh: Option<u64>,
+    /// With `type` / `dictate` (proto 0.17): queue the message if the session cannot take input now.
+    #[n(6)] #[serde(skip_serializing_if = "Option::is_none")] q: Option<bool>,
 });
 body!(CmdResult {
     #[n(0)] ok: bool,

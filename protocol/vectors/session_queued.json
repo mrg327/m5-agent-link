@@ -1,0 +1,12 @@
+{
+  "desc": "Delta: session 3 holds a queued message, shown by its start (proto 0.17); \"\" clears it",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 32,
+    "b": {
+      "sid": 3,
+      "qd": "run the tests again"
+    }
+  },
+  "cbor_hex": "a3000401182003a2000318237372756e2074686520746573747320616761696e"
+}
