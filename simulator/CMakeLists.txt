@@ -68,6 +68,8 @@ add_test(NAME detail_model COMMAND test_detail)
 
 add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
 target_include_directories(test_ring PRIVATE ${FW}/core/src)
+find_package(Threads REQUIRED)
+target_link_libraries(test_ring PRIVATE Threads::Threads)
 add_test(NAME ring_fifo COMMAND test_ring)
 
 add_executable(test_sha256 tests/test_sha256.c ${FW}/core/src/sha256.c)

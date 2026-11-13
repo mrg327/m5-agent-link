@@ -37,7 +37,9 @@ static ring_t s_frames, s_link_evts, s_btn_evts, s_motion_evts, s_gestures;
  * an ISR) and read by core_step: they live in PSRAM, so internal RAM stays for what must be there (BLE). */
 MODEL_EXT_BSS static frame_t s_frame_buf[FRAME_SLOTS];
 static size_t frame_used(const void *stored) { return offsetof(frame_t, data) + ((const frame_t *)stored)->len; }
-static atomic_flag s_rx_lock = ATOMIC_FLAG_INIT; /* transports may deliver from different tasks */
+/* Transports deliver from different tasks (usb_link, NimBLE host) and the holder copies up to 4 KB, too long
+ * for a critical section: a mutex, whose priority inheritance lets a preempted holder finish. */
+static ring_mutex_t s_rx_lock;
 static atomic_uint s_frames_dropped;
 static link_evt_t s_link_buf[8];
 static btn_evt_t s_btn_buf[16];
@@ -88,13 +90,13 @@ static void on_rx(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 {
     MODEL_EXT_BSS static frame_t f;
     if (len > FRAME_MAX) return;
-    ring_spin_lock(&s_rx_lock);
+    ring_mutex_lock(&s_rx_lock);
     f.kind = kind;
     f.len = (uint16_t)len;
     memcpy(f.data, frame, len);
     /* only the message itself is copied, not the 4 KB slot */
     if (!ring_push_n(&s_frames, &f, frame_used(&f))) atomic_fetch_add(&s_frames_dropped, 1);
-    ring_spin_unlock(&s_rx_lock);
+    ring_mutex_unlock(&s_rx_lock);
 }
 
 static void on_state(hal_link_kind_t kind, bool connected)
@@ -664,6 +666,7 @@ bool core_ui_has_label(const char *text)
 
 void core_init(void)
 {
+    ring_mutex_init(&s_rx_lock);
     ring_init(&s_frames, s_frame_buf, sizeof s_frame_buf[0], FRAME_SLOTS);
     ring_init(&s_link_evts, s_link_buf, sizeof s_link_buf[0], 8);
     ring_init(&s_btn_evts, s_btn_buf, sizeof s_btn_buf[0], 16);
