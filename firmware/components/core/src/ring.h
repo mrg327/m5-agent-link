@@ -1,5 +1,6 @@
-/* Tiny fixed-size FIFO that is safe to push to from HAL callbacks (other task or ISR context)
- * while core_step() pops. A spin flag guards a few instructions; items are copied by value. */
+/* Tiny fixed-size FIFO that is safe to push to from HAL callbacks (other tasks, never an ISR) while
+ * core_step() pops. A spin flag guards the copy; items are copied by value. On the watch a contender
+ * that keeps finding the flag set sleeps a tick, so a lower-priority holder on its core can finish. */
 #pragma once
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -12,6 +13,10 @@ typedef struct {
     size_t head, count;
     atomic_flag lock;
 } ring_t;
+
+/* The ring's lock, for other data shared the same way (app.c's staging frame). */
+void ring_spin_lock(atomic_flag *f);
+void ring_spin_unlock(atomic_flag *f);
 
 /* `storage` must hold capacity * item_size bytes. */
 void ring_init(ring_t *r, void *storage, size_t item_size, size_t capacity);

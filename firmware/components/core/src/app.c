@@ -87,14 +87,13 @@ static void on_rx(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 {
     MODEL_EXT_BSS static frame_t f;
     if (len > FRAME_MAX) return;
-    while (atomic_flag_test_and_set_explicit(&s_rx_lock, memory_order_acquire)) {
-    }
+    ring_spin_lock(&s_rx_lock);
     f.kind = kind;
     f.len = (uint16_t)len;
     memcpy(f.data, frame, len);
     /* only the message itself is copied, not the 4 KB slot */
     if (!ring_push_n(&s_frames, &f, frame_used(&f))) atomic_fetch_add(&s_frames_dropped, 1);
-    atomic_flag_clear_explicit(&s_rx_lock, memory_order_release);
+    ring_spin_unlock(&s_rx_lock);
 }
 
 static void on_state(hal_link_kind_t kind, bool connected)

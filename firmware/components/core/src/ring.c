@@ -2,16 +2,39 @@
 
 #include <string.h>
 
-static void lock(ring_t *r)
+#ifdef ESP_PLATFORM
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#endif
+
+/* Spins this often before a contender sleeps a tick: a holder on the other core is done within that. */
+#define RING_SPINS 256
+
+void ring_spin_lock(atomic_flag *f)
 {
-    while (atomic_flag_test_and_set_explicit(&r->lock, memory_order_acquire)) {
+    unsigned n = 0;
+    while (atomic_flag_test_and_set_explicit(f, memory_order_acquire)) {
+#ifdef ESP_PLATFORM
+        /* A holder on this core with a lower priority cannot run while we spin: the NimBLE host task
+         * spun here forever on a frame the main task was popping, and the watch froze (issue 2047). */
+        if (++n >= RING_SPINS) {
+            vTaskDelay(1);
+            n = 0;
+        }
+#else
+        (void)n;
+#endif
     }
 }
 
-static void unlock(ring_t *r)
+void ring_spin_unlock(atomic_flag *f)
 {
-    atomic_flag_clear_explicit(&r->lock, memory_order_release);
+    atomic_flag_clear_explicit(f, memory_order_release);
 }
+
+static void lock(ring_t *r) { ring_spin_lock(&r->lock); }
+
+static void unlock(ring_t *r) { ring_spin_unlock(&r->lock); }
 
 void ring_init(ring_t *r, void *storage, size_t item_size, size_t capacity)
 {
