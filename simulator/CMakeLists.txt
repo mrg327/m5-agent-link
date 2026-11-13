@@ -579,3 +579,11 @@ sim_script_test(sim_ota_rollback_timeout ota_rollback_timeout.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_confirm\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"ota_rollback\".*\"ev\":\"restart\"")
 set_tests_properties(sim_ota_rollback_timeout PROPERTIES ENVIRONMENT "AGENTLINK_SIM_UNCONFIRMED=1")
+# "Updated" tone (sound role `updated`): once, on the first welcome of an unconfirmed
+# (OTA) boot; never on a normal boot, never again on a re-welcome.
+sim_script_test(sim_ota_updated_tone ota_updated_tone.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"ota_updated_tone\".*\"ev\":\"ota_updated_tone\"|\"ev\":\"sound\".*\"ev\":\"sound\""
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_confirm\".*\"ev\":\"ota_updated_tone\".*\"ev\":\"sound\"")
+set_tests_properties(sim_ota_updated_tone PROPERTIES ENVIRONMENT "AGENTLINK_SIM_UNCONFIRMED=1")
+sim_script_test(sim_ota_updated_tone_silent ota_updated_tone_silent.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_updated_tone|\"ev\":\"sound\"")

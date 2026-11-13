@@ -89,6 +89,13 @@ void feedback_denied(void)
     sound("denied");
 }
 
+/* The watch just booted a fresh OTA image and the daemon welcomed it: the "updated" flourish (no haptic).
+ * Called once per update (ota.c), never on a power-on or a USB flash. */
+void feedback_updated(void)
+{
+    sound("updated");
+}
+
 /* Three ticks: an answer went out that neither grants nor denies. */
 void feedback_reply_sent(void)
 {

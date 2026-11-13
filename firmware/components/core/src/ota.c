@@ -206,6 +206,12 @@ void ota_on_link(bool welcomed, uint32_t now_ms)
         hal_ota_confirm();
         s_unconfirmed = false;
         dbg_event("ota", "ota_confirm", "\"after_ms\":%u", (unsigned)(now_ms - s_boot_ms));
+        /* Only here: a power-on or USB flash boots a confirmed image, a re-welcome finds s_unconfirmed cleared. */
+        char msg[40];
+        snprintf(msg, sizeof msg, "Updated to %s", hal_board_info()->fw_version);
+        dbg_event("ota", "ota_updated_tone", "\"fw\":%s", dbg_q(hal_board_info()->fw_version));
+        ui_toast(msg, RGB_SUCCESS);
+        feedback_updated();
     }
     if (s.st == OTA_RECV) {
         s.waiting = !welcomed;

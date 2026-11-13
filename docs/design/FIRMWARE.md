@@ -129,6 +129,7 @@ With 450 mAh, STANDBY at 2.5 mA is about 7 days, and 40 lifts × 10 s/day at 100
 - **Rollback** (`CONFIG_APP_ROLLBACK_ENABLE`). A new image boots unconfirmed. Core confirms it once a daemon
   welcomes it; if that does not happen within 5 minutes, or the image resets first (a panic, a watchdog), the
   bootloader boots the previous image again. The daemon reads the result from the `fw` in the next `hello`.
+  That confirmation (and only that one) plays the `updated` tone and toasts "Updated to <fw>" (MOTION.md, confirmation tones).
 
 ## 10. Spikes to de-risk
 | ID | Spike | Exit criteria |
