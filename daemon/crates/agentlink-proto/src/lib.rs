@@ -5,6 +5,7 @@
 //! `serde::Serialize` using the *symbolic* names from the vectors, which is what
 //! the trace log and `agentlink decode` print.
 
+pub mod battery;
 mod body;
 mod enums;
 mod envelope;

@@ -99,10 +99,14 @@ docs/design/PRESENCE.md. The daemon asks whether the user is at the keyboard (sc
 ## Firmware update
 `agentlink ota <image.bin> [--unsigned] [--device <id>]` sends a signed app image to a connected watch over the air (PROTOCOL §6c, FIRMWARE.md §9), only on request and only to a device that announced proto 0.15. The daemon checks the image first (ESP magic, `agentlink` project name, at most 6 MB, signature block unless `--unsigned`), sends `fw_begin` and 2 KB `fw_chunk`s with at most 4 unanswered, resends from the watch's `next` after a gap, then waits up to 90 s for the restarted watch to say hello and compares its `fw` with the image's version. Ctrl-C stops the transfer. Chunk data never reaches the trace (its length does); the audit log has `ota_start` and `ota_end`. End to end: `uv run --with cbor2 --with websockets python daemon/tools/ota_e2e.py "$PWD"`.
 
+## Power report
+`agentlink power [--hours H | --all] [--device <id>] [--csv FILE]` reads `~/.agentlink/power-reports.csv`, where the daemon logs every `power` report a watch with proto 0.19 sends (PROTOCOL §6f, docs/design/POWER.md): the battery now (volts, a LiPo open-circuit estimate), the discharge per hour since the last unplug, and each power state's share of the time and fitted drain; `--json` too. `agentlink status` shows each device's last report. The daemon never writes `~/.agentlink/power.csv`. End to end: `python3 daemon/tools/power_e2e.py`.
+
 ## Files written
 
 - `~/.agentlink/trace/YYYY-MM-DD.jsonl`: `{ts_us, ts, src, dir, kind, sid?, rid?, msg, bytes?}` for every hook event, registry transition and protocol message (decoded JSON plus raw hex).
 - `~/.agentlink/audit.jsonl`: append-only record of focus actions and approval decisions.
+- `~/.agentlink/power-reports.csv`: one row per watch power report (columns in docs/design/POWER.md).
 
 ## Status
 

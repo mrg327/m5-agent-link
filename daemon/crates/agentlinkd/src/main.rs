@@ -17,6 +17,7 @@ mod keys;
 mod lastmsg;
 mod ota;
 mod paths;
+mod power;
 mod presence;
 mod prompt;
 mod queue;
@@ -84,6 +85,7 @@ async fn main() -> Result<()> {
                 "uptime_s": registry::now_unix().saturating_sub(started),
                 "host": shared.host,
                 "devices": shared.devices.lock().unwrap().values().collect::<Vec<_>>(),
+                "power": shared.power.status(),
                 "sessions": shared.registry.snapshot(),
                 "remotes": shared.registry.remotes(),
                 "attaches": shared.registry.attaches(),

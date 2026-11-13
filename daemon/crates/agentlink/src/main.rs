@@ -2,6 +2,7 @@
 
 mod hooks;
 mod ota;
+mod power;
 mod remote;
 mod remotes;
 mod shell_init;
@@ -82,6 +83,24 @@ enum Cmd {
         /// Device id (hex uid, a prefix will do); needed when several watches are connected.
         #[arg(long)]
         device: Option<String>,
+    },
+    /// Analyse the watch's power-report log: battery drain overall and per power state.
+    Power {
+        /// The report log (default: ~/.agentlink/power-reports.csv).
+        #[arg(long)]
+        csv: Option<std::path::PathBuf>,
+        /// Device id (hex uid, a prefix will do); default: the latest real (non-sim) device in the log.
+        #[arg(long)]
+        device: Option<String>,
+        /// Only the battery reports of the last H hours (default: since the last unplug/charge).
+        #[arg(long, conflicts_with = "all")]
+        hours: Option<f64>,
+        /// Every battery report of the device.
+        #[arg(long)]
+        all: bool,
+        /// Battery capacity for the mA estimates.
+        #[arg(long, default_value_t = 450.0)]
+        capacity_mah: f64,
     },
     /// Inspect or drive the connected device.
     Device {
@@ -222,6 +241,22 @@ fn main() -> Result<()> {
             unsigned,
             device,
         } => ota::run(cli.json, &image, unsigned, device),
+        Cmd::Power {
+            csv,
+            device,
+            hours,
+            all,
+            capacity_mah,
+        } => power::run(
+            cli.json,
+            power::Opts {
+                csv,
+                device,
+                hours,
+                all,
+                capacity_mah,
+            },
+        ),
         Cmd::Device { cmd } => {
             let name = match cmd {
                 DeviceCmd::State => "state",

@@ -48,6 +48,8 @@ pub struct Shared {
     pub devices: Mutex<BTreeMap<String, Value>>,
     /// The firmware update in progress, and the links it can reach (ota.rs).
     pub ota: Arc<crate::ota::Ota>,
+    /// Power reports: the CSV log and the last report per device (power.rs, POWER.md).
+    pub power: crate::power::PowerLog,
     next_link: AtomicU64,
 }
 
@@ -78,6 +80,7 @@ impl Shared {
             host: host_info(),
             devices: Mutex::default(),
             ota: Arc::new(crate::ota::Ota::new(ota_trace)),
+            power: crate::power::PowerLog::new(),
             next_link: AtomicU64::new(1),
         }
     }
@@ -126,6 +129,9 @@ struct Conn {
     hidden: HashSet<u64>,
     /// Counts this device as linked for the answer window (window.rs) once it has handshaken.
     linked: Option<crate::broker::Linked>,
+    /// The device's board and firmware as its hello named them, for the power log.
+    board: String,
+    fw: String,
 }
 
 /// Terminal content leaves the daemon only when the device may show it (UI-V2 §4.4).
@@ -444,6 +450,8 @@ pub async fn run_link(
         deltas: DeltaQueue::default(),
         hidden: HashSet::new(),
         linked: None,
+        board: String::new(),
+        fw: String::new(),
     };
 
     let hello = loop {
@@ -514,6 +522,8 @@ async fn handshake(
     }
     c.next_id = 1;
     c.peer_minor = hello.1.proto.1;
+    c.board = hello.1.dev.board.clone();
+    c.fw = hello.1.dev.fw.clone();
     c.linked.get_or_insert_with(|| shared.broker.link());
     c.deltas.clear(); // the snapshot below carries them
     c.hidden.clear();
@@ -601,6 +611,13 @@ async fn serve(
                 Some(Envelope { msg: Message::FwAck(a), .. }) => {
                     if let Some(key) = dev_key.as_deref() {
                         shared.ota.on_ack(key, a);
+                    }
+                }
+                Some(Envelope { msg: Message::Power(p), .. }) => {
+                    // POWER.md: one CSV row per report, and the last one for `agentlink status`
+                    if let Some(key) = dev_key.as_deref() {
+                        let src = crate::power::Source { uid: key, board: &c.board, fw: &c.fw, transport };
+                        shared.power.record(&src, &p, now_unix());
                     }
                 }
                 Some(env) => handle(shared, c, env, &mut sc, &mut inflight, &mut vs).await?,
@@ -1787,6 +1804,8 @@ mod tests {
                 deltas: DeltaQueue::default(),
                 hidden: HashSet::new(),
                 linked: None,
+                board: String::new(),
+                fw: String::new(),
             };
             let out = c.for_peer(s.clone());
             assert_eq!(
@@ -2002,6 +2021,8 @@ mod tests {
                 deltas: DeltaQueue::default(),
                 hidden: HashSet::new(),
                 linked: None,
+                board: String::new(),
+                fw: String::new(),
             };
             assert_eq!(c.for_peer(s.clone()).qd.as_deref(), want, "minor {minor}");
         }
@@ -2018,6 +2039,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         };
         s.qd = Some(String::new());
         assert_eq!(
@@ -2618,6 +2641,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         };
         c.send(
             None,
@@ -3146,6 +3171,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         };
         let mut s = Session::delta(1);
         (s.snz, s.ntf, s.n, s.ok, s.sum) = (
@@ -3179,6 +3206,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         }
     }
 
@@ -3389,6 +3418,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         };
         let mut s = Session::delta(1);
         (s.eta, s.exit) = (Some(60), Some(1));
@@ -3414,6 +3445,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         };
         let mut s = Session::delta(1);
         (s.ctx, s.mdl, s.pm, s.pr, s.prs) = (
@@ -3450,6 +3483,8 @@ mod tests {
             deltas: DeltaQueue::default(),
             hidden: HashSet::new(),
             linked: None,
+            board: String::new(),
+            fw: String::new(),
         };
         let mut s = Session::delta(1);
         (s.fc, s.la, s.lr, s.tp, s.dur) = (Some(3), Some(120), Some(14), Some(false), Some(252));
@@ -3700,5 +3735,64 @@ mod tests {
         assert_eq!(*drv.0.lock().unwrap(), 0);
         assert!(handle_cmd(&shared, &c(local)).await.ok);
         assert_eq!(*drv.0.lock().unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn power_reports_are_logged_with_the_device_and_kept_for_status() {
+        let dir = std::env::temp_dir().join(format!("al-power-dev-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let trace = Trace::null();
+        let registry = Arc::new(Registry::new(trace.clone()));
+        let mut sh = Shared::new(
+            registry.clone(),
+            Arc::new(Broker::new(registry)),
+            trace,
+            Arc::new(NoFocus),
+            Arc::new(FakeScroll::default()),
+        );
+        sh.power = crate::power::PowerLog::at(dir.join("power-reports.csv"));
+        let shared = Arc::new(sh);
+        let d = linked(&shared, 19).await;
+        let p = |seq, mv| Power {
+            mv,
+            mvf: mv,
+            vin: 0,
+            chg: false,
+            usb: false,
+            pct: 60,
+            on: 1000,
+            dim: 2000,
+            off: 297000,
+            deep: 0,
+            lk: 300000,
+            ble: 300000,
+            itvl: 30000,
+            seq,
+            nd: 0,
+        };
+        for (seq, mv) in [(0, 3900), (1, 3890)] {
+            let env = Envelope::new(10 + seq, Message::Power(p(seq, mv)));
+            d.to_daemon.send(env.to_bytes().unwrap()).unwrap();
+        }
+        let path = dir.join("power-reports.csv");
+        for _ in 0..100 {
+            if std::fs::read_to_string(&path).is_ok_and(|t| t.lines().count() == 3) {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        let text = std::fs::read_to_string(&path).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 3, "{text}");
+        assert_eq!(lines[0], crate::power::header());
+        assert!(
+            lines[2].contains(",0102030405060708,sim,1.0.0,test,1,3890,"),
+            "{}",
+            lines[2]
+        );
+        let st = shared.power.status();
+        assert_eq!(st[0]["report"]["mv"], 3890);
+        assert_eq!(st[0]["transport"], "test");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

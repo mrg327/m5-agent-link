@@ -45,6 +45,7 @@ pub fn run(json: bool) -> Result<()> {
             d["dev"]["board"].as_str().unwrap_or("")
         );
     }
+    print_power(&v["power"]);
     let sessions = v["sessions"].as_array().cloned().unwrap_or_default();
     println!("sessions: {}", sessions.len());
     for s in &sessions {
@@ -115,6 +116,52 @@ fn print_presence(p: &serde_json::Value) {
                 s["source"].as_str().unwrap_or("?")
             );
         }
+    }
+}
+
+/// The last power report of each device (docs/design/POWER.md); `agentlink power` has the analysis.
+fn print_power(p: &serde_json::Value) {
+    let Some(list) = p.as_array().filter(|l| !l.is_empty()) else {
+        return;
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    println!("power (last report):");
+    for d in list {
+        let r = &d["report"];
+        let ms = |k: &str| r[k].as_u64().unwrap_or(0);
+        let mins = |k: &str| format!("{:.1}", ms(k) as f64 / 60000.0);
+        let ocv = d["ocv_pct"]
+            .as_f64()
+            .map(|x| format!(" ({x:.0} % by the LiPo curve)"))
+            .unwrap_or_default();
+        let supply = match (r["usb"].as_bool(), r["chg"].as_bool()) {
+            (_, Some(true)) => "charging",
+            (Some(true), _) => "on USB",
+            _ => "on battery",
+        };
+        let itvl = match ms("itvl") {
+            0 => "no BLE".to_string(),
+            us => format!("BLE interval {:.1} ms", us as f64 / 1000.0),
+        };
+        println!(
+            "  {} {}: {} mV{ocv}, {supply}, {itvl}, {}s ago (seq {})",
+            d["board"].as_str().unwrap_or("?"),
+            d["device"].as_str().unwrap_or("?"),
+            ms("mv"),
+            now.saturating_sub(d["at"].as_u64().unwrap_or(now)),
+            ms("seq")
+        );
+        println!(
+            "    since the report before: on {} min, dim {} min, off {} min, deep {} min ({} deep sleeps)",
+            mins("on"),
+            mins("dim"),
+            mins("off"),
+            mins("deep"),
+            ms("nd")
+        );
     }
 }
 
