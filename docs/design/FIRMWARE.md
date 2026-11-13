@@ -117,8 +117,14 @@ With 450 mAh, STANDBY at 2.5 mA is about 7 days, and 40 lifts × 10 s/day at 100
   ([PROTOCOL.md](PROTOCOL.md) §6c). Core (`core/ota.c`) runs the transfer from the main loop, checks the
   SHA-256 and shows the Updating screen (B held cancels); the board (`boards/stopwatch/ota.cpp`) writes the
   slot with `esp_ota_*`, erasing sector by sector as the image arrives. A dropped link resumes from the last
-  written byte if the daemon asks again within 30 s. The watch refuses an update while it records, or below
-  15% battery unless it is charging, and stays out of standby while one runs.
+  written byte if the daemon asks again within 30 s. Over BLE the watch asks for a 7.5 ms connection interval
+  for the transfer (the interactive 15–30 ms if the central refuses) and its usual one afterwards. A central
+  without data length extension moves only a few 27-byte link-layer packets per connection event, so the
+  interval sets the rate: on the Linux laptop with the BCM4350C0 a 1.3 MB image took 12 min at the central's
+  48.75 ms and takes about 100 s at 7.5 ms (issue 2047). BlueZ remembers the last interval a peripheral asked
+  for and connects with it next time; a connect below 15 ms makes the watch ask for 30–45 ms again. The
+  watch refuses an update while it records, or below 15% battery unless it is charging, and stays out of
+  standby while one runs.
 - **Signing.** Images are signed (ESP-IDF "Require signed app images" without hardware secure boot, RSA-3072
   Secure Boot V2 format; `sdkconfig.defaults`). Nothing is burned into eFuses: a USB flash still boots any
   image. An update is accepted only if it is signed by the key in the running image's signature block, so

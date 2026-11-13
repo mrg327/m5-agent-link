@@ -166,6 +166,9 @@ bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len);
 /* While the watch drives the PC live (SCROLL), ask the links for low latency: BLE requests a
  * 15–30 ms connection interval; false returns to the interval the central chose. No-op elsewhere. */
 void hal_link_interactive(bool on);
+/* While a firmware update streams in, ask the links for throughput: BLE requests the shortest connection
+ * interval (7.5 ms), or the interactive one if the central refuses it; false undoes it. No-op elsewhere. */
+void hal_link_bulk(bool on);
 
 /* ───────────── firmware update (OTA, FIRMWARE.md §9, proto 0.15) ───────────── */
 

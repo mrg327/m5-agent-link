@@ -223,6 +223,7 @@ bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 }
 
 void hal_link_interactive(bool on) { (void)on; }
+void hal_link_bulk(bool on) { (void)on; }
 
 void web_link_up(int kind, bool up)
 {

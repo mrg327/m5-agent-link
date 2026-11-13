@@ -47,6 +47,7 @@ void sw_usb_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state); /*
 bool sw_usb_link_send(const uint8_t *frame, size_t len);
 void sw_ble_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state); /* link_ble.cpp */
 void sw_ble_link_interactive(bool on);                                         /* link_ble.cpp */
+void sw_ble_link_bulk(bool on);                                                /* link_ble.cpp */
 bool sw_ble_link_send(const uint8_t *frame, size_t len);
 
 /* Codec and I2S0 shared by the mic and the speaker (audio.cpp); reference counted. */
