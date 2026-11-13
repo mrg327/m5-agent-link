@@ -7,6 +7,7 @@
 #include "debug.h"
 #include "hal.h"
 #include "link.h"
+#include "model.h"
 
 static const int16_t kStep[89] = {
     7,     8,     9,     10,    11,    12,    13,    14,    16,    17,    19,    21,    23,    25,    28,
@@ -66,7 +67,7 @@ static int s_have, s_index;
 static int s_level;
 static int64_t s_energy;
 static int s_energy_n;
-static char s_text[256];
+MODEL_EXT_BSS static char s_text[VOICE_TEXT_MAX];
 static const char *s_err = "";
 
 voice_state_t voice_state(void) { return s_state; }

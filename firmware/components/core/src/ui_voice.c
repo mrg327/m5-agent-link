@@ -31,7 +31,8 @@
 
 static lv_obj_t *s_root, *s_header, *s_halo, *s_disc, *s_mic, *s_low, *s_box, *s_text, *s_err, *s_reason, *s_btn;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
-static char s_header_txt[64], s_low_txt[32], s_text_txt[256], s_reason_txt[96], s_word_txt[16];
+static char s_header_txt[64], s_low_txt[32], s_reason_txt[96], s_word_txt[16];
+MODEL_EXT_BSS static char s_text_txt[VOICE_TEXT_MAX];
 static uint32_t s_sid, s_rid, s_now, s_text_since;
 static voice_state_t s_shown = (voice_state_t)-1;
 static bool s_holding, s_ramp_started;

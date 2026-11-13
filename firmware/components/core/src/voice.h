@@ -4,8 +4,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define VOICE_MAX_MS 15000 /* a recording stops by itself after this */
-#define VOICE_WAIT_MS 20000 /* no transcript by then: give up */
+#define VOICE_MAX_MS 60000  /* a recording stops by itself after this (issue f97a; it was 15 s) */
+#define VOICE_WAIT_MS 45000 /* no transcript by then: give up (whisper on a minute of speech) */
+/* The longest transcript the device holds, with its NUL (proto 0.16; 256 before). In PSRAM. */
+#define VOICE_TEXT_MAX 2048
 
 typedef enum { VOICE_IDLE, VOICE_REC, VOICE_WAIT, VOICE_TEXT, VOICE_FAILED } voice_state_t;
 

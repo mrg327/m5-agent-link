@@ -366,6 +366,8 @@ const SUMMARY_MINOR: u64 = 14;
 /// Firmware update: `fw_begin` / `fw_chunk` go only to a device that announced proto 0.15 (PROTOCOL §6c), and
 /// only when the user asks (`agentlink ota`, ota.rs).
 pub const FW_MINOR: u64 = 15;
+/// A transcript of up to 2047 bytes (`voice::MAX_TEXT_BYTES`, issue f97a); older devices hold 255.
+const LONG_TRANSCRIPT_MINOR: u64 = 16;
 
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
@@ -573,7 +575,14 @@ async fn serve(
                 Some(env) => handle(shared, c, env, &mut sc, &mut inflight, &mut vs).await?,
             },
             Some((aid, sid, text)) = vrx.recv() => {
-                // the transcript waits for the user's hold; the device shows it meanwhile
+                // the transcript waits for the user's hold; the device shows it meanwhile, and the hold
+                // types only what the device could show
+                let max = if c.peer_minor >= LONG_TRANSCRIPT_MINOR {
+                    crate::voice::MAX_TEXT_BYTES
+                } else {
+                    crate::voice::OLD_MAX_TEXT_BYTES
+                };
+                let text = crate::voice::fit(&text, max);
                 shared.transcripts.lock().unwrap().put(aid, sid, text.clone());
                 c.send(None, Message::Transcript(Transcript { aid, text, autosend_ms: 0 })).await?;
             },

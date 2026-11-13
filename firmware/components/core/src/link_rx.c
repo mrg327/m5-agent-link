@@ -6,6 +6,7 @@
 #include "gauges.h"
 #include "link_internal.h"
 #include "ota.h"
+#include "voice.h"
 
 #define STR(zs, dst) model_copy_str((dst), sizeof(dst), (zs).value, (zs).len)
 
@@ -299,7 +300,7 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
     case envelope_msg_ping_m_c: link_tx_pong(id); break;
     case envelope_msg_transcript_m_c: {
         const struct transcript *t = &e->envelope_msg_transcript_m.msg_transcript_transcript_m;
-        static char text[256]; /* the user's own words: handed to the UI, never logged */
+        MODEL_EXT_BSS static char text[VOICE_TEXT_MAX]; /* the user's own words: handed to the UI, never logged */
         STR(t->transcript_uint1tstr, text);
         dbg_event("link", "transcript", "\"aid\":%u,\"chars\":%u", (unsigned)t->transcript_uint0uint, (unsigned)strlen(text));
         if (g_link.hooks.on_transcript) g_link.hooks.on_transcript(t->transcript_uint0uint, text);

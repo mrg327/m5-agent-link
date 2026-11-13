@@ -84,7 +84,7 @@ bool link_tx_hello(hal_link_kind_t to)
     set_hdr(&m->msg_hello_hdr_m, false, 0);
     struct hello *h = &m->msg_hello_hello_m;
     h->hello_major_l_major = 0;
-    h->hello_major_l_minor = 15; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice; 0.7: keys;
+    h->hello_major_l_minor = 16; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice; 0.7: keys;
                                   * 0.8: action_dictate on attention, dictate with rid answers that card;
                                   * 0.9: jobs (agent_shell, session eta / exit, cmd_op_rerun);
                                   * 0.10: gauges (usage message, session ctx / mdl / pm / pr / prs);
@@ -93,7 +93,8 @@ bool link_tx_hello(hal_link_kind_t to)
                                   * 0.12: presence (attention hush, session hush);
                                   * 0.13: standing rules (attention rule / scope / wide, approve with rh);
                                   * 0.14: done summary (session fc / la / lr / tp / dur);
-                                  * 0.15: firmware update (fw_begin / fw_chunk / fw_ack) */
+                                  * 0.15: firmware update (fw_begin / fw_chunk / fw_ack);
+                                  * 0.16: transcripts up to 2047 bytes (VOICE_TEXT_MAX) */
     h->hello_device_info_m.device_info_device_class_m.device_class_choice = device_class(bi);
     h->hello_device_info_m.device_info_uint1tstr = zstr(bi->board);
     h->hello_device_info_m.device_info_uint2tstr = zstr(bi->fw_version);

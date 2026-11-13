@@ -321,7 +321,8 @@ static bool parse_line(char *line, uint32_t *t)
         add(*t, E_MIC, 0, 0, 0, path);
         *t += 50;
     } else if (!strcmp(cmd, "transcript")) {
-        add(*t, E_TRANSCRIPT, 0, 0, 0, arg); /* answers the device's current recording; "" = nothing heard */
+        add(*t, E_TRANSCRIPT, 0, 0, 0, rest); /* answers the device's current recording; "" = nothing heard.
+                                                 * `rest`, not `arg`: a transcript can be 2 KB */
         *t += 50;
     } else if (!strcmp(cmd, "clear") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_CLEAR, a, 0, 0, arg);
@@ -444,7 +445,7 @@ bool sim_script_load(const char *path)
         fprintf(stderr, "cannot open script %s\n", path);
         return false;
     }
-    char line[1024];
+    char line[4096]; /* a transcript line holds up to 2 KB (issue f97a) */
     uint32_t t = 300; /* let the first frame render */
     for (int no = 1; fgets(line, sizeof line, f); no++) {
         if (!parse_line(line, &t)) {
@@ -728,7 +729,7 @@ static struct zcbor_string zs(const char *str) { return (struct zcbor_string){.v
 
 static void inject_env(struct envelope_r *env, const char *what)
 {
-    static uint8_t buf[1024];
+    static uint8_t buf[4096]; /* one frame (LINK_MAX_MSG): a transcript can be 2 KB */
     size_t len = 0;
     if (cbor_encode_envelope(buf, sizeof buf, env, &len) != ZCBOR_SUCCESS) {
         fail("cannot encode", what);

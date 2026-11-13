@@ -1,0 +1,62 @@
+# VOICE: a minute of dictation (issue f97a). The recording runs past the old 15 s cap and stops by itself at
+# 60 s; a 1515-byte transcript (past the old 256-byte buffer) arrives whole and is paged; the hold is locked
+# until the last page and then sends it (dictate, op 12).
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 1 done webapp feat/login Finished the work
+wait 300
+mic audio/tone_1s.wav
+tap 233 233
+wait 300
+btn B
+wait 150
+btn A
+wait 200
+btn B
+wait 150
+btn A
+wait 300
+expect_screen voice
+wait 20000
+expect_label 0:20
+expect_no_label Transcribing…
+wait 41000
+expect_label Transcribing…
+transcript please run the full test suite again then fix every failing case you find in the login flow update the snapshots that changed on purpose rebase on main resolve the conflicts in the settings screen push the branch and open a pull request that explains each change in plain words please run the full test suite again then fix every failing case you find in the login flow update the snapshots that changed on purpose rebase on main resolve the conflicts in the settings screen push the branch and open a pull request that explains each change in plain words please run the full test suite again then fix every failing case you find in the login flow update the snapshots that changed on purpose rebase on main resolve the conflicts in the settings screen push the branch and open a pull request that explains each change in plain words please run the full test suite again then fix every failing case you find in the login flow update the snapshots that changed on purpose rebase on main resolve the conflicts in the settings screen push the branch and open a pull request that explains each change in plain words please run the full test suite again then fix every failing case you find in the login flow update the snapshots that changed on purpose rebase on main resolve the conflicts in the settings screen push the branch and open a pull request that explains each change in plain words please run the full test suite again then fix every failing case you find in the login flow and that is the end of the minute
+wait 300
+expect_label (transcript)
+expect_label More 1/9
+shot voice_minute_transcript.png
+hold 233 300 1600
+wait 300
+expect_screen voice
+expect_label More 1/9
+tap 233 233
+wait 200
+expect_label More 2/9
+tap 233 233
+wait 200
+expect_label More 3/9
+tap 233 233
+wait 200
+expect_label More 4/9
+tap 233 233
+wait 200
+expect_label More 5/9
+tap 233 233
+wait 200
+expect_label More 6/9
+tap 233 233
+wait 200
+expect_label More 7/9
+tap 233 233
+wait 200
+expect_label More 8/9
+tap 233 233
+wait 200
+expect_label Send
+shot voice_minute_transcript_p9.png
+hold 233 300 1600
+wait 400
+expect_screen ring
+quit

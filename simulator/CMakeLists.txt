@@ -399,6 +399,10 @@ sim_script_test(sim_ask_answered_stays ask_answered_stays.txt FAIL_REGULAR_EXPRE
 sim_script_test(sim_voice_long_transcript voice_long_transcript.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "voice_locked.*voice_page.*\"op\":12,\"sid\":1")
+sim_script_test(sim_voice_minute_transcript voice_minute_transcript.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ms\":600[0-9][0-9],.*\"chars\":1515.*voice_locked.*\"page\":9.*\"op\":12,\"sid\":1")
+set_tests_properties(sim_voice_minute_transcript PROPERTIES TIMEOUT 120)
 sim_script_test(sim_voice_fit_transcript voice_fit_transcript.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"op\":12,\"sid\":1")

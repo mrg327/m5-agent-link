@@ -320,8 +320,8 @@ A live monitor for one running session on the small screen. Opened by the "Watch
 
 Dictate a reply to one session. "Dictate…" ends the Reply list when the daemon can transcribe (`welcome.voice`).
 
-- **Listening:** `Listening…`, the elapsed time (48 px), the loudness of the last 100 ms as the ring's arc, hint `tap to stop`. Tap or A stops; it stops by itself at 15 s. The display stays on.
-- **Transcribing:** `Transcribing…` until the transcript arrives (20 s at most, then `No transcript`).
+- **Listening:** `Listening…`, the elapsed time (48 px), the loudness of the last 100 ms as the ring's arc, hint `tap to stop`. Tap or A stops; it stops by itself at 60 s (15 s before issue f97a). The display stays on.
+- **Transcribing:** `Transcribing…` until the transcript arrives (45 s at most, then `No transcript`).
 - **Transcript:** the text (20 px, up to 5 lines), hint `hold to send`. Only the 1.2 s hold sends it (`cmd dictate`, the approve ramp and arc in the answer colour; armed 300 ms after the text appears); a tap says "Hold to send". The toast reads `Sent`.
 - **Failed:** the reason (`Nothing heard`, `Offline`, `No microphone`, `No transcript`), hint `tap to try again`.
 - Long swipe down or B held discards, the A+B chord goes HOME, and an arriving request opens ASK; a recording left this way is never sent. The badges read A `STOP` / `HOLD` / `RETRY` and B `BACK`.

@@ -25,6 +25,7 @@ const ENUMS = {
   perm_mode: { default: 0, plan: 1, accept_edits: 2, auto: 3, dont_ask: 4, bypass: 5 },
   pr_state: { none: 0, pending: 1, approved: 2, changes: 3, draft: 4 },
   rule_scope: { session: 0, project: 1 }, // proto 0.13 (STANDING-RULES.md)
+  fw_status: { go: 0, done: 1, busy: 2, bad: 3, fail: 4, stopped: 5 }, // proto 0.15 (PROTOCOL.md 6c)
   input_event: { tap: 0, double_tap: 1, long_press: 2, swipe_up: 3, swipe_down: 4, swipe_left: 5, swipe_right: 6, btn_a: 7, btn_b: 8, btn_a_long: 9, btn_b_long: 10, lift: 11, shake: 12 },
 };
 
@@ -32,7 +33,7 @@ export const MSG_TYPES = {
   hello: 1, welcome: 2, snapshot: 3, session_upd: 4, gone: 5, attention: 6, clear: 7, cmd: 8,
   result: 9, detail: 10, cfg: 11, batt: 12, ping: 13, pong: 14, log: 15, audio_start: 16,
   audio: 17, audio_end: 18, transcript: 19, kb_start: 20, kb_stroke: 21, kb_cands: 22,
-  usage: 23,
+  usage: 23, fw_begin: 24, fw_chunk: 25, fw_ack: 26,
   dbg_ui_state_req: 64, dbg_ui_state: 65,
   dbg_screenshot_req: 66, dbg_screenshot_chunk: 67, dbg_inject_input: 68, dbg_set_log_level: 69,
 };
@@ -88,6 +89,9 @@ const SPECS = {
   kb_start: { kid: [0, 'uint'], sid: [1, 'uint'], keys: [2, 'hex'] },
   kb_stroke: { kid: [0, 'uint'], seq: [1, 'uint'], pts: [2, 'hex'] },
   usage: { at: [0, 'uint'], h5: [1, 'uint'], h5r: [2, 'uint'], h5o: [3, 'uint'], wk: [4, 'uint'], wkr: [5, 'uint'], wko: [6, 'uint'] },
+  fw_begin: { size: [0, 'uint'], sha: [1, 'hex'], ver: [2, 'tstr'] },
+  fw_chunk: { off: [0, 'uint'], data: [1, 'hex'] },
+  fw_ack: { st: [0, 'enum:fw_status'], next: [1, 'uint'], msg: [2, 'tstr'] },
   kb_cands: { kid: [0, 'uint'], seq: [1, 'uint'], cands: [2, 'tstrs'], typed: [3, 'uint'], err: [4, 'enum:result_err'] },
   dbg_ui_state: { screen: [0, 'tstr'], sel_sid: [1, 'uint'], rid: [2, 'uint'], visible: [3, 'tstrs'], power: [4, 'tstr'], fps: [5, 'uint'] },
   dbg_screenshot_chunk: { w: [0, 'uint'], h: [1, 'uint'], offset: [2, 'uint'], data: [3, 'bstr'], last: [4, 'bool'] },

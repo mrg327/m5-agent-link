@@ -420,7 +420,7 @@ audio = {
 audio_end = { 0 => uint }  ; aid
 transcript = {
   0 => uint,   ; aid
-  1 => tstr,   ; text      "" when nothing was heard (or the recording failed)
+  1 => tstr,   ; text      "" when nothing was heard (or the recording failed); <= 2047 bytes (proto >= 0.16), else <= 255
   2 => uint   ; autosend_ms  0: never; the device sends only on the user's hold (cmd_op_dictate)
 }
 

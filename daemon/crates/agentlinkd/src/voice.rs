@@ -12,14 +12,13 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use crate::registry::clip;
-
 pub const RATE: u32 = 16_000;
-/// A recording is capped on the watch at 15 s; allow some slack for a late stop.
-const MAX_SAMPLES: usize = RATE as usize * 20;
-pub const MAX_TEXT: usize = 240;
-/// The watch holds a transcript in 256 bytes with its NUL; a longer one would show less than a hold types.
-pub const MAX_TEXT_BYTES: usize = 255;
+/// A recording is capped on the watch at 60 s (15 s before issue f97a); allow some slack for a late stop.
+const MAX_SAMPLES: usize = RATE as usize * 70;
+/// The longest transcript a device with proto >= 0.16 holds (2048 bytes with its NUL, `VOICE_TEXT_MAX`).
+pub const MAX_TEXT_BYTES: usize = 2047;
+/// What an older device holds (256 bytes with its NUL).
+pub const OLD_MAX_TEXT_BYTES: usize = 255;
 /// A transcript waits this long for the user's hold before it is forgotten.
 pub const KEEP: Duration = Duration::from_secs(300);
 
@@ -101,12 +100,16 @@ pub fn clean(text: &str) -> String {
             _ => {}
         }
     }
-    let words: Vec<&str> = out.split_whitespace().collect();
-    let text = clip(&words.join(" "), MAX_TEXT);
-    if text.len() <= MAX_TEXT_BYTES {
-        return text;
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// `text` cut to what the device holds (`max` UTF-8 bytes), ending in `…` when cut. The daemon keeps exactly
+/// this for the hold, so what is typed is what the user read.
+pub fn fit(text: &str, max: usize) -> String {
+    if text.len() <= max {
+        return text.to_owned();
     }
-    let room = MAX_TEXT_BYTES - '…'.len_utf8();
+    let room = max - '…'.len_utf8();
     let mut out: String = text
         .char_indices()
         .take_while(|(i, c)| i + c.len_utf8() <= room)
@@ -393,14 +396,17 @@ mod tests {
 
     #[test]
     fn transcripts_fit_the_watch_buffer() {
-        let ascii = "word ".repeat(100);
-        let t = clean(&ascii);
-        assert_eq!(t.chars().count(), MAX_TEXT);
-        let wide = "überprüfe ".repeat(40);
-        let t = clean(&wide);
-        assert!(t.len() <= MAX_TEXT_BYTES, "{} bytes", t.len());
-        assert!(t.ends_with('…'));
-        assert!(wide.starts_with(t.trim_end_matches('…')));
+        // a minute of speech is kept whole; clean() no longer cuts it
+        let minute = clean(&"word ".repeat(300));
+        assert_eq!(minute.len(), 300 * 5 - 1);
+        assert_eq!(fit(&minute, MAX_TEXT_BYTES), minute);
+        for max in [OLD_MAX_TEXT_BYTES, MAX_TEXT_BYTES] {
+            let wide = "überprüfe ".repeat(400);
+            let t = fit(&wide, max);
+            assert!(t.len() <= max && t.len() > max - 8, "{} bytes", t.len());
+            assert!(t.ends_with('…'));
+            assert!(wide.starts_with(t.trim_end_matches('…')));
+        }
     }
 
     #[test]
@@ -410,8 +416,13 @@ mod tests {
         assert!(r.push(0, vec![5, 0, 0, 0]));
         assert_eq!(r.pcm(), vec![5, 10]);
         let mut r = Recording::new(None);
-        let ok = (0..2000).all(|i| r.push(i, vec![0; 240]));
-        assert!(!ok, "past 20 s the recording is refused");
+        // 2030 blocks of 473 samples: the watch's 60 s cap
+        assert!(
+            (0..2030).all(|i| r.push(i, vec![0; 240])),
+            "a full minute is kept"
+        );
+        let ok = (2030..2400).all(|i| r.push(i, vec![0; 240]));
+        assert!(!ok, "past 70 s the recording is refused");
     }
 
     #[test]

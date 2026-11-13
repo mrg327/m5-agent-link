@@ -2118,7 +2118,7 @@
           "key": 1,
           "optional": false,
           "type": "tstr",
-          "note": "text      \"\" when nothing was heard (or the recording failed)",
+          "note": "text      \"\" when nothing was heard (or the recording failed); <= 2047 bytes (proto >= 0.16), else <= 255",
           "name": "text"
         },
         {
@@ -2148,7 +2148,7 @@
           "key": 1,
           "optional": false,
           "type": "tstr",
-          "note": "text      \"\" when nothing was heard (or the recording failed)",
+          "note": "text      \"\" when nothing was heard (or the recording failed); <= 2047 bytes (proto >= 0.16), else <= 255",
           "name": "text"
         },
         {
