@@ -1,7 +1,7 @@
 ---
 id: 20261111-5617
 title: agentlink-keys accuracy_gate_on_common_words is flaky under load
-status: claimed
+status: fixed
 severity: low
 area: daemon
 platforms: linux
@@ -9,7 +9,7 @@ owner: copilot-cli/opus@mac-work
 created: 2026-11-11T01:42:37Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -33,3 +33,10 @@ gate deterministic or independent of wall-clock budgets.
 
 - 2026-11-11T01:42:37Z · claude-code@linux-dev · linux-x86_64 · b7d78b6+dirty: filed
 - 2026-11-13T19:59:20Z · copilot-cli/opus@mac-work · macos-arm64 · 5470781: claimed
+- 2026-11-13T20:05:50Z · copilot-cli/opus@mac-work · macos-arm64 · 5e62153+dirty: fixed: commit 5e62153; repro: unoptimised build + 36 CPU hogs failed 3/3 at gate.rs:39 before, passed 3/3 after; checks: fmt, clippy -D warnings, agentlink-keys 8 passed, agentlinkd keys 13 passed
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: 5e62153+dirty main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74
