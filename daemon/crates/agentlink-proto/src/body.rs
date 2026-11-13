@@ -531,7 +531,18 @@ body!(FwBegin {
     /// SHA-256 of the whole image: a begin naming the image in progress resumes it.
     #[n(1)] #[cbor(with = "minicbor::bytes")] #[serde(serialize_with = "hex_ser")] sha: [u8; 32],
     #[n(2)] #[serde(skip_serializing_if = "Option::is_none")] ver: Option<String>,
+    /// Proto 0.21: the chunks carry a patch against the running image, not the image itself.
+    #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] patch: Option<FwPatch>,
 });
+body!(
+    /// A detools sequential patch (bsdiff, heatshrink 8/7) against the first `bsize` bytes of the device's
+    /// running app slot, whose SHA-256 is `base`.
+    FwPatch {
+        #[n(0)] psize: u64,
+        #[n(1)] #[cbor(with = "minicbor::bytes")] #[serde(serialize_with = "hex_ser")] base: [u8; 32],
+        #[n(2)] bsize: u64,
+    }
+);
 body!(FwChunk {
     #[n(0)] off: u64,
     #[n(1)] #[cbor(with = "minicbor::bytes")] #[serde(serialize_with = "hex_ser")] data: Vec<u8>,

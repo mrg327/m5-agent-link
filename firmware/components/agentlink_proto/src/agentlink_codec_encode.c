@@ -205,6 +205,8 @@ static bool encode_repeated_usage_uint6uint(zcbor_state_t *state, const struct u
 static bool encode_usage(zcbor_state_t *state, const struct usage *input);
 static bool encode_msg_usage(zcbor_state_t *state, const struct msg_usage *input);
 static bool encode_repeated_fw_begin_uint2tstr(zcbor_state_t *state, const struct fw_begin_uint2tstr *input);
+static bool encode_fw_patch(zcbor_state_t *state, const struct fw_patch *input);
+static bool encode_repeated_fw_begin_fw_patch_m(zcbor_state_t *state, const struct fw_begin_fw_patch_m *input);
 static bool encode_fw_begin(zcbor_state_t *state, const struct fw_begin *input);
 static bool encode_msg_fw_begin(zcbor_state_t *state, const struct msg_fw_begin *input);
 static bool encode_fw_chunk(zcbor_state_t *state, const struct fw_chunk *input);
@@ -2738,17 +2740,47 @@ static bool encode_repeated_fw_begin_uint2tstr(
 	return res;
 }
 
+static bool encode_fw_patch(
+		zcbor_state_t *state, const struct fw_patch *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_encode(state, 3) && (((((zcbor_uint32_put(state, (0))))
+	&& (zcbor_uint32_encode(state, (&(*input).fw_patch_uint0uint))))
+	&& (((zcbor_uint32_put(state, (1))))
+	&& ((((*input).fw_patch_uint1bstr.len == 32)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_bstr_encode(state, (&(*input).fw_patch_uint1bstr))))
+	&& (((zcbor_uint32_put(state, (2))))
+	&& (zcbor_uint32_encode(state, (&(*input).fw_patch_uint2uint))))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 3))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_fw_begin_fw_patch_m(
+		zcbor_state_t *state, const struct fw_begin_fw_patch_m *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (3))))
+	&& (encode_fw_patch(state, (&(*input).fw_begin_fw_patch_m)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_fw_begin(
 		zcbor_state_t *state, const struct fw_begin *input)
 {
 	zcbor_log("%s\r\n", __func__);
 
-	bool res = (((zcbor_map_start_encode(state, 3) && (((((zcbor_uint32_put(state, (0))))
+	bool res = (((zcbor_map_start_encode(state, 4) && (((((zcbor_uint32_put(state, (0))))
 	&& (zcbor_uint32_encode(state, (&(*input).fw_begin_uint0uint))))
 	&& (((zcbor_uint32_put(state, (1))))
 	&& ((((*input).fw_begin_uint1bstr.len == 32)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
 	&& (zcbor_bstr_encode(state, (&(*input).fw_begin_uint1bstr))))
-	&& (!(*input).fw_begin_uint2tstr_present || encode_repeated_fw_begin_uint2tstr(state, (&(*input).fw_begin_uint2tstr)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 3))));
+	&& (!(*input).fw_begin_uint2tstr_present || encode_repeated_fw_begin_uint2tstr(state, (&(*input).fw_begin_uint2tstr)))
+	&& (!(*input).fw_begin_fw_patch_m_present || encode_repeated_fw_begin_fw_patch_m(state, (&(*input).fw_begin_fw_patch_m)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 4))));
 
 	log_result(state, res, __func__);
 	return res;

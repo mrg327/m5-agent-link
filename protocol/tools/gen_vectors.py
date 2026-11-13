@@ -406,6 +406,13 @@ VECTORS = {
         {"t": "fw_begin", "id": 30, "b": {"size": 1388032, "sha": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "ver": "819843e"}},
         env("fw_begin", 30, {0: 1388032, 1: bytes.fromhex("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"), 2: "819843e"}),
     ),
+    "fw_begin_patch": (
+        "Daemon starts a delta update (proto 0.21): a 35 KB patch against the 1.3 MB image the device runs",
+        {"t": "fw_begin", "id": 32, "b": {"size": 1314816, "sha": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "ver": "a109c12",
+                                          "patch": {"psize": 35411, "base": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae", "bsize": 1314816}}},
+        env("fw_begin", 32, {0: 1314816, 1: bytes.fromhex("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"), 2: "a109c12",
+                             3: {0: 35411, 1: bytes.fromhex("2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"), 2: 1314816}}),
+    ),
     "fw_chunk": (
         "Daemon sends 8 bytes of the image at offset 4096",
         {"t": "fw_chunk", "id": 31, "b": {"off": 4096, "data": "e903021000000000"}},

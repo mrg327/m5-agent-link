@@ -436,6 +436,7 @@ impl Transfer<'_> {
                 size: self.data.len() as u64,
                 sha: self.sha,
                 ver: Some(self.ver.to_owned()),
+                patch: None,
             }),
         );
     }
@@ -447,6 +448,7 @@ impl Transfer<'_> {
                 size: 0,
                 sha: [0; 32],
                 ver: None,
+                patch: None,
             }),
         );
     }

@@ -205,6 +205,8 @@ static bool decode_repeated_usage_uint6uint(zcbor_state_t *state, struct usage_u
 static bool decode_usage(zcbor_state_t *state, struct usage *result);
 static bool decode_msg_usage(zcbor_state_t *state, struct msg_usage *result);
 static bool decode_repeated_fw_begin_uint2tstr(zcbor_state_t *state, struct fw_begin_uint2tstr *result);
+static bool decode_fw_patch(zcbor_state_t *state, struct fw_patch *result);
+static bool decode_repeated_fw_begin_fw_patch_m(zcbor_state_t *state, struct fw_begin_fw_patch_m *result);
 static bool decode_fw_begin(zcbor_state_t *state, struct fw_begin *result);
 static bool decode_msg_fw_begin(zcbor_state_t *state, struct msg_fw_begin *result);
 static bool decode_fw_chunk(zcbor_state_t *state, struct fw_chunk *result);
@@ -2984,6 +2986,35 @@ static bool decode_repeated_fw_begin_uint2tstr(
 	return res;
 }
 
+static bool decode_fw_patch(
+		zcbor_state_t *state, struct fw_patch *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_decode(state, (&(*result).fw_patch_uint0uint))))
+	&& (((zcbor_uint32_expect(state, (1))))
+	&& (zcbor_bstr_decode(state, (&(*result).fw_patch_uint1bstr)))
+	&& ((((*result).fw_patch_uint1bstr.len == 32)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false)))
+	&& (((zcbor_uint32_expect(state, (2))))
+	&& (zcbor_uint32_decode(state, (&(*result).fw_patch_uint2uint))))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_fw_begin_fw_patch_m(
+		zcbor_state_t *state, struct fw_begin_fw_patch_m *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (3))))
+	&& (decode_fw_patch(state, (&(*result).fw_begin_fw_patch_m)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_fw_begin(
 		zcbor_state_t *state, struct fw_begin *result)
 {
@@ -2994,13 +3025,15 @@ static bool decode_fw_begin(
 	&& (((zcbor_uint32_expect(state, (1))))
 	&& (zcbor_bstr_decode(state, (&(*result).fw_begin_uint1bstr)))
 	&& ((((*result).fw_begin_uint1bstr.len == 32)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false)))
-	&& zcbor_present_decode(&((*result).fw_begin_uint2tstr_present), (zcbor_decoder_t *)decode_repeated_fw_begin_uint2tstr, state, (&(*result).fw_begin_uint2tstr))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+	&& zcbor_present_decode(&((*result).fw_begin_uint2tstr_present), (zcbor_decoder_t *)decode_repeated_fw_begin_uint2tstr, state, (&(*result).fw_begin_uint2tstr))
+	&& zcbor_present_decode(&((*result).fw_begin_fw_patch_m_present), (zcbor_decoder_t *)decode_repeated_fw_begin_fw_patch_m, state, (&(*result).fw_begin_fw_patch_m))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
 
 	if (false) {
 		/* For testing that the types of the arguments are correct.
 		 * A compiler error here means a bug in zcbor.
 		 */
 		decode_repeated_fw_begin_uint2tstr(state, (&(*result).fw_begin_uint2tstr));
+		decode_repeated_fw_begin_fw_patch_m(state, (&(*result).fw_begin_fw_patch_m));
 	}
 
 	log_result(state, res, __func__);

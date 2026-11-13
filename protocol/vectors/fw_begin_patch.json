@@ -1,0 +1,18 @@
+{
+  "desc": "Daemon starts a delta update (proto 0.21): a 35 KB patch against the 1.3 MB image the device runs",
+  "symbolic": {
+    "t": "fw_begin",
+    "id": 32,
+    "b": {
+      "size": 1314816,
+      "sha": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "ver": "a109c12",
+      "patch": {
+        "psize": 35411,
+        "base": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
+        "bsize": 1314816
+      }
+    }
+  },
+  "cbor_hex": "a300181801182003a4001a001410000158209f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a0802676131303963313203a300198a530158202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae021a00141000"
+}

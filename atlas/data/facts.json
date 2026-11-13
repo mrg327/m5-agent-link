@@ -2741,6 +2741,13 @@
           "type": "tstr",
           "note": "ver    the image's version (its app description), <= 32 chars, for the screen",
           "name": "ver"
+        },
+        {
+          "key": 3,
+          "optional": true,
+          "type": "fw_patch",
+          "note": "patch  (proto 0.21) the chunks carry a patch against the running image, not",
+          "name": "patch"
         }
       ],
       "source": "protocol/agentlink.cddl:80"
@@ -2755,7 +2762,7 @@
           "key": 0,
           "optional": false,
           "type": "uint",
-          "note": "off    byte offset of this chunk in the image",
+          "note": "off    byte offset of this chunk in the image (in the patch, with fw_begin.patch)",
           "name": "off"
         },
         {
@@ -2785,7 +2792,7 @@
           "key": 1,
           "optional": false,
           "type": "uint",
-          "note": "next   bytes received and written so far: the offset the device wants next",
+          "note": "next   bytes received and written so far: the offset the device wants next (a patch",
           "name": "next"
         },
         {

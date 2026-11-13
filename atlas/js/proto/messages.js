@@ -96,7 +96,8 @@ const SPECS = {
   kb_start: { kid: [0, 'uint'], sid: [1, 'uint'], keys: [2, 'hex'] },
   kb_stroke: { kid: [0, 'uint'], seq: [1, 'uint'], pts: [2, 'hex'] },
   usage: { at: [0, 'uint'], h5: [1, 'uint'], h5r: [2, 'uint'], h5o: [3, 'uint'], wk: [4, 'uint'], wkr: [5, 'uint'], wko: [6, 'uint'] },
-  fw_begin: { size: [0, 'uint'], sha: [1, 'hex'], ver: [2, 'tstr'] },
+  fw_begin: { size: [0, 'uint'], sha: [1, 'hex'], ver: [2, 'tstr'], patch: [3, 'obj:fw_patch'] }, // patch: proto 0.21
+  fw_patch: { psize: [0, 'uint'], base: [1, 'hex'], bsize: [2, 'uint'] },
   fw_chunk: { off: [0, 'uint'], data: [1, 'hex'] },
   fw_ack: { st: [0, 'enum:fw_status'], next: [1, 'uint'], msg: [2, 'tstr'] },
   // proto 0.19 (POWER.md): battery and the ms spent in each power state since the previous report

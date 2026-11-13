@@ -1151,11 +1151,23 @@ struct fw_begin_uint2tstr {
 	struct zcbor_string fw_begin_uint2tstr;
 };
 
+struct fw_patch {
+	uint32_t fw_patch_uint0uint;
+	struct zcbor_string fw_patch_uint1bstr;
+	uint32_t fw_patch_uint2uint;
+};
+
+struct fw_begin_fw_patch_m {
+	struct fw_patch fw_begin_fw_patch_m;
+};
+
 struct fw_begin {
 	uint32_t fw_begin_uint0uint;
 	struct zcbor_string fw_begin_uint1bstr;
 	struct fw_begin_uint2tstr fw_begin_uint2tstr;
 	bool fw_begin_uint2tstr_present;
+	struct fw_begin_fw_patch_m fw_begin_fw_patch_m;
+	bool fw_begin_fw_patch_m_present;
 };
 
 struct msg_fw_begin {

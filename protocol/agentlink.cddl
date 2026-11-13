@@ -526,15 +526,25 @@ fw_begin = {
   0 => uint,               ; size   the image's length in bytes; 0 = stop the transfer in progress
   1 => bstr .size 32,      ; sha    SHA-256 of the whole image: a begin naming the image already in progress
                            ;        (same sha and size) resumes it at the device's `next`
-  ? 2 => tstr              ; ver    the image's version (its app description), <= 32 chars, for the screen
+  ? 2 => tstr,             ; ver    the image's version (its app description), <= 32 chars, for the screen
+  ? 3 => fw_patch          ; patch  (proto 0.21) the chunks carry a patch against the running image, not
+                           ;        the image itself; `size` and `sha` still describe the rebuilt image
+}
+; A detools sequential patch (bsdiff, heatshrink window 8 lookahead 7). The device rebuilds the image from the
+; first `bsize` bytes of its running app slot; if their SHA-256 is not `base` it acks bad "Base mismatch".
+fw_patch = {
+  0 => uint,               ; psize  the patch's length in bytes
+  1 => bstr .size 32,      ; base   SHA-256 of the base image (the first bsize bytes of the running slot)
+  2 => uint                ; bsize  the base image's length in bytes
 }
 fw_chunk = {
-  0 => uint,                 ; off    byte offset of this chunk in the image
+  0 => uint,                 ; off    byte offset of this chunk in the image (in the patch, with fw_begin.patch)
   1 => bstr .size (0..2048)  ; data
 }
 fw_ack = {
   0 => fw_status,   ; st
-  1 => uint,        ; next   bytes received and written so far: the offset the device wants next
+  1 => uint,        ; next   bytes received and written so far: the offset the device wants next (a patch
+                    ;        offset, with fw_begin.patch)
   ? 2 => tstr       ; msg    why, for busy / bad / fail / stopped, <= 48 chars
 }
 fw_status = fw_status_go / fw_status_done / fw_status_busy / fw_status_bad / fw_status_fail /

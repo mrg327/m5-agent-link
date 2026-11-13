@@ -99,7 +99,8 @@ bool link_tx_hello(hal_link_kind_t to)
                                   * 0.18: last message (session lm / ll / lp, detail without a rid) and
                                   *       questions (attention qs, cmd_op_answer);
                                   * 0.19: power report (device to daemon only);
-                                  * 0.20: trackpad (welcome.pointer, cmd_op_pointer) */
+                                  * 0.20: trackpad (welcome.pointer, cmd_op_pointer);
+                                  * 0.21: delta firmware update (fw_begin.patch) */
     h->hello_device_info_m.device_info_device_class_m.device_class_choice = device_class(bi);
     h->hello_device_info_m.device_info_uint1tstr = zstr(bi->board);
     h->hello_device_info_m.device_info_uint2tstr = zstr(bi->fw_version);

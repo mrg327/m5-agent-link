@@ -324,7 +324,8 @@ usage { at, h5?, h5r?, h5o?, wk?, wkr?, wko? }      daemon → device (type 23)
 
 ## 6c. Firmware update (proto 0.15, [FIRMWARE.md](FIRMWARE.md) §9, issue b769)
 ```
-fw_begin { size, sha: bstr(32), ver? }           daemon → device (type 24); size 0 stops
+fw_begin { size, sha: bstr(32), ver?, patch? }   daemon → device (type 24); size 0 stops
+fw_patch { psize, base: bstr(32), bsize }        proto 0.21: the chunks carry a patch, not the image
 fw_chunk { off, data: bstr(≤ 2048) }             daemon → device (type 25)
 fw_ack   { st, next, msg? }                      device → daemon (type 26)
 st: go 0 | done 1 | busy 2 | bad 3 | fail 4 | stopped 5
@@ -345,6 +346,16 @@ st: go 0 | done 1 | busy 2 | bad 3 | fail 4 | stopped 5
 - The new image runs unconfirmed until a daemon welcomes it; it then keeps itself. If it is not welcomed
   within 5 minutes, or resets before that, the previous image boots again (rollback). The daemon compares the
   `fw` in the next `hello` with the image's version to tell the two apart.
+- **Delta update (proto 0.21, issue ef2c).** To a device with proto ≥ 0.21 the daemon may send a patch
+  instead of the image: `fw_begin.patch` gives the patch length (`psize`) and the base it applies to, the first
+  `bsize` bytes of the device's running app slot, by SHA-256 (`base`). `size` and `sha` still describe the
+  rebuilt image. The patch is a detools sequential patch (bsdiff, heatshrink window 8 lookahead 7, the format of
+  Espressif's esp_delta_ota). The device hashes its base before it answers; on a mismatch it acks `bad`
+  "Base mismatch" and the daemon starts again with the whole image. Otherwise `fw_chunk.off` and `fw_ack.next`
+  count patch bytes; the device rebuilds the image into the spare slot as the patch arrives and checks it
+  exactly as a whole image (`sha`, signature, rollback). A transfer resumes as before (same `sha`, `size`
+  and patch). The daemon picks the base from images it has sent or built (by the `fw` in `hello`) and sends
+  the whole image when it has none or the patch is not smaller.
 - Chunks never reach the trace (it shows the size only).
 
 ## 6d. Queued messages (proto 0.17)
