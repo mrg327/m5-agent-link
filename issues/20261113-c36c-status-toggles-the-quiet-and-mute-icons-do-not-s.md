@@ -1,7 +1,7 @@
 ---
 id: 20261113-c36c
 title: STATUS toggles: the Quiet and Mute icons do not show the current state
-status: claimed
+status: fixed
 severity: low
 area: firmware
 platforms: any
@@ -9,7 +9,7 @@ owner: copilot-cli/opus@mac-work
 created: 2026-11-13T18:02:06Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -32,3 +32,10 @@ Fix: each icon shows the current state. Quiet: bell (ICON_BELL) while alerts are
 
 - 2026-11-13T18:02:06Z · copilot-cli/opus@mac-work · macos-arm64 · 7a19c7e: filed
 - 2026-11-13T18:02:10Z · copilot-cli/opus@mac-work · macos-arm64 · 7a19c7e: claimed
+- 2026-11-13T18:07:22Z · copilot-cli/opus@mac-work · macos-arm64 · 9fec217: fixed: commit 9fec217; checks: simulator ctest 187/187 (core_ram_budget skipped), idf.py build + check_dram (DIRAM free 182613 B), atlas extract --check + node tests 208/208. Not yet flashed to the watch.
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: 9fec217 main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74
