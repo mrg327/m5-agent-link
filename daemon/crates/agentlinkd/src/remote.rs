@@ -160,7 +160,16 @@ mod unix {
             return err("no remote token: run `agentlink remote init`");
         }
         let id = env.registry.new_attach_id();
-        let socket = env.home.join(format!("remote-{id}.sock"));
+        let socket = match reattach_socket(&env.home, req, &env.registry.attach_sockets()) {
+            Ok(Some(p)) => p,
+            // The pid keeps a new name apart from one an `agentlink ssh` still holds from a
+            // daemon that ran before this one (and will ask for again).
+            Ok(None) => env
+                .home
+                .join(format!("remote-{}-{id}.sock", std::process::id())),
+            Err(e) => return err(e),
+        };
+        let reattach = req.get("socket").is_some();
         let listener = match ipc::bind(&socket) {
             Ok(l) => l,
             Err(e) => return err(&format!("{e:#}")),
@@ -175,7 +184,7 @@ mod unix {
             "attach",
             None,
             None,
-            json!({"id": id, "socket": socket}),
+            json!({"id": id, "socket": socket, "reattach": reattach}),
             None,
         );
         let accept = spawn_accept(listener, env.clone(), Some(id));
@@ -188,6 +197,37 @@ mod unix {
         };
         (reply, Some(guard))
     }
+}
+
+/// A re-attach (`"socket"` in the request) after a daemon restart: `agentlink ssh` asks for the
+/// socket its ssh `-R` forward already points at. Only an attach socket name directly in `home`
+/// that no live attach holds is accepted, so a request can never bind or remove anything else.
+#[cfg_attr(not(unix), allow(dead_code))]
+fn reattach_socket(
+    home: &Path,
+    req: &Value,
+    live: &[std::path::PathBuf],
+) -> Result<Option<std::path::PathBuf>, &'static str> {
+    let Some(v) = req.get("socket") else {
+        return Ok(None);
+    };
+    let bad = "bad re-attach socket";
+    let p = Path::new(v.as_str().ok_or(bad)?);
+    let name = p.file_name().and_then(|n| n.to_str()).ok_or(bad)?;
+    let stem = name
+        .strip_prefix("remote-")
+        .and_then(|n| n.strip_suffix(".sock"))
+        .ok_or(bad)?;
+    let digits = !stem.is_empty()
+        && stem.len() <= 40
+        && stem.bytes().all(|b| b.is_ascii_digit() || b == b'-');
+    if !digits || p.parent() != Some(home) {
+        return Err(bad);
+    }
+    if live.iter().any(|l| l == p) {
+        return Err("that socket is held by a live attach");
+    }
+    Ok(Some(p.to_path_buf()))
 }
 
 #[cfg(not(unix))]
@@ -349,7 +389,7 @@ mod tests {
         let (reply, guard2) = open_attach(&env, &req);
         assert!(guard.is_none());
         assert_eq!(reply["id"], 1);
-        let sock = d.join("remote-1.sock");
+        let sock = d.join(format!("remote-{}-1.sock", std::process::id()));
         assert_eq!(reply["socket"], sock.to_str().unwrap());
 
         let mut c = UnixStream::connect(&sock).await.unwrap();
@@ -368,6 +408,56 @@ mod tests {
             "its sessions end with the tunnel"
         );
         assert!(env.registry.attaches().is_empty());
+        let _ = std::fs::remove_dir_all(d);
+    }
+    #[test]
+    fn reattach_takes_only_a_free_attach_socket_in_home() {
+        let home = Path::new("/h/.agentlink");
+        let req = |p: &str| json!({"ctl": "remote_attach", "socket": p});
+        let ok = "/h/.agentlink/remote-41-2.sock";
+        assert_eq!(reattach_socket(home, &json!({}), &[]), Ok(None));
+        assert_eq!(reattach_socket(home, &req(ok), &[]), Ok(Some(ok.into())));
+        for bad in [
+            "/h/.agentlink/remote.sock",
+            "/h/.agentlink/hook.sock",
+            "/h/.agentlink/remote-.sock",
+            "/h/.agentlink/remote-1x.sock",
+            "/h/.agentlink/sub/remote-1.sock",
+            "/h/.agentlink/../remote-1.sock",
+            "/etc/remote-1.sock",
+            "remote-1.sock",
+        ] {
+            assert!(reattach_socket(home, &req(bad), &[]).is_err(), "{bad}");
+        }
+        assert!(reattach_socket(home, &json!({"socket": 3}), &[]).is_err());
+        assert!(reattach_socket(home, &req(ok), &[ok.into()]).is_err());
+    }
+
+    #[tokio::test]
+    async fn a_restarted_daemon_rebinds_the_socket_the_tunnel_points_at() {
+        let d = scratch("reatt");
+        std::fs::write(d.join("remote.token"), TOKEN).unwrap();
+        let old = env(&d);
+        let req = json!({"ctl":"remote_attach","ctx":{}});
+        let (reply, guard) = open_attach(&old, &req);
+        let sock = std::path::PathBuf::from(reply["socket"].as_str().unwrap());
+        drop(guard);
+        drop(old);
+        assert!(!sock.exists(), "the old daemon removed it");
+
+        let new = env(&d);
+        let again = json!({"ctl":"remote_attach","ctx":{},"socket":sock});
+        let (reply, guard) = open_attach(&new, &again);
+        assert_eq!(reply["ok"], true, "{reply}");
+        assert_eq!(reply["socket"], sock.to_str().unwrap());
+        let (dup, _) = open_attach(&new, &again);
+        assert_eq!(dup["ok"], false, "a live attach keeps its socket");
+
+        let mut c = UnixStream::connect(&sock).await.unwrap();
+        let line = format!("{{\"auth\":\"{TOKEN}\",\"host\":\"w\",\"os\":\"win\"}}\n{HOOK}\n");
+        c.write_all(line.as_bytes()).await.unwrap();
+        assert!(eventually(|| !new.registry.snapshot().is_empty()).await);
+        drop(guard);
         let _ = std::fs::remove_dir_all(d);
     }
 }

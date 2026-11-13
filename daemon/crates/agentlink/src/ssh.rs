@@ -1,11 +1,30 @@
 //! `agentlink ssh <dest>`: registers this terminal window with the daemon, then runs ssh with
 //! a reverse tunnel to the daemon's remote socket. The registration lives as long as the
-//! hook.sock connection, so it is held open until ssh exits.
+//! hook.sock connection, so it is held open until ssh exits, and made again with the same socket
+//! when the daemon restarts.
 
 use anyhow::Result;
 
 #[cfg(unix)]
 pub fn run(port: u16, dest: &str, pre: &[String], extra: &[String]) -> Result<()> {
+    use anyhow::Context;
+
+    let (conn, socket) = attach(None)?;
+    eprintln!("agentlink: tunnel 127.0.0.1:{port} on {dest} → this watch (window registered)");
+    let bin = std::env::var_os("AGENTLINK_SSH").unwrap_or_else(|| "ssh".into());
+    let mut child = std::process::Command::new(&bin)
+        .args(ssh_argv(port, &socket, pre, dest, extra))
+        .spawn()
+        .with_context(|| format!("cannot run {}", bin.to_string_lossy()))?;
+    std::thread::spawn(move || hold(conn, &socket));
+    let status = child.wait()?;
+    std::process::exit(exit_code(status));
+}
+
+/// Registers this window on hook.sock: the held connection and the attach socket. `again` asks a
+/// restarted daemon for the socket the ssh forward already points at.
+#[cfg(unix)]
+fn attach(again: Option<&str>) -> Result<(std::os::unix::net::UnixStream, String)> {
     use anyhow::{bail, Context};
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::net::UnixStream;
@@ -19,7 +38,7 @@ pub fn run(port: u16, dest: &str, pre: &[String], extra: &[String]) -> Result<()
         )
     })?;
     s.set_read_timeout(Some(Duration::from_secs(3)))?;
-    writeln!(s, "{}", attach_request(&capture_ctx()))?;
+    writeln!(s, "{}", attach_request(&capture_ctx(), again))?;
     let mut line = String::new();
     BufReader::new(&s)
         .read_line(&mut line)
@@ -36,14 +55,29 @@ pub fn run(port: u16, dest: &str, pre: &[String], extra: &[String]) -> Result<()
     let Some(socket) = reply["socket"].as_str() else {
         bail!("daemon reply has no socket");
     };
-    eprintln!("agentlink: tunnel 127.0.0.1:{port} on {dest} → this watch (window registered)");
-    let bin = std::env::var_os("AGENTLINK_SSH").unwrap_or_else(|| "ssh".into());
-    let status = std::process::Command::new(&bin)
-        .args(ssh_argv(port, socket, pre, dest, extra))
-        .status()
-        .with_context(|| format!("cannot run {}", bin.to_string_lossy()))?;
-    drop(s);
-    std::process::exit(exit_code(status));
+    s.set_read_timeout(None)?;
+    Ok((s, socket.to_owned()))
+}
+
+/// Holds the registration while ssh runs. When the daemon goes away (a restart closes the
+/// connection and removes the socket), attaches again with the same socket until a daemon takes
+/// it, so the tunnel works again without restarting ssh. Silent: the terminal belongs to ssh.
+#[cfg(unix)]
+fn hold(mut conn: std::os::unix::net::UnixStream, socket: &str) {
+    use std::io::Read;
+    use std::time::Duration;
+    loop {
+        let mut buf = [0u8; 256];
+        while matches!(conn.read(&mut buf), Ok(n) if n > 0) {}
+        let mut wait = Duration::from_millis(250);
+        conn = loop {
+            std::thread::sleep(wait);
+            if let Ok((c, _)) = attach(Some(socket)) {
+                break c;
+            }
+            wait = (wait * 2).min(Duration::from_secs(2));
+        };
+    }
 }
 
 #[cfg(not(unix))]
@@ -72,8 +106,12 @@ fn ssh_argv(port: u16, socket: &str, pre: &[String], dest: &str, extra: &[String
     v
 }
 
-fn attach_request(ctx: &serde_json::Value) -> serde_json::Value {
-    serde_json::json!({"ctl": "remote_attach", "ctx": ctx})
+fn attach_request(ctx: &serde_json::Value, again: Option<&str>) -> serde_json::Value {
+    let mut r = serde_json::json!({"ctl": "remote_attach", "ctx": ctx});
+    if let Some(socket) = again {
+        r["socket"] = socket.into();
+    }
+    r
 }
 
 /// Env that identifies the terminal/window. Keep in sync with `ENV_KEYS` in agentlink-hook.
@@ -188,8 +226,11 @@ mod tests {
 
     #[test]
     fn attach_request_shape_and_chain_starts_at_self() {
-        let r = attach_request(&serde_json::json!({"pids": [3, 2]}));
+        let r = attach_request(&serde_json::json!({"pids": [3, 2]}), None);
         assert_eq!(r["ctl"], "remote_attach");
+        assert!(r.get("socket").is_none());
+        let again = attach_request(&serde_json::json!({}), Some("/h/remote-7-1.sock"));
+        assert_eq!(again["socket"], "/h/remote-7-1.sock");
         assert_eq!(r["ctx"]["pids"], serde_json::json!([3, 2]));
         let (c, tty) = walk_chain("30 20 ttys001\n20 1 ??\n", 30, 8);
         assert_eq!((c, tty.as_deref()), (vec![30, 20], Some("/dev/ttys001")));

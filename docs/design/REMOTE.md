@@ -60,7 +60,12 @@ copilot ─hook─► agentlink-hook.exe                     agentlinkd ──BL
     `{"ctl":"remote_attach","ctx":{cwd, env, tty, pids}}` on `hook.sock`. The reply is
     `{"ok":true,"id":N,"socket":"<path>"}`. The attach and its socket live exactly as long
     as that ctl connection stays open; `agentlink ssh` holds it until ssh exits. Sessions
-    that arrive through an attach can be focused and scrolled (§3.3).
+    that arrive through an attach can be focused and scrolled (§3.3). The name carries the
+    daemon's pid (`remote-<pid>-<id>.sock`), so it never matches one from an earlier daemon.
+  - A **re-attach** adds `"socket":"<path>"` to the request: a restarted daemon binds that same
+    path again, because the running ssh `-R` forward points at it (issue 029e). The daemon
+    accepts only `remote-<digits and dashes>.sock` directly in its home that no live attach
+    holds; anything else is refused.
   - `remote.sock`: always bound, for tunnels opened by hand (§4, RDP case). Its sessions are
     shown and answerable, but focus and scroll answer `unsupported`.
 - Every remote connection must send `{"auth":"<token>","host":"<name>","os":"win"}` as its
@@ -115,6 +120,10 @@ copilot ─hook─► agentlink-hook.exe                     agentlinkd ──BL
 ### 3.4 Lifetime and liveness
 
 - When the tunnel drops, remote hooks fail open.
+- When the daemon restarts, its attach sockets go away with it. `agentlink ssh` sees its ctl
+  connection close and re-attaches with the same socket (every 0.25 s, backing off to 2 s,
+  silently: the terminal belongs to ssh), so the forward works again without restarting ssh.
+  Hooks fired in the gap fail open; the sessions reappear with their next hook.
 - When `agentlink ssh` exits, its attach socket is removed (audited as
   `remote_attach_close`) and the sessions that arrived through it are removed too (`gone` to
   the watch): their `SessionEnd` can no longer arrive. A session that is still running remote
