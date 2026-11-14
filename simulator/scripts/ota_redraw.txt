@@ -1,0 +1,38 @@
+# Updating overlay redraw budget (issue 203f): a percent step redraws the arc's new stretch and the label,
+# not the whole screen (217156 px), including past 3 o'clock (25%).
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 300
+fw_image 40960
+fw_begin 9.9.9
+wait 300
+fw_send 0 2048
+wait 150
+fw_send 2048 2048
+wait 150
+fw_send 4096 2048
+wait 150
+fw_send 6144 2048
+wait 150
+fw_send 8192 2048
+wait 150
+fw_send 10240 2048
+wait 150
+fw_send 12288 2048
+wait 150
+fw_send 14336 2048
+wait 150
+fw_send 16384 2048
+wait 150
+fw_send 18432 2048
+wait 150
+fw_send 20480 2048
+wait 150
+fw_send 22528 2048
+wait 150
+px_reset
+fw_send 24576 2048
+wait 300
+expect_px_max 100000
+fw_stop
+wait 200

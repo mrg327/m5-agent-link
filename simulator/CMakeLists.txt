@@ -564,6 +564,7 @@ sim_script_test(sim_ota_gap ota_gap.txt
 sim_script_test(sim_ota_resume ota_resume.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"ota_begin\".*\"ev\":\"ota_begin\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"ota_resume\",\"next\":6144.*\"ev\":\"ota_done\"")
+sim_script_test(sim_ota_redraw ota_redraw.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_ota_stop ota_stop.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"ev\":\"ota_stopped\",\"why\":\"daemon\".*\"ev\":\"ota_ack\",\"st\":5")

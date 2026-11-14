@@ -16,8 +16,8 @@
 #define Y_NOTE 300
 
 static lv_obj_t *s_root, *s_arc, *s_title, *s_ver, *s_pct, *s_note, *s_hint;
-static unsigned s_pct_v;
-static bool s_waiting, s_restarting;
+static unsigned s_pct_v, s_pct_drawn;
+static bool s_waiting, s_restarting, s_redraw_all;
 
 static void on_draw(lv_event_t *e)
 {
@@ -76,6 +76,30 @@ void ui_ota_init(lv_obj_t *layer)
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
 }
 
+/* Only the stretch of rim the arc grew into: the overlay is full screen and redrawing all of it from PSRAM
+ * on each percent slowed a delta update's flash writes by half (issue 203f). */
+static void invalidate_arc(void)
+{
+    unsigned from = s_pct_drawn, to = s_restarting ? 100 : s_pct_v;
+    if (s_redraw_all || to < from) {
+        lv_obj_invalidate(s_arc);
+    } else if (to > from) {
+        int32_t a0 = (int32_t)(270 + from * 360 / 100) % 360, a1 = (int32_t)(270 + to * 360 / 100) % 360;
+        lv_area_t a, b;
+        if (a1 > a0) {
+            lv_draw_arc_get_area(UI_CX, UI_CX, OTA_R, a0, a1, OTA_W, true, &a);
+            lv_obj_invalidate_area(s_arc, &a);
+        } else { /* through 0 degrees (3 o'clock) or back to the start */
+            lv_draw_arc_get_area(UI_CX, UI_CX, OTA_R, a0, 359, OTA_W, true, &a);
+            lv_draw_arc_get_area(UI_CX, UI_CX, OTA_R, 0, a1 ? a1 : 1, OTA_W, true, &b);
+            lv_obj_invalidate_area(s_arc, &a);
+            lv_obj_invalidate_area(s_arc, &b);
+        }
+    }
+    s_pct_drawn = to;
+    s_redraw_all = false;
+}
+
 static void refresh(void)
 {
     char t[8];
@@ -84,13 +108,14 @@ static void refresh(void)
     lv_label_set_text(s_pct, t);
     lv_label_set_text(s_note, s_waiting && !s_restarting ? "Waiting for the computer…" : "");
     lv_label_set_text(s_hint, s_restarting ? "" : "Hold B to cancel");
-    lv_obj_invalidate(s_arc);
+    invalidate_arc();
 }
 
 void ui_ota_show(const char *ver)
 {
-    s_pct_v = 0;
+    s_pct_v = s_pct_drawn = 0;
     s_waiting = s_restarting = false;
+    s_redraw_all = true;
     lv_label_set_text(s_ver, ver ? ver : "");
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     refresh();
@@ -100,6 +125,7 @@ void ui_ota_progress(unsigned pct, bool waiting)
 {
     if (pct > 100) pct = 100;
     if (pct == s_pct_v && waiting == s_waiting) return;
+    if (waiting != s_waiting) s_redraw_all = true;
     s_pct_v = pct;
     s_waiting = waiting;
     refresh();
@@ -108,6 +134,7 @@ void ui_ota_progress(unsigned pct, bool waiting)
 void ui_ota_restarting(void)
 {
     s_restarting = true;
+    s_redraw_all = true; /* the arc turns green */
     refresh();
 }
 
