@@ -231,6 +231,19 @@ void hal_link_interactive(bool on) { (void)on; }
 void hal_link_bulk(bool on) { (void)on; }
 uint32_t hal_link_ble_interval_us(void) { return 0; }
 
+/* Firmware update (FIRMWARE.md §9): the web watch has no flash to write. A transfer is refused, so the
+ * update screen is never reached here. */
+hal_ota_result_t hal_ota_begin(uint32_t size) { (void)size; return HAL_OTA_UNSUPPORTED; }
+hal_ota_result_t hal_ota_write(const uint8_t *data, size_t len) { (void)data; (void)len; return HAL_OTA_UNSUPPORTED; }
+hal_ota_result_t hal_ota_finish(void) { return HAL_OTA_UNSUPPORTED; }
+void hal_ota_abort(void) {}
+const char *hal_ota_error(void) { return "This watch can't update itself"; }
+bool hal_ota_unconfirmed(void) { return false; }
+void hal_ota_confirm(void) {}
+hal_ota_result_t hal_ota_base_read(uint32_t off, void *buf, size_t len) { (void)off; (void)buf; (void)len; return HAL_OTA_UNSUPPORTED; }
+uint32_t hal_ota_base_size(void) { return 0; }
+void hal_restart(void) {}
+
 void web_link_up(int kind, bool up)
 {
     if ((unsigned)kind > 2) return;
