@@ -34,6 +34,16 @@ const ICONS = {
   "speaker-slash": 0xe45a, "arrow-square-out": 0xe5de, pulse: 0xe000, "stop-circle": 0xe46e,
   "arrow-bend-up-left": 0xe024, "paper-plane-tilt": 0xe398, info: 0xe2ce, "arrow-line-down": 0xe05c,
   backspace: 0xe0ae, circle: 0xe18a, "git-fork": 0xe27e,
+  // The glyph pass (GLYPHS.md): one glyph per word the screens used to spell out.
+  sparkle: 0xe6a2, "airplane-tilt": 0xe5d6, cloud: 0xe1aa, "caret-right": 0xe13a, "arrow-left": 0xe058,
+  check: 0xe182, x: 0xe4f6, "dots-three-outline": 0xe204, checks: 0xe53a, "bell-ringing": 0xe5e8,
+  "arrow-clockwise": 0xe036, "arrow-counter-clockwise": 0xe038, "book-open": 0xe0e6, "hourglass-low": 0xe2b6,
+  sun: 0xe472, "eye-closed": 0xe222, "eye-slash": 0xe224, stack: 0xe466, waveform: 0xe802,
+  "cursor-click": 0xe7c8, "mouse-right-click": 0xe336, "mouse-scroll": 0xe332, "arrows-out-cardinal": 0xe0a4,
+  "download-simple": 0xe20c, "calendar-blank": 0xe10a, "fast-forward": 0xe6a6, "shield-slash": 0xe410,
+  "git-pull-request": 0xe282, files: 0xe710, "folder-dashed": 0xe8f8, prohibit: 0xe3de, "app-window": 0xe5da,
+  "arrow-up": 0xe08e, "arrow-down": 0xe03e, "link-break": 0xe2e4, queue: 0xe6ac, "hand-tap": 0xec90,
+  "arrow-right": 0xe06c, "caret-down": 0xe136,
 };
 // The GRAPH screen's node and lane glyphs (GRAPH.md §4): drawn inside a node disc, so 20 px only.
 const GRAPH_ICONS = {
@@ -59,7 +69,8 @@ function make(name, file, size, range, fallback) {
 
 mkdirSync(join(here, out), { recursive: true });
 const ph = join(phDir, "Phosphor-Fill.ttf");
-for (const s of [20, 28, 44]) make(`font_phosphor_${s}`, ph, s, s === 20 ? ICON_RANGE + "," + hex(GRAPH_ICONS) : ICON_RANGE);
+// Every size holds the graph glyphs too: the glyph pass reuses them (terminal, robot, eye, pencil, flask, globe).
+for (const s of [20, 28, 44]) make(`font_phosphor_${s}`, ph, s, ICON_RANGE + "," + hex(GRAPH_ICONS));
 // Each text font falls back to the icon font of the nearest size.
 make("font_figtree_20_500", fig(500), 20, TEXT_RANGE, "font_phosphor_20");
 make("font_figtree_20_400", fig(400), 20, TEXT_RANGE, "font_phosphor_20");

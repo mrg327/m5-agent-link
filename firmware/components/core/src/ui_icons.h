@@ -53,3 +53,45 @@
 #define ICON_G_REVIEW          "\xEE\x98\x86" /* seal-check e606 */
 #define ICON_G_RESEARCH        "\xEE\x9D\x98" /* books e758 */
 #define ICON_G_MAP             "\xEE\x8C\x9A" /* map-trifold e31a: the plan lane */
+
+/* The glyph pass (GLYPHS.md): the glyphs that stand where a word used to. The graph glyphs above (ICON_G_*) are
+ * in every size now, so a screen may reuse them (terminal, robot, eye, pencil, flask, globe). */
+#define ICON_AG_CLAUDE "\xEE\x9A\xA2" /* sparkle e6a2 */
+#define ICON_AG_COPILOT "\xEE\x97\x96" /* airplane-tilt e5d6 */
+#define ICON_AG_CLOUD "\xEE\x86\xAA" /* cloud e1aa */
+#define ICON_NEXT "\xEE\x84\xBA" /* caret-right e13a */
+#define ICON_BACK "\xEE\x81\x98" /* arrow-left e058 */
+#define ICON_CHECK "\xEE\x86\x82" /* check e182 */
+#define ICON_X "\xEE\x93\xB6" /* x e4f6 */
+#define ICON_MORE "\xEE\x88\x84" /* dots-three-outline e204 */
+#define ICON_ALWAYS "\xEE\x94\xBA" /* checks e53a */
+#define ICON_NOTIFY "\xEE\x97\xA8" /* bell-ringing e5e8 */
+#define ICON_RERUN "\xEE\x80\xB6" /* arrow-clockwise e036 */
+#define ICON_RETRY "\xEE\x80\xB8" /* arrow-counter-clockwise e038 */
+#define ICON_READ "\xEE\x83\xA6" /* book-open e0e6 */
+#define ICON_WAIT "\xEE\x8A\xB6" /* hourglass-low e2b6 */
+#define ICON_UNSNOOZE "\xEE\x91\xB2" /* sun e472 */
+#define ICON_EYE_HALF "\xEE\x88\xA2" /* eye-closed e222 */
+#define ICON_EYE_OFF "\xEE\x88\xA4" /* eye-slash e224 */
+#define ICON_SESSIONS "\xEE\x91\xA6" /* stack e466 */
+#define ICON_WAVE "\xEE\xA0\x82" /* waveform e802 */
+#define ICON_CLICK "\xEE\x9F\x88" /* cursor-click e7c8 */
+#define ICON_RIGHT_CLICK "\xEE\x8C\xB6" /* mouse-right-click e336 */
+#define ICON_WHEEL "\xEE\x8C\xB2" /* mouse-scroll e332 */
+#define ICON_MOVE "\xEE\x82\xA4" /* arrows-out-cardinal e0a4 */
+#define ICON_UPDATE "\xEE\x88\x8C" /* download-simple e20c */
+#define ICON_WEEK "\xEE\x84\x8A" /* calendar-blank e10a */
+#define ICON_SKIP "\xEE\x9A\xA6" /* fast-forward e6a6 */
+#define ICON_BYPASS "\xEE\x90\x90" /* shield-slash e410 */
+#define ICON_PR "\xEE\x8A\x82" /* git-pull-request e282 */
+#define ICON_FILES "\xEE\x9C\x90" /* files e710 */
+#define ICON_NO_FOLDER "\xEE\xA3\xB8" /* folder-dashed e8f8 */
+#define ICON_REFUSED "\xEE\x8F\x9E" /* prohibit e3de */
+#define ICON_WINDOW "\xEE\x97\x9A" /* app-window e5da */
+#define ICON_UP "\xEE\x82\x8E" /* arrow-up e08e */
+#define ICON_DOWN "\xEE\x80\xBE" /* arrow-down e03e */
+#define ICON_LINK_BREAK "\xEE\x8B\xA4" /* link-break e2e4 */
+#define ICON_QUEUED "\xEE\x9A\xAC" /* queue e6ac */
+#define ICON_TAP "\xEE\xB2\x90" /* hand-tap ec90 */
+#define ICON_FORWARD "\xEE\x81\xAC" /* arrow-right e06c */
+#define ICON_CARET_DOWN "\xEE\x84\xB6" /* caret-down e136 */

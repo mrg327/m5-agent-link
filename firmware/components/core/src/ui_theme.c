@@ -64,6 +64,53 @@ const char *theme_state_glyph(const session_t *s)
     }
 }
 
+/* The agent's mark in the context line (GLYPHS.md §2): the screens no longer spell the agent's name. */
+const char *theme_agent_glyph(agent_t a)
+{
+    switch (a) {
+    case AGENT_COPILOT: return ICON_AG_COPILOT;
+    case AGENT_CLAUDE: return ICON_AG_CLAUDE;
+    case AGENT_CLOUD: return ICON_AG_CLOUD;
+    case AGENT_SHELL: return ICON_G_SHELL;
+    default: return ICON_G_ROBOT;
+    }
+}
+
+/* GLYPHS.md §2, the vocabulary: the words the watch draws as a glyph. A screen keeps naming its controls and
+ * messages in words (the UI report, the debug log and the tests read those); what it draws is theme_glyph() of
+ * the word, when there is one. Two glyphs side by side read as one sign ("computer, refused"). */
+static const struct { const char *word, *glyph; } kGlyphs[] = {
+    /* legends and buttons */
+    {"Open", ICON_MORE}, {"Next", ICON_NEXT}, {"Select", ICON_CHECK}, {"Back", ICON_BACK}, {"More", ICON_CARET_DOWN},
+    {"Stop", ICON_STOP}, {"Answer", ICON_REPLY}, {"Review", ICON_G_READ}, {"Read", ICON_READ},
+    {"Open on PC", ICON_COMPUTER}, {"Send", ICON_SENT}, {"Use", ICON_CHECK}, {"Try again", ICON_RETRY},
+    {"Dictate", ICON_MIC}, {"Keyboard", ICON_KEYBOARD},
+    /* toasts */
+    {"Sent", ICON_SENT}, {"Not sent", ICON_SENT ICON_X}, {"Offline", ICON_OFFLINE}, {"Opening on PC...", ICON_COMPUTER},
+    {"Focused", ICON_COMPUTER}, {"Stopping", ICON_STOP}, {"Interrupting", ICON_STOP}, {"Running again", ICON_RERUN},
+    {"Unqueued", ICON_QUEUED ICON_X}, {"Will buzz when done", ICON_NOTIFY}, {"Won't notify", ICON_QUIET},
+    {"Snoozed 30 min", ICON_IDLE " 30"}, {"Unsnoozed", ICON_UNSNOOZE}, {"Session ended", ICON_IDLE},
+    {"Not supported", ICON_REFUSED}, {"Not allowed on the PC", ICON_COMPUTER ICON_REFUSED}, {"Failed", ICON_ERROR},
+    {"Denied", ICON_DENIED}, {"Timed out", ICON_WAIT}, {"No window", ICON_WINDOW ICON_X},
+    {"Out of date", ICON_COMPUTER ICON_UPDATE},
+};
+
+const char *theme_glyph(const char *word)
+{
+    for (size_t i = 0; i < sizeof kGlyphs / sizeof kGlyphs[0]; i++)
+        if (!strcmp(kGlyphs[i].word, word)) return kGlyphs[i].glyph;
+    return NULL;
+}
+
+bool theme_is_glyph(const char *text) { return (uint8_t)text[0] == 0xEE; } /* the icons' private-use block */
+
+bool theme_all_glyphs(const char *text)
+{
+    for (const uint8_t *p = (const uint8_t *)text; *p; p += 3)
+        if (p[0] != 0xEE || !p[1] || !p[2]) return false;
+    return text[0] != 0;
+}
+
 const char *theme_basename(const char *path)
 {
     const char *base = path;
@@ -250,7 +297,10 @@ void theme_key_badge_set_word(lv_obj_t *b, lv_obj_t *word_lbl, const char *word,
 {
     (void)deg;
     (void)r;
-    lv_label_set_text(word_lbl, word);
+    /* GLYPHS.md: a legend is its glyph when the word has one, a size up from the caption it replaces */
+    const char *g = theme_is_glyph(word) ? word : theme_glyph(word);
+    lv_obj_set_style_text_font(word_lbl, g ? FONT_ICON_M : FONT_CAPTION, 0);
+    lv_label_set_text(word_lbl, g ? g : word);
     lv_obj_update_layout(b);
     int bw = lv_obj_get_width(b), bh = lv_obj_get_height(b);
     int dy = UI_Y_LEGEND + LEGEND_H / 2 - 233; /* the lower corner is the one nearest the ring */

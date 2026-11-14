@@ -28,6 +28,7 @@ static uint32_t s_now_ms;
 #define TOAST_MASK_W 314 /* a pill: its outer point at the row centre stays inside r 205, so the ring is never touched */
 static lv_obj_t *s_toast, *s_toast_label, *s_toast_dot, *s_toast_mask;
 static uint32_t s_toast_until_ms;
+static char s_toast_txt[64]; /* the toast in words: the report and the log; the screen shows its glyph */
 static lv_obj_t *s_glow, *s_glow_ring;
 
 lv_obj_t *ui_new_screen(void)
@@ -317,7 +318,7 @@ void ui_report(ui_report_t *r)
         ui_ota_report(r);
         return;
     }
-    if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", lv_label_get_text(s_toast_label));
+    if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_toast_txt);
     if (s_mode == MODE_AGENT) ui_agent_report(r);
     else if (s_mode == MODE_ASK) ui_ask_report(r);
     else if (s_mode == MODE_SCROLL) ui_scroll_report(r);
@@ -357,7 +358,20 @@ void ui_motion_enter(lv_obj_t *content) { rise(content, UI_MOTION_RISE); }
 
 void ui_toast(const char *text, uint32_t rgb)
 {
-    lv_label_set_text(s_toast_label, text);
+    /* GLYPHS.md: a toast whose words have a glyph is that glyph, in the toast's colour and without the dot; a
+     * `Sent "..."` keeps what was sent after the glyph */
+    snprintf(s_toast_txt, sizeof s_toast_txt, "%s", text);
+    char shown[80];
+    const char *g = theme_glyph(text);
+    if (g) snprintf(shown, sizeof shown, "%s", g);
+    else if (!strncmp(text, "Sent \"", 6)) snprintf(shown, sizeof shown, "%s%s", ICON_SENT, text + 4);
+    else snprintf(shown, sizeof shown, "%s", text);
+    bool glyph = theme_is_glyph(shown);
+    lv_obj_set_style_text_font(s_toast_label, theme_all_glyphs(shown) ? FONT_ICON_M : glyph ? FONT_HEAD : FONT_BODY_STRONG, 0);
+    lv_obj_set_style_text_color(s_toast_label, glyph && rgb ? lv_color_hex(rgb) : COL_TEXT, 0);
+    lv_label_set_text(s_toast_label, shown);
+    if (glyph) lv_obj_add_flag(s_toast_dot, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_remove_flag(s_toast_dot, LV_OBJ_FLAG_HIDDEN);
     lv_obj_set_style_bg_color(s_toast_dot, lv_color_hex(rgb), 0);
     place_toast();
     lv_obj_remove_flag(s_toast, LV_OBJ_FLAG_HIDDEN);

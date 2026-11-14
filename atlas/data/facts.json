@@ -1384,7 +1384,7 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:112"
+      "source": "firmware/components/core/src/ui.c:113"
     },
     {
       "id": "attention",
@@ -5825,8 +5825,8 @@
     "ring.band_out_px": "firmware/components/core/src/ui_ring_internal.h:15",
     "ring.band_w_px": "firmware/components/core/src/ui_ring_internal.h:16",
     "ring.done_sweep_ms": "firmware/components/core/src/ui_ring_internal.h:36",
-    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:500",
-    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:500",
+    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:520",
+    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:520",
     "ring.error_flicker_ms": "firmware/components/core/src/ui_ring_internal.h:37",
     "ring.hint_a_deg": "firmware/components/core/src/ui_theme.h:67",
     "ring.hint_b_deg": "firmware/components/core/src/ui_theme.h:68",
@@ -5839,8 +5839,8 @@
     "ring.nothing_else": "firmware/components/core/src/ui_home.c:214",
     "ring.others_pct": "firmware/components/core/src/ui_ring_internal.h:21",
     "ring.perm_period_ms": "firmware/components/core/src/ui_ring_internal.h:35",
-    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:349",
-    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:500",
+    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:370",
+    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:520",
     "ring.prog_out_px": "firmware/components/core/src/ui_ring_internal.h:27",
     "ring.prog_w_px": "firmware/components/core/src/ui_ring_internal.h:28",
     "ring.repo_px": "firmware/components/core/src/ui_theme.h:22",

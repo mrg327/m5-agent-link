@@ -85,6 +85,12 @@ const char *theme_state_glyph(const session_t *s);
 /* Last path component of a working directory or repo name. */
 const char *theme_basename(const char *path);
 const char *theme_agent_name(agent_t a);
+const char *theme_agent_glyph(agent_t a);
+/* GLYPHS.md §2: the glyph that stands for a word of the UI's vocabulary ("Open", "Sent", "Offline"), or NULL when
+ * the word has none and is drawn as text. theme_is_glyph(): the text starts with an icon. */
+const char *theme_glyph(const char *word);
+bool theme_is_glyph(const char *text);
+bool theme_all_glyphs(const char *text); /* nothing but icons: draw it in an icon font */
 /* A job (JOBS.md): a terminal command, not an agent. */
 bool theme_is_job(const session_t *s);
 /* The time beside a job's state word: the elapsed run time, "about 2m left" under a known estimate,
