@@ -10,7 +10,9 @@ use std::time::{Duration, Instant};
 pub enum PointerError {
     /// No backend on this machine (Wayland without X11, no xdotool, …).
     Unsupported,
-    /// The OS refused the events; the message says what to allow.
+    /// The OS refused the events; the message says what to allow. Only the macOS and Windows backends
+    /// construct it (xdotool reports failures as Internal); tests construct it on every platform.
+    #[cfg_attr(all(unix, not(target_os = "macos"), not(test)), allow(dead_code))]
     Denied(String),
     Internal(String),
 }

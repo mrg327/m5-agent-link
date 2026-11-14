@@ -1,11 +1,11 @@
 ---
 id: 20261114-6d07
 title: cargo clippy -D warnings fails on Linux: PointerError::Denied is never constructed
-status: open
+status: claimed
 severity: low
 area: daemon
 platforms: linux
-owner:
+owner: claude-code@linux-dev
 created: 2026-11-14T03:40:14Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -32,3 +32,4 @@ would fix it. The release build shows the same as a warning.
 ## Log
 
 - 2026-11-14T03:40:15Z · claude-code@linux-dev · linux-x86_64 · 9d039a1: filed
+- 2026-11-14T05:11:28Z · claude-code@linux-dev · linux-x86_64 · b4beb9d: claimed
