@@ -614,6 +614,18 @@ foreach(patch ${OTA_PATCHES})
                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_done|ota_slot_ready|\"ev\":\"restart\""
                     PASS_REGULAR_EXPRESSION "\"ev\":\"ota_bad\",\"st\":3,\"msg\":\"(Bad patch|Checksum mismatch|Too much data)\""
                     ENVIRONMENT "AGENTLINK_SIM_PATCH=${patch}")
+    # Issue 203f: on a slow flash (25 ms per write) the decoder runs in steps of well under 100 ms.
+    sim_script_test(sim_ota_patch_${pname}_slow ota_patch_slow.txt
+                    FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_bad|ota_patch_error|ota_gap"
+                    PASS_REGULAR_EXPRESSION "\"ev\":\"ota_done\",[^}]*\"steps\":([2-9]|[1-9][0-9]+),\"step_max_ms\":[0-9]?[0-9]}.*\"ev\":\"restart\""
+                    ENVIRONMENT "AGENTLINK_SIM_PATCH=${patch}")
+    set_property(TEST sim_ota_patch_${pname}_slow APPEND PROPERTY ENVIRONMENT "AGENTLINK_SIM_OTA_WRITE_US=25000")
+    # ... and on a very slow one (300 ms per write, 3.6 s in all) a keepalive `go` repeats next = psize.
+    sim_script_test(sim_ota_patch_${pname}_keepalive ota_patch_keepalive.txt
+                    FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_bad|ota_patch_error|ota_gap"
+                    PASS_REGULAR_EXPRESSION "\"ev\":\"ota_keepalive\".*\"ev\":\"ota_ack\",\"st\":0,\"next\":[0-9]+}.*\"ev\":\"ota_done\".*\"ev\":\"restart\""
+                    ENVIRONMENT "AGENTLINK_SIM_PATCH=${patch}")
+    set_property(TEST sim_ota_patch_${pname}_keepalive APPEND PROPERTY ENVIRONMENT "AGENTLINK_SIM_OTA_WRITE_US=300000")
     sim_script_test(sim_ota_patch_${pname}_resume ota_patch_resume.txt
                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"ota_begin\".*\"ev\":\"ota_begin\"|ota_bad"
                     PASS_REGULAR_EXPRESSION "\"ev\":\"ota_resume\",\"next\":2048.*\"ev\":\"ota_done\""

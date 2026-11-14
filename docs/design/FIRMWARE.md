@@ -133,8 +133,15 @@ With 450 mAh, STANDBY at 2.5 mA is about 7 days, and 40 lifts × 10 s/day at 100
   (`hal_ota_base_read`) and compares their SHA-256 with `base`; a mismatch is `bad` "Base mismatch" and the
   daemon sends the whole image. Otherwise core feeds each patch chunk to the vendored detools decoder
   (`core/third_party/detools`, sequential bsdiff + heatshrink, window 2^11 / lookahead 2^10 only), which reads
-  the base and writes the rebuilt image through `hal_ota_write` in 4 KB pieces. The decoder (about 2.3 KB,
-  mostly heatshrink's window) and the 4 KB buffer sit in PSRAM. After the last patch byte the image length
+  the base and writes the rebuilt image through `hal_ota_write` in 4 KB pieces. One 2 KB patch chunk can
+  rebuild most of the image (many seconds of flash writes), so the patch is kept whole (malloc, at least
+  32 KB so it lands in PSRAM; over 1 MB is refused with "Patch too big" and the daemon sends the image) and
+  acked as it arrives, and `ota_tick` feeds the decoder 16 bytes at a time for about 40 ms per main-loop
+  pass, which keeps the screen and B held working (issue 203f). Once the whole patch is in, the device
+  repeats `go` with the final `next` every 3 s until the image is rebuilt: with nothing unanswered the
+  daemon takes it as a keepalive for its 10 s ack timeout. The Updating screen's percentage counts image
+  bytes rebuilt, not patch bytes. `ota_done` reports the decoder `steps` and the longest (`step_max_ms`).
+  The decoder (about 2.3 KB, mostly heatshrink's window) and the 4 KB buffer sit in PSRAM. After the last patch byte the image length
   must equal `size`; then the SHA-256, signature, rollback and resume work as for a whole image. A patch that
   does not decode is `bad` "Bad patch". Hashing the base blocks the main loop for well under a second on a
   1.3 MB image (`hash_ms` in the `ota_begin` event).

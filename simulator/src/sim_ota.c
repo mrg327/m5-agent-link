@@ -1,9 +1,11 @@
 /* hal_ota_* for the simulator: the image is buffered in RAM and checked the way the watch does, with a
  * stand-in trust rule (the last 4 KB of an image start with E7 02 when it is "signed"). The running slot a
- * delta update reads as its base is whatever sim_ota_set_running() was given (none by default). */
+ * delta update reads as its base is whatever sim_ota_set_running() was given (none by default).
+ * $AGENTLINK_SIM_OTA_WRITE_US makes each write take that long, like the watch's flash (issue 203f). */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "sim.h"
 
@@ -78,6 +80,12 @@ hal_ota_result_t hal_ota_write(const uint8_t *data, size_t len)
         snprintf(s_err, sizeof s_err, "Not an app image");
         return HAL_OTA_BAD;
     }
+    static int write_us = -1;
+    if (write_us < 0) {
+        const char *e = getenv("AGENTLINK_SIM_OTA_WRITE_US");
+        write_us = e ? atoi(e) : 0;
+    }
+    if (write_us > 0) usleep((useconds_t)write_us);
     memcpy(s_buf + s_got, data, len);
     s_got += (uint32_t)len;
     return HAL_OTA_OK;

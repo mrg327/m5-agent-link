@@ -749,6 +749,21 @@ mod tests {
     }
 
     #[test]
+    fn window_takes_repeated_acks_after_the_last_chunk_as_keepalives() {
+        // the device rebuilding a delta image repeats `go` with the final next (firmware ota.c, issue 203f);
+        // with nothing unanswered that sends nothing and is not an error (each ack resets ACK_TIMEOUT)
+        let mut w = Window::new(2 * C + 5);
+        w.begin(0).unwrap();
+        w.on_go(C).unwrap();
+        w.on_go(2 * C).unwrap();
+        assert!(w.on_go(2 * C + 5).unwrap().is_empty());
+        for _ in 0..3 {
+            assert!(w.on_go(2 * C + 5).unwrap().is_empty());
+        }
+        assert_eq!(w.acked(), 2 * C + 5);
+    }
+
+    #[test]
     fn window_resumes_from_the_devices_offset() {
         let mut w = Window::new(10 * C);
         assert_eq!(offs(w.begin(6 * C).unwrap()), [6 * C, 7 * C, 8 * C, 9 * C]);

@@ -16,6 +16,8 @@ void ota_init(uint32_t now_ms);
 void ota_tick(uint32_t now_ms);
 /* The Updating overlay owns the screen and the buttons (a transfer is open, or the restart is pending). */
 bool ota_active(void);
+/* Patch chunks are waiting to be applied: the main loop should come straight back (issue 203f). */
+bool ota_working(void);
 /* fw_begin.patch (proto 0.21): the chunks carry a detools patch of `psize` bytes against the first `bsize`
  * bytes of the running slot, whose SHA-256 is `base` (`base_len` bytes, 32 expected). */
 typedef struct {

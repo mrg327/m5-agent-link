@@ -751,6 +751,7 @@ uint32_t core_step(void)
     }
     /* Display off: nothing to animate and input is queued by interrupts, so poll slowly; the first
      * button or link frame still lands within 50 ms. */
+    if (ota_working()) return 1; /* a delta update rebuilds the image a slice per pass */
     if (!power_display_on()) return 50;
     return wait > 10 ? 10 : wait;
 }
