@@ -114,7 +114,7 @@ and the watch's own ids.
 | Traffic | Goes to |
 |---|---|
 | Anything with a sid or rid: `approve`, `deny`, `reply`, `answer`, `focus`, `scroll`, `type`, `dictate`, `detail`, `graph`, `rerun`, `unqueue`, `snooze`, `ack`, `notify_done`, `cancel`, `kb_*`, `audio_*` | The session's slot |
-| `pointer` (trackpad) | The trackpad's target machine (§6), primary by default. Offered only by slots whose welcome says `pointer` |
+| `pointer` (trackpad) | The trackpad's target machine (§6), the **current** machine by default (§5.1). Offered only by slots whose welcome says `pointer` |
 | `quiet` | Every slot. Each daemon echoes `cfg`, and the primary's is applied (§5) |
 | `fw_ack` | The slot that sent `fw_begin` |
 | `power` report, unsolicited `log` | Primary |
@@ -131,10 +131,47 @@ welcomed. When it drops, the other slot becomes primary.
 | RTC time | Set by the primary's welcome only. A second machine's clock never moves the watch |
 | `cfg.alert`, `quiet_until` (sound, buzz) | The primary's |
 | `cfg.privacy` | Per slot. Each daemon already filters what it sends; the watch uses its own slot's value for that slot's cards |
-| Plan usage gauges | **[ask]** The primary's, or the session's own slot on its card. The usage card is watch-wide today |
+| Plan usage gauges | The **current** machine's (§5.1) |
 | Power reports | Primary only. One CSV, one fit; the other machine's `power-reports.csv` gets nothing new |
 | OTA | **Any** slot may start one. `ota.c` already refuses a second `fw_begin` with `busy`, and it now names the slot it is talking to |
 | Debug (`log` events) | Primary; answers to a request go to the asker |
+
+### 5.1 The current machine: the one last used
+
+Decided (user, 2026-11-14): the machine-specific things on the watch follow the machine the user
+**last used**.
+- **What follows it:** the plan usage gauges, the trackpad's target, and dictation started with no
+  session.
+- **What stays with the primary:** the clock, sound and power reports. Moving those with the user
+  would only add churn.
+- **Rejected: BLE signal strength.**
+  - Reading it costs radio and power.
+  - It is noisy at desk distance (5–10 dB swings, 10–20 dB of wrist shadowing).
+  - It differs by central: the Mac and the BCM4350C0 transmit at different powers.
+
+**Used** means keyboard or mouse input on that machine. The daemon already reads it for presence
+(`presence.rs`: `Reading.idle_ms`, the seconds since the last input).
+
+- **Proto 0.23, `used { idle }`** (daemon → device, a new message type). `idle` is the seconds since
+  the last input on this machine.
+- **When the daemon sends it:**
+  - at once, when input follows 60 s or more without any;
+  - then every 10 s, as long as there has been input in the last 60 s.
+
+  An idle machine sends nothing. The message is about 10 B. One every 10 s is nothing beside the
+  connection events, which already wake the radio every 30–45 ms.
+- **On the watch:** each slot's last use is `now − idle`, by the watch's own clock when the message
+  arrives, so the machines' clocks never need to agree.
+  - The **current** machine is the slot with the latest last use.
+  - A slot that has never sent `used` (an old daemon, or no input since linking) counts as never used.
+  - With no use on either, the current machine is the primary.
+  - A switch takes effect with the next `used`: at most 10 s after the user moves to the other
+    keyboard, and at once when that keyboard had been idle a minute.
+- **USB gets no special rule here.** The machine you type on wins, plugged in or not.
+- **Without the probe:** presence off (`presence.txt`), or a source that gives no `idle_ms` (Reading
+  `idle_ms: None`), means the daemon sends nothing. That machine is then current only as the primary.
+- **On screen:** the current machine's mark is the one drawn full. The other's is drawn as an outline
+  (§6).
 
 ### OTA with two machines
 
@@ -158,15 +195,17 @@ With one machine linked nothing changes on screen. With two:
   2026-11-14), not a tint of the whole segment.
 - **Card:** the mark sits next to the repo, where REMOTE.md's host name goes today. A remote session
   keeps its `hn` as well, so the card reads *this daemon's machine → remote host*.
-- **Link status:** two marks instead of one link glyph. A dropped machine's mark greys out until its
-  grace runs out.
-- **Trackpad:** the target machine's mark at the top. A tap on it switches to the other machine, if
-  that one offers the pointer.
+- **Link status:** two marks instead of one link glyph. The current machine's (§5.1) is drawn full,
+  the other as an outline. A dropped machine's mark greys out until its grace runs out.
+- **Trackpad:** the target machine's mark at the top, the current machine by default. A tap on it
+  switches to the other machine, if that one offers the pointer, until the trackpad closes.
 - **Welcome toast:** the arriving machine's mark, no text.
 
 ## 7. Daemon changes
 
 None are required. These are worth having:
+0. **Proto 0.23 `used { idle }`** (§5.1): the one daemon change the current machine needs. An old
+   daemon still links, but it is never the current machine unless it is the primary.
 1. **Proto 0.23: the hello says `links: 2`.** A daemon then knows the watch is shared:
    - `agentlink status` shows "shared with 1 other machine". The watch would need to say which;
      **[ask]** whether it is worth a message.
@@ -233,7 +272,9 @@ connect, with internal-heap logging around the BLE init (worktree, not committed
      daemons with separate `AGENTLINK_HOME`s link to one simulator. Script commands inject frames
      per slot.
    - Tests: sid clash, rid clash, snapshot per slot, drop with grace, one host moving to USB, slots
-     full, OTA from slot 1, primary handover.
+     full, OTA from slot 1, primary handover, the current machine following `used`.
+   - The daemon's `used` sender (§5.1) lands with it: it is small, and the watch side cannot be tested
+     live without it.
 3. **UI:** machine marks, ring ticks, link status, trackpad target (§6). Contact sheets for the user
    to pick from, as for UI v3.
 4. **Daemon:** proto 0.23 `links`, back-off when ignored, host id (§7).
