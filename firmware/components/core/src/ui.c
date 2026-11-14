@@ -7,6 +7,7 @@
 #include "debug.h"
 #include "ui_countdown.h"
 #include "ui_internal.h"
+#include "ui_kit.h"
 #include "ui_ota.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
@@ -21,14 +22,18 @@ static bool s_link_up, s_animate = true;
 static uint32_t s_seen_rev;
 static uint32_t s_now_ms;
 
-#define TOAST_H 40
-#define TOAST_MAX_W 290
-#define TOAST_DOT 10
-#define TOAST_MASK_H 26 /* covers the 22 px legends */
-#define TOAST_MASK_W 314 /* a pill: its outer point at the row centre stays inside r 205, so the ring is never touched */
-static lv_obj_t *s_toast, *s_toast_label, *s_toast_dot, *s_toast_mask;
+/* Black under the sign, so what a screen has there rests while it shows: the slot between the two key hints
+ * (x 125..341, y 340..406), and above the hints' rings a wider band for a row of text (x 113..353, y 326..346).
+ * Only on the screens that keep content there (toast_blanks_slot): elsewhere the sign's own black margin is all. */
+#define TOAST_MASK_W 216
+#define TOAST_MASK_Y 340
+#define TOAST_MASK_H 66
+#define TOAST_BAND_W 240
+#define TOAST_BAND_Y 326
+#define TOAST_BAND_H 20
+static lv_obj_t *s_toast, *s_toast_mask[2]; /* a sign (GLYPHS.md rule 8, §3.7) on the key-hint row */
 static uint32_t s_toast_until_ms;
-static char s_toast_txt[64]; /* the toast in words: the report and the log; the screen shows its glyph */
+static char s_toast_txt[64]; /* the toast in words: the report and the log; the screen shows its glyphs */
 static lv_obj_t *s_glow, *s_glow_ring;
 
 lv_obj_t *ui_new_screen(void)
@@ -46,41 +51,22 @@ static void create_overlays(void)
 {
     lv_obj_t *top = lv_layer_top();
     ui_ota_init(top); /* under the toast, so a refusal shows over it */
-    /* The legends share the toast's row: a black pill under the toast covers them cleanly while it shows. */
-    s_toast_mask = lv_obj_create(top);
-    lv_obj_remove_style_all(s_toast_mask);
-    lv_obj_set_size(s_toast_mask, TOAST_MASK_W, TOAST_MASK_H);
-    lv_obj_set_style_radius(s_toast_mask, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_pos(s_toast_mask, (UI_SIZE - TOAST_MASK_W) / 2, UI_Y_TOAST - TOAST_MASK_H / 2);
-    lv_obj_set_style_bg_color(s_toast_mask, COL_BG, 0);
-    lv_obj_set_style_bg_opa(s_toast_mask, LV_OPA_COVER, 0);
-    lv_obj_add_flag(s_toast_mask, LV_OBJ_FLAG_HIDDEN);
-
-    /* One slot (UI-V3 §2.5): a neutral capsule with a dot in the toast's colour; the text is always white. */
-    s_toast = lv_obj_create(top);
-    lv_obj_remove_style_all(s_toast);
-    lv_obj_set_style_bg_color(s_toast, COL_FILL2, 0);
-    lv_obj_set_style_bg_opa(s_toast, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(s_toast, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_pad_hor(s_toast, 18, 0);
-    lv_obj_set_style_pad_column(s_toast, 10, 0);
-    lv_obj_set_size(s_toast, LV_SIZE_CONTENT, TOAST_H);
-    lv_obj_set_style_max_width(s_toast, TOAST_MAX_W, 0);
-    lv_obj_set_flex_flow(s_toast, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(s_toast, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_remove_flag(s_toast, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    s_toast_dot = lv_obj_create(s_toast);
-    lv_obj_remove_style_all(s_toast_dot);
-    lv_obj_set_size(s_toast_dot, TOAST_DOT, TOAST_DOT);
-    lv_obj_set_style_radius(s_toast_dot, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_opa(s_toast_dot, LV_OPA_COVER, 0);
-    s_toast_label = lv_label_create(s_toast);
-    lv_obj_set_style_text_font(s_toast_label, FONT_BODY_STRONG, 0);
-    lv_obj_set_style_text_color(s_toast_label, COL_TEXT, 0);
-    lv_label_set_long_mode(s_toast_label, LV_LABEL_LONG_MODE_DOTS);
-    lv_obj_set_width(s_toast_label, LV_SIZE_CONTENT);
-    lv_obj_set_style_max_width(s_toast_label, TOAST_MAX_W - 36 - TOAST_DOT - 10, 0);
+    /* One slot on every screen: between the two key hints, which stay in sight beside a sign of one or two
+     * glyphs; a sign that carries content is wider and covers them while it shows (its black margin). */
+    for (int i = 0; i < 2; i++) {
+        lv_obj_t *m = s_toast_mask[i] = lv_obj_create(top);
+        lv_obj_remove_style_all(m);
+        if (i == 0) lv_obj_set_size(m, TOAST_MASK_W, TOAST_MASK_H), lv_obj_set_pos(m, UI_CX - TOAST_MASK_W / 2, TOAST_MASK_Y);
+        else lv_obj_set_size(m, TOAST_BAND_W, TOAST_BAND_H), lv_obj_set_pos(m, UI_CX - TOAST_BAND_W / 2, TOAST_BAND_Y);
+        lv_obj_set_style_radius(m, i == 0 ? 14 : 0, 0);
+        lv_obj_set_style_bg_color(m, COL_BG, 0);
+        lv_obj_set_style_bg_opa(m, LV_OPA_COVER, 0);
+        lv_obj_remove_flag(m, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_flag(m, LV_OBJ_FLAG_HIDDEN);
+    }
+    s_toast = ui_sign_create(top, UI_CX, UI_Y_TOAST);
     lv_obj_add_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
+    ui_burst_init(top); /* over the toast, under the glow */
 
     s_glow = lv_obj_create(top);
     lv_obj_remove_style_all(s_glow);
@@ -148,13 +134,6 @@ void ui_set_link_transport(int kind)
 nav_mode_t ui_mode(void) { return s_mode; }
 bool ui_dimmed(void) { return s_mode == MODE_HOME && ui_home_ambient(); }
 int ui_last_release_y(void) { return s_rel_y; }
-
-/* The toast has one slot on every screen: centred on the legend row, replacing the legends while it shows. */
-static void place_toast(void)
-{
-    lv_obj_update_layout(s_toast);
-    lv_obj_align(s_toast, LV_ALIGN_TOP_MID, 0, UI_Y_TOAST - TOAST_H / 2);
-}
 
 /* The session WATCH was on when ASK or SCROLL took over; they return there instead of HOME. */
 static uint32_t s_resume_watch_sid;
@@ -318,6 +297,7 @@ void ui_report(ui_report_t *r)
         ui_ota_report(r);
         return;
     }
+    ui_burst_report(r);
     if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_toast_txt);
     if (s_mode == MODE_AGENT) ui_agent_report(r);
     else if (s_mode == MODE_ASK) ui_ask_report(r);
@@ -356,26 +336,35 @@ static void rise(lv_obj_t *o, int px)
 
 void ui_motion_enter(lv_obj_t *content) { rise(content, UI_MOTION_RISE); }
 
+/* The screens whose own rows and discs lie between the key hints, under the sign: HOME (its summary's second
+ * row, the graph strip, the book disc). A rebuilt screen that puts content there adds its mode. */
+static bool toast_blanks_slot(void) { return s_mode == MODE_HOME; }
+
+/* A toast is a sign (GLYPHS.md rule 8): the glyphs the vocabulary has for its words, in its colour. The words
+ * stay what the callers pass and what the report and the log say. Words without a glyph yet draw the info
+ * glyph: a toast never spells them out. Only content is text: what was sent (`Sent "..."`), a short number
+ * the vocabulary puts after the glyph ("Snoozed 30 min": the moon and 30). */
 void ui_toast(const char *text, uint32_t rgb)
 {
-    /* GLYPHS.md: a toast whose words have a glyph is that glyph, in the toast's colour and without the dot; a
-     * `Sent "..."` keeps what was sent after the glyph */
     snprintf(s_toast_txt, sizeof s_toast_txt, "%s", text);
-    char shown[80];
+    char icons[16], content[64] = "";
     const char *g = theme_glyph(text);
-    if (g) snprintf(shown, sizeof shown, "%s", g);
-    else if (!strncmp(text, "Sent \"", 6)) snprintf(shown, sizeof shown, "%s%s", ICON_SENT, text + 4);
-    else snprintf(shown, sizeof shown, "%s", text);
-    bool glyph = theme_is_glyph(shown);
-    lv_obj_set_style_text_font(s_toast_label, theme_all_glyphs(shown) ? FONT_ICON_M : glyph ? FONT_HEAD : FONT_BODY_STRONG, 0);
-    lv_obj_set_style_text_color(s_toast_label, glyph && rgb ? lv_color_hex(rgb) : COL_TEXT, 0);
-    lv_label_set_text(s_toast_label, shown);
-    if (glyph) lv_obj_add_flag(s_toast_dot, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_remove_flag(s_toast_dot, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_style_bg_color(s_toast_dot, lv_color_hex(rgb), 0);
-    place_toast();
+    if (!g && !strncmp(text, "Sent \"", 6)) {
+        g = ICON_SENT;
+        snprintf(content, sizeof content, "%s", text + 5);
+    }
+    if (!g) g = ICON_INFO;
+    size_t n = 0;
+    while ((uint8_t)g[n] == 0xEE && g[n + 1] && g[n + 2] && n + 3 < sizeof icons) n += 3; /* the icons: 3 bytes each */
+    memcpy(icons, g, n);
+    icons[n] = 0;
+    if (!content[0]) snprintf(content, sizeof content, "%s", g[n] == ' ' ? g + n + 1 : g + n);
+    ui_sign_set(s_toast, icons, content, rgb ? rgb : RGB_IDLE);
     lv_obj_remove_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(s_toast_mask, LV_OBJ_FLAG_HIDDEN);
+    for (int i = 0; i < 2; i++) {
+        if (toast_blanks_slot()) lv_obj_remove_flag(s_toast_mask[i], LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(s_toast_mask[i], LV_OBJ_FLAG_HIDDEN);
+    }
     rise(s_toast, UI_TOAST_RISE);
     s_toast_until_ms = s_now_ms + TOAST_MS;
     dbg_event("ui", "toast", "\"text\":%s", dbg_q(text));
@@ -398,8 +387,9 @@ void ui_tick(uint32_t now_ms)
     s_now_ms = now_ms;
     if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN) && (int32_t)(now_ms - s_toast_until_ms) >= 0) {
         lv_obj_add_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(s_toast_mask, LV_OBJ_FLAG_HIDDEN);
+        for (int i = 0; i < 2; i++) lv_obj_add_flag(s_toast_mask[i], LV_OBJ_FLAG_HIDDEN);
     }
+    ui_burst_tick(now_ms);
     if (model_rev() != s_seen_rev) {
         s_seen_rev = model_rev();
         ui_home_refresh(now_ms);
@@ -449,6 +439,11 @@ bool ui_on_gesture(const gesture_evt_t *g)
 {
     if (g->kind == G_RELEASE) s_rel_y = g->y;
     nav_zone_t zone = nav_centre(g->x, g->y) ? ZONE_CENTRE : ZONE_RIM;
+    /* The deck's book disc and graph strip sit between the key hints and reach past the centre zone: a tap
+     * on one is a tap on it, not on the rim (a drag there still scrubs the sessions). */
+    if (zone == ZONE_RIM && s_mode == MODE_HOME && (g->kind == G_TAP || g->kind == G_DOUBLE_TAP) &&
+        (ui_home_read_hit(g->x, g->y) || ui_home_strip_hit(g->x, g->y)))
+        zone = ZONE_CENTRE;
     nav_action_t a = nav_lookup(s_mode, g->kind, zone, ui_home_request_pending(), ui_home_askable());
     if (a != NAV_NONE && g->kind != G_PRESS && g->kind != G_RELEASE && g->kind != G_MOVE) /* moves: a stream */
         dbg_event("ui", "nav", "\"mode\":\"%s\",\"gesture\":\"%s\",\"action\":\"%s\"", nav_mode_name(s_mode),
@@ -460,12 +455,12 @@ bool ui_on_gesture(const gesture_evt_t *g)
             g_ui_actions->reject();
             return true;
         }
-        if (g->kind == G_TAP && ui_home_read_hit(g->x, g->y)) { /* the card's Read button (LAST-MESSAGE.md) */
+        if (g->kind == G_TAP && ui_home_read_hit(g->x, g->y)) { /* the card's book disc (LAST-MESSAGE.md) */
             enter_mode(MODE_READ);
             g_ui_actions->tick();
             return true;
         }
-        if (g->kind == G_TAP && ui_graph_strip_hit(g->x, g->y)) { /* the card's graph strip (GRAPH.md §5) */
+        if (g->kind == G_TAP && ui_home_strip_hit(g->x, g->y)) { /* the card's graph strip (GRAPH.md §5) */
             enter_mode(MODE_GRAPH);
             g_ui_actions->tick();
             return true;

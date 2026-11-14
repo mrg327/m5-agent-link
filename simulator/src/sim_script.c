@@ -90,13 +90,14 @@
 #include "model.h"
 #include "prefs.h"
 #include "ui_countdown.h"
+#include "ui_kit.h"
 #include "ui_theme.h"
 #include "voice.h"
 #include "sim.h"
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_GRAPH, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_PATCH, E_FW_EXPECT_SLOT, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_GRAPH, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_PATCH, E_FW_EXPECT_SLOT, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_KIT, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -458,6 +459,9 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "skip") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_SKIP, a, 0, 0, NULL);
         *t += 20;
+    } else if (!strcmp(cmd, "kit") && sscanf(rest, "%d", &a) == 1) {
+        add(*t, E_KIT, a, 0, 0, NULL);
+        *t += 50;
     } else if (!strcmp(cmd, "quit")) {
         add(*t, E_QUIT, 0, 0, 0, NULL);
     } else {
@@ -1551,6 +1555,7 @@ static void run(const ev_t *e)
         else sim_set_battery_pct(pct, !strcmp(chg, "chg"));
         break;
     }
+    case E_KIT: ui_kit_demo(e->a); break; /* a gallery page of the Sigil primitives (ui_kit.h); 0 hides it */
     case E_SKIP:
         sim_skip_time((uint32_t)e->a);
         s_t0 += (uint32_t)e->a; /* the script's own timeline does not move with it */

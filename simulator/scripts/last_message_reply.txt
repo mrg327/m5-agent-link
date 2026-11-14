@@ -6,7 +6,7 @@ session 1 done webapp feat/login
 message 1 7 Done. Should I push the branch?
 wait 400
 mic audio/tone_1s.wav
-tap 233 320
+tap 233 380
 wait 500
 expect_screen read
 expect_label Reading 1 of 1
@@ -20,7 +20,7 @@ expect_label Reply to webapp
 expect_label > Continue
 btn B long
 wait 300
-tap 233 320
+tap 233 380
 wait 500
 tap 233 200
 wait 400

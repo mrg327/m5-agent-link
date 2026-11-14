@@ -10,7 +10,7 @@ expect_screen ring
 expect_label Built and flashed the new reader
 expect_label Read
 shot lastmsg_card.png
-tap 233 320
+tap 233 380
 wait 500
 expect_screen read
 expect_label Last message

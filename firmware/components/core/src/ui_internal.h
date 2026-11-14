@@ -64,7 +64,8 @@ bool ui_home_act(nav_action_t a, const gesture_evt_t *g);
 void ui_home_note_input(void);  /* any input anywhere resets the ambient timer and the nag */
 bool ui_home_request_pending(void); /* the selected session has an unanswered approvable request on screen */
 bool ui_home_askable(void);         /* the selected session has an unanswered permission or question */
-bool ui_home_read_hit(int x, int y); /* the point is on the card's Read button (LAST-MESSAGE.md) */
+bool ui_home_read_hit(int x, int y); /* the point is on the card's book disc, which opens READ (LAST-MESSAGE.md) */
+bool ui_home_strip_hit(int x, int y); /* the point is on the card's graph strip, which opens GRAPH (GRAPH.md §5) */
 uint32_t ui_home_sel_sid(void);
 const attention_t *ui_home_sel_request(void); /* the selected session's unanswered permission or question */
 lv_obj_t *ui_home_ring(void);

@@ -29,6 +29,8 @@ target_link_libraries(agentlink_hal PUBLIC lvgl::lvgl SDL2::SDL2)
 
 add_subdirectory(${FW}/agentlink_proto agentlink_proto)
 add_subdirectory(${FW}/core core)
+# The gallery of the Sigil primitives (ui_kit.h, script command `kit N`) is built into the simulator only.
+target_compile_definitions(core PUBLIC UI_KIT_DEMO)
 
 add_executable(agentlink_sim src/main.c src/sim_script.c src/sim_fw_image.c)
 target_include_directories(agentlink_sim PRIVATE ${FW}/core/src)
@@ -456,6 +458,11 @@ sim_script_test(sim_question_tap_never_sends question_tap_never_sends.txt
 sim_script_test(sim_queue_show_cancel queue_show_cancel.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"op\":18,\"sid\":1")
+# Sigil (GLYPHS.md): every primitive of ui_kit.h draws (the gallery), and HOME in each of its states keeps saying in
+# the report what its glyphs mean; a tap on the hero glyph or the book disc opens ASK or READ and sends nothing.
+sim_script_test(sim_kit_gallery kit_gallery.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_sigil_home sigil_home.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"op\":5")
+set_tests_properties(sim_sigil_home PROPERTIES TIMEOUT 90)
 sim_script_test(sim_deck_v3_states deck_v3_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_deck_v3_ambient deck_v3_ambient.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_deck_v3_ambient PROPERTIES TIMEOUT 60)

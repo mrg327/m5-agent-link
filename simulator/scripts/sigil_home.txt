@@ -1,0 +1,135 @@
+# GLYPHS.md §4: HOME in Sigil, every state of the card as a render, and the words each one still says in the
+# report (rule 9). The ambient face is in deck_v3_ambient.txt (it needs 30 s without input).
+connect
+rtc 1800000000
+rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+# working for 14 minutes: the sigil, the agent's mark, the hero glyph, 14 dots, the summary on two rows
+session 16 work webapp feat/login Running the test suite after the login refactor
+wait 400
+expect_screen ring
+expect_label feat/login
+expect_label webapp
+expect_label Working
+expect_label 14m
+expect_label Running the test suite after the login refactor
+expect_no_label Review
+shot sigil_working.png
+# the agent graph and the context gauge between the key hints; the summary keeps one row
+gauge 16 76
+graph 16 read:ok:0 search:ok:0 agent:ok:0 search:ok:1:f read:ok:1 shell:ok:2:f read:ok:1:m git:ok:2 edit:ok:0 test:fail:2:m shell:fail:0 edit:ok:0 agent:ok:0 web:ok:3:f mcp:run:3 plan:run:0 la=0,1,4,5 drop=3 gen=1
+step 16 12 ok Bash npm test
+wait 1500
+expect_label strip
+expect_label context 76%
+expect_label npm test
+shot sigil_working_graph.png
+tap 233 374
+wait 500
+expect_screen graph
+btn B long
+wait 300
+expect_screen ring
+graph off
+# a second session: B's hint appears; a toast is a sign between the hints
+session 2 work api main Indexing the repository
+wait 300
+btn A double
+wait 300
+expect_label Nothing else needs you
+shot sigil_toast.png
+wait 1900
+expect_no_label Nothing else needs you
+# needs approval: the hand, the request's title and text; a tap on the hero opens ASK and answers nothing
+session 16 input webapp feat/login
+attention 7 16 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+btn B long
+wait 300
+expect_screen attention
+expect_label Needs approval
+expect_label Review
+expect_label npm test -- --watch=false
+shot sigil_approval.png
+tap 233 206
+wait 400
+expect_screen ask
+btn B long
+wait 300
+clear 7
+# a question
+attention 8 16 question reply,focus 0 Which framework?|Pick the UI library for the new dashboard|React|Vue|Keep vanilla
+wait 400
+btn B long
+wait 300
+expect_label Has a question
+expect_label Answer
+expect_label Pick the UI library for the new dashboard
+shot sigil_question.png
+clear 8
+wait 200
+# done, with the done line and the context gauge
+session 16 done webapp feat/login Bash cargo test --workspace
+done 16 3 120/14 pass 252
+wait 400
+expect_label Done
+expect_label ago
+expect_label 3 files
+expect_label context 76%
+shot sigil_done.png
+# its last message: the first rows of it, and the book disc that opens READ
+message 16 7 Built and flashed the new reader. The watch now shows what the agent said when a turn ends.
+wait 400
+expect_label Built and flashed the new reader
+expect_label Read
+shot sigil_message.png
+tap 233 390
+wait 500
+expect_screen read
+btn B long
+wait 300
+expect_screen ring
+# offline: the card goes grey, the plug sign under the sigil
+disconnect
+wait 1300
+expect_label Offline
+expect_no_label Read
+shot sigil_offline.png
+connect
+rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 200
+# a job with an estimate: the arc inside the dots; then a failed one with its exit status
+drop 16
+drop 2
+job 5 run tools 134 200 0 cargo test --workspace
+wait 700
+expect_label Terminal
+expect_label Running
+expect_label about 2m left
+expect_label progress 6
+shot sigil_job.png
+job 5 fail tools 42 200 101 cargo test --workspace
+wait 400
+expect_label Failed
+expect_label exit 101
+shot sigil_job_failed.png
+# redraw discipline: a card at rest repaints nothing on its ticks (the dots move once a minute)
+wait 1000
+px_reset
+wait 3000
+expect_px_max 3000
+# a low battery: its sign
+battery 9
+wait 10500
+expect_label 9%
+shot sigil_battery.png
+battery 80
+drop 5
+wait 10500
+# the empty deck: the clock alone (a button press first: the long waits above let the face go ambient)
+btn B
+wait 300
+expect_label Nothing running
+expect_label 12:
+shot sigil_empty.png
+quit

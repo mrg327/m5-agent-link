@@ -52,29 +52,54 @@ const GRAPH_ICONS = {
   binoculars: 0xea64, lightning: 0xe2de, "seal-check": 0xe606, books: 0xe758, "map-trifold": 0xe31a,
 };
 
-const css = readFileSync(join(here, phDir, "style.css"), "utf8");
-for (const [name, code] of Object.entries({ ...ICONS, ...GRAPH_ICONS })) {
-  const m = css.match(new RegExp(`\\.ph-fill\\.ph-${name}:before\\s*{\\s*content:\\s*"\\\\([0-9a-f]+)"`));
-  if (!m || parseInt(m[1], 16) !== code) throw new Error(`icon ${name}: expected ${code.toString(16)}, stylesheet says ${m && m[1]}`);
-}
-const hex = (o) => Object.values(o).map((c) => "0x" + c.toString(16)).join(",");
-const ICON_RANGE = hex(ICONS);
+// Sigil (GLYPHS.md §3.2): the tick, the cross, the double tick and the carets come from Phosphor Bold. The Fill
+// family draws the first three inside a filled square and the carets as solid triangles. Same code points.
+const BOLD = { check: 0xe182, x: 0xe4f6, checks: 0xe53a, "caret-right": 0xe13a, "caret-down": 0xe136 };
+const boldDir = "node_modules/@phosphor-icons/web/src/bold";
+// The hero sizes (128 px: a state or a result alone on the screen; 96 px: the glyph on a primary disc) hold only
+// the glyphs that are ever a state, a result or a primary action.
+const HERO = ["arrows-clockwise", "hand-palm", "chat-circle-dots", "check-circle", "warning-circle", "moon",
+  "hourglass-low", "desktop", "plugs", "microphone", "paper-plane-tilt", "download-simple", "check", "x", "checks",
+  "book-open"];
 
-function make(name, file, size, range, fallback) {
-  const args = ["--font", file, "--range", range, "--size", String(size), "--bpp", "4", "--no-compress", "--format", "lvgl",
-    "--lv-include", "lvgl.h", "--lv-font-name", name, "-o", join(out, name + ".c")];
+const checkCss = (dir, cls, icons) => {
+  const css = readFileSync(join(here, dir, "style.css"), "utf8");
+  for (const [name, code] of Object.entries(icons)) {
+    const m = css.match(new RegExp(`\\.${cls}\\.ph-${name}:before\\s*{\\s*content:\\s*"\\\\([0-9a-f]+)"`));
+    if (!m || parseInt(m[1], 16) !== code) throw new Error(`icon ${name}: expected ${code.toString(16)}, ${cls} stylesheet says ${m && m[1]}`);
+  }
+};
+checkCss(phDir, "ph-fill", { ...ICONS, ...GRAPH_ICONS });
+checkCss(boldDir, "ph-bold", BOLD);
+for (const name of HERO) if (!(name in ICONS)) throw new Error(`hero icon ${name} is not in ICONS`);
+for (const name of Object.keys(BOLD)) if (!(name in ICONS)) throw new Error(`bold icon ${name} is not in ICONS`);
+const hex = (codes) => codes.map((c) => "0x" + c.toString(16)).join(",");
+const isBold = (c) => Object.values(BOLD).includes(c);
+
+// `sources` is a list of [font file, range]: lv_font_conv takes several --font/--range pairs in one call.
+function make(name, sources, size, fallback) {
+  const args = [];
+  for (const [file, range] of sources) if (range) args.push("--font", file, "--range", range);
+  args.push("--size", String(size), "--bpp", "4", "--no-compress", "--format", "lvgl",
+    "--lv-include", "lvgl.h", "--lv-font-name", name, "-o", join(out, name + ".c"));
   if (fallback) args.push("--lv-fallback", fallback);
   execFileSync(conv, args, { stdio: "inherit", cwd: here });
 }
+// An icon font: the code points from Fill, except the BOLD ones, which come from Bold.
+function makeIcons(name, size, codes) {
+  make(name, [[join(phDir, "Phosphor-Fill.ttf"), hex(codes.filter((c) => !isBold(c)))],
+    [join(boldDir, "Phosphor-Bold.ttf"), hex(codes.filter(isBold))]], size);
+}
 
 mkdirSync(join(here, out), { recursive: true });
-const ph = join(phDir, "Phosphor-Fill.ttf");
-// Every size holds the graph glyphs too: the glyph pass reuses them (terminal, robot, eye, pencil, flask, globe).
-for (const s of [20, 28, 44]) make(`font_phosphor_${s}`, ph, s, ICON_RANGE + "," + hex(GRAPH_ICONS));
+// Every size but the hero holds the graph glyphs too: the glyph pass reuses them (terminal, robot, eye, pencil, flask, globe).
+const ALL = [...Object.values(ICONS), ...Object.values(GRAPH_ICONS)];
+for (const s of [20, 28, 44, 64]) makeIcons(`font_phosphor_${s}`, s, ALL);
+for (const s of [96, 128]) makeIcons(`font_phosphor_${s}`, s, HERO.map((n) => ICONS[n]));
 // Each text font falls back to the icon font of the nearest size.
-make("font_figtree_20_500", fig(500), 20, TEXT_RANGE, "font_phosphor_20");
-make("font_figtree_20_400", fig(400), 20, TEXT_RANGE, "font_phosphor_20");
-make("font_figtree_20_600", fig(600), 20, TEXT_RANGE, "font_phosphor_20");
-make("font_figtree_24_600", fig(600), 24, TEXT_RANGE, "font_phosphor_28");
-make("font_figtree_34_600", fig(600), 34, TEXT_RANGE, "font_phosphor_28");
-make("font_figtree_56_600", fig(600), 56, NUM_RANGE);
+make("font_figtree_20_500", [[fig(500), TEXT_RANGE]], 20, "font_phosphor_20");
+make("font_figtree_20_400", [[fig(400), TEXT_RANGE]], 20, "font_phosphor_20");
+make("font_figtree_20_600", [[fig(600), TEXT_RANGE]], 20, "font_phosphor_20");
+make("font_figtree_24_600", [[fig(600), TEXT_RANGE]], 24, "font_phosphor_28");
+make("font_figtree_34_600", [[fig(600), TEXT_RANGE]], 34, "font_phosphor_28");
+make("font_figtree_56_600", [[fig(600), NUM_RANGE]], 56);

@@ -277,9 +277,13 @@ def extract_ring():
     for key, macro in [("merge_at", "MERGE_AT"), ("ambient_ms", "AMBIENT_MS"), ("nag_ms", "NAG_MS"), ("nag_max", "NAG_MAX")]:
         r[key] = int(find(home, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
     # key badges beside the buttons (UI-V2 §4.1); the fact keys keep their old names for the Atlas
-    # the subject line (UI-V3 §4.1): FONT_TITLE when it fits TITLE_W, else FONT_HEAD on two lines
-    r["repo_w_px"] = int(find(card, r"#define TITLE_W\s+(\d+)", "ring.repo_w_px").group(1))
+    # Sigil (GLYPHS.md §4): the card no longer spells the project's name, it draws its sigil. The Atlas still
+    # reads repo_w_px, so the key stays, as 0 (like the ring constants UI-V3 removed); the new card facts follow.
+    r["repo_w_px"] = 0
     r["summary_w_px"] = int(find(card, r"#define SUMMARY_W\s+(\d+)", "ring.summary_w_px").group(1))
+    for key, macro in [("sigil_r_px", "SIGIL_R"), ("time_dots_r_px", "DOTS_R")]:
+        r[key] = int(find(card, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
+    r["hero_px"] = int(find(CORE + "ui_theme.h", r"#define FONT_ICON_HERO \(&font_phosphor_(\d+)\)", "ring.hero_px").group(1))
     for key, tok in [("repo_px", "FONT_TITLE"), ("repo_small_px", "FONT_HEAD")]:
         r[key] = int(find(CORE + "ui_theme.h", rf"#define {tok} \(&font_figtree_(\d+)_", f"ring.{key}").group(1))
     for key, macro in [("hint_a_deg", "UI_BADGE_A_DEG"), ("hint_b_deg", "UI_BADGE_B_DEG"), ("hint_r_px", "UI_BADGE_R")]:
@@ -305,8 +309,9 @@ def extract_ring():
         kinds[m.group(1).lower()] = m.group(2)
     SOURCES["ring.kinds"] = f"{CORE}ui_ring.h:{line_of(CORE + 'ui_ring.h', find(CORE + 'ui_ring.h', r'RING_WORK,').start())}"
     r["kinds"] = kinds
-    # v3 has no action pill (UI-V3 §4.1): the exception slot's Answer / Review button opens ASK, and
-    # the A legend says "Open". The `pills` fact keeps its key for the Atlas.
+    # no action pill (UI-V3 §4.1), and in Sigil no button either: a tap on the hero glyph of a session that needs
+    # you opens ASK; the report still names it Review / Answer, and A's hint is "Open" (drawn as a glyph). The
+    # `pills` fact keeps its key for the Atlas.
     find(card, r'"Review" : "Answer"', "ring.pill_approve")
     find(card, r'static const char \*const words\[2\] = \{"Open", "Next"\};', "ring.pill_done")
     r["pills"] = {"approve": "Review / Answer", "done": "Open", "default": "Open"}
