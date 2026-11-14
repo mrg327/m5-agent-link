@@ -46,10 +46,11 @@ void sw_input_init(void);
 void sw_usb_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state); /* link_usb.cpp */
 bool sw_usb_link_send(const uint8_t *frame, size_t len);
 void sw_ble_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state); /* link_ble.cpp */
-void sw_ble_link_interactive(bool on);                                         /* link_ble.cpp */
-void sw_ble_link_bulk(bool on);                                                /* link_ble.cpp */
-bool sw_ble_link_send(const uint8_t *frame, size_t len);
-/* link_ble.cpp: the connection interval in force (us, 0 = no central), and the Battery Level (0x2A19) value;
+/* link_ble.cpp: per port (HAL_LINK_BLE, HAL_LINK_BLE2: one per central); other ports are ignored. */
+void sw_ble_link_interactive(hal_link_kind_t port, bool on);
+void sw_ble_link_bulk(hal_link_kind_t port, bool on);
+bool sw_ble_link_send(hal_link_kind_t port, const uint8_t *frame, size_t len);
+/* link_ble.cpp: the shortest connection interval in force (us, 0 = no central), and the Battery Level (0x2A19) value;
  * a change is notified to a subscribed central. Safe to call from the core task. */
 uint32_t sw_ble_link_interval_us(void);
 void sw_ble_battery_level(uint8_t percent);

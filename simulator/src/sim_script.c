@@ -383,8 +383,11 @@ static bool parse_line(char *line, uint32_t *t)
         add(*t, E_MOTION, HAL_MOTION_SHAKE, 0, 0, NULL);
         *t += 100;
     } else if (!strcmp(cmd, "connect") || !strcmp(cmd, "disconnect")) {
-        /* optional transport: usb | ble (default: the WS fake link) */
-        int kind = !strncmp(arg, "usb", 3) ? HAL_LINK_USB : !strncmp(arg, "ble", 3) ? HAL_LINK_BLE : HAL_LINK_WS;
+        /* optional transport: usb | ble | ble2 (the second central) (default: the WS fake link) */
+        int kind = !strncmp(arg, "usb", 3)    ? HAL_LINK_USB
+                   : !strncmp(arg, "ble2", 4) ? HAL_LINK_BLE2
+                   : !strncmp(arg, "ble", 3)  ? HAL_LINK_BLE
+                                              : HAL_LINK_WS;
         add(*t, E_CONNECT, cmd[0] == 'c', kind, 0, NULL);
         *t += 50;
     } else if (!strcmp(cmd, "rx") && arg[0]) {
@@ -393,6 +396,9 @@ static bool parse_line(char *line, uint32_t *t)
         if (!strncmp(arg, "usb ", 4) || !strncmp(arg, "ble ", 4)) {
             kind = arg[0] == 'u' ? HAL_LINK_USB : HAL_LINK_BLE;
             hex += 4;
+        } else if (!strncmp(arg, "ble2 ", 5)) {
+            kind = HAL_LINK_BLE2;
+            hex += 5;
         }
         add(*t, E_RX, 0, kind, 0, hex);
         *t += 50;

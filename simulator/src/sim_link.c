@@ -9,7 +9,7 @@
 
 static hal_link_rx_cb_t s_rx;
 static hal_link_state_cb_t s_state;
-static bool s_ws_enabled = true, s_fake_up[3]; /* per hal_link_kind_t, for --no-ws scripts */
+static bool s_ws_enabled = true, s_fake_up[HAL_LINK_PORTS]; /* per hal_link_kind_t, for --no-ws scripts */
 static uint32_t s_next_try_ms, s_attempts;
 
 static void on_open(void)
@@ -41,7 +41,7 @@ void sim_link_set_tx_tap(sim_tx_tap_t tap) { s_tap = tap; }
 
 bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 {
-    if ((unsigned)kind > HAL_LINK_WS) return false;
+    if ((unsigned)kind >= HAL_LINK_PORTS) return false;
     if (s_tap && !(kind == HAL_LINK_WS && s_ws_enabled) && s_fake_up[kind]) s_tap(frame, len);
     if (kind == HAL_LINK_WS && s_ws_enabled) return ws_send_binary(frame, len);
     /* fake transports swallow frames; USB and BLE ones are logged so scripts can see where hellos go */
@@ -49,16 +49,22 @@ bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len)
     return s_fake_up[kind];
 }
 
-void hal_link_interactive(bool on) { (void)on; }
-void hal_link_bulk(bool on) { (void)on; }
+void hal_link_interactive(hal_link_kind_t port, bool on)
+{
+    if (hal_link_is_ble(port)) sim_log("ble_interval", "\"port\":%d,\"fast\":%s", (int)port, on ? "true" : "false");
+}
+void hal_link_bulk(hal_link_kind_t port, bool on)
+{
+    if (hal_link_is_ble(port)) sim_log("ble_interval", "\"port\":%d,\"bulk\":%s", (int)port, on ? "true" : "false");
+}
 /* A fake BLE link runs at the 30 ms interval a Linux central settles on. */
-uint32_t hal_link_ble_interval_us(void) { return s_fake_up[HAL_LINK_BLE] ? 30000u : 0u; }
+uint32_t hal_link_ble_interval_us(void) { return s_fake_up[HAL_LINK_BLE] || s_fake_up[HAL_LINK_BLE2] ? 30000u : 0u; }
 
 void sim_link_enable_ws(bool enable) { s_ws_enabled = enable; }
 
 void sim_link_set_connected_kind(int kind, bool connected)
 {
-    if (kind < 0 || kind > HAL_LINK_WS) return;
+    if (kind < 0 || kind >= HAL_LINK_PORTS) return;
     s_fake_up[kind] = connected;
     if (s_state) s_state((hal_link_kind_t)kind, connected);
 }

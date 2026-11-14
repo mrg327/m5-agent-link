@@ -8,7 +8,7 @@
 
 #define LINK_MAX_MSG 4096 /* advertised as caps.max_msg */
 #define LINK_MAX_PENDING 4
-#define LINK_N_KINDS 3 /* hal_link_kind_t values */
+#define LINK_N_KINDS HAL_LINK_PORTS /* hal_link_kind_t values */
 
 typedef struct { uint32_t id; int op; uint32_t sid, rid; } pending_cmd_t;
 

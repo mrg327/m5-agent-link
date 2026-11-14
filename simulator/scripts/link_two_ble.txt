@@ -1,0 +1,21 @@
+# Two BLE centrals (MULTI-LINK.md phase 1): the link layer still runs one link. The first central's welcome
+# claims it; a second central (port 3, HAL_LINK_BLE2) that connects meanwhile gets no hello and its frames
+# are ignored. When the first drops, the handshake falls back to the second, whose welcome links the watch
+# without a reconnect. The order is asserted by the log pattern in CMakeLists.txt.
+connect ble
+wait 200
+rx ble a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+wait 200
+expect_no_label Connecting
+connect ble2
+wait 3500
+rx ble2 a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+wait 200
+disconnect ble
+wait 300
+expect_label Connecting
+rx ble2 a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+wait 300
+expect_no_label Connecting
+expect_no_label Offline
+quit
