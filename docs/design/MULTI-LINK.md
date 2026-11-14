@@ -1,6 +1,6 @@
 # m5-agent-link: one watch, several machines
 
-Status: **design, not built** (issue `20261114-101b`). The spike numbers in §9 were measured on the
+Status: **phase 1 built** on branch `multilink` (issue `20261114-101b`). The spike numbers in §9 were measured on the
 watch. Everything else is a proposal until the phases in §10 land. Items marked **[ask]** need the
 user's call.
 
@@ -43,8 +43,8 @@ links as one of the two, unaware of the other.
 - **BLE connections: 2** (`MAX_CONNECTIONS=2`, `BLE_MAX_ACT=4`: two connections, advertising and one
   spare). That covers the stated case (Mac + Linux laptop). A further connection costs little memory
   (1.1 KB of internal heap, §9). What it does cost is a share of the radio schedule and battery.
-- **[ask]** A third machine. Nothing below is tied to two except the constant and the UI's colour
-  pair. I would rather measure two in daily use first.
+- **Decided (user, 2026-11-14): two is enough.** Nothing below is tied to two except the constant and
+  the UI's colour pair.
 
 ## 4. Watch design
 
@@ -100,7 +100,7 @@ and the watch's own ids.
 
 - `snapshot` replaces **that slot's** sessions only (`model_replace_slot`), and its `away` events
   join the list.
-- A slot that drops removes its sessions after a short grace (**[ask]** 30 s?). A BLE blip should
+- A slot that drops removes its sessions after a **30 s grace** (decided, user, 2026-11-14). A BLE blip should
   not empty the ring. Today a lost link keeps the cards until the next snapshot. With two slots, that
   would leave the dropped machine's stale cards beside live ones.
 - `MODEL_MAX_SESSIONS` (32) and `MODEL_MAX_ATTENTION` (4) are shared. Attention rises to 6, so one
@@ -154,8 +154,8 @@ With one machine linked nothing changes on screen. With two:
 - **Machine mark.** Each slot has a mark: the OS glyph from the welcome's `host.os` (Apple, Linux,
   Windows), drawn in the slot's colour (slot 0 the current accent, slot 1 a second hue). Two Macs
   differ by colour alone.
-- **Ring:** a session's segment carries its slot's colour as a thin outer tick. **[ask]** Or the
-  whole segment tinted.
+- **Ring:** a session's segment carries its slot's colour as a thin outer tick (decided, user,
+  2026-11-14), not a tint of the whole segment.
 - **Card:** the mark sits next to the repo, where REMOTE.md's host name goes today. A remote session
   keeps its `hn` as well, so the card reads *this daemon's machine → remote host*.
 - **Link status:** two marks instead of one link glyph. A dropped machine's mark greys out until its
