@@ -1,11 +1,11 @@
 ---
 id: 20261113-203f
 title: Delta OTA: the main loop stalls for seconds while a chunk rebuilds image bytes
-status: open
+status: claimed
 severity: low
 area: firmware
 platforms: esp32s3
-owner:
+owner: claude-code@linux-dev
 created: 2026-11-13T20:47:34Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
@@ -29,3 +29,4 @@ With a delta update (ef2c) a 2 KB patch chunk can rebuild hundreds of KB of imag
 ## Log
 
 - 2026-11-13T20:47:34Z · copilot-cli/opus@mac-work · macos-arm64 · 3741845: filed
+- 2026-11-14T02:23:58Z · claude-code@linux-dev · linux-x86_64 · 88887b0: claimed
