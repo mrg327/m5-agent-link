@@ -35,3 +35,4 @@ Firmware: GRAPH screen opened from the AGENT wheel ("Graph"), drawn with one cus
 - 2026-11-13T23:31:22Z · copilot-cli/opus@mac-work · macos-arm64 · 6d95e27: filed
 - 2026-11-13T23:31:25Z · copilot-cli/opus@mac-work · macos-arm64 · 6d95e27: claimed
 - 2026-11-13T23:58:39Z · copilot-cli/opus@mac-work · macos-arm64 · 2b92d85: Implemented: contract b96cb8b, daemon ff52ad3, firmware 2b92d85. Checks: cargo fmt/clippy/test (agentlinkd 329), sim ctest 198/198, idf build (DRAM 182041 B free), atlas 222, vectors ok. Daemon reinstalled; agentlink graph shows the live session. Pending: OTA to the watch (not connected at install time) and a live look at the screen.
+- 2026-11-14T00:04:22Z · copilot-cli/opus@mac-work · macos-arm64 · 584e805: follow-up from the user: the graph also lives on the deck card as a horizontal strip in the empty button slot (newest on the right); a tap on it opens GRAPH

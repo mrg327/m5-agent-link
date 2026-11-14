@@ -11,6 +11,7 @@
 #define GRAPH_LANES 8    /* lane 0 is the session's own agent, 1-7 its sub-agents */
 #define GRAPH_POLL_MS 3000   /* asked again this often while the screen is open */
 #define GRAPH_CHANGE_MS 1000 /* a change of the session's n or ok asks again, at most this often */
+#define GRAPH_DECK_POLL_MS 10000 /* the deck strip (§5) leans on the changes and asks rarely otherwise */
 
 /* A node's bits (GRAPH.md §3): 0-3 kind, 4-5 state, 6-8 lane, 9 fork, 10 merge. */
 #define GRAPH_KIND(v) ((v) & 0xfu)
@@ -53,6 +54,8 @@ int graph_lanes_used(const graph_t *g);
 /* Fetch schedule (§4): watching a session clears the store when the session differs. graph_due() says whether to
  * ask now, given the session's n and step state; it remembers the time when it says yes. */
 void graph_watch(uint32_t sid, uint32_t now_ms);
+/* The same, asking again every poll_ms when nothing changes (the deck strip: GRAPH_DECK_POLL_MS). */
+void graph_watch_every(uint32_t sid, uint32_t now_ms, uint32_t poll_ms);
 void graph_unwatch(void);
 uint32_t graph_watched(void);
 bool graph_due(uint32_t now_ms, uint32_t n, uint8_t step);

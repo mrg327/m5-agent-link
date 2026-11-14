@@ -114,6 +114,14 @@ int main(void)
     graph_unwatch();
     EXPECT(!graph_due(20000, 9, 0), "closed: never");
 
+    /* the deck strip (§5): the changes as before, otherwise every 10 s */
+    graph_watch_every(6, 30000, GRAPH_DECK_POLL_MS);
+    EXPECT(graph_due(30000, 9, 0), "deck: asks when it starts watching");
+    EXPECT(!graph_due(33000, 9, 0), "deck: unchanged, no 3 s poll");
+    EXPECT(graph_due(34000, 10, 0), "deck: n moved, asks");
+    EXPECT(!graph_due(43999, 10, 0), "deck: nothing before 10 s");
+    EXPECT(graph_due(44000, 10, 0), "deck: every 10 s");
+
     if (failures) printf("%d failure(s)\n", failures);
     else printf("graph: all passed\n");
     return failures ? 1 : 0;

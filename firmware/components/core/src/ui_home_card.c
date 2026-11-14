@@ -118,8 +118,8 @@ bool ui_home_read_hit(int x, int y)
     return x >= c.x1 - 12 && x <= c.x2 + 12 && y >= c.y1 - 10 && y <= c.y2 + 10; /* a fingertip's slack */
 }
 
-/* Exception slot (§4.1), by precedence: Offline chip, low battery chip, the Answer / Review button,
- * a lone quiet glyph, nothing. `btn` is the button's text and colour when the session needs you. */
+/* Exception slot (§4.1), by precedence: Offline chip, low battery chip, the Answer / Review / Read button,
+ * the agent graph strip (GRAPH.md §5), a lone quiet glyph, nothing. `btn` is the button's text and colour when the session needs you. */
 static void update_slot(const char *btn, uint32_t btn_rgb)
 {
     char txt[32] = "";
@@ -153,7 +153,9 @@ static void update_slot(const char *btn, uint32_t btn_rgb)
     bool button = !chip && btn && s_look == LOOK_CARD;
     show(s_chip, chip);
     show(s_btn, button);
-    show(s_quiet, !chip && !button && s_quiet_shown && s_look != LOOK_AMBIENT);
+    const home_slot_t *sl = ui_home_sel_slot();
+    bool strip = ui_graph_strip_update(ui_home_sel_session(), !chip && !button && s_look == LOOK_CARD && sl && !sl->n_merged);
+    show(s_quiet, !chip && !button && !strip && s_quiet_shown && s_look != LOOK_AMBIENT);
     if (chip) {
         theme_set_text(s_chip_icon, s_chip_icon_txt, sizeof s_chip_icon_txt, icon);
         theme_set_text(s_chip_txt, s_chip_txt_txt, sizeof s_chip_txt_txt, txt);
@@ -396,6 +398,7 @@ void ui_home_card_report(ui_report_t *r)
     }
     if (!lv_obj_has_flag(s_chip, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_chip_txt_txt);
     if (!lv_obj_has_flag(s_btn, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_btn_txt);
+    ui_graph_strip_report(r);
     if (s_quiet_shown) ui_report_add(r, "quiet");
 }
 
@@ -478,6 +481,8 @@ void ui_home_card_create(lv_obj_t *centre)
     s_btn_lbl = mk(s_btn, FONT_HEAD, COL_ON_ACCENT);
     content_label(s_btn_lbl);
     lv_obj_center(s_btn_lbl);
+
+    ui_graph_strip_create(s_centre, SLOT_Y - 4); /* clear of the legends below */
 
     s_quiet = mk(s_centre, FONT_ICON_S, COL_TEXT3);
     content_label(s_quiet);

@@ -60,7 +60,7 @@ static int lane_x(const geo_t *q, int lane) { return q->ox + UI_CX - (q->lanes -
 /* node i (0 oldest) sits on row count-1-i */
 static int node_y(const geo_t *q, const graph_t *g, int i) { return q->oy + ROW0_Y + (g->count - 1 - i - s_top) * ROW_DY; }
 
-static void line(lv_layer_t *l, int x1, int y1, int x2, int y2, uint32_t rgb, lv_opa_t opa)
+static void line_w(lv_layer_t *l, int x1, int y1, int x2, int y2, uint32_t rgb, lv_opa_t opa, int w)
 {
     lv_draw_line_dsc_t d;
     lv_draw_line_dsc_init(&d);
@@ -69,26 +69,32 @@ static void line(lv_layer_t *l, int x1, int y1, int x2, int y2, uint32_t rgb, lv
     d.p2.x = x2;
     d.p2.y = y2;
     d.color = lv_color_hex(rgb);
-    d.width = LINE_W;
+    d.width = w;
     d.opa = opa;
     d.round_start = d.round_end = 1;
     lv_draw_line(l, &d);
 }
 
-/* A short S curve from (x1, y1) to (x2, y2): a smoothstep in x over the height, in a few segments. */
-static void curve(lv_layer_t *l, int x1, int y1, int x2, int y2, uint32_t rgb)
+static void line(lv_layer_t *l, int x1, int y1, int x2, int y2, uint32_t rgb, lv_opa_t opa) { line_w(l, x1, y1, x2, y2, rgb, opa, LINE_W); }
+
+/* A short S curve from (x1, y1) to (x2, y2): a smoothstep in x over the height (or, `across`, in y over the
+ * width), in a few segments. */
+static void curve_w(lv_layer_t *l, int x1, int y1, int x2, int y2, uint32_t rgb, int w, bool across)
 {
     enum { SEG = 6 };
     int px = x1, py = y1;
     for (int k = 1; k <= SEG; k++) {
         int t = k * 256 / SEG; /* 0..256 */
         int s = t * t * (768 - 2 * t) / 65536; /* 3t^2 - 2t^3, scaled to 0..256 */
-        int x = x1 + (x2 - x1) * s / 256, y = y1 + (y2 - y1) * k / SEG;
-        line(l, px, py, x, y, rgb, LV_OPA_COVER);
+        int x = across ? x1 + (x2 - x1) * k / SEG : x1 + (x2 - x1) * s / 256;
+        int y = across ? y1 + (y2 - y1) * s / 256 : y1 + (y2 - y1) * k / SEG;
+        line_w(l, px, py, x, y, rgb, LV_OPA_COVER, w);
         px = x;
         py = y;
     }
 }
+
+static void curve(lv_layer_t *l, int x1, int y1, int x2, int y2, uint32_t rgb) { curve_w(l, x1, y1, x2, y2, rgb, LINE_W, false); }
 
 static void glyph(lv_layer_t *l, const char *g, int cx, int cy, lv_color_t col, lv_opa_t opa)
 {
@@ -113,7 +119,7 @@ static lv_opa_t pulse_opa(void)
     return (lv_opa_t)(102 + tri * 153 / 255);
 }
 
-static void node(lv_layer_t *l, int x, int y, uint16_t v, uint32_t rgb)
+static void node(lv_layer_t *l, int x, int y, uint16_t v, uint32_t rgb, int r)
 {
     int st = (int)GRAPH_STATE(v);
     if (st == GS_RUNNING) {
@@ -122,20 +128,20 @@ static void node(lv_layer_t *l, int x, int y, uint16_t v, uint32_t rgb)
         bg.radius = LV_RADIUS_CIRCLE;
         bg.bg_color = COL_BG;
         bg.bg_opa = LV_OPA_COVER;
-        lv_area_t a = {x - NODE_R, y - NODE_R, x + NODE_R, y + NODE_R};
+        lv_area_t a = {x - r, y - r, x + r, y + r};
         lv_draw_rect(l, &bg, &a);
         lv_draw_arc_dsc_t d;
         lv_draw_arc_dsc_init(&d);
         d.center.x = x;
         d.center.y = y;
-        d.radius = NODE_R;
-        d.width = 3;
+        d.radius = (uint16_t)r;
+        d.width = r > 8 ? 3 : 2;
         d.start_angle = 0;
         d.end_angle = 360;
         d.color = lv_color_hex(rgb);
         d.opa = pulse_opa();
         lv_draw_arc(l, &d);
-        glyph(l, kind_glyph(v), x, y, lv_color_hex(rgb), d.opa);
+        if (r > 8) glyph(l, kind_glyph(v), x, y, lv_color_hex(rgb), d.opa);
         return;
     }
     lv_draw_rect_dsc_t d;
@@ -143,9 +149,9 @@ static void node(lv_layer_t *l, int x, int y, uint16_t v, uint32_t rgb)
     d.radius = LV_RADIUS_CIRCLE;
     d.bg_color = lv_color_hex(st == GS_FAILED ? RGB_DANGER : rgb);
     d.bg_opa = LV_OPA_COVER;
-    lv_area_t a = {x - NODE_R, y - NODE_R, x + NODE_R, y + NODE_R};
+    lv_area_t a = {x - r, y - r, x + r, y + r};
     lv_draw_rect(l, &d, &a);
-    glyph(l, kind_glyph(v), x, y, COL_ON_ACCENT, LV_OPA_COVER);
+    if (r > 8) glyph(l, kind_glyph(v), x, y, COL_ON_ACCENT, LV_OPA_COVER); /* a small dot has no room for one */
 }
 
 /* Older calls were dropped: the lane fades out below the oldest row. */
@@ -216,7 +222,7 @@ static void on_draw(lv_event_t *e)
         uint16_t v = g->node[i];
         int lane = (int)GRAPH_LANE(v), x = lane_x(&q, lane);
         uint32_t rgb = theme_lane_rgb(s, lane);
-        node(l, x, y, v, rgb);
+        node(l, x, y, v, rgb, NODE_R);
         if (lane != 0 && GRAPH_FORK(v)) glyph(l, s_lane_glyph[g->la[lane] & 7], x + NODE_R + 14, y, lv_color_hex(rgb), LV_OPA_COVER);
     }
 }
@@ -389,4 +395,157 @@ lv_obj_t *ui_graph_init(lv_obj_t *screen)
     lv_obj_add_event_cb(s_draw, on_draw, LV_EVENT_DRAW_MAIN, NULL);
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     return s_root;
+}
+
+/* ───────── the deck strip (GRAPH.md §5) ─────────
+ * The same graph on the deck card, in its free button slot, turned on its side: time runs left to right, the
+ * newest call at the right edge. Lane 0's calls are discs with their glyph; a sub-agent's calls are dots on a
+ * row above (lane 1 the first row, the rest the second), forking off lane 0 and merging back in short curves.
+ * Whatever does not fit fades out at the left. A tap on it opens GRAPH. */
+#define STRIP_W 300
+#define STRIP_H 56
+#define STRIP_R 13     /* a lane 0 disc: the 20 px glyph inside */
+#define STRIP_DOT_R 5  /* a sub-agent's call */
+#define STRIP_GAP 4    /* between two neighbours' edges */
+#define STRIP_ROW_DY 12
+#define STRIP_LINE_W 3
+
+static lv_obj_t *s_strip;
+static uint32_t s_strip_sid, s_strip_rev, s_strip_pulse;
+static bool s_strip_shown;
+static int16_t s_sx[GRAPH_NODES], s_sy[GRAPH_NODES]; /* where the last draw put each node; 0 = not drawn */
+
+static int strip_r(uint16_t v) { return GRAPH_LANE(v) ? STRIP_DOT_R : STRIP_R; }
+
+static void strip_draw(lv_event_t *e)
+{
+    const session_t *s = model_find(s_strip_sid);
+    const graph_t *g = graph_get(s_strip_sid);
+    memset(s_sx, 0, sizeof s_sx);
+    if (!s || !g || !g->count) return;
+    lv_layer_t *l = lv_event_get_layer(e);
+    lv_area_t c;
+    lv_obj_get_coords(s_strip, &c);
+    int n = g->count, first = n, left = c.x1 + 2;
+    bool sub = graph_lanes_used(g) > 1;
+    int y0 = sub ? c.y2 - STRIP_R - 1 : (c.y1 + c.y2) / 2, row1 = y0 - STRIP_R - 8;
+    /* newest first, from the right edge, until the next one would not fit */
+    for (int i = n - 1, x = c.x2 - STRIP_R - 1; i >= 0; i--) {
+        if (i < n - 1) x -= strip_r(g->node[i + 1]) + strip_r(g->node[i]) + STRIP_GAP;
+        if (x - strip_r(g->node[i]) < left) break;
+        int lane = (int)GRAPH_LANE(g->node[i]);
+        s_sx[i] = (int16_t)x;
+        s_sy[i] = (int16_t)(lane == 0 ? y0 : row1 - (lane > 1 ? STRIP_ROW_DY : 0));
+        first = i;
+    }
+    uint32_t rgb0 = theme_lane_rgb(s, 0);
+    bool cut = first > 0 || g->drop; /* older calls than the leftmost one: lane 0 fades in from the edge */
+    int x_old = cut ? left + 24 : s_sx[first];
+    if (cut)
+        for (int f = 0; f < FADE_STEPS; f++)
+            line_w(l, left + f * 6, y0, left + (f + 1) * 6, y0, rgb0, (lv_opa_t)(LV_OPA_COVER * (f + 1) / (FADE_STEPS + 1)), STRIP_LINE_W);
+    if (s_sx[n - 1] > x_old) line_w(l, x_old, y0, s_sx[n - 1], y0, rgb0, LV_OPA_COVER, STRIP_LINE_W);
+    int start[GRAPH_LANES];
+    for (int k = 0; k < GRAPH_LANES; k++) start[k] = -1;
+    for (int i = first; i <= n; i++) {
+        int lane = i < n ? (int)GRAPH_LANE(g->node[i]) : 0;
+        bool fork = i < n && GRAPH_FORK(g->node[i]), merge = i < n && GRAPH_MERGE(g->node[i]);
+        for (int k = 1; k < GRAPH_LANES; k++) /* a run ends at the newest call or where a new fork takes its lane */
+            if (start[k] >= 0 && (i == n || (k == lane && fork))) {
+                int last = start[k];
+                for (int j = start[k]; j < i; j++)
+                    if ((int)GRAPH_LANE(g->node[j]) == k) last = j;
+                if (last != start[k]) line_w(l, s_sx[start[k]], s_sy[start[k]], s_sx[last], s_sy[last], theme_lane_rgb(s, k), LV_OPA_COVER, STRIP_LINE_W);
+                start[k] = -1;
+            }
+        if (i == n || lane == 0) continue;
+        uint32_t rgb = theme_lane_rgb(s, lane);
+        if (start[lane] < 0) {
+            start[lane] = i;
+            if (fork) curve_w(l, i > first ? s_sx[i - 1] : s_sx[i] - 12, y0, s_sx[i], s_sy[i], rgb, STRIP_LINE_W, true);
+            else line_w(l, left, s_sy[i], s_sx[i], s_sy[i], rgb, LV_OPA_50, STRIP_LINE_W); /* it began further back */
+        }
+        if (merge) { /* back into lane 0 at the next call */
+            if (start[lane] != i) line_w(l, s_sx[start[lane]], s_sy[i], s_sx[i], s_sy[i], rgb, LV_OPA_COVER, STRIP_LINE_W);
+            curve_w(l, s_sx[i], s_sy[i], i + 1 < n ? s_sx[i + 1] : s_sx[i] + 12, y0, rgb, STRIP_LINE_W, true);
+            start[lane] = -1;
+        }
+    }
+    for (int i = first; i < n; i++) {
+        uint16_t v = g->node[i];
+        node(l, s_sx[i], s_sy[i], v, theme_lane_rgb(s, (int)GRAPH_LANE(v)), strip_r(v));
+    }
+}
+
+void ui_graph_strip_create(lv_obj_t *parent, int cy)
+{
+    s_strip = lv_obj_create(parent);
+    lv_obj_remove_style_all(s_strip);
+    lv_obj_set_size(s_strip, STRIP_W, STRIP_H);
+    lv_obj_set_pos(s_strip, UI_CX - STRIP_W / 2, cy - STRIP_H / 2);
+    lv_obj_remove_flag(s_strip, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(s_strip, strip_draw, LV_EVENT_DRAW_MAIN, NULL);
+    lv_obj_add_flag(s_strip, LV_OBJ_FLAG_HIDDEN);
+}
+
+bool ui_graph_strip_update(const session_t *s, bool room)
+{
+    if (ui_mode() != MODE_HOME) return s_strip_shown; /* the card is redrawn behind another screen: leave it be */
+    uint32_t sid = s && room && !theme_is_job(s) && s->state != SESS_ENDED && model_peer_minor() >= GRAPH_MINOR ? s->sid : 0;
+    if (sid != s_strip_sid) {
+        s_strip_sid = sid;
+        s_strip_rev = 0;
+    }
+    if (sid && graph_watched() != sid) graph_watch_every(sid, lv_tick_get(), GRAPH_DECK_POLL_MS);
+    else if (!sid && graph_watched()) graph_unwatch(); /* ambient, a request, another kind of card: stop asking */
+    const graph_t *g = graph_get(sid);
+    bool shown = g && g->count;
+    if (shown != s_strip_shown) {
+        s_strip_shown = shown;
+        if (shown) lv_obj_remove_flag(s_strip, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(s_strip, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (shown && g->rev != s_strip_rev) {
+        s_strip_rev = g->rev;
+        lv_obj_invalidate(s_strip);
+    }
+    return shown;
+}
+
+void ui_graph_strip_tick(uint32_t now)
+{
+    if (!s_strip_sid) return;
+    const session_t *s = model_find(s_strip_sid);
+    if (s && graph_due(now, s->n, s->step) && g_ui_actions->graph) g_ui_actions->graph(s_strip_sid);
+    const graph_t *g = graph_get(s_strip_sid);
+    if ((g && g->count) != s_strip_shown) ui_home_card_update(); /* the slot changes hands */
+    else if (g && g->rev != s_strip_rev) {
+        s_strip_rev = g->rev;
+        lv_obj_invalidate(s_strip);
+    }
+    if (!s_strip_shown || !ui_animations_allowed() || !graph_any_running(g) || now - s_strip_pulse < PULSE_STEP_MS) return;
+    s_strip_pulse = s_pulse_ms = now;
+    for (int i = 0; i < g->count; i++) {
+        if (GRAPH_STATE(g->node[i]) != GS_RUNNING || !s_sx[i]) continue;
+        int r = strip_r(g->node[i]) + 2;
+        lv_area_t a = {s_sx[i] - r, s_sy[i] - r, s_sx[i] + r, s_sy[i] + r};
+        lv_obj_invalidate_area(s_strip, &a);
+    }
+}
+
+bool ui_graph_strip_hit(int x, int y)
+{
+    if (!s_strip_shown) return false;
+    lv_area_t c;
+    lv_obj_get_coords(s_strip, &c);
+    return x >= c.x1 - 8 && x <= c.x2 + 8 && y >= c.y1 - 10 && y <= c.y2 + 10; /* a fingertip's slack */
+}
+
+void ui_graph_strip_report(ui_report_t *r)
+{
+    if (!s_strip_shown) return;
+    const graph_t *g = graph_get(s_strip_sid);
+    int drawn = 0;
+    for (int i = 0; g && i < g->count; i++) drawn += s_sx[i] != 0;
+    ui_report_add(r, "strip %d of %d", drawn, g ? g->count : 0); /* for tests only: the strip has no text */
 }

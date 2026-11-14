@@ -337,6 +337,7 @@ void ui_home_tick(uint32_t now)
         s_last_elapsed = now;
         ui_home_card_tick();
     }
+    if (ui_mode() == MODE_HOME && !s_ambient) ui_graph_strip_tick(now);
 }
 
 bool ui_home_ambient(void) { return s_ambient; }

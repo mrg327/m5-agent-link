@@ -129,6 +129,13 @@ bool ui_graph_refresh(uint32_t now_ms); /* false: the session is gone */
 bool ui_graph_act(nav_action_t a, const gesture_evt_t *g);
 void ui_graph_tick(uint32_t now_ms);
 void ui_graph_report(ui_report_t *r);
+/* The deck strip (GRAPH.md §5): the selected agent's graph on its card, in the free button slot. update shows it
+ * for s when `room` (nothing else holds the slot) and there is a graph to draw, and says whether it shows. */
+void ui_graph_strip_create(lv_obj_t *parent, int cy);
+bool ui_graph_strip_update(const session_t *s, bool room);
+void ui_graph_strip_tick(uint32_t now_ms); /* HOME only: asks for the graph, redraws, pulses a running call */
+bool ui_graph_strip_hit(int x, int y);     /* the point is on the strip: a tap opens GRAPH */
+void ui_graph_strip_report(ui_report_t *r);
 
 /* The STATUS screen (ui_status.c). */
 lv_obj_t *ui_status_init(lv_obj_t *screen);

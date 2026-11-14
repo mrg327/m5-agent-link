@@ -78,8 +78,8 @@ sub-agent's lane merges when the turn ends.
 
 ## 4. The screen (firmware)
 
-- **Opening it.** "Graph" on the AGENT wheel (glyph: git-fork) opens it for an agent session, not a
-  job, when the daemon speaks 0.22. B long, the A+B chord, swipe right and long-press go back, as on
+- **Opening it.** A tap on the deck card's graph strip (§5), or "Graph" on the AGENT wheel (glyph:
+  git-fork), opens it for an agent session, not a job, when the daemon speaks 0.22. B long, the A+B chord, swipe right and long-press go back, as on
   the other screens.
 - **Fetching.** The device sends `cmd graph` when the screen opens, again when the session's `n` or `ok`
   changes (at most once a second), and every 3 s while the screen stays open.
@@ -92,3 +92,22 @@ sub-agent's lane merges when the turn ends.
 - **Text.** None. The header shows the agent's state glyph, the same as on the AGENT screen.
 - **Drawing.** One LVGL object with a draw callback paints the visible rows. There are no per-node
   objects and no canvas, which keeps DRAM small.
+
+## 5. The deck strip (firmware)
+
+The graph also lives on the session's deck card, so most of the time you never open the screen.
+
+- **Where.** In the card's exception slot (300 × 56, centred on y 316), when nothing outranks it. The
+  order is: offline chip, low-battery chip, the Answer / Review / Read button, **the strip**, the quiet
+  glyph. It shows only for an agent session (not a job, not a merged Done group) with at least one call,
+  on the full card, not the ambient face.
+- **Layout.** The graph turned on its side: time runs left to right, with the newest call at the right
+  edge. Lane 0's calls are discs (r 13) with their kind glyph. A sub-agent's calls are dots (r 5) on a
+  row above: lane 1 on the first row, lanes 2–7 sharing the second. Forks and merges are short curves to
+  lane 0. Running calls pulse and failed calls are red, as on the screen. Calls that don't fit, and
+  `drop`, fade lane 0 out at the left edge.
+- **Fetching.** The same `cmd graph`: when the card starts showing the session, when its `n` or `ok`
+  changes (at most once a second), and otherwise every 10 s. Nothing is asked for on the ambient face,
+  under a request, or while another screen is open.
+- **Opening the screen.** A tap on the strip opens GRAPH (§4). A tap anywhere else on the card opens
+  AGENT, as before.

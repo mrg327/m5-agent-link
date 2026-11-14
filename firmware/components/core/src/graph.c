@@ -5,7 +5,7 @@
 
 static graph_t s_g;
 static struct {
-    uint32_t sid, n, last_ms;
+    uint32_t sid, n, last_ms, poll_ms;
     uint8_t step;
     bool sent, changed;
 } s_w;
@@ -50,7 +50,9 @@ int graph_lanes_used(const graph_t *g)
     return m + 1;
 }
 
-void graph_watch(uint32_t sid, uint32_t now_ms)
+void graph_watch(uint32_t sid, uint32_t now_ms) { graph_watch_every(sid, now_ms, GRAPH_POLL_MS); }
+
+void graph_watch_every(uint32_t sid, uint32_t now_ms, uint32_t poll_ms)
 {
     (void)now_ms;
     if (sid != s_g.sid) {
@@ -60,6 +62,7 @@ void graph_watch(uint32_t sid, uint32_t now_ms)
     }
     memset(&s_w, 0, sizeof s_w);
     s_w.sid = sid;
+    s_w.poll_ms = poll_ms;
 }
 
 void graph_unwatch(void) { memset(&s_w, 0, sizeof s_w); }
@@ -73,7 +76,7 @@ bool graph_due(uint32_t now_ms, uint32_t n, uint8_t step)
     s_w.n = n;
     s_w.step = step;
     uint32_t since = now_ms - s_w.last_ms;
-    bool due = !s_w.sent || since >= GRAPH_POLL_MS || (s_w.changed && since >= GRAPH_CHANGE_MS);
+    bool due = !s_w.sent || since >= s_w.poll_ms || (s_w.changed && since >= GRAPH_CHANGE_MS);
     if (!due) return false;
     s_w.sent = true;
     s_w.changed = false;

@@ -212,7 +212,8 @@ anywhere else in the centre behaves as in v2. A tap still never commits a hold i
 - No action pill, no link row (H2, H3). The exception slot shows, in this order of precedence:
   `Offline · 4m` (amber chip) › low battery ≤ 15 % (vermillion chip `12%`) › an **Answer** button
   (prominent, the state colour, 160 × 44, centred on y 320, `Review` for a permission and `Answer` for a question)
-  when the session needs you › a lone `ICON_QUIET` in `COL_TEXT3` while quiet runs › nothing.
+  when the session needs you › the agent graph strip (proto 0.22, [GRAPH.md](GRAPH.md) §5) › a lone `ICON_QUIET`
+  in `COL_TEXT3` while quiet runs › nothing.
 - Legends: A `Open`, B `Next` (hidden with one session).
 - Offline: the card drops to 50 % as in v2.
 - **Empty**: the time in `FONT_NUM` at y 200 and `Nothing running` in `FONT_BODY` `COL_TEXT2` at
@@ -528,7 +529,9 @@ glyph in the lane colour and a pulsing ring. Lane 0 is the session's state colou
 one row newer, and the fork node shows its lane kind's glyph beside it. Dropped older calls fade out below the
 oldest row.
 
-- Opened by AGENT's `Graph` (after Activity, agent sessions only, daemon ≥ 0.22). It asks `cmd graph` on open,
+- Opened by a tap on the deck card's graph strip (GRAPH.md §5: the same graph on its side in the free slot, newest
+  on the right, sub-agents as dots on rows above) or by AGENT's `Graph` (after Activity, agent sessions only,
+  daemon ≥ 0.22). It asks `cmd graph` on open,
   when the session's `n` or `ok` change (≤ 1/s) and every 3 s while open; new calls keep the top anchored.
 - The rim (one detent per row) and a centre drag scroll the rows; B moves one row older. Back is swipe right,
   B held or a finger held still (to HOME); A+B is Home. The session going away returns HOME.

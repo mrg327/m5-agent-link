@@ -451,6 +451,11 @@ bool ui_on_gesture(const gesture_evt_t *g)
             g_ui_actions->tick();
             return true;
         }
+        if (g->kind == G_TAP && ui_graph_strip_hit(g->x, g->y)) { /* the card's graph strip (GRAPH.md §5) */
+            enter_mode(MODE_GRAPH);
+            g_ui_actions->tick();
+            return true;
+        }
         enter_mode(MODE_AGENT);
         g_ui_actions->tick();
         return true;

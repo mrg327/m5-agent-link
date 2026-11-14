@@ -1389,7 +1389,7 @@
     {
       "id": "attention",
       "title": "Deck · a request is waiting",
-      "source": "firmware/components/core/src/ui_home.c:360"
+      "source": "firmware/components/core/src/ui_home.c:361"
     },
     {
       "id": "agent",
@@ -5825,8 +5825,8 @@
     "ring.band_out_px": "firmware/components/core/src/ui_ring_internal.h:15",
     "ring.band_w_px": "firmware/components/core/src/ui_ring_internal.h:16",
     "ring.done_sweep_ms": "firmware/components/core/src/ui_ring_internal.h:36",
-    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:495",
-    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:495",
+    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:500",
+    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:500",
     "ring.error_flicker_ms": "firmware/components/core/src/ui_ring_internal.h:37",
     "ring.hint_a_deg": "firmware/components/core/src/ui_theme.h:67",
     "ring.hint_b_deg": "firmware/components/core/src/ui_theme.h:68",
@@ -5839,8 +5839,8 @@
     "ring.nothing_else": "firmware/components/core/src/ui_home.c:214",
     "ring.others_pct": "firmware/components/core/src/ui_ring_internal.h:21",
     "ring.perm_period_ms": "firmware/components/core/src/ui_ring_internal.h:35",
-    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:347",
-    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:495",
+    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:349",
+    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:500",
     "ring.prog_out_px": "firmware/components/core/src/ui_ring_internal.h:27",
     "ring.prog_w_px": "firmware/components/core/src/ui_ring_internal.h:28",
     "ring.repo_px": "firmware/components/core/src/ui_theme.h:22",
@@ -5851,7 +5851,7 @@
     "ring.sel_w_px": "firmware/components/core/src/ui_ring_internal.h:18",
     "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:23",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:33",
-    "screens": "firmware/components/core/src/ui_home.c:360",
+    "screens": "firmware/components/core/src/ui_home.c:361",
     "screens.agent": "firmware/components/core/src/ui_agent.c:366",
     "screens.ask": "firmware/components/core/src/ui_ask.c:944",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:299",
