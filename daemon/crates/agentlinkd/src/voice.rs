@@ -151,6 +151,47 @@ impl Recording {
     }
 }
 
+/// whisper encodes a 30 s window (1500 frames, 50 a second) whatever the recording's length, and on a CPU
+/// without a GPU that is most of the wait: 4.3 s of the 5.7 s a 4 s dictation took on a 2-core laptop.
+/// `-ac` gives it the recording and this much more. 64 frames garbled a short clip; 128 did not.
+const AUDIO_CTX_PAD: usize = 128;
+const AUDIO_CTX_MAX: usize = 1500;
+/// Beam width. whisper-cli's own 5 costs twice the decoding of 2 and gave the same words on every clip
+/// tried; greedy (1) dropped or changed words. `AGENTLINK_WHISPER_BEAM` overrides (1 to 8).
+const BEAM: usize = 2;
+
+/// The encoder frames a recording of `samples` needs: a recording of 27 s or more gets the whole window.
+pub fn audio_ctx(samples: usize) -> usize {
+    (samples * 50 / RATE as usize + AUDIO_CTX_PAD).min(AUDIO_CTX_MAX)
+}
+
+fn beam() -> usize {
+    std::env::var("AGENTLINK_WHISPER_BEAM")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|n| (1..=8).contains(n))
+        .unwrap_or(BEAM)
+}
+
+/// whisper-cli's options after the model and the file: text only, English, and no more work than the
+/// recording needs (issue 20261115-ea88: 5.7 s -> 1.4 s for 4 s of speech, 6.3 s -> 2.8 s for 11 s).
+pub fn whisper_args(threads: usize, samples: usize, beam: usize) -> Vec<String> {
+    let mut a: Vec<String> = ["-nt", "-np", "-l", "en"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    for (flag, n) in [
+        ("-t", threads),
+        ("-ac", audio_ctx(samples)),
+        ("-bs", beam),
+        ("-bo", beam),
+    ] {
+        a.push(flag.to_string());
+        a.push(n.to_string());
+    }
+    a
+}
+
 /// whisper.cpp: the CLI and a model. `AGENTLINK_WHISPER_CLI` / `AGENTLINK_WHISPER_MODEL`, else
 /// `~/tools/whisper.cpp` with the base.en model. Voice is offered only when both exist.
 #[derive(Clone, Debug)]
@@ -229,7 +270,7 @@ impl Stt {
             .arg(&self.model)
             .args(["-f"])
             .arg(&path)
-            .args(["-nt", "-np", "-l", "en", "-t", &threads.to_string()])
+            .args(whisper_args(threads, pcm.len(), beam()))
             .output();
         let _ = std::fs::remove_file(&path);
         let out = out.map_err(|e| format!("whisper did not run: {e}"))?;
@@ -378,6 +419,18 @@ mod tests {
         assert!(
             text.to_lowercase().contains("ask not what your country"),
             "{text}"
+        );
+    }
+
+    #[test]
+    fn whisper_gets_only_as_much_window_as_the_recording() {
+        assert_eq!(audio_ctx(RATE as usize * 4), 328); // 4 s: 200 frames and the pad
+        assert_eq!(audio_ctx(RATE as usize * 11), 678);
+        assert_eq!(audio_ctx(RATE as usize * 30), 1500); // never more than whisper's own window
+        assert_eq!(audio_ctx(RATE as usize * 60), 1500);
+        assert_eq!(
+            whisper_args(4, RATE as usize * 4, 2),
+            ["-nt", "-np", "-l", "en", "-t", "4", "-ac", "328", "-bs", "2", "-bo", "2"]
         );
     }
 
