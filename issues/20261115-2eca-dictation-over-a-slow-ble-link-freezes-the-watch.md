@@ -1,7 +1,7 @@
 ---
 id: 20261115-2eca
 title: Dictation over a slow BLE link freezes the watch
-status: claimed
+status: fixed
 severity: high
 area: firmware
 platforms: any
@@ -9,7 +9,7 @@ owner: claude-code@linux-dev
 created: 2026-11-15T22:19:18Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
-verified_on:
+verified_on: linux-x86_64
 gh:
 ---
 
@@ -35,3 +35,10 @@ Fix: the microphone only fills a queue of encoded blocks (PSRAM, a minute's wort
 - 2026-11-15T22:19:18Z · claude-code@linux-dev · linux-x86_64 · cace2b8: filed
 - 2026-11-15T22:27:22Z · claude-code@linux-dev · linux-x86_64 · cace2b8: claimed
 - 2026-11-15T22:27:39Z · claude-code@linux-dev · linux-x86_64 · d16f9c9: Fix in main with the multilink merge (060428d, d16f9c9) and on branch glyphs (6c20dae, which is what the watch runs). Simulator voice tests pass (8/8), full suite 204/204. Flashed; clean boot. Not yet confirmed by a dictation on the watch over BLE: check the daemon trace for the block rate, an audio_end and a transcript.
+- 2026-11-15T22:31:52Z · claude-code@linux-dev · linux-x86_64 · 25f67e2: fixed: commits 060428d (main, merged in d16f9c9) and 6c20dae (glyphs). Verified on the watch over BLE to the Linux daemon: a 6.8 s dictation delivered 231 blocks at 34.9/s (was 7.3/s), audio_end received, transcript returned in 6.5 s and the dictate command sent. Simulator: voice tests 8/8, full suite 204/204.
+    - agent: claude-code
+    - host: linux-dev
+    - platform: linux-x86_64
+    - os: Ubuntu 24.04.4 LTS (kernel 7.0.0-42-generic)
+    - git: 25f67e2 main
+    - toolchains: cc 13.3.0-6ubuntu2~24.04.1, cmake 3.28.3, ninja 1.11.1, node 22.23.2, python 3.12.3, rustc 1.95.0, cargo 1.95.0, sdl2 2.30.0
