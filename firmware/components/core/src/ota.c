@@ -35,6 +35,7 @@ typedef enum { OTA_IDLE, OTA_RECV, OTA_RESTART } ota_state_t;
 static struct {
     ota_state_t st;
     uint32_t size, next, last_ms, restart_at, begin_ms;
+    hal_link_kind_t port; /* the port whose interval went to bulk */
     uint8_t sha[32];
     char ver[32];
     sha256_t ctx;
@@ -88,7 +89,7 @@ static void free_patch(void)
  * display timer back. A reason the user should see goes out as a toast. */
 static void close_transfer(const char *toast)
 {
-    if (s.st != OTA_IDLE) hal_link_bulk(false);
+    if (s.st != OTA_IDLE) hal_link_bulk(s.port, false);
     s.st = OTA_IDLE;
     free_patch();
     ui_ota_hide();
@@ -289,7 +290,8 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
         memcpy(s.base, patch->base, 32);
         detools_apply_patch_init(&s_dt, base_read, base_seek, s.psize, image_write, NULL);
     }
-    hal_link_bulk(true);
+    s.port = link_active_kind();
+    hal_link_bulk(s.port, true);
     ui_ota_show(s.ver);
     ui_ota_progress(0, false);
     feedback_tick();

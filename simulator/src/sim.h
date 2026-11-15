@@ -35,7 +35,7 @@ void sim_link_poll(uint32_t now_ms);
 void sim_link_set_connected(bool connected); /* for --no-ws scripts */
 /* `mic FILE.wav` (16 kHz mono 16-bit): the simulated microphone plays it from the next start. */
 bool sim_mic_load(const char *path);
-/* `connect usb|ble`, `rx usb|ble HEX`: fake transports beside the default WS one (kind = hal_link_kind_t). */
+/* `connect usb|ble|ble2`, `rx usb|ble|ble2 HEX`: fake transports beside the default WS one (kind = hal_link_kind_t). */
 void sim_link_set_connected_kind(int kind, bool connected);
 void sim_link_inject_rx_kind(int kind, const uint8_t *frame, size_t len);
 void sim_link_inject_rx(const uint8_t *frame, size_t len);

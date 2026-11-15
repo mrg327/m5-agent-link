@@ -169,20 +169,24 @@ uint32_t *hal_retained_words(void);
 
 /* A transport carries opaque protocol frames (already CBOR+envelope encoded).
  * Framing (COBS, BLE fragmentation, WebSocket frames) is the transport's job. */
-typedef enum { HAL_LINK_USB = 0, HAL_LINK_BLE = 1, HAL_LINK_WS = 2 } hal_link_kind_t;
+/* A port is one transport connection: USB, the first and second BLE central, and the simulator's WebSocket. A
+ * board with one BLE connection never reports HAL_LINK_BLE2 (MULTI-LINK.md). */
+typedef enum { HAL_LINK_USB = 0, HAL_LINK_BLE = 1, HAL_LINK_WS = 2, HAL_LINK_BLE2 = 3 } hal_link_kind_t;
+#define HAL_LINK_PORTS 4
+static inline bool hal_link_is_ble(int port) { return port == HAL_LINK_BLE || port == HAL_LINK_BLE2; }
 typedef void (*hal_link_rx_cb_t)(hal_link_kind_t kind, const uint8_t *frame, size_t len);
 typedef void (*hal_link_state_cb_t)(hal_link_kind_t kind, bool connected);
 
 void hal_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state);
 /* Returns false if that transport is not connected or the frame is too large. */
 bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len);
-/* While the watch drives the PC live (SCROLL), ask the links for low latency: BLE requests a
- * 15–30 ms connection interval; false returns to the interval the central chose. No-op elsewhere. */
-void hal_link_interactive(bool on);
-/* While a firmware update streams in, ask the links for throughput: BLE requests the shortest connection
- * interval (7.5 ms), or the interactive one if the central refuses it; false undoes it. No-op elsewhere. */
-void hal_link_bulk(bool on);
-/* The BLE connection interval in force, in microseconds; 0 when no central is connected (or no BLE). */
+/* While the watch drives the PC live (SCROLL), ask that port for low latency: BLE requests a 15–30 ms
+ * connection interval; false returns to the interval the central chose. No-op on other ports. */
+void hal_link_interactive(hal_link_kind_t port, bool on);
+/* While a firmware update streams in, ask that port for throughput: BLE requests the shortest connection
+ * interval (7.5 ms), or the interactive one if the central refuses it; false undoes it. No-op on other ports. */
+void hal_link_bulk(hal_link_kind_t port, bool on);
+/* The shortest BLE connection interval in force, in microseconds; 0 when no central is connected (or no BLE). */
 uint32_t hal_link_ble_interval_us(void);
 
 /* ───────────── firmware update (OTA, FIRMWARE.md §9, proto 0.15) ───────────── */

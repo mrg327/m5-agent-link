@@ -1404,7 +1404,7 @@
     {
       "id": "scroll",
       "title": "Scroll · the terminal's scrollback",
-      "source": "firmware/components/core/src/ui_scroll.c:299"
+      "source": "firmware/components/core/src/ui_scroll.c:302"
     },
     {
       "id": "status",
@@ -5854,8 +5854,8 @@
     "screens": "firmware/components/core/src/ui_home.c:361",
     "screens.agent": "firmware/components/core/src/ui_agent.c:366",
     "screens.ask": "firmware/components/core/src/ui_ask.c:944",
-    "screens.scroll": "firmware/components/core/src/ui_scroll.c:299",
-    "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:55",
+    "screens.scroll": "firmware/components/core/src/ui_scroll.c:302",
+    "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:56",
     "screens.status": "firmware/components/core/src/ui_status.c:379",
     "sounds.approved-chime": "firmware/components/core/src/sound_bank.c:161",
     "sounds.approved-rise": "firmware/components/core/src/sound_bank.c:159",

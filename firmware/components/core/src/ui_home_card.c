@@ -137,7 +137,7 @@ static void update_slot(const char *btn, uint32_t btn_rgb)
         } else if (k < 0) {
             snprintf(txt, sizeof txt, "Offline");
         } else {
-            icon = k == HAL_LINK_USB ? ICON_USB : k == HAL_LINK_BLE ? ICON_BLUETOOTH : ICON_COMPUTER;
+            icon = k == HAL_LINK_USB ? ICON_USB : hal_link_is_ble(k) ? ICON_BLUETOOTH : ICON_COMPUTER;
             snprintf(txt, sizeof txt, "Connecting" "\xE2\x80\xA6");
         }
     } else {

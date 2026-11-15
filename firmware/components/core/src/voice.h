@@ -17,7 +17,8 @@ bool voice_start(uint32_t sid, uint32_t now_ms);
 void voice_stop(uint32_t now_ms);
 /* Abandons the recording or the transcript; the daemon simply never gets a dictate for it. */
 void voice_cancel(void);
-/* Pulls the mic, encodes and sends; stops at VOICE_MAX_MS; times out a missing transcript. */
+/* Pulls the mic and encodes into a queue; sends from it for a short budget (a slow link must not hold the
+ * UI); stops at VOICE_MAX_MS; after a stop sends what is queued, then the end; times out a missing transcript. */
 void voice_tick(uint32_t now_ms);
 /* A transcript arrived (the link hook). */
 void voice_on_transcript(uint32_t aid, const char *text);
