@@ -301,6 +301,10 @@ sim_script_test(sim_watch_ask_return watch_ask_return.txt FAIL_REGULAR_EXPRESSIO
 set_tests_properties(sim_watch_ask_return PROPERTIES TIMEOUT 60)
 sim_script_test(sim_watch_states watch_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_watch_states PROPERTIES TIMEOUT 60)
+# Sigil (GLYPHS.md §5 WATCH): the lane of glyph nodes in every state, the report's words, the comet's redraw budget.
+# A tap on a node selects that step: it must never focus the terminal (op 0) nor answer anything (op 3, op 4).
+sim_script_test(sim_sigil_watch sigil_watch.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0,|\"op\":3|\"op\":4")
+set_tests_properties(sim_sigil_watch PROPERTIES TIMEOUT 90)
 # UI-V3 second safety pass: a hold acts on the row under the finger; early taps after opening are ignored;
 # a moved selection cancels a hold; the answered state lingers; a long transcript cannot be sent.
 sim_script_test(sim_ask_hold_neighbour_row ask_hold_neighbour_row.txt
@@ -362,6 +366,10 @@ sim_script_test(sim_gauges_wire gauges_wire.txt FAIL_REGULAR_EXPRESSION "SCRIPT 
 foreach(n done_all done_failed done_time_only done_long done_wire done_activity)
   sim_script_test(sim_${n} ${n}.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4")
 endforeach()
+# Sigil (GLYPHS.md §5 GAUGES, DONE): the arcs, the AGENT readout's glyphs and the done row in the states the scripts
+# above do not render; the report keeps their words.
+sim_script_test(sim_sigil_gauges sigil_gauges.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4")
+set_tests_properties(sim_sigil_gauges PROPERTIES TIMEOUT 90)
 
 # Answer window and full text (ANSWER-WINDOW.md, proto 0.11). No approve (op 3) may leave after a window ended,
 # while the full text is still arriving, for a text that does not add up, past the cap or under privacy meta.

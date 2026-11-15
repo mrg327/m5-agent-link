@@ -54,6 +54,14 @@ bool gauges_should_warn(const usage_t *prev, const usage_t *now)
     return true;
 }
 
+int gauges_window_pm(const usage_win_t *w, uint32_t at, uint32_t len)
+{
+    if (!len || at >= w->resets) return 1000;
+    uint32_t left = w->resets - at;
+    if (left >= len) return 0;
+    return (int)((uint64_t)(len - left) * 1000 / len);
+}
+
 void gauges_span(char *dst, size_t cap, uint32_t secs)
 {
     uint32_t m = (secs + 59) / 60;

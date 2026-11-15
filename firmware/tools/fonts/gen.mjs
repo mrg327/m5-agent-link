@@ -46,6 +46,8 @@ const ICONS = {
   "arrow-right": 0xe06c, "caret-down": 0xe136,
   // ASK (docs/design/glyphs/ASK.md): a standing rule's breadth (wildcard / exactly as written) and its project scope.
   asterisk: 0xe0aa, equals: 0xe21c, folder: 0xe24a,
+  // WATCH, gauges and the done row: a turn's time, the 5-hour window, the "don't ask" mode.
+  timer: 0xe492, clock: 0xe19a, "chat-circle-slash": 0xe16a,
 };
 // The GRAPH screen's node and lane glyphs (GRAPH.md §4): drawn inside a node disc, so 20 px only.
 const GRAPH_ICONS = {
@@ -98,7 +100,11 @@ mkdirSync(join(here, out), { recursive: true });
 // Every size but the hero holds the graph glyphs too: the glyph pass reuses them (terminal, robot, eye, pencil, flask, globe).
 const ALL = [...Object.values(ICONS), ...Object.values(GRAPH_ICONS)];
 for (const s of [20, 28, 44, 64]) makeIcons(`font_phosphor_${s}`, s, ALL);
-for (const s of [96, 128]) makeIcons(`font_phosphor_${s}`, s, HERO.map((n) => ICONS[n]));
+// WATCH's hero node is a step's tool as a 96 px glyph in a ring: the node kinds of GRAPH, at that size too.
+const NODE96 = ["dot", "eye", "pencil-simple", "terminal-window", "magnifying-glass", "globe", "robot", "list-checks",
+  "git-commit", "flask", "plug"];
+makeIcons("font_phosphor_96", 96, [...HERO.map((n) => ICONS[n]), ...NODE96.map((n) => GRAPH_ICONS[n])]);
+makeIcons("font_phosphor_128", 128, HERO.map((n) => ICONS[n]));
 // Each text font falls back to the icon font of the nearest size.
 make("font_figtree_20_500", [[fig(500), TEXT_RANGE]], 20, "font_phosphor_20");
 make("font_figtree_20_400", [[fig(400), TEXT_RANGE]], 20, "font_phosphor_20");

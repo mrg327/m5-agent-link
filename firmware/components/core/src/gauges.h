@@ -44,6 +44,14 @@ bool gauges_wk(uint32_t now, usage_win_t *out);
  * window. A watch that connects with the figure already high does not buzz: it never saw it cross. */
 bool gauges_should_warn(const usage_t *prev, const usage_t *now);
 
+/* The lengths of the two windows: the gauges draw time along the same arc as the usage (GLYPHS.md rule 4). */
+#define GAUGES_H5_S (5u * 3600u)
+#define GAUGES_WK_S (7u * 24u * 3600u)
+/* How far through its window the moment `at` is, 0..1000 per mille: the window is `len` seconds long and ends at
+ * w->resets. Drawn as a bead on the window's arc: the arc left beyond the bead is the time until the reset, and
+ * usage that has filled past the bead is ahead of the clock. */
+int gauges_window_pm(const usage_win_t *w, uint32_t at, uint32_t len);
+
 /* "2h 10m", "45m", "3d 4h": a duration to the minute, rounded up. */
 void gauges_span(char *dst, size_t cap, uint32_t secs);
 /* "14:30": unix time `at` in local time (tz_off minutes east). */

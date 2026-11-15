@@ -99,3 +99,7 @@
 #define ICON_WILD "\xEE\x82\xAA" /* asterisk e0aa (Bold): the rule has a wildcard */
 #define ICON_EXACT "\xEE\x88\x9C" /* equals e21c (Bold): the rule matches exactly what is written */
 #define ICON_FOLDER "\xEE\x89\x8A" /* folder e24a: saved for this project */
+/* WATCH, gauges and the done row (docs/design/glyphs/WATCH-GAUGES-DONE.md). */
+#define ICON_TIMER "\xEE\x92\x92" /* timer e492: how long a turn took */
+#define ICON_CLOCK "\xEE\x86\x9A" /* clock e19a: the plan's 5-hour window (the week is ICON_WEEK) */
+#define ICON_DONT_ASK "\xEE\x85\xAA" /* chat-circle-slash e16a: the "don't ask" permission mode */
