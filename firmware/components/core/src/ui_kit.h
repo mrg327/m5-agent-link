@@ -133,6 +133,12 @@ void ui_orbit_set_accent(lv_obj_t *o, uint32_t rgb); /* the selected disc's colo
 /* Radius of the circle and where the first item sits. With key hints on the screen and 8 items use phase 22:
  * the two lower discs then straddle the hints instead of covering them. */
 void ui_orbit_set_geometry(lv_obj_t *o, int radius, int phase_deg);
+/* An arch instead of the whole circle: the discs of a page sit on an arc of `span_deg` centred on the phase
+ * (12 o'clock by default), the first at its left end and the rest clockwise, no further apart than
+ * `max_pitch_deg`; a few discs then sit together at the top. The orbit is open at the bottom, where the key
+ * hints and a row of content are: AGENT and READ use 222 degrees, which ends 24 degrees short of each hint.
+ * span 0 (the default) is the whole circle again. */
+void ui_orbit_set_arch(lv_obj_t *o, int span_deg, int max_pitch_deg);
 void ui_orbit_select(lv_obj_t *o, int i);
 int ui_orbit_step(lv_obj_t *o, int dir); /* +1 / -1, wraps, turns the page; returns the new selection */
 int ui_orbit_selected(lv_obj_t *o);

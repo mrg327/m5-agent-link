@@ -547,7 +547,7 @@ static void run_rule(const char *spec)
 
 static void run_session(const char *spec)
 {
-    /* session SID STATE REPO [BRANCH|- [summary text...]] */
+    /* session SID STATE REPO|- [BRANCH|- [summary text...]] ("-" for REPO: a session with no folder) */
     unsigned sid;
     char st[16], repo[33], branch[33] = "";
     int n = 0;
@@ -557,6 +557,7 @@ static void run_session(const char *spec)
     }
     sscanf(spec, "%*u %*15s %*32s %32s %n", branch, &n);
     if (!strcmp(branch, "-")) branch[0] = 0;
+    if (!strcmp(repo, "-")) repo[0] = 0;
     uint32_t now = theme_now_unix();
     session_t d = {.sid = sid, .agent = (agent_t)(sid % 3), .state = SESS_WORK, .t0 = now - 3600 + sid, .tst = now - 40 - 53 * sid};
     uint32_t present = SF_AGENT | SF_STATE | SF_SUB | SF_REPO | SF_T0 | SF_TST | SF_SEEN;

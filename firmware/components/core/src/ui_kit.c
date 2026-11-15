@@ -810,6 +810,7 @@ typedef struct {
     ui_orbit_item_t it[UI_ORBIT_ITEMS];
     lv_obj_t *disc[UI_ORBIT_SLOTS];
     int16_t n, sel, radius, phase, hold;
+    int16_t span, pitch; /* an arch (ui_orbit_set_arch): the arc it covers and the widest step; span 0 = the whole circle */
     uint32_t accent;
 } orbit_t;
 
@@ -837,7 +838,12 @@ static void orbit_apply(lv_obj_t *o)
     orbit_t *d = lv_obj_get_user_data(o);
     int first = d->n ? d->sel / UI_ORBIT_SLOTS * UI_ORBIT_SLOTS : 0, cnt = d->n - first;
     if (cnt > UI_ORBIT_SLOTS) cnt = UI_ORBIT_SLOTS;
-    float step = d->n > UI_ORBIT_SLOTS ? 45.0f : d->n ? 360.0f / (float)d->n : 0;
+    float step = d->n > UI_ORBIT_SLOTS ? 45.0f : d->n ? 360.0f / (float)d->n : 0, first_deg = (float)d->phase;
+    if (d->span > 0) { /* an arch: the page's discs centred on the phase, left to right */
+        step = cnt > 1 ? (float)d->span / (float)(cnt - 1) : 0;
+        if (step > (float)d->pitch) step = (float)d->pitch;
+        first_deg -= step * (float)(cnt - 1) / 2.0f;
+    }
     int ccx = lv_obj_get_width(o) / 2, ccy = lv_obj_get_height(o) / 2, x, y;
     if (!ccx) ccx = ccy = UI_CX; /* before the first layout */
     for (int k = 0; k < UI_ORBIT_SLOTS; k++) {
@@ -850,7 +856,7 @@ static void orbit_apply(lv_obj_t *o)
         if (!on) continue;
         const ui_orbit_item_t *it = &d->it[first + k];
         bool sel = first + k == d->sel;
-        polar(ccx, ccy, (float)d->radius, (float)d->phase + (float)k * step, &x, &y);
+        polar(ccx, ccy, (float)d->radius, first_deg + (float)k * step, &x, &y);
         ui_disc_set_pos(disc, x, y);
         ui_disc_set_r(disc, sel ? UI_DISC_R_ORBIT_SEL : UI_DISC_R_SMALL);
         ui_disc_set_glyph(disc, it->glyph);
@@ -905,6 +911,15 @@ void ui_orbit_set_geometry(lv_obj_t *o, int radius, int phase_deg)
     if (d->radius == radius && d->phase == phase_deg) return;
     d->radius = (int16_t)radius;
     d->phase = (int16_t)phase_deg;
+    orbit_apply(o);
+}
+
+void ui_orbit_set_arch(lv_obj_t *o, int span_deg, int max_pitch_deg)
+{
+    orbit_t *d = lv_obj_get_user_data(o);
+    if (d->span == span_deg && d->pitch == max_pitch_deg) return;
+    d->span = (int16_t)span_deg;
+    d->pitch = (int16_t)max_pitch_deg;
     orbit_apply(o);
 }
 

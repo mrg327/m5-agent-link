@@ -149,6 +149,10 @@ leaves r 0 to 105 free.
   of the selection is the one on screen, and pips under the subject say which.
 - `ui_orbit_set_geometry(o, radius, phase_deg)`: with key hints on the screen and 8 items use phase 22, so
   the two lower discs straddle the hints.
+- `ui_orbit_set_arch(o, span_deg, max_pitch_deg)`: an arch instead of the whole circle, open at the bottom. The
+  discs of a page sit on an arc of `span_deg` centred on 12 o'clock, the first at its left end, no further apart
+  than `max_pitch_deg`. AGENT and READ use 222 and 50: the arc ends 24 degrees short of each key hint, and the
+  slot between the hints stays free for a row of content (`docs/design/glyphs/AGENT-READ.md`).
 - The screen maps its input: the dial and button B to `ui_orbit_step(o, ±1)` (wraps, turns the page), a tap to
   `ui_orbit_hit(o, x, y)` (select that item, or run it when it is `ui_orbit_selected(o)`), button A to
   running the selection, a hold to `ui_orbit_set_hold(o, permille)`. `ui_orbit_count(o)`, `ui_orbit_select(o, i)`.
@@ -204,6 +208,7 @@ screen. A screen that needs a new meaning adds a row.
 | Snooze / unsnooze | moon (and the minutes as dots) / sun |
 | Notify when done / don't | bell-ringing / bell-slash |
 | Stop / run again / try again | stop-circle / arrow-clockwise / arrow-counter-clockwise |
+| Hold to stop / hold to run again (a tap on a hold disc) | hand-tap and stop-circle / hand-tap and arrow-clockwise |
 | Dismiss | cross |
 | Open (menu) / next / back / more / select | dots / caret-right / arrow-left / caret-down / tick |
 | Quiet / sound / mute | bell-slash / speaker / speaker-slash |

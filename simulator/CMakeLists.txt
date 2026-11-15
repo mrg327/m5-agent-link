@@ -318,6 +318,14 @@ sim_script_test(sim_agent_tall_row_out agent_tall_row_out.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,|\"op\":8,")
 sim_script_test(sim_agent_hold_cancel_on_select agent_hold_cancel_on_select.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,")
+# Sigil AGENT and READ (GLYPHS.md §5): every state of the two screens, named in the report; a touch on a disc past
+# the centre zone is a touch on it; a tap or a short hold on Stop sends nothing (no op 6); the row touched is the
+# reply sent ("No" = type arg 101); button A in the reader opens the session on the computer (op 0).
+sim_script_test(sim_sigil_agent sigil_agent.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,"
+                PASS_REGULAR_EXPRESSION "\"op\":11,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":101.*\"op\":0,\"sid\":2")
+set_tests_properties(sim_sigil_agent PROPERTIES TIMEOUT 120)
+sim_script_test(sim_sigil_agent_bare sigil_agent_bare.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,|\"op\":11,")
 # Read before you approve: an unread long text locks Approve; the reader cannot answer; a daemon-cut text is
 # never approvable on the watch.
 sim_script_test(sim_ask_read_first ask_read_first.txt

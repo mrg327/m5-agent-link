@@ -337,8 +337,9 @@ static void rise(lv_obj_t *o, int px)
 void ui_motion_enter(lv_obj_t *content) { rise(content, UI_MOTION_RISE); }
 
 /* The screens whose own rows and discs lie between the key hints, under the sign: HOME (its summary's second
- * row, the graph strip, the book disc). A rebuilt screen that puts content there adds its mode. */
-static bool toast_blanks_slot(void) { return s_mode == MODE_HOME; }
+ * row, the graph strip, the book disc), AGENT (the queued message; Dictate and Keyboard) and READ (the page
+ * dots). A rebuilt screen that puts content there adds its mode. */
+static bool toast_blanks_slot(void) { return s_mode == MODE_HOME || s_mode == MODE_AGENT || s_mode == MODE_READ; }
 
 /* A toast is a sign (GLYPHS.md rule 8): the glyphs the vocabulary has for its words, in its colour. The words
  * stay what the callers pass and what the report and the log say. Words without a glyph yet draw the info
@@ -443,6 +444,11 @@ bool ui_on_gesture(const gesture_evt_t *g)
      * on one is a tap on it, not on the rim (a drag there still scrubs the sessions). */
     if (zone == ZONE_RIM && s_mode == MODE_HOME && (g->kind == G_TAP || g->kind == G_DOUBLE_TAP) &&
         (ui_home_read_hit(g->x, g->y) || ui_home_strip_hit(g->x, g->y)))
+        zone = ZONE_CENTRE;
+    /* So do the discs of AGENT's orbit and of READ's: a touch on one (a tap, or the press of a hold) is a touch
+     * on it; a slide along the bezel still dials. */
+    if (zone == ZONE_RIM && (g->kind == G_TAP || g->kind == G_DOUBLE_TAP || g->kind == G_PRESS || g->kind == G_LONG_PRESS) &&
+        ((s_mode == MODE_AGENT && ui_agent_hit(g->x, g->y)) || (s_mode == MODE_READ && ui_read_hit(g->x, g->y))))
         zone = ZONE_CENTRE;
     nav_action_t a = nav_lookup(s_mode, g->kind, zone, ui_home_request_pending(), ui_home_askable());
     if (a != NAV_NONE && g->kind != G_PRESS && g->kind != G_RELEASE && g->kind != G_MOVE) /* moves: a stream */
