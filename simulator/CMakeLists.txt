@@ -463,6 +463,10 @@ sim_script_test(sim_queue_show_cancel queue_show_cancel.txt
 sim_script_test(sim_kit_gallery kit_gallery.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_sigil_home sigil_home.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"op\":5")
 set_tests_properties(sim_sigil_home PROPERTIES TIMEOUT 90)
+# Sigil: STATUS, LABS and TRACKPAD in every state (renders), the words each still reports, a tap on a disc in the
+# rim zone, and STATUS at rest repainting nothing.
+sim_script_test(sim_sigil_status sigil_status.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+set_tests_properties(sim_sigil_status PROPERTIES TIMEOUT 90)
 sim_script_test(sim_deck_v3_states deck_v3_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_deck_v3_ambient deck_v3_ambient.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_deck_v3_ambient PROPERTIES TIMEOUT 60)

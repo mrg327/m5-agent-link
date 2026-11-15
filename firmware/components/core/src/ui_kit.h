@@ -67,6 +67,12 @@ void ui_tally_set_pos(lv_obj_t *t, int cx, int cy);
 lv_obj_t *ui_arc_create(lv_obj_t *parent, int cx, int cy, int r, int w);
 void ui_arc_set_span(lv_obj_t *a, int start_deg, int span_deg); /* default 0, 360: a whole circle from 12 o'clock */
 void ui_arc_set(lv_obj_t *a, int permille, lv_color_t fill, lv_color_t track); /* a black track draws no track */
+/* A level of `n` equal steps (a volume of 5): the arc is drawn as n pieces with gaps between them, and the fill
+ * lights whole pieces, the nearest count to `permille`. 0 or 1 (the default): one continuous arc. */
+void ui_arc_set_steps(lv_obj_t *a, int n);
+/* Moves the arc and gives it another radius: an arc round a disc follows the disc (an orbit's selected disc is
+ * larger and a screen may shift its centre). Change-only. */
+void ui_arc_set_geometry(lv_obj_t *a, int cx, int cy, int r);
 
 /* ── pips: a position among a few (rule 4) ── */
 

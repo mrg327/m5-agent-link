@@ -95,3 +95,7 @@
 #define ICON_TAP "\xEE\xB2\x90" /* hand-tap ec90 */
 #define ICON_FORWARD "\xEE\x81\xAC" /* arrow-right e06c */
 #define ICON_CARET_DOWN "\xEE\x84\xB6" /* caret-down e136 */
+#define ICON_LABS "\xEE\x97\xA4" /* atom e5e4: the experiments */
+#define ICON_CURSOR "\xEE\x87\x9C" /* cursor e1dc: the pointer of the PC */
+#define ICON_CLOCK "\xEE\x86\x9A" /* clock e19a: the wall clock, where it is not digits */
+#define ICON_LEFT_CLICK "\xEE\x8C\xB4" /* mouse-left-click e334 */

@@ -88,8 +88,8 @@ static const struct { const char *word, *glyph; } kGlyphs[] = {
     {"Dictate", ICON_MIC}, {"Keyboard", ICON_KEYBOARD}, {"Done", ICON_CHECK}, {"Reply", ICON_REPLY},
     {"Bottom", ICON_LIVE}, {"Page", ICON_DOWN}, {"SEND", ICON_SENT}, {"DEL", ICON_BACKSPACE},
     {"Quiet 30 min", ICON_QUIET}, {"Quiet 1 h", ICON_QUIET}, {"Quiet off", ICON_BELL}, {"Mute", ICON_MUTE},
-    {"Unmute", ICON_SOUND}, {"Volume 0", ICON_SOUND}, {"Volume 1", ICON_SOUND}, {"Volume 2", ICON_SOUND},
-    {"Volume 3", ICON_SOUND}, {"Volume 4", ICON_SOUND}, {"Volume 5", ICON_SOUND},
+    {"Unmute", ICON_SOUND}, {"Volume 0", ICON_WAVE}, {"Volume 1", ICON_WAVE}, {"Volume 2", ICON_WAVE},
+    {"Volume 3", ICON_WAVE}, {"Volume 4", ICON_WAVE}, {"Volume 5", ICON_WAVE},
     /* toasts */
     {"Sent", ICON_SENT}, {"Not sent", ICON_SENT ICON_X}, {"Offline", ICON_OFFLINE}, {"Opening on PC...", ICON_COMPUTER},
     {"Focused", ICON_COMPUTER}, {"Stopping", ICON_STOP}, {"Interrupting", ICON_STOP}, {"Running again", ICON_RERUN},
@@ -98,6 +98,8 @@ static const struct { const char *word, *glyph; } kGlyphs[] = {
     {"Not supported", ICON_REFUSED}, {"Not allowed on the PC", ICON_COMPUTER ICON_REFUSED}, {"Failed", ICON_ERROR},
     {"Denied", ICON_DENIED}, {"Timed out", ICON_WAIT}, {"No window", ICON_WINDOW ICON_X},
     {"Out of date", ICON_COMPUTER ICON_UPDATE}, {"Nothing else needs you", ICON_DONE},
+    /* STATUS, LABS, TRACKPAD */
+    {"Set the clock first", ICON_CLOCK ICON_X}, {"Update agentlinkd", ICON_COMPUTER ICON_UPDATE},
     /* results (ui_burst) */
     {"Approved", ICON_CHECK}, {"Always allowed", ICON_ALWAYS}, {"On your computer", ICON_COMPUTER},
     {"Waiting for your computer", ICON_COMPUTER}, {"Time ran out", ICON_WAIT},

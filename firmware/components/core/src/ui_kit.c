@@ -551,7 +551,7 @@ void ui_tally_set_pos(lv_obj_t *o, int cx, int cy)
 /* ───────── arcs ───────── */
 
 typedef struct {
-    int16_t r, w, start, span, pm;
+    int16_t r, w, start, span, pm, steps;
     lv_color_t fill, track;
 } arc_t;
 
@@ -564,6 +564,16 @@ static void arc_draw(lv_event_t *e)
     lv_layer_t *l = lv_event_get_layer(e);
     int cx, cy, r_out = a->r + a->w / 2;
     centre_of(o, &cx, &cy);
+    if (a->steps > 1) { /* a level: whole pieces, the gap between two is the caps and 4 px */
+        bool track = !lv_color_eq(a->track, lv_color_black());
+        int gap = (a->w + 4) * 57 / (a->r > 0 ? a->r : 1) + 1, lit = (a->pm * a->steps + 500) / 1000;
+        for (int i = 0; i < a->steps; i++) {
+            if (i >= lit && !track) break;
+            arc(l, cx, cy, r_out, a->w, a->start + a->span * i / a->steps + gap / 2, a->start + a->span * (i + 1) / a->steps - gap / 2,
+                i < lit ? a->fill : a->track);
+        }
+        return;
+    }
     if (!lv_color_eq(a->track, lv_color_black())) arc(l, cx, cy, r_out, a->w, a->start, a->start + a->span, a->track);
     if (a->pm <= 0) return;
     int end = arc_end(a, a->pm);
@@ -614,6 +624,22 @@ void ui_arc_set(lv_obj_t *o, int permille, lv_color_t fill, lv_color_t track)
     int cx, cy;
     centre_of(o, &cx, &cy);
     inv_arc(o, cx, cy, a->r - a->w / 2 - 1, a->r + a->w / 2 + 1, e0, e1, a->w / 2 + 2);
+}
+
+void ui_arc_set_steps(lv_obj_t *o, int n)
+{
+    arc_t *a = lv_obj_get_user_data(o);
+    if (n < 0) n = 0;
+    if (a->steps == n) return;
+    a->steps = (int16_t)n;
+    lv_obj_invalidate(o);
+}
+
+void ui_arc_set_geometry(lv_obj_t *o, int cx, int cy, int r)
+{
+    arc_t *a = lv_obj_get_user_data(o);
+    a->r = (int16_t)r; /* a new radius is a new size: place() resizes, which redraws */
+    place(o, cx, cy, r + a->w + 2);
 }
 
 /* ───────── pips ───────── */

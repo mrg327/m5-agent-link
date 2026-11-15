@@ -337,16 +337,38 @@ static void rise(lv_obj_t *o, int px)
 void ui_motion_enter(lv_obj_t *content) { rise(content, UI_MOTION_RISE); }
 
 /* The screens whose own rows and discs lie between the key hints, under the sign: HOME (its summary's second
- * row, the graph strip, the book disc). A rebuilt screen that puts content there adds its mode. */
-static bool toast_blanks_slot(void) { return s_mode == MODE_HOME; }
+ * row, the graph strip, the book disc), STATUS (the About disc), LABS and TRACKPAD (their own sign for why the
+ * trackpad cannot start or work). A rebuilt screen that puts content there adds its mode. */
+static bool toast_blanks_slot(void)
+{
+    return s_mode == MODE_HOME || s_mode == MODE_STATUS || s_mode == MODE_LABS || s_mode == MODE_TRACKPAD;
+}
 
 /* A toast is a sign (GLYPHS.md rule 8): the glyphs the vocabulary has for its words, in its colour. The words
  * stay what the callers pass and what the report and the log say. Words without a glyph yet draw the info
  * glyph: a toast never spells them out. Only content is text: what was sent (`Sent "..."`), a short number
  * the vocabulary puts after the glyph ("Snoozed 30 min": the moon and 30). */
+static void toast_show(const char *words, const char *icons, const char *content, uint32_t rgb)
+{
+    snprintf(s_toast_txt, sizeof s_toast_txt, "%s", words);
+    ui_sign_set(s_toast, icons, content, rgb ? rgb : RGB_IDLE);
+    lv_obj_remove_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
+    for (int i = 0; i < 2; i++) {
+        if (toast_blanks_slot()) lv_obj_remove_flag(s_toast_mask[i], LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(s_toast_mask[i], LV_OBJ_FLAG_HIDDEN);
+    }
+    rise(s_toast, UI_TOAST_RISE);
+    s_toast_until_ms = s_now_ms + TOAST_MS;
+    dbg_event("ui", "toast", "\"text\":%s", dbg_q(words));
+}
+
+void ui_toast_sign(const char *words, const char *icons, const char *content, uint32_t rgb)
+{
+    toast_show(words, icons, content ? content : "", rgb);
+}
+
 void ui_toast(const char *text, uint32_t rgb)
 {
-    snprintf(s_toast_txt, sizeof s_toast_txt, "%s", text);
     char icons[16], content[64] = "";
     const char *g = theme_glyph(text);
     if (!g && !strncmp(text, "Sent \"", 6)) {
@@ -359,15 +381,7 @@ void ui_toast(const char *text, uint32_t rgb)
     memcpy(icons, g, n);
     icons[n] = 0;
     if (!content[0]) snprintf(content, sizeof content, "%s", g[n] == ' ' ? g + n + 1 : g + n);
-    ui_sign_set(s_toast, icons, content, rgb ? rgb : RGB_IDLE);
-    lv_obj_remove_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
-    for (int i = 0; i < 2; i++) {
-        if (toast_blanks_slot()) lv_obj_remove_flag(s_toast_mask[i], LV_OBJ_FLAG_HIDDEN);
-        else lv_obj_add_flag(s_toast_mask[i], LV_OBJ_FLAG_HIDDEN);
-    }
-    rise(s_toast, UI_TOAST_RISE);
-    s_toast_until_ms = s_now_ms + TOAST_MS;
-    dbg_event("ui", "toast", "\"text\":%s", dbg_q(text));
+    toast_show(text, icons, content, rgb);
 }
 
 void ui_glow(uint32_t rgb)

@@ -9,3 +9,4 @@ fw_send 0 2048 10
 wait 500
 expect_screen ring
 expect_label Checksum mismatch
+shot ota_error.png
