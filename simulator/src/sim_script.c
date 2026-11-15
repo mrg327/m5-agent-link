@@ -1,7 +1,7 @@
 /* Scripted input. A script is expanded up front into a timeline of primitive events (mouse, keys,
  * IMU, frames, checks) that are replayed in real time through the same paths as real input.
  *
- *   wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double|held] | chord
+ *   wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double|held|down|up] | chord
  *   stroke X,Y X,Y ...              KEYS: one finger stroke through the points, a sample every 33 ms, then lifted
  *   word LETTERS                    KEYS: a swipe through the centres of those layer-0 letters
  *   key CHAR|space|bksp|layer       KEYS: a tap on that key (layer 0, then the symbols layer)
@@ -252,7 +252,10 @@ static bool parse_line(char *line, uint32_t *t)
         bool held = strstr(rest, "held") != NULL; /* past the 1.2 s hold-to-send */
         bool lng = strstr(rest, "long") != NULL || held, dbl = strstr(rest, "double") != NULL;
         int bi = rest[0] == 'B';
-        if (dbl) {
+        if (strstr(rest, " down") || strstr(rest, " up")) { /* a press held across other commands (a shot mid-hold) */
+            add(*t, E_BTN, bi, strstr(rest, " down") != NULL, 0, NULL);
+            *t += 20;
+        } else if (dbl) {
             btn(t, bi, 0, 60);
             btn(t, bi, 160, 220);
             *t += 220 + 600; /* a double press settles at once; leave room for a stray single */

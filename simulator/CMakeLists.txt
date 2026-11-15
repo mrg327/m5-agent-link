@@ -463,6 +463,17 @@ sim_script_test(sim_queue_show_cancel queue_show_cancel.txt
 sim_script_test(sim_kit_gallery kit_gallery.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_sigil_home sigil_home.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"op\":5")
 set_tests_properties(sim_sigil_home PROPERTIES TIMEOUT 90)
+# Sigil: VOICE, KEYS and SCROLL in every state. The report keeps the words; a tap or a short A never sends (no
+# dictate, op 12, at all; kb_send, op 15, only from the one A hold, with hold_ms >= 1000); a control answers the
+# wrong gesture itself (voice_nudge, keys_flash); each screen at rest repaints nothing.
+sim_script_test(sim_sigil_voice sigil_voice.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":12"
+  PASS_REGULAR_EXPRESSION "voice_nudge.*voice_locked.*voice_page")
+set_tests_properties(sim_sigil_voice PROPERTIES TIMEOUT 150)
+sim_script_test(sim_sigil_keys sigil_keys.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":15,\"sid\":[0-9]+,\"rid\":0,\"hold_ms\":[0-9][0-9]?[0-9]?,"
+  PASS_REGULAR_EXPRESSION "keys_flash.*\"op\":15,\"sid\":1,\"rid\":0,\"hold_ms\":1[0-9][0-9][0-9]")
+sim_script_test(sim_sigil_scroll sigil_scroll.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"unit\":2")
 sim_script_test(sim_deck_v3_states deck_v3_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_deck_v3_ambient deck_v3_ambient.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_deck_v3_ambient PROPERTIES TIMEOUT 60)

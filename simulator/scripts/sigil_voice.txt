@@ -1,0 +1,169 @@
+# Sigil (GLYPHS.md §5): VOICE in every state. It still says in the report what its glyphs
+# mean (rule 9), a tap never sends, and the screen at rest repaints nothing.
+connect
+rx a400020101020103a70082001201a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f506f5
+session 1 done webapp feat/login Finished the work
+wait 300
+mic audio/tone_1s.wav
+# ── VOICE: listening (the microphone, the time ring, the loudness as waves) ──
+tap 233 233
+wait 300
+btn B
+wait 150
+btn A
+wait 200
+btn B
+wait 150
+expect_label > Dictate
+btn A
+wait 300
+expect_screen voice
+expect_label Reply to webapp
+expect_label 0:0
+wait 300
+shot sv_listening.png
+# a second of listening repaints the waves and a sliver of the time ring, never the screen
+px_reset
+wait 1000
+expect_px_max 20000
+expect_label 0:02
+tap 233 233
+wait 400
+expect_label Transcribing…
+shot sv_transcribing.png
+transcript run the tests again and push
+wait 400
+expect_label (transcript)
+expect_label Send
+shot sv_transcript.png
+# at rest: nothing
+px_reset
+wait 2000
+expect_px_max 0
+# a tap never sends: the ring to fill lights up
+tap 233 338
+wait 200
+expect_screen voice
+expect_label Hold to send
+shot sv_hold_nudge.png
+wait 2000
+expect_no_label Hold to send
+press 233 338
+wait 800
+shot sv_hold.png
+release
+wait 200
+expect_screen voice
+btn B long
+wait 300
+expect_screen ring
+# ── VOICE: a transcript of two pages: the caret disc, the pips; a hold while a page is unread lights the caret ──
+tap 233 233
+wait 300
+btn B
+wait 150
+btn A
+wait 200
+btn B
+wait 150
+btn A
+wait 300
+expect_screen voice
+wait 600
+btn A
+wait 300
+expect_label Transcribing…
+transcript please run the full test suite again, then fix every failing case you find in the login flow, update the snapshots that changed on purpose, rebase on main, resolve the conflicts in the settings screen, push the branch and open a pull request that explains each of the changes in plain words for the reviewers
+wait 400
+expect_label More 1/2
+shot sv_more.png
+press 233 338
+wait 500
+expect_label Tap to read the rest
+shot sv_locked.png
+release
+wait 200
+expect_screen voice
+expect_label More 1/2
+btn A
+wait 300
+expect_label Send
+expect_no_label More 1/2
+shot sv_last_page.png
+btn B long
+wait 300
+expect_screen ring
+# ── VOICE: failed, each reason as a sign; A tries again ──
+tap 233 233
+wait 300
+btn B
+wait 150
+btn A
+wait 200
+btn B
+wait 150
+btn A
+wait 300
+expect_screen voice
+wait 600
+tap 233 233
+wait 300
+transcript
+wait 300
+expect_label Nothing heard
+expect_label Try again
+shot sv_failed.png
+px_reset
+wait 2000
+expect_px_max 0
+btn B long
+wait 300
+expect_screen ring
+# ── VOICE answering one question of two: the question glyph, and the tick ("Use") instead of the plane ──
+session 2 ask dashboard main
+ask 33 2 60000 60000 Name|What should the new command be called?|single|agentlink read|agentlink last ;; Scope|Where does it go?|single|CLI|Daemon
+wait 600
+expect_screen ask
+btn B
+wait 200
+btn B
+wait 200
+expect_label > Other
+# (the selected row of ASK, as in question_other.txt)
+tap 233 282
+wait 400
+expect_screen voice
+expect_label Answer for dashboard
+wait 800
+btn A
+wait 300
+transcript call it agentlink say
+wait 400
+expect_label Use
+expect_no_label Send
+shot sv_use.png
+btn B long
+wait 300
+clear 33 answered_dev
+drop 2
+wait 300
+expect_screen ring
+# ── VOICE: the computer never answers: after 45 s the sign is the computer and the hourglass ──
+tap 233 233
+wait 300
+btn B
+wait 150
+btn A
+wait 200
+btn B
+wait 150
+btn A
+wait 300
+expect_screen voice
+wait 600
+tap 233 233
+wait 46000
+expect_label No transcript
+expect_label Try again
+shot sv_failed_no_transcript.png
+quit

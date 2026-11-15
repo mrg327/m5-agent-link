@@ -90,6 +90,9 @@ static const struct { const char *word, *glyph; } kGlyphs[] = {
     {"Quiet 30 min", ICON_QUIET}, {"Quiet 1 h", ICON_QUIET}, {"Quiet off", ICON_BELL}, {"Mute", ICON_MUTE},
     {"Unmute", ICON_SOUND}, {"Volume 0", ICON_SOUND}, {"Volume 1", ICON_SOUND}, {"Volume 2", ICON_SOUND},
     {"Volume 3", ICON_SOUND}, {"Volume 4", ICON_SOUND}, {"Volume 5", ICON_SOUND},
+    /* VOICE and KEYS: why a dictation failed, why the keyboard was refused */
+    {"Nothing heard", ICON_WAVE ICON_X}, {"No microphone", ICON_MIC ICON_REFUSED}, {"No transcript", ICON_COMPUTER ICON_WAIT},
+    {"Busy", ICON_KEYBOARD ICON_WAIT}, {"Not kitty", ICON_G_SHELL ICON_REFUSED},
     /* toasts */
     {"Sent", ICON_SENT}, {"Not sent", ICON_SENT ICON_X}, {"Offline", ICON_OFFLINE}, {"Opening on PC...", ICON_COMPUTER},
     {"Focused", ICON_COMPUTER}, {"Stopping", ICON_STOP}, {"Interrupting", ICON_STOP}, {"Running again", ICON_RERUN},

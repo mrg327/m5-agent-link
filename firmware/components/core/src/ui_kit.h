@@ -68,6 +68,27 @@ lv_obj_t *ui_arc_create(lv_obj_t *parent, int cx, int cy, int r, int w);
 void ui_arc_set_span(lv_obj_t *a, int start_deg, int span_deg); /* default 0, 360: a whole circle from 12 o'clock */
 void ui_arc_set(lv_obj_t *a, int permille, lv_color_t fill, lv_color_t track); /* a black track draws no track */
 
+/* ── track: a position on something long (rule 4) ── */
+
+/* A scroll bar bent round the screen: a thin arc from `start` over `span` degrees on the circle of centre-line
+ * radius `r` about (cx, cy), and on it a thumb `w` px wide (the track is a third of that). The thumb is `len`
+ * per mille of the span long and sits at `pos` per mille of the room that leaves it: 0 at `start`, 1000 at the
+ * far end. A move invalidates only where the thumb was and where it is. */
+lv_obj_t *ui_track_create(lv_obj_t *parent, int cx, int cy, int r, int w, int start_deg, int span_deg);
+void ui_track_set(lv_obj_t *t, int pos_permille, int len_permille, lv_color_t thumb, lv_color_t track);
+
+/* ── waves: a level as arcs either side of a subject (rule 4) ── */
+
+#define UI_WAVES_MAX 6
+
+/* `n` pairs of arcs left and right of (cx, cy), like sound leaving it: pair i lies on the circle of radius
+ * r0 + i * pitch, each arc 26 degrees either side of 3 and of 9 o'clock, 6 px wide, round caps. Bit i of `mask`
+ * lights pair i in `on`; the others are drawn in `off` (black: not drawn). A loudness lights the inner pairs
+ * (mask (1 << k) - 1); one bit walking inwards says the sound is being worked on. A change repaints only the
+ * pairs whose bit changed. */
+lv_obj_t *ui_waves_create(lv_obj_t *parent, int cx, int cy, int r0, int pitch, int n);
+void ui_waves_set(lv_obj_t *w, unsigned mask, lv_color_t on, lv_color_t off);
+
 /* ── pips: a position among a few (rule 4) ── */
 
 #define UI_PIPS_MAX 12

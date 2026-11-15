@@ -43,7 +43,7 @@ One command per line, `#` comments. Input is replayed in real time through the s
 input, so gesture recognition is exercised.
 
 ```
-wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double] | chord
+wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double|held|down|up] | chord
 scrub DEG0 DEG1 [MS [RADIUS]] | session SID STATE REPO [BRANCH [SUMMARY]] | drop SID
 lift | shake | connect | disconnect | rx HEX | ui | shot FILE.png
 attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OPT...

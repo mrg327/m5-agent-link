@@ -1,0 +1,54 @@
+# Sigil (GLYPHS.md §5): SCROLL in every state. The report still says how many lines up the view is (rule 9); the
+# glass shows it as a thumb on a track and a column of bars. At rest nothing repaints.
+connect
+rx a400020101020103a70082001201a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f506f5
+# ── SCROLL: live, scrolled with the terminal's line, the top of the scrollback, no line under privacy meta ──
+session 1 work webapp feat/login Running the test suite
+wait 300
+expect_screen ring
+tap 233 233
+wait 300
+btn A
+wait 300
+expect_screen watch
+drag 233 260 -30
+wait 300
+expect_screen scroll
+expect_label Claude Code
+expect_label [1] lines up
+result pos 0 1 1200
+wait 200
+expect_label Live
+shot ss_live.png
+px_reset
+wait 2000
+expect_px_max 0
+drag 233 260 -96
+wait 200
+expect_label [7] lines up
+shot ss_predicted.png
+result pos 3 0 1200 $ cargo build --release
+wait 200
+expect_label [3] lines up
+expect_label cargo build
+shot ss_near_bottom.png
+result pos 142 0 1200 $ npm test -- --watch=false
+wait 200
+expect_label [142] lines up
+expect_label npm test
+shot ss_scrolled.png
+result pos 1198 0 1200 Last login: Sat Nov 14 on ttys003
+wait 200
+expect_label [1198] lines up
+shot ss_top.png
+result pos 400 0 - $ git status
+wait 200
+expect_label [400] lines up
+shot ss_unknown_total.png
+cfg privacy meta
+result pos 142 0 1200 $ secret-command --token=abc
+wait 200
+expect_label [142] lines up
+expect_no_label secret
+shot ss_private.png
+quit
