@@ -642,6 +642,137 @@ void ui_arc_set_geometry(lv_obj_t *o, int cx, int cy, int r)
     place(o, cx, cy, r + a->w + 2);
 }
 
+/* ───────── track ───────── */
+
+typedef struct {
+    int16_t r, w, start, span, pos, len;
+    lv_color_t thumb, track;
+} track_t;
+
+/* Where the thumb lies, in degrees (a0 < a1 whichever way the track runs). */
+static void track_thumb(const track_t *t, int *a0, int *a1)
+{
+    int len = (int)((int32_t)t->span * t->len / 1000);
+    int from = t->start + (int)((int32_t)(t->span - len) * t->pos / 1000);
+    *a0 = len < 0 ? from + len : from;
+    *a1 = len < 0 ? from : from + len;
+    if (*a1 <= *a0) *a1 = *a0 + 1;
+}
+
+static void track_draw(lv_event_t *e)
+{
+    lv_obj_t *o = lv_event_get_target_obj(e);
+    track_t *t = lv_obj_get_user_data(o);
+    lv_layer_t *l = lv_event_get_layer(e);
+    int cx, cy, a0 = t->span < 0 ? t->start + t->span : t->start, a1 = t->span < 0 ? t->start : t->start + t->span;
+    int tw = t->w / 3 < 2 ? 2 : t->w / 3;
+    centre_of(o, &cx, &cy);
+    if (!lv_color_eq(t->track, lv_color_black())) arc(l, cx, cy, t->r + tw / 2, tw, a0, a1, t->track);
+    if (t->len <= 0) return;
+    track_thumb(t, &a0, &a1);
+    arc(l, cx, cy, t->r + t->w / 2, t->w, a0, a1, t->thumb);
+}
+
+lv_obj_t *ui_track_create(lv_obj_t *parent, int cx, int cy, int r, int w, int start_deg, int span_deg)
+{
+    lv_obj_t *o = blank(parent, sizeof(track_t), track_draw);
+    track_t *t = lv_obj_get_user_data(o);
+    t->r = (int16_t)r;
+    t->w = (int16_t)w;
+    t->start = (int16_t)start_deg;
+    t->span = (int16_t)span_deg;
+    t->thumb = COL_TEXT;
+    t->track = COL_FILL2;
+    place(o, cx, cy, r + w + 2);
+    return o;
+}
+
+void ui_track_set(lv_obj_t *o, int pos, int len, lv_color_t thumb, lv_color_t track)
+{
+    track_t *t = lv_obj_get_user_data(o);
+    pos = pos < 0 ? 0 : pos > 1000 ? 1000 : pos;
+    len = len < 0 ? 0 : len > 1000 ? 1000 : len;
+    bool same_col = lv_color_eq(t->thumb, thumb) && lv_color_eq(t->track, track);
+    if (same_col && t->pos == pos && t->len == len) return;
+    int cx, cy, o0, o1, n0, n1, in = t->r - t->w / 2 - 1, out = t->r + t->w / 2 + 1, pad = t->w / 2 + 2;
+    bool had = t->len > 0;
+    centre_of(o, &cx, &cy);
+    track_thumb(t, &o0, &o1);
+    t->pos = (int16_t)pos;
+    t->len = (int16_t)len;
+    t->thumb = thumb;
+    t->track = track;
+    if (!lv_color_eq(track, lv_color_black()) && !same_col) { /* the whole arc, not the square it lies in */
+        inv_arc(o, cx, cy, in, out, t->start, t->start + t->span, pad);
+        return;
+    }
+    track_thumb(t, &n0, &n1);
+    if (same_col && had && len > 0 && o0 == n0 && o1 == n1) return; /* less than a degree: nothing moved */
+    if (had) inv_arc(o, cx, cy, in, out, o0, o1, pad);
+    if (len > 0) inv_arc(o, cx, cy, in, out, n0, n1, pad);
+}
+
+/* ───────── waves ───────── */
+
+#define WAVES_HALF 26 /* each arc: this many degrees either side of 3 and of 9 o'clock */
+#define WAVES_W 6
+
+typedef struct {
+    int16_t r0, pitch, n;
+    uint16_t mask;
+    lv_color_t on, off;
+} waves_t;
+
+static void waves_draw(lv_event_t *e)
+{
+    lv_obj_t *o = lv_event_get_target_obj(e);
+    waves_t *d = lv_obj_get_user_data(o);
+    lv_layer_t *l = lv_event_get_layer(e);
+    int cx, cy;
+    centre_of(o, &cx, &cy);
+    for (int i = 0; i < d->n; i++) {
+        bool lit = d->mask >> i & 1;
+        if (!lit && lv_color_eq(d->off, lv_color_black())) continue;
+        int r_out = d->r0 + i * d->pitch + WAVES_W / 2;
+        arc(l, cx, cy, r_out, WAVES_W, 90 - WAVES_HALF, 90 + WAVES_HALF, lit ? d->on : d->off);
+        arc(l, cx, cy, r_out, WAVES_W, 270 - WAVES_HALF, 270 + WAVES_HALF, lit ? d->on : d->off);
+    }
+}
+
+lv_obj_t *ui_waves_create(lv_obj_t *parent, int cx, int cy, int r0, int pitch, int n)
+{
+    lv_obj_t *o = blank(parent, sizeof(waves_t), waves_draw);
+    waves_t *d = lv_obj_get_user_data(o);
+    d->r0 = (int16_t)r0;
+    d->pitch = (int16_t)pitch;
+    d->n = (int16_t)(n > UI_WAVES_MAX ? UI_WAVES_MAX : n);
+    d->on = COL_TEXT;
+    d->off = COL_FILL2;
+    place(o, cx, cy, r0 + (d->n - 1) * pitch + WAVES_W + 2);
+    return o;
+}
+
+void ui_waves_set(lv_obj_t *o, unsigned mask, lv_color_t on, lv_color_t off)
+{
+    waves_t *d = lv_obj_get_user_data(o);
+    mask &= (1u << d->n) - 1;
+    unsigned changed = mask ^ d->mask;
+    if (!lv_color_eq(d->on, on)) changed |= mask | d->mask;              /* the lit ones change colour */
+    if (!lv_color_eq(d->off, off)) changed |= ~(mask & d->mask) & ((1u << d->n) - 1); /* and the dark ones */
+    d->mask = (uint16_t)mask;
+    d->on = on;
+    d->off = off;
+    if (!changed) return;
+    int cx, cy;
+    centre_of(o, &cx, &cy);
+    for (int i = 0; i < d->n; i++) {
+        if (!(changed >> i & 1)) continue;
+        int r = d->r0 + i * d->pitch;
+        inv_arc(o, cx, cy, r - WAVES_W / 2 - 1, r + WAVES_W / 2 + 1, 90 - WAVES_HALF, 90 + WAVES_HALF, WAVES_W / 2 + 2);
+        inv_arc(o, cx, cy, r - WAVES_W / 2 - 1, r + WAVES_W / 2 + 1, 270 - WAVES_HALF, 270 + WAVES_HALF, WAVES_W / 2 + 2);
+    }
+}
+
 /* ───────── pips ───────── */
 
 typedef struct {

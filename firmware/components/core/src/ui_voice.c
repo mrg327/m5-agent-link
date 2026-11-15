@@ -1,39 +1,62 @@
-/* The VOICE screen (issue 0ea9; looks per UI-V3 §4.7): dictate a reply to one session. Opened by "Dictate"
- * at the end of the Reply list, or on ASK for a request that takes free text (rid != 0: the transcript
- * answers it). Listening (tap or A stops; 15 s at most), Transcribing, then the transcript with a hold
- * button: only the 1.2 s hold sends it (cmd dictate names the recording; the daemon holds the text and
- * types it). A transcript longer than its five-line box is paged (issue c6cf): a tap or A turns the page,
- * and the button reads "More" until the last page has been on screen, so a hold never sends words the user
- * was not shown. Long swipe down or B held discards. voice.c does the recording. */
+/* The VOICE screen in Sigil (docs/design/GLYPHS.md §5; issue 0ea9 for what it does): dictate a reply to one
+ * session. Opened by Dictate at the end of the Reply list, or on ASK for a request that takes free text
+ * (rid != 0: the transcript answers it). voice.c does the recording.
+ *
+ * What is on the glass, top to bottom:
+ *   - who hears it: the reply glyph beside the project's sigil (the question glyph when the words answer a
+ *     question of a request);
+ *   - listening: the microphone as the hero glyph, inside a ring that drains with the time left (60 s), with
+ *     the loudness as waves leaving it left and right. A tap or A stops it;
+ *   - transcribing: the microphone goes grey and one wave walks inwards;
+ *   - the transcript (text: rule 1), five rows at a time, page pips under it, and one disc below: grey with
+ *     the caret while pages are unread (a tap or A turns the page), then the primary disc in yellow with the
+ *     paper plane (the tick when the words are one answer of several) inside the ring a hold fills. Only the
+ *     1.2 s hold sends, and only once every page has been on screen and the text has been readable for a
+ *     moment, so a hold never sends words the user was not shown;
+ *   - failed: the reason as a sign of one or two glyphs, and the retry disc (a tap or A).
+ * A tap where a hold is needed, or a hold while pages are unread, is answered on the control itself: the hold
+ * ring lights up, or the caret disc does. Long swipe down, swipe right or B held discards.
+ * The report names all of it in the words the screen used to show (rule 9). */
 #include <stdio.h>
 #include <string.h>
 
 #include "debug.h"
 #include "nav.h"
 #include "ui_internal.h"
+#include "ui_kit.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
-#include "ui_wheel.h"
 #include "voice.h"
 
-#define DISC_Y 186
-#define DISC_D 96
-#define HALO_R_MIN 48
-#define HALO_R_MAX 80 /* the halo's lowest edge (y 266) stays above the timer (top at y 271) */
-#define HALO_STEP 4 /* radius quantum: a repaint only when the loudness moves this far */
-#define LOW_Y 292   /* timer / "Transcribing…" */
-#define TEXT_CY 170
-#define TEXT_W_MAX 330 /* as wide as the chord allows, at most this */
+/* Geometry: centres. The content circle is r 205 about (233, 233). */
+#define HEAD_Y 50
+#define HEAD_SIGIL_R 22
+#define HEAD_GLYPH_X (UI_CX - 28) /* a 28 px glyph, a 10 px gap, the sigil: centred as a pair */
+#define HEAD_SIGIL_X (UI_CX + 19)
+#define HERO_Y 228        /* the microphone, its time ring and its waves share this centre */
+#define TIME_R 84         /* the ring that drains while recording */
+#define TIME_W 4
+#define WAVE_R0 104       /* the loudness: four pairs of arcs, the outermost at r 155 */
+#define WAVE_PITCH 17
+#define WAVE_N 4
+#define WAVE_STEP_MS 170  /* transcribing: the lit wave moves in one step per this */
+#define TEXT_CY 166
+#define TEXT_W_MAX 330    /* as wide as the chord allows, at most this */
 #define TEXT_LINES 5
-#define ERR_ICON_Y 176
-#define REASON_Y 236
-#define BUTTON_Y 296
+#define PIPS_Y 236
+#define DISC_Y 338        /* the send disc: with its hold ring it ends at r 197 */
+#define HOLD_RING (UI_DISC_R_PRIMARY + 11) /* the centre line of the disc's hold ring (ui_kit.c: 8 px out, 6 wide) */
+#define SIGN_Y 172        /* failed: the reason */
+#define RETRY_Y 312
+#define NUDGE_MS 1800     /* how long a control stays lit after the wrong gesture on it */
 
-static lv_obj_t *s_root, *s_header, *s_halo, *s_disc, *s_mic, *s_low, *s_box, *s_text, *s_err, *s_reason, *s_btn;
-static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
-static char s_header_txt[64], s_low_txt[32], s_reason_txt[96], s_word_txt[16];
+typedef enum { NUDGE_NONE, NUDGE_HOLD, NUDGE_READ } nudge_t;
+
+static lv_obj_t *s_root, *s_head, *s_sigil, *s_time, *s_waves, *s_hero, *s_box, *s_text, *s_pips, *s_track, *s_disc;
+static lv_obj_t *s_sign, *s_sign_big, *s_key_a;
+static char s_header_txt[64], s_low_txt[32], s_reason_txt[96];
 MODEL_EXT_BSS static char s_text_txt[VOICE_TEXT_MAX];
-static uint32_t s_sid, s_rid, s_now, s_text_since;
+static uint32_t s_sid, s_rid, s_now, s_text_since, s_wait_since, s_nudge_until;
 static bool s_queue; /* the hold sends the dictation with q (a working session: typed mid-turn, PROTOCOL §6d) */
 static int s_qi = -1;  /* >= 0: a free answer to that question of request s_rid (proto 0.18); the hold hands it to ASK */
 static bool s_qlast;   /* ... and it is the request's last question: the hold sends every answer ("Send", else "Use") */
@@ -41,19 +64,21 @@ static voice_state_t s_shown = (voice_state_t)-1;
 static bool s_holding, s_ramp_started;
 static bool s_lock_press; /* a press while pages are unread: says so once it has lasted NAV_HOLD_SHOW_MS */
 static uint32_t s_hold_t0;
-static int s_halo_r;
 static int s_page_i, s_pages;
 static bool s_read_all; /* the last page has been on screen: everything a hold would send has been shown */
+static nudge_t s_nudge;
 
 static void show(lv_obj_t *o, bool on)
 {
+    if (lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN) != on) return;
     if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
 }
 
+/* The hold fills the ring round the disc and, because the finger covers the disc, the bezel ring too. */
 static void hold_progress(int permille)
 {
-    wheel_set_progress(s_btn, permille);
+    ui_disc_set_hold(s_disc, permille);
     ring_set_progress(ui_home_ring(), permille, RGB_ASK);
 }
 
@@ -66,31 +91,34 @@ static void hold_cancel(void)
     hold_progress(0);
 }
 
-/* LVGL invalidates on every style write, so the font is written only when it changes. */
-static void set_low_font(const lv_font_t *f)
-{
-    if (lv_obj_get_style_text_font(s_low, 0) == f) return;
-    int lh = lv_font_get_line_height(f);
-    lv_obj_set_style_text_font(s_low, f, 0);
-    lv_obj_set_height(s_low, lh);
-    lv_obj_set_y(s_low, LOW_Y - lh / 2);
-}
+/* "Use": the words are one answer of several, handed to ASK; "Send": the hold sends. */
+static bool is_use(void) { return !s_queue && s_qi >= 0 && !s_qlast; }
+static const char *nudge_words(void) { return s_nudge == NUDGE_HOLD ? "Hold to send" : "Tap to read the rest"; }
 
-/* Halo radius follows the loudness (0..100), quantised so a quiet room does not repaint. */
-static void set_halo(int level)
+/* The loudness (0..100) as lit waves, counted from the microphone. A square-root curve: speech sits at 10..30
+ * of 100 and should still light two or three of the four. A quiet room lights none, so nothing repaints. */
+static void set_level(int level)
 {
     level = level < 0 ? 0 : level > 100 ? 100 : level;
-    int root = 0; /* square-root curve: speech sits at 10..30 of 100 and should still move the halo */
+    int root = 0;
     while ((root + 1) * (root + 1) <= level * 100) root++;
-    int r = HALO_R_MIN + (HALO_R_MAX - HALO_R_MIN) * root / 100;
-    r = r / HALO_STEP * HALO_STEP;
-    if (r == s_halo_r) return;
-    s_halo_r = r;
-    lv_obj_set_size(s_halo, 2 * r, 2 * r);
-    lv_obj_set_pos(s_halo, UI_CX - r, DISC_Y - r);
+    int lit = (root + 10) / 20;
+    if (lit > WAVE_N) lit = WAVE_N;
+    ui_waves_set(s_waves, (1u << lit) - 1, lv_color_hex(RGB_ASK), COL_FILL2);
 }
 
-/* The transcript, centred on y 170: FONT_BODY in a box as tall as the text, at most five lines. A longer
+/* Transcribing: what was heard travels into the microphone, one wave at a time, then a beat of nothing. */
+static void set_pulse(void)
+{
+    unsigned mask = 1; /* animations off: the innermost wave, still */
+    if (ui_animations_allowed()) {
+        int step = (int)((s_now - s_wait_since) / WAVE_STEP_MS % (WAVE_N + 1));
+        mask = step < WAVE_N ? 1u << (WAVE_N - 1 - step) : 0;
+    }
+    ui_waves_set(s_waves, mask, lv_color_hex(RGB_ASK), COL_FILL1);
+}
+
+/* The transcript, centred on TEXT_CY: FONT_BODY in a box as tall as the text, at most five lines. A longer
  * text is shown five lines at a time (the label slides up inside the clipping box). */
 static void set_transcript(const char *t)
 {
@@ -113,16 +141,30 @@ static void set_transcript(const char *t)
     theme_set_text(s_text, s_text_txt, sizeof s_text_txt, t);
 }
 
-/* "Send" (the hold) once every page has been shown; until then "More 1/3", which a tap answers. */
-static void set_button(voice_state_t st)
+/* The one disc under the transcript, or under the reason. While pages are unread it is the small grey caret
+ * ("More 1/3", which a tap answers); once every page has been shown it grows into the primary disc, in
+ * yellow, inside the ring its hold fills ("Send" / "Use"). After a failure it is the retry ("Try again"). */
+static void set_disc(voice_state_t st)
 {
-    const wheel_item_t send = {!s_queue && s_qi >= 0 && !s_qlast ? "Use" : "Send", RGB_ASK, true, 1, NULL};
-    static const wheel_item_t retry = {"Try again", 0, false, 2, NULL};
-    char more[24];
-    wheel_item_t next = {more, 0, false, 3, NULL};
-    snprintf(more, sizeof more, "More %d/%d", s_page_i + 1, s_pages);
-    wheel_set(s_btn, st != VOICE_TEXT ? &retry : s_read_all ? &send : &next, 1, 0);
-    wheel_set_shown(s_btn, true);
+    bool text = st == VOICE_TEXT, send = text && s_read_all;
+    ui_disc_set_pos(s_disc, UI_CX, text ? DISC_Y : RETRY_Y);
+    ui_disc_set_r(s_disc, send ? UI_DISC_R_PRIMARY : UI_DISC_R_SECONDARY);
+    ui_disc_set_glyph(s_disc, !text ? ICON_RETRY : !s_read_all ? ICON_CARET_DOWN : is_use() ? ICON_CHECK : ICON_SENT);
+    /* a hold while pages are unread lights the caret: this is what to tap */
+    ui_disc_set_rgb(s_disc, send || (text && s_nudge == NUDGE_READ) ? RGB_ASK : 0);
+    /* the ring to fill: dim until a tap asks for the hold */
+    show(s_track, send);
+    if (send) ui_arc_set(s_track, 0, COL_TEXT, s_nudge == NUDGE_HOLD ? lv_color_hex(RGB_ASK) : theme_dim(RGB_ASK, 30));
+    ui_pips_set(s_pips, text ? s_pages : 1, s_page_i);
+}
+
+static void nudge(nudge_t n)
+{
+    s_nudge = n;
+    s_nudge_until = s_now + NUDGE_MS;
+    set_disc(voice_state());
+    g_ui_actions->reject();
+    dbg_event("ui", "voice_nudge", "\"text\":%s", dbg_q(nudge_words()));
 }
 
 /* The next page (the first again after the last); the last one on screen unlocks the hold. */
@@ -131,69 +173,82 @@ static void turn_page(void)
     s_page_i = (s_page_i + 1) % s_pages;
     lv_obj_set_y(s_text, -s_page_i * TEXT_LINES * lv_font_get_line_height(FONT_BODY));
     if (s_page_i == s_pages - 1) s_read_all = true;
-    set_button(VOICE_TEXT);
+    s_nudge = NUDGE_NONE;
+    set_disc(VOICE_TEXT);
     dbg_event("ui", "voice_page", "\"page\":%d,\"pages\":%d", s_page_i + 1, s_pages);
+}
+
+/* Why it failed, as a sign (rule 8): one glyph as large as a state, or two side by side. */
+static void set_reason(const char *why)
+{
+    if (!strcmp(why, s_reason_txt)) return;
+    snprintf(s_reason_txt, sizeof s_reason_txt, "%s", why);
+    const char *g = theme_glyph(why);
+    if (!g) g = ICON_ERROR;
+    bool one = !g[3] && ui_glyph_font(g, 128) == FONT_ICON_HERO;
+    ui_glyph_set(s_sign_big, one ? g : "", lv_color_hex(RGB_ERROR));
+    ui_glyph_set(s_sign, one ? "" : g, lv_color_hex(RGB_ERROR));
 }
 
 static void render(void)
 {
     voice_state_t st = voice_state();
     const session_t *s = model_find(s_sid);
-    char buf[64];
     const char *base = s ? theme_basename(s->repo) : "";
-    snprintf(buf, sizeof buf, "%s %s", !s_queue && s_qi >= 0 ? "Answer for" : "Reply to", base[0] ? base : "(no folder)");
-    theme_set_text(s_header, s_header_txt, sizeof s_header_txt, buf);
+    bool answer = !s_queue && s_qi >= 0;
+    snprintf(s_header_txt, sizeof s_header_txt, "%s %s", answer ? "Answer for" : "Reply to", base[0] ? base : "(no folder)");
+    ui_sigil_set_name(s_sigil, base);
+    ui_glyph_set(s_head, answer ? ICON_QUESTION : ICON_REPLY, answer ? lv_color_hex(RGB_ASK) : COL_TEXT2);
+    bool rec = st == VOICE_REC, wait = st == VOICE_WAIT, text = st == VOICE_TEXT, failed = !rec && !wait && !text;
     if (st != s_shown) {
-        if (st == VOICE_TEXT) s_text_since = s_now;
-        if (st != VOICE_TEXT) hold_cancel();
+        if (text) s_text_since = s_now;
+        if (wait) s_wait_since = s_now;
+        if (!text) hold_cancel();
         s_shown = st;
-        bool rec = st == VOICE_REC, wait = st == VOICE_WAIT, text = st == VOICE_TEXT;
-        show(s_halo, rec);
-        show(s_disc, rec || wait);
-        theme_set_bg_color(s_disc, rec ? lv_color_hex(RGB_ASK) : COL_FILL2);
-        theme_set_text_color(s_mic, rec ? COL_ON_ACCENT : COL_TEXT);
-        show(s_low, rec || wait);
-        if (text) { /* before the button, which names the pages */
+        s_nudge = NUDGE_NONE;
+        show(s_hero, rec || wait);
+        show(s_waves, rec || wait);
+        show(s_time, rec);
+        ui_glyph_set(s_hero, ICON_MIC, rec ? lv_color_hex(RGB_ASK) : COL_TEXT3);
+        if (text) { /* before the disc, which depends on the pages */
             s_text_txt[0] = 0; /* a retry that heard the same words starts on page one again */
             set_transcript(voice_text());
         }
         show(s_box, text);
-        show(s_err, !rec && !wait && !text);
-        show(s_reason, !rec && !wait && !text);
-        if (text || st == VOICE_FAILED) set_button(st);
-        else wheel_set_shown(s_btn, false);
-        if (rec) set_halo(0);
+        show(s_pips, text);
+        show(s_sign, failed);
+        show(s_sign_big, failed);
+        show(s_disc, text || failed);
+        if (text || failed) set_disc(st);
+        else show(s_track, false);
+        if (rec) set_level(0);
     }
-    const char *word = "Stop";
+    const char *key = ""; /* what A does: stop, the next page, try again; nothing while waiting or once all is read */
     switch (st) {
     case VOICE_REC: {
         uint32_t ms = voice_elapsed_ms(s_now);
-        set_low_font(FONT_TITLE);
-        snprintf(buf, sizeof buf, "%u:%02u", (unsigned)(ms / 60000), (unsigned)(ms / 1000 % 60));
-        theme_set_text(s_low, s_low_txt, sizeof s_low_txt, buf);
-        set_halo(voice_level());
+        snprintf(s_low_txt, sizeof s_low_txt, "%u:%02u", (unsigned)(ms / 60000), (unsigned)(ms / 1000 % 60));
+        int left = ms >= VOICE_MAX_MS ? 0 : (int)((VOICE_MAX_MS - ms) * 1000 / VOICE_MAX_MS);
+        ui_arc_set(s_time, left, lv_color_hex(RGB_ASK), COL_FILL2);
+        set_level(voice_level());
+        key = ICON_STOP;
         break;
     }
     case VOICE_WAIT:
-        set_low_font(FONT_HEAD);
-        theme_set_text(s_low, s_low_txt, sizeof s_low_txt, "Transcribing\xe2\x80\xa6");
-        word = ""; /* A does nothing while waiting */
+        snprintf(s_low_txt, sizeof s_low_txt, "Transcribing\xe2\x80\xa6");
+        set_pulse();
         break;
     case VOICE_TEXT:
-        word = s_read_all ? "" : "More";
+        key = s_read_all ? "" : ICON_CARET_DOWN;
         break;
     case VOICE_FAILED:
     default:
-        theme_set_text(s_reason, s_reason_txt, sizeof s_reason_txt, voice_error()[0] ? voice_error() : "Not sent");
-        word = "";
+        set_reason(voice_error()[0] ? voice_error() : "Not sent");
+        key = ICON_RETRY;
         break;
     }
-    /* Stop names A only while listening (the hold button and Try again are touch / hold). */
-    show(s_badge[0], word[0] != 0);
-    if (word[0] && strcmp(word, s_word_txt)) {
-        snprintf(s_word_txt, sizeof s_word_txt, "%s", word);
-        theme_key_badge_set_word(s_badge[0], s_word[0], word, UI_BADGE_A_DEG, UI_BADGE_R);
-    }
+    show(s_key_a, key[0] != 0);
+    if (key[0]) ui_key_hint_set(s_key_a, key);
 }
 
 void ui_voice_open(uint32_t sid, uint32_t rid, bool queue, int qi, bool last, uint32_t now)
@@ -205,12 +260,13 @@ void ui_voice_open(uint32_t sid, uint32_t rid, bool queue, int qi, bool last, ui
     s_rid = rid;
     s_now = now;
     s_shown = (voice_state_t)-1;
-    s_halo_r = 0;
-    s_text_txt[0] = 0;
+    s_text_txt[0] = s_reason_txt[0] = s_low_txt[0] = 0;
     s_page_i = 0;
     s_pages = 1;
     s_read_all = false;
     s_holding = s_ramp_started = s_lock_press = false;
+    s_nudge = NUDGE_NONE;
+    ui_disc_set_hold(s_disc, 0);
     ring_set_still(ui_home_ring(), true);
     voice_start(sid, now); /* a refusal shows as the failed state with its reason */
     render();
@@ -256,8 +312,7 @@ bool ui_voice_act(nav_action_t a, const gesture_evt_t *g)
             turn_page();
             g_ui_actions->tick();
         } else if (st == VOICE_TEXT) {
-            ui_toast("Hold to send", RGB_ASK);
-            g_ui_actions->reject();
+            nudge(NUDGE_HOLD); /* a tap never sends: the ring to fill lights up */
         }
         render();
         return true;
@@ -285,10 +340,13 @@ bool ui_voice_act(nav_action_t a, const gesture_evt_t *g)
 bool ui_voice_tick(uint32_t now)
 {
     s_now = now;
+    if (s_nudge != NUDGE_NONE && (int32_t)(now - s_nudge_until) >= 0) {
+        s_nudge = NUDGE_NONE;
+        if (voice_state() == VOICE_TEXT) set_disc(VOICE_TEXT);
+    }
     if (s_lock_press && now - s_hold_t0 >= NAV_HOLD_SHOW_MS) { /* a hold, not a tap: say why it does nothing */
         s_lock_press = false;
-        ui_toast("Tap to read the rest", RGB_AMBER);
-        g_ui_actions->reject();
+        nudge(NUDGE_READ);
         dbg_event("ui", "voice_locked", "\"pages\":%d", s_pages);
     }
     if (s_holding && voice_state() == VOICE_TEXT && s_read_all) {
@@ -297,6 +355,10 @@ bool ui_voice_tick(uint32_t now)
             if (!s_ramp_started) {
                 s_ramp_started = true;
                 g_ui_actions->hold_start();
+                if (s_nudge != NUDGE_NONE) { /* the hold it asked for: the ring is the hold's now */
+                    s_nudge = NUDGE_NONE;
+                    set_disc(VOICE_TEXT);
+                }
             }
             hold_progress((int)(el * 1000 / NAV_HOLD_MS));
         }
@@ -322,40 +384,14 @@ void ui_voice_report(ui_report_t *r)
     snprintf(r->screen, sizeof r->screen, "voice");
     r->has_sel_sid = true;
     r->sel_sid = s_sid;
-    if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
     voice_state_t st = voice_state();
+    if (s_nudge != NUDGE_NONE && st == VOICE_TEXT) ui_report_add(r, "%s", nudge_words()); /* the lit control */
+    if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
     if (s_low_txt[0] && (st == VOICE_REC || st == VOICE_WAIT)) ui_report_add(r, "%s", s_low_txt);
     if (st == VOICE_TEXT) ui_report_add(r, "(transcript)");
     if (st == VOICE_FAILED) ui_report_add(r, "%s", s_reason_txt);
-    if (st == VOICE_TEXT && !s_read_all) ui_report_add(r, "More %d/%d", s_page_i + 1, s_pages); /* the button */
-    else if (st == VOICE_TEXT || st == VOICE_FAILED)
-        ui_report_add(r, "%s", st == VOICE_TEXT ? (!s_queue && s_qi >= 0 && !s_qlast ? "Use" : "Send") : "Try again");
-}
-
-static lv_obj_t *label(lv_obj_t *parent, const lv_font_t *f, lv_color_t col, int cy, int w, int lines)
-{
-    lv_obj_t *l = lv_label_create(parent);
-    lv_obj_set_style_text_font(l, f, 0);
-    lv_obj_set_style_text_color(l, col, 0);
-    lv_obj_set_size(l, w, lines * lv_font_get_line_height(f));
-    lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
-    lv_obj_set_pos(l, UI_CX - w / 2, cy - lv_font_get_line_height(f) / 2);
-    lv_label_set_text(l, "");
-    return l;
-}
-
-static lv_obj_t *disc(lv_obj_t *parent, int d, lv_color_t col)
-{
-    lv_obj_t *o = lv_obj_create(parent);
-    lv_obj_remove_style_all(o);
-    lv_obj_set_size(o, d, d);
-    lv_obj_set_pos(o, UI_CX - d / 2, DISC_Y - d / 2);
-    lv_obj_set_style_radius(o, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(o, col, 0);
-    lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    return o;
+    if (st == VOICE_TEXT && !s_read_all) ui_report_add(r, "More %d/%d", s_page_i + 1, s_pages); /* the disc */
+    else if (st == VOICE_TEXT || st == VOICE_FAILED) ui_report_add(r, "%s", st == VOICE_TEXT ? (is_use() ? "Use" : "Send") : "Try again");
 }
 
 lv_obj_t *ui_voice_init(lv_obj_t *screen)
@@ -364,36 +400,44 @@ lv_obj_t *ui_voice_init(lv_obj_t *screen)
     lv_obj_remove_style_all(s_root);
     lv_obj_set_size(s_root, UI_SIZE, UI_SIZE);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    s_header = label(s_root, FONT_CAPTION, COL_TEXT2, UI_Y_CAPTION, 280, 1);
-    s_halo = disc(s_root, 2 * HALO_R_MIN, lv_color_hex(RGB_ASK));
-    lv_obj_set_style_bg_opa(s_halo, (LV_OPA_COVER / 4), 0);
-    s_disc = disc(s_root, DISC_D, lv_color_hex(RGB_ASK));
-    s_mic = lv_label_create(s_disc);
-    lv_obj_set_style_text_font(s_mic, FONT_ICON_L, 0);
-    lv_label_set_text(s_mic, ICON_MIC);
-    lv_obj_center(s_mic);
-    s_low = label(s_root, FONT_TITLE, COL_TEXT, LOW_Y, 300, 1);
-    s_box = lv_obj_create(s_root); /* clips the transcript to one page */
+
+    /* who hears it */
+    s_head = ui_glyph_create(s_root, FONT_ICON_M, HEAD_GLYPH_X, HEAD_Y);
+    s_sigil = ui_sigil_create(s_root, HEAD_SIGIL_X, HEAD_Y, HEAD_SIGIL_R);
+
+    /* listening and transcribing: the time left, the loudness, the microphone */
+    s_time = ui_arc_create(s_root, UI_CX, HERO_Y, TIME_R, TIME_W);
+    s_waves = ui_waves_create(s_root, UI_CX, HERO_Y, WAVE_R0, WAVE_PITCH, WAVE_N);
+    s_hero = ui_glyph_create(s_root, FONT_ICON_HERO, UI_CX, HERO_Y);
+
+    /* the transcript: a box that clips the text to one page, and which page */
+    s_box = lv_obj_create(s_root);
     lv_obj_remove_style_all(s_box);
     lv_obj_remove_flag(s_box, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_size(s_box, TEXT_W_MAX, TEXT_LINES * lv_font_get_line_height(FONT_BODY));
-    s_text = label(s_box, FONT_BODY, COL_TEXT, 0, TEXT_W_MAX, 1);
+    s_text = lv_label_create(s_box);
+    lv_obj_set_style_text_font(s_text, FONT_BODY, 0);
+    lv_obj_set_style_text_color(s_text, COL_TEXT, 0);
+    lv_obj_set_style_text_align(s_text, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(s_text, LV_LABEL_LONG_MODE_WRAP);
-    lv_obj_set_pos(s_text, 0, 0);
+    lv_obj_set_width(s_text, TEXT_W_MAX);
     lv_obj_set_height(s_text, LV_SIZE_CONTENT);
-    s_err = lv_label_create(s_root);
-    lv_obj_set_style_text_font(s_err, FONT_ICON_L, 0);
-    lv_obj_set_style_text_color(s_err, lv_color_hex(RGB_ERROR), 0);
-    lv_label_set_text(s_err, ICON_ERROR);
-    lv_obj_align(s_err, LV_ALIGN_TOP_MID, 0, ERR_ICON_Y - 22);
-    s_reason = label(s_root, FONT_HEAD, COL_TEXT, REASON_Y, 320, 2);
-    s_btn = wheel_create_at(s_root, WHEEL_LAYOUT_BUTTON_TALL(BUTTON_Y));
-    static const char *const words[2] = {"Stop", "Back"}; /* B has no legend here: a short press does nothing */
-    for (int i = 0; i < 2; i++)
-        s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,
-                                     UI_BADGE_R, &s_key[i], &s_word[i]);
-    snprintf(s_word_txt, sizeof s_word_txt, "Stop");
-    show(s_badge[1], false);
-    lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_pos(s_text, 0, 0);
+    lv_label_set_text(s_text, "");
+    s_pips = ui_pips_create(s_root, UI_CX, PIPS_Y);
+
+    /* why it failed */
+    s_sign = ui_glyph_create(s_root, FONT_ICON_XL, UI_CX, SIGN_Y);
+    s_sign_big = ui_glyph_create(s_root, FONT_ICON_HERO, UI_CX, SIGN_Y);
+
+    /* the disc, and under it the ring its hold fills */
+    s_track = ui_arc_create(s_root, UI_CX, DISC_Y, HOLD_RING, 6);
+    s_disc = ui_disc_create(s_root, UI_CX, DISC_Y, UI_DISC_R_SECONDARY);
+
+    /* rule 6: what A does. B has no hint here: a short press does nothing (held, it leaves) */
+    s_key_a = ui_key_hint_create(s_root, UI_KEY_A);
+
+    lv_obj_t *hide[] = {s_time, s_waves, s_hero, s_box, s_pips, s_sign, s_sign_big, s_track, s_disc, s_key_a, s_root};
+    for (size_t i = 0; i < sizeof hide / sizeof hide[0]; i++) lv_obj_add_flag(hide[i], LV_OBJ_FLAG_HIDDEN);
     return s_root;
 }
