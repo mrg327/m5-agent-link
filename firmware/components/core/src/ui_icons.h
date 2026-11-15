@@ -95,3 +95,7 @@
 #define ICON_TAP "\xEE\xB2\x90" /* hand-tap ec90 */
 #define ICON_FORWARD "\xEE\x81\xAC" /* arrow-right e06c */
 #define ICON_CARET_DOWN "\xEE\x84\xB6" /* caret-down e136 */
+/* WATCH, gauges and the done row (docs/design/glyphs/WATCH-GAUGES-DONE.md). */
+#define ICON_TIMER "\xEE\x92\x92" /* timer e492: how long a turn took */
+#define ICON_CLOCK "\xEE\x86\x9A" /* clock e19a: the plan's 5-hour window (the week is ICON_WEEK) */
+#define ICON_DONT_ASK "\xEE\x85\xAA" /* chat-circle-slash e16a: the "don't ask" permission mode */

@@ -1,6 +1,10 @@
 # Gauges: plan usage and context on the watch
 
 > Status: built on branch `next` (issue 20261112-2777). Protocol 0.10. Not yet run on the device.
+>
+> On glass these are arcs and glyphs since Sigil (issue 20261114-8c3d): see
+> [glyphs/WATCH-GAUGES-DONE.md](glyphs/WATCH-GAUGES-DONE.md) §2. The data, the rules and the report's words below
+> are unchanged; where §1 and §5 describe a capsule, a figure or a line of words, read that section instead.
 
 The watch knew what each agent was doing but nothing about what it costs. Two numbers decide whether a
 long run will finish: how much of the plan's rate limit is left, and how full the session's context window

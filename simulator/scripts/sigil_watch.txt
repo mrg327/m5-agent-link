@@ -1,0 +1,113 @@
+# GLYPHS.md §5 WATCH in Sigil: the step timeline as a lane of glyph nodes. Every state of the lane as a render,
+# the words each one still says in the report (rule 9), a tap that selects an earlier step, and the redraw budget
+# of the comet on a running step. The states without a lane (needs you, error, done, idle) are in watch_states.txt.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login
+session 2 work api main
+wait 300
+tap 233 233
+wait 300
+expect_label > Activity
+btn A
+wait 300
+expect_screen watch
+# no step yet: the working glyph in a running ring; no word of it on glass, `Working` in the report
+expect_label Claude Code · webapp
+expect_label Working
+ui
+shot sigil_watch_start.png
+# the first step: the eye in the ring, its argument below, the count in the badge
+step 1 1 Read · src/main.c
+wait 200
+expect_label Read
+expect_label src/main.c
+expect_label Step 1
+shot sigil_watch_step.png
+# it returned: the ring is a filled disc
+step 1 1 ok
+wait 200
+shot sigil_watch_ok.png
+# a test run that failed: the flask on a red disc
+step 1 2 Bash · npm test -- --watch=false
+step 1 2 fail
+wait 200
+expect_label [ok] Read · src/main.c
+expect_label Bash
+expect_label npm test -- --watch=false
+shot sigil_watch_failed.png
+# a tool the watch has no glyph for keeps its name: an MCP tool is the plug and its whole text
+step 1 3 mcp__github__create_issue · Login fails on Safari
+wait 200
+expect_label [fail] Bash
+expect_label mcp__github__create_issue
+shot sigil_watch_mcp.png
+# a sub-agent's step leads with the agent: the tool is what follows
+step 1 3 ok
+step 1 4 explore: grep · TODO|FIXME
+wait 200
+expect_label explore: grep
+shot sigil_watch_subagent.png
+# five steps: the first one left the timeline, the lane fades out beyond the oldest node
+step 1 4 ok
+step 1 5 Edit · src/components/authentication/LoginForm.tsx
+wait 200
+expect_no_label [ok] Read
+expect_label [fail] Bash
+expect_label [ok] mcp__github__create_issue
+expect_label [ok] explore: grep
+expect_label Step 5
+shot sigil_watch_lane.png
+# a tap on the node before the current one selects it: its argument is the text
+tap 129 202
+wait 200
+expect_screen watch
+expect_label > [ok] explore: grep
+shot sigil_watch_select.png
+# the furthest node lies beyond the centre zone: its tap selects it too, and picks no session
+tap 47 202
+wait 200
+expect_screen watch
+expect_label > [fail] Bash
+expect_label Claude Code · webapp
+shot sigil_watch_select_far.png
+# a tap on the hero selects the current step again
+tap 233 202
+wait 200
+expect_screen watch
+expect_no_label > [
+# so does a new step
+tap 129 202
+wait 200
+expect_label > [
+step 1 5 ok
+step 1 137 WebFetch · https://example.com/docs/getting-started
+wait 200
+expect_no_label > [
+expect_label Step 137
+expect_label WebFetch
+shot sigil_watch_count.png
+# prose instead of a tool: the working glyph, and the whole sentence as text
+session 1 work webapp feat/login Running the test suite after the login refactor
+wait 200
+expect_label Running the test suite after the login refactor
+shot sigil_watch_prose.png
+# 47 minutes on: the time in this state is a tally under the lane (four tens and eight ones)
+rtc 1800002760
+wait 600
+expect_label 47:
+shot sigil_watch_long.png
+# redraw budget: 3 s of a running step repaint only the two ends of the comet (and the index ring's own comets)
+px_reset
+wait 3000
+expect_px_max 420000
+# B follows the deck to the next session: nothing of the first one's lane is left
+btn B
+wait 200
+expect_screen watch
+expect_label api
+expect_no_label WebFetch
+expect_no_label [ok]
+shot sigil_watch_other.png
+quit
