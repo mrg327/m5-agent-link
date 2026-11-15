@@ -444,6 +444,9 @@ bool ui_on_gesture(const gesture_evt_t *g)
     if (zone == ZONE_RIM && s_mode == MODE_HOME && (g->kind == G_TAP || g->kind == G_DOUBLE_TAP) &&
         (ui_home_read_hit(g->x, g->y) || ui_home_strip_hit(g->x, g->y)))
         zone = ZONE_CENTRE;
+    /* ASK's Open on PC is button A's hint, and a tap item sits between the hints: both beyond the centre zone */
+    if (zone == ZONE_RIM && s_mode == MODE_ASK && (g->kind == G_TAP || g->kind == G_DOUBLE_TAP) && ui_ask_target_hit(g->x, g->y))
+        zone = ZONE_CENTRE;
     nav_action_t a = nav_lookup(s_mode, g->kind, zone, ui_home_request_pending(), ui_home_askable());
     if (a != NAV_NONE && g->kind != G_PRESS && g->kind != G_RELEASE && g->kind != G_MOVE) /* moves: a stream */
         dbg_event("ui", "nav", "\"mode\":\"%s\",\"gesture\":\"%s\",\"action\":\"%s\"", nav_mode_name(s_mode),

@@ -463,6 +463,11 @@ sim_script_test(sim_queue_show_cancel queue_show_cancel.txt
 sim_script_test(sim_kit_gallery kit_gallery.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_sigil_home sigil_home.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"op\":5")
 set_tests_properties(sim_sigil_home PROPERTIES TIMEOUT 90)
+# ASK in Sigil (docs/design/glyphs/ASK.md): every state as a render, the words each still says in the report, and
+# a redraw budget at rest. A tap on the Approve disc sends nothing; the script's own holds approve, deny and answer.
+sim_script_test(sim_sigil_ask sigil_ask.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"op\":3.*\"op\":4.*\"op\":19")
+set_tests_properties(sim_sigil_ask PROPERTIES TIMEOUT 120)
 sim_script_test(sim_deck_v3_states deck_v3_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_deck_v3_ambient deck_v3_ambient.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_deck_v3_ambient PROPERTIES TIMEOUT 60)

@@ -101,6 +101,12 @@ static const struct { const char *word, *glyph; } kGlyphs[] = {
     /* results (ui_burst) */
     {"Approved", ICON_CHECK}, {"Always allowed", ICON_ALWAYS}, {"On your computer", ICON_COMPUTER},
     {"Waiting for your computer", ICON_COMPUTER}, {"Time ran out", ICON_WAIT},
+    /* ASK (ui_ask.c): a tap on a hold item is told "finger, and what the hold does"; a shut grant is told why */
+    {"Hold to approve", ICON_TAP ICON_CHECK}, {"Hold to deny", ICON_TAP ICON_X}, {"Hold to always allow", ICON_TAP ICON_ALWAYS},
+    {"Hold to choose", ICON_TAP ICON_CHECK}, {"Hold to send", ICON_TAP ICON_SENT},
+    {"Hold for the next question", ICON_TAP ICON_NEXT}, {"Read it first", ICON_READ},
+    {"Too long to approve here", ICON_COMPUTER ICON_CHECK}, {"Rule too long for the watch", ICON_ALWAYS ICON_REFUSED},
+    {"Tick at least one", ICON_G_PLAN},
 };
 
 const char *theme_glyph(const char *word)

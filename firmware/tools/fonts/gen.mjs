@@ -44,6 +44,8 @@ const ICONS = {
   "git-pull-request": 0xe282, files: 0xe710, "folder-dashed": 0xe8f8, prohibit: 0xe3de, "app-window": 0xe5da,
   "arrow-up": 0xe08e, "arrow-down": 0xe03e, "link-break": 0xe2e4, queue: 0xe6ac, "hand-tap": 0xec90,
   "arrow-right": 0xe06c, "caret-down": 0xe136,
+  // ASK (docs/design/glyphs/ASK.md): a standing rule's breadth (wildcard / exactly as written) and its project scope.
+  asterisk: 0xe0aa, equals: 0xe21c, folder: 0xe24a,
 };
 // The GRAPH screen's node and lane glyphs (GRAPH.md §4): drawn inside a node disc, so 20 px only.
 const GRAPH_ICONS = {
@@ -54,7 +56,8 @@ const GRAPH_ICONS = {
 
 // Sigil (GLYPHS.md §3.2): the tick, the cross, the double tick and the carets come from Phosphor Bold. The Fill
 // family draws the first three inside a filled square and the carets as solid triangles. Same code points.
-const BOLD = { check: 0xe182, x: 0xe4f6, checks: 0xe53a, "caret-right": 0xe13a, "caret-down": 0xe136 };
+const BOLD = { check: 0xe182, x: 0xe4f6, checks: 0xe53a, "caret-right": 0xe13a, "caret-down": 0xe136,
+  asterisk: 0xe0aa, equals: 0xe21c };
 const boldDir = "node_modules/@phosphor-icons/web/src/bold";
 // The hero sizes (128 px: a state or a result alone on the screen; 96 px: the glyph on a primary disc) hold only
 // the glyphs that are ever a state, a result or a primary action.

@@ -109,6 +109,9 @@ bool ui_ask_tick(uint32_t now_ms);    /* true: wants to close */
 void ui_ask_report(ui_report_t *r);
 /* The request ASK shows and can still be answered (its countdown runs), or NULL. */
 const attention_t *ui_ask_request(void);
+/* The point is on one of ASK's items (a disc, a row, button A's hint): a tap there is let through although some
+ * of them reach past the centre zone (GLYPHS.md §3.4). */
+bool ui_ask_target_hit(int x, int y);
 /* VOICE's hold on an "Other" answer: recording aid answers question qi of request rid. */
 void ui_ask_other_done(uint32_t rid, int qi, uint32_t aid, uint32_t hold_ms);
 

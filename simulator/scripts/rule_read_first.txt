@@ -12,17 +12,17 @@ wait 150
 btn B
 wait 300
 expect_label Bash(npm test:*)
-hold 233 282 700
+hold 140 313 700
 wait 100
 expect_label Read it first
 expect_no_label Always allowed
-tap 233 282
+tap 140 313
 wait 400
 expect_label Reading 1 of 1
 btn B
 wait 400
 expect_label > Always allow HOLD
-hold 233 282 1900
+hold 140 313 1900
 wait 300
 expect_label Always allowed
 quit

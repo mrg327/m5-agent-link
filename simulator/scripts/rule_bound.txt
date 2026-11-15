@@ -12,7 +12,7 @@ btn B
 wait 150
 btn B
 wait 300
-press 233 282
+press 140 313
 wait 600
 clear 12 answered_pc
 wait 50
@@ -27,11 +27,11 @@ wait 150
 btn B
 wait 300
 expect_label > Always allow HOLD
-press 233 282
+press 140 313
 wait 2400
 release
 wait 300
-hold 233 282 1900
+hold 140 313 1900
 wait 300
 expect_no_label Always allowed
 quit

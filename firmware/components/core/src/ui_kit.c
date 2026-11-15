@@ -673,6 +673,7 @@ typedef struct {
     int16_t r, cx, cy, hold;
     uint32_t rgb;
     uint8_t state;
+    bool track; /* the hold ring's path is drawn, dim, under the ring: this disc is held, not tapped */
     const char *glyph;
     const lv_font_t *font;
 } disc_t;
@@ -712,6 +713,7 @@ static void disc_draw(lv_event_t *e)
         lv_draw_rect(l, &r, &a);
     }
     ui_glyph_draw(l, d->font, d->glyph, cx, cy, ink, LV_OPA_COVER);
+    if (d->track && d->hold < 1000) arc(l, cx, cy, d->r + disc_hold_gap(d) + disc_hold_w(d), disc_hold_w(d), 0, 360, COL_FILL2);
     if (d->hold > 0) arc(l, cx, cy, d->r + disc_hold_gap(d) + disc_hold_w(d), disc_hold_w(d), 0, d->hold * 360 / 1000, COL_TEXT);
 }
 
@@ -751,6 +753,14 @@ void ui_disc_set_state(lv_obj_t *o, ui_disc_state_t st)
     disc_t *d = lv_obj_get_user_data(o);
     if (d->state == (uint8_t)st) return;
     d->state = (uint8_t)st;
+    lv_obj_invalidate(o);
+}
+
+void ui_disc_set_track(lv_obj_t *o, bool on)
+{
+    disc_t *d = lv_obj_get_user_data(o);
+    if (d->track == on) return;
+    d->track = on;
     lv_obj_invalidate(o);
 }
 

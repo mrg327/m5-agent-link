@@ -106,6 +106,9 @@ void ui_disc_set_r(lv_obj_t *d, int r);
 /* The hold ring: an arc round the disc, 0..1000 per mille clockwise from 12 o'clock, 0 hides it. 8 px outside
  * the disc and 6 px wide (3 and 3 on a key hint), white. Each step invalidates only the arc it adds. */
 void ui_disc_set_hold(lv_obj_t *d, int permille);
+/* The hold ring's path, drawn dim under the ring while `on`: a disc that is held, not tapped, shows where its
+ * ring will run (ASK: the selected hold item). Off by default. */
+void ui_disc_set_track(lv_obj_t *d, bool on);
 /* The screen point is on the disc or within UI_DISC_SLACK of it. False while the disc is hidden. */
 bool ui_disc_hit(lv_obj_t *d, int x, int y);
 

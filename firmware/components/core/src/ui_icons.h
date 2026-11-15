@@ -95,3 +95,7 @@
 #define ICON_TAP "\xEE\xB2\x90" /* hand-tap ec90 */
 #define ICON_FORWARD "\xEE\x81\xAC" /* arrow-right e06c */
 #define ICON_CARET_DOWN "\xEE\x84\xB6" /* caret-down e136 */
+/* ASK in Sigil (docs/design/glyphs/ASK.md): what a standing rule covers and where it is saved. */
+#define ICON_WILD "\xEE\x82\xAA" /* asterisk e0aa (Bold): the rule has a wildcard */
+#define ICON_EXACT "\xEE\x88\x9C" /* equals e21c (Bold): the rule matches exactly what is written */
+#define ICON_FOLDER "\xEE\x89\x8A" /* folder e24a: saved for this project */
