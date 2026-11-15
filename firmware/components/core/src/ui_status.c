@@ -207,7 +207,7 @@ static void link_look(link_look_t *k)
 {
     char buf[64];
     int t = ui_link_transport();
-    const char *sym = t == HAL_LINK_USB ? ICON_USB : t == HAL_LINK_BLE ? ICON_BLUETOOTH : ICON_COMPUTER;
+    const char *sym = t == HAL_LINK_USB ? ICON_USB : hal_link_is_ble(t) ? ICON_BLUETOOTH : ICON_COMPUTER;
     uint32_t down = ui_link_down_ms();
     *k = (link_look_t){.icon = sym, .host = model_host()};
     if (!ui_link_connected() && down && model_count() > 0) {
@@ -227,7 +227,7 @@ static void link_look(link_look_t *k)
     } else {
         k->sigil = k->host[0] != 0;
         if (theme_now_unix() > 100000) /* with the clock unset the first line already is the host name */
-            snprintf(buf, sizeof buf, "%s %.16s", sym, k->host[0] ? k->host : t == HAL_LINK_USB ? "USB" : t == HAL_LINK_BLE ? "BLE" : "PC");
+            snprintf(buf, sizeof buf, "%s %.16s", sym, k->host[0] ? k->host : t == HAL_LINK_USB ? "USB" : hal_link_is_ble(t) ? "BLE" : "PC");
         else
             snprintf(buf, sizeof buf, "%s", sym);
     }

@@ -38,6 +38,7 @@
 
 typedef enum { PAD_OK, PAD_OFFLINE, PAD_OLD, PAD_NO_POINTER, PAD_REFUSED } pad_t;
 
+static int s_fast_port = -1; /* the port asked for the short interval, -1 none */
 static lv_obj_t *s_root, *s_pointer, *s_rim, *s_wheel, *s_left, *s_right, *s_hold, *s_sign, *s_hint;
 static uint32_t s_now, s_sent_ms;
 static char s_hint_txt[128];    /* in words, for the report: the how-to, or why the pad cannot work */
@@ -113,7 +114,8 @@ void ui_trackpad_open(uint32_t now)
     ui_home_rim_mode(true);
     if (g_ui_actions->sectors) g_ui_actions->sectors(NAV_POINTER_SECTORS); /* a notch per 15 degrees */
     if (g_ui_actions->moves) g_ui_actions->moves(true);
-    hal_link_interactive(true); /* the short BLE interval, as in SCROLL */
+    s_fast_port = ui_link_transport();
+    if (s_fast_port >= 0) hal_link_interactive((hal_link_kind_t)s_fast_port, true); /* the short BLE interval, as in SCROLL */
     ui_trackpad_refresh(now);
     show(s_root, true);
     dbg_event("ui", "trackpad", "\"pointer\":%s", model_pointer() ? "true" : "false");
@@ -123,7 +125,8 @@ void ui_trackpad_close(void)
 {
     send(-1, 0, 0); /* a move still pending */
     if (g_ui_actions->moves) g_ui_actions->moves(false);
-    hal_link_interactive(false);
+    if (s_fast_port >= 0) hal_link_interactive((hal_link_kind_t)s_fast_port, false);
+    s_fast_port = -1;
     show(s_root, false);
     dbg_event("ui", "trackpad_close", "\"left\":%d,\"right\":%d,\"double\":%d,\"wheel\":%d", s_n_left, s_n_right, s_n_double,
               s_wheel_sum);

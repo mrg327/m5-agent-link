@@ -204,7 +204,7 @@ static void update_marks(const char *marks)
         } else {
             snprintf(s_sign_words, sizeof s_sign_words, "Connecting\xE2\x80\xA6");
             kind = SIGN_CONNECTING;
-            icon = k == HAL_LINK_USB ? ICON_USB : k == HAL_LINK_BLE ? ICON_BLUETOOTH : ICON_COMPUTER;
+            icon = k == HAL_LINK_USB ? ICON_USB : hal_link_is_ble(k) ? ICON_BLUETOOTH : ICON_COMPUTER;
         }
     } else {
         hal_battery_t b = hal_battery_read();

@@ -53,6 +53,7 @@
 #define STOP_GAP_MS 400     /* the end-of-scrollback thud repeats at most this often */
 #define UNKNOWN_TOTAL_SOFT 100 /* total unknown: the thumb sits at lines/(lines+this), so 100 lines = half way */
 
+static int s_fast_port = -1; /* the port asked for the short interval, -1 none */
 static lv_obj_t *s_root, *s_sigil, *s_marks, *s_map, *s_live, *s_preview, *s_track, *s_key[2];
 static uint32_t s_sid, s_now, s_last_input;
 static char s_header_txt[64], s_count_txt[24], s_preview_txt[64], s_marks_txt[24];
@@ -207,14 +208,16 @@ void ui_scroll_open(uint32_t sid, uint32_t now)
     ring_set_track(ui_home_ring(), 0, RGB_ACCENT); /* ... and says so: one grey ring, no sessions to scrub */
     ui_scroll_refresh(now);
     show(s_root, true);
-    hal_link_interactive(true);
+    s_fast_port = ui_link_transport();
+    if (s_fast_port >= 0) hal_link_interactive((hal_link_kind_t)s_fast_port, true);
     dbg_event("ui", "scroll", "\"sid\":%u,\"preview_allowed\":%s", (unsigned)sid, preview_allowed() ? "true" : "false");
 }
 
 void ui_scroll_close(void)
 {
     s_glide_v = 0;
-    hal_link_interactive(false);
+    if (s_fast_port >= 0) hal_link_interactive((hal_link_kind_t)s_fast_port, false);
+    s_fast_port = -1;
     show(s_root, false);
     ring_set_still(ui_home_ring(), !ui_animations_allowed());
 }

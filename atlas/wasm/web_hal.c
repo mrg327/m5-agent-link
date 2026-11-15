@@ -227,8 +227,8 @@ bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len)
     return true;
 }
 
-void hal_link_interactive(bool on) { (void)on; }
-void hal_link_bulk(bool on) { (void)on; }
+void hal_link_interactive(hal_link_kind_t port, bool on) { (void)port; (void)on; }
+void hal_link_bulk(hal_link_kind_t port, bool on) { (void)port; (void)on; }
 uint32_t hal_link_ble_interval_us(void) { return 0; }
 
 /* Firmware update (FIRMWARE.md §9): the web watch has no flash to write. A transfer is refused, so the

@@ -72,6 +72,7 @@ MODEL_EXT_BSS static uint8_t s_q_len[VOICE_Q_BLOCKS];
 static uint32_t s_q_n;   /* blocks encoded; s_seq of them are sent */
 static bool s_draining;  /* stopped, with blocks still to send: the end follows the last one */
 static bool s_bulk;      /* the link was asked for its short interval */
+static hal_link_kind_t s_port;
 
 static voice_state_t s_state;
 static uint32_t s_aid, s_sid, s_seq, s_t0, s_t_end, s_wait_t0;
@@ -95,8 +96,9 @@ uint32_t voice_elapsed_ms(uint32_t now_ms) { return (s_state == VOICE_REC ? now_
 static void bulk(bool on)
 {
     if (on == s_bulk) return;
+    if (on) s_port = link_active_kind();
     s_bulk = on;
-    hal_link_bulk(on);
+    hal_link_bulk(s_port, on);
 }
 
 static void fail(const char *why)
