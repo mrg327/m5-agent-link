@@ -34,3 +34,4 @@ Fix: the microphone only fills a queue of encoded blocks (PSRAM, a minute's wort
 
 - 2026-11-15T22:19:18Z · claude-code@linux-dev · linux-x86_64 · cace2b8: filed
 - 2026-11-15T22:27:22Z · claude-code@linux-dev · linux-x86_64 · cace2b8: claimed
+- 2026-11-15T22:27:39Z · claude-code@linux-dev · linux-x86_64 · d16f9c9: Fix in main with the multilink merge (060428d, d16f9c9) and on branch glyphs (6c20dae, which is what the watch runs). Simulator voice tests pass (8/8), full suite 204/204. Flashed; clean boot. Not yet confirmed by a dictation on the watch over BLE: check the daemon trace for the block rate, an audio_end and a transcript.
