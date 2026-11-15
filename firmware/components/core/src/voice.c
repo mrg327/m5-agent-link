@@ -60,6 +60,20 @@ int voice_adpcm_block(const int16_t *pcm, int n, uint8_t *out, int *index_io)
     return len;
 }
 
+/* The recording waits here, encoded, for the link. The microphone makes 8 kB/s and a BLE central on a long
+ * interval takes less (48.75 ms to a Linux machine: under 2 kB/s). Sending straight from the microphone loop
+ * then never returned: the watch froze and recorded past VOICE_MAX_MS. So the microphone only fills this
+ * queue, a tick sends from it for VOICE_SEND_BUDGET_US, and a stop drains it before the end is sent.
+ * In PSRAM: a minute of blocks, and the second the microphone's own buffer holds. */
+#define VOICE_Q_BLOCKS ((VOICE_MAX_MS + 1500) * (HAL_MIC_RATE / 1000) / VOICE_BLOCK_SAMPLES + 2)
+#define VOICE_SEND_BUDGET_US 20000
+MODEL_EXT_BSS static uint8_t s_q[VOICE_Q_BLOCKS][VOICE_BLOCK_BYTES];
+MODEL_EXT_BSS static uint8_t s_q_len[VOICE_Q_BLOCKS];
+static uint32_t s_q_n;   /* blocks encoded; s_seq of them are sent */
+static bool s_draining;  /* stopped, with blocks still to send: the end follows the last one */
+static bool s_bulk;      /* the link was asked for its short interval */
+static hal_link_kind_t s_port;
+
 static voice_state_t s_state;
 static uint32_t s_aid, s_sid, s_seq, s_t0, s_t_end, s_wait_t0;
 static int16_t s_pcm[VOICE_BLOCK_SAMPLES];
@@ -78,9 +92,20 @@ const char *voice_text(void) { return s_text; }
 const char *voice_error(void) { return s_err; }
 uint32_t voice_elapsed_ms(uint32_t now_ms) { return (s_state == VOICE_REC ? now_ms : s_t_end) - s_t0; }
 
+/* A recording is the one time the watch sends in bulk: ask the link for its shortest interval meanwhile. */
+static void bulk(bool on)
+{
+    if (on == s_bulk) return;
+    if (on) s_port = link_active_kind();
+    s_bulk = on;
+    hal_link_bulk(s_port, on);
+}
+
 static void fail(const char *why)
 {
     hal_mic_stop();
+    bulk(false);
+    s_draining = false;
     s_state = VOICE_FAILED;
     s_err = why;
     dbg_event("voice", "failed", "\"aid\":%u,\"why\":\"%s\"", (unsigned)s_aid, why);
@@ -89,10 +114,40 @@ static void fail(const char *why)
 static void flush_block(void)
 {
     if (s_have < 1) return;
-    uint8_t out[VOICE_BLOCK_BYTES];
-    int len = voice_adpcm_block(s_pcm, s_have, out, &s_index);
-    if (!link_send_audio(s_aid, s_seq++, out, (size_t)len)) fail("Offline");
+    if (s_q_n < VOICE_Q_BLOCKS) { /* full only past VOICE_MAX_MS, if a tick came very late: the rest is dropped */
+        s_q_len[s_q_n] = (uint8_t)voice_adpcm_block(s_pcm, s_have, s_q[s_q_n], &s_index);
+        s_q_n++;
+    }
     s_have = 0;
+}
+
+/* Sends queued blocks for one tick's budget. A send waits for the link (back-pressure), so one block can
+ * take longer than the budget on a slow link; the loop still returns after it. */
+static void send_queued(void)
+{
+    uint64_t t0 = hal_time_us();
+    while (s_seq < s_q_n) {
+        if (!link_send_audio(s_aid, s_seq, s_q[s_seq], s_q_len[s_seq])) {
+            fail("Offline");
+            return;
+        }
+        s_seq++;
+        if (hal_time_us() - t0 >= VOICE_SEND_BUDGET_US) break;
+    }
+}
+
+/* After a stop: the rest of the queue, then the end. The daemon's time to transcribe counts from the end. */
+static void drain(uint32_t now_ms)
+{
+    send_queued();
+    if (s_state != VOICE_WAIT || s_seq < s_q_n) return;
+    s_draining = false;
+    bulk(false);
+    if (!link_send_audio_end(s_aid)) {
+        fail("Offline");
+        return;
+    }
+    s_wait_t0 = now_ms;
 }
 
 bool voice_start(uint32_t sid, uint32_t now_ms)
@@ -102,6 +157,8 @@ bool voice_start(uint32_t sid, uint32_t now_ms)
     s_aid = s_aid + 1 + (now_ms & 0xff); /* differs across boots: the daemon keys recordings by aid */
     s_sid = sid;
     s_seq = 0;
+    s_q_n = 0;
+    s_draining = false;
     s_have = 0;
     s_index = 0;
     s_level = 0;
@@ -124,6 +181,7 @@ bool voice_start(uint32_t sid, uint32_t now_ms)
     }
     s_t0 = now_ms;
     s_state = VOICE_REC;
+    bulk(true);
     dbg_event("voice", "start", "\"aid\":%u,\"sid\":%u", (unsigned)s_aid, (unsigned)sid);
     return true;
 }
@@ -157,25 +215,24 @@ void voice_stop(uint32_t now_ms)
     pull();
     hal_mic_stop();
     flush_block();
-    if (s_state != VOICE_REC) return; /* the last block failed */
     s_t_end = now_ms;
-    if (!link_send_audio_end(s_aid)) {
-        fail("Offline");
-        return;
-    }
     s_state = VOICE_WAIT;
+    s_draining = true;
     s_wait_t0 = now_ms;
     s_level = 0;
-    dbg_event("voice", "stop", "\"aid\":%u,\"ms\":%u,\"blocks\":%u", (unsigned)s_aid, (unsigned)(now_ms - s_t0),
-              (unsigned)s_seq);
+    drain(now_ms); /* a link that kept up has nothing queued: the end goes now */
+    if (s_state != VOICE_WAIT) return; /* a block or the end failed */
+    dbg_event("voice", "stop", "\"aid\":%u,\"ms\":%u,\"blocks\":%u,\"queued\":%u", (unsigned)s_aid,
+              (unsigned)(now_ms - s_t0), (unsigned)s_q_n, (unsigned)(s_q_n - s_seq));
 }
 
 void voice_cancel(void)
 {
-    if (s_state == VOICE_REC) {
-        hal_mic_stop();
-        link_send_audio_end(s_aid); /* the daemon transcribes it, and nothing ever sends it */
-    }
+    if (s_state == VOICE_REC) hal_mic_stop();
+    if (s_state == VOICE_REC || (s_state == VOICE_WAIT && s_draining))
+        link_send_audio_end(s_aid); /* the daemon transcribes what it got, and nothing ever sends it */
+    bulk(false);
+    s_draining = false;
     if (s_state != VOICE_IDLE) dbg_event("voice", "cancel", "\"aid\":%u", (unsigned)s_aid);
     s_state = VOICE_IDLE;
     s_text[0] = 0;
@@ -185,7 +242,10 @@ void voice_tick(uint32_t now_ms)
 {
     if (s_state == VOICE_REC) {
         pull();
+        send_queued();
         if (s_state == VOICE_REC && now_ms - s_t0 >= VOICE_MAX_MS) voice_stop(now_ms);
+    } else if (s_state == VOICE_WAIT && s_draining) {
+        drain(now_ms);
     } else if (s_state == VOICE_WAIT && now_ms - s_wait_t0 >= VOICE_WAIT_MS) {
         fail("No transcript");
     }
