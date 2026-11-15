@@ -92,6 +92,7 @@ static const struct { const char *word, *glyph; } kGlyphs[] = {
     {"Volume 3", ICON_SOUND}, {"Volume 4", ICON_SOUND}, {"Volume 5", ICON_SOUND},
     /* toasts */
     {"Sent", ICON_SENT}, {"Not sent", ICON_SENT ICON_X}, {"Offline", ICON_OFFLINE}, {"Opening on PC...", ICON_COMPUTER},
+    {"Hold to stop", ICON_TAP ICON_STOP}, {"Hold to run again", ICON_TAP ICON_RERUN}, /* AGENT: a tap on a hold disc */
     {"Focused", ICON_COMPUTER}, {"Stopping", ICON_STOP}, {"Interrupting", ICON_STOP}, {"Running again", ICON_RERUN},
     {"Unqueued", ICON_QUEUED ICON_X}, {"Will buzz when done", ICON_NOTIFY}, {"Won't notify", ICON_QUIET},
     {"Snoozed 30 min", ICON_IDLE " 30"}, {"Unsnoozed", ICON_UNSNOOZE}, {"Session ended", ICON_IDLE},

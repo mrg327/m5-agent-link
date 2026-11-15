@@ -84,6 +84,7 @@ bool ui_agent_refresh(uint32_t now_ms); /* false: the session is gone */
 bool ui_agent_act(nav_action_t a, const gesture_evt_t *g);
 bool ui_agent_tick(uint32_t now_ms);    /* true: wants to close */
 void ui_agent_report(ui_report_t *r);
+bool ui_agent_hit(int x, int y); /* the point is on one of its discs or rows: a touch there is a centre touch */
 
 /* The SCROLL screen (ui_scroll.c). */
 lv_obj_t *ui_scroll_init(lv_obj_t *screen);
@@ -124,6 +125,7 @@ bool ui_read_act(nav_action_t a, const gesture_evt_t *g);
 bool ui_read_back(void);               /* true: the end picker was open and the last page is back */
 void ui_read_tick(uint32_t now_ms);
 void ui_read_report(ui_report_t *r);
+bool ui_read_hit(int x, int y); /* the point is on a disc of its end picker: a touch there is a centre touch */
 
 /* GRAPH (ui_graph.c, GRAPH.md §4) */
 lv_obj_t *ui_graph_init(lv_obj_t *screen);

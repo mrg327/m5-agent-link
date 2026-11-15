@@ -13,7 +13,7 @@ expect_label Reading 1 of 1
 tap 233 200
 wait 400
 expect_label > Dictate
-tap 233 334
+tap 170 97
 wait 400
 expect_screen agent
 expect_label Reply to webapp
@@ -25,7 +25,7 @@ wait 500
 tap 233 200
 wait 400
 expect_label > Dictate
-tap 233 280
+tap 88 194
 wait 400
 expect_screen voice
 expect_label Reply to webapp
