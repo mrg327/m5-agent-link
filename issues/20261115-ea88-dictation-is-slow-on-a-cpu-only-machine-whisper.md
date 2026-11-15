@@ -41,3 +41,4 @@ Chosen: base.en, -ac = recording + 128 frames (the full 1500 from 27 s up), beam
 
 - 2026-11-15T23:13:25Z · claude-code@linux-dev · linux-x86_64 · eadae85+dirty: filed
 - 2026-11-15T23:13:33Z · claude-code@linux-dev · linux-x86_64 · eadae85+dirty: claimed
+- 2026-11-15T23:25:38Z · claude-code@linux-dev · linux-x86_64 · 1c6865c: Change in main (1c6865c): -ac sized to the recording + 128 frames, beam 2, AGENTLINK_WHISPER_BEAM to override. Daemon checks pass (fmt, clippy, 331 tests incl. real speech through the watch format). Release binary built; installing it on the Linux machine and restarting the service is left to the user (blocked by the session's permission mode), so it is not yet verified on a real dictation.
