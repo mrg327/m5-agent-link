@@ -101,5 +101,8 @@
 #define ICON_FOLDER "\xEE\x89\x8A" /* folder e24a: saved for this project */
 /* WATCH, gauges and the done row (docs/design/glyphs/WATCH-GAUGES-DONE.md). */
 #define ICON_TIMER "\xEE\x92\x92" /* timer e492: how long a turn took */
-#define ICON_CLOCK "\xEE\x86\x9A" /* clock e19a: the plan's 5-hour window (the week is ICON_WEEK) */
+#define ICON_CLOCK "\xEE\x86\x9A" /* clock e19a: the plan's 5-hour window (the week is ICON_WEEK); the wall clock where it is not digits */
 #define ICON_DONT_ASK "\xEE\x85\xAA" /* chat-circle-slash e16a: the "don't ask" permission mode */
+#define ICON_LABS "\xEE\x97\xA4" /* atom e5e4: the experiments */
+#define ICON_CURSOR "\xEE\x87\x9C" /* cursor e1dc: the pointer of the PC */
+#define ICON_LEFT_CLICK "\xEE\x8C\xB4" /* mouse-left-click e334 */

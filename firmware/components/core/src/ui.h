@@ -79,6 +79,10 @@ uint32_t ui_watched_sid(void);
 /* The first unanswered request, if any, else 0. */
 uint32_t ui_pending_attention_sid(void);
 void ui_toast(const char *text, uint32_t rgb);
+/* A toast whose words the vocabulary cannot hold (they carry a version, or come from the flash driver): `words`
+ * goes to the report and the log, the glass shows `icons` (one or two ICON_*) and after them `content` (a short
+ * number or a version; may be NULL). GLYPHS.md rule 8. */
+void ui_toast_sign(const char *words, const char *icons, const char *content, uint32_t rgb);
 /* A scroll result arrived (sid 0 = unknown): SCROLL updates its counter, track and preview. */
 /* A scroll failed (e.g. `unsupported`): SCROLL closes, back to WATCH. */
 void ui_scroll_failed(void);

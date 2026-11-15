@@ -1,8 +1,16 @@
-/* The TRACKPAD screen (EXPERIMENTS.md, proto 0.20): the glass drives the pointer of the PC the daemon runs on.
- * A drag moves it (with acceleration), a tap is a left click and a tap soon after near the last one the second
- * click of a double click, a hold is a right click, a turn along the bezel scrolls (clockwise = down, a notch per
- * 15 degrees). Moves are summed into one cmd_op_pointer per NAV_POINTER_COALESCE_MS; a click or a notch goes out
- * at once, carrying any move still pending. A, B long and the chord leave. */
+/* The TRACKPAD screen in Sigil (docs/design/GLYPHS.md §5; EXPERIMENTS.md, proto 0.20): the glass drives the
+ * pointer of the PC the daemon runs on, and the screen is the pad. A drag moves the pointer (with acceleration),
+ * a tap is a left click and a tap soon after near the last one the second click of a double click, a hold is a
+ * right click, a turn along the bezel scrolls (clockwise = down, a notch per 15 degrees). Moves are summed into
+ * one cmd_op_pointer per NAV_POINTER_COALESCE_MS; a click or a notch goes out at once, carrying any move still
+ * pending. A, B long and the chord leave.
+ *
+ * On glass: a large faint pointer in the middle (what a drag moves) and the how-to as three pictograms, each
+ * where its gesture is made: the mouse with its wheel under an arc along the bezel (turn the bezel to scroll),
+ * the mouse with its left button (a tap), and the mouse with its right button inside a hold ring (a hold). When
+ * the pad cannot work, a sign takes the pictograms' place: the plug (offline), "computer, download" (the daemon
+ * is too old), "computer, pointer, cross" (this PC has no pointer to drive), "computer, refused". The words are
+ * in the report (rule 9). */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,17 +20,29 @@
 #include "nav.h"
 #include "ui_icons.h"
 #include "ui_internal.h"
+#include "ui_kit.h"
 #include "ui_theme.h"
 
-#define ICON_Y 150
-#define TITLE_Y 206
-#define HINT_Y 262
-#define HINT_LINES 3
+#define POINTER_Y 212
+#define RIM_R 190       /* the scroll arc: just inside the session ring */
+#define RIM_W 4
+#define RIM_SPAN 56     /* degrees, centred on 12 o'clock */
+#define WHEEL_Y 80
+#define CLICK_Y 302     /* the two click pictograms: with the wheel they stand round the pointer, clear of */
+#define CLICK_DX 116    /* the key hint and of a toast's sign */
+#define HOLD_R 34       /* the hold ring round the right button's mouse */
+#define HOLD_W 4
+#define HOLD_PM 720     /* how far the pictogram's ring is filled: a hold in progress */
+#define SIGN_Y UI_Y_TOAST /* why the pad cannot work: where the toast that announced it was, so one follows the other */
+#define RGB_FAINT 0x38383c /* the pointer: there, and out of the way */
 
-static lv_obj_t *s_root, *s_icon, *s_title, *s_hint, *s_badge[2], *s_key[2], *s_word[2];
+typedef enum { PAD_OK, PAD_OFFLINE, PAD_OLD, PAD_NO_POINTER, PAD_REFUSED } pad_t;
+
+static lv_obj_t *s_root, *s_pointer, *s_rim, *s_wheel, *s_left, *s_right, *s_hold, *s_sign, *s_hint;
 static uint32_t s_now, s_sent_ms;
-static char s_hint_txt[128];
-static bool s_failed;           /* the daemon refused: the hint says why until the screen reopens */
+static char s_hint_txt[128];    /* in words, for the report: the how-to, or why the pad cannot work */
+static pad_t s_pad = PAD_OK, s_pad_shown = PAD_OK;
+static bool s_failed;           /* the daemon refused: the sign says why until the screen reopens */
 static int s_rx10, s_ry10;      /* sub-pixel remainder of the accelerated moves, tenths of a pixel */
 static int s_pend_dx, s_pend_dy; /* pointer pixels not sent yet */
 static int s_scrub_last;
@@ -33,25 +53,34 @@ static int s_n_left, s_n_right, s_n_double, s_wheel_sum, s_moved_x, s_moved_y;
 
 static void show(lv_obj_t *o, bool on)
 {
+    if (lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN) != on) return;
     if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
 }
 
 static const char *const k_hint = "Drag to move, tap to click\nHold for a right click\nTurn the bezel to scroll";
 
-static void set_hint(const char *t, bool warn)
+/* The pad's state: the pictograms while it works, otherwise the sign for why it does not; `words` is the same
+ * in words. */
+static void set_pad(pad_t pad, const char *words)
 {
-    theme_set_text(s_hint, s_hint_txt, sizeof s_hint_txt, t);
-    theme_set_text_color(s_hint, warn ? lv_color_hex(RGB_AMBER) : COL_TEXT2);
+    static const char *const sign[] = {"", ICON_OFFLINE, ICON_COMPUTER ICON_UPDATE, ICON_COMPUTER ICON_CURSOR ICON_X, ICON_COMPUTER ICON_REFUSED};
+    snprintf(s_hint_txt, sizeof s_hint_txt, "%s", words);
+    s_pad = pad;
+    lv_obj_t *const howto[] = {s_rim, s_wheel, s_left, s_right, s_hold};
+    for (size_t i = 0; i < sizeof howto / sizeof howto[0]; i++) show(howto[i], pad == PAD_OK);
+    if (pad != PAD_OK && pad != s_pad_shown) ui_sign_set(s_sign, sign[pad], NULL, RGB_AMBER);
+    s_pad_shown = pad;
+    show(s_sign, pad != PAD_OK);
 }
 
 void ui_trackpad_refresh(uint32_t now)
 {
     s_now = now;
     if (s_failed) return;
-    if (!ui_link_connected()) set_hint("Offline", true);
-    else if (!model_pointer()) set_hint("agentlinkd on this PC has no trackpad", true);
-    else set_hint(k_hint, false);
+    if (!ui_link_connected()) set_pad(PAD_OFFLINE, "Offline");
+    else if (!model_pointer()) set_pad(PAD_OLD, "agentlinkd on this PC has no trackpad");
+    else set_pad(PAD_OK, k_hint);
 }
 
 /* One command: what is pending, then the click and the notches. False when it could not go out. */
@@ -103,7 +132,9 @@ void ui_trackpad_close(void)
 void ui_trackpad_failed(int err, const char *msg)
 {
     s_failed = true;
-    set_hint(err == 1 && msg && msg[0] ? msg : err == 2 ? "This PC has no pointer agentlinkd can drive" : "The PC refused", true);
+    if (err == 1 && msg && msg[0]) set_pad(PAD_REFUSED, msg); /* the daemon's own words: to the report */
+    else if (err == 2) set_pad(PAD_NO_POINTER, "This PC has no pointer agentlinkd can drive");
+    else set_pad(PAD_REFUSED, "The PC refused");
 }
 
 static void move(const gesture_evt_t *g)
@@ -193,35 +224,35 @@ void ui_trackpad_report(ui_report_t *r)
     ui_report_add(r, "%s", tmp);
 }
 
-static lv_obj_t *centred(lv_obj_t *parent, const lv_font_t *font, lv_color_t col, int cy, int w, int lines)
-{
-    lv_obj_t *l = lv_label_create(parent);
-    lv_obj_set_style_text_font(l, font, 0);
-    lv_obj_set_style_text_color(l, col, 0);
-    lv_obj_set_size(l, w, lines * lv_font_get_line_height(font));
-    lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_pos(l, UI_CX - w / 2, cy - lv_font_get_line_height(font) / 2);
-    lv_label_set_text(l, "");
-    return l;
-}
-
 lv_obj_t *ui_trackpad_init(lv_obj_t *screen)
 {
     s_root = lv_obj_create(screen);
     lv_obj_remove_style_all(s_root);
     lv_obj_set_size(s_root, UI_SIZE, UI_SIZE);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    s_icon = centred(s_root, FONT_ICON_L, COL_TEXT2, ICON_Y, 80, 1);
-    lv_label_set_text(s_icon, ICON_COMPUTER);
-    s_title = centred(s_root, FONT_HEAD, COL_TEXT, TITLE_Y, theme_chord(TITLE_Y, 30), 1);
-    lv_label_set_text(s_title, "Trackpad");
-    s_hint = centred(s_root, FONT_CAPTION, COL_TEXT2, HINT_Y, theme_chord(HINT_Y + 60, 24), HINT_LINES);
-    lv_label_set_long_mode(s_hint, LV_LABEL_LONG_MODE_WRAP);
-    static const char *const words[2] = {"Back", "Back"};
-    for (int i = 0; i < 2; i++)
-        s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,
-                                     UI_BADGE_R, &s_key[i], &s_word[i]);
-    show(s_badge[1], false); /* B leaves only by a long press; A is the one to show */
+
+    /* the pad: the pointer a drag moves, faint */
+    s_pointer = ui_glyph_create(s_root, FONT_ICON_HERO, UI_CX, POINTER_Y);
+    ui_glyph_set(s_pointer, ICON_CURSOR, lv_color_hex(RGB_FAINT));
+
+    /* the how-to, three pictograms, each where its gesture is made */
+    s_rim = ui_arc_create(s_root, UI_CX, UI_CX, RIM_R, RIM_W); /* along the bezel: a turn scrolls */
+    ui_arc_set_span(s_rim, -RIM_SPAN / 2, RIM_SPAN);
+    ui_arc_set(s_rim, 1000, COL_TEXT2, lv_color_black());
+    s_wheel = ui_glyph_create(s_root, FONT_ICON_L, UI_CX, WHEEL_Y);
+    ui_glyph_set(s_wheel, ICON_WHEEL, COL_TEXT2);
+    s_left = ui_glyph_create(s_root, FONT_ICON_L, UI_CX - CLICK_DX, CLICK_Y); /* a tap: the left button */
+    ui_glyph_set(s_left, ICON_LEFT_CLICK, COL_TEXT2);
+    s_right = ui_glyph_create(s_root, FONT_ICON_L, UI_CX + CLICK_DX, CLICK_Y); /* a hold: the right button, in a hold ring */
+    ui_glyph_set(s_right, ICON_RIGHT_CLICK, COL_TEXT2);
+    s_hold = ui_arc_create(s_root, UI_CX + CLICK_DX, CLICK_Y, HOLD_R, HOLD_W);
+    ui_arc_set(s_hold, HOLD_PM, COL_TEXT2, COL_FILL2);
+
+    s_sign = ui_sign_create(s_root, UI_CX, SIGN_Y);
+    show(s_sign, false);
+    /* rule 6: A goes back (B leaves only by a long press, so it has no hint) */
+    s_hint = ui_key_hint_create(s_root, UI_KEY_A);
+    ui_key_hint_set(s_hint, ICON_BACK);
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     return s_root;
 }

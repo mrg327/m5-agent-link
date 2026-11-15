@@ -230,6 +230,10 @@ Rule 4, a quantity as geometry.
 - `ui_arc_set(a, permille, fill, track)`: a track over the span and a fill over `permille` of it; a black
   track draws none. Progress fills; a countdown drains (set it from 1000 down). A step invalidates only the
   piece between the old end and the new one.
+- `ui_arc_set_steps(a, n)`: a level of `n` equal steps (a volume of 5). The arc is drawn as `n` pieces with
+  gaps, and the fill lights whole pieces. 0 (the default) is one continuous arc.
+- `ui_arc_set_geometry(a, cx, cy, r)`: moves the arc and changes its radius, change-only: an arc that follows
+  something the screen lays out (STATUS's battery ring).
 
 ### 3.10 Pips: `ui_pips_*`
 

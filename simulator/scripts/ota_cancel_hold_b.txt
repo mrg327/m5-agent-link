@@ -11,3 +11,4 @@ btn B long
 wait 500
 expect_screen ring
 expect_label Update cancelled
+shot ota_cancelled.png

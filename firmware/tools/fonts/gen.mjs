@@ -48,6 +48,8 @@ const ICONS = {
   asterisk: 0xe0aa, equals: 0xe21c, folder: 0xe24a,
   // WATCH, gauges and the done row: a turn's time, the 5-hour window, the "don't ask" mode.
   timer: 0xe492, clock: 0xe19a, "chat-circle-slash": 0xe16a,
+  // Sigil, STATUS / LABS / TRACKPAD: the experiments' subject, the pointer, and the clock (of "set the clock").
+  atom: 0xe5e4, cursor: 0xe1dc, "mouse-left-click": 0xe334,
 };
 // The GRAPH screen's node and lane glyphs (GRAPH.md §4): drawn inside a node disc, so 20 px only.
 const GRAPH_ICONS = {
@@ -65,7 +67,7 @@ const boldDir = "node_modules/@phosphor-icons/web/src/bold";
 // the glyphs that are ever a state, a result or a primary action.
 const HERO = ["arrows-clockwise", "hand-palm", "chat-circle-dots", "check-circle", "warning-circle", "moon",
   "hourglass-low", "desktop", "plugs", "microphone", "paper-plane-tilt", "download-simple", "check", "x", "checks",
-  "book-open"];
+  "book-open", "atom", "cursor"];
 
 const checkCss = (dir, cls, icons) => {
   const css = readFileSync(join(here, dir, "style.css"), "utf8");
