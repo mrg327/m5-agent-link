@@ -124,6 +124,11 @@ enum HooksCmd {
     Print,
     /// Print the pi coding agent's extension: `agentlink hooks pi > ~/.pi/agent/extensions/agentlink.ts`.
     Pi,
+    /// Show whether each agent's hooks are installed (all agents unless one is named).
+    List { agent: Option<hooks::Agent> },
+    /// Install an agent's hooks if they are missing or stale; the replaced file is kept as
+    /// `<file>.agentlink-bak`. Claude Code's other settings and hooks are kept.
+    Install { agent: hooks::Agent },
     /// Print the Claude Code `statusLine` setting that feeds the watch's usage and context gauges.
     /// Your current status-line command (read from ~/.claude/settings.json) is kept and chained.
     Statusline {
@@ -213,6 +218,8 @@ fn main() -> Result<()> {
         Cmd::Hooks { cmd } => match cmd {
             HooksCmd::Print => hooks::print(cli.json),
             HooksCmd::Pi => hooks::pi(),
+            HooksCmd::List { agent } => hooks::list(agent, cli.json),
+            HooksCmd::Install { agent } => hooks::install(agent, cli.json),
             HooksCmd::Statusline { chain } => hooks::statusline(chain, cli.json),
         },
         Cmd::Remote { cmd } => match cmd {

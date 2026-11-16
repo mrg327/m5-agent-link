@@ -185,7 +185,7 @@ Priority for sorting: `needs_input > error > done(unseen) > working > idle > don
 
 **PC interface:** a tray icon (state summary, connected device, quiet mode, pause), a **minimal native config page** (devices, pairing, agents/hooks, focus-driver permissions, privacy, quiet hours) and a CLI: `agentlink pair | status | config | hooks install|remove | doctor`. Candidate crates are `tray-icon` plus `egui`/`eframe` for the small native window; this is a spike decision.
 
-**Hook installation:** the daemon detects Copilot CLI and Claude Code and **asks once** per agent before writing hooks (`~/.copilot/hooks/agentlink.json`, the `hooks` block in Claude `settings.json`). It keeps a backup and offers `hooks remove`. Sessions that were already running pick the hooks up on restart, and the UI says so.
+**Hook installation:** the daemon detects Copilot CLI and Claude Code and **asks once** per agent before writing hooks (`~/.copilot/hooks/agentlink.json`, the `hooks` block in Claude `settings.json`). It keeps a backup and offers `hooks remove`. Done so far (issue 20261116-7847): `agentlink hooks list [agent]` and `hooks install copilot|claude|pi`, which write only what is missing or stale, keep the replaced file as `<file>.agentlink-bak`, and merge into Claude `settings.json` without touching other hooks; detection, asking and `remove` are still to come. Sessions that were already running pick the hooks up on restart, and the UI says so.
 
 **Pairing:** both methods are supported:
 - (a) the **BLE passkey** shown on the device and typed on the PC;

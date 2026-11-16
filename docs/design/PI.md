@@ -6,7 +6,7 @@ loads TypeScript extensions from `~/.pi/agent/extensions/`. The watch reaches pi
 ## Install
 
 ```sh
-agentlink hooks pi > ~/.pi/agent/extensions/agentlink.ts    # or test once: pi -e daemon/integrations/pi/agentlink.ts
+agentlink hooks install pi    # or: agentlink hooks pi > ~/.pi/agent/extensions/agentlink.ts; test once: pi -e daemon/integrations/pi/agentlink.ts
 ```
 
 The source is `daemon/integrations/pi/agentlink.ts`; the CLI embeds it. Its tests run with
