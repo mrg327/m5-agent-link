@@ -187,7 +187,7 @@ struct Record {
     /// Display only for remote sessions.
     ctx: HostCtx,
     origin: Origin,
-    /// The running turn's tally; none until a prompt of a Claude Code session is seen (turn.rs).
+    /// The running turn's tally; none until a prompt of a Claude Code or pi session is seen (turn.rs).
     tally: Option<crate::turn::Tally>,
     /// The agent's last message: its id (`session.lm`) and cleaned text, for `detail` without a rid.
     last: Option<(u64, String)>,
@@ -572,7 +572,7 @@ impl Registry {
             }
         }
         // the done summary (DONE-SUMMARY.md): only from a turn whose prompt this daemon saw
-        if p.agent == Agent::Claude {
+        if matches!(p.agent, Agent::Claude | Agent::Pi) {
             let now = std::time::Instant::now();
             match &p.turn {
                 Turn::Prompt => {

@@ -750,6 +750,7 @@ static bool decode_agent(
 	|| (((*result).agent_choice == agent_claude_m_c) && ((1)))
 	|| (((*result).agent_choice == agent_cloud_m_c) && ((1)))
 	|| (((*result).agent_choice == agent_shell_m_c) && ((1)))
+	|| (((*result).agent_choice == agent_pi_m_c) && ((1)))
 	|| (((*result).agent_choice == agent_other_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
 
 	log_result(state, res, __func__);

@@ -33,7 +33,7 @@ const SIGINT_EXIT: u64 = 130;
 const IGNORED: &[&str] = &[
     "vim", "nvim", "vi", "view", "vimdiff", "nano", "emacs", "less", "more", "man", "ssh", "mosh",
     "tmux", "screen", "top", "htop", "btop", "watch", "fg", "bg", "claude", "copilot", "codex",
-    "aider", "gemini",
+    "aider", "gemini", "pi",
 ];
 /// Ignored only when started without arguments (a REPL or a nested shell, not a script run).
 const IGNORED_BARE: &[&str] = &[

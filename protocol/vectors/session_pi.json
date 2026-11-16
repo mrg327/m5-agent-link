@@ -1,0 +1,15 @@
+{
+  "desc": "Delta: session 5, a pi coding agent session, starts work (proto 0.23)",
+  "symbolic": {
+    "t": "session_upd",
+    "id": 23,
+    "b": {
+      "sid": 5,
+      "ag": "pi",
+      "st": "work",
+      "tool": "edit",
+      "tst": 1793995400
+    }
+  },
+  "cbor_hex": "a30004011703a5000501040201066465646974081a6aee3288"
+}

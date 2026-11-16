@@ -122,6 +122,8 @@ enum Cmd {
 enum HooksCmd {
     /// Print the config snippets for Copilot CLI and Claude Code (nothing is installed).
     Print,
+    /// Print the pi coding agent's extension: `agentlink hooks pi > ~/.pi/agent/extensions/agentlink.ts`.
+    Pi,
     /// Print the Claude Code `statusLine` setting that feeds the watch's usage and context gauges.
     /// Your current status-line command (read from ~/.claude/settings.json) is kept and chained.
     Statusline {
@@ -210,6 +212,7 @@ fn main() -> Result<()> {
         Cmd::Decode { hex } => decode(&hex, cli.json),
         Cmd::Hooks { cmd } => match cmd {
             HooksCmd::Print => hooks::print(cli.json),
+            HooksCmd::Pi => hooks::pi(),
             HooksCmd::Statusline { chain } => hooks::statusline(chain, cli.json),
         },
         Cmd::Remote { cmd } => match cmd {

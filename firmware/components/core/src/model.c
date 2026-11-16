@@ -121,6 +121,7 @@ const char *agent_name(agent_t a)
     case AGENT_COPILOT: return "copilot";
     case AGENT_CLAUDE: return "claude";
     case AGENT_CLOUD: return "cloud";
+    case AGENT_PI: return "pi";
     default: return "other";
     }
 }

@@ -267,11 +267,12 @@ pr_state_pending = 1
 pr_state_approved = 2
 pr_state_changes = 3        ; changes requested
 pr_state_draft = 4
-agent = agent_copilot / agent_claude / agent_cloud / agent_shell / agent_other
+agent = agent_copilot / agent_claude / agent_cloud / agent_shell / agent_pi / agent_other
 agent_copilot = 0
 agent_claude = 1
 agent_cloud = 2
 agent_shell = 3      ; a job: a command the user started in a terminal (proto 0.9, JOBS.md)
+agent_pi = 4         ; the pi coding agent (proto 0.23); an older device gets agent_other
 agent_other = 15
 
 sess_state = sess_state_start / sess_state_work / sess_state_input / sess_state_error /

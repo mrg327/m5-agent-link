@@ -9,7 +9,7 @@ const ENUMS = {
   feature: { focus: 0, ack: 1, approve: 2, reply: 3, voice: 4, badge: 5, debug: 6, scroll: 7, keys: 8 },
   privacy: { meta: 0, preview: 1, full: 2 },
   alert_mode: { full: 0, quiet: 1, silent: 2 },
-  agent: { copilot: 0, claude: 1, cloud: 2, shell: 3, other: 15 },
+  agent: { copilot: 0, claude: 1, cloud: 2, shell: 3, pi: 4, other: 15 },
   sess_state: { start: 0, work: 1, input: 2, error: 3, done: 4, idle: 5, ended: 6 },
   input_sub: { approval: 0, question: 1 },
   att_kind: { approval: 0, question: 1, error: 2, done: 3 },
@@ -219,7 +219,7 @@ export const pong = (id, re) => ({ t: 'pong', id, re, b: {} });
 
 // ───────────── description ─────────────
 const STATE_WORD = { start: 'starting', work: 'working', input: 'waiting for you', error: 'in error', done: 'Done', idle: 'idle', ended: 'ended' };
-const AGENT_NAME = { copilot: 'Copilot CLI', claude: 'Claude Code', cloud: 'a cloud agent', shell: 'a terminal job', other: 'an agent' };
+const AGENT_NAME = { copilot: 'Copilot CLI', claude: 'Claude Code', cloud: 'a cloud agent', shell: 'a terminal job', pi: 'pi', other: 'an agent' };
 const DEVICE_SENT = new Set(['hello', 'cmd', 'ping', 'batt', 'log', 'dbg_ui_state', 'dbg_screenshot_chunk', 'audio_start', 'audio', 'audio_end', 'kb_start', 'kb_stroke']);
 
 /** Short human sentence for a decoded message. dir: 'tx' (watch sent) | 'rx' (watch received). */

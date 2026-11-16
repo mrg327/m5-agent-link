@@ -37,6 +37,10 @@ const CLAUDE_BLOCKING: &[&str] = &["PermissionRequest"];
 /// Claude Code `timeout` (seconds) for the blocking hooks: the longest window plus 30 s.
 const BLOCKING_TIMEOUT_S: u64 = 330;
 
+/// The pi coding agent's extension (`~/.pi/agent/extensions/agentlink.ts`): pi has no shell hooks, so
+/// the extension spawns `agentlink-hook pi <Event>` for its events.
+const PI_EXTENSION: &str = include_str!("../../../integrations/pi/agentlink.ts");
+
 /// `~/.copilot/hooks/agentlink.json`
 fn copilot() -> Value {
     copilot_with("agentlink-hook")
@@ -130,7 +134,13 @@ pub fn print(json: bool) -> Result<()> {
         println!("# Claude Code: merge into ~/.claude/settings.json");
         println!("{}", serde_json::to_string_pretty(&claude())?);
         println!("\n# Usage and context gauges on the watch: see `agentlink hooks statusline`.");
+        println!("# pi coding agent: agentlink hooks pi > ~/.pi/agent/extensions/agentlink.ts");
     }
+    Ok(())
+}
+
+pub fn pi() -> Result<()> {
+    print!("{PI_EXTENSION}");
     Ok(())
 }
 

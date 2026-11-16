@@ -243,6 +243,7 @@ struct agent_r {
 		agent_claude_m_c = 1,
 		agent_cloud_m_c = 2,
 		agent_shell_m_c = 3,
+		agent_pi_m_c = 4,
 		agent_other_m_c = 15,
 	} agent_choice;
 };
