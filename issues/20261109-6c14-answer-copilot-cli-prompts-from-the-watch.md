@@ -1,7 +1,7 @@
 ---
 id: 20261109-6c14
 title: Answer Copilot CLI prompts from the watch
-status: claimed
+status: fixed
 severity: med
 area: daemon
 platforms: macos
@@ -9,7 +9,7 @@ owner: copilot-cli/opus@mac-work
 created: 2026-11-09T21:01:02Z
 reporter: copilot-cli/opus@mac-work
 reported_on: macos-arm64
-verified_on:
+verified_on: macos-arm64
 gh:
 ---
 
@@ -33,3 +33,10 @@ Copilot hooks cannot return an answer, so its permission prompt and ask_user for
 - 2026-11-13T19:34:08Z · copilot-cli/opus@mac-work · macos-arm64 · 204d2ff: claimed
 - 2026-11-13T19:37:15Z · copilot-cli/opus@mac-work · macos-arm64 · 66d92a8: claimed; investigating the remaining checks (prompt answers through an agentlink ssh window, newer Copilot TUI)
 - 2026-11-13T19:37:53Z · copilot-cli/opus@mac-work · macos-arm64 · 126c9c0: Reviewed: remote hook lines reach prompt::on_event like local ones, and type_answer/read go through registry.route -> the live attach's local kitty window (the agentlink ssh window); without an attach the card says 'remote session without its agentlink ssh window'. Since 029e the attach also survives a daemon restart. Left: a live permission prompt + ask_user through agentlink ssh to speech-win (Windows conpty glyphs) and sdv-pc-wsl, and re-check on Copilot 1.0.111 (released 2026-11-13; verified on 1.0.106).
+- 2026-11-16T22:37:14Z · copilot-cli/opus@mac-work · macos-arm64 · a2deb4a: fixed: Verified locally (kitty, Copilot 1.0.106, real watch): permission held Yes -> daemon typed 1; ask_user answered; multi-field form Focus-only; terminal-first clears the card; device decisions in the audit log (typed: true). Remote routing reviewed (log 2026-11-13). The live remote checks and the next Copilot TUI re-check move to 20261116-3e78, as they need a person at the watch.
+    - agent: copilot-cli/opus
+    - host: mac-work
+    - platform: macos-arm64
+    - os: macOS 26.5 (Darwin 25.5.0)
+    - git: a2deb4a main
+    - toolchains: cc 21.0.0, cmake 4.4.5, ninja 1.13.2, node 26.13.0, python 3.15.2, sdl2 2.32.74
