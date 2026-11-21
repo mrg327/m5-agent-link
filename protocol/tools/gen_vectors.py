@@ -131,6 +131,11 @@ VECTORS = {
         {"t": "session_upd", "id": 16, "b": {"sid": 4, "st": "error", "tst": 1793995242, "seen": False, "exit": 101}},
         env("session_upd", 16, {0: 4, 2: 3, 8: 1793995242, 10: False, 20: 101}),
     ),
+    "session_pi": (
+        "Delta: session 5, a pi coding agent session, starts work (proto 0.23)",
+        {"t": "session_upd", "id": 23, "b": {"sid": 5, "ag": "pi", "st": "work", "tool": "edit", "tst": 1793995400}},
+        env("session_upd", 23, {0: 5, 1: 4, 2: 1, 6: "edit", 8: 1793995400}),
+    ),
     "cmd_rerun": (
         "Device runs session 4's finished job again after a hold (proto 0.9)",
         {"t": "cmd", "id": 17, "b": {"op": "rerun", "sid": 4, "hold_ms": 1250}},

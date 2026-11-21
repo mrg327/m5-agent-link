@@ -110,7 +110,8 @@ welcome = {
 ```cddl
 session = {
   sid: uint,                 ; short id assigned by daemon (stable for the session lifetime)
-  ag: "copilot"/"claude"/"cloud"/"shell"/tstr,   ; "shell" = a job, a terminal command (proto 0.9, JOBS.md)
+  ag: "copilot"/"claude"/"cloud"/"shell"/"pi"/tstr,   ; "shell" = a job, a terminal command (proto 0.9, JOBS.md);
+                             ; "pi" = the pi coding agent (proto 0.23; an older device gets "other")
   st: "start"/"work"/"input"/"error"/"done"/"idle"/"ended",
   ? sub: "approval"/"question",      ; when st = input
   repo?: tstr,               ; ≤ 32 chars, ellipsized by daemon

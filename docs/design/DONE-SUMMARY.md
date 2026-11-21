@@ -17,7 +17,7 @@ changed, how many lines it added and removed, whether the tests passed, and how 
 ```
 
 Every part is optional. A part the daemon cannot stand behind is absent, never zero: no `0 files`, no
-`tests not run`, no `+0 –0`. This is claimed for Claude Code only (Copilot's hook payloads differ and are not
+`tests not run`, no `+0 –0`. This is claimed for Claude Code and pi (PI.md) only (Copilot's hook payloads differ and are not
 tallied).
 
 ## 1. Data sources, and what each figure means and misses

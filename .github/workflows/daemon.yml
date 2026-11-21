@@ -43,3 +43,13 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --workspace -- -D warnings
       - run: cargo test --workspace
+
+  pi-extension:
+    name: pi extension (node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # runs .ts without flags
+      - run: node --test daemon/integrations/pi/

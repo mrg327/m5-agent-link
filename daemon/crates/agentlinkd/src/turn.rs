@@ -138,6 +138,57 @@ pub fn effect_of(event: &str, payload: &Value) -> Option<Effect> {
     }
 }
 
+/// The same for the pi agent's built-in tools, as its agentlink extension forwards them: `edit`
+/// (`path`, `edits: [{oldText, newText}]`), `write` (`path`, `content`; `tool_response.type` is
+/// `"create"` for a new file) and `bash` (`command`; a failure's `error` ends with pi's
+/// `Command exited with code N`).
+pub fn effect_of_pi(event: &str, payload: &Value) -> Option<Effect> {
+    let failed = event.eq_ignore_ascii_case("posttoolusefailure");
+    let input = &payload["tool_input"];
+    match payload["tool_name"].as_str()? {
+        "edit" | "write" if failed => None,
+        "edit" => {
+            let mut lines = Some((0, 0));
+            for e in input["edits"].as_array()? {
+                lines = match (lines, e["oldText"].as_str().zip(e["newText"].as_str())) {
+                    (Some((a, r)), Some((old, new))) => {
+                        line_delta(old, new).map(|(da, dr)| (a + da, r + dr))
+                    }
+                    _ => None,
+                };
+            }
+            file_effect(input["path"].as_str()?, lines)
+        }
+        "write" => file_effect(input["path"].as_str()?, write_lines(input, payload)),
+        "bash" => {
+            let found = recognise(input["command"].as_str()?)?;
+            let verdict = if failed {
+                found.on_failure(pi_exit_code(payload["error"].as_str().unwrap_or("")))
+            } else {
+                Some(true)
+            };
+            Some(Effect {
+                test: Some(verdict),
+                ..Effect::default()
+            })
+        }
+        _ => None,
+    }
+}
+
+/// pi ends a failed command's output with `Command exited with code N`; a timeout or an abort has no
+/// code.
+fn pi_exit_code(error: &str) -> Option<i32> {
+    error
+        .lines()
+        .rev()
+        .find(|l| !l.trim().is_empty())?
+        .trim()
+        .strip_prefix("Command exited with code ")?
+        .parse()
+        .ok()
+}
+
 fn file_effect(path: &str, lines: Option<(u64, u64)>) -> Option<Effect> {
     (!path.is_empty()).then(|| Effect {
         file: Some(path.to_owned()),
@@ -799,6 +850,57 @@ mod tests {
             t.add(&fx(&format!("/f{i}"), Some((1, 0))));
         }
         assert_eq!(t.summary(t0).files, None);
+    }
+
+    #[test]
+    fn pi_tools_count_files_lines_and_tests() {
+        use serde_json::json;
+        let edit = json!({"tool_name": "edit", "tool_input": {"path": "src/a.rs", "edits": [
+            {"oldText": "a\nb", "newText": "a\nc\nd"}, {"oldText": "x", "newText": ""}]}});
+        assert_eq!(
+            effect_of_pi("PostToolUse", &edit),
+            Some(Effect {
+                file: Some("src/a.rs".into()),
+                lines: Some((2, 2)),
+                test: None
+            })
+        );
+        assert_eq!(effect_of_pi("PostToolUseFailure", &edit), None);
+        let new = json!({"tool_name": "write", "tool_input": {"path": "n.txt", "content": "1\n2\n3"},
+            "tool_response": {"type": "create"}});
+        assert_eq!(
+            effect_of_pi("PostToolUse", &new).unwrap().lines,
+            Some((3, 0))
+        );
+        let over = json!({"tool_name": "write", "tool_input": {"path": "n.txt", "content": "1"}});
+        let fx = effect_of_pi("PostToolUse", &over).unwrap();
+        assert_eq!((fx.file.as_deref(), fx.lines), (Some("n.txt"), None));
+        let bash = |cmd: &str| {
+            json!({"tool_name": "bash", "tool_input": {"command": cmd},
+            "error": "test result: FAILED. 1 failed\n\nCommand exited with code 101"})
+        };
+        assert_eq!(
+            effect_of_pi("PostToolUse", &bash("cargo test"))
+                .unwrap()
+                .test,
+            Some(Some(true))
+        );
+        assert_eq!(
+            effect_of_pi("PostToolUseFailure", &bash("cargo test"))
+                .unwrap()
+                .test,
+            Some(Some(false))
+        );
+        let timeout = json!({"tool_name": "bash", "tool_input": {"command": "cargo test"},
+            "error": "Command timed out after 30 seconds"});
+        assert_eq!(
+            effect_of_pi("PostToolUseFailure", &timeout).unwrap().test,
+            Some(None)
+        );
+        assert_eq!(effect_of_pi("PostToolUse", &bash("ls")), None);
+        // Claude Code's names are not pi's
+        let claude = json!({"tool_name": "Edit", "tool_input": {"file_path": "a", "old_string": "a", "new_string": "b"}});
+        assert_eq!(effect_of_pi("PostToolUse", &claude), None);
     }
 
     #[test]

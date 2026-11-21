@@ -18,7 +18,8 @@ uint_enum!(InputKind { Touch = 0, Btn = 1, Rotary = 2, Imu = 3 });
 uint_enum!(Feature { Focus = 0, Ack = 1, Approve = 2, Reply = 3, Voice = 4, Badge = 5, Debug = 6, Scroll = 7, Keys = 8 });
 uint_enum!(Privacy { Meta = 0, Preview = 1, Full = 2 });
 uint_enum!(AlertMode { Full = 0, Quiet = 1, Silent = 2 });
-uint_enum!(Agent { Copilot = 0, Claude = 1, Cloud = 2, Shell = 3, Other = 15 });
+// Pi (proto 0.23) goes to an older device as Other: its decoder rejects an agent value it does not know.
+uint_enum!(Agent { Copilot = 0, Claude = 1, Cloud = 2, Shell = 3, Pi = 4, Other = 15 });
 uint_enum!(SessState { Start = 0, Work = 1, Input = 2, Error = 3, Done = 4, Idle = 5, Ended = 6 });
 uint_enum!(InputSub { Approval = 0, Question = 1 });
 // The agent's permission mode (proto 0.10, GAUGES.md); Claude Code's names in `from_claude`.

@@ -513,6 +513,7 @@ fn agent_of(name: &str) -> Agent {
     match name {
         "copilot" => Agent::Copilot,
         "claude" => Agent::Claude,
+        "pi" => Agent::Pi,
         "cloud" => Agent::Cloud,
         _ => Agent::Other,
     }
@@ -578,13 +579,21 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
         "posttooluse" | "posttoolusefailure" => {
             p.state = Some(SessState::Work);
             p.step = Step::Result(tool_ok(&event, payload));
-            if agent_name == "claude" {
-                if let Some(fx) = crate::turn::effect_of(&event, payload) {
-                    p.turn = Turn::Tool(fx);
-                }
+            let fx = match agent_name {
+                "claude" => crate::turn::effect_of(&event, payload),
+                "pi" => crate::turn::effect_of_pi(&event, payload),
+                _ => None,
+            };
+            if let Some(fx) = fx {
+                p.turn = Turn::Tool(fx);
             }
         }
-        "pretooluse" if matches!(tool, Some("AskUserQuestion" | "ask_user")) => {
+        "pretooluse"
+            if matches!(
+                tool,
+                Some("AskUserQuestion" | "ask_user" | "ask_user_question")
+            ) =>
+        {
             p.state = Some(SessState::Input);
             p.sub = Some(InputSub::Question);
             p.tool = tool.map(str::to_owned);
@@ -598,14 +607,15 @@ pub fn to_session_event(v: &Value, via: &Via) -> Option<SessionEvent> {
         }
         "agentstop" | "stop" => {
             p.state = Some(SessState::Done);
-            // Claude Code hands the turn's last message to Stop; for Copilot's agentStop, agentlink-hook
-            // reads it from the session transcript. Its closing question feeds Reply
+            // Claude Code hands the turn's last message to Stop, and so does pi's agentlink extension; for
+            // Copilot's agentStop, agentlink-hook reads it from the session transcript. Its closing
+            // question feeds Reply
             if let Some(text) = payload["last_assistant_message"].as_str() {
                 p.ask = Some(crate::ask::ask_of(text));
                 // the message itself, for the watch's reader (LAST-MESSAGE.md)
                 if matches!(
                     (event.as_str(), agent_name),
-                    ("stop", "claude") | ("agentstop", "copilot")
+                    ("stop", "claude" | "pi") | ("agentstop", "copilot")
                 ) {
                     let clean = crate::lastmsg::clean(text);
                     p.last = if clean.is_empty() {
@@ -1483,6 +1493,50 @@ mod tests {
             (None, None, None, None, Some(0)),
             "unknown stays absent, not zero"
         );
+    }
+
+    #[test]
+    fn a_pi_turn_shows_its_steps_summary_and_last_message() {
+        let reg = Registry::new(Trace::null());
+        let mut rx = reg.subscribe().1;
+        let pi = |event: &str, payload: Value| {
+            let mut p = payload;
+            (p["session_id"], p["cwd"]) = (json!("p1"), json!("/nonexistent/proj"));
+            json!({"agent":"pi","event":event,"payload":p})
+        };
+        feed(&reg, &pi("SessionStart", json!({})));
+        feed(&reg, &pi("UserPromptSubmit", json!({})));
+        let edit = json!({"tool_name":"edit","tool_input":{"path":"src/a.rs",
+            "edits":[{"oldText":"a","newText":"b\nc"}]}});
+        feed(&reg, &pi("PreToolUse", edit.clone()));
+        let ds = drain(&mut rx);
+        let d = ds.last().unwrap();
+        assert_eq!(d.ag, None, "the agent went with the first upsert");
+        assert_eq!(ds[0].ag, Some(agentlink_proto::Agent::Pi));
+        assert!(ds.iter().any(|d| d.st == Some(SessState::Work)));
+        feed(&reg, &pi("PostToolUse", edit));
+        feed(
+            &reg,
+            &pi(
+                "PreToolUse",
+                json!({"tool_name":"ask_user_question","tool_input":{}}),
+            ),
+        );
+        assert_eq!(drain(&mut rx).last().unwrap().st, Some(SessState::Input));
+        feed(
+            &reg,
+            &pi(
+                "Stop",
+                json!({"last_assistant_message":"Done. Shall I also update the docs?"}),
+            ),
+        );
+        let ds = drain(&mut rx);
+        let last = ds.last().unwrap().clone();
+        assert_eq!(last.st, Some(SessState::Done));
+        assert_eq!((last.fc, last.la, last.lr), (Some(1), Some(2), Some(1)));
+        assert!(last.lm.is_some_and(|id| id > 0), "the last message is kept");
+        feed(&reg, &pi("SessionEnd", json!({})));
+        assert!(reg.snapshot().is_empty());
     }
 
     #[test]

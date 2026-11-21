@@ -186,6 +186,9 @@ impl Conn {
         if self.peer_minor < 2 {
             s.hn = None;
         }
+        if self.peer_minor < PI_MINOR && s.ag == Some(Agent::Pi) {
+            s.ag = Some(Agent::Other);
+        }
         if self.peer_minor < 3 {
             (s.snz, s.ntf, s.n, s.ok) = (None, None, None, None);
         }
@@ -422,6 +425,8 @@ const ANSWER_MINOR: u64 = 18;
 const POINTER_MINOR: u64 = 20;
 /// The agent graph: `cmd graph` and its `graph` answer (GRAPH.md).
 const GRAPH_MINOR: u64 = 22;
+/// `agent_pi`; an older device's decoder rejects an agent value it does not know.
+const PI_MINOR: u64 = 23;
 
 fn keys_offered(minor: u64, feats: &[Feature]) -> Option<bool> {
     (minor >= KEYS_MINOR && feats.contains(&Feature::Keys)).then_some(true)
@@ -3430,6 +3435,16 @@ mod tests {
         assert_eq!(c.for_peer(s.clone()).hush, None);
         c.peer_minor = 12;
         assert_eq!(c.for_peer(s).hush, Some(true));
+    }
+
+    #[test]
+    fn a_pi_session_reaches_an_older_device_as_other() {
+        let mut s = Session::delta(1);
+        s.ag = Some(Agent::Pi);
+        let mut c = test_conn(PI_MINOR - 1);
+        assert_eq!(c.for_peer(s.clone()).ag, Some(Agent::Other));
+        c.peer_minor = PI_MINOR;
+        assert_eq!(c.for_peer(s).ag, Some(Agent::Pi));
     }
 
     /// A shell whose job ran (and ended, when `exit` is given) in a `Shared` with a fake terminal.

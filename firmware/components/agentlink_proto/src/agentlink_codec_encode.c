@@ -705,8 +705,9 @@ static bool encode_agent(
 	: (((*input).agent_choice == agent_claude_m_c) ? ((zcbor_uint32_put(state, (1))))
 	: (((*input).agent_choice == agent_cloud_m_c) ? ((zcbor_uint32_put(state, (2))))
 	: (((*input).agent_choice == agent_shell_m_c) ? ((zcbor_uint32_put(state, (3))))
+	: (((*input).agent_choice == agent_pi_m_c) ? ((zcbor_uint32_put(state, (4))))
 	: (((*input).agent_choice == agent_other_m_c) ? ((zcbor_uint32_put(state, (15))))
-	: false)))))));
+	: false))))))));
 
 	log_result(state, res, __func__);
 	return res;

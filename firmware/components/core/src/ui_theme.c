@@ -146,6 +146,7 @@ const char *theme_agent_name(agent_t a)
     case AGENT_CLAUDE: return "Claude Code";
     case AGENT_CLOUD: return "Cloud agent";
     case AGENT_SHELL: return "Terminal";
+    case AGENT_PI: return "pi";
     default: return "Agent";
     }
 }

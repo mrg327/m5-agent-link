@@ -12,7 +12,7 @@
 #define MODEL_RULE_CAP 160 /* the daemon's standing::RULE_CAP */
 
 /* AGENT_SHELL is a job: a command the user started in a terminal (JOBS.md, proto 0.9). */
-typedef enum { AGENT_COPILOT = 0, AGENT_CLAUDE = 1, AGENT_CLOUD = 2, AGENT_SHELL = 3, AGENT_OTHER = 15 } agent_t;
+typedef enum { AGENT_COPILOT = 0, AGENT_CLAUDE = 1, AGENT_CLOUD = 2, AGENT_SHELL = 3, AGENT_PI = 4, AGENT_OTHER = 15 } agent_t;
 typedef enum {
     SESS_START = 0, SESS_WORK = 1, SESS_INPUT = 2, SESS_ERROR = 3,
     SESS_DONE = 4, SESS_IDLE = 5, SESS_ENDED = 6
