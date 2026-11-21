@@ -1,11 +1,11 @@
 ---
 id: 20261111-3aa6
 title: Performance pass: internal RAM, firmware size, hook latency, dev daemon (branch perf)
-status: claimed
+status: open
 severity: low
 area: firmware
 platforms: any
-owner: claude-code@linux-dev
+owner:
 created: 2026-11-11T21:53:15Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -38,3 +38,4 @@ transition and comet animations.
 
 - 2026-11-11T21:53:16Z · claude-code@linux-dev · linux-x86_64 · 5898b75: filed
 - 2026-11-11T21:53:16Z · claude-code@linux-dev · linux-x86_64 · 5898b75: claimed
+- 2026-11-21T23:15:56Z · claude-code@linux-dev · linux-x86_64 · dc17059+dirty: Code merged and on the watch (main dc17059). Claim released; to close, live check: re-measure on dc17059 (check_dram 185553 B free, image 0x1a1000) and hook latency with the installed release hook, then close or split the remaining items.

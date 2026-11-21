@@ -1,7 +1,7 @@
 ---
 id: 20261114-8c3d
 title: Glyph pass: replace words with glyphs on every watch screen
-status: claimed
+status: fixed
 severity: med
 area: firmware
 platforms: any
@@ -9,7 +9,7 @@ owner: claude-code@linux-dev
 created: 2026-11-14T21:08:52Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
-verified_on:
+verified_on: linux-x86_64
 gh:
 ---
 
@@ -49,3 +49,10 @@ all screens, then the screens in stages, each with before / after sheets for the
 - 2026-11-15T21:56:10Z · claude-code@linux-dev · linux-x86_64 · 2f93fce: Flashed glyphs 59a558d to the watch over USB: one clean boot, no asserts or panics in 14 s of boot log, daemon relinked over BLE.
 - 2026-11-15T23:25:38Z · claude-code@linux-dev · linux-x86_64 · 1c6865c: Main merged into glyphs (aed13f8, 630e82e): Sigil UI + two BLE centrals + the dictation queue. ctest 215/215, firmware builds from a fresh sdkconfig (image 0x1a1000, 2 connections), check_dram 185553 B free, wasm rebuilt, 222 atlas tests. The watch runs glyphs + the dictation fix (6c20dae, one BLE connection); the combined build is not flashed.
 - 2026-11-16T22:05:10Z · copilot-cli/opus@mac-work · macos-arm64 · 0253ee0: main 0253ee0 adds AGENT_PI = 4 (proto 0.23, pi coding agent, issue 20261116-f705): model.h, ui_theme.c theme_agent_name, model.c agent_name. The Sigil UI on glyphs needs a mark for pi when it merges.
+- 2026-11-21T23:15:46Z · claude-code@linux-dev · linux-x86_64 · dc17059+dirty: fixed: Sigil UI merged into main (dc17059) with a pi mark (fe424a4). main dc17059 (glyphs merged), flashed over USB 2026-11-21, clean boot log, BLE relinked; ctest 215/215, check_dram 185553 B free, atlas 224/224, cargo test 413 pass (one flaky first run, clean on rerun)
+    - agent: claude-code
+    - host: linux-dev
+    - platform: linux-x86_64
+    - os: Ubuntu 24.04.4 LTS (kernel 7.0.0-43-generic)
+    - git: dc17059+dirty main
+    - toolchains: cc 13.3.0-6ubuntu2~24.04.1, cmake 3.28.3, ninja 1.11.1, node 22.23.2, python 3.12.3, rustc 1.95.0, cargo 1.95.0, sdl2 2.30.0

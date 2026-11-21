@@ -1,7 +1,7 @@
 ---
 id: 20261111-f62b
 title: Dictation over a slow BLE link freezes the watch (voice pull() never returns)
-status: claimed
+status: duplicate
 severity: high
 area: firmware
 platforms: esp32,linux
@@ -51,3 +51,10 @@ run; request the fast interval during VOICE_REC; if the link still falls behind,
 - 2026-11-11T03:39:51Z · claude-code@linux-dev · linux-x86_64 · b8174a9: Not started: the user deferred the fix (2026-11-10). Workaround: dictate over USB, or hold power to restart the watch if it freezes. Related gap: the daemon logs the watch's non-'#' console lines (panics, ESP_LOG output such as 'notify back-pressure timeout') only at debug, so they don't reach the journal; run with RUST_LOG=info,device_log=debug when reproducing.
 - 2026-11-11T04:49:53Z · claude-code@linux-dev · linux-x86_64 · eaa7978: claimed
 - 2026-11-13T06:08:20Z · claude-code@linux-dev · linux-x86_64 · 4762df9: Related fix on branch ota-speed a2822fa: ring lock spin could hang nimble_host on core 0 (task_wdt IDLE0); may cover part of this freeze class. The bounded pull() fix is still in git stash (f62b WIP) and conflicts with today's voice changes.
+- 2026-11-21T23:15:46Z · claude-code@linux-dev · linux-x86_64 · dc17059+dirty: duplicate: Same freeze as 20261115-2eca, fixed and verified on the watch (voice queue drained by the link). The old bounded-pull WIP is still in git stash@{0} on the linux-dev main checkout; no longer needed.
+    - agent: claude-code
+    - host: linux-dev
+    - platform: linux-x86_64
+    - os: Ubuntu 24.04.4 LTS (kernel 7.0.0-43-generic)
+    - git: dc17059+dirty main
+    - toolchains: cc 13.3.0-6ubuntu2~24.04.1, cmake 3.28.3, ninja 1.11.1, node 22.23.2, python 3.12.3, rustc 1.95.0, cargo 1.95.0, sdl2 2.30.0

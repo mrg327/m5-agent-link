@@ -1,11 +1,11 @@
 ---
 id: 20261112-2777
 title: Usage and context gauges on the watch (plan limits, context fill, model, mode, PR)
-status: claimed
+status: open
 severity: med
 area: protocol
 platforms: any
-owner: claude-code@linux-dev
+owner:
 created: 2026-11-12T00:32:54Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -31,3 +31,4 @@ From the market research: the most common feature in rival devices. Daemon reads
 - 2026-11-12T00:32:54Z · claude-code@linux-dev · linux-x86_64 · 6d098e8: filed
 - 2026-11-12T00:32:54Z · claude-code@linux-dev · linux-x86_64 · 6d098e8: claimed
 - 2026-11-12T02:41:33Z · claude-code@linux-dev · linux-x86_64 · c950d64: Built on branch next (113d8d7, 499130a, 254ae1f): protocol 0.10 (usage message, session keys ctx/mdl/pm/pr/prs), agentlink-hook statusline shim with chaining, STATUS arcs, idle-face figure, context capsule, AGENT header readout. ctest 104/104 at that point, gauges_e2e 20/20. No CI check state: the status-line data has none. Not verified on a live subscriber session.
+- 2026-11-21T23:15:56Z · claude-code@linux-dev · linux-x86_64 · dc17059+dirty: Code merged and on the watch (main dc17059). Claim released; to close, live check: a live Claude Code session shows plan-limit and context arcs on STATUS and the capsule matching /status.

@@ -1,11 +1,11 @@
 ---
 id: 20261113-bcd9
 title: Answer an agent's multiple-choice question (AskUserQuestion) on the watch
-status: claimed
+status: open
 severity: med
 area: daemon
 platforms: esp32,linux
-owner: claude-code@linux-dev
+owner:
 created: 2026-11-13T01:56:36Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -46,3 +46,4 @@ watch has no way to pick an option.
 - 2026-11-13T01:56:36Z · claude-code@linux-dev · linux-x86_64 · fce1a1d: filed
 - 2026-11-13T01:56:36Z · claude-code@linux-dev · linux-x86_64 · bf451bb: claimed
 - 2026-11-13T06:58:09Z · claude-code@linux-dev · linux-x86_64 · f288ede: Deployed tonight: watch runs a389685 (branch power, which contains response 11baa78) via BLE OTA; daemon/hook/CLI from the same commit. Awaiting the user's live test.
+- 2026-11-21T23:15:57Z · claude-code@linux-dev · linux-x86_64 · dc17059+dirty: Code merged and on the watch (main dc17059). Claim released; to close, live check: answer one live AskUserQuestion from the watch and the agent receives the chosen option.

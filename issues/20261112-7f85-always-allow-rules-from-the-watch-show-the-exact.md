@@ -1,11 +1,11 @@
 ---
 id: 20261112-7f85
 title: Always-allow rules from the watch: show the exact rule and scope before the hold
-status: claimed
+status: open
 severity: med
 area: protocol
 platforms: any
-owner: claude-code@linux-dev
+owner:
 created: 2026-11-12T08:04:20Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -31,3 +31,4 @@ A third answer to a permission request that grants a standing rule (for example 
 - 2026-11-12T08:04:20Z · claude-code@linux-dev · linux-x86_64 · 997305d: filed
 - 2026-11-12T08:04:21Z · claude-code@linux-dev · linux-x86_64 · 997305d: claimed
 - 2026-11-12T08:52:47Z · claude-code@linux-dev · linux-x86_64 · 3680681: Built on branch next (bae0b12..b33082f): protocol 0.13 (attention rule/scope/wide, cmd rh). One Claude Code suggestion passed back verbatim, addRules/allow only, session or local project scope, exact rule shown before a 1.6 s hold, grant bound to the rule shown by hash. Before this the hook echoed the whole suggestions array unseen. standing_rules_e2e 31/31. Not verified in a live session; not deployed to the daemon yet.
+- 2026-11-21T23:15:56Z · claude-code@linux-dev · linux-x86_64 · dc17059+dirty: Code merged and on the watch (main dc17059). Claim released; to close, live check: grant one always-allow rule from the watch in a live session; the rule shown matches what lands in settings.

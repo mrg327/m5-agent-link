@@ -1,7 +1,7 @@
 ---
 id: 20261111-7732
 title: UI v3: full visual and UX overhaul of the watch (branch ui-v3)
-status: claimed
+status: fixed
 severity: med
 area: firmware
 platforms: any
@@ -9,7 +9,7 @@ owner: claude-code@linux-dev
 created: 2026-11-11T05:14:58Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
-verified_on:
+verified_on: linux-x86_64
 gh:
 ---
 
@@ -50,3 +50,10 @@ should build on it.
 - 2026-11-11T05:15:03Z · claude-code@linux-dev · linux-x86_64 · ff33ff3+dirty: claimed
 - 2026-11-11T06:31:31Z · claude-code@linux-dev · linux-x86_64 · facbc79+dirty: Built on branch ui-v3 (local, not pushed; HEAD f17bed3, 20 commits over main): docs/design/UI-PROFILE.md (audit) and UI-V3.md (spec, updated to what was built); Figtree + Phosphor fonts, tokens, legend, toast, ring, list/picker component; every screen but KEYS restyled; swipe right = back in six modes; row taps; nav safety rules unchanged. An independent review found and this branch fixed: a hold on a neighbour row committing the selected item, VOICE sending a transcript longer than it shows, a second tap after opening ASK committing Open on PC, AGENT hold not cancelled on selection change, answered state flashing, a sideways flick leaving SCROLL. Checks on linux-x86_64: ctest -j 16 87/87 (43-54 s; the suite was 463 s serial), atlas extract --check and 140 node tests, idf.py build 1.28 MB (79% of the app partition free), check_dram 128417 B free. Flashed to the StopWatch: clean boot log (one reset, no assert or malloc failure), daemon reconnected and sent a snapshot. Not yet done: hands-on validation of touch targets and motion on the glass, merge to main, Atlas wasm rebuild (no Emscripten here), a simulator battery knob to test the low-battery chip. Open question for the user: a permission text longer than three lines is still ellipsized and can be approved (as on main).
 - 2026-11-13T18:02:10Z · copilot-cli/opus@mac-work · macos-arm64 · 7a19c7e: copilot-cli/opus@mac-work edits ui_status.c on main for issue 20261113-c36c (Quiet/Mute icons show state); small change in render()/init only.
+- 2026-11-21T23:15:46Z · claude-code@linux-dev · linux-x86_64 · dc17059+dirty: fixed: UI v3 merged into main on 2026-11-12 and since superseded by the Sigil UI (8c3d, dc17059); live on the watch since 11-11.
+    - agent: claude-code
+    - host: linux-dev
+    - platform: linux-x86_64
+    - os: Ubuntu 24.04.4 LTS (kernel 7.0.0-43-generic)
+    - git: dc17059+dirty main
+    - toolchains: cc 13.3.0-6ubuntu2~24.04.1, cmake 3.28.3, ninja 1.11.1, node 22.23.2, python 3.12.3, rustc 1.95.0, cargo 1.95.0, sdl2 2.30.0

@@ -1,11 +1,11 @@
 ---
 id: 20261113-3704
 title: Play a sound once the watch has taken an over-the-air update
-status: claimed
+status: open
 severity: low
 area: firmware
 platforms: esp32,linux
-owner: claude-code@linux-dev
+owner:
 created: 2026-11-13T01:59:40Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -43,3 +43,4 @@ power on (or after a USB flash).
 - 2026-11-13T01:59:40Z · claude-code@linux-dev · linux-x86_64 · 1c53c7c: filed
 - 2026-11-13T01:59:40Z · claude-code@linux-dev · linux-x86_64 · 1c53c7c: claimed
 - 2026-11-13T06:58:10Z · claude-code@linux-dev · linux-x86_64 · f288ede: Deployed tonight: watch runs a389685 (branch power, which contains response 11baa78) via BLE OTA; daemon/hook/CLI from the same commit. Awaiting the user's live test.
+- 2026-11-21T23:15:57Z · claude-code@linux-dev · linux-x86_64 · dc17059+dirty: Code merged and on the watch (main dc17059). Claim released; to close, live check: after the next OTA (BLE or USB), the watch plays the update tone once on first boot.

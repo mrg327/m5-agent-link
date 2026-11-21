@@ -152,7 +152,7 @@ Decided (user, 2026-11-14): the machine-specific things on the watch follow the 
 **Used** means keyboard or mouse input on that machine. The daemon already reads it for presence
 (`presence.rs`: `Reading.idle_ms`, the seconds since the last input).
 
-- **Proto 0.23, `used { idle }`** (daemon → device, a new message type). `idle` is the seconds since
+- **Proto 0.24, `used { idle }`** (daemon → device, a new message type). `idle` is the seconds since
   the last input on this machine.
 - **When the daemon sends it:**
   - at once, when input follows 60 s or more without any;
@@ -204,9 +204,9 @@ With one machine linked nothing changes on screen. With two:
 ## 7. Daemon changes
 
 None are required. These are worth having:
-0. **Proto 0.23 `used { idle }`** (§5.1): the one daemon change the current machine needs. An old
+0. **Proto 0.24 `used { idle }`** (§5.1): the one daemon change the current machine needs. An old
    daemon still links, but it is never the current machine unless it is the primary.
-1. **Proto 0.23: the hello says `links: 2`.** A daemon then knows the watch is shared:
+1. **Proto 0.24: the hello says `links: 2`.** A daemon then knows the watch is shared:
    - `agentlink status` shows "shared with 1 other machine". The watch would need to say which;
      **[ask]** whether it is worth a message.
    - The OTA progress line mentions that the other machine will lose the watch for the restart.
@@ -277,7 +277,7 @@ connect, with internal-heap logging around the BLE init (worktree, not committed
      live without it.
 3. **UI:** machine marks, ring ticks, link status, trackpad target (§6). Contact sheets for the user
    to pick from, as for UI v3.
-4. **Daemon:** proto 0.23 `links`, back-off when ignored, host id (§7).
+4. **Daemon:** proto 0.24 `links`, back-off when ignored, host id (§7).
 5. **Live:**
    - The Mac and the Linux laptop together for a day.
    - Power reports with one and two links, to give the battery cost of the second link at its idle

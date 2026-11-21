@@ -1,7 +1,7 @@
 ---
 id: 20261111-f6fc
 title: ASK: read before you approve (long permission text)
-status: claimed
+status: fixed
 severity: med
 area: firmware
 platforms: any
@@ -9,7 +9,7 @@ owner: claude-code@linux-dev
 created: 2026-11-11T08:16:10Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
-verified_on:
+verified_on: linux-x86_64
 gh:
 ---
 
@@ -39,3 +39,10 @@ implement the `detail` op (PROTOCOL §attention) so the watch can fetch and page
 - 2026-11-11T08:16:11Z · claude-code@linux-dev · linux-x86_64 · 0104ec1: filed
 - 2026-11-11T08:16:11Z · claude-code@linux-dev · linux-x86_64 · 0104ec1: claimed
 - 2026-11-11T08:16:25Z · claude-code@linux-dev · linux-x86_64 · 958e24a: Built on branch ui-v3-read-first: reader, approve lock, three sim tests (ask_read_first, ask_read_then_approve, ask_cut_text). ctest 90/90 on linux-x86_64; firmware builds, check_dram 128345 B free. Not flashed, not merged: waiting for the owner's decision, in particular on blocking daemon-cut text.
+- 2026-11-21T23:15:46Z · claude-code@linux-dev · linux-x86_64 · dc17059+dirty: fixed: ui-v3-read-first merged into main 2026-11-12 (reader, approve lock, sim tests ask_read_first / ask_read_then_approve / ask_cut_text); on the watch since then; now in dc17059 with the Sigil ASK. main dc17059 (glyphs merged), flashed over USB 2026-11-21, clean boot log, BLE relinked; ctest 215/215, check_dram 185553 B free, atlas 224/224, cargo test 413 pass (one flaky first run, clean on rerun)
+    - agent: claude-code
+    - host: linux-dev
+    - platform: linux-x86_64
+    - os: Ubuntu 24.04.4 LTS (kernel 7.0.0-43-generic)
+    - git: dc17059+dirty main
+    - toolchains: cc 13.3.0-6ubuntu2~24.04.1, cmake 3.28.3, ninja 1.11.1, node 22.23.2, python 3.12.3, rustc 1.95.0, cargo 1.95.0, sdl2 2.30.0
