@@ -6,6 +6,7 @@
 
 #include "app.h"
 #include "hal.h"
+#include "ui_kit.h"
 
 uint32_t theme_state_rgb(sess_state_t s)
 {
@@ -62,6 +63,73 @@ const char *theme_state_glyph(const session_t *s)
     case SESS_IDLE: return ICON_IDLE;
     default: return ICON_WORKING;
     }
+}
+
+/* The agent's mark in the context line (GLYPHS.md §2): the screens no longer spell the agent's name. */
+const char *theme_agent_glyph(agent_t a)
+{
+    switch (a) {
+    case AGENT_COPILOT: return ICON_AG_COPILOT;
+    case AGENT_CLAUDE: return ICON_AG_CLAUDE;
+    case AGENT_CLOUD: return ICON_AG_CLOUD;
+    case AGENT_SHELL: return ICON_G_SHELL;
+    case AGENT_PI: return ICON_AG_PI;
+    default: return ICON_G_ROBOT;
+    }
+}
+
+/* GLYPHS.md §3.8, the vocabulary: the words the watch draws as a glyph. A screen keeps naming its controls and
+ * messages in words (the UI report, the debug log and the tests read those); what it draws is theme_glyph() of
+ * the word, when there is one. Two glyphs side by side read as one sign ("computer, refused"). */
+static const struct { const char *word, *glyph; } kGlyphs[] = {
+    /* key hints and discs */
+    {"Open", ICON_MORE}, {"Next", ICON_NEXT}, {"Select", ICON_CHECK}, {"Back", ICON_BACK}, {"More", ICON_CARET_DOWN},
+    {"Stop", ICON_STOP}, {"Answer", ICON_REPLY}, {"Review", ICON_G_READ}, {"Read", ICON_READ},
+    {"Open on PC", ICON_COMPUTER}, {"Send", ICON_SENT}, {"Use", ICON_CHECK}, {"Try again", ICON_RETRY},
+    {"Dictate", ICON_MIC}, {"Keyboard", ICON_KEYBOARD}, {"Done", ICON_CHECK}, {"Reply", ICON_REPLY},
+    {"Bottom", ICON_LIVE}, {"Page", ICON_DOWN}, {"SEND", ICON_SENT}, {"DEL", ICON_BACKSPACE},
+    {"Quiet 30 min", ICON_QUIET}, {"Quiet 1 h", ICON_QUIET}, {"Quiet off", ICON_BELL}, {"Mute", ICON_MUTE},
+    {"Unmute", ICON_SOUND}, {"Volume 0", ICON_WAVE}, {"Volume 1", ICON_WAVE}, {"Volume 2", ICON_WAVE},
+    {"Volume 3", ICON_WAVE}, {"Volume 4", ICON_WAVE}, {"Volume 5", ICON_WAVE},
+    /* VOICE and KEYS: why a dictation failed, why the keyboard was refused */
+    {"Nothing heard", ICON_WAVE ICON_X}, {"No microphone", ICON_MIC ICON_REFUSED}, {"No transcript", ICON_COMPUTER ICON_WAIT},
+    {"Busy", ICON_KEYBOARD ICON_WAIT}, {"Not kitty", ICON_G_SHELL ICON_REFUSED},
+    /* toasts */
+    {"Sent", ICON_SENT}, {"Not sent", ICON_SENT ICON_X}, {"Offline", ICON_OFFLINE}, {"Opening on PC...", ICON_COMPUTER},
+    {"Hold to stop", ICON_TAP ICON_STOP}, {"Hold to run again", ICON_TAP ICON_RERUN}, /* AGENT: a tap on a hold disc */
+    {"Focused", ICON_COMPUTER}, {"Stopping", ICON_STOP}, {"Interrupting", ICON_STOP}, {"Running again", ICON_RERUN},
+    {"Unqueued", ICON_QUEUED ICON_X}, {"Will buzz when done", ICON_NOTIFY}, {"Won't notify", ICON_QUIET},
+    {"Snoozed 30 min", ICON_IDLE " 30"}, {"Unsnoozed", ICON_UNSNOOZE}, {"Session ended", ICON_IDLE},
+    {"Not supported", ICON_REFUSED}, {"Not allowed on the PC", ICON_COMPUTER ICON_REFUSED}, {"Failed", ICON_ERROR},
+    {"Denied", ICON_DENIED}, {"Timed out", ICON_WAIT}, {"No window", ICON_WINDOW ICON_X},
+    {"Out of date", ICON_COMPUTER ICON_UPDATE}, {"Nothing else needs you", ICON_DONE},
+    /* STATUS, LABS, TRACKPAD */
+    {"Set the clock first", ICON_CLOCK ICON_X}, {"Update agentlinkd", ICON_COMPUTER ICON_UPDATE},
+    /* results (ui_burst) */
+    {"Approved", ICON_CHECK}, {"Always allowed", ICON_ALWAYS}, {"On your computer", ICON_COMPUTER},
+    {"Waiting for your computer", ICON_COMPUTER}, {"Time ran out", ICON_WAIT},
+    /* ASK (ui_ask.c): a tap on a hold item is told "finger, and what the hold does"; a shut grant is told why */
+    {"Hold to approve", ICON_TAP ICON_CHECK}, {"Hold to deny", ICON_TAP ICON_X}, {"Hold to always allow", ICON_TAP ICON_ALWAYS},
+    {"Hold to choose", ICON_TAP ICON_CHECK}, {"Hold to send", ICON_TAP ICON_SENT},
+    {"Hold for the next question", ICON_TAP ICON_NEXT}, {"Read it first", ICON_READ},
+    {"Too long to approve here", ICON_COMPUTER ICON_CHECK}, {"Rule too long for the watch", ICON_ALWAYS ICON_REFUSED},
+    {"Tick at least one", ICON_G_PLAN},
+};
+
+const char *theme_glyph(const char *word)
+{
+    for (size_t i = 0; i < sizeof kGlyphs / sizeof kGlyphs[0]; i++)
+        if (!strcmp(kGlyphs[i].word, word)) return kGlyphs[i].glyph;
+    return NULL;
+}
+
+bool theme_is_glyph(const char *text) { return (uint8_t)text[0] == 0xEE; } /* the icons' private-use block */
+
+bool theme_all_glyphs(const char *text)
+{
+    for (const uint8_t *p = (const uint8_t *)text; *p; p += 3)
+        if (p[0] != 0xEE || !p[1] || !p[2]) return false;
+    return text[0] != 0;
 }
 
 const char *theme_basename(const char *path)
@@ -209,55 +277,37 @@ void theme_elapsed_long(char *dst, size_t cap, uint32_t secs)
     else snprintf(dst, cap, "%uh %02um", (unsigned)(secs / 3600), (unsigned)(secs / 60 % 60));
 }
 
-#define LEGEND_H UI_KEYCAP_PX
-#define LEGEND_R 212 /* the farthest corner of a legend: inside the ring (r 218), not on it */
+/* The old legend calls, drawing the Sigil key hints (GLYPHS.md §3.6): see ui_theme.h. */
+static const char *hint_glyph(const char *word)
+{
+    if (!word || !word[0]) return "";
+    if (theme_is_glyph(word)) return word;
+    const char *g = theme_glyph(word);
+    return g ? g : ICON_G_DOT; /* a word without a glyph yet: a dot, never letters (rule 6) */
+}
 
 lv_obj_t *theme_key_badge(lv_obj_t *parent, const char *key, const char *word, bool key_left, int deg, int r,
                           lv_obj_t **key_out, lv_obj_t **word_out)
 {
+    (void)key;
     (void)deg;
     (void)r;
-    lv_obj_t *b = lv_obj_create(parent);
-    lv_obj_remove_style_all(b);
-    lv_obj_set_size(b, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(b, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(b, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(b, 6, 0);
-    lv_obj_remove_flag(b, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_user_data(b, (void *)(intptr_t)(key_left ? 1 : 0)); /* which side of the row it hugs */
-    lv_obj_t *cap = lv_obj_create(b);
-    lv_obj_remove_style_all(cap);
-    lv_obj_set_size(cap, UI_KEYCAP_PX, UI_KEYCAP_PX);
-    lv_obj_set_style_radius(cap, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_border_width(cap, 2, 0); /* the spec's 1.5 px: LVGL borders are whole pixels */
-    lv_obj_set_style_border_color(cap, COL_TEXT3, 0);
-    lv_obj_remove_flag(cap, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_t *k = lv_label_create(cap);
-    lv_obj_set_style_text_font(k, FONT_CAPTION, 0);
-    lv_obj_set_style_text_color(k, COL_TEXT2, 0);
-    lv_label_set_text(k, key);
-    lv_obj_center(k);
-    lv_obj_t *w = theme_label(b, 16, COL_TEXT2);
-    lv_label_set_long_mode(w, LV_LABEL_LONG_MODE_CLIP);
-    lv_label_set_text(w, word);
-    if (!key_left) lv_obj_move_to_index(cap, 1); /* word first, cap on the button side */
-    theme_key_badge_set_word(b, w, word, 0, 0);
-    if (key_out) *key_out = k;
-    if (word_out) *word_out = w;
+    lv_obj_t *b = ui_key_hint_create(parent, key_left ? UI_KEY_A : UI_KEY_B);
+    ui_key_hint_set(b, hint_glyph(word));
+    lv_obj_t *dummy = lv_label_create(b); /* what the old callers keep as "the key label" and "the word label" */
+    lv_label_set_text(dummy, "");
+    lv_obj_add_flag(dummy, LV_OBJ_FLAG_HIDDEN);
+    if (key_out) *key_out = dummy;
+    if (word_out) *word_out = dummy;
     return b;
 }
 
 void theme_key_badge_set_word(lv_obj_t *b, lv_obj_t *word_lbl, const char *word, int deg, int r)
 {
+    (void)word_lbl;
     (void)deg;
     (void)r;
-    lv_label_set_text(word_lbl, word);
-    lv_obj_update_layout(b);
-    int bw = lv_obj_get_width(b), bh = lv_obj_get_height(b);
-    int dy = UI_Y_LEGEND + LEGEND_H / 2 - 233; /* the lower corner is the one nearest the ring */
-    int edge = (int)sqrtf((float)(LEGEND_R * LEGEND_R - dy * dy));
-    int x = lv_obj_get_user_data(b) ? 233 - edge : 233 + edge - bw;
-    lv_obj_set_pos(b, x, UI_Y_LEGEND - bh / 2);
+    ui_key_hint_set(b, hint_glyph(word));
 }
 
 static bool job_running(const session_t *s) { return s->state == SESS_START || s->state == SESS_WORK; }

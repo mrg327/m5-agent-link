@@ -1,0 +1,191 @@
+# GLYPHS.md §5: STATUS, LABS and TRACKPAD in Sigil, every state as a render, and the words each one still says in
+# the report (rule 9). Nothing on these screens is spelled out but the firmware version on STATUS's About face.
+connect
+rtc 1800000000
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 done webapp feat/login Running the test suite
+wait 300
+# STATUS: the clock, the four toggles round it (Quiet left, Mute top, Volume right, About bottom), the link above
+# the clock (the transport and the computer's sigil) and the battery ring under it
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+expect_label 12:00
+expect_label dev-mac
+expect_label 80%
+expect_label > Quiet: off
+expect_label icons bell speaker volume-5 info
+shot sigil_status.png
+# redraw discipline: at rest the screen repaints nothing on its ticks (one finished session: the ring is still)
+wait 300
+px_reset
+wait 2500
+expect_px_max 3000
+session 2 input api main
+session 3 error docs main
+wait 300
+# quiet for 30 minutes: half a turn round the bell; an hour: the whole turn
+btn A
+wait 200
+expect_label > Quiet until 12:30
+expect_label icons bell-slash speaker volume-5 info
+shot sigil_status_quiet30.png
+btn A
+wait 200
+expect_label > Quiet until 13:00
+shot sigil_status_quiet60.png
+# the arc stays round the bell when another toggle is selected
+btn B
+wait 150
+expect_label > Sounds: on
+shot sigil_status_mute.png
+btn A
+wait 200
+expect_label > Sounds: off
+expect_label icons bell-slash speaker-slash volume-5 info
+shot sigil_status_muted.png
+# the volume's five steps: grey while muted, lit again once it is stepped (which unmutes)
+btn B
+wait 150
+expect_label > Volume 5 of 5 (muted)
+shot sigil_status_volume_muted.png
+btn A
+wait 300
+expect_label > Volume 1 of 5
+expect_label icons bell-slash speaker volume-1 info
+btn A
+wait 300
+btn A
+wait 300
+expect_label > Volume 3 of 5
+shot sigil_status_volume3.png
+# a tap on a disc in the rim zone (beyond r 150) still reaches it: Quiet goes from an hour to off
+tap 70 233
+wait 200
+expect_label > Quiet: off
+expect_label icons bell speaker volume-3 info
+# About: the sessions, those waiting and those failed with their counts, the privacy eye, the version
+tap 233 365
+wait 200
+expect_label > 3 sessions
+expect_label 1 waiting
+expect_label Privacy: preview
+expect_label 0.1.0-sim
+shot sigil_status_about.png
+cfg privacy meta
+wait 1200
+expect_label Privacy: meta
+shot sigil_status_about_meta.png
+cfg privacy preview
+# the battery: charging, then low (vermillion)
+btn B
+wait 150
+battery 55 chg
+wait 1200
+expect_label 55%
+shot sigil_status_charging.png
+battery 9
+wait 1200
+expect_label 9%
+shot sigil_status_battery_low.png
+battery 80
+# with the plan's usage (ui_gauges.c: two arcs and two rows) the link sits beside the battery under the clock,
+# and About's face starts under the rows
+usage 42 7800 - 18 280000
+wait 1200
+expect_label 5h 42%
+expect_label dev-mac
+shot sigil_status_gauges.png
+tap 233 365
+wait 200
+expect_label > 3 sessions
+shot sigil_status_gauges_about.png
+btn B
+wait 150
+# offline for two minutes: the amber plug and a tally of the minutes in the link's place
+disconnect
+wait 300
+skip 125000
+wait 300
+swipe 233 180 233 300 160
+wait 300
+expect_screen status
+expect_label Offline
+expect_label 2m
+shot sigil_status_offline_gauges.png
+usage - 0 - - 0
+wait 1200
+shot sigil_status_offline.png
+btn B long
+wait 300
+expect_screen ring
+
+# LABS: the atom and its experiments. Offline, the Trackpad disc is dim and the plug says why
+swipe 233 300 233 180 160
+wait 300
+expect_screen labs
+expect_label Experiments
+expect_label > Trackpad
+expect_label Offline
+shot sigil_labs_offline.png
+# a daemon without the pointer: "computer, download"; a tap stays put and says so as a toast
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+wait 300
+expect_label agentlinkd on this PC has no trackpad
+shot sigil_labs_old.png
+tap 233 83
+wait 300
+expect_screen labs
+expect_label Update agentlinkd
+shot sigil_labs_toast.png
+wait 1900
+# a daemon that offers the pointer: the disc is lit, A's hint shows
+rx a400020101020103a60082001401a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a200010100048168436f6e74696e756507f5
+wait 300
+expect_label Use the watch as this PC's trackpad
+shot sigil_labs.png
+# a tap on its disc (in the rim zone) opens it
+tap 233 60
+wait 300
+expect_screen trackpad
+expect_label Trackpad
+expect_label Drag to move, tap to click
+shot sigil_trackpad.png
+# the PC has no pointer to drive: "computer, pointer, cross"
+tap 233 233
+wait 100
+result err unsupported
+wait 300
+expect_label This PC has no pointer agentlinkd can drive
+# (once the toast that announced it has gone, the screen's own sign stands in its place)
+wait 1900
+shot sigil_trackpad_no_pointer.png
+btn A
+wait 300
+expect_screen labs
+tap 233 233
+wait 300
+expect_screen trackpad
+expect_label Drag to move, tap to click
+# the PC refused: "computer, refused"
+tap 233 233
+wait 100
+result err denied
+wait 300
+expect_label The PC refused
+shot sigil_trackpad_refused.png
+btn A
+wait 300
+tap 233 233
+wait 300
+expect_screen trackpad
+# offline: the plug
+disconnect
+wait 600
+expect_label Offline
+shot sigil_trackpad_offline.png
+chord
+wait 300
+expect_screen ring
+quit

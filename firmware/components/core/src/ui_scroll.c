@@ -1,9 +1,20 @@
-/* The SCROLL screen (UI-V2 §4.4): the centre is a trackpad for the focused terminal's scrollback.
- * A drag step is one wheel line, a release at speed glides on, B pages, A jumps back to the live
- * bottom. The first step on an idle link goes out at once, later ones are summed into one
- * cmd_op_scroll per NAV_SCROLL_COALESCE_MS; the daemon's scroll_pos corrects the counter, fills the
- * index ring's position track and (privacy ≥ preview) the one-line preview.
- * v3 look: a big line count (or the Live icon and word), a muted line of terminal text, no chevrons. */
+/* The SCROLL screen in Sigil (docs/design/GLYPHS.md §5; UI-V2 §4.4 for what it does): the centre is a trackpad
+ * for the focused terminal's scrollback. A drag step is one wheel line, a release at speed glides on, B pages,
+ * A jumps back to the live bottom. The first step on an idle link goes out at once, later ones are summed into
+ * one cmd_op_scroll per NAV_SCROLL_COALESCE_MS; the daemon's scroll_pos corrects the position and (privacy
+ * >= preview) brings the line at the top of the view.
+ *
+ * What is on the glass:
+ *   - whose terminal: the project's sigil and the agent's mark under it, as on the deck;
+ *   - the scrollback as a column of bars, one a line, each as long as its line number makes it, so the column
+ *     moves with the finger like the text it stands for. The row in the middle is where the view is: the
+ *     terminal's own line when the daemon sends one (text: terminal content), a bright bar otherwise. Rows
+ *     under it are the lines down to the live bottom; there are none when the view is live, and the live
+ *     glyph stands there instead, in the session's colour. Rows above stop at the top of the scrollback;
+ *   - how far up, as geometry (rule 4): a track bent along the left of the screen with a thumb, at the lower
+ *     end when live. It is on the left because the finger comes in from the right. No number;
+ *   - the hints: A is the live glyph (back to the bottom, and out), B a page down; neither while live.
+ * The report still says "[142] lines up" / "Live" and the preview (rule 9). */
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,27 +23,48 @@
 #include "hal.h"
 #include "nav.h"
 #include "ui_internal.h"
+#include "ui_kit.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
 
-#define ICON_Y 176
-#define LIVE_Y 236
-#define COUNT_Y 196
-#define CAPTION_Y 246
-#define PREVIEW_Y 296
+/* Geometry: centres. */
+#define SIGIL_Y 50
+#define SIGIL_R 22
+#define MARK_Y 84          /* the agent's mark, as on the deck */
+#define VIEW_Y 228         /* the row where the view is: the preview line, or a bright bar */
+#define PREVIEW_W 330      /* from the column's left edge: it is a line of the column */
+#define ROWS 5             /* bars above the view, and as many under it */
+#define ROW_PITCH 18
+#define ROW_GAP 28         /* from the view row to the first bar */
+#define BAR_H 6
+#define BAR_X 100          /* a bar starts here plus its indent ... */
+#define BAR_INDENT 16      /* ... of 0 to 3 of these ... */
+#define BAR_MIN 56         /* ... and is this long at least, */
+#define BAR_VAR 144        /* this much longer at most: it ends at x 348 or before */
+#define MAP_X0 (BAR_X - 4)
+#define MAP_X1 (BAR_X + 3 * BAR_INDENT + BAR_MIN + BAR_VAR + 4)
+#define MAP_HALF (ROW_GAP + (ROWS - 1) * ROW_PITCH + BAR_H) /* the column's half height */
+#define LIVE_Y 300         /* the live glyph, under the view row */
+#define TRACK_R 182        /* the position track: left of the column, from 235 degrees (live) up to 305 */
+#define TRACK_W 10
+#define TRACK_START 235
+#define TRACK_SPAN 70
+#define THUMB_LEN 150      /* per mille of the track */
 #define STOP_GAP_MS 400     /* the end-of-scrollback thud repeats at most this often */
-#define UNKNOWN_TOTAL_SOFT 100 /* total unknown: the track arc is lines/(lines+this), so 100 lines = half */
+#define UNKNOWN_TOTAL_SOFT 100 /* total unknown: the thumb sits at lines/(lines+this), so 100 lines = half way */
 
 static int s_fast_port = -1; /* the port asked for the short interval, -1 none */
-static lv_obj_t *s_root, *s_header, *s_icon, *s_live, *s_count, *s_caption, *s_preview;
-static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
+static lv_obj_t *s_root, *s_sigil, *s_marks, *s_map, *s_live, *s_preview, *s_track, *s_key[2];
 static uint32_t s_sid, s_now, s_last_input;
-static char s_header_txt[64], s_count_txt[24], s_preview_txt[64];
+static char s_header_txt[64], s_count_txt[24], s_preview_txt[64], s_marks_txt[24];
 
 /* position: the daemon's last word, nudged locally by what we sent since */
 static uint32_t s_lines_above, s_total;
 static bool s_dragged; /* a drag step went out during the current touch */
 static bool s_at_bottom = true, s_has_total, s_have_pos;
+/* what the column shows now: it is repainted only when one of these changes */
+static uint32_t s_map_lines, s_map_top;
+static bool s_map_text;
 /* coalescer: pending lines or pages (pages win); one command per NAV_SCROLL_COALESCE_MS */
 static int s_pend_lines, s_pend_pages;
 static uint32_t s_sent_ms;
@@ -49,39 +81,95 @@ static const session_t *session(void) { return model_find(s_sid); }
 
 static void show(lv_obj_t *o, bool on)
 {
+    if (lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN) != on) return;
     if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
 }
 
 static bool preview_allowed(void) { return model_settings()->privacy != PRIVACY_META; }
+static bool live(void) { return s_at_bottom || s_lines_above == 0; }
+
+/* ───────── the column of bars ───────── */
+
+/* A line's bar, from its number: the same line is the same bar wherever it is on screen, so the column moves
+ * as a whole when the view does. An indent and a length, like a line of a program. */
+static void bar_of(uint32_t line, int *x, int *w)
+{
+    uint32_t h = line * 2654435761u;
+    h ^= h >> 15;
+    h *= 2246822519u;
+    h ^= h >> 13;
+    *x = BAR_X + (int)(h & 3) * BAR_INDENT;
+    *w = BAR_MIN + (int)((h >> 8) % (BAR_VAR + 1));
+}
+
+static void bar(lv_layer_t *l, int x, int cy, int w, int h, lv_color_t c)
+{
+    lv_draw_rect_dsc_t r;
+    lv_draw_rect_dsc_init(&r);
+    r.bg_opa = LV_OPA_COVER;
+    r.bg_color = c;
+    r.radius = LV_RADIUS_CIRCLE;
+    lv_area_t a = {x, cy - h / 2, x + w - 1, cy + h / 2 - 1};
+    lv_draw_rect(l, &r, &a);
+}
+
+/* Row k above the view (k > 0) is line lines_above + k, an older one; row k under it is a newer one, down to
+ * line 0, the live bottom. The further from the view, the dimmer. */
+static void on_map_draw(lv_event_t *e)
+{
+    static const uint8_t shade[ROWS] = {0x58, 0x48, 0x38, 0x2a, 0x1e};
+    lv_layer_t *l = lv_event_get_layer(e);
+    int x, w;
+    for (int k = 1; k <= ROWS; k++) {
+        lv_color_t c = lv_color_make(shade[k - 1], shade[k - 1], (uint8_t)(shade[k - 1] + 4));
+        int dy = ROW_GAP + (k - 1) * ROW_PITCH;
+        uint32_t up = s_map_lines + (uint32_t)k;
+        if (!s_map_top || up <= s_map_top) { /* nothing above the top of the scrollback */
+            bar_of(up, &x, &w);
+            bar(l, x, VIEW_Y - dy, w, BAR_H, c);
+        }
+        if (s_map_lines >= (uint32_t)k) { /* nothing under the live bottom */
+            bar_of(s_map_lines - (uint32_t)k, &x, &w);
+            bar(l, x, VIEW_Y + dy, w, BAR_H, c);
+        }
+    }
+    if (!s_map_text) { /* no line to show (privacy, or none sent): the view row is the brightest bar */
+        bar_of(s_map_lines, &x, &w);
+        bar(l, x, VIEW_Y, w, BAR_H + 2, COL_TEXT);
+    }
+}
 
 static void render(void)
 {
     const session_t *s = session();
     uint32_t rgb = s ? theme_session_rgb(s) : RGB_ACCENT;
-    char buf[24];
-    bool live = s_at_bottom || s_lines_above == 0;
-    show(s_icon, live);
-    show(s_live, live);
-    show(s_count, !live);
-    show(s_caption, !live);
-    for (int i = 0; i < 2; i++) show(s_badge[i], !(live && s_have_pos)); /* at the bottom neither Bottom nor Page does anything */
-    if (live) {
-        theme_set_text_color(s_icon, lv_color_hex(rgb));
+    bool at_live = live();
+    show(s_live, at_live);
+    for (int i = 0; i < 2; i++) show(s_key[i], !(at_live && s_have_pos)); /* at the bottom neither Bottom nor Page does anything */
+    if (at_live) {
+        ui_glyph_set(s_live, ICON_LIVE, lv_color_hex(rgb));
         s_count_txt[0] = 0;
     } else {
-        snprintf(buf, sizeof buf, "%u", (unsigned)s_lines_above);
-        theme_set_text(s_count, s_count_txt, sizeof s_count_txt, buf);
+        snprintf(s_count_txt, sizeof s_count_txt, "%u", (unsigned)s_lines_above); /* in words: the report */
     }
     bool prev = preview_allowed() && s_preview_txt[0];
     show(s_preview, prev);
-    /* the track: a thin grey ring with an arc for how far above the bottom the view sits */
+    /* the column: only when the view moved, the top became known or the row's text came or went */
+    uint32_t lines = at_live ? 0 : s_lines_above, top = s_has_total && s_total > 0 ? s_total : 0;
+    if (lines != s_map_lines || top != s_map_top || prev != s_map_text) {
+        s_map_lines = lines;
+        s_map_top = top;
+        s_map_text = prev;
+        lv_obj_invalidate(s_map);
+    }
+    /* the thumb: how far above the bottom the view sits */
     int permille = 0;
-    if (s_lines_above > 0) {
+    if (!at_live) {
         if (s_has_total && s_total > 0) permille = (int)((uint64_t)s_lines_above * 1000 / s_total);
         else permille = (int)((uint64_t)s_lines_above * 1000 / (s_lines_above + UNKNOWN_TOTAL_SOFT));
     }
-    ring_set_track(ui_home_ring(), permille, RGB_ACCENT);
+    ui_track_set(s_track, permille, THUMB_LEN, lv_color_hex(rgb), COL_FILL2);
 }
 
 bool ui_scroll_refresh(uint32_t now)
@@ -89,12 +177,13 @@ bool ui_scroll_refresh(uint32_t now)
     s_now = now;
     const session_t *s = session();
     if (!s || s->state == SESS_ENDED) return false;
-    char buf[64];
     const char *base = theme_basename(s->repo);
-    char host[24];
+    char host[24], marks[24];
     theme_host_prefix(host, sizeof host, s);
-    snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
-    theme_set_text(s_header, s_header_txt, sizeof s_header_txt, buf);
+    snprintf(s_header_txt, sizeof s_header_txt, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
+    ui_sigil_set_name(s_sigil, base);
+    snprintf(marks, sizeof marks, "%s%s", s->host ? ICON_G_WEB " " : "", theme_agent_glyph(s->agent)); /* remote: the globe first */
+    theme_set_text(s_marks, s_marks_txt, sizeof s_marks_txt, marks);
     render();
     return true;
 }
@@ -116,6 +205,7 @@ void ui_scroll_open(uint32_t sid, uint32_t now)
     s_preview_txt[0] = 0;
     lv_label_set_text(s_preview, "");
     if (g_ui_actions->sectors) g_ui_actions->sectors(0); /* the rim is unused here */
+    ring_set_track(ui_home_ring(), 0, RGB_ACCENT); /* ... and says so: one grey ring, no sessions to scrub */
     ui_scroll_refresh(now);
     show(s_root, true);
     s_fast_port = ui_link_transport();
@@ -308,15 +398,17 @@ void ui_scroll_report(ui_report_t *r)
     if (!lv_obj_has_flag(s_preview, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_preview_txt);
 }
 
-static lv_obj_t *line(lv_obj_t *parent, const lv_font_t *f, lv_color_t col, int y, int w)
+static lv_obj_t *line(lv_obj_t *parent, const lv_font_t *f, lv_color_t col, int cy, int w)
 {
     lv_obj_t *l = lv_label_create(parent);
+    int lh = lv_font_get_line_height(f);
     lv_obj_set_style_text_font(l, f, 0);
     lv_obj_set_style_text_color(l, col, 0);
-    lv_obj_set_size(l, w, lv_font_get_line_height(f));
+    lv_obj_set_size(l, w, lh);
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
-    lv_obj_set_pos(l, UI_CX - w / 2, y);
+    lv_obj_set_pos(l, UI_CX - w / 2, cy - lh / 2);
+    lv_label_set_text(l, "");
     return l;
 }
 
@@ -326,19 +418,31 @@ lv_obj_t *ui_scroll_init(lv_obj_t *screen)
     lv_obj_remove_style_all(s_root);
     lv_obj_set_size(s_root, UI_SIZE, UI_SIZE);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    s_header = line(s_root, FONT_CAPTION, COL_TEXT2, UI_Y_CAPTION, 280);
-    s_icon = line(s_root, FONT_ICON_L, COL_TEXT, ICON_Y, 80);
-    lv_label_set_text(s_icon, ICON_LIVE);
-    s_live = line(s_root, FONT_TITLE, COL_TEXT, LIVE_Y, 200);
-    lv_label_set_text(s_live, "Live");
-    s_count = line(s_root, FONT_NUM, COL_TEXT, COUNT_Y, 300);
-    s_caption = line(s_root, FONT_BODY, COL_TEXT2, CAPTION_Y, 300);
-    lv_label_set_text(s_caption, "lines up");
-    s_preview = line(s_root, FONT_BODY, COL_TEXT2, PREVIEW_Y, theme_chord(PREVIEW_Y + 12, 28));
-    static const char *const words[2] = {"Bottom", "Page"};
-    for (int i = 0; i < 2; i++)
-        s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,
-                                     UI_BADGE_R, &s_key[i], &s_word[i]);
+
+    /* whose terminal */
+    s_sigil = ui_sigil_create(s_root, UI_CX, SIGIL_Y, SIGIL_R);
+    s_marks = line(s_root, FONT_CAPTION, COL_TEXT3, MARK_Y, 120);
+
+    /* the scrollback: the column, the view's own line over its middle row, the live glyph under it */
+    s_map = lv_obj_create(s_root);
+    lv_obj_remove_style_all(s_map);
+    lv_obj_remove_flag(s_map, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_pos(s_map, MAP_X0, VIEW_Y - MAP_HALF);
+    lv_obj_set_size(s_map, MAP_X1 - MAP_X0, 2 * MAP_HALF);
+    lv_obj_add_event_cb(s_map, on_map_draw, LV_EVENT_DRAW_MAIN, NULL);
+    s_preview = line(s_root, FONT_BODY, COL_TEXT, VIEW_Y, PREVIEW_W);
+    lv_obj_set_style_text_align(s_preview, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_x(s_preview, BAR_X);
+    s_live = ui_glyph_create(s_root, FONT_ICON_XL, UI_CX, LIVE_Y);
+
+    /* how far up */
+    s_track = ui_track_create(s_root, UI_CX, UI_CX, TRACK_R, TRACK_W, TRACK_START, TRACK_SPAN);
+
+    /* rule 6: A goes back to the live bottom, B is a page down */
+    s_key[0] = ui_key_hint_create(s_root, UI_KEY_A);
+    ui_key_hint_set(s_key[0], ICON_LIVE);
+    s_key[1] = ui_key_hint_create(s_root, UI_KEY_B);
+    ui_key_hint_set(s_key[1], ICON_DOWN);
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     return s_root;
 }

@@ -53,6 +53,14 @@ int main(void)
     usage_t other = reading(T0, 79, T0 + 9000);
     EXPECT(!gauges_should_warn(&other, &hi), "two different windows are not a crossing");
 
+    /* time along the arc: how far through its window a moment is */
+    usage_win_t tw = {true, 42, T0 + GAUGES_H5_S, 0};
+    EXPECT(gauges_window_pm(&tw, T0, GAUGES_H5_S) == 0, "the window has just begun");
+    EXPECT(gauges_window_pm(&tw, T0 + GAUGES_H5_S / 2, GAUGES_H5_S) == 500, "half way");
+    EXPECT(gauges_window_pm(&tw, T0 + GAUGES_H5_S - 1800, GAUGES_H5_S) == 900, "half an hour before the reset");
+    EXPECT(gauges_window_pm(&tw, T0 + GAUGES_H5_S + 5, GAUGES_H5_S) == 1000, "past the reset: the end");
+    EXPECT(gauges_window_pm(&tw, T0 - 600, GAUGES_H5_S) == 0, "a reset further away than the window is long: the start");
+
     /* words */
     char buf[64];
     gauges_span(buf, sizeof buf, 7800);

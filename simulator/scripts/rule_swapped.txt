@@ -14,7 +14,7 @@ wait 150
 btn B
 wait 300
 expect_label Bash(npm test:*)
-press 233 282
+press 140 313
 wait 700
 rule session exact Bash(rm -rf build)
 attention_win 59000 60000 - 12 2 approval approve,deny,focus 0 Run shell command|npm test
@@ -31,7 +31,7 @@ wait 300
 expect_label > Always allow HOLD
 expect_label Bash(rm -rf build)
 expect_label Until this session ends
-hold 233 282 1900
+hold 140 313 1900
 wait 300
 expect_label Always allowed
 quit

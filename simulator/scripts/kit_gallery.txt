@@ -1,0 +1,39 @@
+# The Sigil primitives of ui_kit.h (GLYPHS.md §3), one gallery page each: a render to look at, and a smoke test
+# that every primitive draws. `kit N` shows page N on the top layer; `kit 0` hides it.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+wait 200
+kit 1
+wait 150
+shot kit_sigils.png
+kit 2
+wait 150
+shot kit_sigil_big.png
+kit 3
+wait 150
+shot kit_discs.png
+kit 4
+wait 150
+shot kit_orbit.png
+kit 5
+wait 150
+shot kit_orbit3.png
+kit 6
+wait 150
+shot kit_orbit_paged.png
+kit 7
+wait 150
+shot kit_time.png
+kit 9
+wait 150
+shot kit_signs.png
+kit 8
+wait 150
+expect_label Approved
+shot kit_burst.png
+wait 800
+expect_no_label Approved
+kit 0
+wait 100
+expect_label Nothing running
+quit

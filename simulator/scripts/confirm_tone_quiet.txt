@@ -20,6 +20,6 @@ expect_screen ask
 btn B
 wait 150
 expect_label > Deny HOLD
-hold 233 282 1100
+hold 140 268 1100
 wait 400
 quit

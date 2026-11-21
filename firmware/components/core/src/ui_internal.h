@@ -64,7 +64,8 @@ bool ui_home_act(nav_action_t a, const gesture_evt_t *g);
 void ui_home_note_input(void);  /* any input anywhere resets the ambient timer and the nag */
 bool ui_home_request_pending(void); /* the selected session has an unanswered approvable request on screen */
 bool ui_home_askable(void);         /* the selected session has an unanswered permission or question */
-bool ui_home_read_hit(int x, int y); /* the point is on the card's Read button (LAST-MESSAGE.md) */
+bool ui_home_read_hit(int x, int y); /* the point is on the card's book disc, which opens READ (LAST-MESSAGE.md) */
+bool ui_home_strip_hit(int x, int y); /* the point is on the card's graph strip, which opens GRAPH (GRAPH.md §5) */
 uint32_t ui_home_sel_sid(void);
 const attention_t *ui_home_sel_request(void); /* the selected session's unanswered permission or question */
 lv_obj_t *ui_home_ring(void);
@@ -83,6 +84,7 @@ bool ui_agent_refresh(uint32_t now_ms); /* false: the session is gone */
 bool ui_agent_act(nav_action_t a, const gesture_evt_t *g);
 bool ui_agent_tick(uint32_t now_ms);    /* true: wants to close */
 void ui_agent_report(ui_report_t *r);
+bool ui_agent_hit(int x, int y); /* the point is on one of its discs or rows: a touch there is a centre touch */
 
 /* The SCROLL screen (ui_scroll.c). */
 lv_obj_t *ui_scroll_init(lv_obj_t *screen);
@@ -108,6 +110,9 @@ bool ui_ask_tick(uint32_t now_ms);    /* true: wants to close */
 void ui_ask_report(ui_report_t *r);
 /* The request ASK shows and can still be answered (its countdown runs), or NULL. */
 const attention_t *ui_ask_request(void);
+/* The point is on one of ASK's items (a disc, a row, button A's hint): a tap there is let through although some
+ * of them reach past the centre zone (GLYPHS.md §3.4). */
+bool ui_ask_target_hit(int x, int y);
 /* VOICE's hold on an "Other" answer: recording aid answers question qi of request rid. */
 void ui_ask_other_done(uint32_t rid, int qi, uint32_t aid, uint32_t hold_ms);
 
@@ -120,6 +125,7 @@ bool ui_read_act(nav_action_t a, const gesture_evt_t *g);
 bool ui_read_back(void);               /* true: the end picker was open and the last page is back */
 void ui_read_tick(uint32_t now_ms);
 void ui_read_report(ui_report_t *r);
+bool ui_read_hit(int x, int y); /* the point is on a disc of its end picker: a touch there is a centre touch */
 
 /* GRAPH (ui_graph.c, GRAPH.md §4) */
 lv_obj_t *ui_graph_init(lv_obj_t *screen);

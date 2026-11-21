@@ -21,7 +21,7 @@ expect_label > Send HOLD
 tap 233 282
 wait 300
 expect_label Hold to send
-hold 233 226 1500
+hold 233 205 1500
 wait 300
 expect_no_label Sent
 btn A

@@ -2,6 +2,10 @@
 
 > Status: built on branch `done-summary` (issue 20261112-d01e). Protocol 0.14. Simulator-verified; not run on the
 > device or against a live Claude Code session.
+>
+> On glass the summary is a row of marks since Sigil (issue 20261114-8c3d): see
+> [glyphs/WATCH-GAUGES-DONE.md](glyphs/WATCH-GAUGES-DONE.md) §3. The data, what gives way and the report's words
+> below are unchanged; where §4 describes a line of words, read that section instead.
 
 A finished agent card said little more than that it finished. It now says what the turn did: how many files it
 changed, how many lines it added and removed, whether the tests passed, and how long it took:

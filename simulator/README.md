@@ -43,13 +43,13 @@ One command per line, `#` comments. Input is replayed in real time through the s
 input, so gesture recognition is exercised.
 
 ```
-wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double] | chord
+wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double|held|down|up] | chord
 scrub DEG0 DEG1 [MS [RADIUS]] | session SID STATE REPO [BRANCH [SUMMARY]] | drop SID
 lift | shake | connect | disconnect | rx HEX | ui | shot FILE.png
 attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OPT...
 result ok | result err stale|denied|... | clear RID [WHY]
 graph SID KIND:STATE:LANE[:f][:m]... [la=K,K..] [drop=N] [gen=N] | graph off
-expect_screen NAME | expect_label TEXT | expect_no_label TEXT | px_reset | expect_px_max PX | quit
+expect_screen NAME | expect_label TEXT | expect_no_label TEXT | px_reset | expect_px_max PX | kit N | quit
 ```
 
 `rx` feeds a CBOR envelope (e.g. `cbor_hex` from `protocol/vectors`) as if the daemon sent it;
@@ -58,6 +58,8 @@ firmware's own codec. `graph` is a stand-in daemon for `cmd graph` (GRAPH.md): i
 this graph (state `run`/`ok`/`fail`, `f` fork, `m` merge, `la` the lane kinds, lane 0 first). `connect` fakes the transport being up for `--no-ws` runs. A failed `expect_*`
 exits with code 1. `shot` writes a PNG of the framebuffer (round mask applied); `press` without a
 `release` keeps the finger down, so a hold can be photographed mid-way.
+`kit N` shows page N of a gallery of the Sigil primitives (`ui_kit.h`, GLYPHS.md §3) on the top layer and
+`kit 0` hides it (`scripts/kit_gallery.txt`); the gallery is compiled into the simulator only.
 `px_reset` / `expect_px_max` bound the pixels LVGL flushed in between (`core_px_flushed()`); see
 `perf_four_agents.txt` for the redraw budget with four busy agents. The log line also reports
 `cpu_us` (host CPU inside `core_step`), informational only since it varies with machine load.

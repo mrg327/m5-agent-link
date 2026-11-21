@@ -1,6 +1,7 @@
-# Safety: the tap that opens ASK must not be followed by a commit. A second quick tap at the centre lands on
-# the upper neighbour row (Open on PC); until the card has been on screen 300 ms ASK ignores taps. No focus
-# (op 0), and the screen stays ASK with Approve selected.
+# Safety: the tap that opens ASK must not be followed by a commit. Until the card has been on screen 300 ms ASK
+# ignores taps: a second quick tap at the centre (in Sigil it lands on the Approve disc), and one on Open on PC
+# (button A's hint at 101, 365, the item a tap would commit). No focus (op 0), and the screen stays ASK with
+# Approve selected.
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 session 2 input webapp feat/login
@@ -14,6 +15,16 @@ expect_screen attention
 tap 233 233
 wait 100
 tap 233 233
+wait 100
+expect_screen ask
+expect_label > Approve HOLD
+wait 400
+btn B long
+wait 300
+expect_screen attention
+tap 233 233
+wait 100
+tap 101 365
 wait 100
 expect_screen ask
 expect_label > Approve HOLD

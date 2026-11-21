@@ -1,0 +1,272 @@
+# Sigil AGENT and READ (GLYPHS.md §5): every state of the two screens with a render, what each says in words
+# (rule 9), and where its discs are. The menu is an orbit arched over the session's sigil; its discs reach past
+# the centre zone (r 150) and a touch on one is still a touch on it. Stop only by a hold on its own disc.
+# The daemon: proto 0.22, replies Continue / Yes / Run the tests, voice and keys.
+connect
+rx a400020101020103a70082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f5
+rtc 1800000000
+# ── a working session: six discs, left to right: Activity (93,287), Graph (95,173), Notify (176,94),
+#    Snooze (290,94), Reply now (371,173), Stop (373,287)
+session 1 work webapp feat/login Running the test suite
+wait 300
+tap 233 233
+wait 400
+expect_screen agent
+expect_label webapp
+expect_label > Activity
+expect_label 6 items
+shot sigil_agent_work.png
+# at rest nothing is redrawn
+wait 500
+px_reset
+wait 2000
+expect_px_max 0
+# a tap on Stop (a hold item, beyond the centre zone) selects it and says why it did nothing more
+tap 373 287
+wait 300
+expect_screen agent
+expect_label > Stop
+expect_label Hold to stop
+shot sigil_agent_stop_toast.png
+wait 2200
+# the hold fills the disc's ring and the bezel; letting go early stops nothing
+press 373 287
+wait 800
+shot sigil_agent_hold.png
+release
+wait 300
+expect_screen agent
+expect_label > Stop
+# the dial and button B step round the arch, and past its end back to its start
+btn B
+wait 150
+expect_label > Activity
+# ── what belongs to the session shows under its name: the gauges' readout, the message that waits; the
+#    toggles say what they will do now (sun: unsnooze; bell-slash: don't notify); seven discs
+queued 1 run the tests
+wait 300
+expect_label Queued: run the tests
+expect_label 7 items
+expect_label Graph
+gauge 1 34 Opus_4.7 plan 128 approved
+notify 1 on
+snooze 1 1800003600
+wait 300
+expect_label Opus 4.7 · Plan · PR 128 approved
+expect_label Queued: run the tests
+btn B
+wait 150
+btn B
+wait 150
+expect_label > Don't notify
+expect_label Unsnooze
+shot sigil_agent_full.png
+btn B
+wait 150
+btn B
+wait 150
+btn B
+wait 150
+expect_label > Cancel queued
+shot sigil_agent_unqueue.png
+queued 1 off
+notify 1 off
+snooze 1 off
+wait 300
+expect_no_label Queued:
+expect_label 6 items
+# ── Reply now: the reply list in queue mode (no question, no Keyboard): rows of the user's own text, Dictate a disc
+btn B
+wait 150
+btn B
+wait 150
+btn B
+wait 150
+btn B
+wait 150
+expect_label > Reply now
+btn A
+wait 300
+expect_screen agent
+expect_label Reply to webapp
+expect_label > Continue
+expect_label Dictate
+expect_no_label Keyboard
+expect_label 4 items
+shot sigil_reply_queue.png
+# a long press off the rows goes back to the deck
+hold 233 120 800
+wait 300
+expect_screen ring
+# ── a remote session: the globe before the name; the words keep the host
+remote 1 1 WIN-BUILD01
+wait 300
+tap 233 233
+wait 400
+expect_screen agent
+expect_label WIN-BUILD01 · webapp
+shot sigil_agent_remote.png
+btn B long
+wait 300
+remote 1 0
+# ── the agent asked something: Reply lists its own answers first, under the question, then the user's replies,
+#    then Dictate and Keyboard as discs between the key hints
+rx a30004010603a500010204081a6aee3224117653686f756c64204920666c617368206974206e6f773f12826d5965732c20676f206168656164624e6f
+wait 300
+tap 233 233
+wait 400
+expect_screen agent
+btn B
+wait 150
+btn B
+wait 150
+expect_label > Reply
+shot sigil_agent_done.png
+btn A
+wait 300
+expect_label Reply to webapp
+expect_label Should I flash it now?
+expect_label > Yes, go ahead
+expect_label No
+expect_label 7 items
+shot sigil_reply_question.png
+btn B
+wait 150
+btn B
+wait 150
+btn B
+wait 150
+expect_label > Yes
+shot sigil_reply_row.png
+btn B
+wait 150
+btn B
+wait 150
+expect_label > Dictate
+shot sigil_reply_dictate.png
+# the Keyboard disc (269,374) is the disc you touch: it opens KEYS
+tap 269 374
+wait 400
+expect_screen keys
+btn B long
+wait 400
+# a tap on a row is that reply: "No" is the row under the selected one (op 11, arg 101)
+tap 233 233
+wait 400
+expect_screen agent
+btn B
+wait 150
+btn B
+wait 150
+btn A
+wait 300
+expect_label > Yes, go ahead
+tap 233 290
+wait 300
+expect_screen ring
+expect_label Sent "No"
+wait 2200
+# ── READ: a finished session's last message, three pages; the page dots sit between the key hints
+session 2 done api main
+message 2 7 Built and flashed the new reader. The watch now shows what the agent said when a turn ends.\n\nWhat changed:\n• the daemon keeps the final message of each session\n• the finished card shows its first lines\n• Read opens all of it in pages\n• Reply and Dictate wait at the end\n\nChecks:\n  cargo test --workspace\n  ctest --test-dir build/sim\n\nThe firmware build fits: 183 KB of internal RAM left for BLE.\n\nShould I also show it on the Activity screen?
+wait 400
+drop 1
+wait 300
+expect_screen ring
+# AGENT of a finished session with a message: Read leads
+tap 233 233
+wait 400
+expect_screen agent
+expect_label > Read
+expect_label 4 items
+shot sigil_agent_read.png
+btn A
+wait 500
+expect_screen read
+expect_label Cloud agent · api
+expect_label Last message
+expect_label Reading 1 of 3
+expect_no_label Loading
+shot sigil_read_page.png
+# a page at rest redraws nothing
+px_reset
+wait 1500
+expect_px_max 0
+btn B
+wait 350
+expect_label Reading 2 of 3
+shot sigil_read_page2.png
+tap 233 200
+wait 350
+expect_label Reading 3 of 3
+shot sigil_read_last.png
+btn B
+wait 350
+# the end: Dictate (88,194), Reply (170,97), Read again (296,97), Open on PC (378,194)
+expect_label Answer it
+expect_label > Dictate
+expect_label Reply
+expect_label Read again
+expect_label Open on PC
+shot sigil_read_end.png
+btn B
+wait 150
+expect_label > Reply
+shot sigil_read_end_reply.png
+# Read again is the disc you touch: back to the first page
+tap 296 97
+wait 400
+expect_screen read
+expect_label Last message
+expect_label Reading 1 of 3
+# button A opens the session on the computer from any page (op 0)
+btn A
+wait 400
+expect_screen ring
+# ── the daemon no longer has that message (it serves another session's now): the reader keeps the preview and
+#    shows the error glyph beside the dots; the words say "Not loaded"
+session 3 done docs main
+message 3 9 The docs are rebuilt and every link checks out.\n\nWhat I did:\n• regenerated the API pages\n• fixed eleven dead links\n• added the migration guide\n\nOne thing is left: the changelog still names the old flag.\n\nShould I rename it there too?
+wait 2200
+btn B
+wait 300
+tap 233 233
+wait 400
+expect_screen agent
+expect_label docs
+expect_label > Read
+btn A
+wait 600
+expect_screen read
+expect_no_label Loading
+btn B long
+wait 400
+expect_screen ring
+btn B
+wait 300
+tap 233 233
+wait 400
+expect_label api
+btn A
+wait 800
+expect_screen read
+expect_label Not loaded
+shot sigil_read_failed.png
+btn B long
+wait 400
+# ── the message is still arriving (the link is down): the preview, and the ring that fills as the rest comes
+disconnect
+wait 400
+btn B
+wait 300
+tap 233 233
+wait 400
+expect_screen agent
+expect_label docs
+expect_label > Read
+btn A
+wait 600
+expect_screen read
+expect_label Loading
+shot sigil_read_loading.png
+quit

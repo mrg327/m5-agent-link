@@ -1,8 +1,20 @@
-/* The STATUS screen, the control centre (UI-V3 §4.6): the clock, one chip row for link and battery
- * (status by exception: amber only when the link is down), and four round toggles: Quiet, Mute, Volume,
- * About. nav.c still owns the five v2 rows and the quiet cycle; Quiet and Mute are its first two rows, the
- * Privacy row stands for About (it only informs), and Volume steps the stored speaker level (prefs.h). A tap on a disc selects and commits it, A
- * commits the selected one, scrub and B move the selection. The ring keeps showing the sessions. */
+/* The STATUS screen in Sigil (docs/design/GLYPHS.md §5), the control centre: the clock in digits is the subject
+ * and the four toggles orbit it, Quiet at 9 o'clock, Mute at 12, Volume at 3, About at 6. Nothing is spelled out:
+ *
+ *   - a toggle's glyph is its state (a bell while alerts sound, a crossed-out bell while quiet runs; a speaker,
+ *     a crossed-out speaker);
+ *   - what is left of the quiet time is an arc round the bell that drains, a whole turn for an hour;
+ *   - the volume is five steps of an arc round its disc, grey while nothing would be heard;
+ *   - the link is the transport's glyph and the computer's own sigil (rule 2: an identity is a mark), or the amber
+ *     plug with how long it has been down as a tally; the battery is a ring round the battery glyph;
+ *   - About turns the centre into its face: the sessions, those that wait for you and those that failed as
+ *     glyphs with their counts, the privacy eye, and the firmware version, the one piece of text;
+ *   - A's hint is what a press does to the selected toggle (the glyph it will become), B's is the caret.
+ *
+ * The usage gauges (ui_gauges.c) keep their two arcs inside the bezel and their two rows above the clock; the
+ * link then moves down beside the battery. nav.c still owns the quiet cycle; Volume steps the stored speaker
+ * level (prefs.h). A tap on a disc selects and commits it, a tap elsewhere and A commit the selected one, the
+ * dial and B move the selection. What every glyph means is said in words in the report (rule 9), as before. */
 #include <stdio.h>
 #include <string.h>
 
@@ -12,39 +24,73 @@
 #include "prefs.h"
 #include "ui_gauges.h"
 #include "ui_internal.h"
+#include "ui_kit.h"
 #include "ui_theme.h"
 
-#define TIME_Y 116
-#define CHIP_Y 168
-/* With the usage gauges (GAUGES.md) the clock is the title size and higher, the chips follow it, and
- * the two figure rows sit at y 152 and 180 (ui_gauges.c). */
-#define TIME_Y_G 84
-#define CHIP_Y_G 120
-#define TOGGLE_Y 246
-#define TOGGLE_D 64
-#define TOGGLE_HIT 40 /* tap radius: a little beyond the disc, half the pitch */
-#define VOL_R 25      /* the volume disc's level arc: centred on this radius, VOL_W wide, a 300° dial */
-#define VOL_W 4
+/* Geometry: centres. The orbit's radius puts Quiet and Volume straight above the two key hints and About on
+ * their row. The gauges' arcs begin at r 180 (a selected disc ends at r 172); their rows are y 139..193 (the
+ * disc at 12 o'clock ends at y 141). */
+#define ORBIT_R 132
+#define ORBIT_PHASE 270 /* the first toggle at 9 o'clock */
+/* A value arc keeps one radius: round the small disc (r 30) while it rests, and inside the rim of the large one
+ * (r 40) once its toggle is selected, where it is drawn in the dark ink of the disc's glyph. */
+#define VAL_R 36
+#define VAL_W 4
+#define RGB_VAL_TRACK_SEL 0x3d7fa5 /* an unlit step on the selected (accent) disc */
+#define RGB_VAL_OFF_SEL 0x2e607d   /* lit steps nothing is heard at, on the selected disc */
+#define VOL_START 210   /* the volume dial: 300 degrees, the gap at 6 o'clock */
 #define VOL_SPAN 300
-#define SEL_RING_D (TOGGLE_D + 2 * 7) /* 2 px ring, 5 px clear of the disc */
-#define DESC_Y 316
-#define RENDER_MS 1000 /* the clock, battery and quiet end are re-read this often while open */
+#define CLOCK_Y 233
+#define TOP_Y 172       /* the slot above the clock: the link, or the gauges' rows */
+#define LOW_Y 292       /* the slot under it: the battery, and the link when the gauges have the top */
+#define LINK_PX 28      /* the transport's glyph */
+#define LINK_GAP 8      /* between it and the sigil or the tally */
+#define HOST_R UI_SIGIL_R_MIN
+#define BATT_R 21
+#define BATT_W 4
+#define BATT_D (2 * BATT_R + BATT_W) /* the ring, edge to edge */
+#define ROW_GAP 18      /* link and battery side by side in the lower slot */
+#define BATT_LOW 15
+/* The About face. With the gauges' rows above it, it starts lower. */
+#define ABOUT_Y 198     /* the three glyphs */
+#define ABOUT_Y_G 222
+#define ABOUT_PITCH 58
+#define ABOUT_NUM_DY 36 /* their counts */
+#define ABOUT_NUM_W 52
+#define ABOUT_VER_DY 74 /* the privacy eye and the version */
+#define EYE_PX 28
+#define RENDER_MS 1000  /* the clock, battery and quiet end are re-read this often while open */
 #define N_TOGGLES 4
 enum { T_QUIET, T_MUTE, T_VOLUME, T_ABOUT };
+enum { A_SESSIONS, A_WAITING, A_ERRORS, A_COUNT };
 
-static const int16_t k_tx[N_TOGGLES] = {107, 191, 275, 359};
-static lv_obj_t *s_root, *s_time, *s_chips, *s_link, *s_batt, *s_ring, *s_disc[N_TOGGLES], *s_icon[N_TOGGLES], *s_desc;
-static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
+static lv_obj_t *s_root, *s_orbit, *s_quiet_arc, *s_vol_arc, *s_clock, *s_link, *s_host, *s_age, *s_batt_arc, *s_batt;
+static lv_obj_t *s_about[A_COUNT], *s_about_n[A_COUNT], *s_eye, *s_ver, *s_hint[2];
 static uint32_t s_now, s_last_input, s_last_render;
 static status_item_t s_items[ST_COUNT];
-static int s_n, s_sel;
-static char s_time_txt[24], s_link_txt[64], s_batt_txt[24], s_desc_txt[96], s_word_txt[16];
-static bool s_gauges; /* the usage gauges are shown: the top of the screen is laid out for them */
+static int s_n, s_ver_w;
+static int32_t s_about_at[A_COUNT], s_ver_at;
+static bool s_gauges; /* the usage gauges are shown: they have the slot above the clock */
+/* On glass, with the labels' caches. */
+static char s_clock_txt[8], s_about_txt[A_COUNT][4], s_ver_txt[16];
+/* In words, for the report (rule 9): what the glyphs and arcs say. */
+static char s_time_txt[24], s_link_txt[64], s_batt_txt[24], s_desc_txt[96];
 
 static void show(lv_obj_t *o, bool on)
 {
+    if (lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN) != on) return;
     if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+}
+
+/* Moves a one-row label of `font` so its row is centred on (x, cy); `x` is its left edge. Only when `*at`,
+ * where it was last put, differs: LVGL redraws on every position write. */
+static void put(lv_obj_t *label, const lv_font_t *font, int x, int cy, int32_t *at)
+{
+    int32_t key = (int32_t)(x << 12 | cy);
+    if (*at == key) return;
+    *at = key;
+    lv_obj_set_pos(label, x, cy - lv_font_get_line_height(font) / 2);
 }
 
 /* Toggle i's v2 row (About stands for Privacy; Volume has none: ST_COUNT matches no row). */
@@ -63,50 +109,30 @@ static bool is_on(int i, uint32_t now)
     return false;
 }
 
-/* The icon shows the current state, not the action: a bell while alerts are on, a crossed-out bell while
- * quiet runs; a speaker while sounds are on, a crossed-out speaker while they are off; Volume shows its
- * level as a digit (the arc around it draws the same level). */
+/* The glyph shows the current state, not the action: a bell while alerts are on, a crossed-out bell while
+ * quiet runs; a speaker while sounds are on, a crossed-out speaker while they are off. Volume's level is the
+ * arc round its disc. */
 static const char *icon_of(int i, bool on)
 {
-    static const char *const digits[PREFS_VOL_MAX + 1] = {"0", "1", "2", "3", "4", "5"};
     if (i == T_QUIET) return on ? ICON_QUIET : ICON_BELL;
     if (i == T_MUTE) return on ? ICON_MUTE : ICON_SOUND;
-    if (i == T_VOLUME) return digits[prefs_volume()];
+    if (i == T_VOLUME) return ICON_WAVE;
     return ICON_INFO;
 }
 
-/* The level is what the speaker plays at only while sounds are on; otherwise the digit and arc go grey. */
+/* The level is what the speaker plays at only while sounds are on; otherwise its arc goes grey. */
 static bool volume_heard(void) { return model_settings()->alert == ALERT_FULL && prefs_volume() > 0; }
 
 /* The next level a commit sets: up one step, from the top back to 1 (0 is Mute's job). */
 static uint8_t volume_next(void) { return prefs_volume() >= PREFS_VOL_MAX ? 1 : (uint8_t)(prefs_volume() + 1); }
 
-static void vol_arc(lv_layer_t *l, int cx, int cy, int a0, int a1, lv_color_t c)
+/* What is left of the quiet time, a whole turn for an hour (or for longer, or with the clock unset). */
+static int quiet_permille(uint32_t now)
 {
-    if (a1 <= a0) return;
-    lv_draw_arc_dsc_t d;
-    lv_draw_arc_dsc_init(&d);
-    d.center.x = cx;
-    d.center.y = cy;
-    d.radius = (uint16_t)(VOL_R + VOL_W / 2);
-    d.width = VOL_W;
-    d.color = c;
-    d.rounded = 1;
-    d.start_angle = (lv_value_precise_t)((a0 + 360 + 270) % 360); /* degrees clockwise from 12 o'clock */
-    d.end_angle = (lv_value_precise_t)((a1 + 360 + 270) % 360);
-    lv_draw_arc(l, &d);
-}
-
-/* The volume disc's dial: a dim track with the gap at 6 o'clock, filled clockwise up to the level. */
-static void on_draw_volume(lv_event_t *e)
-{
-    lv_layer_t *l = lv_event_get_layer(e);
-    lv_area_t a;
-    lv_obj_get_coords(lv_event_get_target_obj(e), &a);
-    int cx = a.x1 + lv_area_get_width(&a) / 2, cy = a.y1 + lv_area_get_height(&a) / 2, a0 = 180 - VOL_SPAN / 2;
-    vol_arc(l, cx, cy, a0, a0 + VOL_SPAN, COL_FILL2);
-    if (prefs_volume())
-        vol_arc(l, cx, cy, a0, a0 + VOL_SPAN * prefs_volume() / PREFS_VOL_MAX, volume_heard() ? lv_color_hex(RGB_WORKING) : COL_TEXT3);
+    uint32_t until = model_settings()->quiet_until;
+    if (!model_quiet_active(now)) return 0;
+    uint32_t min = (until - now + 59) / 60;
+    return now <= 100000 || min >= 60 ? 1000 : (int)(min * 1000 / 60);
 }
 
 static void quiet_line(char *dst, size_t cap, uint32_t now)
@@ -121,15 +147,15 @@ static void quiet_line(char *dst, size_t cap, uint32_t now)
     }
 }
 
-/* What the selected toggle is, in words (state never rests on colour alone). */
-static void describe(char *dst, size_t cap, uint32_t now)
+/* What the selected toggle is, in words: the report's legend for the glyphs and arcs. */
+static void describe(char *dst, size_t cap, int sel, uint32_t now)
 {
     const settings_t *st = model_settings();
-    if (s_sel == T_QUIET) {
+    if (sel == T_QUIET) {
         quiet_line(dst, cap, now);
-    } else if (s_sel == T_MUTE) {
+    } else if (sel == T_MUTE) {
         snprintf(dst, cap, "%s", st->alert == ALERT_FULL ? "Sounds: on" : st->alert == ALERT_QUIET ? "Sounds: off" : "Silent");
-    } else if (s_sel == T_VOLUME) {
+    } else if (sel == T_VOLUME) {
         snprintf(dst, cap, "Volume %u of %u%s", (unsigned)prefs_volume(), (unsigned)PREFS_VOL_MAX,
                  st->alert == ALERT_FULL ? "" : st->alert == ALERT_QUIET ? " (muted)" : " (silent)");
     } else {
@@ -146,25 +172,17 @@ static void describe(char *dst, size_t cap, uint32_t now)
     }
 }
 
-/* A names what a commit on the selected toggle does; About has no commit, so no legend. */
-static void update_badge(void)
+/* A's hint is what a commit does to the selected toggle: the glyph the toggle will show. About has no commit,
+ * so no hint. */
+static void update_hint(int sel)
 {
     const settings_t *st = model_settings();
-    const char *word = NULL;
-    if (s_sel == T_QUIET) {
-        int step = nav_quiet_step(st->quiet_until, theme_now_unix());
-        word = step == 1 ? "Quiet 30 min" : step == 2 ? "Quiet 1 h" : "Quiet off";
-    } else if (s_sel == T_MUTE) {
-        word = st->alert == ALERT_FULL ? "Mute" : "Unmute";
-    } else if (s_sel == T_VOLUME) {
-        static const char *const words[PREFS_VOL_MAX + 1] = {"Volume 0", "Volume 1", "Volume 2", "Volume 3", "Volume 4", "Volume 5"};
-        word = words[volume_next()];
-    }
-    show(s_badge[0], word != NULL);
-    if (word && strcmp(word, s_word_txt)) {
-        snprintf(s_word_txt, sizeof s_word_txt, "%s", word);
-        theme_key_badge_set_word(s_badge[0], s_word[0], word, UI_BADGE_A_DEG, UI_BADGE_R);
-    }
+    const char *icon = NULL;
+    if (sel == T_QUIET) icon = nav_quiet_step(st->quiet_until, theme_now_unix()) ? ICON_QUIET : ICON_BELL;
+    else if (sel == T_MUTE) icon = st->alert == ALERT_FULL ? ICON_MUTE : ICON_SOUND;
+    else if (sel == T_VOLUME) icon = ICON_WAVE;
+    show(s_hint[0], icon != NULL);
+    if (icon) ui_key_hint_set(s_hint[0], icon);
 }
 
 static const char *battery_icon(const hal_battery_t *b)
@@ -174,92 +192,173 @@ static const char *battery_icon(const hal_battery_t *b)
            : b->percent >= 15 ? ICON_BATTERY_LOW : ICON_BATTERY_WARN;
 }
 
-/* Link chip: icon + host; amber `Offline · 4m` only while down (a healthy link is not shouted). */
-static void render_chips(void)
+/* How the link looks: the transport's glyph and the computer's sigil; amber and without the sigil while it is
+ * down (a healthy link is not shouted): the plug and how long as a tally, or the transport's glyph while it
+ * connects. */
+typedef struct {
+    const char *icon, *host;
+    uint32_t rgb, age_min;
+    bool sigil;
+    int w; /* px the glyph and what follows it take */
+} link_look_t;
+
+/* Reads the link into `k`, and into s_link_txt in the old chip's words. */
+static void link_look(link_look_t *k)
 {
     char buf[64];
-    int k = ui_link_transport();
-    const char *sym = k == HAL_LINK_USB ? ICON_USB : hal_link_is_ble(k) ? ICON_BLUETOOTH : ICON_COMPUTER;
-    uint32_t down = ui_link_down_ms(), rgb = 0;
+    int t = ui_link_transport();
+    const char *sym = t == HAL_LINK_USB ? ICON_USB : hal_link_is_ble(t) ? ICON_BLUETOOTH : ICON_COMPUTER;
+    uint32_t down = ui_link_down_ms();
+    *k = (link_look_t){.icon = sym, .host = model_host()};
     if (!ui_link_connected() && down && model_count() > 0) {
         char age[16];
         theme_elapsed(age, sizeof age, down / 1000);
         snprintf(buf, sizeof buf, "%s %s%s%s", ICON_OFFLINE, "Offline", theme_sep(), age);
-        rgb = RGB_AMBER;
-    } else if (k < 0) {
+        k->rgb = RGB_AMBER;
+        k->icon = ICON_OFFLINE;
+        k->age_min = down / 60000;
+    } else if (t < 0) {
         snprintf(buf, sizeof buf, "%s Offline", ICON_OFFLINE);
-        rgb = RGB_AMBER;
+        k->rgb = RGB_AMBER;
+        k->icon = ICON_OFFLINE;
     } else if (!ui_link_connected()) {
         snprintf(buf, sizeof buf, "%s Connecting\xe2\x80\xa6", sym);
-        rgb = RGB_AMBER;
+        k->rgb = RGB_AMBER;
     } else {
-        const char *host = model_host();
-        if (theme_now_unix() > 100000) /* with the clock unset the title already is the host name: icon only */
-            snprintf(buf, sizeof buf, "%s %.16s", sym, host[0] ? host : k == HAL_LINK_USB ? "USB" : hal_link_is_ble(k) ? "BLE" : "PC");
+        k->sigil = k->host[0] != 0;
+        if (theme_now_unix() > 100000) /* with the clock unset the first line already is the host name */
+            snprintf(buf, sizeof buf, "%s %.16s", sym, k->host[0] ? k->host : t == HAL_LINK_USB ? "USB" : hal_link_is_ble(t) ? "BLE" : "PC");
         else
             snprintf(buf, sizeof buf, "%s", sym);
     }
-    theme_set_text(s_link, s_link_txt, sizeof s_link_txt, buf);
-    theme_set_text_color(s_link, rgb ? lv_color_hex(rgb) : COL_TEXT2);
-
-    hal_battery_t b = hal_battery_read();
-    if (b.percent <= 100) snprintf(buf, sizeof buf, "%s %u%%", battery_icon(&b), b.percent);
-    else buf[0] = 0;
-    theme_set_text(s_batt, s_batt_txt, sizeof s_batt_txt, buf);
-    show(s_batt, buf[0] != 0);
-    lv_obj_update_layout(s_chips);
-    theme_align(s_chips, LV_ALIGN_TOP_MID, 0, (s_gauges ? CHIP_Y_G : CHIP_Y) - lv_obj_get_height(s_chips) / 2);
+    snprintf(s_link_txt, sizeof s_link_txt, "%s", buf);
+    int w2 = k->sigil ? 2 * HOST_R : k->age_min ? ui_tally_width(k->age_min) : 0;
+    k->w = LINK_PX + (w2 ? LINK_GAP + w2 : 0);
 }
 
-/* LVGL invalidates on every style write, so write the font only when it changes. The label keeps its centre
- * row (y TIME_Y, or TIME_Y_G under the gauges) whatever the font. */
-static void set_time_font(const lv_font_t *f)
+/* The link, centred on (cx, cy). */
+static void render_link(const link_look_t *k, int cx, int cy, bool on)
 {
-    if (s_gauges && f == FONT_NUM) f = FONT_TITLE;
-    int lh = lv_font_get_line_height(f), y = (s_gauges ? TIME_Y_G : TIME_Y) - lh / 2;
-    if (lv_obj_get_style_text_font(s_time, 0) != f) lv_obj_set_style_text_font(s_time, f, 0);
-    if (lv_obj_get_height(s_time) != lh) lv_obj_set_height(s_time, lh);
-    if (lv_obj_get_y(s_time) != y) lv_obj_set_y(s_time, y);
+    int x0 = cx - k->w / 2, x2 = x0 + LINK_PX + LINK_GAP; /* where the sigil or the tally begins */
+    show(s_link, on);
+    show(s_host, on && k->sigil);
+    show(s_age, on && k->age_min > 0);
+    ui_glyph_set_pos(s_link, x0 + LINK_PX / 2, cy);
+    ui_glyph_set(s_link, k->icon, k->rgb ? lv_color_hex(k->rgb) : COL_TEXT2);
+    if (k->sigil) {
+        ui_sigil_set_pos(s_host, x2 + HOST_R, cy);
+        ui_sigil_set_name(s_host, k->host);
+    }
+    if (k->age_min) {
+        ui_tally_set_pos(s_age, x2 + (k->w - LINK_PX - LINK_GAP) / 2, cy);
+        ui_tally_set(s_age, k->age_min, lv_color_hex(k->rgb));
+    }
+}
+
+/* The battery, centred on (cx, cy): a ring that is the level, round the battery glyph (which also says
+ * charging). Vermillion when low, as on HOME. A board without a battery shows none. */
+static void render_battery(const hal_battery_t *bp, int cx, int cy, bool on)
+{
+    hal_battery_t b = *bp;
+    bool known = b.percent <= 100, low = known && b.percent <= BATT_LOW && !b.charging;
+    if (known) snprintf(s_batt_txt, sizeof s_batt_txt, "%s %u%%", battery_icon(&b), b.percent);
+    else s_batt_txt[0] = 0;
+    show(s_batt_arc, on && known);
+    show(s_batt, on && known);
+    if (!known) return;
+    ui_arc_set_geometry(s_batt_arc, cx, cy, BATT_R);
+    ui_arc_set(s_batt_arc, b.percent * 10, low ? lv_color_hex(RGB_ERROR) : COL_TEXT, COL_FILL2);
+    ui_glyph_set_pos(s_batt, cx, cy);
+    ui_glyph_set(s_batt, battery_icon(&b), low ? lv_color_hex(RGB_ERROR) : COL_TEXT2);
+}
+
+/* The About face: sessions, waiting for you, failed, each a glyph with its count under it (none and grey at
+ * zero); then the privacy eye and the version. */
+static void render_about(bool on)
+{
+    model_counts_t c = model_counts();
+    const unsigned n[A_COUNT] = {(unsigned)model_count() % 100u, (unsigned)c.waiting % 100u, (unsigned)c.error % 100u};
+    static const char *const icon[A_COUNT] = {ICON_SESSIONS, ICON_PERMISSION, ICON_ERROR};
+    static const uint32_t rgb[A_COUNT] = {0xffffff, RGB_PERMISSION, RGB_ERROR};
+    int y = s_gauges ? ABOUT_Y_G : ABOUT_Y;
+    for (int i = 0; i < A_COUNT; i++) {
+        char buf[12];
+        snprintf(buf, sizeof buf, "%u", n[i]);
+        show(s_about[i], on);
+        show(s_about_n[i], on && n[i] > 0);
+        ui_glyph_set_pos(s_about[i], UI_CX + (i - 1) * ABOUT_PITCH, y);
+        ui_glyph_set(s_about[i], icon[i], n[i] ? lv_color_hex(rgb[i]) : COL_TEXT3);
+        theme_set_text(s_about_n[i], s_about_txt[i], sizeof s_about_txt[i], buf);
+        theme_set_text_color(s_about_n[i], lv_color_hex(rgb[i]));
+        put(s_about_n[i], FONT_HEAD, UI_CX + (i - 1) * ABOUT_PITCH - ABOUT_NUM_W / 2, y + ABOUT_NUM_DY, &s_about_at[i]);
+    }
+    if (!s_ver_txt[0]) { /* once: the version does not change while the watch runs */
+        lv_point_t sz;
+        snprintf(s_ver_txt, sizeof s_ver_txt, "%.14s", hal_board_info()->fw_version);
+        lv_text_get_size(&sz, s_ver_txt, FONT_CAPTION, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+        s_ver_w = sz.x;
+        lv_obj_set_width(s_ver, s_ver_w + 2);
+        lv_label_set_text(s_ver, s_ver_txt);
+    }
+    privacy_t p = model_settings()->privacy;
+    int x0 = UI_CX - (EYE_PX + 8 + s_ver_w) / 2;
+    show(s_eye, on);
+    show(s_ver, on);
+    ui_glyph_set_pos(s_eye, x0 + EYE_PX / 2, y + ABOUT_VER_DY);
+    ui_glyph_set(s_eye, p == PRIVACY_META ? ICON_EYE_OFF : p == PRIVACY_FULL ? ICON_G_READ : ICON_EYE_HALF, COL_TEXT2);
+    put(s_ver, FONT_CAPTION, x0 + EYE_PX + 8, y + ABOUT_VER_DY, &s_ver_at);
 }
 
 static void render(void)
 {
     s_last_render = s_now;
     uint32_t now = theme_now_unix();
+    int sel = ui_orbit_selected(s_orbit);
+    bool about = sel == T_ABOUT;
     char buf[96];
     s_gauges = ui_gauges_status_render(now);
-    if (now > 100000) { /* the clock is set: local time; otherwise the host name stands in */
+
+    /* the clock; until it is set its digits are dashes (the report names the computer instead, as before) */
+    bool set = now > 100000;
+    if (set) {
         uint32_t local = now + (uint32_t)((int32_t)model_settings()->tz_off_min * 60);
-        snprintf(buf, sizeof buf, "%u:%02u", (unsigned)(local / 3600 % 24), (unsigned)(local / 60 % 60));
-        set_time_font(FONT_NUM);
+        snprintf(s_time_txt, sizeof s_time_txt, "%u:%02u", (unsigned)(local / 3600 % 24), (unsigned)(local / 60 % 60));
     } else {
         const char *host = model_host();
-        snprintf(buf, sizeof buf, "%.20s", host[0] ? host : "Watch");
-        set_time_font(FONT_TITLE);
+        snprintf(s_time_txt, sizeof s_time_txt, "%.20s", host[0] ? host : "Watch");
     }
-    theme_set_text(s_time, s_time_txt, sizeof s_time_txt, buf);
-    render_chips();
+    theme_set_text(s_clock, s_clock_txt, sizeof s_clock_txt, set ? s_time_txt : "--:--");
+    theme_set_text_color(s_clock, set ? COL_TEXT : COL_TEXT3);
+    show(s_clock, !about);
+    /* the link above the clock and the battery under it; or, when the gauges have the slot above, both under
+     * it as one centred row */
+    link_look_t link;
+    hal_battery_t batt = hal_battery_read();
+    link_look(&link);
+    int link_x = UI_CX, batt_x = UI_CX;
+    if (s_gauges && batt.percent <= 100) {
+        int x0 = UI_CX - (link.w + ROW_GAP + BATT_D) / 2;
+        link_x = x0 + link.w / 2;
+        batt_x = x0 + link.w + ROW_GAP + BATT_D / 2;
+    }
+    render_link(&link, link_x, s_gauges ? LOW_Y : TOP_Y, !about);
+    render_battery(&batt, batt_x, LOW_Y, !about);
+    render_about(about);
 
-    for (int i = 0; i < N_TOGGLES; i++) {
-        bool on = is_on(i, now);
-        theme_set_bg_color(s_disc[i], on ? lv_color_hex(RGB_WORKING) : COL_FILL1);
-        theme_set_text_color(s_icon[i], on ? COL_ON_ACCENT : COL_TEXT);
-        const char *icon = icon_of(i, on);
-        if (strcmp(lv_label_get_text(s_icon[i]), icon)) lv_label_set_text(s_icon[i], icon); /* only on a change */
-    }
-    static int s_vol_drawn = -1; /* level and audibility the dial was last drawn with */
-    int vol = prefs_volume() | (volume_heard() ? 0x100 : 0);
-    if (vol != s_vol_drawn) {
-        s_vol_drawn = vol;
-        theme_set_text_color(s_icon[T_VOLUME], volume_heard() ? COL_TEXT : COL_TEXT3);
-        lv_obj_invalidate(s_disc[T_VOLUME]);
-    }
-    int rx = k_tx[s_sel] - SEL_RING_D / 2;
-    if (lv_obj_get_x(s_ring) != rx) lv_obj_set_x(s_ring, rx);
+    /* the toggles: each glyph is its state */
+    ui_orbit_item_t items[N_TOGGLES];
+    for (int i = 0; i < N_TOGGLES; i++) items[i] = (ui_orbit_item_t){icon_of(i, is_on(i, now)), 0, false};
+    ui_orbit_set_items(s_orbit, items, N_TOGGLES);
+    /* the two quantities: white round a resting disc, dark inside the selected one */
+    ui_arc_set(s_quiet_arc, quiet_permille(now), sel == T_QUIET ? COL_ON_ACCENT : COL_TEXT, lv_color_black());
+    if (sel == T_VOLUME)
+        ui_arc_set(s_vol_arc, prefs_volume() * 1000 / PREFS_VOL_MAX, volume_heard() ? COL_ON_ACCENT : lv_color_hex(RGB_VAL_OFF_SEL),
+                   lv_color_hex(RGB_VAL_TRACK_SEL));
+    else ui_arc_set(s_vol_arc, prefs_volume() * 1000 / PREFS_VOL_MAX, volume_heard() ? COL_TEXT : COL_TEXT3, COL_FILL2);
 
-    describe(buf, sizeof buf, now);
-    theme_set_text(s_desc, s_desc_txt, sizeof s_desc_txt, buf);
-    update_badge();
+    describe(buf, sizeof buf, sel, now);
+    snprintf(s_desc_txt, sizeof s_desc_txt, "%s", buf);
+    update_hint(sel);
 }
 
 void ui_status_refresh(uint32_t now)
@@ -272,7 +371,7 @@ void ui_status_open(uint32_t now)
 {
     s_now = s_last_input = now;
     s_n = nav_status_items(s_items, ST_COUNT);
-    s_sel = T_QUIET;
+    ui_orbit_select(s_orbit, T_QUIET);
     render();
     ui_home_rim_mode(true); /* a rim drag dials through the toggles */
     show(s_root, true);
@@ -286,8 +385,8 @@ static int s_scrub_last;
 static void select_item(int i, const char *via, void (*haptic)(void))
 {
     i = ((i % N_TOGGLES) + N_TOGGLES) % N_TOGGLES;
-    if (i == s_sel) return;
-    s_sel = i;
+    if (i == ui_orbit_selected(s_orbit)) return;
+    ui_orbit_select(s_orbit, i);
     render();
     const status_item_t *it = item_of(i);
     dbg_event("ui", "item", "\"idx\":%d,\"id\":%d,\"via\":\"%s\"", i, it ? (int)it->id : -1, via);
@@ -332,37 +431,35 @@ static void commit(int sel)
     render();
 }
 
-/* The toggle under a point, or -1. */
-static int toggle_at(int x, int y)
-{
-    for (int i = 0; i < N_TOGGLES; i++) {
-        int dx = x - k_tx[i], dy = y - TOGGLE_Y;
-        if (dx * dx + dy * dy <= TOGGLE_HIT * TOGGLE_HIT) return i;
-    }
-    return -1;
-}
-
 bool ui_status_act(nav_action_t a, const gesture_evt_t *g)
 {
     if (g->kind != G_LIFT && g->kind != G_SHAKE) s_last_input = s_now;
     switch (a) {
     case NAV_COMMIT: {
-        int hit = g->kind == G_TAP ? toggle_at(g->x, g->y) : -1;
+        int hit = g->kind == G_TAP ? ui_orbit_hit(s_orbit, g->x, g->y) : -1;
         if (hit >= 0) select_item(hit, "tap", NULL);
-        commit(hit >= 0 ? hit : s_sel);
+        commit(hit >= 0 ? hit : ui_orbit_selected(s_orbit));
         return true;
     }
     case NAV_HOLD_LONG:
-        if (toggle_at(g->x, g->y) < 0) ui_go_back();
+        if (ui_orbit_hit(s_orbit, g->x, g->y) < 0) ui_go_back();
         return true;
     case NAV_SCRUB: {
         int d = nav_list_scrub(&s_scrub_last, g->kind, g->x);
-        if (d) select_item(s_sel + d, "scrub", g_ui_actions->detent);
+        if (d) select_item(ui_orbit_selected(s_orbit) + d, "scrub", g_ui_actions->detent);
         return true;
     }
-    case NAV_NEXT: select_item(s_sel + 1, "btn", g_ui_actions->tick); return true;
-    case NAV_PREV: select_item(s_sel - 1, "btn", g_ui_actions->tick); return true;
-    default: return false;
+    case NAV_NEXT: select_item(ui_orbit_selected(s_orbit) + 1, "btn", g_ui_actions->tick); return true;
+    case NAV_PREV: select_item(ui_orbit_selected(s_orbit) - 1, "btn", g_ui_actions->tick); return true;
+    default: {
+        /* The discs reach past the centre zone (nav.h: r 150), where a tap is no action of this screen: a tap
+         * on a disc is still a tap on it. */
+        int hit = g->kind == G_TAP ? ui_orbit_hit(s_orbit, g->x, g->y) : -1;
+        if (hit < 0) return false;
+        select_item(hit, "tap", NULL);
+        commit(hit);
+        return true;
+    }
     }
 }
 
@@ -388,39 +485,25 @@ void ui_status_report(ui_report_t *r)
     if (nl) *nl = 0;
     ui_report_add(r, "> %s", tmp);
     if (nl) ui_report_add(r, "%s", nl + 1);
-    /* the toggles' icons by their Phosphor names, so a script can check that each shows its state;
-       last, as the report drops lines once it is full */
-    const char *names[N_TOGGLES];
-    for (int i = 0; i < N_TOGGLES; i++) {
-        const char *ic = lv_label_get_text(s_icon[i]);
-        names[i] = i == T_VOLUME ? ic : !strcmp(ic, ICON_BELL) ? "bell" : !strcmp(ic, ICON_QUIET) ? "bell-slash"
-                   : !strcmp(ic, ICON_SOUND) ? "speaker" : !strcmp(ic, ICON_MUTE) ? "speaker-slash" : "info";
-    }
-    ui_report_add(r, "icons %s %s volume-%s %s", names[0], names[1], names[2], names[3]);
+    /* the toggles' glyphs by their Phosphor names, so a script can check that each shows its state; last, as
+       the report drops lines once it is full */
+    uint32_t now = theme_now_unix();
+    ui_report_add(r, "icons %s %s volume-%u info", is_on(T_QUIET, now) ? "bell-slash" : "bell", is_on(T_MUTE, now) ? "speaker-slash" : "speaker",
+                  (unsigned)prefs_volume());
 }
 
-static lv_obj_t *centred(lv_obj_t *parent, const lv_font_t *font, lv_color_t col, int cy, int w, int lines)
+static lv_obj_t *centred(lv_obj_t *parent, const lv_font_t *font, lv_color_t col, int cx, int cy, int w)
 {
     lv_obj_t *l = lv_label_create(parent);
     lv_obj_set_style_text_font(l, font, 0);
     lv_obj_set_style_text_color(l, col, 0);
-    int h = lines * lv_font_get_line_height(font);
+    int h = lv_font_get_line_height(font);
     lv_obj_set_size(l, w, h);
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
-    lv_obj_set_pos(l, UI_CX - w / 2, cy - lv_font_get_line_height(font) / 2);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_CLIP);
+    lv_obj_set_pos(l, cx - w / 2, cy - h / 2);
     lv_label_set_text(l, "");
     return l;
-}
-
-static lv_obj_t *circle(lv_obj_t *parent, int d)
-{
-    lv_obj_t *o = lv_obj_create(parent);
-    lv_obj_remove_style_all(o);
-    lv_obj_set_size(o, d, d);
-    lv_obj_set_style_radius(o, LV_RADIUS_CIRCLE, 0);
-    lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    return o;
 }
 
 lv_obj_t *ui_status_init(lv_obj_t *screen)
@@ -430,50 +513,40 @@ lv_obj_t *ui_status_init(lv_obj_t *screen)
     lv_obj_set_size(s_root, UI_SIZE, UI_SIZE);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
 
-    s_time = centred(s_root, FONT_NUM, COL_TEXT, TIME_Y, theme_chord(TIME_Y, 30), 1);
+    ui_gauges_status_create(s_root); /* under everything: two arcs inside the bezel, two rows above the clock */
 
-    s_chips = lv_obj_create(s_root);
-    lv_obj_remove_style_all(s_chips);
-    lv_obj_set_size(s_chips, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(s_chips, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(s_chips, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(s_chips, 22, 0);
-    lv_obj_remove_flag(s_chips, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    s_link = lv_label_create(s_chips);
-    s_batt = lv_label_create(s_chips);
-    lv_obj_t *chip[2] = {s_link, s_batt};
-    for (int i = 0; i < 2; i++) {
-        lv_obj_set_style_text_font(chip[i], FONT_CAPTION, 0);
-        lv_obj_set_style_text_color(chip[i], COL_TEXT2, 0);
-        lv_obj_set_width(chip[i], LV_SIZE_CONTENT);
-        lv_label_set_text(chip[i], "");
+    /* the toggles, and the two that carry a quantity */
+    s_orbit = ui_orbit_create(s_root);
+    ui_orbit_set_geometry(s_orbit, ORBIT_R, ORBIT_PHASE);
+    s_quiet_arc = ui_arc_create(s_root, UI_CX - ORBIT_R, UI_CX, VAL_R, VAL_W);
+    s_vol_arc = ui_arc_create(s_root, UI_CX + ORBIT_R, UI_CX, VAL_R, VAL_W);
+    ui_arc_set_span(s_vol_arc, VOL_START, VOL_SPAN);
+    ui_arc_set_steps(s_vol_arc, PREFS_VOL_MAX);
+
+    /* the subject: the clock, the link above it and the battery under it */
+    s_clock = centred(s_root, FONT_NUM, COL_TEXT, UI_CX, CLOCK_Y, 164);
+    s_link = ui_glyph_create(s_root, FONT_ICON_M, UI_CX, TOP_Y);
+    s_host = ui_sigil_create(s_root, UI_CX, TOP_Y, HOST_R);
+    s_age = ui_tally_create(s_root, UI_CX, TOP_Y);
+    s_batt_arc = ui_arc_create(s_root, UI_CX, LOW_Y, BATT_R, BATT_W);
+    s_batt = ui_glyph_create(s_root, FONT_ICON_S, UI_CX, LOW_Y);
+
+    /* the About face, in the clock's place while About is selected */
+    for (int i = 0; i < A_COUNT; i++) {
+        s_about[i] = ui_glyph_create(s_root, FONT_ICON_L, UI_CX + (i - 1) * ABOUT_PITCH, ABOUT_Y);
+        s_about_n[i] = centred(s_root, FONT_HEAD, COL_TEXT, UI_CX + (i - 1) * ABOUT_PITCH, ABOUT_Y + ABOUT_NUM_DY, ABOUT_NUM_W);
     }
+    s_eye = ui_glyph_create(s_root, FONT_ICON_M, UI_CX, ABOUT_Y + ABOUT_VER_DY);
+    /* the firmware version: the screen's one piece of text (it cannot be drawn) */
+    s_ver = centred(s_root, FONT_CAPTION, COL_TEXT3, UI_CX, ABOUT_Y + ABOUT_VER_DY, 10);
+    lv_obj_set_style_text_align(s_ver, LV_TEXT_ALIGN_LEFT, 0);
 
-    for (int i = 0; i < N_TOGGLES; i++) {
-        s_disc[i] = circle(s_root, TOGGLE_D);
-        lv_obj_set_pos(s_disc[i], k_tx[i] - TOGGLE_D / 2, TOGGLE_Y - TOGGLE_D / 2);
-        lv_obj_set_style_bg_opa(s_disc[i], LV_OPA_COVER, 0);
-        theme_set_bg_color(s_disc[i], COL_FILL1);
-        s_icon[i] = lv_label_create(s_disc[i]);
-        lv_obj_set_style_text_font(s_icon[i], i == T_VOLUME ? FONT_TITLE : FONT_ICON_L, 0);
-        lv_obj_set_style_text_color(s_icon[i], COL_TEXT, 0);
-        lv_label_set_text(s_icon[i], icon_of(i, false));
-        lv_obj_center(s_icon[i]);
-    }
-    lv_obj_add_event_cb(s_disc[T_VOLUME], on_draw_volume, LV_EVENT_DRAW_POST, NULL);
-    s_ring = circle(s_root, SEL_RING_D);
-    lv_obj_set_style_border_width(s_ring, 2, 0);
-    lv_obj_set_style_border_color(s_ring, COL_TEXT, 0);
-    lv_obj_set_pos(s_ring, k_tx[0] - SEL_RING_D / 2, TOGGLE_Y - SEL_RING_D / 2);
-
-    s_desc = centred(s_root, FONT_BODY, COL_TEXT2, DESC_Y, theme_chord(DESC_Y + 24, 20), 2);
-    ui_gauges_status_create(s_root);
-
-    static const char *const words[2] = {"Quiet 30 min", "Next"};
-    for (int i = 0; i < 2; i++)
-        s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, i == 0 ? UI_BADGE_A_DEG : UI_BADGE_B_DEG,
-                                     UI_BADGE_R, &s_key[i], &s_word[i]);
-    snprintf(s_word_txt, sizeof s_word_txt, "%s", words[0]);
+    /* rule 6: A does to the selected toggle what its glyph shows, B is the next one */
+    s_hint[0] = ui_key_hint_create(s_root, UI_KEY_A);
+    s_hint[1] = ui_key_hint_create(s_root, UI_KEY_B);
+    ui_key_hint_set(s_hint[1], ICON_NEXT);
+    lv_obj_t *hide[] = {s_host, s_age, s_about[0], s_about[1], s_about[2], s_about_n[0], s_about_n[1], s_about_n[2], s_eye, s_ver};
+    for (size_t i = 0; i < sizeof hide / sizeof hide[0]; i++) lv_obj_add_flag(hide[i], LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     return s_root;
 }

@@ -15,6 +15,9 @@ LV_FONT_DECLARE(font_figtree_56_600)
 LV_FONT_DECLARE(font_phosphor_20)
 LV_FONT_DECLARE(font_phosphor_28)
 LV_FONT_DECLARE(font_phosphor_44)
+LV_FONT_DECLARE(font_phosphor_64)
+LV_FONT_DECLARE(font_phosphor_96)
+LV_FONT_DECLARE(font_phosphor_128)
 #define FONT_CAPTION (&font_figtree_20_500)     /* context line, legends, footers */
 #define FONT_BODY (&font_figtree_20_400)        /* summaries, prompt text, unselected rows */
 #define FONT_BODY_STRONG (&font_figtree_20_600) /* toasts, chips, small buttons */
@@ -24,6 +27,12 @@ LV_FONT_DECLARE(font_phosphor_44)
 #define FONT_ICON_S (&font_phosphor_20)
 #define FONT_ICON_M (&font_phosphor_28)
 #define FONT_ICON_L (&font_phosphor_44)
+/* Sigil (GLYPHS.md §3.2). XL holds every icon; XXL and HERO only the glyphs that are ever a state, a result or a
+ * primary action (gen.mjs HERO): working, hand, question, done, error, moon, hourglass, desktop, plugs, microphone,
+ * paper-plane, download, tick, cross, double tick, book. */
+#define FONT_ICON_XL (&font_phosphor_64)
+#define FONT_ICON_XXL (&font_phosphor_96)   /* the glyph on a primary disc */
+#define FONT_ICON_HERO (&font_phosphor_128) /* a state or a result, alone at the centre */
 
 /* Colour (UI-V3 §2.3): chrome is white and grey, state colours are the only colour on a screen. */
 #define COL_BG lv_color_hex(0x000000) /* AMOLED black: pixels off */
@@ -85,6 +94,12 @@ const char *theme_state_glyph(const session_t *s);
 /* Last path component of a working directory or repo name. */
 const char *theme_basename(const char *path);
 const char *theme_agent_name(agent_t a);
+const char *theme_agent_glyph(agent_t a);
+/* GLYPHS.md §2: the glyph that stands for a word of the UI's vocabulary ("Open", "Sent", "Offline"), or NULL when
+ * the word has none and is drawn as text. theme_is_glyph(): the text starts with an icon. */
+const char *theme_glyph(const char *word);
+bool theme_is_glyph(const char *text);
+bool theme_all_glyphs(const char *text); /* nothing but icons: draw it in an icon font */
 /* A job (JOBS.md): a terminal command, not an agent. */
 bool theme_is_job(const session_t *s);
 /* The time beside a job's state word: the elapsed run time, "about 2m left" under a known estimate,
@@ -117,11 +132,13 @@ void theme_elapsed(char *dst, size_t cap, uint32_t secs);
 /* "42s", "4m 12s", "1h 05m". */
 void theme_elapsed_long(char *dst, size_t cap, uint32_t secs);
 uint32_t theme_now_unix(void);
-/* Legend (UI-V3 §2.5): an outlined 22 px key cap and a sentence-case word, both grey. A (key_left) hugs the
- * left of the y 364 row and B the right, beside the physical buttons, as far out as r 212 allows (the spec's
- * "6 px inside the chord" would put the key cap on the ring, which owns r 218-233). `deg` and `r`
- * are ignored (the old polar position); `key_out`/`word_out` return the two labels. */
+/* Key hint (GLYPHS.md rule 6, §3.6): what a button does, as a glyph in a thin ring beside the physical button,
+ * A (key_left) lower left in amber, B lower right in red. No letters: `word` is looked up in the vocabulary
+ * (theme_glyph) and stays the name the screens and their reports use. This is ui_key_hint_create() of ui_kit.h
+ * behind the old signature, so every screen that has not been rebuilt yet shows the new hints: the returned
+ * object is the hint (a disc: show, hide and move it as before); `key`, `deg` and `r` are ignored;
+ * `key_out`/`word_out` return a hidden label, kept only so old callers compile. */
 lv_obj_t *theme_key_badge(lv_obj_t *parent, const char *key, const char *word, bool key_left, int deg, int r,
                           lv_obj_t **key_out, lv_obj_t **word_out);
-/* Change a legend's word; it stays anchored to its side of the row (`deg` and `r` ignored). */
+/* Change a hint's word, and so its glyph ("" draws no glyph); `word_lbl`, `deg` and `r` are ignored. */
 void theme_key_badge_set_word(lv_obj_t *badge, lv_obj_t *word_lbl, const char *word, int deg, int r);

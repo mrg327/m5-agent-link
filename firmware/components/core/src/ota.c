@@ -86,22 +86,24 @@ static void free_patch(void)
 }
 
 /* Ends the transfer (the slot is already dropped or finished) and gives the screen, the radio and the
- * display timer back. A reason the user should see goes out as a toast. */
-static void close_transfer(const char *toast)
+ * display timer back. */
+static void close_transfer(void)
 {
     if (s.st != OTA_IDLE) hal_link_bulk(s.port, false);
     s.st = OTA_IDLE;
     free_patch();
     ui_ota_hide();
-    if (toast && toast[0]) ui_toast(toast, RGB_AMBER);
 }
 
-static void stop(const char *why, const char *toast, bool tell)
+/* A reason the user should see goes out as a toast: `toast` in words (the report, the log), `sign` on the glass
+ * (GLYPHS.md rule 8: "download, cross" for a cancelled update, "download, hourglass" for one that timed out). */
+static void stop(const char *why, const char *toast, const char *sign, bool tell)
 {
     hal_ota_abort();
     dbg_event("ota", "ota_stopped", "\"why\":%s,\"next\":%u", dbg_q(why), (unsigned)s.next);
     if (tell) ack(5, NULL);
-    close_transfer(toast);
+    close_transfer();
+    if (toast) ui_toast_sign(toast, sign, NULL, RGB_AMBER);
 }
 
 static const char *err_text(const char *fallback)
@@ -110,13 +112,42 @@ static const char *err_text(const char *fallback)
     return e && e[0] ? e : fallback;
 }
 
+/* GLYPHS.md rule 8: a failed update has no picture, so the glass shows the error glyph and a short number. This
+ * is the number for each reason the watch can give (ota.c's own, and the flash drivers' in boards/ and the
+ * simulator); the words still go to the daemon in the ack, to the log and to the report. Words not listed here
+ * show the ack's status (3: the update was bad, 4: the flash failed). */
+static int fail_code(int st, const char *msg)
+{
+    static const struct {
+        const char *msg;
+        uint8_t code;
+    } k[] = {
+        /* the image is not what it should be */
+        {"Checksum mismatch", 11}, {"Signature not trusted", 12}, {"Not an app image", 13}, {"Built for another chip", 14},
+        {"Not agentlink firmware", 15}, {"Image incomplete", 16}, {"Incomplete image", 16}, {"Image too big", 17},
+        {"Image too small", 18}, {"Image longer than announced", 19}, {"Write past the end", 19},
+        /* the patch is not */
+        {"Too much data", 21}, {"Bad patch", 22},
+        /* the watch could not take it */
+        {"No spare app slot", 31}, {"Flash error", 32}, {"No update open", 33}, {"Out of memory", 34},
+        {"Update refused", 35}, {"This watch can't update itself", 36},
+    };
+    for (size_t i = 0; i < sizeof k / sizeof k[0]; i++)
+        if (!strcmp(k[i].msg, msg)) return k[i].code;
+    return st;
+}
+
 /* The transfer failed: tell the daemon, drop the slot, show the reason. */
 static void fail_transfer(int st, const char *msg)
 {
+    char num[12];
+    int code = fail_code(st, msg);
     hal_ota_abort();
-    dbg_event("ota", "ota_bad", "\"st\":%d,\"msg\":%s,\"next\":%u", st, dbg_q(msg), (unsigned)s.next);
+    dbg_event("ota", "ota_bad", "\"st\":%d,\"msg\":%s,\"next\":%u,\"code\":%d", st, dbg_q(msg), (unsigned)s.next, code);
     ack(st, msg);
-    close_transfer(msg);
+    close_transfer();
+    snprintf(num, sizeof num, "%d", code);
+    ui_toast_sign(msg, ICON_ERROR, num, RGB_ERROR);
     feedback_reject();
 }
 
@@ -207,7 +238,7 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
 {
     if (size == 0) {
         if (s.st == OTA_RECV) {
-            stop("daemon", NULL, true);
+            stop("daemon", NULL, NULL, true);
         } else {
             if (s.st == OTA_IDLE) hal_ota_abort();
             ack(5, NULL);
@@ -436,7 +467,7 @@ void ota_on_link(bool welcomed, uint32_t now_ms)
         char msg[40];
         snprintf(msg, sizeof msg, "Updated to %s", hal_board_info()->fw_version);
         dbg_event("ota", "ota_updated_tone", "\"fw\":%s", dbg_q(hal_board_info()->fw_version));
-        ui_toast(msg, RGB_SUCCESS);
+        ui_toast_sign(msg, ICON_UPDATE ICON_CHECK, hal_board_info()->fw_version, RGB_SUCCESS); /* "download, tick" and the version */
         feedback_updated();
     }
     if (s.st == OTA_RECV) {
@@ -449,16 +480,16 @@ void ota_cancel(uint32_t now_ms)
 {
     (void)now_ms;
     if (s.st != OTA_RECV) return;
-    stop("user", "Update cancelled", true);
+    stop("user", "Update cancelled", ICON_UPDATE ICON_X, true);
 }
 
 void ota_tick(uint32_t now_ms)
 {
     apply_step(now_ms);
-    if (s.st == OTA_RECV && now_ms - s.last_ms >= OTA_IDLE_TIMEOUT_MS) stop("timeout", "Update timed out", true);
+    if (s.st == OTA_RECV && now_ms - s.last_ms >= OTA_IDLE_TIMEOUT_MS) stop("timeout", "Update timed out", ICON_UPDATE ICON_WAIT, true);
     if (s.st == OTA_RESTART && (int32_t)(now_ms - s.restart_at) >= 0) {
         hal_restart(); /* does not return on the watch */
-        close_transfer(NULL);
+        close_transfer();
     }
     if (s_unconfirmed && now_ms - s_boot_ms >= OTA_CONFIRM_MS) {
         s_unconfirmed = false;

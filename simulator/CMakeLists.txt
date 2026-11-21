@@ -29,6 +29,8 @@ target_link_libraries(agentlink_hal PUBLIC lvgl::lvgl SDL2::SDL2)
 
 add_subdirectory(${FW}/agentlink_proto agentlink_proto)
 add_subdirectory(${FW}/core core)
+# The gallery of the Sigil primitives (ui_kit.h, script command `kit N`) is built into the simulator only.
+target_compile_definitions(core PUBLIC UI_KIT_DEMO)
 
 add_executable(agentlink_sim src/main.c src/sim_script.c src/sim_fw_image.c)
 target_include_directories(agentlink_sim PRIVATE ${FW}/core/src)
@@ -303,6 +305,10 @@ sim_script_test(sim_watch_ask_return watch_ask_return.txt FAIL_REGULAR_EXPRESSIO
 set_tests_properties(sim_watch_ask_return PROPERTIES TIMEOUT 60)
 sim_script_test(sim_watch_states watch_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_watch_states PROPERTIES TIMEOUT 60)
+# Sigil (GLYPHS.md §5 WATCH): the lane of glyph nodes in every state, the report's words, the comet's redraw budget.
+# A tap on a node selects that step: it must never focus the terminal (op 0) nor answer anything (op 3, op 4).
+sim_script_test(sim_sigil_watch sigil_watch.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0,|\"op\":3|\"op\":4")
+set_tests_properties(sim_sigil_watch PROPERTIES TIMEOUT 90)
 # UI-V3 second safety pass: a hold acts on the row under the finger; early taps after opening are ignored;
 # a moved selection cancels a hold; the answered state lingers; a long transcript cannot be sent.
 sim_script_test(sim_ask_hold_neighbour_row ask_hold_neighbour_row.txt
@@ -320,6 +326,14 @@ sim_script_test(sim_agent_tall_row_out agent_tall_row_out.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,|\"op\":8,")
 sim_script_test(sim_agent_hold_cancel_on_select agent_hold_cancel_on_select.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,")
+# Sigil AGENT and READ (GLYPHS.md §5): every state of the two screens, named in the report; a touch on a disc past
+# the centre zone is a touch on it; a tap or a short hold on Stop sends nothing (no op 6); the row touched is the
+# reply sent ("No" = type arg 101); button A in the reader opens the session on the computer (op 0).
+sim_script_test(sim_sigil_agent sigil_agent.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,"
+                PASS_REGULAR_EXPRESSION "\"op\":11,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":101.*\"op\":0,\"sid\":2")
+set_tests_properties(sim_sigil_agent PROPERTIES TIMEOUT 120)
+sim_script_test(sim_sigil_agent_bare sigil_agent_bare.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":6,|\"op\":11,")
 # Read before you approve: an unread long text locks Approve; the reader cannot answer; a daemon-cut text is
 # never approvable on the watch.
 sim_script_test(sim_ask_read_first ask_read_first.txt
@@ -356,6 +370,10 @@ sim_script_test(sim_gauges_wire gauges_wire.txt FAIL_REGULAR_EXPRESSION "SCRIPT 
 foreach(n done_all done_failed done_time_only done_long done_wire done_activity)
   sim_script_test(sim_${n} ${n}.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4")
 endforeach()
+# Sigil (GLYPHS.md §5 GAUGES, DONE): the arcs, the AGENT readout's glyphs and the done row in the states the scripts
+# above do not render; the report keeps their words.
+sim_script_test(sim_sigil_gauges sigil_gauges.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4")
+set_tests_properties(sim_sigil_gauges PROPERTIES TIMEOUT 90)
 
 # Answer window and full text (ANSWER-WINDOW.md, proto 0.11). No approve (op 3) may leave after a window ended,
 # while the full text is still arriving, for a text that does not add up, past the cap or under privacy meta.
@@ -460,6 +478,31 @@ sim_script_test(sim_question_tap_never_sends question_tap_never_sends.txt
 sim_script_test(sim_queue_show_cancel queue_show_cancel.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"op\":18,\"sid\":1")
+# Sigil (GLYPHS.md): every primitive of ui_kit.h draws (the gallery), and HOME in each of its states keeps saying in
+# the report what its glyphs mean; a tap on the hero glyph or the book disc opens ASK or READ and sends nothing.
+sim_script_test(sim_kit_gallery kit_gallery.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_sigil_home sigil_home.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"op\":5")
+set_tests_properties(sim_sigil_home PROPERTIES TIMEOUT 90)
+# ASK in Sigil (docs/design/glyphs/ASK.md): every state as a render, the words each still says in the report, and
+# a redraw budget at rest. A tap on the Approve disc sends nothing; the script's own holds approve, deny and answer.
+sim_script_test(sim_sigil_ask sigil_ask.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"op\":3.*\"op\":4.*\"op\":19")
+set_tests_properties(sim_sigil_ask PROPERTIES TIMEOUT 120)
+# Sigil: STATUS, LABS and TRACKPAD in every state (renders), the words each still reports, a tap on a disc in the
+# rim zone, and STATUS at rest repainting nothing.
+sim_script_test(sim_sigil_status sigil_status.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+set_tests_properties(sim_sigil_status PROPERTIES TIMEOUT 90)
+# Sigil: VOICE, KEYS and SCROLL in every state. The report keeps the words; a tap or a short A never sends (no
+# dictate, op 12, at all; kb_send, op 15, only from the one A hold, with hold_ms >= 1000); a control answers the
+# wrong gesture itself (voice_nudge, keys_flash); each screen at rest repaints nothing.
+sim_script_test(sim_sigil_voice sigil_voice.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":12"
+  PASS_REGULAR_EXPRESSION "voice_nudge.*voice_locked.*voice_page")
+set_tests_properties(sim_sigil_voice PROPERTIES TIMEOUT 150)
+sim_script_test(sim_sigil_keys sigil_keys.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":15,\"sid\":[0-9]+,\"rid\":0,\"hold_ms\":[0-9][0-9]?[0-9]?,"
+  PASS_REGULAR_EXPRESSION "keys_flash.*\"op\":15,\"sid\":1,\"rid\":0,\"hold_ms\":1[0-9][0-9][0-9]")
+sim_script_test(sim_sigil_scroll sigil_scroll.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"unit\":2")
 sim_script_test(sim_deck_v3_states deck_v3_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_deck_v3_ambient deck_v3_ambient.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_deck_v3_ambient PROPERTIES TIMEOUT 60)

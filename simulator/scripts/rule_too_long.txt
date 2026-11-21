@@ -17,7 +17,7 @@ expect_label > Always allow HOLD
 expect_label too long to show on the watch
 expect_no_label --coverage
 shot rule_too_long.png
-hold 233 282 700
+hold 140 313 700
 wait 100
 expect_label Rule too long for the watch
 expect_no_label Always allowed

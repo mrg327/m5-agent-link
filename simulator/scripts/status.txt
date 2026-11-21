@@ -41,7 +41,7 @@ wait 200
 expect_label > Quiet until
 expect_label icons bell-slash speaker volume-5 info
 shot status_quiet.png
-tap 107 246
+tap 101 233
 wait 200
 expect_label > Quiet until
 tap 233 320
@@ -77,10 +77,10 @@ wait 300
 expect_label > Volume 2 of 5
 shot status_volume_2.png
 # muted, the level reads as muted; stepping it unmutes (the user wants to hear it)
-tap 191 246
+tap 233 101
 wait 200
 expect_label > Sounds: off
-tap 275 246
+tap 365 233
 wait 300
 expect_label > Volume 3 of 5
 expect_label icons bell-slash speaker volume-3 info
@@ -95,21 +95,21 @@ scrub 300 250 400
 wait 150
 expect_screen status
 # a tap on a disc selects and commits it: Mute on, then off; a tap on Quiet's disc cycles it (30 min to 1 h)
-tap 191 246
+tap 233 101
 wait 200
 expect_label > Sounds: off
 btn B
 wait 150
 expect_label > Volume 3 of 5 (muted)
 shot status_volume_muted.png
-tap 191 246
+tap 233 101
 wait 200
 expect_label > Sounds: on
-tap 107 246
+tap 101 233
 wait 200
 expect_label > Quiet until
 shot status_quiet_on.png
-tap 359 246
+tap 233 365
 wait 200
 expect_label > 2 sessions
 # swipe up goes back; the deck shows quiet mode subtly

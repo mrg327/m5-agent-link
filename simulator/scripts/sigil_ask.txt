@@ -1,0 +1,247 @@
+# docs/design/glyphs/ASK.md: ASK in Sigil, every state as a render, and the words each one still says in the
+# report (GLYPHS.md rule 9). Nothing on the glass is a word that is not the agent's or the user's.
+# The safety paths have their own scripts (ask_*, rule_*, detail_*, question_*, window_*); this one is the look.
+connect
+rtc 1800000000
+rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+mic audio/tone_1s.wav
+session 2 input webapp feat/login
+wait 300
+# a bare permission: the request in words, Approve the primary disc (lit, ringed: it is held), Deny beside it,
+# Open on PC on button A's hint; the answer window is the arc at the bezel
+attention_win 60000 60000 - 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 500
+expect_screen ask
+expect_label webapp
+expect_label Run shell command
+expect_label npm test -- --watch=false
+expect_label > Approve HOLD
+expect_label Deny HOLD
+expect_label Open on PC
+expect_label 3 options
+expect_countdown 58 60
+shot sigil_ask_approval.png
+# at rest only the countdown's end moves
+px_reset
+wait 2000
+expect_px_max 3000
+# a tap never approves: the sign says "finger, tick" and the ring starts and falls back
+tap 304 262
+wait 150
+expect_label Hold to approve
+shot sigil_ask_hint.png
+wait 1900
+expect_label > Approve HOLD
+# the hold fills the disc's ring (and the index ring)
+press 304 262
+wait 600
+shot sigil_ask_hold.png
+release
+wait 300
+expect_label > Approve HOLD
+# a tap on the Deny disc selects it: it is the lit one now, and the one that can be held
+tap 140 262
+wait 150
+expect_label > Deny HOLD
+expect_label Hold to deny
+shot sigil_ask_deny.png
+wait 1900
+# button B steps on to Open on PC: button A's hint is ringed
+btn B
+wait 200
+expect_label > Open on PC
+shot sigil_ask_pc.png
+btn B
+wait 200
+expect_label > Approve HOLD
+hold 304 262 1500
+wait 300
+expect_label Approved
+expect_label Waiting for your computer
+expect_countdown -1 -1
+shot sigil_ask_approved.png
+clear 7 answered_dev
+wait 1200
+expect_screen ring
+# denied
+attention 8 2 approval approve,deny,focus 0 Run shell command|git push --force origin main
+wait 500
+btn B
+wait 200
+hold 140 262 1100
+wait 300
+expect_label Denied
+shot sigil_ask_denied.png
+clear 8 answered_dev
+wait 1200
+# always allow: the double-tick disc under Deny; selected, the rule stands where the request was, under where it
+# is saved (the folder: this project) and how wide it is (the asterisk: a wildcard)
+rule project wide Bash(npm test:*)
+attention_win 60000 60000 - 12 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 500
+expect_label > Approve HOLD
+expect_label 4 options
+shot sigil_ask_rule_default.png
+tap 146 306
+wait 150
+expect_label > Always allow HOLD
+expect_label Hold to always allow
+expect_label Saved for this project
+expect_label Bash(npm test:*)
+expect_label Wide: * matches anything
+wait 1900
+shot sigil_ask_rule.png
+hold 146 306 1900
+wait 300
+expect_label Always allowed
+expect_label Bash(npm test:*)
+expect_label Saved for this project
+shot sigil_ask_rule_granted.png
+clear 12 answered_dev
+wait 2800
+# for this session only (the hourglass), exactly as written (the equals sign)
+rule session exact Bash(rm -rf build)
+attention_win 60000 60000 - 14 2 approval approve,deny,focus 0 Run shell command|rm -rf build
+wait 500
+btn B
+wait 150
+btn B
+wait 200
+expect_label Until this session ends
+expect_label Exactly as written
+shot sigil_ask_rule_session.png
+clear 14 answered_pc
+wait 600
+# a rule too long to show whole is not shown in part: the sign says "not here: on the computer"
+rule project exact Bash(npm run test -- --reporter=verbose --coverage --watch=false)\nBash(make lint)
+attention_win 60000 60000 - 15 2 approval approve,deny,focus 0 Run shell command|npm run test && make lint
+wait 500
+btn B
+wait 150
+btn B
+wait 200
+expect_label too long to show on the watch
+expect_label Answer it on your computer
+shot sigil_ask_rule_too_long.png
+clear 15 answered_pc
+wait 600
+rule off
+# read before you approve: a text that goes on shows two lines and the book; Approve is shut (dim) until the
+# reader's last page has been on screen
+attention 16 2 approval approve,deny,focus 0 Run shell command|cd packages/frontend && npm run test -- --watch=false --coverage --runInBand && git push --force origin main
+wait 500
+expect_label Read all
+expect_label > Approve HOLD
+shot sigil_ask_read_first.png
+press 304 262
+wait 700
+expect_label Read it first
+shot sigil_ask_read_first_sign.png
+release
+wait 1900
+tap 233 120
+wait 400
+expect_label Reading 1 of 1
+shot sigil_ask_reader.png
+btn B
+wait 300
+expect_label > Approve HOLD
+shot sigil_ask_read_done.png
+clear 16 answered_pc
+wait 600
+# the agent's own choices are words, so rows: the selected one with its disc, the others as rings
+attention 17 2 approval approve,deny,focus,reply 3 Run shell command|npm test -- --watch=false|Yes|Yes, don't ask again|No
+wait 500
+expect_label > Yes HOLD
+expect_label 4 options
+shot sigil_ask_options.png
+btn B
+wait 150
+btn B
+wait 200
+expect_label > No HOLD
+shot sigil_ask_options_deny.png
+clear 17 answered_pc
+wait 600
+# a question whose options answer by a tap
+attention 18 2 question reply,focus 0 Which framework?|Pick the UI library for the new dashboard|React|Vue|Keep vanilla
+wait 500
+expect_label > React
+shot sigil_ask_question.png
+tap 233 320
+wait 300
+expect_label Sent
+expect_label "Vue"
+shot sigil_ask_sent.png
+clear 18 answered_dev
+wait 1200
+# AskUserQuestion: two questions (the pips), the first single choice (held), the second multi-select (ticked)
+ask 32 2 60000 60000 Framework|Which UI framework should the dashboard use?|single|React=Component library, large ecosystem|Vue=Progressive framework|Svelte=Compiles away ;; Extras|Which extras should I add?|multi|Router|State store|Tests=Vitest and Playwright
+wait 600
+expect_label 1 of 2
+expect_label > React HOLD
+shot sigil_ask_q_single.png
+tap 233 120
+wait 400
+expect_label Reading 1 of
+shot sigil_ask_q_reader.png
+btn B
+wait 300
+expect_label > React HOLD
+hold 233 262 1500
+wait 500
+expect_label 2 of 2
+expect_label > Router
+tap 233 262
+wait 300
+btn B
+wait 200
+btn B
+wait 200
+tap 233 262
+wait 300
+shot sigil_ask_q_multi.png
+btn B
+wait 200
+expect_label > Other
+shot sigil_ask_q_other.png
+btn B
+wait 200
+expect_label > Send HOLD
+shot sigil_ask_q_send.png
+hold 233 262 1500
+wait 400
+expect_label Sent
+expect_label 2 answers
+shot sigil_ask_q_sent.png
+clear 32 answered_dev
+wait 1200
+# a question that takes free text: Dictate is the primary disc
+attention 19 2 question focus,dictate 0 Commit message|What should the commit message say?
+wait 500
+expect_label > Dictate
+expect_label Open on PC
+shot sigil_ask_dictate.png
+clear 19 answered_pc
+wait 600
+# nothing the watch can answer: Open on PC alone
+attention 20 2 question focus 0 Deploy|Which environment should the release go to?
+wait 500
+expect_label > Open on PC
+expect_label 1 options
+shot sigil_ask_pc_only.png
+clear 20 answered_pc
+wait 600
+# the window ran out: the desktop and the hourglass, then the deck
+attention_win 2000 60000 - 21 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 500
+expect_countdown 1 2
+shot sigil_ask_late.png
+clear 21 expired
+wait 300
+expect_screen ask
+expect_label On your computer
+shot sigil_ask_expired.png
+wait 3200
+expect_screen ring
+quit

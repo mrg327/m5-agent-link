@@ -1,7 +1,7 @@
 /* Scripted input. A script is expanded up front into a timeline of primitive events (mouse, keys,
  * IMU, frames, checks) that are replayed in real time through the same paths as real input.
  *
- *   wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double|held] | chord
+ *   wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double|held|down|up] | chord
  *   stroke X,Y X,Y ...              KEYS: one finger stroke through the points, a sample every 33 ms, then lifted
  *   word LETTERS                    KEYS: a swipe through the centres of those layer-0 letters
  *   key CHAR|space|bksp|layer       KEYS: a tap on that key (layer 0, then the symbols layer)
@@ -90,13 +90,14 @@
 #include "model.h"
 #include "prefs.h"
 #include "ui_countdown.h"
+#include "ui_kit.h"
 #include "ui_theme.h"
 #include "voice.h"
 #include "sim.h"
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_GRAPH, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_PATCH, E_FW_EXPECT_SLOT, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_GRAPH, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_PATCH, E_FW_EXPECT_SLOT, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_KIT, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -251,7 +252,10 @@ static bool parse_line(char *line, uint32_t *t)
         bool held = strstr(rest, "held") != NULL; /* past the 1.2 s hold-to-send */
         bool lng = strstr(rest, "long") != NULL || held, dbl = strstr(rest, "double") != NULL;
         int bi = rest[0] == 'B';
-        if (dbl) {
+        if (strstr(rest, " down") || strstr(rest, " up")) { /* a press held across other commands (a shot mid-hold) */
+            add(*t, E_BTN, bi, strstr(rest, " down") != NULL, 0, NULL);
+            *t += 20;
+        } else if (dbl) {
             btn(t, bi, 0, 60);
             btn(t, bi, 160, 220);
             *t += 220 + 600; /* a double press settles at once; leave room for a stray single */
@@ -464,6 +468,9 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "skip") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_SKIP, a, 0, 0, NULL);
         *t += 20;
+    } else if (!strcmp(cmd, "kit") && sscanf(rest, "%d", &a) == 1) {
+        add(*t, E_KIT, a, 0, 0, NULL);
+        *t += 50;
     } else if (!strcmp(cmd, "quit")) {
         add(*t, E_QUIT, 0, 0, 0, NULL);
     } else {
@@ -549,7 +556,7 @@ static void run_rule(const char *spec)
 
 static void run_session(const char *spec)
 {
-    /* session SID STATE REPO [BRANCH|- [summary text...]] */
+    /* session SID STATE REPO|- [BRANCH|- [summary text...]] ("-" for REPO: a session with no folder) */
     unsigned sid;
     char st[16], repo[33], branch[33] = "";
     int n = 0;
@@ -559,6 +566,7 @@ static void run_session(const char *spec)
     }
     sscanf(spec, "%*u %*15s %*32s %32s %n", branch, &n);
     if (!strcmp(branch, "-")) branch[0] = 0;
+    if (!strcmp(repo, "-")) repo[0] = 0;
     uint32_t now = theme_now_unix();
     session_t d = {.sid = sid, .agent = (agent_t)(sid % 3), .state = SESS_WORK, .t0 = now - 3600 + sid, .tst = now - 40 - 53 * sid};
     uint32_t present = SF_AGENT | SF_STATE | SF_SUB | SF_REPO | SF_T0 | SF_TST | SF_SEEN;
@@ -1557,6 +1565,7 @@ static void run(const ev_t *e)
         else sim_set_battery_pct(pct, !strcmp(chg, "chg"));
         break;
     }
+    case E_KIT: ui_kit_demo(e->a); break; /* a gallery page of the Sigil primitives (ui_kit.h); 0 hides it */
     case E_SKIP:
         sim_skip_time((uint32_t)e->a);
         s_t0 += (uint32_t)e->a; /* the script's own timeline does not move with it */

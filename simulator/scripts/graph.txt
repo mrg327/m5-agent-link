@@ -9,7 +9,7 @@ wait 1200
 expect_screen ring
 expect_label strip
 shot deck_graph.png
-tap 233 320
+tap 233 374
 wait 500
 expect_screen graph
 swipe 150 233 380 233 200
