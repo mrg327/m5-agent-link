@@ -73,6 +73,7 @@ const char *theme_agent_glyph(agent_t a)
     case AGENT_CLAUDE: return ICON_AG_CLAUDE;
     case AGENT_CLOUD: return ICON_AG_CLOUD;
     case AGENT_SHELL: return ICON_G_SHELL;
+    case AGENT_PI: return ICON_AG_PI;
     default: return ICON_G_ROBOT;
     }
 }

@@ -59,6 +59,7 @@
 #define ICON_AG_CLAUDE "\xEE\x9A\xA2" /* sparkle e6a2 */
 #define ICON_AG_COPILOT "\xEE\x97\x96" /* airplane-tilt e5d6 */
 #define ICON_AG_CLOUD "\xEE\x86\xAA" /* cloud e1aa */
+#define ICON_AG_PI "\xEE\xB2\x80" /* pi ec80 */
 #define ICON_NEXT "\xEE\x84\xBA" /* caret-right e13a */
 #define ICON_BACK "\xEE\x81\x98" /* arrow-left e058 */
 #define ICON_CHECK "\xEE\x86\x82" /* check e182 */

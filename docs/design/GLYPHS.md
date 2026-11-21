@@ -214,7 +214,7 @@ screen. A screen that needs a new meaning adds a row.
 | Quiet / sound / mute | bell-slash / speaker / speaker-slash |
 | Privacy full / preview / meta | eye / eye-closed / eye-slash |
 | Sessions (count) | stack |
-| Claude Code / Copilot CLI / cloud / terminal / other | sparkle / airplane / cloud / terminal / robot |
+| Claude Code / Copilot CLI / cloud / terminal / pi / other | sparkle / airplane / cloud / terminal / pi (π) / robot |
 | Not supported / not allowed on the PC | prohibit / desktop and prohibit |
 | Timed out / no window / out of date | hourglass / app-window and cross / desktop and download |
 | Updating | download |

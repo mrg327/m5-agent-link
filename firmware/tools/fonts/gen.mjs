@@ -35,7 +35,7 @@ const ICONS = {
   "arrow-bend-up-left": 0xe024, "paper-plane-tilt": 0xe398, info: 0xe2ce, "arrow-line-down": 0xe05c,
   backspace: 0xe0ae, circle: 0xe18a, "git-fork": 0xe27e,
   // The glyph pass (GLYPHS.md): one glyph per word the screens used to spell out.
-  sparkle: 0xe6a2, "airplane-tilt": 0xe5d6, cloud: 0xe1aa, "caret-right": 0xe13a, "arrow-left": 0xe058,
+  sparkle: 0xe6a2, "airplane-tilt": 0xe5d6, cloud: 0xe1aa, pi: 0xec80, "caret-right": 0xe13a, "arrow-left": 0xe058,
   check: 0xe182, x: 0xe4f6, "dots-three-outline": 0xe204, checks: 0xe53a, "bell-ringing": 0xe5e8,
   "arrow-clockwise": 0xe036, "arrow-counter-clockwise": 0xe038, "book-open": 0xe0e6, "hourglass-low": 0xe2b6,
   sun: 0xe472, "eye-closed": 0xe222, "eye-slash": 0xe224, stack: 0xe466, waveform: 0xe802,
