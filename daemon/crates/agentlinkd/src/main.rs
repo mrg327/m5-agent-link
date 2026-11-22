@@ -4,6 +4,7 @@
 //! with everything traced to `~/.agentlink/trace/`.
 
 mod ask;
+mod bench;
 mod ble;
 mod broker;
 mod deltas;
@@ -108,6 +109,7 @@ async fn main() -> Result<()> {
         broker,
         jobs: shared.jobs.clone(),
         ota: shared.ota.clone(),
+        bench: shared.bench.clone(),
     })];
     for s in sources {
         let reg = registry.clone();

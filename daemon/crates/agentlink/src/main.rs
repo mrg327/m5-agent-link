@@ -1,5 +1,6 @@
 //! agentlink: the CLI window into the daemon (DESIGN §0: auditability).
 
+mod bench;
 mod graph;
 mod hooks;
 mod ota;
@@ -115,6 +116,40 @@ enum Cmd {
     Device {
         #[command(subcommand)]
         cmd: DeviceCmd,
+    },
+    /// Play task scripts on the watch as a finger and report frame times and task times (BENCH.md).
+    Bench {
+        #[command(subcommand)]
+        cmd: BenchCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum BenchCmd {
+    /// Run task scripts (bench/tasks/*.txt) on the connected watch. The watch shows only the script's
+    /// sessions meanwhile, and its answers reach no agent.
+    Run {
+        /// Task scripts, in the simulator's script language.
+        #[arg(required = true)]
+        tasks: Vec<std::path::PathBuf>,
+        /// Runs per task.
+        #[arg(long, default_value_t = 3)]
+        runs: u32,
+        /// Play input like a person: taps scattered around their target and a reaction time before each
+        /// input, seeded (run i uses SEED + i). Without it the input is exact.
+        #[arg(long, value_name = "SEED")]
+        human: Option<u64>,
+        /// Where to write report.md, report.json and the timelines (default: ~/.agentlink/bench/<time>).
+        #[arg(long)]
+        out: Option<std::path::PathBuf>,
+        /// Device id (hex uid, a prefix will do); needed when several watches are connected.
+        #[arg(long)]
+        device: Option<String>,
+    },
+    /// Report on timeline records saved by the simulator (`bench save FILE`); one file per run, named by task.
+    Report {
+        #[arg(required = true)]
+        files: Vec<std::path::PathBuf>,
     },
 }
 
@@ -277,6 +312,25 @@ fn main() -> Result<()> {
                 capacity_mah,
             },
         ),
+        Cmd::Bench { cmd } => match cmd {
+            BenchCmd::Run {
+                tasks,
+                runs,
+                human,
+                out,
+                device,
+            } => bench::run(
+                cli.json,
+                &tasks,
+                bench::RunOpts {
+                    runs,
+                    human,
+                    out,
+                    device,
+                },
+            ),
+            BenchCmd::Report { files } => bench::report(cli.json, &files),
+        },
         Cmd::Device { cmd } => {
             let name = match cmd {
                 DeviceCmd::State => "state",

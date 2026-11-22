@@ -1,0 +1,18 @@
+# Switch: two agents; drag along the rim to the other one and bring its terminal forward (A: Open on PC).
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+bench start
+session 1 work ember feat/login Running the test suite
+session 2 work fjord main Fixing the flaky retry test
+wait 600
+expect_screen ring
+bench mark 1
+scrub 20 220 500
+wait 300
+expect_label fjord
+btn A
+expect_cmd focus
+wait 600
+bench stop
+wait 1500
+bench save switch.bin

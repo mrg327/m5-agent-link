@@ -118,7 +118,7 @@ the watch. The daemon's player understands this subset:
 ```
 wait MS | tap X Y | hold X Y MS | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double] | lift
 session SID STATE REPO [BRANCH [SUMMARY]] | attention RID SID approval|question ACTS GRANT TITLE|TEXT|OPT...
-mark N | expect_cmd OP | expect_screen NAME
+bench mark N | expect_cmd OP | expect_screen NAME | question SID Q|ANSWER... | scrub DEG0 DEG1 [MS [RADIUS]]
 ```
 
 `expect_cmd OP` waits (up to 10 s) for the watch to send that command and ends the task's clock there; the

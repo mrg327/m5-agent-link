@@ -324,6 +324,7 @@ mod tests {
             token_file: d.join("remote.token"),
             home: d.to_path_buf(),
             ota: Arc::new(crate::ota::Ota::new(Trace::null())),
+            bench: Arc::new(crate::bench::Bench::new(Trace::null())),
         })
     }
 

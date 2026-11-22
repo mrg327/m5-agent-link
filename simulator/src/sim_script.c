@@ -73,6 +73,7 @@
  *   battery PCT [chg]               the battery reading (chg = charging and on USB)
  *   skip MS                         jump the clock forward (the script's own timeline stays put): long timeouts
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
+ *   question SID Q|ANSWER|ANSWER...  a delta with the agent's closing question and its answers (proto 0.5)
  *   touch DT X Y [X Y ...]          a daemon `dbg_touch` (proto 0.24, BENCH.md): the finger presses at the first point,
  *                                   moves to the next every DT ms and lifts DT ms after the last
  *   bench start|stop|mark N         a daemon `dbg_bench`: record the frame timeline, stop and send it, or mark it
@@ -105,7 +106,7 @@
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_GRAPH, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_PATCH, E_FW_EXPECT_SLOT, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_KIT, E_STROKE, E_BENCH, E_BENCH_SAVE, E_BENCH_EXPECT, E_EXPECT_CMD, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_GRAPH, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_PATCH, E_FW_EXPECT_SLOT, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_KIT, E_QUESTION, E_STROKE, E_BENCH, E_BENCH_SAVE, E_BENCH_EXPECT, E_EXPECT_CMD, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -479,6 +480,9 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "kit") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_KIT, a, 0, 0, NULL);
         *t += 50;
+    } else if (!strcmp(cmd, "question") && arg[0]) {
+        add(*t, E_QUESTION, 0, 0, 0, arg);
+        *t += 20;
     } else if (!strcmp(cmd, "touch")) {
         int dt = 0, n = 0, used = 0;
         if (sscanf(rest, "%d%n", &dt, &used) != 1 || dt <= 0) return false;
@@ -620,6 +624,27 @@ static void run_session(const char *spec)
         present |= SF_HUSH;
     }
     model_upsert(&d, present);
+}
+
+/* question SID Q|ANSWER...: the agent's closing question and up to three answers (proto 0.5, the Reply list). */
+static void run_question(const char *spec)
+{
+    unsigned sid;
+    int n = 0;
+    if (sscanf(spec, "%u %n", &sid, &n) != 1 || !spec[n]) {
+        s_failed = true;
+        return;
+    }
+    session_t d = {.sid = sid};
+    char buf[512];
+    snprintf(buf, sizeof buf, "%s", spec + n);
+    char *save = NULL;
+    int i = 0;
+    for (char *f = strtok_r(buf, "|", &save); f; f = strtok_r(NULL, "|", &save), i++) {
+        if (i == 0) snprintf(d.q, sizeof d.q, "%s", f);
+        else if (i <= 3) snprintf(d.rp[d.n_rp++], sizeof d.rp[0], "%s", f);
+    }
+    model_upsert(&d, SF_Q | SF_RP);
 }
 
 /* job SID run|done|fail REPO ELAPSED_S ETA_S EXIT [command line...]: a terminal job (JOBS.md, proto 0.9).
@@ -1593,6 +1618,7 @@ static void run(const ev_t *e)
     case E_RX: send_hex_kind(e->b, e->text); break;
     case E_UI: core_dump_ui_state(); break;
     case E_STROKE: send_stroke(e->a, e->text); break;
+    case E_QUESTION: run_question(e->text); break;
     case E_BENCH: send_bench(e->a, e->b); break;
     case E_BENCH_SAVE: bench_save(e->text); break;
     case E_BENCH_EXPECT: bench_expect(e->text); break;
