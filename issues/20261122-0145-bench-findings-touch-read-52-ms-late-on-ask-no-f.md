@@ -1,6 +1,6 @@
 ---
 id: 20261122-0145
-title: Bench findings: touch read ~52 ms late on ASK, no feedback for ~290 ms on a held disc, agent screens at 16 fps
+title: "Bench findings: screen changes are 3 full-screen frames at 13 fps, swipes show nothing until lift, no press state on a held disc, agent screens at 16 fps"
 status: open
 severity: med
 area: firmware
@@ -40,3 +40,4 @@ should show which screens redraw too much.
 ## Log
 
 - 2026-11-22T09:16:07Z · claude-code@linux-dev · linux-x86_64 · d9213f1: filed
+- 2026-11-22T19:20:21Z · claude-code@linux-dev · linux-x86_64 · 3724645: Correction from the UX profile (docs/design/UX-PROFILE.md §1-2, branch ux-profile): the 52 ms touch-read delay on ASK was the dark display's 50 ms poll (the f724 bug turned the display off when the card arrived); with the display on, every screen reads the touch 11-13 ms after it lands. New: every screen change is three full-screen frames of 70-110 ms (ui_motion_enter: the content rises 20 px over 160 ms, so each step repaints all 217 k px), ~250 ms at 13 fps; a swipe draws nothing until the finger lifts (~450 ms to the finished screen); STATUS frames take 100-107 ms; a held disc shows no press state for ~320 ms (NAV_HOLD_SHOW_MS 250 by design, but the disc could change at touch-down).
