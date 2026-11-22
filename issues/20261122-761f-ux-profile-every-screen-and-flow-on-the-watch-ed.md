@@ -32,3 +32,4 @@ Plan: map every screen, input and transition; extend the bench (BENCH.md) to eve
 
 - 2026-11-22T18:52:16Z · claude-code@linux-dev · linux-x86_64 · e830a6d: filed
 - 2026-11-22T18:52:21Z · claude-code@linux-dev · linux-x86_64 · e830a6d: claimed
+- 2026-11-22T19:21:00Z · claude-code@linux-dev · linux-x86_64 · 6d07365: Done on branch ux-profile (6c32527): docs/design/UX-PROFILE.md, 7 new bench tasks (11 pass on the watch, exact and --human 1), repro scripts in simulator/scripts/ux. Fixed f724 on the way (b980ef1, flashed). Filed 883f, 4b25, 5f79, 09b8, 6b60, 9689, 9df4, 67d1, 4094, d379; corrected 0145. Checks: ctest 229/229, cargo fmt/clippy.
