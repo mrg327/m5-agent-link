@@ -43,3 +43,4 @@ Plan (docs/design/BENCH.md):
 
 - 2026-11-22T08:14:52Z · claude-code@linux-dev · linux-x86_64 · afdd71a: filed
 - 2026-11-22T08:14:53Z · claude-code@linux-dev · linux-x86_64 · afdd71a: claimed
+- 2026-11-22T08:34:56Z · claude-code@linux-dev · linux-x86_64 · 4721000: Stage 1 on branch bench (89f29b6): proto 0.24 dbg_touch/dbg_bench/dbg_frames, stroke player + frame timeline in core (bench.c), sim commands touch/bench/expect_cmd. ctest 217/217, firmware builds (+88 B internal RAM), cargo 414, atlas 230. Next: bench mode in the daemon and agentlink bench run.
