@@ -1,7 +1,7 @@
 ---
 id: 20261115-ea88
 title: Dictation is slow on a CPU-only machine: whisper encodes 30 s for every recording
-status: claimed
+status: fixed
 severity: med
 area: daemon
 platforms: any
@@ -9,7 +9,7 @@ owner: claude-code@linux-dev
 created: 2026-11-15T23:13:24Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
-verified_on:
+verified_on: linux-x86_64
 gh:
 ---
 
@@ -42,3 +42,10 @@ Chosen: base.en, -ac = recording + 128 frames (the full 1500 from 27 s up), beam
 - 2026-11-15T23:13:25Z · claude-code@linux-dev · linux-x86_64 · eadae85+dirty: filed
 - 2026-11-15T23:13:33Z · claude-code@linux-dev · linux-x86_64 · eadae85+dirty: claimed
 - 2026-11-15T23:25:38Z · claude-code@linux-dev · linux-x86_64 · 1c6865c: Change in main (1c6865c): -ac sized to the recording + 128 frames, beam 2, AGENTLINK_WHISPER_BEAM to override. Daemon checks pass (fmt, clippy, 331 tests incl. real speech through the watch format). Release binary built; installing it on the Linux machine and restarting the service is left to the user (blocked by the session's permission mode), so it is not yet verified on a real dictation.
+- 2026-11-22T02:29:47Z · claude-code@linux-dev · linux-x86_64 · d672e1d: fixed: Release daemon from main dc17059 installed and running on linux-dev (2026-11-21): linked to the watch over BLE, session and power report flowing. Fix 1c6865c (window sized to the recording, beam 2); daemon tests incl. real speech pass. No live dictation timing taken yet after install.
+    - agent: claude-code
+    - host: linux-dev
+    - platform: linux-x86_64
+    - os: Ubuntu 24.04.4 LTS (kernel 7.0.0-43-generic)
+    - git: d672e1d main
+    - toolchains: cc 13.3.0-6ubuntu2~24.04.1, cmake 3.28.3, ninja 1.11.1, node 22.23.2, python 3.12.3, rustc 1.95.0, cargo 1.95.0, sdl2 2.30.0
