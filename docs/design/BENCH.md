@@ -60,7 +60,7 @@ dbg_frames = {
 A stroke presses the finger at the first point when it arrives, moves it to each next point every `dt` ms, and
 lifts it `dt` ms after the last. A tap is one point with `dt` 60, a hold is one point with `dt` equal to the hold,
 and a swipe is a point every 10 ms (the touch read period). The player sits in the touch read callback, under
-LVGL and the gesture recognizer, so they see a finger. The panel's real touches are ignored while a stroke plays.
+LVGL and the gesture recognizer, so they see a finger. The panel's real touches are ignored while a stroke plays. The touch is polled (every 10 ms when the loop is free), and a read can come tens of ms late while a frame renders, so the stroke's clock starts at the first read that plays it: the watch sees the whole stroke, a short tap included. The down record keeps how late that read was.
 A stroke that arrives while another plays lifts the first one. A stroke counts as user activity: it wakes a dimmed
 display, as a real touch does.
 
@@ -69,7 +69,7 @@ only from a welcomed daemon, like every other debug message.
 
 ## 3. The timeline
 
-`bench_start` allocates 4096 records (64 KB, PSRAM on the watch) once and clears them. Recording stops when the
+`bench_start` wakes the display, as a person raising the watch would, and allocates 4096 records (64 KB, PSRAM on the watch) once and clears them. Recording stops when the
 buffer is full: the start of a run is kept and `lost` counts the rest. At 30 frames a second that is over two
 minutes of animation.
 
@@ -78,7 +78,7 @@ Each record is 16 bytes, little-endian:
 | Offset | Field | |
 |---|---|---|
 | 0 | `t` u32 | µs since `bench_start` |
-| 4 | `a` u32 | frame: µs from render start to the end of the flush; other kinds: 0 |
+| 4 | `a` u32 | frame: µs from render start to the end of the flush; down: µs from a stroke's arrival to the read that played it (0 for a real finger); other kinds: 0 |
 | 8 | `b` u32 | frame: µs spent waiting for the panel; other kinds: the argument below |
 | 12 | `c` u24 + `kind` u8 | frame: pixels flushed; touch: x << 12 \| y |
 
@@ -141,7 +141,38 @@ In the simulator, `bench start` / `bench save FILE` record and write the same re
 `agentlink bench report FILE` reads them. Those times are the desktop's, useful for counting frames and pixels,
 not for speed.
 
-## 7. Later
+## 7. Running it
+
+The watch needs firmware with proto 0.24, and the daemon that runs the bench must hold the watch's link. A daemon
+installed as a service can run it directly (`agentlink bench run bench/tasks/*.txt`). To try a daemon build
+without touching the service, run that build on USB alone, with its own home; a plugged-in watch prefers USB, and
+goes back to the service's BLE link when the bench daemon stops:
+
+```sh
+ln -sfn /some/dir /tmp/alb    # a short home: Unix socket paths are limited to about 100 bytes
+AGENTLINK_HOME=/tmp/alb AGENTLINK_USB=1 AGENTLINK_BLE=0 AGENTLINK_WS_ADDR=127.0.0.1:7979 \
+  AGENTLINK_PRESENCE=off AGENTLINK_KEEP_AWAKE=off daemon/target/release/agentlinkd &
+AGENTLINK_HOME=/tmp/alb daemon/target/release/agentlink bench run bench/tasks/*.txt --runs 3 [--human 1]
+```
+
+The task scripts carry a proto 0.24 welcome for the simulator, so its menus match the watch's (the agent graph
+item exists from 0.22 on).
+
+First results (2026-11-22, StopWatch over USB, firmware cb1eabc plus the bench fixes, exact input):
+
+| Task | Time ms | Touch read late ms | Touch→frame ms (p50 / p95) | Frame ms (p50 / p95 / max) | Anim fps |
+|---|---|---|---|---|---|
+| approve | 1159 | 52 | 289 / 294 | 7.3 / 63 / 79 | 29 |
+| answer | 55 | 52 | 77 / 129 | 49 / 53 / 53 | – |
+| reply | 2582 | 10 / 51 | 89 / 156 | 37 / 74 / 75 | 16 |
+| switch | 950 | 11 | 23 / 31 | 9.1 / 15 / 58 | 30 |
+
+What they say: on ASK the touch is read about 52 ms late, because the loop is busy drawing; a held disc shows
+nothing for about 290 ms after the finger lands; the agent and reply screens draw at 16 fps, with median frames of
+37 ms against the 33 ms period. With `--human 1` the task times grow by the reaction times (reply 3.3 s) and the
+frame figures stay the same.
+
+## 8. Later
 
 - Filmstrips: keep the changed area of N frames after a trigger in PSRAM and upload them, so an animation can be
   checked frame by frame.

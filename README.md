@@ -31,6 +31,7 @@ scripts/atlas --open        # serves index.html at http://localhost:8700/
 | `daemon/` | Rust workspace: `agentlinkd`, `agentlink-hook`, `agentlink` CLI |
 | `firmware/` | ESP-IDF project: portable `core` + `hal` contract + `boards/<name>` |
 | `simulator/` | The same firmware core on SDL2, linked to the daemon over WebSocket |
+| `bench/` | Task scripts the bench plays on the real watch as a finger (`agentlink bench`, `docs/design/BENCH.md`) |
 
 ## Principles
 

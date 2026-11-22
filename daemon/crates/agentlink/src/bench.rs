@@ -49,6 +49,8 @@ pub struct RunStats {
     pub task_ms: Option<f64>,
     pub inputs: usize,
     pub touch_to_frame_ms: Vec<f64>,
+    /// A played stroke's arrival to the touch read that played it (ms): how late the polled touch is read.
+    pub read_late_ms: Vec<f64>,
     pub frame_ms: Vec<f64>,
     /// Start-to-start gaps between frames of one animation (ms).
     pub gaps_ms: Vec<f64>,
@@ -74,6 +76,11 @@ pub fn analyse(recs: &[Rec]) -> RunStats {
         ..Default::default()
     };
     let frames: Vec<&Rec> = recs.iter().copied().filter(|r| r.kind == FRAME).collect();
+    s.read_late_ms = recs
+        .iter()
+        .filter(|r| r.kind == DOWN && r.a > 0)
+        .map(|r| r.a as f64 / 1000.0)
+        .collect();
     for r in recs.iter().filter(|r| r.kind == DOWN || r.kind == UP) {
         if let Some(f) = frames.iter().find(|f| f.t_us >= r.t_us) {
             s.touch_to_frame_ms
@@ -129,6 +136,7 @@ impl TaskStats {
         };
         let times: Vec<f64> = self.runs.iter().filter_map(|r| r.task_ms).collect();
         let ttf = all(|r| &r.touch_to_frame_ms);
+        let late = all(|r| &r.read_late_ms);
         let fr = all(|r| &r.frame_ms);
         let gaps = all(|r| &r.gaps_ms);
         let frame_us: u64 = self.runs.iter().map(|r| r.frame_us).sum();
@@ -141,6 +149,7 @@ impl TaskStats {
             "task_ms": {"median": pct(&times, 50.0), "worst": times.iter().copied().reduce(f64::max)},
             "inputs": pct(&inputs, 50.0),
             "touch_to_frame_ms": {"p50": pct(&ttf, 50.0), "p95": pct(&ttf, 95.0)},
+            "read_late_ms": {"p50": pct(&late, 50.0), "p95": pct(&late, 95.0)},
             "frame_ms": {"p50": pct(&fr, 50.0), "p95": pct(&fr, 95.0), "max": fr.iter().copied().reduce(f64::max)},
             "frames": fr.len(),
             "slow_gaps": self.runs.iter().map(|r| r.slow_gaps).sum::<usize>(),
@@ -164,11 +173,11 @@ fn ms(v: &Value) -> String {
 /// The report as Markdown: a header naming what the numbers depend on, then one row per task.
 pub fn markdown(header: &str, tasks: &[Value]) -> String {
     let mut s = format!("# Bench report\n\n{header}\n\n");
-    s.push_str("| Task | Runs | Time ms (median / worst) | Inputs | Touch→frame ms (p50 / p95) | Frame ms (p50 / p95 / max) | Slow gaps / frames | Anim fps | Panel wait |\n");
-    s.push_str("|---|---|---|---|---|---|---|---|---|\n");
+    s.push_str("| Task | Runs | Time ms (median / worst) | Inputs | Touch read late ms (p50 / p95) | Touch→frame ms (p50 / p95) | Frame ms (p50 / p95 / max) | Slow gaps / frames | Anim fps | Panel wait |\n");
+    s.push_str("|---|---|---|---|---|---|---|---|---|---|\n");
     for t in tasks {
         s.push_str(&format!(
-            "| {} | {} | {} / {} | {} | {} / {} | {} / {} / {} | {} / {} | {} | {} |\n",
+            "| {} | {} | {} / {} | {} | {} / {} | {} / {} | {} / {} / {} | {} / {} | {} | {} |\n",
             t["task"].as_str().unwrap_or("?"),
             t["runs"],
             ms(&t["task_ms"]["median"]),
@@ -176,6 +185,8 @@ pub fn markdown(header: &str, tasks: &[Value]) -> String {
             t["inputs"]
                 .as_f64()
                 .map_or("–".into(), |x| format!("{x:.0}")),
+            ms(&t["read_late_ms"]["p50"]),
+            ms(&t["read_late_ms"]["p95"]),
             ms(&t["touch_to_frame_ms"]["p50"]),
             ms(&t["touch_to_frame_ms"]["p95"]),
             ms(&t["frame_ms"]["p50"]),
@@ -192,7 +203,8 @@ pub fn markdown(header: &str, tasks: &[Value]) -> String {
         ));
     }
     s.push_str(
-        "\nTime: first input to the last command the watch sent. Touch→frame: a touch-down or lift to the end of \
+        "\nTime: first input to the last command the watch sent. Touch read late: a played stroke's arrival to the polled touch read \
+         that played it. Touch→frame: a touch-down or lift to the end of \
          the first frame drawn after it. Frame: render start to the end of the panel transfer. Slow gaps: frames \
          more than 50 ms apart inside one animation. Panel wait: the share of frame time spent waiting for the \
          panel. All times are the watch's own clock (BENCH.md).\n",
@@ -448,6 +460,6 @@ mod tests {
             runs: vec![RunStats::default()],
         };
         let md = markdown("header", &[t.json()]);
-        assert!(md.contains("| approve | 1 | – / – | 0 |"), "{md}");
+        assert!(md.contains("| approve | 1 | – / – | 0 | – / – |"), "{md}");
     }
 }

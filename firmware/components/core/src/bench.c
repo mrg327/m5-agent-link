@@ -4,15 +4,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "app.h"
 #include "debug.h"
 #include "hal.h"
 #include "link_internal.h"
 #include "model.h"
+#include "power.h"
 
 /* ── the stroke player ── */
 
 typedef struct {
-    bool playing;
+    bool playing, seen; /* seen: a touch read has reported this stroke's press */
     uint32_t t0, dt;
     uint16_t n;
 } play_t;
@@ -84,9 +86,18 @@ void bench_note(int kind, uint32_t arg) { record(kind, hal_time_us(), 0, arg, 0)
 bool bench_touch(uint32_t now_ms, bool *down, int32_t *x, int32_t *y)
 {
     bool played = false;
+    uint32_t late_ms = 0;
     if (s_play.playing) {
         played = true;
         uint32_t i = (now_ms - s_play.t0) / s_play.dt;
+        /* The touch is polled, and a read can come tens of ms late while a frame renders: the stroke's clock
+         * starts at the first read that plays it, so the watch sees the whole stroke, a short tap included. */
+        if (!s_play.seen) {
+            late_ms = now_ms - s_play.t0;
+            s_play.seen = true;
+            s_play.t0 = now_ms;
+            i = 0;
+        }
         if (i < s_play.n) {
             *down = true;
             *x = s_pts[i][0];
@@ -101,7 +112,7 @@ bool bench_touch(uint32_t now_ms, bool *down, int32_t *x, int32_t *y)
     if (*down != s.touch_down) {
         s.touch_down = *down;
         int32_t cx = *x < 0 ? 0 : *x > 4095 ? 4095 : *x, cy = *y < 0 ? 0 : *y > 4095 ? 4095 : *y;
-        record(*down ? BENCH_DOWN : BENCH_UP, hal_time_us(), 0, 0, (uint32_t)cx << 12 | (uint32_t)cy);
+        record(*down ? BENCH_DOWN : BENCH_UP, hal_time_us(), late_ms * 1000, 0, (uint32_t)cx << 12 | (uint32_t)cy);
     }
     return played;
 }
@@ -158,7 +169,7 @@ void bench_init(lv_display_t *disp)
     lv_display_add_event_cb(disp, on_refr_ready, LV_EVENT_REFR_READY, NULL);
 }
 
-void bench_on_ctl(int op, uint32_t arg)
+void bench_on_ctl(int op, uint32_t arg, uint32_t now_ms)
 {
     switch (op) {
     case BENCH_OP_START:
@@ -172,6 +183,9 @@ void bench_on_ctl(int op, uint32_t arg)
         s.touch_down = down;
         s.rec = true;
         s.t0_us = hal_time_us();
+        /* A run starts with the user looking: the display wakes. The step's own time: power_tick() later in this
+         * step compares against it unsigned, and a later stamp would read as an idle eternity. */
+        power_activity(now_ms);
         dbg_event("bench", "start", NULL);
         break;
     case BENCH_OP_STOP:

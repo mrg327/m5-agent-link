@@ -22,7 +22,7 @@ void bench_init(lv_display_t *disp);
 /* dbg_touch: play one stroke. `pts` holds int16 LE x, y pairs in the coordinates the user sees. */
 void bench_on_touch(uint32_t dt_ms, const uint8_t *pts, size_t len, uint32_t now_ms);
 /* dbg_bench: start (clear, record), stop (send the records) or mark. */
-void bench_on_ctl(int op, uint32_t arg);
+void bench_on_ctl(int op, uint32_t arg, uint32_t now_ms);
 
 /* From the touch read callback, with the user-facing point the panel reported. When a stroke plays, replaces it
  * with the stroke's and returns true. Also records touch-down and lift for real and played touches alike. */

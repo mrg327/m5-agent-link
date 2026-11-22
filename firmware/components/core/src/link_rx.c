@@ -451,7 +451,7 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
     case envelope_msg_dbg_bench_m_c: {
         const struct dbg_bench *b = &e->envelope_msg_dbg_bench_m.msg_dbg_bench_dbg_bench_m;
         bench_on_ctl((int)b->dbg_bench_bench_op_m.bench_op_choice,
-                     b->dbg_bench_uint1uint_present ? b->dbg_bench_uint1uint.dbg_bench_uint1uint : 0);
+                     b->dbg_bench_uint1uint_present ? b->dbg_bench_uint1uint.dbg_bench_uint1uint : 0, now_ms);
         break;
     }
     case envelope_msg_dbg_set_log_level_m_c:
