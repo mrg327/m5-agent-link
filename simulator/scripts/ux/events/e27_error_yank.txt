@@ -1,0 +1,34 @@
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 1 done webapp feat/login Finished the work
+session 2 work api main Working
+wait 300
+tap 233 233
+wait 300
+btn B
+wait 150
+btn B
+wait 150
+btn A
+wait 300
+btn B
+wait 150
+btn B
+wait 150
+btn B
+wait 150
+btn B
+wait 150
+btn A
+wait 300
+word hello
+wait 200
+cands 0 hello hells
+wait 300
+ui
+session 2 error api main
+attention 9 2 error ack 0 Build failed|exit 1
+wait 500
+ui
+shot e27_error.png
+quit

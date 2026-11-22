@@ -1,0 +1,41 @@
+connect
+rtc 1800000000
+rx a400020101020103a5008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 1 work webapp feat/login Running tests
+tap 233 233
+wait 400
+btn A
+wait 400
+step 1 1 Bash · cd /home/user/projects/customer-portal && npm run test:integration -- --runInBand 1
+wait 150
+step 1 1 ok
+step 1 2 Bash · cd /home/user/projects/customer-portal && npm run test:integration -- --runInBand 2
+wait 150
+step 1 2 ok
+step 1 3 Bash · cd /home/user/projects/customer-portal && npm run test:integration -- --runInBand 3
+wait 150
+step 1 3 fail
+step 1 4 Bash · cd /home/user/projects/customer-portal && npm run test:integration -- --runInBand 4
+wait 150
+step 1 4 ok
+step 1 5 Bash · cd /home/user/projects/customer-portal && npm run test:integration -- --runInBand 5
+wait 150
+step 1 5 ok
+step 1 6 Bash · cd /home/user/projects/customer-portal && npm run test:integration -- --runInBand 6
+wait 150
+step 1 6 fail
+step 1 7 Bash · cd /home/user/projects/customer-portal && npm run test:integration -- --runInBand 7
+wait 150
+step 1 7 ok
+step 1 8 Bash · cd /home/user/projects/customer-portal && npm run test:integration -- --runInBand 8
+wait 150
+step 1 8 ok
+step 1 9 Edit · 源代码/认证/中间件.ts
+wait 300
+shot w01_watch.png
+ui
+step 1 10
+wait 300
+shot w01_watch_notext.png
+ui
+quit

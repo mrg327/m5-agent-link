@@ -1,0 +1,21 @@
+connect
+rtc 1800000000
+rx a400020101020103a5008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 1 done webapp feat/login
+message 1 9 Pushed to https://github.com/example-org/customer-portal-frontend/compare/main...feature/very-long-branch-name-for-auth?expand=1&diff=split&w=1 commit 3f9a1c2e7b4d5a6f8e9d0c1b2a3f4e5d6c7b8a9f0e1d2c3b4a5f6e7d8c9b0a1f2
+wait 500
+shot r03_card.png
+ui
+tap 233 390
+wait 700
+shot r03_r0.png
+ui
+btn B
+wait 400
+shot r03_r1.png
+ui
+btn B
+wait 400
+shot r03_r2.png
+ui
+quit

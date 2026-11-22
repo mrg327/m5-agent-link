@@ -1,0 +1,29 @@
+connect
+rtc 1800000000
+rx a400020101020103a5008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 2 ask webapp feat/login
+attention 9 2 question reply,focus 0 Which approach should I take for the migration?|I can either rewrite the schema in place or add a compatibility layer first; the second is slower but safer for prod|Rewrite in place now|Add a compat layer|Ask the DBA first
+wait 700
+shot a09_0.png
+ui
+btn B
+wait 300
+shot a09_1.png
+ui
+btn B
+wait 300
+shot a09_2.png
+ui
+btn B
+wait 300
+shot a09_3.png
+ui
+btn B
+wait 300
+shot a09_4.png
+ui
+btn B
+wait 300
+shot a09_5.png
+ui
+quit

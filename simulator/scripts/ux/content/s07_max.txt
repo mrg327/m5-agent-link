@@ -1,0 +1,48 @@
+connect
+rtc 1800000000
+rx a400020101020103a5008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 1 done repo01 main
+session 2 idle repo02 main
+session 3 error repo03 main
+session 4 work repo04 main
+session 5 done repo05 main
+session 6 idle repo06 main
+session 7 error repo07 main
+session 8 work repo08 main
+session 9 done repo09 main
+session 10 idle repo10 main
+session 11 error repo11 main
+session 12 work repo12 main
+session 13 done repo13 main
+session 14 idle repo14 main
+session 15 error repo15 main
+session 16 work repo16 main
+session 17 done repo17 main
+session 18 idle repo18 main
+session 19 error repo19 main
+session 20 work repo20 main
+session 21 done repo21 main
+session 22 idle repo22 main
+session 23 error repo23 main
+session 24 work repo24 main
+session 25 done repo25 main
+session 26 idle repo26 main
+session 27 error repo27 main
+session 28 work repo28 main
+session 29 done repo29 main
+session 30 idle repo30 main
+session 31 error repo31 main
+session 32 work repo32 main
+wait 600
+shot s07_32.png
+ui
+rx a3000401187c03a90018210101020203000469757267656e742d333305646d61696e071a6b49c411081a6b49d1a30af4
+attention 99 33 approval approve,deny,focus 0 Run shell command|rm -rf build
+wait 800
+shot s07_33.png
+ui
+btn A double
+wait 500
+shot s07_33_nextatt.png
+ui
+quit

@@ -23,7 +23,7 @@ pub const MARK: u8 = 4;
 pub const CMD: u8 = 5;
 
 /// gesture_kind_t values that are an input of their own (not a touch's): buttons, wrist lift, chord.
-const OWN_INPUT_GESTURES: &[u32] = &[9, 10, 11, 12, 13, 19, 20];
+const OWN_INPUT_GESTURES: &[u32] = &[9, 10, 11, 12, 13, 18, 19];
 /// Frames closer than this belong to one animation.
 const ANIM_GAP_US: u32 = 100_000;
 /// A gap inside an animation longer than one and a half LVGL periods (33 ms) is a slow frame.

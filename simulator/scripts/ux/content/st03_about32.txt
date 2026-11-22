@@ -1,0 +1,49 @@
+connect
+rtc 1800000000
+rx a400020101020103a5008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 1 error r01 main
+session 2 input r02 main
+session 3 error r03 main
+session 4 input r04 main
+session 5 error r05 main
+session 6 input r06 main
+session 7 error r07 main
+session 8 input r08 main
+session 9 error r09 main
+session 10 input r10 main
+session 11 error r11 main
+session 12 input r12 main
+session 13 error r13 main
+session 14 input r14 main
+session 15 error r15 main
+session 16 input r16 main
+session 17 error r17 main
+session 18 input r18 main
+session 19 error r19 main
+session 20 input r20 main
+session 21 error r21 main
+session 22 input r22 main
+session 23 error r23 main
+session 24 input r24 main
+session 25 error r25 main
+session 26 input r26 main
+session 27 error r27 main
+session 28 input r28 main
+session 29 error r29 main
+session 30 input r30 main
+session 31 error r31 main
+session 32 input r32 main
+wait 500
+swipe 233 180 233 300 160
+wait 400
+tap 233 365
+wait 300
+shot st03_about32.png
+ui
+swipe 233 300 233 150 160
+wait 400
+swipe 233 300 233 150 160
+wait 500
+shot st03_labs.png
+ui
+quit

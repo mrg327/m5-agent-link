@@ -1,0 +1,51 @@
+connect
+rtc 1800000000
+rx a400020101020103a5008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 2 input webapp feat/login
+attention 7 2 approval approve,deny,focus 255 Run shell command|rm -rf node_modules|Yes|No
+wait 700
+shot a04_0.png
+ui
+btn B
+wait 300
+shot a04_1.png
+ui
+btn B
+wait 300
+shot a04_2.png
+ui
+btn B
+wait 300
+shot a04_3.png
+ui
+btn B
+wait 300
+shot a04_4.png
+ui
+clear 7
+wait 300
+attention 8 2 approval approve,deny,focus 0 Run shell command|rm -rf node_modules|Allow|Always allow|Deny
+wait 700
+shot a04b_0.png
+ui
+btn B
+wait 300
+shot a04b_1.png
+ui
+btn B
+wait 300
+shot a04b_2.png
+ui
+btn B
+wait 300
+shot a04b_3.png
+ui
+btn B
+wait 300
+shot a04b_4.png
+ui
+btn B
+wait 300
+shot a04b_5.png
+ui
+quit
