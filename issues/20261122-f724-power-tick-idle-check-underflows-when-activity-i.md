@@ -1,11 +1,11 @@
 ---
 id: 20261122-f724
 title: power_tick idle check underflows when activity is stamped later than the step's clock
-status: open
-severity: low
+status: claimed
+severity: high
 area: firmware
 platforms: any
-owner:
+owner: claude-code@linux-dev
 created: 2026-11-22T09:16:07Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -34,3 +34,5 @@ today's callers pass now or run after power_tick, so nothing else triggers it ye
 ## Log
 
 - 2026-11-22T09:16:07Z · claude-code@linux-dev · linux-x86_64 · d9213f1: filed
+- 2026-11-22T19:04:59Z · claude-code@linux-dev · linux-x86_64 · 14586dd: claimed
+- 2026-11-22T19:04:59Z · claude-code@linux-dev · linux-x86_64 · 14586dd: Not latent: on_attention() calls power_attention(rgb, app_now_ms()) from drain_link, before power_tick(now). On the watch every request that arrived on a lit display turned it off 5-20 ms after ASK opened (8 of 8 in the bench log); the next touch or button was spent waking it. The simulator never shows it (the drain takes under 1 ms). Severity raised to high. Fix on branch ux-profile: signed elapsed checks in power_tick, unit test simulator/tests/test_power.c (fails before, passes after).
