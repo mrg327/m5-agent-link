@@ -36,5 +36,7 @@ bool link_tx_hello(hal_link_kind_t to);
 bool link_tx_pong(uint32_t re);
 bool link_tx_ping(void);
 bool link_send_ui_state(const ui_report_t *r, uint32_t re);
+/* dbg_frames (proto 0.24, BENCH.md §3): `len` bytes of 16-byte timeline records from record `seq`. */
+bool link_send_bench_frames(uint32_t seq, const uint8_t *recs, size_t len, bool last, uint32_t lost);
 bool link_send_screenshot_chunk(uint16_t w, uint16_t h, uint32_t offset, const uint8_t *data, size_t len,
                                 bool last, uint32_t re);

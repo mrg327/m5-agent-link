@@ -651,3 +651,21 @@ body!(DbgSetLogLevel {
     #[n(0)]
     lvl: LogLevel
 });
+// Bench (proto 0.24, BENCH.md §2).
+body!(DbgTouch {
+    /// ms between samples (1..2000); the finger lifts `dt` after the last.
+    #[n(0)] dt: u64,
+    /// int16 LE x, y pairs in the coordinates the user sees, 1..512.
+    #[n(1)] #[cbor(with = "minicbor::bytes")] #[serde(serialize_with = "hex_ser")] pts: Vec<u8>,
+});
+body!(DbgBench {
+    #[n(0)] op: BenchOp,
+    #[n(1)] #[serde(skip_serializing_if = "Option::is_none")] arg: Option<u64>,
+});
+body!(DbgFrames {
+    #[n(0)] seq: u64,
+    /// 16-byte timeline records (BENCH.md §3).
+    #[n(1)] #[cbor(with = "minicbor::bytes")] #[serde(serialize_with = "hex_ser")] recs: Vec<u8>,
+    #[n(2)] last: bool,
+    #[n(3)] lost: u64,
+});

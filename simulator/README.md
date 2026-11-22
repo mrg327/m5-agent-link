@@ -50,7 +50,12 @@ attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OP
 result ok | result err stale|denied|... | clear RID [WHY]
 graph SID KIND:STATE:LANE[:f][:m]... [la=K,K..] [drop=N] [gen=N] | graph off
 expect_screen NAME | expect_label TEXT | expect_no_label TEXT | px_reset | expect_px_max PX | kit N | quit
+touch DT X Y [X Y...] | bench start|stop|mark N|save FILE|expect KIND MIN | expect_cmd OP
 ```
+
+`touch` and `bench` are the daemon's bench messages (BENCH.md, proto 0.24): a finger stroke played under the
+touch read path, and the frame timeline the device sends back after `bench stop`. `expect_cmd OP` checks that
+the device sent that command since the last `expect_cmd`.
 
 `rx` feeds a CBOR envelope (e.g. `cbor_hex` from `protocol/vectors`) as if the daemon sent it;
 `attention`, `result` (answers the device's last command) and `clear` build such envelopes with the

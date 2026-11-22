@@ -43,6 +43,9 @@ void ota_on_chunk(uint32_t off, const uint8_t *d, size_t n, uint32_t now) { (voi
 void dbg_on_ui_state_req(uint32_t r) { (void)r; }
 void dbg_on_screenshot_req(uint32_t r) { (void)r; }
 void dbg_on_inject(int e, bool h, int x, int y) { (void)e; (void)h; (void)x; (void)y; }
+void bench_on_touch(uint32_t dt, const uint8_t *p, size_t n, uint32_t now) { (void)dt; (void)p; (void)n; (void)now; }
+void bench_on_ctl(int op, uint32_t arg) { (void)op; (void)arg; }
+void bench_note(int kind, uint32_t arg) { (void)kind; (void)arg; }
 
 static int failures;
 #define EXPECT(cond, msg) do { if (!(cond)) { printf("FAIL: %s (line %d)\n", msg, __LINE__); failures++; } } while (0)

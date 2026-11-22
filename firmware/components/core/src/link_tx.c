@@ -84,7 +84,7 @@ bool link_tx_hello(hal_link_kind_t to)
     set_hdr(&m->msg_hello_hdr_m, false, 0);
     struct hello *h = &m->msg_hello_hello_m;
     h->hello_major_l_major = 0;
-    h->hello_major_l_minor = 23; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice; 0.7: keys;
+    h->hello_major_l_minor = 24; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice; 0.7: keys;
                                   * 0.8: action_dictate on attention, dictate with rid answers that card;
                                   * 0.9: jobs (agent_shell, session eta / exit, cmd_op_rerun);
                                   * 0.10: gauges (usage message, session ctx / mdl / pm / pr / prs);
@@ -102,7 +102,7 @@ bool link_tx_hello(hal_link_kind_t to)
                                   * 0.20: trackpad (welcome.pointer, cmd_op_pointer);
                                   * 0.21: delta firmware update (fw_begin.patch);
                                   * 0.22: agent graph (cmd graph, graph);
-                                  * 0.23: agent_pi */
+                                  * 0.23: agent_pi; 0.24: bench (dbg_touch, dbg_bench, dbg_frames) */
     h->hello_device_info_m.device_info_device_class_m.device_class_choice = device_class(bi);
     h->hello_device_info_m.device_info_uint1tstr = zstr(bi->board);
     h->hello_device_info_m.device_info_uint2tstr = zstr(bi->fw_version);
@@ -247,6 +247,21 @@ bool link_send_screenshot_chunk(uint16_t w, uint16_t h, uint32_t offset, const u
     c->dbg_screenshot_chunk_uint3bstr = (struct zcbor_string){.value = data, .len = len};
     c->dbg_screenshot_chunk_uint4bool = last;
     return send_env(g_link.kind, "screenshot_chunk");
+}
+
+bool link_send_bench_frames(uint32_t seq, const uint8_t *recs, size_t len, bool last, uint32_t lost)
+{
+    if (!g_link.welcomed) return false;
+    memset(&g_tx_env, 0, sizeof g_tx_env);
+    g_tx_env.envelope_choice = envelope_msg_dbg_frames_m_c;
+    struct msg_dbg_frames *m = &g_tx_env.envelope_msg_dbg_frames_m;
+    set_hdr(&m->msg_dbg_frames_hdr_m, false, 0);
+    struct dbg_frames *f = &m->msg_dbg_frames_dbg_frames_m;
+    f->dbg_frames_uint0uint = seq;
+    f->dbg_frames_uint1bstr = (struct zcbor_string){.value = recs, .len = len};
+    f->dbg_frames_uint2bool = last;
+    f->dbg_frames_uint3uint = lost;
+    return send_env(g_link.kind, "dbg_frames");
 }
 
 bool link_send_fw_ack(int st, uint32_t next, const char *msg)

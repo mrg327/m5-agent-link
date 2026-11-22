@@ -28,7 +28,16 @@ MT = dict(hello=1, welcome=2, snapshot=3, session_upd=4, gone=5, attention=6, cl
           audio_start=16, audio=17, audio_end=18, transcript=19,
           kb_start=20, kb_stroke=21, kb_cands=22, usage=23,
           fw_begin=24, fw_chunk=25, fw_ack=26, power=27, graph=28,
-          dbg_ui_state=65, dbg_inject_input=68)
+          dbg_ui_state=65, dbg_inject_input=68, dbg_touch=70, dbg_bench=71, dbg_frames=72)
+
+
+def bench_rec(t_us: int, a: int, b: int, c: int, kind: int) -> bytes:
+    """One 16-byte timeline record (BENCH.md §3)."""
+    le = lambda v, n: v.to_bytes(n, "little")
+    return le(t_us, 4) + le(a, 4) + le(b, 4) + le(c, 3) + bytes([kind])
+
+
+BENCH_RECS = bench_rec(1000, 8200, 3100, 21716, 0) + bench_rec(5000, 0, 0, (233 << 12) | 282, 1)
 
 
 def env(t: str, id_: int, body: dict, re_: int | None = None) -> dict:
@@ -546,6 +555,22 @@ VECTORS = {
         "Debug: inject a double-tap at the screen centre",
         {"t": "dbg_inject_input", "id": 11, "b": {"kind": "double_tap", "x": 233, "y": 233}},
         env("dbg_inject_input", 11, {0: 1, 1: 233, 2: 233}),
+    ),
+    # Bench (proto 0.24, BENCH.md): a stroke, a mark, and the timeline coming back.
+    "dbg_touch_hold": (
+        "Bench: one point held 1.6 s on the approve disc (x 233, y 282), then lifted",
+        {"t": "dbg_touch", "id": 12, "b": {"dt": 1600, "pts": "e9001a01"}},
+        env("dbg_touch", 12, {0: 1600, 1: bytes.fromhex("e9001a01")}),
+    ),
+    "dbg_bench_mark": (
+        "Bench: write mark 3 into the frame timeline",
+        {"t": "dbg_bench", "id": 13, "b": {"op": "mark", "arg": 3}},
+        env("dbg_bench", 13, {0: 2, 1: 3}),
+    ),
+    "dbg_frames_last": (
+        "Bench: the last two records: a frame (t 1000 us, 8200 us, 3100 us panel wait, 21716 px) and a touch-down",
+        {"t": "dbg_frames", "id": 40, "b": {"seq": 30, "recs": BENCH_RECS.hex(), "last": True, "lost": 0}},
+        env("dbg_frames", 40, {0: 30, 1: BENCH_RECS, 2: True, 3: 0}),
     ),
 }
 

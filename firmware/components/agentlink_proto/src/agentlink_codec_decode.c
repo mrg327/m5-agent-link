@@ -238,6 +238,14 @@ static bool decode_dbg_inject_input(zcbor_state_t *state, struct dbg_inject_inpu
 static bool decode_msg_dbg_inject_input(zcbor_state_t *state, struct msg_dbg_inject_input *result);
 static bool decode_dbg_set_log_level(zcbor_state_t *state, struct dbg_set_log_level *result);
 static bool decode_msg_dbg_set_log_level(zcbor_state_t *state, struct msg_dbg_set_log_level *result);
+static bool decode_dbg_touch(zcbor_state_t *state, struct dbg_touch *result);
+static bool decode_msg_dbg_touch(zcbor_state_t *state, struct msg_dbg_touch *result);
+static bool decode_bench_op(zcbor_state_t *state, struct bench_op_r *result);
+static bool decode_repeated_dbg_bench_uint1uint(zcbor_state_t *state, struct dbg_bench_uint1uint *result);
+static bool decode_dbg_bench(zcbor_state_t *state, struct dbg_bench *result);
+static bool decode_msg_dbg_bench(zcbor_state_t *state, struct msg_dbg_bench *result);
+static bool decode_dbg_frames(zcbor_state_t *state, struct dbg_frames *result);
+static bool decode_msg_dbg_frames(zcbor_state_t *state, struct msg_dbg_frames *result);
 static bool decode_envelope(zcbor_state_t *state, struct envelope_r *result);
 
 
@@ -3554,6 +3562,133 @@ static bool decode_msg_dbg_set_log_level(
 	return res;
 }
 
+static bool decode_dbg_touch(
+		zcbor_state_t *state, struct dbg_touch *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_decode(state, (&(*result).dbg_touch_uint0uint)))
+	&& ((((*result).dbg_touch_uint0uint <= UINT16_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false)))
+	&& (((zcbor_uint32_expect(state, (1))))
+	&& (zcbor_bstr_decode(state, (&(*result).dbg_touch_uint1bstr)))
+	&& ((((*result).dbg_touch_uint1bstr.len >= 4)
+	&& ((*result).dbg_touch_uint1bstr.len <= 2048)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false)))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_msg_dbg_touch(
+		zcbor_state_t *state, struct msg_dbg_touch *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_expect(state, (70))))
+	&& ((decode_hdr(state, (&(*result).msg_dbg_touch_hdr_m))))
+	&& (((zcbor_uint32_expect(state, (3))))
+	&& (decode_dbg_touch(state, (&(*result).msg_dbg_touch_dbg_touch_m))))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_bench_op(
+		zcbor_state_t *state, struct bench_op_r *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((((zcbor_uint_decode(state, &(*result).bench_op_choice, sizeof((*result).bench_op_choice)))) && ((((((*result).bench_op_choice == bench_op_start_m_c) && ((1)))
+	|| (((*result).bench_op_choice == bench_op_stop_m_c) && ((1)))
+	|| (((*result).bench_op_choice == bench_op_mark_m_c) && ((1)))) || (zcbor_error(state, ZCBOR_ERR_WRONG_VALUE), false))))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_repeated_dbg_bench_uint1uint(
+		zcbor_state_t *state, struct dbg_bench_uint1uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (1))))
+	&& (zcbor_uint32_decode(state, (&(*result).dbg_bench_uint1uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_dbg_bench(
+		zcbor_state_t *state, struct dbg_bench *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (decode_bench_op(state, (&(*result).dbg_bench_bench_op_m))))
+	&& zcbor_present_decode(&((*result).dbg_bench_uint1uint_present), (zcbor_decoder_t *)decode_repeated_dbg_bench_uint1uint, state, (&(*result).dbg_bench_uint1uint))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	if (false) {
+		/* For testing that the types of the arguments are correct.
+		 * A compiler error here means a bug in zcbor.
+		 */
+		decode_repeated_dbg_bench_uint1uint(state, (&(*result).dbg_bench_uint1uint));
+	}
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_msg_dbg_bench(
+		zcbor_state_t *state, struct msg_dbg_bench *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_expect(state, (71))))
+	&& ((decode_hdr(state, (&(*result).msg_dbg_bench_hdr_m))))
+	&& (((zcbor_uint32_expect(state, (3))))
+	&& (decode_dbg_bench(state, (&(*result).msg_dbg_bench_dbg_bench_m))))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_dbg_frames(
+		zcbor_state_t *state, struct dbg_frames *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_decode(state, (&(*result).dbg_frames_uint0uint))))
+	&& (((zcbor_uint32_expect(state, (1))))
+	&& (zcbor_bstr_decode(state, (&(*result).dbg_frames_uint1bstr)))
+	&& ((((*result).dbg_frames_uint1bstr.len >= 0)
+	&& ((*result).dbg_frames_uint1bstr.len <= 1024)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false)))
+	&& (((zcbor_uint32_expect(state, (2))))
+	&& (zcbor_bool_decode(state, (&(*result).dbg_frames_uint2bool))))
+	&& (((zcbor_uint32_expect(state, (3))))
+	&& (zcbor_uint32_decode(state, (&(*result).dbg_frames_uint3uint))))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool decode_msg_dbg_frames(
+		zcbor_state_t *state, struct msg_dbg_frames *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_decode(state) && (((((zcbor_uint32_expect(state, (0))))
+	&& (zcbor_uint32_expect(state, (72))))
+	&& ((decode_hdr(state, (&(*result).msg_dbg_frames_hdr_m))))
+	&& (((zcbor_uint32_expect(state, (3))))
+	&& (decode_dbg_frames(state, (&(*result).msg_dbg_frames_dbg_frames_m))))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_envelope(
 		zcbor_state_t *state, struct envelope_r *result)
 {
@@ -3593,7 +3728,10 @@ static bool decode_envelope(
 	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_screenshot_req(state, (&(*result).envelope_msg_dbg_screenshot_req_m)))) && (((*result).envelope_choice = envelope_msg_dbg_screenshot_req_m_c), true)))
 	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_screenshot_chunk(state, (&(*result).envelope_msg_dbg_screenshot_chunk_m)))) && (((*result).envelope_choice = envelope_msg_dbg_screenshot_chunk_m_c), true)))
 	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_inject_input(state, (&(*result).envelope_msg_dbg_inject_input_m)))) && (((*result).envelope_choice = envelope_msg_dbg_inject_input_m_c), true)))
-	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_set_log_level(state, (&(*result).envelope_msg_dbg_set_log_level_m)))) && (((*result).envelope_choice = envelope_msg_dbg_set_log_level_m_c), true)))), zcbor_union_end_code(state), int_res))));
+	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_set_log_level(state, (&(*result).envelope_msg_dbg_set_log_level_m)))) && (((*result).envelope_choice = envelope_msg_dbg_set_log_level_m_c), true)))
+	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_touch(state, (&(*result).envelope_msg_dbg_touch_m)))) && (((*result).envelope_choice = envelope_msg_dbg_touch_m_c), true)))
+	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_bench(state, (&(*result).envelope_msg_dbg_bench_m)))) && (((*result).envelope_choice = envelope_msg_dbg_bench_m_c), true)))
+	|| (zcbor_union_elem_code(state) && (((decode_msg_dbg_frames(state, (&(*result).envelope_msg_dbg_frames_m)))) && (((*result).envelope_choice = envelope_msg_dbg_frames_m_c), true)))), zcbor_union_end_code(state), int_res))));
 
 	log_result(state, res, __func__);
 	return res;

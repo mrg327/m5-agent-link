@@ -22,6 +22,7 @@ const ENUMS = {
   clear_why: { answered_pc: 0, answered_dev: 1, expired: 2, cancelled: 3, handed_back: 4 },
   result_err: { stale: 0, denied: 1, unsupported: 2, no_window: 3, timeout: 4, internal: 5 },
   log_level: { err: 0, warn: 1, info: 2, debug: 3 },
+  bench_op: { start: 0, stop: 1, mark: 2 },
   audio_codec: { adpcm16k: 0, opus16k: 1 },
   perm_mode: { default: 0, plan: 1, accept_edits: 2, auto: 3, dont_ask: 4, bypass: 5 },
   pr_state: { none: 0, pending: 1, approved: 2, changes: 3, draft: 4 },
@@ -37,6 +38,7 @@ export const MSG_TYPES = {
   usage: 23, fw_begin: 24, fw_chunk: 25, fw_ack: 26, power: 27, graph: 28,
   dbg_ui_state_req: 64, dbg_ui_state: 65,
   dbg_screenshot_req: 66, dbg_screenshot_chunk: 67, dbg_inject_input: 68, dbg_set_log_level: 69,
+  dbg_touch: 70, dbg_bench: 71, dbg_frames: 72,
 };
 const MT_NAME = Object.fromEntries(Object.entries(MSG_TYPES).map(([k, v]) => [v, k]));
 
@@ -111,6 +113,9 @@ const SPECS = {
   dbg_screenshot_chunk: { w: [0, 'uint'], h: [1, 'uint'], offset: [2, 'uint'], data: [3, 'bstr'], last: [4, 'bool'] },
   dbg_inject_input: { kind: [0, 'enum:input_event'], x: [1, 'int'], y: [2, 'int'] },
   dbg_set_log_level: { lvl: [0, 'enum:log_level'] },
+  dbg_touch: { dt: [0, 'uint'], pts: [1, 'hex'] },
+  dbg_bench: { op: [0, 'enum:bench_op'], arg: [1, 'uint'] },
+  dbg_frames: { seq: [0, 'uint'], recs: [1, 'hex'], last: [2, 'bool'], lost: [3, 'uint'] },
 };
 const BODY_SPEC = {
   session_upd: 'session', cfg: 'device_cfg', ping: 'empty', pong: 'empty', dbg_ui_state_req: 'empty',
@@ -220,7 +225,7 @@ export const pong = (id, re) => ({ t: 'pong', id, re, b: {} });
 // ───────────── description ─────────────
 const STATE_WORD = { start: 'starting', work: 'working', input: 'waiting for you', error: 'in error', done: 'Done', idle: 'idle', ended: 'ended' };
 const AGENT_NAME = { copilot: 'Copilot CLI', claude: 'Claude Code', cloud: 'a cloud agent', shell: 'a terminal job', pi: 'pi', other: 'an agent' };
-const DEVICE_SENT = new Set(['hello', 'cmd', 'ping', 'batt', 'log', 'dbg_ui_state', 'dbg_screenshot_chunk', 'audio_start', 'audio', 'audio_end', 'kb_start', 'kb_stroke']);
+const DEVICE_SENT = new Set(['hello', 'cmd', 'ping', 'batt', 'log', 'dbg_ui_state', 'dbg_screenshot_chunk', 'dbg_frames', 'audio_start', 'audio', 'audio_end', 'kb_start', 'kb_stroke']);
 
 /** Short human sentence for a decoded message. dir: 'tx' (watch sent) | 'rx' (watch received). */
 export function describe(msg, dir) {

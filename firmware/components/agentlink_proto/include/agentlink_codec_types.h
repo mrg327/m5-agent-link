@@ -1366,6 +1366,51 @@ struct msg_dbg_set_log_level {
 	struct dbg_set_log_level msg_dbg_set_log_level_dbg_set_log_level_m;
 };
 
+struct dbg_touch {
+	uint32_t dbg_touch_uint0uint;
+	struct zcbor_string dbg_touch_uint1bstr;
+};
+
+struct msg_dbg_touch {
+	struct hdr_r msg_dbg_touch_hdr_m;
+	struct dbg_touch msg_dbg_touch_dbg_touch_m;
+};
+
+struct bench_op_r {
+	enum {
+		bench_op_start_m_c = 0,
+		bench_op_stop_m_c = 1,
+		bench_op_mark_m_c = 2,
+	} bench_op_choice;
+};
+
+struct dbg_bench_uint1uint {
+	uint32_t dbg_bench_uint1uint;
+};
+
+struct dbg_bench {
+	struct bench_op_r dbg_bench_bench_op_m;
+	struct dbg_bench_uint1uint dbg_bench_uint1uint;
+	bool dbg_bench_uint1uint_present;
+};
+
+struct msg_dbg_bench {
+	struct hdr_r msg_dbg_bench_hdr_m;
+	struct dbg_bench msg_dbg_bench_dbg_bench_m;
+};
+
+struct dbg_frames {
+	uint32_t dbg_frames_uint0uint;
+	struct zcbor_string dbg_frames_uint1bstr;
+	bool dbg_frames_uint2bool;
+	uint32_t dbg_frames_uint3uint;
+};
+
+struct msg_dbg_frames {
+	struct hdr_r msg_dbg_frames_hdr_m;
+	struct dbg_frames msg_dbg_frames_dbg_frames_m;
+};
+
 struct envelope_r {
 	union {
 		struct msg_hello envelope_msg_hello_m;
@@ -1402,6 +1447,9 @@ struct envelope_r {
 		struct msg_dbg_screenshot_chunk envelope_msg_dbg_screenshot_chunk_m;
 		struct msg_dbg_inject_input envelope_msg_dbg_inject_input_m;
 		struct msg_dbg_set_log_level envelope_msg_dbg_set_log_level_m;
+		struct msg_dbg_touch envelope_msg_dbg_touch_m;
+		struct msg_dbg_bench envelope_msg_dbg_bench_m;
+		struct msg_dbg_frames envelope_msg_dbg_frames_m;
 	};
 	enum {
 		envelope_msg_hello_m_c,
@@ -1438,6 +1486,9 @@ struct envelope_r {
 		envelope_msg_dbg_screenshot_chunk_m_c,
 		envelope_msg_dbg_inject_input_m_c,
 		envelope_msg_dbg_set_log_level_m_c,
+		envelope_msg_dbg_touch_m_c,
+		envelope_msg_dbg_bench_m_c,
+		envelope_msg_dbg_frames_m_c,
 	} envelope_choice;
 };
 

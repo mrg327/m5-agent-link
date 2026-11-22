@@ -1,0 +1,12 @@
+{
+  "desc": "Bench: write mark 3 into the frame timeline",
+  "symbolic": {
+    "t": "dbg_bench",
+    "id": 13,
+    "b": {
+      "op": "mark",
+      "arg": 3
+    }
+  },
+  "cbor_hex": "a3001847010d03a200020103"
+}

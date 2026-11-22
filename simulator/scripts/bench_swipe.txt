@@ -1,0 +1,14 @@
+# Bench: a many-point stroke is a swipe to the recognizer (a point every 10 ms, left to right).
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work webapp feat/login Running the test suite
+session 2 done api main Fixed the flaky retry test
+wait 400
+bench start
+touch 10 120 233 150 233 180 233 210 233 240 233 270 233 300 233 330 233 360 233
+wait 600
+bench stop
+wait 500
+bench expect gesture 1
+bench expect down 1
+bench expect up 1

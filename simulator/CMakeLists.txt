@@ -137,6 +137,11 @@ sim_script_test(sim_approve_hold approve_hold.txt
                 PASS_REGULAR_EXPRESSION "\"op\":3")
 sim_script_test(sim_deny_swipe deny_swipe.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4")
 sim_script_test(sim_button_jump button_jump.txt)
+# Bench (BENCH.md): daemon strokes play as a finger; the frame timeline comes back in dbg_frames.
+sim_script_test(sim_bench_stroke bench_stroke.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"bench_dump\"")
+sim_script_test(sim_bench_swipe bench_swipe.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"cat\":\"input\",\"ev\":\"swipe_right\"")
 # Approval safety: the card shows the request; a short or low swipe never denies; a hold before
 # the card has been visible never approves.
 sim_script_test(sim_approve_card approve_card.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")

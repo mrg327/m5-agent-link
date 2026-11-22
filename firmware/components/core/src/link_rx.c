@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "bench.h"
 #include "detail.h"
 #include "gauges.h"
 #include "graph.h"
@@ -19,7 +20,7 @@ static const struct hdr_r *env_hdr(const struct envelope_r *e)
     H(msg_clear) H(msg_cmd) H(msg_result) H(msg_detail) H(msg_cfg) H(msg_batt) H(msg_ping) H(msg_pong)
     H(msg_log) H(msg_audio_start) H(msg_audio) H(msg_audio_end) H(msg_transcript)
     H(msg_dbg_ui_state_req) H(msg_dbg_ui_state) H(msg_dbg_screenshot_req) H(msg_dbg_screenshot_chunk)
-    H(msg_dbg_inject_input) H(msg_dbg_set_log_level) H(msg_kb_start) H(msg_kb_stroke) H(msg_kb_cands) H(msg_usage) H(msg_fw_begin) H(msg_fw_chunk) H(msg_fw_ack) H(msg_power)
+    H(msg_dbg_inject_input) H(msg_dbg_set_log_level) H(msg_dbg_touch) H(msg_dbg_bench) H(msg_dbg_frames) H(msg_kb_start) H(msg_kb_stroke) H(msg_kb_cands) H(msg_usage) H(msg_fw_begin) H(msg_fw_chunk) H(msg_fw_ack) H(msg_power)
     H(msg_graph)
     }
 #undef H
@@ -440,6 +441,17 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
         dbg_on_inject((int)in->dbg_inject_input_input_event_m.input_event_choice, has_xy,
                       has_xy ? in->dbg_inject_input_uint1int.dbg_inject_input_uint1int : 0,
                       has_xy ? in->dbg_inject_input_uint2int.dbg_inject_input_uint2int : 0);
+        break;
+    }
+    case envelope_msg_dbg_touch_m_c: {
+        const struct dbg_touch *t = &e->envelope_msg_dbg_touch_m.msg_dbg_touch_dbg_touch_m;
+        bench_on_touch(t->dbg_touch_uint0uint, t->dbg_touch_uint1bstr.value, t->dbg_touch_uint1bstr.len, now_ms);
+        break;
+    }
+    case envelope_msg_dbg_bench_m_c: {
+        const struct dbg_bench *b = &e->envelope_msg_dbg_bench_m.msg_dbg_bench_dbg_bench_m;
+        bench_on_ctl((int)b->dbg_bench_bench_op_m.bench_op_choice,
+                     b->dbg_bench_uint1uint_present ? b->dbg_bench_uint1uint.dbg_bench_uint1uint : 0);
         break;
     }
     case envelope_msg_dbg_set_log_level_m_c:

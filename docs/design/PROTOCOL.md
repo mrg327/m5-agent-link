@@ -455,6 +455,20 @@ graph { sid, nodes: [0*64 uint], ? la: [0*8 uint], ? drop: uint, ? gen: uint }  
 - No agent content: sent under every privacy level, traced. Only on request; a daemon below 0.22 has no `cmd graph`.
   `agentlink graph SID [--json]` prints the same graph.
 
+## 6i. Bench (proto 0.24, [BENCH.md](BENCH.md))
+
+Debug messages for driving the watch as a finger and timing what it draws. The daemon sends them only to a
+device with proto ≥ 0.24 that offers `feature_debug`, and only while `agentlink bench` runs.
+
+```
+dbg_touch  (70) daemon → device  { dt, pts: bstr }       one stroke: int16 LE x, y pairs, a point every dt ms,
+                                                         lifted dt after the last; replaces a stroke still playing
+dbg_bench  (71) daemon → device  { op: start|stop|mark, arg? }
+dbg_frames (72) device → daemon  { seq, recs: bstr, last, lost }   after stop: 16-byte records, 64 per message
+```
+
+The record layout and kinds (frame, down, up, gesture, mark, cmd) are in BENCH.md §3.
+
 ## 7. Misc
 - `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray. The current firmware does not send it; the power report (§6f) carries more.
 - `cfg { … }` (daemon → device) is a partial update of the `welcome.cfg` fields.

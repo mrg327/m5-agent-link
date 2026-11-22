@@ -1,0 +1,12 @@
+{
+  "desc": "Bench: one point held 1.6 s on the approve disc (x 233, y 282), then lifted",
+  "symbolic": {
+    "t": "dbg_touch",
+    "id": 12,
+    "b": {
+      "dt": 1600,
+      "pts": "e9001a01"
+    }
+  },
+  "cbor_hex": "a3001846010c03a2001906400144e9001a01"
+}

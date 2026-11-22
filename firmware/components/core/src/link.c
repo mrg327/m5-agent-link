@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "bench.h"
 #include "graph.h"
 #include "link_internal.h"
 
@@ -185,6 +186,7 @@ static bool finish_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_m
     dbg_event("link", "tx_cmd", "\"id\":%u,\"op\":%d,\"sid\":%u,\"rid\":%u,\"hold_ms\":%u,\"arg\":%d,\"q\":%d",
               (unsigned)id, (int)op, (unsigned)sid, (unsigned)rid, (unsigned)hold_ms, arg_log,
               m->msg_cmd_cmd_m.cmd_uint6bool_present && m->msg_cmd_cmd_m.cmd_uint6bool.cmd_uint6bool);
+    bench_note(BENCH_CMD, (uint32_t)op);
     return hal_link_send(g_link.kind, buf, len);
 }
 
