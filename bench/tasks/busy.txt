@@ -1,0 +1,19 @@
+# Six agents at work: what the watch draws when nobody touches it (5 s), then a full turn of the rim.
+connect
+rx a400020101020103a5008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+bench start
+session 1 work ember feat/login Running the test suite
+session 2 work fjord main Fixing the flaky retry test
+session 3 work glade fix/ci Bisecting the CI failure
+session 4 start harbor main
+session 5 work iris docs Writing the changelog
+session 6 idle juniper main
+wait 600
+bench mark 1
+wait 5000
+bench mark 2
+scrub 10 350 1500
+wait 800
+bench stop
+wait 1500
+bench save busy.bin

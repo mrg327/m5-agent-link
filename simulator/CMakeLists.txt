@@ -73,6 +73,12 @@ target_include_directories(test_graph PRIVATE ${FW}/core/src)
 target_link_libraries(test_graph PRIVATE agentlink_proto)
 add_test(NAME graph_model COMMAND test_graph)
 
+# POWER.md: idle and face-down display-off, the glow, and a stamp later than the step's clock (issue 20261122-f724).
+add_executable(test_power tests/test_power.c ${FW}/core/src/power.c)
+target_include_directories(test_power PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_power PRIVATE lvgl::lvgl)
+add_test(NAME power_timers COMMAND test_power)
+
 add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
 target_include_directories(test_ring PRIVATE ${FW}/core/src)
 find_package(Threads REQUIRED)
@@ -153,6 +159,14 @@ bench_task_test(approve "\"op\":3,\"sid\":2,\"rid\":7")
 bench_task_test(answer "\"op\":5,\"sid\":2,\"rid\":8,\"hold_ms\":0,\"arg\":1")
 bench_task_test(reply "\"op\":11,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":100")
 bench_task_test(switch "\"op\":0,\"sid\":2")
+bench_task_test(deny "\"op\":4,\"sid\":2,\"rid\":7")
+# Screens with no command at the end (UX profile, issue 20261122-761f): the script's own expect_screen lines are the check.
+foreach(t agent_back watch status labs busy arrival)
+    add_test(NAME sim_task_${t}
+             COMMAND agentlink_sim --headless --no-ws --script ${CMAKE_CURRENT_SOURCE_DIR}/../bench/tasks/${t}.txt)
+    set_tests_properties(sim_task_${t} PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                         FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+endforeach()
 # Approval safety: the card shows the request; a short or low swipe never denies; a hold before
 # the card has been visible never approves.
 sim_script_test(sim_approve_card approve_card.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")

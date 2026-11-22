@@ -27,7 +27,7 @@ void bench_on_ctl(int op, uint32_t arg, uint32_t now_ms);
 /* From the touch read callback, with the user-facing point the panel reported. When a stroke plays, replaces it
  * with the stroke's and returns true. Also records touch-down and lift for real and played touches alike. */
 bool bench_touch(uint32_t now_ms, bool *down, int32_t *x, int32_t *y);
-/* True while a stroke plays (it counts as user activity). */
+/* True while a stroke plays. */
 bool bench_playing(void);
 
 /* A gesture the UI dispatched, or a command the watch sent. */

@@ -112,6 +112,14 @@ void power_attention(uint32_t rgb, uint32_t now_ms)
     s_glow_until = now_ms + GLOW_MS;
 }
 
+/* True once `ms` have passed since `since`. Signed, so a stamp taken later than this step's clock (a request that
+ * arrived while the link drained, issue 20261122-f724) reads as no time passed, not as 49 days. */
+static bool passed(uint32_t now_ms, uint32_t since, uint32_t ms)
+{
+    int32_t d = (int32_t)(now_ms - since);
+    return d >= 0 && (uint32_t)d >= ms;
+}
+
 void power_tick(uint32_t now_ms)
 {
     if (s_glowing && (int32_t)(now_ms - s_glow_until) >= 0) {
@@ -123,7 +131,7 @@ void power_tick(uint32_t now_ms)
     }
     if (link_connected()) reset_retries();
     uint32_t deep_after = s_timer_wake && RECONNECT_WINDOW_MS < s_deep_after_ms ? RECONNECT_WINDOW_MS : s_deep_after_ms;
-    if (!s_on && !s_glowing && !s_deep && now_ms - s_off_since >= deep_after && may_deep()) {
+    if (!s_on && !s_glowing && !s_deep && passed(now_ms, s_off_since, deep_after) && may_deep()) {
         uint32_t wake_after_s = POWER_TIMER_WAKES && s_tries < N_RETRY ? kRetryMin[s_tries] * 60u : 0;
         hal_retained_set(s_tries + 1);
         s_deep = true;
@@ -137,12 +145,12 @@ void power_tick(uint32_t now_ms)
             dbg_event("power", "deep_refused", "\"tries\":%u", (unsigned)s_tries);
         }
     }
-    if (s_on && !s_glowing && motion_face_down() && now_ms - s_last_activity >= FACE_DOWN_OFF_MS) {
+    if (s_on && !s_glowing && motion_face_down() && passed(now_ms, s_last_activity, FACE_DOWN_OFF_MS)) {
         set_display(false);
         s_off_since = now_ms;
         return;
     }
-    if (s_on && !s_glowing && s_idle_ms && now_ms - s_last_activity >= s_idle_ms) {
+    if (s_on && !s_glowing && s_idle_ms && passed(now_ms, s_last_activity, s_idle_ms)) {
         set_display(false);
         s_off_since = now_ms; /* DEEP counts from display-off, not from the last input */
     }

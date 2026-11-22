@@ -61,8 +61,8 @@ A stroke presses the finger at the first point when it arrives, moves it to each
 lifts it `dt` ms after the last. A tap is one point with `dt` 60, a hold is one point with `dt` equal to the hold,
 and a swipe is a point every 10 ms (the touch read period). The player sits in the touch read callback, under
 LVGL and the gesture recognizer, so they see a finger. The panel's real touches are ignored while a stroke plays. The touch is polled (every 10 ms when the loop is free), and a read can come tens of ms late while a frame renders, so the stroke's clock starts at the first read that plays it: the watch sees the whole stroke, a short tap included. The down record keeps how late that read was.
-A stroke that arrives while another plays lifts the first one. A stroke counts as user activity: it wakes a dimmed
-display, as a real touch does.
+A stroke that arrives while another plays lifts the first one. A stroke reaches the UI as a finger does: on a dark
+display its press only wakes it, and on a glow it only reveals the request.
 
 A debug link can already inject gestures (`dbg_inject_input`), so a stroke grants nothing new. It is accepted
 only from a welcomed daemon, like every other debug message.
