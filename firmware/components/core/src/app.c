@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "app.h"
+#include "bench.h"
 #include "core.h"
 #include "debug.h"
 #include "detail.h"
@@ -131,9 +132,18 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
      * recognizer, the bezel dial and the keyboard work on what the user sees, so they get the turned point. */
     int32_t x = data->point.x, y = data->point.y;
     lv_display_t *disp = lv_indev_get_display(indev);
-    if (disp && lv_display_get_rotation(disp) == LV_DISPLAY_ROTATION_180) {
-        x = lv_display_get_horizontal_resolution(disp) - 1 - x;
-        y = lv_display_get_vertical_resolution(disp) - 1 - y;
+    bool turned = disp && lv_display_get_rotation(disp) == LV_DISPLAY_ROTATION_180;
+    int32_t w = disp ? lv_display_get_horizontal_resolution(disp) : 0, h = disp ? lv_display_get_vertical_resolution(disp) : 0;
+    if (turned) {
+        x = w - 1 - x;
+        y = h - 1 - y;
+    }
+    /* A bench stroke (BENCH.md §2) stands in for the panel: LVGL gets it in panel coordinates, as a finger. */
+    if (bench_touch(app_now_ms(), &down, &x, &y)) {
+        data->state = down ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+        data->point.x = turned ? w - 1 - x : x;
+        data->point.y = turned ? h - 1 - y : y;
+        if (down) power_activity(app_now_ms());
     }
     if (keys_touch(down, x, y, app_now_ms())) return; /* KEYS owns the finger: strokes, not gestures */
     if (!down && !s_gesture.pressed) return;
@@ -548,6 +558,7 @@ static bool s_swallow_touch;
 static void dispatch(const gesture_evt_t *g)
 {
     log_gesture(g);
+    bench_note(BENCH_GESTURE, (uint32_t)g->kind);
     if (g->kind == G_LIFT) return;
     bool touch = is_touch_gesture(g->kind);
     if (s_swallow_touch && touch && g->kind != G_PRESS) {
@@ -694,6 +705,7 @@ void core_init(void)
     s_disp_main = disp;
     lv_display_add_event_cb(disp, on_refr_ready, LV_EVENT_REFR_READY, NULL);
     lv_display_add_event_cb(disp, on_flush_start, LV_EVENT_FLUSH_START, NULL);
+    bench_init(disp);
     s_touch = hal_touch_create(disp);
     if (s_touch) {
         s_hal_touch_read = lv_indev_get_read_cb(s_touch);
@@ -743,6 +755,7 @@ uint32_t core_step(void)
     ui_tick(now);
     orientation_step();
     dbg_tick(now);
+    bench_tick(now);
 
     if (now - s_fps_t0 >= 1000) {
         s_fps = s_frames_drawn * 1000 / (now - s_fps_t0);

@@ -1,0 +1,14 @@
+{
+  "desc": "Bench: the last two records: a frame (t 1000 us, 8200 us, 3100 us panel wait, 21716 px) and a touch-down",
+  "symbolic": {
+    "t": "dbg_frames",
+    "id": 40,
+    "b": {
+      "seq": 30,
+      "recs": "e8030000082000001c0c0000d45400008813000000000000000000001a910e01",
+      "last": true,
+      "lost": 0
+    }
+  },
+  "cbor_hex": "a300184801182803a400181e015820e8030000082000001c0c0000d45400008813000000000000000000001a910e0102f50300"
+}

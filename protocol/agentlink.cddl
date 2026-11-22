@@ -16,6 +16,7 @@ envelope = msg_hello / msg_welcome / msg_snapshot / msg_session_upd / msg_gone
          / msg_fw_begin / msg_fw_chunk / msg_fw_ack / msg_power / msg_graph
          / msg_dbg_ui_state_req / msg_dbg_ui_state / msg_dbg_screenshot_req
          / msg_dbg_screenshot_chunk / msg_dbg_inject_input / msg_dbg_set_log_level
+         / msg_dbg_touch / msg_dbg_bench / msg_dbg_frames
 
 hdr = (1 => uint, ? 2 => uint)
 
@@ -53,6 +54,9 @@ msg_dbg_screenshot_req   = { 0 => mt_dbg_screenshot_req, hdr, 3 => empty }
 msg_dbg_screenshot_chunk = { 0 => mt_dbg_screenshot_chunk, hdr, 3 => dbg_screenshot_chunk }
 msg_dbg_inject_input     = { 0 => mt_dbg_inject_input, hdr, 3 => dbg_inject_input }
 msg_dbg_set_log_level    = { 0 => mt_dbg_set_log_level, hdr, 3 => dbg_set_log_level }
+msg_dbg_touch            = { 0 => mt_dbg_touch, hdr, 3 => dbg_touch }
+msg_dbg_bench            = { 0 => mt_dbg_bench, hdr, 3 => dbg_bench }
+msg_dbg_frames           = { 0 => mt_dbg_frames, hdr, 3 => dbg_frames }
 
 ; types 64+ are debug / observability (DESIGN §0)
 mt_hello = 1
@@ -89,6 +93,9 @@ mt_dbg_screenshot_req = 66
 mt_dbg_screenshot_chunk = 67
 mt_dbg_inject_input = 68
 mt_dbg_set_log_level = 69
+mt_dbg_touch = 70     ; bench (proto 0.24, BENCH.md): daemon → device, one finger stroke to play
+mt_dbg_bench = 71     ; daemon → device: start / stop / mark the frame timeline
+mt_dbg_frames = 72    ; device → daemon: frame timeline records
 
 empty = {}
 
@@ -626,6 +633,22 @@ dbg_inject_input = {
 dbg_set_log_level = {
   0 => log_level
 }
+; BENCH.md §2 (proto 0.24). The finger presses at the first point, moves to the next every dt ms and lifts dt ms
+; after the last; the points are int16 little-endian x, y pairs in the coordinates the user sees.
+dbg_touch = {
+  0 => uint .size 2,  ; dt    ms between samples, 1..2000
+  1 => bstr .size (4..2048)  ; pts   1..512 points
+}
+dbg_bench = {
+  0 => bench_op,      ; op
+  ? 1 => uint         ; arg   with bench_op_mark: a number written into the timeline
+}
+dbg_frames = {
+  0 => uint,          ; seq   index of the first record
+  1 => bstr .size (0..1024),  ; recs  16-byte records (BENCH.md §3)
+  2 => bool,          ; last
+  3 => uint           ; lost  records not kept, the buffer being full
+}
 
 ; ───────────────────────── named enums ─────────────────────────
 disp_shape = disp_shape_round / disp_shape_rect
@@ -654,6 +677,11 @@ result_err_unsupported = 2
 result_err_no_window = 3
 result_err_timeout = 4
 result_err_internal = 5
+
+bench_op = bench_op_start / bench_op_stop / bench_op_mark
+bench_op_start = 0
+bench_op_stop = 1
+bench_op_mark = 2
 
 log_level = log_level_err / log_level_warn / log_level_info / log_level_debug
 log_level_err = 0

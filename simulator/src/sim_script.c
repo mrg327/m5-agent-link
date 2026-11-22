@@ -73,6 +73,14 @@
  *   battery PCT [chg]               the battery reading (chg = charging and on USB)
  *   skip MS                         jump the clock forward (the script's own timeline stays put): long timeouts
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
+ *   question SID Q|ANSWER|ANSWER...  a delta with the agent's closing question and its answers (proto 0.5)
+ *   touch DT X Y [X Y ...]          a daemon `dbg_touch` (proto 0.24, BENCH.md): the finger presses at the first point,
+ *                                   moves to the next every DT ms and lifts DT ms after the last
+ *   bench start|stop|mark N         a daemon `dbg_bench`: record the frame timeline, stop and send it, or mark it
+ *   bench save FILE                 write the records the device sent after `bench stop` (16 bytes each, BENCH.md §3)
+ *   bench expect frame|down|up|gesture|mark|cmd MIN   at least MIN records of that kind arrived
+ *   expect_cmd OP                   the device sent a cmd OP (focus ack ... graph, CDDL names without cmd_op_) since
+ *                                   the script began or the last expect_cmd
  *   px_reset | expect_px_max PX     redraw budget: pixels flushed since px_reset must stay within PX
  *                                   (the log line also reports core_step host CPU as cpu_us, not asserted)
  */
@@ -84,6 +92,7 @@
 #include "agentlink_codec_decode.h"
 #include "agentlink_codec_encode.h"
 #include "app.h"
+#include "bench.h"
 #include "core.h"
 #include "keys.h"
 #include "link_internal.h"
@@ -97,7 +106,7 @@
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_GRAPH, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_PATCH, E_FW_EXPECT_SLOT, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_KIT, E_QUIT } ev_kind_t;
+typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_GRAPH, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_PATCH, E_FW_EXPECT_SLOT, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_KIT, E_QUESTION, E_STROKE, E_BENCH, E_BENCH_SAVE, E_BENCH_EXPECT, E_EXPECT_CMD, E_QUIT } ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
@@ -471,6 +480,29 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "kit") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_KIT, a, 0, 0, NULL);
         *t += 50;
+    } else if (!strcmp(cmd, "question") && arg[0]) {
+        add(*t, E_QUESTION, 0, 0, 0, arg);
+        *t += 20;
+    } else if (!strcmp(cmd, "touch")) {
+        int dt = 0, n = 0, used = 0;
+        if (sscanf(rest, "%d%n", &dt, &used) != 1 || dt <= 0) return false;
+        for (const char *p = rest + used; sscanf(p, "%d %d%n", &a, &b, &used) == 2; p += used) n++;
+        if (n == 0) return false;
+        add(*t, E_STROKE, dt, 0, 0, arg);
+        *t += (uint32_t)(dt * n) + 150;
+    } else if (!strcmp(cmd, "bench")) {
+        char what[16] = "", rest2[480] = "";
+        if (sscanf(rest, "%15s %479[^\n]", what, rest2) < 1) return false;
+        if (!strcmp(what, "start")) add(*t, E_BENCH, 0, 0, 0, NULL);
+        else if (!strcmp(what, "stop")) add(*t, E_BENCH, 1, 0, 0, NULL);
+        else if (!strcmp(what, "mark") && sscanf(rest2, "%d", &a) == 1) add(*t, E_BENCH, 2, a, 0, NULL);
+        else if (!strcmp(what, "save") && rest2[0]) add(*t, E_BENCH_SAVE, 0, 0, 0, rest2);
+        else if (!strcmp(what, "expect") && rest2[0]) add(*t, E_BENCH_EXPECT, 0, 0, 0, rest2);
+        else return false;
+        *t += 50;
+    } else if (!strcmp(cmd, "expect_cmd") && arg[0]) {
+        add(*t, E_EXPECT_CMD, 0, 0, 0, arg);
+        *t += 50;
     } else if (!strcmp(cmd, "quit")) {
         add(*t, E_QUIT, 0, 0, 0, NULL);
     } else {
@@ -592,6 +624,27 @@ static void run_session(const char *spec)
         present |= SF_HUSH;
     }
     model_upsert(&d, present);
+}
+
+/* question SID Q|ANSWER...: the agent's closing question and up to three answers (proto 0.5, the Reply list). */
+static void run_question(const char *spec)
+{
+    unsigned sid;
+    int n = 0;
+    if (sscanf(spec, "%u %n", &sid, &n) != 1 || !spec[n]) {
+        s_failed = true;
+        return;
+    }
+    session_t d = {.sid = sid};
+    char buf[512];
+    snprintf(buf, sizeof buf, "%s", spec + n);
+    char *save = NULL;
+    int i = 0;
+    for (char *f = strtok_r(buf, "|", &save); f; f = strtok_r(NULL, "|", &save), i++) {
+        if (i == 0) snprintf(d.q, sizeof d.q, "%s", f);
+        else if (i <= 3) snprintf(d.rp[d.n_rp++], sizeof d.rp[0], "%s", f);
+    }
+    model_upsert(&d, SF_Q | SF_RP);
 }
 
 /* job SID run|done|fail REPO ELAPSED_S ETA_S EXIT [command line...]: a terminal job (JOBS.md, proto 0.9).
@@ -1280,14 +1333,126 @@ static void run_ask(char *spec)
     inject_env(&env, "attention");
 }
 
+/* ── bench (BENCH.md): strokes and timeline control as the daemon sends them; the records the device sends back ── */
+
+static const char *const kCmdOps[] = {"focus", "ack", "snooze", "approve", "deny", "reply", "cancel", "detail",
+                                      "notify_done", "quiet", "scroll", "type", "dictate", "kb_pick", "kb_del",
+                                      "kb_send", "kb_end", "rerun", "unqueue", "answer", "pointer", "graph"};
+static uint32_t s_cmds_seen; /* bit per cmd op since the last expect_cmd */
+static uint8_t *s_dump;      /* records received after `bench stop` */
+static size_t s_dump_n;
+static bool s_dump_last;
+
+static void on_device_tx(const uint8_t *frame, size_t len);
+
+static void send_stroke(int dt, const char *text)
+{
+    sim_link_set_tx_tap(on_device_tx); /* expect_cmd and the dump read what the device sends */
+    static uint8_t pts[BENCH_MAX_POINTS * 4];
+    size_t n = 0;
+    int x, y, used = 0, skip = 0;
+    sscanf(text, "%*d%n", &skip);
+    for (const char *p = text + skip; n < BENCH_MAX_POINTS && sscanf(p, "%d %d%n", &x, &y, &used) == 2; p += used) {
+        pts[4 * n] = (uint8_t)x, pts[4 * n + 1] = (uint8_t)(x >> 8);
+        pts[4 * n + 2] = (uint8_t)y, pts[4 * n + 3] = (uint8_t)(y >> 8);
+        n++;
+    }
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_dbg_touch_m_c;
+    env.envelope_msg_dbg_touch_m.msg_dbg_touch_hdr_m.hdr_uint1uint = ++s_rx_id;
+    struct dbg_touch *d = &env.envelope_msg_dbg_touch_m.msg_dbg_touch_dbg_touch_m;
+    d->dbg_touch_uint0uint = (uint32_t)dt;
+    d->dbg_touch_uint1bstr = (struct zcbor_string){.value = pts, .len = n * 4};
+    inject_env(&env, "dbg_touch");
+}
+
+static void send_bench(int op, int arg)
+{
+    sim_link_set_tx_tap(on_device_tx);
+    if (op == 1) {
+        s_dump_n = 0;
+        s_dump_last = false;
+    }
+    static struct envelope_r env;
+    memset(&env, 0, sizeof env);
+    env.envelope_choice = envelope_msg_dbg_bench_m_c;
+    env.envelope_msg_dbg_bench_m.msg_dbg_bench_hdr_m.hdr_uint1uint = ++s_rx_id;
+    struct dbg_bench *b = &env.envelope_msg_dbg_bench_m.msg_dbg_bench_dbg_bench_m;
+    b->dbg_bench_bench_op_m.bench_op_choice = op;
+    b->dbg_bench_uint1uint_present = op == 2;
+    b->dbg_bench_uint1uint.dbg_bench_uint1uint = (uint32_t)arg;
+    inject_env(&env, "dbg_bench");
+}
+
+static void on_bench_frames(const struct dbg_frames *f)
+{
+    if (!s_dump) s_dump = malloc((size_t)BENCH_MAX_RECS * BENCH_REC_BYTES);
+    size_t n = f->dbg_frames_uint1bstr.len / BENCH_REC_BYTES;
+    if (f->dbg_frames_uint0uint != s_dump_n || s_dump_n + n > BENCH_MAX_RECS) {
+        fail("bench records out of order at", "seq");
+        return;
+    }
+    memcpy(s_dump + s_dump_n * BENCH_REC_BYTES, f->dbg_frames_uint1bstr.value, n * BENCH_REC_BYTES);
+    s_dump_n += n;
+    if (f->dbg_frames_uint2bool) {
+        s_dump_last = true;
+        sim_log("bench_dump", "\"recs\":%u,\"lost\":%u", (unsigned)s_dump_n, (unsigned)f->dbg_frames_uint3uint);
+    }
+}
+
+static void bench_save(const char *path)
+{
+    if (!s_dump_last) {
+        fail("bench save before the device sent its last records", path);
+        return;
+    }
+    FILE *fp = fopen(path, "wb");
+    if (!fp || fwrite(s_dump, BENCH_REC_BYTES, s_dump_n, fp) != s_dump_n) fail("cannot write", path);
+    if (fp) fclose(fp);
+}
+
+static void bench_expect(const char *spec)
+{
+    static const char *const kinds[] = {"frame", "down", "up", "gesture", "mark", "cmd"};
+    char kind[16] = "";
+    int min = 0;
+    if (sscanf(spec, "%15s %d", kind, &min) != 2 || enum_of(kind, kinds, 6) < 0) {
+        fail("bad bench expect", spec);
+        return;
+    }
+    int k = enum_of(kind, kinds, 6), got = 0;
+    for (size_t i = 0; i < s_dump_n; i++)
+        if (s_dump[i * BENCH_REC_BYTES + 15] == k) got++;
+    sim_log("bench_count", "\"kind\":\"%s\",\"n\":%d", kind, got);
+    if (!s_dump_last || got < min) fail("too few bench records of kind", spec);
+}
+
+static void expect_cmd(const char *name)
+{
+    int op = enum_of(name, kCmdOps, (int)(sizeof kCmdOps / sizeof *kCmdOps));
+    if (op < 0) {
+        fail("unknown cmd op", name);
+        return;
+    }
+    if (!(s_cmds_seen & 1u << op)) fail("the device did not send cmd", name);
+    s_cmds_seen = 0;
+}
+
 /* The device sent a frame: answer a `cmd detail` for the served request like the daemon does. */
 static void on_device_tx(const uint8_t *frame, size_t len)
 {
     static struct envelope_r env;
     size_t used = 0;
     memset(&env, 0, sizeof env);
-    if (cbor_decode_envelope(frame, len, &env, &used) != ZCBOR_SUCCESS || env.envelope_choice != envelope_msg_cmd_m_c) return;
+    if (cbor_decode_envelope(frame, len, &env, &used) != ZCBOR_SUCCESS) return;
+    if (env.envelope_choice == envelope_msg_dbg_frames_m_c) {
+        on_bench_frames(&env.envelope_msg_dbg_frames_m.msg_dbg_frames_dbg_frames_m);
+        return;
+    }
+    if (env.envelope_choice != envelope_msg_cmd_m_c) return;
     const struct cmd *c = &env.envelope_msg_cmd_m.msg_cmd_cmd_m;
+    if (c->cmd_op_m.cmd_op_choice < 32) s_cmds_seen |= 1u << c->cmd_op_m.cmd_op_choice;
     if (c->cmd_op_m.cmd_op_choice == cmd_op_graph_m_c) { /* the agent graph (proto 0.22) */
         serve_graph(c, env.envelope_msg_cmd_m.msg_cmd_hdr_m.hdr_uint1uint);
         return;
@@ -1452,6 +1617,12 @@ static void run(const ev_t *e)
     case E_CONNECT: sim_link_set_connected_kind(e->b, e->a); break;
     case E_RX: send_hex_kind(e->b, e->text); break;
     case E_UI: core_dump_ui_state(); break;
+    case E_STROKE: send_stroke(e->a, e->text); break;
+    case E_QUESTION: run_question(e->text); break;
+    case E_BENCH: send_bench(e->a, e->b); break;
+    case E_BENCH_SAVE: bench_save(e->text); break;
+    case E_BENCH_EXPECT: bench_expect(e->text); break;
+    case E_EXPECT_CMD: expect_cmd(e->text); break;
     case E_SHOT: {
         /* writing the PNG takes real time (a few hundred ms on a slow disk); the script's timeline waits for it,
          * so the events behind it keep their spacing (a tap's press and release never land in one poll) */

@@ -238,6 +238,14 @@ static bool encode_dbg_inject_input(zcbor_state_t *state, const struct dbg_injec
 static bool encode_msg_dbg_inject_input(zcbor_state_t *state, const struct msg_dbg_inject_input *input);
 static bool encode_dbg_set_log_level(zcbor_state_t *state, const struct dbg_set_log_level *input);
 static bool encode_msg_dbg_set_log_level(zcbor_state_t *state, const struct msg_dbg_set_log_level *input);
+static bool encode_dbg_touch(zcbor_state_t *state, const struct dbg_touch *input);
+static bool encode_msg_dbg_touch(zcbor_state_t *state, const struct msg_dbg_touch *input);
+static bool encode_bench_op(zcbor_state_t *state, const struct bench_op_r *input);
+static bool encode_repeated_dbg_bench_uint1uint(zcbor_state_t *state, const struct dbg_bench_uint1uint *input);
+static bool encode_dbg_bench(zcbor_state_t *state, const struct dbg_bench *input);
+static bool encode_msg_dbg_bench(zcbor_state_t *state, const struct msg_dbg_bench *input);
+static bool encode_dbg_frames(zcbor_state_t *state, const struct dbg_frames *input);
+static bool encode_msg_dbg_frames(zcbor_state_t *state, const struct msg_dbg_frames *input);
 static bool encode_envelope(zcbor_state_t *state, const struct envelope_r *input);
 
 
@@ -3260,6 +3268,127 @@ static bool encode_msg_dbg_set_log_level(
 	return res;
 }
 
+static bool encode_dbg_touch(
+		zcbor_state_t *state, const struct dbg_touch *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_encode(state, 2) && (((((zcbor_uint32_put(state, (0))))
+	&& ((((*input).dbg_touch_uint0uint <= UINT16_MAX)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_uint32_encode(state, (&(*input).dbg_touch_uint0uint))))
+	&& (((zcbor_uint32_put(state, (1))))
+	&& ((((*input).dbg_touch_uint1bstr.len >= 4)
+	&& ((*input).dbg_touch_uint1bstr.len <= 2048)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_bstr_encode(state, (&(*input).dbg_touch_uint1bstr))))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 2))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_msg_dbg_touch(
+		zcbor_state_t *state, const struct msg_dbg_touch *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_encode(state, 4) && (((((zcbor_uint32_put(state, (0))))
+	&& (zcbor_uint32_put(state, (70))))
+	&& ((encode_hdr(state, (&(*input).msg_dbg_touch_hdr_m))))
+	&& (((zcbor_uint32_put(state, (3))))
+	&& (encode_dbg_touch(state, (&(*input).msg_dbg_touch_dbg_touch_m))))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 4))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_bench_op(
+		zcbor_state_t *state, const struct bench_op_r *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((((*input).bench_op_choice == bench_op_start_m_c) ? ((zcbor_uint32_put(state, (0))))
+	: (((*input).bench_op_choice == bench_op_stop_m_c) ? ((zcbor_uint32_put(state, (1))))
+	: (((*input).bench_op_choice == bench_op_mark_m_c) ? ((zcbor_uint32_put(state, (2))))
+	: false)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_repeated_dbg_bench_uint1uint(
+		zcbor_state_t *state, const struct dbg_bench_uint1uint *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_put(state, (1))))
+	&& (zcbor_uint32_encode(state, (&(*input).dbg_bench_uint1uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_dbg_bench(
+		zcbor_state_t *state, const struct dbg_bench *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_encode(state, 2) && (((((zcbor_uint32_put(state, (0))))
+	&& (encode_bench_op(state, (&(*input).dbg_bench_bench_op_m))))
+	&& (!(*input).dbg_bench_uint1uint_present || encode_repeated_dbg_bench_uint1uint(state, (&(*input).dbg_bench_uint1uint)))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 2))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_msg_dbg_bench(
+		zcbor_state_t *state, const struct msg_dbg_bench *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_encode(state, 4) && (((((zcbor_uint32_put(state, (0))))
+	&& (zcbor_uint32_put(state, (71))))
+	&& ((encode_hdr(state, (&(*input).msg_dbg_bench_hdr_m))))
+	&& (((zcbor_uint32_put(state, (3))))
+	&& (encode_dbg_bench(state, (&(*input).msg_dbg_bench_dbg_bench_m))))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 4))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_dbg_frames(
+		zcbor_state_t *state, const struct dbg_frames *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_encode(state, 4) && (((((zcbor_uint32_put(state, (0))))
+	&& (zcbor_uint32_encode(state, (&(*input).dbg_frames_uint0uint))))
+	&& (((zcbor_uint32_put(state, (1))))
+	&& ((((*input).dbg_frames_uint1bstr.len >= 0)
+	&& ((*input).dbg_frames_uint1bstr.len <= 1024)) || (zcbor_error(state, ZCBOR_ERR_WRONG_RANGE), false))
+	&& (zcbor_bstr_encode(state, (&(*input).dbg_frames_uint1bstr))))
+	&& (((zcbor_uint32_put(state, (2))))
+	&& (zcbor_bool_encode(state, (&(*input).dbg_frames_uint2bool))))
+	&& (((zcbor_uint32_put(state, (3))))
+	&& (zcbor_uint32_encode(state, (&(*input).dbg_frames_uint3uint))))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 4))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
+static bool encode_msg_dbg_frames(
+		zcbor_state_t *state, const struct msg_dbg_frames *input)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = (((zcbor_map_start_encode(state, 4) && (((((zcbor_uint32_put(state, (0))))
+	&& (zcbor_uint32_put(state, (72))))
+	&& ((encode_hdr(state, (&(*input).msg_dbg_frames_hdr_m))))
+	&& (((zcbor_uint32_put(state, (3))))
+	&& (encode_dbg_frames(state, (&(*input).msg_dbg_frames_dbg_frames_m))))) || (zcbor_list_map_end_force_encode(state), false)) && zcbor_map_end_encode(state, 4))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool encode_envelope(
 		zcbor_state_t *state, const struct envelope_r *input)
 {
@@ -3299,7 +3428,10 @@ static bool encode_envelope(
 	: (((*input).envelope_choice == envelope_msg_dbg_screenshot_chunk_m_c) ? ((encode_msg_dbg_screenshot_chunk(state, (&(*input).envelope_msg_dbg_screenshot_chunk_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_inject_input_m_c) ? ((encode_msg_dbg_inject_input(state, (&(*input).envelope_msg_dbg_inject_input_m))))
 	: (((*input).envelope_choice == envelope_msg_dbg_set_log_level_m_c) ? ((encode_msg_dbg_set_log_level(state, (&(*input).envelope_msg_dbg_set_log_level_m))))
-	: false))))))))))))))))))))))))))))))))))));
+	: (((*input).envelope_choice == envelope_msg_dbg_touch_m_c) ? ((encode_msg_dbg_touch(state, (&(*input).envelope_msg_dbg_touch_m))))
+	: (((*input).envelope_choice == envelope_msg_dbg_bench_m_c) ? ((encode_msg_dbg_bench(state, (&(*input).envelope_msg_dbg_bench_m))))
+	: (((*input).envelope_choice == envelope_msg_dbg_frames_m_c) ? ((encode_msg_dbg_frames(state, (&(*input).envelope_msg_dbg_frames_m))))
+	: false)))))))))))))))))))))))))))))))))))))));
 
 	log_result(state, res, __func__);
 	return res;

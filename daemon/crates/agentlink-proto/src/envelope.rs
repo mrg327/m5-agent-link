@@ -63,6 +63,7 @@ messages! {
     64 DbgUiStateReq(Empty), 65 DbgUiState(DbgUiState),
     66 DbgScreenshotReq(Empty), 67 DbgScreenshotChunk(DbgScreenshotChunk),
     68 DbgInjectInput(DbgInjectInput), 69 DbgSetLogLevel(DbgSetLogLevel),
+    70 DbgTouch(DbgTouch), 71 DbgBench(DbgBench), 72 DbgFrames(DbgFrames),
 }
 
 /// One protocol message on the wire.

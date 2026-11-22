@@ -48,6 +48,8 @@ pub struct Shared {
     pub devices: Mutex<BTreeMap<String, Value>>,
     /// The firmware update in progress, and the links it can reach (ota.rs).
     pub ota: Arc<crate::ota::Ota>,
+    /// The bench run holding a link, if any (bench.rs, BENCH.md).
+    pub bench: Arc<crate::bench::Bench>,
     /// Power reports: the CSV log and the last report per device (power.rs, POWER.md).
     pub power: crate::power::PowerLog,
     /// The machine's pointer, driven by the watch's trackpad (pointer.rs, EXPERIMENTS.md).
@@ -83,7 +85,8 @@ impl Shared {
             queue: crate::queue::Queue::default(),
             host: host_info(),
             devices: Mutex::default(),
-            ota: Arc::new(crate::ota::Ota::new(ota_trace)),
+            ota: Arc::new(crate::ota::Ota::new(ota_trace.clone())),
+            bench: Arc::new(crate::bench::Bench::new(ota_trace)),
             power: crate::power::PowerLog::new(),
             pointer: crate::pointer::system(),
             pointer_err: crate::pointer::ErrGate::default(),
@@ -526,6 +529,7 @@ pub async fn run_link(
         }
     }
     shared.ota.link_down(link_id);
+    shared.bench.link_down(link_id);
     tracing::info!("device disconnected: {peer}");
     result
 }
@@ -603,6 +607,14 @@ async fn handshake(
         &hello.1.dev.fw,
         transport == "usb",
     );
+    shared.bench.hello(
+        link_id,
+        &key,
+        c.peer_minor,
+        hello.1.caps.feats.contains(&Feature::Debug),
+        &hello.1.dev.fw,
+        transport,
+    );
     *dev_key = Some(key);
     Ok(updates)
 }
@@ -627,11 +639,25 @@ async fn serve(
     };
     let (otx, mut orx) = tokio::sync::mpsc::unbounded_channel();
     shared.ota.attach(link_id, otx);
+    // A bench run holding this link (BENCH.md §4): no registry or broker traffic, its commands go to the run.
+    let (btx, mut brx) = tokio::sync::mpsc::unbounded_channel();
+    shared.bench.attach(link_id, btx);
+    let mut held = false;
     loop {
         let deferred_due = sc.deferred_due();
         let deltas_due = c.deltas.next_due();
         tokio::select! {
             Some(msg) = orx.recv() => c.send(None, msg).await?,
+            Some(b) = brx.recv() => match b {
+                crate::bench::ToLink::Send(msg) => c.send(None, *msg).await?,
+                crate::bench::ToLink::Hold(on) => {
+                    let was = std::mem::replace(&mut held, on);
+                    shared.trace.record(&c.src, Dir::Internal, "bench_hold", None, None, json!({"on": on}), None);
+                    if was && !on {
+                        resync(shared, c).await?;
+                    }
+                }
+            },
             env = c.recv() => match env? {
                 None => return Ok(()),
                 Some(Envelope { id, msg: Message::Hello(h), .. }) => {
@@ -650,6 +676,17 @@ async fn serve(
                         let src = crate::power::Source { uid: key, board: &c.board, fw: &c.fw, transport };
                         shared.power.record(&src, &p, now_unix());
                     }
+                }
+                Some(Envelope { msg: Message::DbgFrames(f), .. }) => {
+                    shared.bench.on_event(link_id, crate::bench::Event::Frames(f));
+                }
+                Some(Envelope { msg: Message::DbgUiState(s), .. }) => {
+                    shared.bench.on_event(link_id, crate::bench::Event::UiState(s));
+                }
+                // held: the run answers every command, nothing reaches an agent or a terminal
+                Some(Envelope { id, msg: Message::Cmd(cmd), .. }) if held => {
+                    shared.bench.on_event(link_id, crate::bench::Event::Cmd(cmd));
+                    c.send(Some(id), Message::Result(CmdResult::ok())).await?;
                 }
                 Some(env) => handle(shared, c, env, &mut sc, &mut inflight, &mut vs).await?,
             },
@@ -680,6 +717,8 @@ async fn serve(
                 c.send_due_deltas().await?;
             },
             u = updates.recv() => match u {
+                // held for the bench: dropped here, the resync at the end brings the watch up to date
+                Ok(_) | Err(RecvError::Lagged(_)) if held => {}
                 Ok(Update::Upsert(mut s)) => {
                     if c.peer_minor >= PRESENCE_MINOR {
                         s.hush = finished_hush(shared, &s).await;
@@ -695,26 +734,7 @@ async fn serve(
                 Ok(Update::Clear(cl)) => c.send(None, Message::Clear(cl)).await?,
                 Ok(Update::Usage(u)) => c.send_usage(Some(u)).await?,
                 // Missed updates: the device has drifted, so send a full replacement.
-                Err(RecvError::Lagged(_)) => {
-                    c.deltas.clear();
-                    let sessions = c.sessions_for_peer(shared.registry.snapshot());
-                    c.send(None, Message::Snapshot(Snapshot { sessions, away: None })).await?;
-                    // A snapshot drops only the cards of sessions that are gone, so a request that
-                    // ended during the lag needs its own clear. Why it ended is lost: `cancelled`
-                    // removes the card without claiming an answer or a hand-back.
-                    let pending = shared.broker.pending();
-                    let open: HashSet<u64> = pending.iter().map(|a| a.rid).collect();
-                    let mut ended: Vec<u64> =
-                        c.rids.iter().copied().filter(|r| !open.contains(r)).collect();
-                    ended.sort_unstable();
-                    for rid in ended {
-                        c.send(None, Message::Clear(Clear { rid, why: ClearWhy::Cancelled })).await?;
-                    }
-                    for att in pending {
-                        c.send(None, Message::Attention(att)).await?;
-                    }
-                    c.send_usage(shared.registry.usage()).await?;
-                }
+                Err(RecvError::Lagged(_)) => resync(shared, c).await?,
                 Err(RecvError::Closed) => return Ok(()),
             },
         }
@@ -724,6 +744,46 @@ async fn serve(
 /// `Some(true)` when the delta enters done / error while the user has that session's terminal in front
 /// of them: the watch need not buzz (PRESENCE.md). A session armed with Notify (the delta clears `ntf`)
 /// is one the user asked to be told about, so it buzzes whatever presence says.
+/// A full replacement of what the device shows: after missed updates, or after a bench run held the link.
+async fn resync(shared: &Shared, c: &mut Conn) -> Result<()> {
+    c.deltas.clear();
+    let sessions = c.sessions_for_peer(shared.registry.snapshot());
+    c.send(
+        None,
+        Message::Snapshot(Snapshot {
+            sessions,
+            away: None,
+        }),
+    )
+    .await?;
+    // A snapshot drops only the cards of sessions that are gone, so a request that
+    // ended during the lag needs its own clear. Why it ended is lost: `cancelled`
+    // removes the card without claiming an answer or a hand-back.
+    let pending = shared.broker.pending();
+    let open: HashSet<u64> = pending.iter().map(|a| a.rid).collect();
+    let mut ended: Vec<u64> = c
+        .rids
+        .iter()
+        .copied()
+        .filter(|r| !open.contains(r))
+        .collect();
+    ended.sort_unstable();
+    for rid in ended {
+        c.send(
+            None,
+            Message::Clear(Clear {
+                rid,
+                why: ClearWhy::Cancelled,
+            }),
+        )
+        .await?;
+    }
+    for att in pending {
+        c.send(None, Message::Attention(att)).await?;
+    }
+    c.send_usage(shared.registry.usage()).await
+}
+
 async fn finished_hush(shared: &Shared, s: &Session) -> Option<bool> {
     if !enters_finished(s) {
         return None;
@@ -4096,5 +4156,140 @@ mod tests {
             (Some(8), false, Some(ResultErr::Denied))
         );
         assert!(matches!(d.next().await.msg, Message::Pong(_)));
+    }
+
+    /// BENCH.md §4: a run holds the link (the watch sees only the script's sessions, a real update is held
+    /// back), answers the watch's commands itself, brings back the timeline and gives the link back.
+    #[tokio::test]
+    async fn a_bench_run_holds_the_link_answers_its_commands_and_gives_it_back() {
+        let shared = shared();
+        let real = add_session(&shared);
+        let mut d = linked(&shared, crate::bench::BENCH_MINOR).await;
+        let script = "connect\nsession 9 input bench main\n\
+                      attention 77 9 approval approve,deny,focus 0 Run shell command|npm test\n\
+                      mark 1\ntap 233 282\nexpect_cmd approve\n";
+        let (tx, mut out) = tokio::sync::mpsc::unbounded_channel();
+        let sh = shared.clone();
+        let run = tokio::spawn(async move {
+            let req = crate::bench::Request {
+                name: "approve".into(),
+                script: script.into(),
+                human: None,
+                device: None,
+            };
+            sh.bench.run(req, 0, tx).await
+        });
+        let Message::Snapshot(s) = d.next().await.msg else {
+            panic!("an emptied list first")
+        };
+        assert!(s.sessions.is_empty());
+        // a real update while the link is held does not reach the watch
+        {
+            use crate::registry::{SessionEvent, SessionPatch};
+            let mut p = SessionPatch::new(Agent::Claude);
+            p.state = Some(SessState::Done);
+            shared.registry.apply(SessionEvent::Update {
+                key: "claude:s".into(),
+                via: crate::registry::Via::Local,
+                patch: p,
+                ctx: crate::registry::HostCtx::default(),
+            });
+        }
+        assert!(matches!(
+            d.next().await.msg,
+            Message::DbgBench(DbgBench {
+                op: BenchOp::Start,
+                ..
+            })
+        ));
+        let Message::SessionUpd(s) = d.next().await.msg else {
+            panic!("the script's session")
+        };
+        assert_eq!((s.sid, s.repo.as_deref()), (9, Some("bench")));
+        let Message::Attention(a) = d.next().await.msg else {
+            panic!("the script's card")
+        };
+        assert_eq!(a.rid, 77);
+        assert!(matches!(
+            d.next().await.msg,
+            Message::DbgBench(DbgBench {
+                op: BenchOp::Mark,
+                arg: Some(1)
+            })
+        ));
+        let Message::DbgTouch(t) = d.next().await.msg else {
+            panic!("the tap as a stroke")
+        };
+        assert_eq!((t.dt, t.pts.len()), (50, 4));
+        // the watch approves: the run answers, nothing reaches the broker
+        d.to_daemon
+            .send(cmd_bytes(
+                5,
+                cmd(CmdOp::Approve, Some(77), None, Some(1600)),
+            ))
+            .unwrap();
+        let e = d.next().await;
+        assert_eq!(e.re, Some(5));
+        assert!(matches!(e.msg, Message::Result(CmdResult { ok: true, .. })));
+        assert!(matches!(
+            d.next().await.msg,
+            Message::DbgBench(DbgBench {
+                op: BenchOp::Stop,
+                ..
+            })
+        ));
+        let frames = DbgFrames {
+            seq: 0,
+            recs: vec![7; 16],
+            last: true,
+            lost: 0,
+        };
+        d.to_daemon
+            .send(
+                Envelope::new(6, Message::DbgFrames(frames))
+                    .to_bytes()
+                    .unwrap(),
+            )
+            .unwrap();
+        // given back: the real sessions again, with the update held back meanwhile
+        let Message::Snapshot(s) = d.next().await.msg else {
+            panic!("a resync")
+        };
+        assert_eq!(
+            s.sessions.iter().map(|s| (s.sid, s.st)).collect::<Vec<_>>(),
+            vec![(real, Some(SessState::Done))]
+        );
+        run.await.unwrap();
+        let mut last = None;
+        while let Ok(v) = out.try_recv() {
+            last = Some(v);
+        }
+        let done = last.unwrap();
+        assert_eq!(done["bench"], "done", "{done}");
+        assert_eq!(done["recs"], "07".repeat(16));
+        assert_eq!(done["cmds"], json!(["approve"]));
+    }
+
+    #[tokio::test]
+    async fn a_bench_run_refuses_while_a_real_request_waits_and_without_a_bench_watch() {
+        let shared = shared();
+        let (tx, mut out) = tokio::sync::mpsc::unbounded_channel();
+        let req = |s: &str| crate::bench::Request {
+            name: "t".into(),
+            script: s.into(),
+            human: None,
+            device: None,
+        };
+        shared.bench.run(req("wait 1\n"), 1, tx.clone()).await;
+        assert!(out.try_recv().unwrap()["msg"]
+            .as_str()
+            .unwrap()
+            .contains("real request"));
+        let _d = linked(&shared, crate::bench::BENCH_MINOR - 1).await;
+        shared.bench.run(req("wait 1\n"), 0, tx).await;
+        assert!(out.try_recv().unwrap()["msg"]
+            .as_str()
+            .unwrap()
+            .contains("proto 0.24"));
     }
 }

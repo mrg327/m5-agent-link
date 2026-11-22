@@ -53,6 +53,7 @@ pub struct HookSource {
     pub broker: Arc<Broker>,
     pub jobs: Arc<Jobs>,
     pub ota: Arc<crate::ota::Ota>,
+    pub bench: Arc<crate::bench::Bench>,
 }
 
 /// What every connection handler needs.
@@ -65,6 +66,7 @@ pub struct ConnEnv {
     pub home: PathBuf,
     pub jobs: Arc<Jobs>,
     pub ota: Arc<crate::ota::Ota>,
+    pub bench: Arc<crate::bench::Bench>,
 }
 
 /// Which socket a connection came in on.
@@ -95,6 +97,7 @@ impl AgentSource for HookSource {
             home: self.home,
             jobs: self.jobs,
             ota: self.ota,
+            bench: self.bench,
         });
         remote::spawn_remote_socket(&self.remote_socket, env.clone());
         loop {
@@ -153,6 +156,17 @@ where
         }
         if v.get("ctl").and_then(Value::as_str) == Some("ota") {
             run_ota(&env.ota, &v, &mut lines, &mut w).await;
+            continue;
+        }
+        if v.get("ctl").and_then(Value::as_str) == Some("bench") {
+            run_bench(
+                &env.bench,
+                env.broker.pending().len(),
+                &v,
+                &mut lines,
+                &mut w,
+            )
+            .await;
             continue;
         }
         let reply = match v.get("ctl").and_then(Value::as_str) {
@@ -262,9 +276,42 @@ where
             .await;
         return;
     };
+    stream_run(|tx| ota.run(req, tx), lines, w).await;
+}
+
+/// `{"ctl":"bench"}` (BENCH.md §4): one task run on the watch while this connection stays open, one line per
+/// event; closing the connection stops it and gives the link back.
+async fn run_bench<R, W>(
+    bench: &crate::bench::Bench,
+    pending: usize,
+    v: &Value,
+    lines: &mut tokio::io::Lines<R>,
+    w: &mut W,
+) where
+    R: tokio::io::AsyncBufRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    let Some(req) = crate::bench::Request::from_json(v) else {
+        let _ = w
+            .write_all(b"{\"bench\":\"error\",\"msg\":\"missing script\"}\n")
+            .await;
+        return;
+    };
+    stream_run(|tx| bench.run(req, pending, tx), lines, w).await;
+}
+
+/// Runs `start`'s future while the connection stays open, writing each line it sends; the client's EOF
+/// drops the receiver, which the run takes as a cancel.
+async fn stream_run<F, Fut, R, W>(start: F, lines: &mut tokio::io::Lines<R>, w: &mut W)
+where
+    F: FnOnce(tokio::sync::mpsc::UnboundedSender<Value>) -> Fut,
+    Fut: std::future::Future<Output = ()>,
+    R: tokio::io::AsyncBufRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     let mut rx = Some(rx);
-    let mut run = std::pin::pin!(ota.run(req, tx));
+    let mut run = std::pin::pin!(start(tx));
     let mut eof = false;
     loop {
         tokio::select! {
