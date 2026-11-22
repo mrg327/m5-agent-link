@@ -1,0 +1,46 @@
+connect
+rtc 1800000000
+rx a400020101020103a5008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 2 ask webapp feat/login
+ask 36 2 60000 60000 One|First?|single|x|y ;; Extras|Which extras should I add to the project?|multi|An option label that is exactly forty-eight chs|Anothern option label that is exactly forty-eight chs|Short|Tests=Vitest and Playwright
+wait 700
+hold 233 282 1500
+wait 500
+wait 700
+shot q05_0.png
+ui
+btn B
+wait 300
+shot q05_1.png
+ui
+btn B
+wait 300
+shot q05_2.png
+ui
+btn B
+wait 300
+shot q05_3.png
+ui
+btn B
+wait 300
+shot q05_4.png
+ui
+btn B
+wait 300
+shot q05_5.png
+ui
+btn B
+wait 300
+tap 233 282
+wait 300
+btn B
+wait 300
+tap 233 282
+wait 300
+shot q05_ticked.png
+ui
+tap 233 125
+wait 600
+shot q05_read.png
+ui
+quit

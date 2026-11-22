@@ -143,7 +143,7 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
         data->state = down ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
         data->point.x = turned ? w - 1 - x : x;
         data->point.y = turned ? h - 1 - y : y;
-        if (down) power_activity(app_now_ms());
+        /* no power_activity here: the press reaches dispatch() like a finger's, so on a dark display it only wakes */
     }
     if (keys_touch(down, x, y, app_now_ms())) return; /* KEYS owns the finger: strokes, not gestures */
     if (!down && !s_gesture.pressed) return;

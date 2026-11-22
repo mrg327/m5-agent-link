@@ -1,0 +1,67 @@
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 1 done webapp feat/login Finished the work
+session 2 work api main Working
+session 3 work cli main Working
+wait 300
+btn A double
+wait 600
+ui
+session 2 input api main
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 600
+swipe 140 233 330 233 160
+wait 400
+btn B
+wait 300
+ui
+btn A double
+wait 600
+ui
+swipe 140 233 330 233 160
+wait 400
+session 3 input cli main
+attention 8 3 approval approve,deny,focus 0 Edit|a.rs
+wait 600
+ui
+swipe 140 233 330 233 160
+wait 400
+session 4 input four main
+attention 9 4 question - 0 Pick one|A|B
+wait 600
+ui
+swipe 140 233 330 233 160
+wait 400
+ui
+btn A double
+wait 600
+ui
+swipe 140 233 330 233 160
+wait 400
+btn A double
+wait 600
+ui
+swipe 140 233 330 233 160
+wait 400
+btn A double
+wait 600
+ui
+swipe 140 233 330 233 160
+wait 400
+btn A double
+wait 600
+ui
+swipe 140 233 330 233 160
+wait 400
+btn B
+wait 200
+btn B
+wait 200
+ui
+tap 233 233
+wait 400
+ui
+btn A double
+wait 600
+ui
+quit

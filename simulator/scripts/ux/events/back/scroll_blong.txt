@@ -1,0 +1,17 @@
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+graph 1 read:ok:0 search:ok:0 agent:run:0
+session 1 work webapp feat/login Running
+session 2 work api main Working
+wait 600
+tap 233 233
+wait 300
+btn A
+wait 300
+drag 233 260 -30
+wait 400
+ui
+btn B long
+wait 500
+ui
+quit

@@ -9,7 +9,7 @@ attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watc
 wait 600
 expect_screen ask
 bench mark 1
-hold 233 282 1600
+hold 305 260 1600
 expect_cmd approve
 wait 600
 bench stop

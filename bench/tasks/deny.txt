@@ -1,0 +1,18 @@
+# Deny: a permission card arrives; step to Deny with B and hold it.
+connect
+rx a400020101020103a5008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+bench start
+session 2 input webapp feat/login
+wait 300
+attention 7 2 approval approve,deny,focus 0 Run shell command|rm -rf node_modules
+wait 600
+expect_screen ask
+bench mark 1
+btn B
+wait 300
+hold 140 260 1100
+expect_cmd deny
+wait 600
+bench stop
+wait 1500
+bench save deny.bin
