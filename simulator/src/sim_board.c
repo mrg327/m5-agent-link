@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "sim.h"
 
@@ -35,11 +36,33 @@ const hal_board_info_t *hal_board_info(void) { return &s_info; }
 
 static uint64_t s_skip_us; /* `skip`: the clock jumps, to test long timeouts */
 
-uint64_t hal_time_us(void)
+/* A scripted headless run uses a virtual clock (sim_clock_virtual): it moves only when the main
+ * loop sleeps, so a starved process cannot stretch a press into a hold (issue 6eb4). */
+static bool s_virtual;
+static uint64_t s_virtual_us;
+
+static uint64_t real_us(void)
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000u + (uint64_t)ts.tv_nsec / 1000u + s_skip_us;
+    return (uint64_t)ts.tv_sec * 1000000u + (uint64_t)ts.tv_nsec / 1000u;
+}
+
+uint64_t hal_time_us(void) { return (s_virtual ? s_virtual_us : real_us()) + s_skip_us; }
+
+void sim_clock_virtual(void)
+{
+    s_virtual_us = real_us();
+    s_virtual = true;
+}
+
+void sim_sleep_us(uint64_t us)
+{
+    if (s_virtual) {
+        s_virtual_us += us;
+    } else if (us) {
+        usleep((useconds_t)us);
+    }
 }
 
 void sim_skip_time(uint32_t ms) { s_skip_us += (uint64_t)ms * 1000u; }

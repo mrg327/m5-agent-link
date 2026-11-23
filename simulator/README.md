@@ -10,7 +10,7 @@ brew install sdl2 ninja                                 # macOS (sdl2-compat is 
 sudo apt-get install -y libsdl2-dev ninja-build         # Debian/Ubuntu
 cmake -S simulator -B build/sim -G Ninja
 cmake --build build/sim
-ctest --test-dir build/sim -j 16   # protocol vectors, unit tests, scripted headless UI runs (about 35 s; the scripts replay in real time, so run them in parallel)
+ctest --test-dir build/sim -j 16   # protocol vectors, unit tests, scripted headless UI runs (about 12 s; headless scripts run on a virtual clock)
 ```
 
 LVGL v9.5.0 is fetched with FetchContent (config: `simulator/lv_conf.h`).
@@ -39,8 +39,11 @@ is logged to stdout as one JSON object per line (`hal_debug_line`), including ha
 
 ## Scripts
 
-One command per line, `#` comments. Input is replayed in real time through the same paths as real
-input, so gesture recognition is exercised.
+One command per line, `#` comments. Input is replayed on the script's timeline through the same paths
+as real input, so gesture recognition is exercised. With `--headless --no-ws` the clock is virtual: it
+advances only while the main loop sleeps, so a run takes as long as its drawing, not its `wait`s, and
+a loaded machine cannot stretch a tap into a hold. Set `AGENTLINK_SIM_REAL_CLOCK=1` for wall-clock time.
+With a window or a WebSocket link the clock is real.
 
 ```text
 wait MS | tap X Y | hold X Y MS | press X Y | release | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double|held|down|up] | chord
