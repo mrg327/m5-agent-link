@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: ui
+issue: 20261113-61ce
+last_reviewed: 2026-11-13
+summary: LABS and the Trackpad
+---
+
 # Experiments (LABS) and the Trackpad
 
 Issue 61ce. Experiments are features that sit outside the agent flow. They may change or go away.

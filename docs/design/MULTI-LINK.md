@@ -1,3 +1,11 @@
+---
+status: accepted
+owner: daemon
+issue: 20261114-101b
+last_reviewed: 2026-11-22
+summary: One watch, several machines
+---
+
 # m5-agent-link: one watch, several machines
 
 Status: **phase 1 built** on branch `multilink` (issue `20261114-101b`). The spike numbers in §9 were measured on the
@@ -8,6 +16,7 @@ user's call.
 
 Two machines, each running `agentlinkd` (for example the Mac and the Linux laptop), are in BLE range of
 one watch at the same time. Both stay linked:
+
 - Sessions from both machines show on the ring together.
 - Every answer, reply, focus, scroll, dictation and keyboard stroke goes back to the machine that owns
   the session.
@@ -15,6 +24,7 @@ one watch at the same time. Both stay linked:
 Today the first machine to connect owns the watch, and the other sees nothing.
 
 Out of scope:
+
 - A daemon relaying another machine's sessions. [REMOTE.md](REMOTE.md) already does that over SSH,
   and it stays the answer for a machine that is not in BLE range.
 - Two daemons on one machine.
@@ -140,6 +150,7 @@ welcomed. When it drops, the other slot becomes primary.
 
 Decided (user, 2026-11-14): the machine-specific things on the watch follow the machine the user
 **last used**.
+
 - **What follows it:** the plan usage gauges, the trackpad's target, and dictation started with no
   session.
 - **What stays with the primary:** the clock, sound and power reports. Moving those with the user
@@ -188,6 +199,7 @@ Decided (user, 2026-11-14): the machine-specific things on the watch follow the 
 ## 6. UI (glyphs over words)
 
 With one machine linked nothing changes on screen. With two:
+
 - **Machine mark.** Each slot has a mark: the OS glyph from the welcome's `host.os` (Apple, Linux,
   Windows), drawn in the slot's colour (slot 0 the current accent, slot 1 a second hue). Two Macs
   differ by colour alone.
@@ -206,6 +218,7 @@ With one machine linked nothing changes on screen. With two:
 None are required. These are worth having:
 0. **Proto 0.24 `used { idle }`** (§5.1): the one daemon change the current machine needs. An old
    daemon still links, but it is never the current machine unless it is the primary.
+
 1. **Proto 0.24: the hello says `links: 2`.** A daemon then knows the watch is shared:
    - `agentlink status` shows "shared with 1 other machine". The watch would need to say which;
      **[ask]** whether it is worth a message.
@@ -223,6 +236,7 @@ None are required. These are worth having:
 
 Nothing new in kind: there is still no bonding and no encryption (PROTOCOL.md §1). Two things change
 in degree:
+
 - The watch now advertises while linked, so a stranger nearby can take the free slot at any time,
   not only when the watch is idle. That central could show cards and receive the answers to its own
   cards. It never sees the other machine's sessions, because each slot gets only its own daemon's

@@ -7,11 +7,13 @@
 #include <stdint.h>
 
 #define KEYS_MAX_KEYS 64
-#define KEYS_MAX_PTS 200      /* points in one stroke (1200 B on the wire) */
-#define KEYS_SAMPLE_MS 30     /* touch samples are kept at least this far apart (~30 Hz) */
-#define KEYS_TAP_PX 18        /* a stroke whose extent stays under this is a tap */
-#define KEYS_TOP_Y 170        /* top of the key block; the cap with the candidates lies above it */
-#define KEYS_BOTTOM_Y 386     /* bottom of the key block; a double tap below it leaves the keyboard */
+#define KEYS_MAX_PTS 200  /* points in one stroke (1200 B on the wire) */
+#define KEYS_SAMPLE_MS 30 /* touch samples are kept at least this far apart (~30 Hz) */
+#define KEYS_TAP_PX 18    /* a stroke whose extent stays under this is a tap */
+/* top of the key block; the cap with the candidates lies above it */
+#define KEYS_TOP_Y 170
+/* bottom of the key block; a double tap below it leaves the keyboard */
+#define KEYS_BOTTOM_Y 386
 #define KEYS_BACK_DOUBLE_MS 400 /* the second tap of that double tap must land within this */
 #define KEYS_MAX_CANDS 4
 #define KEYS_CAND_LEN 32
@@ -42,7 +44,8 @@ int keys_layout(int layer, keys_key_t *out, int cap);
 
 /* Opens the keyboard for `sid`: new kid, sends kb_start with layer 0. False when offline. */
 bool keys_open(uint32_t sid, uint32_t now_ms);
-/* Closes it: kb_end (erase = the daemon removes what it typed and was not sent) and drops any stroke. */
+/* Closes it: kb_end (erase = the daemon removes what it typed and was not sent) and drops any
+ * stroke. */
 void keys_close(bool erase);
 bool keys_active(void);
 void keys_tick(uint32_t now_ms); /* re-announces the keyboard after a reconnect */
@@ -52,8 +55,8 @@ bool keys_set_layer(int layer);
 uint32_t keys_kid(void);
 uint32_t keys_seq(void); /* the seq the next stroke will carry */
 
-/* Raw touch sample (core: the touch read callback). True while KEYS owns the contact, so the gesture
- * recognizer must not see it. */
+/* Raw touch sample (core: the touch read callback). True while KEYS owns the contact, so the
+ * gesture recognizer must not see it. */
 bool keys_touch(bool down, int x, int y, uint32_t now_ms);
 /* The stroke being drawn, or the last one until the next touch-down. */
 const keys_stroke_t *keys_live(bool *down);

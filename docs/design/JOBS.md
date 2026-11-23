@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: daemon
+issue: 20261111-2e5f
+last_reviewed: 2026-11-22
+summary: Terminal commands on the watch (protocol 0.9)
+---
+
 # Jobs: terminal commands on the watch
 
 > Status: built on branch `jobs` (issue 20261111-2e5f). Protocol 0.9.
@@ -73,7 +81,7 @@ Commands on a shell session:
 `agentlink shell-init zsh|bash` prints a snippet that calls the hook shim in the background, so a
 command is never delayed:
 
-```
+```sh
 agentlink-hook shell start --pid $$ --seq N -- "<command line>"     # preexec
 agentlink-hook shell end   --pid $$ --seq N --exit <status>          # precmd
 agentlink-hook shell exit  --pid $$                                  # the shell exits

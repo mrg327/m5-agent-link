@@ -7,8 +7,10 @@
 #include "debug.h"
 #include "link.h"
 
-static const char *const kRows[2][3] = {{"qwertyuiop", "asdfghjkl", "zxcvbnm"}, {"1234567890", "-_./:~=+@", "#%&*?!'"}};
-/* 44 x 54 keys, as large as the circle allows with the candidates above (each corner >= 4 px inside the glass) */
+static const char *const kRows[2][3] = {{"qwertyuiop", "asdfghjkl", "zxcvbnm"},
+                                        {"1234567890", "-_./:~=+@", "#%&*?!'"}};
+/* 44 x 54 keys, as large as the circle allows with the candidates above (each corner >= 4 px inside
+ * the glass) */
 static const int16_t kRowX[3] = {13, 35, 79};
 static const int16_t kRowY[3] = {170, 224, 278};
 #define KEY_W 44
@@ -21,7 +23,8 @@ int keys_layout(int layer, keys_key_t *out, int cap)
     layer = layer ? 1 : 0;
     for (int r = 0; r < 3; r++)
         for (int i = 0; kRows[layer][r][i] && n < cap; i++)
-            out[n++] = (keys_key_t){(uint16_t)kRows[layer][r][i], (int16_t)(kRowX[r] + KEY_W * i), kRowY[r], KEY_W, KEY_H};
+            out[n++] = (keys_key_t){(uint16_t)kRows[layer][r][i], (int16_t)(kRowX[r] + KEY_W * i),
+                                    kRowY[r], KEY_W, KEY_H};
     if (n + 3 <= cap) {
         out[n++] = (keys_key_t){KEYS_CP_LAYER, 79, BOTTOM_Y, 66, KEY_H};
         out[n++] = (keys_key_t){KEYS_CP_SPACE, 145, BOTTOM_Y, 176, KEY_H};
@@ -78,7 +81,8 @@ static bool send_start(void)
 
 bool keys_open(uint32_t sid, uint32_t now_ms)
 {
-    s_kid = s_kid + 1 + (now_ms & 0xff); /* differs across boots: the daemon keys a keyboard by kid */
+    /* differs across boots: the daemon keys a keyboard by kid */
+    s_kid = s_kid + 1 + (now_ms & 0xff);
     s_sid = sid;
     s_seq = 0;
     s_layer = 0;
@@ -97,7 +101,8 @@ void keys_close(bool erase)
     s_qn = 0;
     link_send_cmd_arg(LINK_OP_KB_END, s_sid, 0, erase ? 1 : 0, 0);
     keys_cands_clear();
-    dbg_event("keys", "close", "\"kid\":%u,\"erase\":%s", (unsigned)s_kid, erase ? "true" : "false");
+    dbg_event("keys", "close", "\"kid\":%u,\"erase\":%s", (unsigned)s_kid,
+              erase ? "true" : "false");
 }
 
 bool keys_set_layer(int layer)
@@ -203,8 +208,8 @@ bool keys_send_stroke(const keys_stroke_t *s)
         le16(p + 4, s->pts[i].t_ms);
     }
     bool ok = link_send_kb_stroke(s_kid, s_seq, buf, (size_t)s->n * 6);
-    dbg_event("keys", "stroke", "\"seq\":%u,\"pts\":%u,\"tap\":%s,\"sent\":%s", (unsigned)s_seq, (unsigned)s->n,
-              keys_is_tap(s) ? "true" : "false", ok ? "true" : "false");
+    dbg_event("keys", "stroke", "\"seq\":%u,\"pts\":%u,\"tap\":%s,\"sent\":%s", (unsigned)s_seq,
+              (unsigned)s->n, keys_is_tap(s) ? "true" : "false", ok ? "true" : "false");
     if (ok) s_seq++;
     return ok;
 }

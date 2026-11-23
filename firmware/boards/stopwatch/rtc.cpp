@@ -1,4 +1,4 @@
-// RX8130CE RTC (I2C 0x32). The chip always holds UTC.
+/* RX8130CE RTC (I2C 0x32). The chip always holds UTC. */
 #include <stdint.h>
 
 #include "esp_log.h"
@@ -21,20 +21,14 @@ static const char *TAG = "sw-rtc";
 static i2c_master_dev_handle_t s_dev;
 
 static bool rd(uint8_t reg, uint8_t *buf, size_t len)
-{
-    return i2c_master_transmit_receive(s_dev, &reg, 1, buf, len, 100) == ESP_OK;
-}
+{ return i2c_master_transmit_receive(s_dev, &reg, 1, buf, len, 100) == ESP_OK; }
 
 static bool wr(uint8_t reg, const uint8_t *data, size_t len)
 {
     uint8_t tmp[8];
-    if (len > 7) {
-        return false;
-    }
+    if (len > 7) { return false; }
     tmp[0] = reg;
-    for (size_t i = 0; i < len; i++) {
-        tmp[1 + i] = data[i];
-    }
+    for (size_t i = 0; i < len; i++) { tmp[1 + i] = data[i]; }
     return i2c_master_transmit(s_dev, tmp, len + 1, 100) == ESP_OK;
 }
 
@@ -94,19 +88,15 @@ uint32_t hal_rtc_get_unix(void)
     int year = 2000 + bcd2dec(r[6]);
     unsigned month = bcd2dec(r[5] & 0x1f);
     unsigned mday = bcd2dec(r[4] & 0x3f);
-    if (month < 1 || month > 12 || mday < 1 || mday > 31) {
-        return 0;
-    }
-    int64_t t = days_from_civil(year, month, mday) * 86400 + bcd2dec(r[2] & 0x3f) * 3600 + bcd2dec(r[1] & 0x7f) * 60 +
-                bcd2dec(r[0] & 0x7f);
+    if (month < 1 || month > 12 || mday < 1 || mday > 31) { return 0; }
+    int64_t t = days_from_civil(year, month, mday) * 86400 + bcd2dec(r[2] & 0x3f) * 3600 +
+                bcd2dec(r[1] & 0x7f) * 60 + bcd2dec(r[0] & 0x7f);
     return (t < RTC_MIN_VALID_UNIX || t > UINT32_MAX) ? 0 : (uint32_t)t;
 }
 
 void hal_rtc_set_unix(uint32_t unix_s)
 {
-    if (!s_dev) {
-        return;
-    }
+    if (!s_dev) { return; }
     int64_t days = unix_s / 86400;
     uint32_t sod = unix_s % 86400;
     int year;
@@ -114,13 +104,10 @@ void hal_rtc_set_unix(uint32_t unix_s)
     civil_from_days(days, &year, &month, &day);
     unsigned wday = (unsigned)((days + 4) % 7); /* 1970-01-01 was a Thursday */
 
-    uint8_t regs[7] = {dec2bcd(sod % 60),
-                       dec2bcd((sod / 60) % 60),
-                       dec2bcd(sod / 3600),
-                       (uint8_t)(1u << wday), /* weekday is one-hot on the RX8130 */
-                       dec2bcd(day),
-                       dec2bcd(month),
-                       dec2bcd((uint8_t)(year % 100))};
+    uint8_t regs[7] = {
+        dec2bcd(sod % 60),     dec2bcd((sod / 60) % 60), dec2bcd(sod / 3600),
+        (uint8_t)(1u << wday), /* weekday is one-hot on the RX8130 */
+        dec2bcd(day),          dec2bcd(month),           dec2bcd((uint8_t)(year % 100))};
 
     uint8_t ctrl = 0;
     rd(REG_CTRL0, &ctrl, 1);

@@ -1,9 +1,10 @@
-/* The LABS screen in Sigil (docs/design/GLYPHS.md §5; EXPERIMENTS.md): a swipe up on the deck opens the
- * experiments, features that sit outside the agent workflow and may change or go. The subject is the atom, the
- * experiments orbit it as discs, the selected one large and in the accent. One that cannot start is dim, and
- * why is a sign under the atom: the plug while offline, "computer, download" while the daemon is too old. A tap
- * or A opens the selected one, the dial and B move the selection, a swipe down or right goes back. No word is
- * drawn; the report names the experiments and says why one is blocked, as before (rule 9). */
+/* The LABS screen in Sigil (docs/design/GLYPHS.md §5; EXPERIMENTS.md): a swipe up on the deck opens
+ * the experiments, features that sit outside the agent workflow and may change or go. The subject
+ * is the atom, the experiments orbit it as discs, the selected one large and in the accent. One
+ * that cannot start is dim, and why is a sign under the atom: the plug while offline, "computer,
+ * download" while the daemon is too old. A tap or A opens the selected one, the dial and B move the
+ * selection, a swipe down or right goes back. No word is drawn; the report names the experiments
+ * and says why one is blocked, as before (rule 9). */
 #include <stdio.h>
 #include <string.h>
 
@@ -15,7 +16,8 @@
 #include "ui_theme.h"
 
 #define SUBJECT_Y 233
-#define SIGN_Y UI_Y_TOAST /* between the key hints: the toast a refused tap shows is the same sign, in the same place */
+/* between the key hints: the toast a refused tap shows is the same sign, in the same place */
+#define SIGN_Y UI_Y_TOAST
 
 enum { LAB_TRACKPAD, LAB_COUNT };
 
@@ -57,9 +59,12 @@ static void render(void)
     int sel = ui_orbit_selected(s_orbit);
     const char *why = blocked(sel);
     ui_orbit_item_t items[LAB_COUNT];
-    for (int i = 0; i < LAB_COUNT; i++) items[i] = (ui_orbit_item_t){k_glyph[i], 0, blocked(i) != NULL};
+    for (int i = 0; i < LAB_COUNT; i++)
+        items[i] = (ui_orbit_item_t){k_glyph[i], 0, blocked(i) != NULL};
     ui_orbit_set_items(s_orbit, items, LAB_COUNT);
-    if (sel == LAB_TRACKPAD) snprintf(s_desc_txt, sizeof s_desc_txt, "%s", why ? why : "Use the watch as this PC's trackpad");
+    if (sel == LAB_TRACKPAD)
+        snprintf(s_desc_txt, sizeof s_desc_txt, "%s",
+                 why ? why : "Use the watch as this PC's trackpad");
     else s_desc_txt[0] = 0;
     const char *icons = why ? blocked_sign(sel) : "";
     if (icons != s_sign_icons) { /* literals: the pointer is the identity */
@@ -83,7 +88,8 @@ void ui_labs_open(uint32_t now)
     ui_home_rim_mode(true); /* a rim drag dials through the experiments */
     render();
     show(s_root, true);
-    dbg_event("ui", "labs", "\"items\":%d,\"pointer\":%s", LAB_COUNT, model_pointer() ? "true" : "false");
+    dbg_event("ui", "labs", "\"items\":%d,\"pointer\":%s", LAB_COUNT,
+              model_pointer() ? "true" : "false");
 }
 
 void ui_labs_close(void) { show(s_root, false); }
@@ -131,10 +137,12 @@ bool ui_labs_act(nav_action_t a, const gesture_evt_t *g)
         if (d) select_item(ui_orbit_selected(s_orbit) + d, "scrub", g_ui_actions->detent);
         return true;
     }
-    case NAV_NEXT: select_item(ui_orbit_selected(s_orbit) + 1, "btn", g_ui_actions->tick); return true;
+    case NAV_NEXT:
+        select_item(ui_orbit_selected(s_orbit) + 1, "btn", g_ui_actions->tick);
+        return true;
     default: {
-        /* The discs reach past the centre zone (nav.h: r 150), where a tap is no action of this screen: a tap
-         * on a disc is still a tap on it. */
+        /* The discs reach past the centre zone (nav.h: r 150), where a tap is no action of this
+         * screen: a tap on a disc is still a tap on it. */
         int hit = g->kind == G_TAP ? ui_orbit_hit(s_orbit, g->x, g->y) : -1;
         if (hit < 0) return false;
         select_item(hit, "tap", NULL);
@@ -155,7 +163,8 @@ void ui_labs_report(ui_report_t *r)
     snprintf(r->screen, sizeof r->screen, "labs");
     ui_report_add(r, "Experiments");
     int sel = ui_orbit_selected(s_orbit);
-    for (int k = 0; k < LAB_COUNT; k++) ui_report_add(r, "%s%s", k == 0 ? "> " : "", k_name[(sel + k) % LAB_COUNT]);
+    for (int k = 0; k < LAB_COUNT; k++)
+        ui_report_add(r, "%s%s", k == 0 ? "> " : "", k_name[(sel + k) % LAB_COUNT]);
     if (s_desc_txt[0]) ui_report_add(r, "%s", s_desc_txt);
 }
 

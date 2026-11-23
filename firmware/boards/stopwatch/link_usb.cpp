@@ -1,16 +1,16 @@
-// USB Serial/JTAG link (PROTOCOL §1: 0x00 ‖ COBS(payload ‖ crc16_be) ‖ 0x00) and the '#' debug
-// channel, which share the same USB CDC stream with the ESP-IDF console log.
-//
-// Interleaving: usb_serial_jtag_write_bytes() queues its whole buffer as one ring-buffer item,
-// so a frame (one call) is never split by console characters. hal_debug_line() uses the same
-// call; a mutex serialises both so the shared encode buffer is safe as well.
-//
-// Link state (reported through on_state):
-//   up   = USB host attached (usb_serial_jtag_is_connected(), debounced). Core then sends hello
-//          every 3 s until the daemon, once it opens the port, answers with welcome.
-//   down = host detached, or no valid frame for SILENCE_MS after the daemon had been talking
-//          (daemon gone/restarted). The state is then re-announced up, which re-triggers hello.
-// The daemon pings every ~5 s, so a live link never trips the silence timeout.
+/* USB Serial/JTAG link (PROTOCOL §1: 0x00 ‖ COBS(payload ‖ crc16_be) ‖ 0x00) and the '#' debug
+ * channel, which share the same USB CDC stream with the ESP-IDF console log.
+ *
+ * Interleaving: usb_serial_jtag_write_bytes() queues its whole buffer as one ring-buffer item,
+ * so a frame (one call) is never split by console characters. hal_debug_line() uses the same
+ * call; a mutex serialises both so the shared encode buffer is safe as well.
+ *
+ * Link state (reported through on_state):
+ *   up   = USB host attached (usb_serial_jtag_is_connected(), debounced). Core then sends hello
+ *          every 3 s until the daemon, once it opens the port, answers with welcome.
+ *   down = host detached, or no valid frame for SILENCE_MS after the daemon had been talking
+ *          (daemon gone/restarted). The state is then re-announced up, which re-triggers hello.
+ * The daemon pings every ~5 s, so a live link never trips the silence timeout. */
 #include <stdio.h>
 #include <string.h>
 
@@ -46,7 +46,8 @@ static uint16_t crc16_ccitt(const uint8_t *d, size_t n)
     uint16_t crc = 0xFFFF;
     while (n--) {
         crc ^= (uint16_t)(*d++) << 8;
-        for (int i = 0; i < 8; i++) crc = (crc & 0x8000) ? (uint16_t)((crc << 1) ^ 0x1021) : (uint16_t)(crc << 1);
+        for (int i = 0; i < 8; i++)
+            crc = (crc & 0x8000) ? (uint16_t)((crc << 1) ^ 0x1021) : (uint16_t)(crc << 1);
     }
     return crc;
 }

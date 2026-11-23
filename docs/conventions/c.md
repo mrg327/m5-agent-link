@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # C conventions
 
 How to write C in `firmware/` and `simulator/`. The board files under `firmware/boards/` are C++ only
@@ -10,6 +17,14 @@ Every rule ends with how it is enforced: `checked: <tool>`, `review`, or `planne
 are listed in [README.md](README.md#phases)). Rules that are not yet checked apply to new and changed
 code. Existing violations are counted in a baseline (see [Where the code stands](#where-the-code-stands-today))
 and fixed when the code around them is touched.
+
+`scripts/check lint` runs `scripts/check.d/lint_c.py`: clang-tidy 23.1.4 with the root `.clang-tidy`
+over the 75 first-party `.c` files in the simulator's compile database (core, the simulator HAL and
+`main`, the tests), and an `nm` prefix pass over core's objects. Its baseline,
+`scripts/check.d/baselines/lint_c.txt`, counts findings per check and file and may only shrink.
+`firmware/main/main.c`, the C++ board files and `atlas/wasm` are not in that database and stay
+`review` until the firmware database (tooling.md §3) is wired in. `lint_c.py --analyzer` adds
+clang-analyzer (about ten times slower; its 15 findings are baselined separately).
 
 ## 1. Base style
 
@@ -28,8 +43,8 @@ Our deltas:
   `if (!p) return;`. Any body on its own line has braces, and so does every `else` of a braced `if`.
   A body on the next line without braces is how a second statement ends up outside the branch
   (MISRA C:2012 Rule 15.6 asks for braces always; this is our relaxation for guard clauses).
-  `planned: phase 3` (clang-tidy `readability-braces-around-statements` with
-  `ShortStatementLines: 1`).
+  `checked: scripts/check lint (lint_c.py, baseline 503)` (clang-tidy
+  `readability-braces-around-statements` with `ShortStatementLines: 1`).
 - **C-STY-05** A function definition puts its opening brace on its own line, as ESP-IDF does, except
   that a function whose whole body fits on one line may stay on one line:
   `bool bench_playing(void) { return s_play.playing; }`. `planned: phase 1` (clang-format
@@ -53,23 +68,29 @@ exceptions are in the table at the end.
   (the component API in `core/include/core.h`), `ui_` and `ui_<screen>_`, `model_`, `link_`, `nav_`,
   `keys_`, `detail_`, `feedback_`, `gauges_`, `voice_`, `power_`, `ota_`, `gesture_`, `bench_`,
   `graph_`, `motion_`, `prefs_`, `steps_`, `done_`, `sha256_`, `ring_`, `sim_`, and `sw_` for
-  board-private functions shared between StopWatch files. `checked: review`; `planned: phase 3`
-  (clang-tidy `readability-identifier-naming`, `FunctionCase: lower_case`, prefix by review).
+  board-private functions shared between StopWatch files. `checked: scripts/check lint (lint_c.py,
+  baseline 0)` for the prefix being one of the allowed module prefixes (clang-tidy
+  `GlobalFunctionPrefix` sentinel with the allowlist in `GlobalFunctionIgnoredRegexp`, and an `nm`
+  pass over the simulator's core objects, `nm-prefix`); `review` for the prefix matching the file.
 - **C-NAME-02** Anything used in one file is `static`. File-scope variables, `const` tables included,
   are named `s_<name>`: `static hal_power_state_t s_power_state`. The one exception is ESP-IDF's log
-  tag, `static const char *TAG = "sw-board";`. No `g_`, `k` or Hungarian prefixes. `planned: phase 3`
-  (clang-tidy `GlobalVariablePrefix: s_` and `GlobalConstantPrefix: s_`: a file-scope `static` is a
-  *global* to clang-tidy, and `StaticVariable` covers only function-local statics; see
-  [tooling.md](tooling.md)).
+  tag, `static const char *TAG = "sw-board";`. No `g_`, `k` or Hungarian prefixes. `checked: scripts/check
+  lint (lint_c.py, baseline 83 for the names, 12 for missing `static`)` (clang-tidy
+  `GlobalVariablePrefix: s_` and `GlobalConstantPrefix: s_`: a file-scope `static` is a *global* to
+  clang-tidy, and `StaticVariable` covers only function-local statics; see [tooling.md](tooling.md);
+  `misc-use-internal-linkage` for `static`).
 - **C-NAME-03** Types are snake_case with `_t`: `hal_board_info_t`, `ring_t`. Function-pointer
   typedefs end in `_cb_t` when they are callbacks (`hal_button_cb_t`, `gesture_cb_t`); other
   function-pointer typedefs end in `_fn_t` or `_fn` (both are allowed: `detail_send_fn`). Type names carry the module prefix too (`hal_ota_result_t`, not `ota_result_t`).
-  `planned: phase 3` (`TypedefSuffix: _t`, `TypedefIgnoredRegexp: '^[a-z0-9_]+_fn$'`).
+  `checked: scripts/check lint (lint_c.py, baseline 0)` (`TypedefSuffix: _t`,
+  `TypedefIgnoredRegexp: '^[a-z0-9_]+_fn$'`); `review` for the module prefix.
 - **C-NAME-04** Enums are typedef'd. Enum constants are UPPER_CASE and start with the type's name
   without `_t`, or with the module prefix: `HAL_BTN_A` for `hal_button_t`, `DETAIL_NONE` for
-  `detail_state_t`. `planned: phase 3` (`EnumConstantCase: UPPER_CASE`; the prefix by review).
+  `detail_state_t`. `checked: scripts/check lint (lint_c.py, baseline 0)` (`EnumConstantCase:
+  UPPER_CASE`); `review` for the prefix.
 - **C-NAME-05** Macros are UPPER_CASE with the module prefix (`UI_MOTION_RISE`, `BENCH_MAX_RECS`).
-  `planned: phase 3` (`MacroDefinitionCase: UPPER_CASE`).
+  `checked: scripts/check lint (lint_c.py, baseline 0)` (`MacroDefinitionCase: UPPER_CASE`); `review`
+  for the prefix.
 - **C-NAME-06** Files are lowercase snake_case and named after their module: `<module>.c` with
   `<module>.h`; screens are `ui_<screen>.c`; simulator HAL files are `sim_<part>.c`; tests are
   `simulator/tests/test_<module>.c`. A header shared by several files of one module and private to it
@@ -176,20 +197,22 @@ rule 9 (no function pointers) is out: the HAL callbacks and LVGL events need the
   `review`.
 - **C-SAFE-03 No recursion.** Stack depth must be known at build time, because each FreeRTOS task
   has a fixed stack (MISRA Rule 17.2; Power of 10 rule 1). A direct-recursion scan finds none today.
-  `planned: phase 3` (clang-tidy `misc-no-recursion`).
+  `checked: scripts/check lint (lint_c.py, baseline 0)` (clang-tidy `misc-no-recursion`).
 - **C-SAFE-04 Fixed-width integers.** Use `uint8_t` to `uint64_t` and `int8_t` to `int64_t` for
   data whose size matters (protocol fields, registers, retained words, times), `size_t` for sizes
   and indices, `bool` for flags. Plain `int` is fine for small loop counters and LVGL coordinates
   (MISRA Dir 4.6; BARR-C 5.2). Times carry their unit in the name (`now_ms`, `t_us`). `review`.
 - **C-SAFE-05 Every `switch` has a `default`, and no case falls through by accident.** Mark an
   intended fall-through with `__attribute__((fallthrough));` (MISRA Rules 16.3, 16.4; CERT MSC17-C).
-  `checked: GCC -Wextra` (warns on implicit fall-through, does not fail the build); `planned:
-  phase 3` (`-Werror=implicit-fallthrough`, clang-tidy `bugprone-switch-missing-default-case`).
+  `checked: scripts/check lint (lint_c.py, baseline 1)` (clang-tidy
+  `bugprone-switch-missing-default-case`); `checked: GCC -Wextra` (warns on implicit fall-through,
+  does not fail the build); `planned: phase 3` (`-Werror=implicit-fallthrough`).
 - **C-SAFE-06 Buffers travel with their length.** A function that takes a buffer also takes its
   size, and writes stay inside it. Use `snprintf` (247 uses today), never `sprintf`, `strcpy` or
   `strcat`. Prefer indexing to pointer arithmetic (MISRA Rules 18.1, 18.4, 21.17; CERT ARR30-C,
-  STR31-C). `planned: phase 3` (clang-tidy `bugprone-unsafe-functions`,
-  `bugprone-not-null-terminated-result`, `bugprone-sizeof-expression`).
+  STR31-C). `checked: scripts/check lint (lint_c.py, baseline 0)` (clang-tidy
+  `bugprone-unsafe-functions`, `bugprone-not-null-terminated-result`, `bugprone-sizeof-expression`);
+  `review` for the length parameter and pointer arithmetic.
 - **C-SAFE-07 `const` where it can be.** A pointer parameter that is only read is `const`, and
   lookup tables are `static const` so they stay in flash (MISRA Rule 8.13). `planned: phase 3`
   (clang-tidy `readability-non-const-parameter`).
@@ -203,8 +226,9 @@ rule 9 (no function pointers) is out: the HAL callbacks and LVGL events need the
   words) (Power of 10 rule 5; CERT MSC11-C). `review`.
 - **C-SAFE-10 `static inline` over function-like macros.** A function-like macro is allowed only
   when a function cannot do the job (stringizing, `sizeof` of an argument). Any macro kept has every
-  parameter and the whole body in parentheses (MISRA Dir 4.9; BARR-C 6.3). `review`; `planned:
-  phase 3` (clang-tidy `bugprone-macro-parentheses`).
+  parameter and the whole body in parentheses (MISRA Dir 4.9; BARR-C 6.3). `review` for
+  preferring `static inline`; `checked: scripts/check lint (lint_c.py, baseline 0)` for the
+  parentheses (clang-tidy `bugprone-macro-parentheses`).
 - **C-SAFE-11 One thread touches LVGL.** HAL callbacks may run in an ISR or a driver task. They copy
   their data into a queue or `ring_t` and return, and they never call LVGL or block (CERT CON43-C;
   rule stated in `hal.h`). `review`.
@@ -260,8 +284,9 @@ esp_err_t hal_ota_write(const uint8_t *data, size_t len);
 
 - **C-SIZE-01** A function body is at most 60 lines. Past that, split out the steps as `static`
   helpers that have names. The limit is Power of 10's "one printed page". Functions that are already
-  longer go in a baseline and are flagged only when a change touches them. `planned: phase 3`
-  (clang-tidy `readability-function-size` with `LineThreshold: 60`, diff-only, baseline file).
+  longer are counted in the baseline, per file, and fail the check when a file gains one.
+  `checked: scripts/check lint (lint_c.py, baseline 31)` (clang-tidy `readability-function-size`
+  with `LineThreshold: 60`, which counts blank and comment lines too).
 
 ## Where the code stands today
 
@@ -277,7 +302,7 @@ Measured on 2026-11-22 over first-party code only: 121 C files (`.c`/`.h`) and 1
 | ...by place | 15 core, 4 `simulator/src`, 8 test `main()`s, 1 board | Longest: `parse_line` in `sim_script.c` (281), `link_rx_dispatch` (151), `ui_on_gesture` (145) |
 | Pointer declarations `T *p` / `T * p` / `T* p` (C-STY-02) | 2,333 / 0 / 0 | Regex on code with strings and comments blanked, after known type names |
 | One-line function definitions (C-STY-05) | 312 C, allowed | lizard, length 1 |
-| Brace-less bodies not on one line (C-STY-04) | 390 (of about 1,356 brace-less bodies) | clang-tidy `readability-braces-around-statements`, `ShortStatementLines: 1` |
+| Brace-less bodies not on one line (C-STY-04) | 503 after the reformat, tests included (390 before, without tests) | clang-tidy `readability-braces-around-statements`, `ShortStatementLines: 1` |
 | Headers with `#pragma once` / `#ifndef` guards | 44 / 0 | grep |
 | Doxygen `/**` blocks in headers (C-DOC-02) | 0 | grep |
 | `esp_err_t` in core, simulator, tests (C-ERR-01) | 0 | grep; boards use it for ESP-IDF calls |

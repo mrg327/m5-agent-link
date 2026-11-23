@@ -10,6 +10,9 @@
 //! The patches are byte-identical to `detools.create_patch(..., compression='heatshrink',
 //! heatshrink_window_sz2=11, heatshrink_lookahead_sz2=10)` (detools 0.53.1).
 
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
+
 mod bsdiff;
 mod heatshrink;
 

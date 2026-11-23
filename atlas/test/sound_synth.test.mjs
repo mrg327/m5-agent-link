@@ -12,7 +12,8 @@ test('bank has candidates for every role, ids unique, waves known', () => {
     assert.ok(sounds.bank.filter((s) => s.role === r.id).length >= 2, r.id);
     assert.equal(sounds.bank.find((s) => s.id === r.pick)?.role, r.id, `${r.id} pick`);
   }
-  for (const s of sounds.bank) for (const x of s.tracks.flat()) assert.ok(sounds.waves.includes(x.wave), `${s.id} ${x.wave}`);
+  for (const s of sounds.bank)
+    for (const x of s.tracks.flat()) assert.ok(sounds.waves.includes(x.wave), `${s.id} ${x.wave}`);
 });
 
 test('every sound renders audible, unclipped, short and click-free at the ends', () => {
@@ -28,7 +29,10 @@ test('every sound renders audible, unclipped, short and click-free at the ends',
 });
 
 test('a held square note has the expected period', () => {
-  const pcm = render({ tracks: [[{ wave: 'sq50', note: 69, slide: 0, vol: 15, ms: 100, decay: 0 }]] }, 16000);
+  const pcm = render(
+    { tracks: [[{ wave: 'sq50', note: 69, slide: 0, vol: 15, ms: 100, decay: 0 }]] },
+    16000,
+  );
   let flips = 0;
   for (let i = 401; i < 1200; i++) if (Math.sign(pcm[i]) !== Math.sign(pcm[i - 1])) flips++;
   assert.ok(Math.abs(flips / 2 - (799 / 16000) * midiHz(69)) <= 1, `flips ${flips}`);

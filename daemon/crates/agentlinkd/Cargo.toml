@@ -5,6 +5,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 agentlink-proto.workspace = true
 agentlink-keys = { path = "../agentlink-keys" }

@@ -35,6 +35,72 @@ uuid = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# Lints for every crate (docs/conventions/rust.md section 8); each crate opts in with
+# `[lints] workspace = true`. Existing findings are counted in scripts/check.d/baselines/lint_rust.txt
+# and checked by scripts/check.d/lint_rust.py, so the counts only go down.
+[workspace.lints.rust]
+ambiguous_negative_literals = "warn"
+missing_debug_implementations = "warn"
+redundant_imports = "warn"
+redundant_lifetimes = "warn"
+trivial_numeric_casts = "warn"
+unsafe_op_in_unsafe_fn = "warn"
+unused_lifetimes = "warn"
+unsafe_code = "deny" # OS-binding code opts out with #[expect(unsafe_code, reason = "...")]
+# missing_docs is set per library crate with #![warn(missing_docs)] in lib.rs: a workspace setting
+# would also hit the three binaries, whose items are not an API.
+
+[workspace.lints.clippy]
+# groups, overridden by the single lints below
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+# pedantic lints that cost more than they give here
+module_name_repetitions = "allow" # existing names; RS-4 covers new ones in review
+must_use_candidate = "allow"
+missing_fields_in_debug = "allow"
+cast_possible_truncation = "allow" # wire and pixel maths; we review casts instead
+cast_sign_loss = "allow"
+cast_precision_loss = "allow"
+cast_possible_wrap = "allow"
+too_many_lines = "allow" # function size is a review rule, not a lint, for Rust
+similar_names = "allow"
+# cargo lints that do not fit an unpublished workspace
+cargo_common_metadata = "allow"
+multiple_crate_versions = "allow"
+# panics (RS-19, RS-23); tests are exempt through daemon/clippy.toml
+unwrap_used = "warn"
+expect_used = "warn"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "warn"
+# unsafe (RS-28)
+undocumented_unsafe_blocks = "warn"
+unnecessary_safety_comment = "warn"
+unnecessary_safety_doc = "warn"
+# overrides must say why (RS-21)
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+# Microsoft's restriction picks
+as_pointer_underscore = "warn"
+assertions_on_result_states = "warn"
+clone_on_ref_ptr = "warn"
+deref_by_slicing = "warn"
+disallowed_script_idents = "warn"
+empty_drop = "warn"
+empty_enum_variants_with_brackets = "warn"
+empty_structs_with_brackets = "warn"
+fn_to_numeric_cast_any = "warn"
+if_then_some_else_none = "warn"
+map_err_ignore = "warn"
+redundant_type_annotations = "warn"
+renamed_function_params = "warn"
+semicolon_outside_block = "warn"
+unneeded_field_pattern = "warn"
+unused_result_ok = "warn"
+too_long_first_doc_paragraph = "warn"
+literal_string_with_formatting_args = "allow"
+
 # The daemon on a development machine runs the dev build as a service (README). Our own crates stay
 # unoptimised and debuggable; what is hot or not ours is optimised: the swipe decoder is ~20x slower at
 # opt-level 0 (its accuracy gate took 10-30 s and timed out under load, issue 5617), and CBOR, BLE and

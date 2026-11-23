@@ -1,0 +1,23 @@
+{
+  // Type-checks the pi extension against pi's API (docs/conventions/js.md JS-3). The types come
+  // from tools/lint/node_modules (npm ci --prefix tools/lint); pi loads the .ts files directly
+  // (through jiti), so resolution is "bundler" rather than Node's.
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": true,
+    "target": "es2022",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "lib": ["es2023"],
+    "types": ["node"],
+    "typeRoots": ["../../../tools/lint/node_modules/@types"],
+    "paths": {
+      "@earendil-works/pi-coding-agent": ["../../../tools/lint/node_modules/@earendil-works/pi-coding-agent"]
+    },
+    "skipLibCheck": true
+  },
+  "include": ["*.ts"]
+}

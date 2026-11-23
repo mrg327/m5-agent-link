@@ -8,25 +8,30 @@
 
 #define CX 233
 #define CY 233
-/* Index ring (UI-V3 §3.1): one round-capped capsule per session on a centre line at r 225, 8 degrees
- * apart. 6 px wide at rest, 12 px when selected (grown both ways around the same line). The selected
- * session and any that needs you are at full brightness, the rest at 40 %. A session that needs you
- * also carries a pip just inside its capsule (when it is not the selected one), so it never depends on colour alone. */
+/* Index ring (UI-V3 §3.1): one round-capped capsule per session on a centre line at r 225, 8
+ * degrees apart. 6 px wide at rest, 12 px when selected (grown both ways around the same line). The
+ * selected session and any that needs you are at full brightness, the rest at 40 %. A session that
+ * needs you also carries a pip just inside its capsule (when it is not the selected one), so it
+ * never depends on colour alone. */
 #define BAND_OUT 228 /* outer radius of a normal capsule: centre line 225, width 6 */
 #define BAND_W 6
 #define SEL_OUT 231 /* the selected capsule: width 12 around the same centre line */
 #define SEL_W 12
-#define SEG_GAP_DEG 8  /* gap between capsules (shrinks when sectors get narrow) */
-#define CAP_DEG 1      /* a round cap reaches about this far past its arc's end: spans are inset by it */
-#define REST_PCT 40    /* brightness of a session that does not need you */
+#define SEG_GAP_DEG 8 /* gap between capsules (shrinks when sectors get narrow) */
+/* a round cap reaches about this far past its arc's end: spans are inset by it */
+#define CAP_DEG 1
+#define REST_PCT 40     /* brightness of a session that does not need you */
 #define HOLD_DIM_PCT 20 /* the selected capsule while a hold arc is drawn over it */
-#define PIP_R 205      /* needs-you pip: centre radius and diameter (10 px across); drawn on unselected segments only */
+/* needs-you pip: centre radius and diameter (10 px across); drawn on unselected segments only */
+#define PIP_R 205
 #define PIP_D 10
-#define GLOW_W 14      /* ring_set_solid: the display-off alert glow is wider than the index band */
+/* ring_set_solid: the display-off alert glow is wider than the index band */
+#define GLOW_W 14
 #define TRACK_RING_W 4 /* ring_set_track: the grey track and the position arc share this width */
 #define PROG_OUT 230   /* hold arc: 10 px over the selected capsule */
 #define PROG_W 10
-#define INV_R_IN (PIP_R - PIP_D / 2 - 1) /* every invalidated chunk covers this radius band: all the ring draws */
+/* every invalidated chunk covers this radius band: all the ring draws */
+#define INV_R_IN (PIP_R - PIP_D / 2 - 1)
 #define INV_R_OUT SEL_OUT
 #define TICK_MS 30
 
@@ -43,7 +48,8 @@
 typedef struct {
     ring_seg_t s;
     uint32_t entry_ms;
-    int16_t lvl; /* quantised animation state last drawn: a repaint is only needed when it changes */
+    /* quantised animation state last drawn: a repaint is only needed when it changes */
+    int16_t lvl;
 } ring_slot_t;
 
 typedef struct {

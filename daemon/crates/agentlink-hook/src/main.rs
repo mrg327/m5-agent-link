@@ -351,6 +351,10 @@ fn process_identity(ppid: u32) -> (Vec<u32>, Option<String>) {
 /// Parent pid chain via a Toolhelp snapshot, formatted like `ps` rows (`pid ppid`) so
 /// `walk_chain` can be shared. Windows consoles have no tty.
 #[cfg(windows)]
+#[expect(
+    unsafe_code,
+    reason = "Win32 Toolhelp FFI: the OS binding for the process table"
+)]
 fn process_table() -> String {
     use std::fmt::Write;
     use windows::Win32::Foundation::CloseHandle;

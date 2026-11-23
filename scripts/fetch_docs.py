@@ -35,8 +35,16 @@ PAGES = [
     *[
         (f"arduino/api/{n}.md", f"/en/arduino/stopwatch/{n}")
         for n in (
-            "battery", "button", "display", "imu", "mic", "rtc",
-            "speaker", "touch", "vibration", "m5pm1_m5ioe1",
+            "battery",
+            "button",
+            "display",
+            "imu",
+            "mic",
+            "rtc",
+            "speaker",
+            "touch",
+            "vibration",
+            "m5pm1_m5ioe1",
         )
     ],
     ("uiflow2/program.md", "/en/uiflow2/stopwatch/program"),
@@ -51,20 +59,38 @@ GITHUB_READMES = [
     ("github/M5GFX.md", "https://raw.githubusercontent.com/m5stack/M5GFX/master/README.md"),
     ("github/M5PM1.md", "https://raw.githubusercontent.com/m5stack/M5PM1/main/README.md"),
     ("github/M5IOE1.md", "https://raw.githubusercontent.com/m5stack/M5IOE1/main/README.md"),
-    ("github/M5StopWatch-UserDemo.md", "https://raw.githubusercontent.com/m5stack/M5StopWatch-UserDemo/main/README.md"),
-    ("github/M5StopWatch-PowerDemo.md", "https://raw.githubusercontent.com/m5stack/M5StopWatch-PowerDemo/main/README.md"),
-    ("github/hermes-gadget-sdk_STOPWATCH.md", "https://raw.githubusercontent.com/allinnb/hermes-gadget-sdk/main/STOPWATCH.md"),
+    (
+        "github/M5StopWatch-UserDemo.md",
+        "https://raw.githubusercontent.com/m5stack/M5StopWatch-UserDemo/main/README.md",
+    ),
+    (
+        "github/M5StopWatch-PowerDemo.md",
+        "https://raw.githubusercontent.com/m5stack/M5StopWatch-PowerDemo/main/README.md",
+    ),
+    (
+        "github/hermes-gadget-sdk_STOPWATCH.md",
+        "https://raw.githubusercontent.com/allinnb/hermes-gadget-sdk/main/STOPWATCH.md",
+    ),
 ]
 
 OSS = "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com"
 PDFS = [
-    ("StopWatch_product_page.pdf", "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/static/pdf/static/en/core/StopWatch.pdf"),
-    ("hardware/StopWatch_schematic.pdf", f"{OSS}/1242/C152-SCH_Stopwatch_PRJ_Main_VA_20251201_2026_04_24_17_46_22.pdf"),
+    (
+        "StopWatch_product_page.pdf",
+        "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/static/pdf/static/en/core/StopWatch.pdf",
+    ),
+    (
+        "hardware/StopWatch_schematic.pdf",
+        f"{OSS}/1242/C152-SCH_Stopwatch_PRJ_Main_VA_20251201_2026_04_24_17_46_22.pdf",
+    ),
     ("hardware/StopWatch_model_size.pdf", f"{OSS}/1242/C152-StopWatch-model-size.pdf"),
     ("datasheets/ESP32-S3_datasheet.pdf", f"{OSS}/472/esp32-s3_datasheet_en.pdf"),
     ("datasheets/M5PM1_power_management.pdf", f"{OSS}/1207/M5PM1_Datasheet_EN.pdf"),
     ("datasheets/M5IOE1_io_expander.pdf", f"{OSS}/1210/IO_Expander_Datasheet_EN.pdf"),
-    ("datasheets/ES8311_audio_codec.pdf", "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/products/atom/Atomic%20Echo%20Base/ES8311.pdf"),
+    (
+        "datasheets/ES8311_audio_codec.pdf",
+        "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/products/atom/Atomic%20Echo%20Base/ES8311.pdf",
+    ),
     ("datasheets/RX8130CE_rtc.pdf", f"{OSS}/1132/RX8130CE_cn.pdf"),
     ("datasheets/RX8130CE_rtc_registers.pdf", f"{OSS}/1132/RX8130CE_cn-Register-Datasheet.pdf"),
     ("datasheets/CO5300_display_driver.pdf", f"{OSS}/1242/CO5300_Datasheet.pdf"),
@@ -119,7 +145,11 @@ def fetch_page(out: str, path: str) -> None:
         str(body),
         heading_style="ATX",
         code_language_callback=lambda el: next(
-            (c.removeprefix("language-") for c in (el.code or el).get("class", []) if c.startswith("language-")),
+            (
+                c.removeprefix("language-")
+                for c in (el.code or el).get("class", [])
+                if c.startswith("language-")
+            ),
             None,
         ),
     )
@@ -130,7 +160,10 @@ def fetch_page(out: str, path: str) -> None:
 def main() -> int:
     jobs = (
         [(o, lambda o=o, p=p: fetch_page(o, p)) for o, p in PAGES]
-        + [(o, lambda o=o, u=u: write_text(o, f"> Source: {u}\n\n{get(u).text}")) for o, u in GITHUB_READMES]
+        + [
+            (o, lambda o=o, u=u: write_text(o, f"> Source: {u}\n\n{get(u).text}"))
+            for o, u in GITHUB_READMES
+        ]
         + [(o, lambda o=o, u=u: write_bytes(o, get(u).content)) for o, u in PDFS]
     )
     failures = []

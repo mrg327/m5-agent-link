@@ -1,10 +1,17 @@
+---
+status: implemented
+owner: protocol
+last_reviewed: 2026-11-22
+summary: 'The wire protocol: envelope, messages, versions, AEAD'
+---
+
 # agentlink protocol v0 (draft)
 
 > Status: **[D] v0 decisions: integer CBOR keys, always-on app-layer AEAD, zcbor C codegen.** The protocol is transport-agnostic and device-agnostic. See DESIGN.md §3.1 and §5.
 
 ## 1. Layers
 
-```
+```text
 ┌ app messages (CBOR maps, schema below) ┐
 ├ security envelope (after pairing)      ┤  AEAD (ChaCha20-Poly1305), per-link session key, counters
 ├ fragmentation (BLE only)               ┤  1-byte header: [FIRST|LAST|seq:6]
@@ -54,7 +61,7 @@ Unknown `t` → ignore. Unknown keys in `b` → ignore. A breaking change means 
 
 ## 3. Handshake & lifecycle
 
-```
+```text
 device                                 daemon
   │── hello {proto, dev, caps, fw} ───►│
   │◄── welcome {proto, host, time, cfg}│   (version negotiated: min(major) must match)
@@ -70,6 +77,7 @@ device                                 daemon
 - **Transport arbitration** (device side, `link.c`): the device sends `hello` on every transport that is up, and the first `welcome` claims the link; frames from the other transports are then ignored. **USB is preferred when plugged in** (2026-11-10): while welcomed on BLE or WS with a USB host attached, the device also offers a `hello` on USB, at once and then every 5 s (every 30 s while those sends time out, i.e. a host that is attached but not reading). A `welcome` on USB takes the link over: it is a new link (cards dropped, a snapshot follows) and the old transport is ignored from then on. When the active transport drops, the device falls back to a handshake on whatever is still up. The daemon that loses the device simply stops hearing from it.
 
 ### `hello` (device → daemon)
+
 ```cddl
 hello = {
   proto: [uint, uint],             ; [major, minor] = [0, 20]
@@ -90,6 +98,7 @@ hello = {
 ```
 
 ### `welcome` (daemon → device)
+
 ```cddl
 welcome = {
   proto: [uint, uint],
@@ -102,11 +111,13 @@ welcome = {
   ? pointer: bool             ; key 7 (proto 0.20): the daemon drives its machine's pointer (§6g)
 }
 ```
+
 - `replies` is sent only to a device whose `hello` says proto ≥ 0.4 (an older decoder rejects an unknown key). Its presence means the daemon can type into terminals: `cmd type` and `cmd cancel` (§5). The list is the user's own `~/.agentlink/replies.txt` (one per line, `#` comments, ≤ 6 × 24 chars), and empty without one: there are no built-in defaults.
 
 ## 4. State messages (daemon → device)
 
 ### Session object
+
 ```cddl
 session = {
   sid: uint,                 ; short id assigned by daemon (stable for the session lifetime)
@@ -147,6 +158,7 @@ session = {
   ? lp: tstr                 ; its start, ≤ 160 bytes; "" under privacy meta     ┘
 }
 ```
+
 - `q` / `rp` (keys 17, 18, proto 0.5): when an agent's turn ends on a question, the daemon reads it from the turn's last message (Claude Code's Stop hook carries `last_assistant_message`) and sends the question (≤ 120 chars) with up to 3 answers (≤ 24 chars): the options of an "A or B?" question, else `Yes, go ahead` / `No` for a yes/no one, else none. The watch lists them first under Reply, with the question above. They are cleared (`""`, `[]`: a delta cannot remove a key) as soon as the agent works again. Agent content: never sent under privacy `meta`, and only to devices with proto ≥ 0.5.
 - `sum` is the current step: `"<tool> · <argument>"` (the shell command's first line, a file's last two
   path components, a URL or a search pattern), ≤ 80 chars. The daemon sends it only when the device's
@@ -169,6 +181,7 @@ session = {
 - `gone { sid }`: the session has been removed.
 
 ### Attention
+
 ```cddl
 attention = {
   rid: uint,                 ; request id; required for approve/deny
@@ -195,6 +208,7 @@ attention = {
 ask_q = { h: tstr, q: tstr, o: [1*4 { l: tstr, ? d: tstr }], ? m: bool }   ; header, question, options, multi
 clear = { rid: uint, why: "answered_pc"/"answered_dev"/"expired"/"cancelled"/"handed_back" }
 ```
+
 - **Answer window (proto 0.11, [ANSWER-WINDOW.md](ANSWER-WINDOW.md)).** `left` and `win` let the device count
   down on its own clock (a re-sent request after a reconnect carries what is left now); `expired` means the
   window ran out and the terminal asks now. `len` says the preview is not the whole text (cut, or reshaped) and
@@ -245,6 +259,7 @@ scroll_arg = { unit: "lines"/"pages"/"to_end", delta: int, ? seq: uint }   ; del
 result = { ok: bool, ? err: "stale"/"denied"/"unsupported"/"no_window"/"timeout", ? msg: tstr, ? pos: scroll_pos }
 scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tstr }   ; only in answers to scroll
 ```
+
 - `focus`: the daemon runs the FocusDriver for that session. On `no_window`, the device shows "Open terminal not found".
   With a `rid` (proto 0.11) it also hands that open request back to the terminal at once: the hook returns no
   decision, the terminal prompt appears, and devices get `clear` `handed_back`. It answers nothing.
@@ -282,13 +297,15 @@ scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tst
 - `approve`/`deny`/`reply` on a `rid` that has already been cleared returns `err: "stale"`, so a race against the terminal answer is safe. The daemon's approval broker holds the agent's blocking hook for that `rid` (DESIGN §6a) for the answer window ([ANSWER-WINDOW.md](ANSWER-WINDOW.md)); the first of {device answer, terminal answer, Open on PC, window over, hook gone} settles it, and only a device answer ever becomes a decision for the agent.
 
 ## 6. Audio: voice dictation (proto 0.6, issue 0ea9)
-```
+
+```text
 audio_start { aid, codec: "adpcm16k", sid? }   device → daemon
 audio       { aid, seq, data: bstr }             device → daemon (≤ 240 B each)
 audio_end   { aid }                              device → daemon
 transcript  { aid, text, autosend_ms: 0 }        daemon → device
 cmd { op: "dictate", sid, rid?, arg: aid, hold_ms }  device → daemon
 ```
+
 - The daemon offers voice with `welcome.voice: true` (only to devices with proto ≥ 0.6) when whisper.cpp is installed (`AGENTLINK_WHISPER_CLI` / `AGENTLINK_WHISPER_MODEL`, else `~/tools/whisper.cpp` with `ggml-base.en.bin`). A device with a mic advertises `feature_voice`.
 - `adpcm16k`: 16 kHz mono IMA ADPCM in self-contained blocks: 4 header bytes (first sample, int16 LE; step index; 0), then two samples per byte, low nibble first; 240 bytes hold 473 samples (~30 ms). A lost block only loses its 30 ms. The device caps a recording at 60 s (15 s before proto 0.16); the daemon drops one past 70 s. The audio is streamed as it is recorded, so the length costs the device no memory.
 - On `audio_end` the daemon decodes the blocks in `seq` order, runs whisper (the WAV exists only while it runs, 0600 in `~/.agentlink/voice/`), drops whisper's own annotations (`[BLANK_AUDIO]`, `(music)`), and answers `transcript` with `text` of at most what the device holds: 2047 UTF-8 bytes for proto ≥ 0.16, else 255 (a longer text is cut on a character boundary and ends with `…`), `""` when nothing was heard. The daemon keeps exactly the text it sent, so `dictate` types what the user read. The device pages a long transcript and allows the hold only once its last page has been on screen. `autosend_ms` is always 0: nothing is sent without the user.
@@ -297,7 +314,8 @@ cmd { op: "dictate", sid, rid?, arg: aid, hold_ms }  device → daemon
 - Speech and transcripts never reach the trace or the audit log (the trace replaces `data` and `text` with `<private>`); the daemon logs only the duration and the word count.
 
 ## 6a. Keyboard: KEYS swipe input (proto 0.7, issue 1e57)
-```
+
+```text
 kb_start  { kid, sid, keys: bstr }                    device → daemon (≤ 64 keys × 10 B)
 kb_stroke { kid, seq, pts: bstr }                     device → daemon (≤ 200 points × 6 B)
 kb_cands  { kid, seq, cands: [≤ 4 tstr], typed?, err? } daemon → device
@@ -306,6 +324,7 @@ cmd { op: "kb_del",  sid }                            device → daemon
 cmd { op: "kb_send", sid, hold_ms }                   device → daemon
 cmd { op: "kb_end",  sid, arg: 1 erase / 0 keep }     device → daemon
 ```
+
 - The daemon offers KEYS with `welcome.keys: true` only to devices that advertise `feature_keys` with proto ≥ 0.7. The device draws the keyboard and owns its geometry; the daemon owns the lexicon and the decoder. The device still never sends text: only key rectangles, touch points and candidate indices.
 - `kb_start.keys`: per key 10 bytes LE: u16 code point, i16 x, i16 y, u16 w, u16 h (top-left rectangle, display px). Code points: a letter types itself, `0x20` space, `0x08` backspace (deletes the last word), `0x0E` layer switch (handled on the device, which resends `kb_start` with the same `kid`). Any other printable ASCII code point (the symbols layer: digits, `-_./:~=+@#%&*?!'`) is typed literally and glued to the word before it and the word after it, so `check_dram` `.` `py` gives `check_dram.py`; a later `kb_pick` replaces only the part after the symbol. A repeated `kb_start` replaces the layout and keeps the composition.
 - `kb_stroke.pts`: per point 6 bytes LE: i16 x, i16 y, u16 ms since touch-down, sampled at the touch rate (~30 Hz). A stroke is one word. A stroke whose extent stays under 18 px is a tap on the key under its first point.
@@ -314,9 +333,11 @@ cmd { op: "kb_end",  sid, arg: 1 erase / 0 keep }     device → daemon
 - Strokes, candidates and typed words never reach the audit log; the trace replaces `keys`, `pts` and `cands` with `<private>`. The daemon logs only word counts.
 
 ## 6b. Usage (proto 0.10, [GAUGES.md](GAUGES.md))
-```
+
+```text
 usage { at, h5?, h5r?, h5o?, wk?, wkr?, wko? }      daemon → device (type 23)
 ```
+
 - The plan's rate-limit windows from Claude Code's status line (`rate_limits.five_hour` / `seven_day`): used
   percent (rounded down), reset time, and the time it runs out at the current pace when that comes first. `at` is
   when the daemon last read them. A full replacement: an absent window is unknown, never zero.
@@ -326,13 +347,15 @@ usage { at, h5?, h5r?, h5o?, wk?, wkr?, wko? }      daemon → device (type 23)
 - The device shows a window while the clock is set, the window has not reset and `at` is under an hour old.
 
 ## 6c. Firmware update (proto 0.15, [FIRMWARE.md](FIRMWARE.md) §9, issue b769)
-```
+
+```text
 fw_begin { size, sha: bstr(32), ver?, patch? }   daemon → device (type 24); size 0 stops
 fw_patch { psize, base: bstr(32), bsize }        proto 0.21: the chunks carry a patch, not the image
 fw_chunk { off, data: bstr(≤ 2048) }             daemon → device (type 25)
 fw_ack   { st, next, msg? }                      device → daemon (type 26)
 st: go 0 | done 1 | busy 2 | bad 3 | fail 4 | stopped 5
 ```
+
 - Only to a device with proto ≥ 0.15, and only when asked (`agentlink ota <image.bin>`); never on its own.
 - `fw_begin` opens a transfer of a whole app image (`sha` is its SHA-256). The device answers `fw_ack go`
   with `next` = 0, or with the offset it already holds when a transfer of the same `sha` and `size` is open
@@ -363,9 +386,11 @@ st: go 0 | done 1 | busy 2 | bad 3 | fail 4 | stopped 5
 - Chunks never reach the trace (it shows the size only).
 
 ## 6d. Queued messages (proto 0.17)
+
 A quick reply or a dictation can be sent to a session whose agent is working; it is typed at once, mid-turn
 (the agent takes it in as it goes). Only while typing would answer something else is it held, and typed later.
 Until 2026-11-13 the daemon also held it through `start`/`work` until the turn ended; that made replies stale.
+
 - `type` or `dictate` with `q: true` and no `rid`: when the session can take input now (no open request, not
   `input` with `sub` approval or question; `start` and `work` can), the daemon types it at once, as without `q`.
   Otherwise it keeps the text (a dictation's transcript is taken at once) and answers `ok`. A session holds one
@@ -382,6 +407,7 @@ Until 2026-11-13 the daemon also held it through `start`/`work` until the turn e
   not the text.
 
 ## 6e. Last message and questions (proto 0.18, [LAST-MESSAGE.md](LAST-MESSAGE.md))
+
 - **Last message.** When a Claude Code turn ends (`Stop`, `last_assistant_message`), the daemon keeps the final
   message, markdown cleaned to plain text and cut at 4096 bytes, one per session, in memory, and sends `lm` (a new
   id), `ll` (its length) and `lp` (its start, ≤ 160 bytes) with the delta that enters done; a new prompt clears them
@@ -402,9 +428,11 @@ Until 2026-11-13 the daemon also held it through `start`/`work` until the turn e
   `dictate` with the `rid`), anything else is Open on PC only.
 
 ## 6f. Power report (proto 0.19, [POWER.md](POWER.md))
-```
+
+```text
 power { mv, mvf, vin, chg, usb, pct, on, dim, off, deep, lk, ble, itvl, seq, nd }   device → daemon (type 27)
 ```
+
 - The device sends it only to a daemon whose `welcome` says proto ≥ 0.19: right after the welcome, then every 5
   minutes while welcomed (a send that fails is tried again 30 s later). Nothing is sent, and nothing extra wakes
   the device, while no daemon listens: the figures add up until the next report goes out.
@@ -421,9 +449,11 @@ power { mv, mvf, vin, chg, usb, pct, on, dim, off, deep, lk, ble, itvl, seq, nd 
   `agentlink status`; `agentlink power` reads the file. An older daemon ignores the message type.
 
 ## 6g. Trackpad (proto 0.20, [EXPERIMENTS.md](EXPERIMENTS.md))
-```
+
+```text
 cmd { op: "pointer", ptr: { dx?: int, dy?: int, btn?: "left"/"right", n?: uint, wheel?: int } }   device → daemon
 ```
+
 - The daemon moves the pointer of **its own machine** (not the host a session runs on): by (`dx`, `dy`) pixels
   (positive = right / down), then presses and releases `btn` once, then scrolls `wheel` notches (positive = down,
   towards newer content). It clamps one command to ±2000 px, click count 3 and ±20 notches.
@@ -437,10 +467,12 @@ cmd { op: "pointer", ptr: { dx?: int, dy?: int, btn?: "left"/"right", n?: uint, 
 - The trace leaves out commands that only move; clicks and scrolls are traced. Nothing is audited.
 
 ## 6h. Agent graph (proto 0.22, [GRAPH.md](GRAPH.md))
-```
+
+```text
 cmd { op: "graph", sid }                                   device → daemon
 graph { sid, nodes: [0*64 uint], ? la: [0*8 uint], ? drop: uint, ? gen: uint }   daemon → device (type 28)
 ```
+
 - `nodes` are the current turn's tool calls of the session and its sub-agents, oldest first, at most the newest
   64; `drop` counts the older ones. One uint per node, bits low to high: 0-3 kind (0 other, 1 read, 2 edit,
   3 shell, 4 search, 5 web, 6 agent, 7 ask, 8 plan, 9 git, 10 test, 11 mcp), 4-5 state (0 running, 1 ok,
@@ -460,7 +492,7 @@ graph { sid, nodes: [0*64 uint], ? la: [0*8 uint], ? drop: uint, ? gen: uint }  
 Debug messages for driving the watch as a finger and timing what it draws. The daemon sends them only to a
 device with proto ≥ 0.24 that offers `feature_debug`, and only while `agentlink bench` runs.
 
-```
+```text
 dbg_touch  (70) daemon → device  { dt, pts: bstr }       one stroke: int16 LE x, y pairs, a point every dt ms,
                                                          lifted dt after the last; replaces a stroke still playing
 dbg_bench  (71) daemon → device  { op: start|stop|mark, arg? }
@@ -470,12 +502,14 @@ dbg_frames (72) device → daemon  { seq, recs: bstr, last, lost }   after stop:
 The record layout and kinds (frame, down, up, gesture, mark, cmd) are in BENCH.md §3.
 
 ## 7. Misc
+
 - `batt { pct, chg: bool }` (device → daemon, on change ≥ 5% or on charge state change) is shown in the tray. The current firmware does not send it; the power report (§6f) carries more.
 - `cfg { … }` (daemon → device) is a partial update of the `welcome.cfg` fields.
 - `ping {}` / `pong {}`.
 - `log { lvl, msg }` (device → daemon) is debug only and is enabled from the daemon.
 
 ## 8. Security
+
 1. **Pairing** establishes a long-term shared secret per (device, host).
    - BLE: LE Secure Connections with a passkey shown on the device. An app-level key confirmation (`pair` message) then binds the secret.
    - USB-first: X25519 key exchange over CDC, with a confirmation code shown on both screens.
@@ -484,9 +518,11 @@ The record layout and kinds (frame, down, up, gesture, mark, cmd) are in BENCH.m
 4. A simulator (WS on localhost) pairs like USB-first. It is never exposed beyond 127.0.0.1.
 
 ## 9. Sizing sanity (StopWatch over BLE)
+
 A typical `session` delta is 30–80 B, and a `snapshot` with 10 sessions is about 1.2 KB, which is 5–6 BLE fragments. When idle there is no traffic, apart from the BLE link-layer empty packets at the connection interval (~1 s). This fits the multi-day battery target.
 
 ## 10. Open
+
 - **[D]** Integer keys; symbolic names are kept in CDDL and debug tooling.
 - **[D]** App-layer AEAD is always on, on every transport.
 - **[D]** `zcbor` generates the C encoders/decoders from the CDDL. The Rust side is hand-written (`minicbor` derive with `#[n(k)]` indices). Both sides must pass the shared test vectors in `protocol/vectors/` in CI.

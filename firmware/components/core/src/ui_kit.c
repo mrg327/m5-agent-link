@@ -1,9 +1,10 @@
 /* Sigil primitives (docs/design/GLYPHS.md §3); the API and what each one is for are in ui_kit.h.
  *
- * Each primitive is a plain lv_obj with a draw callback and a small heap struct in its user data (freed with
- * the object). Redraw discipline (UI-V2 §8a): a setter compares before it writes, and what changes is
- * invalidated as the smallest box that holds it: one dot, or an arc cut in 30 degree pieces so a long arc is
- * never one near full-screen box. The draw callbacks skip what lies outside the layer's clip area. */
+ * Each primitive is a plain lv_obj with a draw callback and a small heap struct in its user data
+ * (freed with the object). Redraw discipline (UI-V2 §8a): a setter compares before it writes, and
+ * what changes is invalidated as the smallest box that holds it: one dot, or an arc cut in 30
+ * degree pieces so a long arc is never one near full-screen box. The draw callbacks skip what lies
+ * outside the layer's clip area. */
 #include "ui_kit.h"
 
 #include <math.h>
@@ -46,7 +47,8 @@ static void place(lv_obj_t *o, int cx, int cy, int half)
 {
     int side = 2 * half + 1;
     if (lv_obj_get_style_width(o, 0) != side) lv_obj_set_size(o, side, side);
-    if (lv_obj_get_style_x(o, 0) != cx - half || lv_obj_get_style_y(o, 0) != cy - half) lv_obj_set_pos(o, cx - half, cy - half);
+    if (lv_obj_get_style_x(o, 0) != cx - half || lv_obj_get_style_y(o, 0) != cy - half)
+        lv_obj_set_pos(o, cx - half, cy - half);
 }
 
 /* The object's centre on the screen. */
@@ -83,8 +85,8 @@ static void dot(lv_layer_t *l, int x, int y, int r, lv_color_t c)
     lv_draw_rect(l, &d, &a);
 }
 
-/* A round-capped arc whose outer edge is at r_out, a0..a1 degrees clockwise from 12 o'clock. 360 degrees or
- * more is a closed ring without caps. */
+/* A round-capped arc whose outer edge is at r_out, a0..a1 degrees clockwise from 12 o'clock. 360
+ * degrees or more is a closed ring without caps. */
 static void arc(lv_layer_t *l, int cx, int cy, int r_out, int w, int a0, int a1, lv_color_t c)
 {
     if (a1 <= a0 || w <= 0 || r_out <= 0 || !in_clip(l, cx, cy, r_out + w)) return;
@@ -95,7 +97,8 @@ static void arc(lv_layer_t *l, int cx, int cy, int r_out, int w, int a0, int a1,
     d.radius = (uint16_t)r_out;
     d.width = (uint16_t)w;
     d.color = c;
-    if (a1 - a0 >= 360) { /* two overlapping halves: one 0..359 arc leaves a seam (as the index ring does) */
+    if (a1 - a0 >= 360) {
+        /* two overlapping halves: one 0..359 arc leaves a seam (as the index ring does) */
         d.start_angle = 0;
         d.end_angle = 181;
         lv_draw_arc(l, &d);
@@ -109,7 +112,8 @@ static void arc(lv_layer_t *l, int cx, int cy, int r_out, int w, int a0, int a1,
     lv_draw_arc(l, &d);
 }
 
-/* Invalidates the band r_in..r_out between a0 and a1 degrees about (cx, cy), `pad` px round it (a round cap). */
+/* Invalidates the band r_in..r_out between a0 and a1 degrees about (cx, cy), `pad` px round it (a
+ * round cap). */
 static void inv_arc(lv_obj_t *o, int cx, int cy, int r_in, int r_out, int a0, int a1, int pad)
 {
     if (a0 > a1) {
@@ -183,7 +187,8 @@ static int glyph_measure(const lv_font_t *font, const char *icons, int *w, int *
     return n;
 }
 
-void ui_glyph_draw(lv_layer_t *l, const lv_font_t *font, const char *icons, int cx, int cy, lv_color_t c, lv_opa_t opa)
+void ui_glyph_draw(lv_layer_t *l, const lv_font_t *font, const char *icons, int cx, int cy,
+                   lv_color_t c, lv_opa_t opa)
 {
     if (!icons || !icons[0]) return;
     int tw, th, lh = lv_font_get_line_height(font), gap = lh / 6;
@@ -198,8 +203,10 @@ void ui_glyph_draw(lv_layer_t *l, const lv_font_t *font, const char *icons, int 
     for (uint32_t cp; n < GLYPH_ROW && (cp = next_cp(&icons)) != 0;) {
         lv_font_glyph_dsc_t g;
         if (cp == ' ' || !lv_font_get_glyph_dsc(font, &g, cp, 0)) continue;
-        /* a label puts the ink at x + ofs_x, y + line_height - base_line - box_h - ofs_y: solve for the ink's centre */
-        lv_point_t pt = {x - g.ofs_x, cy - g.box_h / 2 - (lh - font->base_line - g.box_h - g.ofs_y)};
+        /* a label puts the ink at x + ofs_x, y + line_height - base_line - box_h - ofs_y: solve for
+         * the ink's centre */
+        lv_point_t pt = {x - g.ofs_x,
+                         cy - g.box_h / 2 - (lh - font->base_line - g.box_h - g.ofs_y)};
         lv_draw_character(l, &d, &pt, cp);
         x += g.box_w + gap;
         n++;
@@ -208,7 +215,8 @@ void ui_glyph_draw(lv_layer_t *l, const lv_font_t *font, const char *icons, int 
 
 const lv_font_t *ui_glyph_font(const char *icons, int px)
 {
-    static const lv_font_t *const fonts[] = {FONT_ICON_HERO, FONT_ICON_XXL, FONT_ICON_XL, FONT_ICON_L, FONT_ICON_M, FONT_ICON_S};
+    static const lv_font_t *const fonts[] = {FONT_ICON_HERO, FONT_ICON_XXL, FONT_ICON_XL,
+                                             FONT_ICON_L,    FONT_ICON_M,   FONT_ICON_S};
     static const int size[] = {128, 96, 64, 44, 28, 20};
     for (size_t i = 0; i < sizeof size / sizeof size[0]; i++) {
         if (size[i] > px && i + 1 < sizeof size / sizeof size[0]) continue;
@@ -305,7 +313,8 @@ void ui_sigil_hash(const char *name, uint8_t h[UI_SIGIL_HASH])
     memcpy(h, out, UI_SIGIL_HASH);
 }
 
-void ui_sigil_paint(lv_layer_t *l, const uint8_t h[UI_SIGIL_HASH], int cx, int cy, int r, int w, lv_color_t c)
+void ui_sigil_paint(lv_layer_t *l, const uint8_t h[UI_SIGIL_HASH], int cx, int cy, int r, int w,
+                    lv_color_t c)
 {
     if (w <= 0) w = sigil_w(r);
     if (!in_clip(l, cx, cy, r + 1)) return;
@@ -346,7 +355,9 @@ static void sigil_draw(lv_event_t *e)
     int cx, cy;
     centre_of(o, &cx, &cy);
     if (s->named) ui_sigil_paint(lv_event_get_layer(e), s->h, cx, cy, s->r, 0, s->col);
-    else ui_glyph_draw(lv_event_get_layer(e), ui_glyph_font(ICON_NO_FOLDER, s->r * 2), ICON_NO_FOLDER, cx, cy, s->col, LV_OPA_COVER);
+    else
+        ui_glyph_draw(lv_event_get_layer(e), ui_glyph_font(ICON_NO_FOLDER, s->r * 2),
+                      ICON_NO_FOLDER, cx, cy, s->col, LV_OPA_COVER);
 }
 
 lv_obj_t *ui_sigil_create(lv_obj_t *parent, int cx, int cy, int r)
@@ -387,13 +398,13 @@ void ui_sigil_set_pos(lv_obj_t *o, int cx, int cy)
 
 /* ───────── §3.3 time dots ───────── */
 
-#define DOT_R 2      /* a minute */
-#define DOT_R_TEN 4  /* every tenth */
-#define DOT_PAD 6    /* the object reaches this far past the circle */
-#define DOT_DIM 35   /* % brightness of the minutes still to come in a running hour */
-#define PIP_IN 12    /* hour pips: this far inside the circle */
+#define DOT_R 2     /* a minute */
+#define DOT_R_TEN 4 /* every tenth */
+#define DOT_PAD 6   /* the object reaches this far past the circle */
+#define DOT_DIM 35  /* % brightness of the minutes still to come in a running hour */
+#define PIP_IN 12   /* hour pips: this far inside the circle */
 #define PIP_R 3
-#define PIP_STEP 12  /* degrees between hour pips */
+#define PIP_STEP 12 /* degrees between hour pips */
 #define PIP_MAX 12
 
 typedef struct {
@@ -483,8 +494,11 @@ int ui_tally_width(uint32_t minutes)
     int kinds = (h > 0) + (t > 0) + (u > 0);
     if (!kinds) return 0;
     /* each mark takes its pitch; the last one ends at its own edge, not a pitch later */
-    int w = h * TALLY_BAR_PITCH + t * TALLY_TEN_PITCH + u * TALLY_ONE_PITCH + (kinds - 1) * TALLY_GROUP;
-    int last = u ? TALLY_ONE_PITCH - (2 * TALLY_ONE_R + 1) : t ? TALLY_TEN_PITCH - (2 * TALLY_TEN_R + 1) : TALLY_BAR_PITCH - TALLY_BAR_W;
+    int w =
+        h * TALLY_BAR_PITCH + t * TALLY_TEN_PITCH + u * TALLY_ONE_PITCH + (kinds - 1) * TALLY_GROUP;
+    int last = u   ? TALLY_ONE_PITCH - (2 * TALLY_ONE_R + 1)
+               : t ? TALLY_TEN_PITCH - (2 * TALLY_TEN_R + 1)
+                   : TALLY_BAR_PITCH - TALLY_BAR_W;
     return w - last;
 }
 
@@ -507,9 +521,11 @@ static void tally_draw(lv_event_t *e)
         lv_draw_rect(l, &r, &a);
     }
     if (h && (t || u)) x += TALLY_GROUP;
-    for (int i = 0; i < t; i++, x += TALLY_TEN_PITCH) dot(l, x + TALLY_TEN_R, cy, TALLY_TEN_R, d->col);
+    for (int i = 0; i < t; i++, x += TALLY_TEN_PITCH)
+        dot(l, x + TALLY_TEN_R, cy, TALLY_TEN_R, d->col);
     if (t && u) x += TALLY_GROUP;
-    for (int i = 0; i < u; i++, x += TALLY_ONE_PITCH) dot(l, x + TALLY_ONE_R, cy, TALLY_ONE_R, d->col);
+    for (int i = 0; i < u; i++, x += TALLY_ONE_PITCH)
+        dot(l, x + TALLY_ONE_R, cy, TALLY_ONE_R, d->col);
 }
 
 static void tally_place(lv_obj_t *o)
@@ -555,7 +571,8 @@ typedef struct {
     lv_color_t fill, track;
 } arc_t;
 
-static int arc_end(const arc_t *a, int pm) { return a->start + (int)((int32_t)a->span * pm / 1000); }
+static int arc_end(const arc_t *a, int pm)
+{ return a->start + (int)((int32_t)a->span * pm / 1000); }
 
 static void arc_draw(lv_event_t *e)
 {
@@ -566,15 +583,17 @@ static void arc_draw(lv_event_t *e)
     centre_of(o, &cx, &cy);
     if (a->steps > 1) { /* a level: whole pieces, the gap between two is the caps and 4 px */
         bool track = !lv_color_eq(a->track, lv_color_black());
-        int gap = (a->w + 4) * 57 / (a->r > 0 ? a->r : 1) + 1, lit = (a->pm * a->steps + 500) / 1000;
+        int gap = (a->w + 4) * 57 / (a->r > 0 ? a->r : 1) + 1,
+            lit = (a->pm * a->steps + 500) / 1000;
         for (int i = 0; i < a->steps; i++) {
             if (i >= lit && !track) break;
-            arc(l, cx, cy, r_out, a->w, a->start + a->span * i / a->steps + gap / 2, a->start + a->span * (i + 1) / a->steps - gap / 2,
-                i < lit ? a->fill : a->track);
+            arc(l, cx, cy, r_out, a->w, a->start + a->span * i / a->steps + gap / 2,
+                a->start + a->span * (i + 1) / a->steps - gap / 2, i < lit ? a->fill : a->track);
         }
         return;
     }
-    if (!lv_color_eq(a->track, lv_color_black())) arc(l, cx, cy, r_out, a->w, a->start, a->start + a->span, a->track);
+    if (!lv_color_eq(a->track, lv_color_black()))
+        arc(l, cx, cy, r_out, a->w, a->start, a->start + a->span, a->track);
     if (a->pm <= 0) return;
     int end = arc_end(a, a->pm);
     if (end <= a->start) end = a->start + 1; /* known and above nothing: at least the round cap */
@@ -664,16 +683,19 @@ static void track_draw(lv_event_t *e)
     lv_obj_t *o = lv_event_get_target_obj(e);
     track_t *t = lv_obj_get_user_data(o);
     lv_layer_t *l = lv_event_get_layer(e);
-    int cx, cy, a0 = t->span < 0 ? t->start + t->span : t->start, a1 = t->span < 0 ? t->start : t->start + t->span;
+    int cx, cy, a0 = t->span < 0 ? t->start + t->span : t->start,
+                a1 = t->span < 0 ? t->start : t->start + t->span;
     int tw = t->w / 3 < 2 ? 2 : t->w / 3;
     centre_of(o, &cx, &cy);
-    if (!lv_color_eq(t->track, lv_color_black())) arc(l, cx, cy, t->r + tw / 2, tw, a0, a1, t->track);
+    if (!lv_color_eq(t->track, lv_color_black()))
+        arc(l, cx, cy, t->r + tw / 2, tw, a0, a1, t->track);
     if (t->len <= 0) return;
     track_thumb(t, &a0, &a1);
     arc(l, cx, cy, t->r + t->w / 2, t->w, a0, a1, t->thumb);
 }
 
-lv_obj_t *ui_track_create(lv_obj_t *parent, int cx, int cy, int r, int w, int start_deg, int span_deg)
+lv_obj_t *ui_track_create(lv_obj_t *parent, int cx, int cy, int r, int w, int start_deg,
+                          int span_deg)
 {
     lv_obj_t *o = blank(parent, sizeof(track_t), track_draw);
     track_t *t = lv_obj_get_user_data(o);
@@ -694,7 +716,8 @@ void ui_track_set(lv_obj_t *o, int pos, int len, lv_color_t thumb, lv_color_t tr
     len = len < 0 ? 0 : len > 1000 ? 1000 : len;
     bool same_col = lv_color_eq(t->thumb, thumb) && lv_color_eq(t->track, track);
     if (same_col && t->pos == pos && t->len == len) return;
-    int cx, cy, o0, o1, n0, n1, in = t->r - t->w / 2 - 1, out = t->r + t->w / 2 + 1, pad = t->w / 2 + 2;
+    int cx, cy, o0, o1, n0, n1, in = t->r - t->w / 2 - 1, out = t->r + t->w / 2 + 1,
+                                pad = t->w / 2 + 2;
     bool had = t->len > 0;
     centre_of(o, &cx, &cy);
     track_thumb(t, &o0, &o1);
@@ -702,12 +725,14 @@ void ui_track_set(lv_obj_t *o, int pos, int len, lv_color_t thumb, lv_color_t tr
     t->len = (int16_t)len;
     t->thumb = thumb;
     t->track = track;
-    if (!lv_color_eq(track, lv_color_black()) && !same_col) { /* the whole arc, not the square it lies in */
+    if (!lv_color_eq(track, lv_color_black()) && !same_col) {
+        /* the whole arc, not the square it lies in */
         inv_arc(o, cx, cy, in, out, t->start, t->start + t->span, pad);
         return;
     }
     track_thumb(t, &n0, &n1);
-    if (same_col && had && len > 0 && o0 == n0 && o1 == n1) return; /* less than a degree: nothing moved */
+    /* less than a degree: nothing moved */
+    if (same_col && had && len > 0 && o0 == n0 && o1 == n1) return;
     if (had) inv_arc(o, cx, cy, in, out, o0, o1, pad);
     if (len > 0) inv_arc(o, cx, cy, in, out, n0, n1, pad);
 }
@@ -757,8 +782,10 @@ void ui_waves_set(lv_obj_t *o, unsigned mask, lv_color_t on, lv_color_t off)
     waves_t *d = lv_obj_get_user_data(o);
     mask &= (1u << d->n) - 1;
     unsigned changed = mask ^ d->mask;
-    if (!lv_color_eq(d->on, on)) changed |= mask | d->mask;              /* the lit ones change colour */
-    if (!lv_color_eq(d->off, off)) changed |= ~(mask & d->mask) & ((1u << d->n) - 1); /* and the dark ones */
+    /* the lit ones change colour */
+    if (!lv_color_eq(d->on, on)) changed |= mask | d->mask;
+    /* and the dark ones */
+    if (!lv_color_eq(d->off, off)) changed |= ~(mask & d->mask) & ((1u << d->n) - 1);
     d->mask = (uint16_t)mask;
     d->on = on;
     d->off = off;
@@ -768,16 +795,16 @@ void ui_waves_set(lv_obj_t *o, unsigned mask, lv_color_t on, lv_color_t off)
     for (int i = 0; i < d->n; i++) {
         if (!(changed >> i & 1)) continue;
         int r = d->r0 + i * d->pitch;
-        inv_arc(o, cx, cy, r - WAVES_W / 2 - 1, r + WAVES_W / 2 + 1, 90 - WAVES_HALF, 90 + WAVES_HALF, WAVES_W / 2 + 2);
-        inv_arc(o, cx, cy, r - WAVES_W / 2 - 1, r + WAVES_W / 2 + 1, 270 - WAVES_HALF, 270 + WAVES_HALF, WAVES_W / 2 + 2);
+        inv_arc(o, cx, cy, r - WAVES_W / 2 - 1, r + WAVES_W / 2 + 1, 90 - WAVES_HALF,
+                90 + WAVES_HALF, WAVES_W / 2 + 2);
+        inv_arc(o, cx, cy, r - WAVES_W / 2 - 1, r + WAVES_W / 2 + 1, 270 - WAVES_HALF,
+                270 + WAVES_HALF, WAVES_W / 2 + 2);
     }
 }
 
 /* ───────── pips ───────── */
 
-typedef struct {
-    int16_t n, cur;
-} pips_t;
+typedef struct { int16_t n, cur; } pips_t;
 
 /* `n` pips in a row centred on (cx, cy), pip `cur` the current one. */
 static void pips_paint(lv_layer_t *l, int cx, int cy, int n, int cur)
@@ -788,7 +815,8 @@ static void pips_paint(lv_layer_t *l, int cx, int cy, int n, int cur)
         n = UI_PIPS_MAX;
     }
     int x = cx - (n - 1) * UI_PIPS_PITCH / 2;
-    for (int i = 0; i < n; i++, x += UI_PIPS_PITCH) dot(l, x, cy, i == cur ? 4 : 3, i == cur ? COL_TEXT : COL_TEXT3);
+    for (int i = 0; i < n; i++, x += UI_PIPS_PITCH)
+        dot(l, x, cy, i == cur ? 4 : 3, i == cur ? COL_TEXT : COL_TEXT3);
 }
 
 static void pips_draw(lv_event_t *e)
@@ -830,7 +858,8 @@ typedef struct {
     int16_t r, cx, cy, hold;
     uint32_t rgb;
     uint8_t state;
-    bool track; /* the hold ring's path is drawn, dim, under the ring: this disc is held, not tapped */
+    /* the hold ring's path is drawn, dim, under the ring: this disc is held, not tapped */
+    bool track;
     const char *glyph;
     const lv_font_t *font;
 } disc_t;
@@ -857,7 +886,8 @@ static void disc_draw(lv_event_t *e)
     if (d->state == UI_DISC_DISABLED) fill = COL_FILL1, ink = COL_TEXT3;
     else if (d->state == UI_DISC_SELECTED || d->rgb) fill = accent, ink = COL_ON_ACCENT;
     else fill = COL_FILL2, ink = d->r >= UI_DISC_R_ORBIT_SEL ? COL_TEXT : COL_TEXT2;
-    if (disc_is_key(d)) { /* a hint, not an action: a thin ring and the glyph in the button's colour */
+    if (disc_is_key(d)) {
+        /* a hint, not an action: a thin ring and the glyph in the button's colour */
         ink = d->state == UI_DISC_DISABLED ? COL_TEXT3 : accent;
         arc(l, cx, cy, d->r, KEY_RING_W, 0, 360, ink);
     } else if (in_clip(l, cx, cy, d->r + 1)) {
@@ -870,8 +900,11 @@ static void disc_draw(lv_event_t *e)
         lv_draw_rect(l, &r, &a);
     }
     ui_glyph_draw(l, d->font, d->glyph, cx, cy, ink, LV_OPA_COVER);
-    if (d->track && d->hold < 1000) arc(l, cx, cy, d->r + disc_hold_gap(d) + disc_hold_w(d), disc_hold_w(d), 0, 360, COL_FILL2);
-    if (d->hold > 0) arc(l, cx, cy, d->r + disc_hold_gap(d) + disc_hold_w(d), disc_hold_w(d), 0, d->hold * 360 / 1000, COL_TEXT);
+    if (d->track && d->hold < 1000)
+        arc(l, cx, cy, d->r + disc_hold_gap(d) + disc_hold_w(d), disc_hold_w(d), 0, 360, COL_FILL2);
+    if (d->hold > 0)
+        arc(l, cx, cy, d->r + disc_hold_gap(d) + disc_hold_w(d), disc_hold_w(d), 0,
+            d->hold * 360 / 1000, COL_TEXT);
 }
 
 lv_obj_t *ui_disc_create(lv_obj_t *parent, int cx, int cy, int r)
@@ -950,7 +983,8 @@ void ui_disc_set_hold(lv_obj_t *o, int permille)
     d->hold = (int16_t)permille;
     int a0 = old * 360 / 1000, a1 = permille * 360 / 1000;
     if (a0 == a1 && (old > 0) == (permille > 0)) return;
-    if (old >= 1000 || permille >= 1000 || old == 0 || permille == 0) { /* the ring closes, opens, appears or goes */
+    if (old >= 1000 || permille >= 1000 || old == 0 || permille == 0) {
+        /* the ring closes, opens, appears or goes */
         lv_obj_invalidate(o);
         return;
     }
@@ -977,7 +1011,9 @@ typedef struct {
     ui_orbit_item_t it[UI_ORBIT_ITEMS];
     lv_obj_t *disc[UI_ORBIT_SLOTS];
     int16_t n, sel, radius, phase, hold;
-    int16_t span, pitch; /* an arch (ui_orbit_set_arch): the arc it covers and the widest step; span 0 = the whole circle */
+    /* an arch (ui_orbit_set_arch): the arc it covers and the widest step; span 0 = the whole
+     * circle */
+    int16_t span, pitch;
     uint32_t accent;
 } orbit_t;
 
@@ -987,7 +1023,8 @@ static void orbit_pips_area(lv_obj_t *o, lv_area_t *a)
 {
     int cx, cy;
     centre_of(o, &cx, &cy);
-    *a = (lv_area_t){cx - 2 * UI_PIPS_PITCH, cy + ORBIT_PIP_DY - 5, cx + 2 * UI_PIPS_PITCH, cy + ORBIT_PIP_DY + 5};
+    *a = (lv_area_t){cx - 2 * UI_PIPS_PITCH, cy + ORBIT_PIP_DY - 5, cx + 2 * UI_PIPS_PITCH,
+                     cy + ORBIT_PIP_DY + 5};
 }
 
 static void orbit_draw(lv_event_t *e)
@@ -996,16 +1033,21 @@ static void orbit_draw(lv_event_t *e)
     orbit_t *d = lv_obj_get_user_data(o);
     int cx, cy;
     centre_of(o, &cx, &cy);
-    pips_paint(lv_event_get_layer(e), cx, cy + ORBIT_PIP_DY, orbit_pages(d), d->sel / UI_ORBIT_SLOTS);
+    pips_paint(lv_event_get_layer(e), cx, cy + ORBIT_PIP_DY, orbit_pages(d),
+               d->sel / UI_ORBIT_SLOTS);
 }
 
-/* Puts the page of the selection on the discs. Every disc setter is change-only, so a step repaints two discs. */
+/* Puts the page of the selection on the discs. Every disc setter is change-only, so a step repaints
+ * two discs. */
 static void orbit_apply(lv_obj_t *o)
 {
     orbit_t *d = lv_obj_get_user_data(o);
     int first = d->n ? d->sel / UI_ORBIT_SLOTS * UI_ORBIT_SLOTS : 0, cnt = d->n - first;
     if (cnt > UI_ORBIT_SLOTS) cnt = UI_ORBIT_SLOTS;
-    float step = d->n > UI_ORBIT_SLOTS ? 45.0f : d->n ? 360.0f / (float)d->n : 0, first_deg = (float)d->phase;
+    float step = d->n > UI_ORBIT_SLOTS ? 45.0f
+                 : d->n                ? 360.0f / (float)d->n
+                                       : 0,
+          first_deg = (float)d->phase;
     if (d->span > 0) { /* an arch: the page's discs centred on the phase, left to right */
         step = cnt > 1 ? (float)d->span / (float)(cnt - 1) : 0;
         if (step > (float)d->pitch) step = (float)d->pitch;
@@ -1028,7 +1070,9 @@ static void orbit_apply(lv_obj_t *o)
         ui_disc_set_r(disc, sel ? UI_DISC_R_ORBIT_SEL : UI_DISC_R_SMALL);
         ui_disc_set_glyph(disc, it->glyph);
         ui_disc_set_rgb(disc, sel ? (it->rgb ? it->rgb : d->accent) : 0);
-        ui_disc_set_state(disc, it->disabled ? UI_DISC_DISABLED : sel ? UI_DISC_SELECTED : UI_DISC_NORMAL);
+        ui_disc_set_state(disc, it->disabled ? UI_DISC_DISABLED
+                                : sel        ? UI_DISC_SELECTED
+                                             : UI_DISC_NORMAL);
         ui_disc_set_hold(disc, sel ? d->hold : 0);
     }
 }
@@ -1138,7 +1182,8 @@ void ui_orbit_set_hold(lv_obj_t *o, int permille)
 
 lv_obj_t *ui_key_hint_create(lv_obj_t *parent, ui_key_t key)
 {
-    lv_obj_t *o = ui_disc_create(parent, key == UI_KEY_A ? UI_KEY_A_X : UI_KEY_B_X, UI_KEY_Y, UI_DISC_R_KEY);
+    lv_obj_t *o =
+        ui_disc_create(parent, key == UI_KEY_A ? UI_KEY_A_X : UI_KEY_B_X, UI_KEY_Y, UI_DISC_R_KEY);
     ui_disc_set_rgb(o, key == UI_KEY_A ? RGB_KEY_A : RGB_KEY_B);
     return o;
 }
@@ -1159,7 +1204,8 @@ static void burst_draw(lv_event_t *e)
 {
     lv_layer_t *l = lv_event_get_layer(e);
     dot(l, UI_CX, UI_CX, BURST_R, COL_BG);
-    ui_glyph_draw(l, ui_glyph_font(s_burst_icons, 128), s_burst_icons, UI_CX, UI_CX, s_burst_col, LV_OPA_COVER);
+    ui_glyph_draw(l, ui_glyph_font(s_burst_icons, 128), s_burst_icons, UI_CX, UI_CX, s_burst_col,
+                  LV_OPA_COVER);
 }
 
 void ui_burst_init(lv_obj_t *top)
@@ -1208,9 +1254,7 @@ void ui_burst_report(ui_report_t *r)
 #define SIGN_H_TEXT 44
 #define SIGN_TEXT_W 210
 
-typedef struct {
-    int16_t cx, cy;
-} sign_t;
+typedef struct { int16_t cx, cy; } sign_t;
 
 lv_obj_t *ui_sign_create(lv_obj_t *parent, int cx, int cy)
 {
@@ -1222,7 +1266,8 @@ lv_obj_t *ui_sign_create(lv_obj_t *parent, int cx, int cy)
     lv_obj_set_style_bg_opa(s, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(s, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_border_width(s, 2, 0);
-    lv_obj_set_style_outline_width(s, 6, 0); /* a black margin: what it lies over never touches the capsule */
+    /* a black margin: what it lies over never touches the capsule */
+    lv_obj_set_style_outline_width(s, 6, 0);
     lv_obj_set_style_outline_color(s, COL_BG, 0);
     lv_obj_set_style_outline_pad(s, 0, 0);
     lv_obj_set_style_pad_hor(s, 20, 0);
@@ -1238,7 +1283,8 @@ lv_obj_t *ui_sign_create(lv_obj_t *parent, int cx, int cy)
     lv_label_set_long_mode(text, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_width(text, LV_SIZE_CONTENT);
     lv_obj_set_style_max_width(text, SIGN_TEXT_W, 0);
-    lv_obj_set_height(text, lv_font_get_line_height(FONT_BODY_STRONG)); /* one line: the dots need a fixed height */
+    /* one line: the dots need a fixed height */
+    lv_obj_set_height(text, lv_font_get_line_height(FONT_BODY_STRONG));
     lv_label_set_text(text, "");
     return s;
 }
@@ -1293,13 +1339,17 @@ void ui_kit_demo(int page)
     }
     lv_obj_remove_flag(s_demo, LV_OBJ_FLAG_HIDDEN);
     static const ui_orbit_item_t menu[11] = {
-        {ICON_ACTIVITY, 0, false}, {ICON_IDLE, 0, false}, {ICON_NOTIFY, 0, false}, {ICON_REPLY, 0, false},
-        {ICON_COMPUTER, 0, false}, {ICON_STOP, RGB_ERROR, false}, {ICON_GRAPH, 0, false}, {ICON_READ, 0, true},
-        {ICON_MIC, 0, false}, {ICON_KEYBOARD, 0, false}, {ICON_X, 0, false}};
+        {ICON_ACTIVITY, 0, false}, {ICON_IDLE, 0, false},     {ICON_NOTIFY, 0, false},
+        {ICON_REPLY, 0, false},    {ICON_COMPUTER, 0, false}, {ICON_STOP, RGB_ERROR, false},
+        {ICON_GRAPH, 0, false},    {ICON_READ, 0, true},      {ICON_MIC, 0, false},
+        {ICON_KEYBOARD, 0, false}, {ICON_X, 0, false}};
     switch (page) {
     case 1: { /* sigils: sizes and names; the folder glyph */
-        static const char *const names[] = {"webapp", "api", "tools", "m5-agent-link", "docs", "infra"};
-        for (int i = 0; i < 6; i++) ui_sigil_set_name(ui_sigil_create(s_demo, 93 + i % 3 * 140, 120 + i / 3 * 80, 26), names[i]);
+        static const char *const names[] = {"webapp",        "api",  "tools",
+                                            "m5-agent-link", "docs", "infra"};
+        for (int i = 0; i < 6; i++)
+            ui_sigil_set_name(ui_sigil_create(s_demo, 93 + i % 3 * 140, 120 + i / 3 * 80, 26),
+                              names[i]);
         ui_sigil_set_name(ui_sigil_create(s_demo, 150, 310, 52), "webapp");
         lv_obj_t *big = ui_sigil_create(s_demo, 290, 310, 52);
         ui_sigil_set_name(big, "api");

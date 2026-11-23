@@ -4,7 +4,8 @@ import { cobsLayout, frameParts } from '../proto/cobs.js';
 import { fragment, parseHeader } from '../proto/blefrag.js';
 import { describe } from '../proto/messages.js';
 
-const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const esc = (s) =>
+  String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
 const hex2 = (v) => v.toString(16).padStart(2, '0');
 
 function scalar(v) {
@@ -35,7 +36,13 @@ export function jsonLines(v, ind = 0, key = '') {
 
 function visible(n, head, tail) {
   if (n <= head + tail + 4) return { show: Array.from({ length: n }, (_, i) => i), cut: null };
-  return { show: [...Array.from({ length: head }, (_, i) => i), ...Array.from({ length: tail }, (_, i) => n - tail + i)], cut: [head, n - tail] };
+  return {
+    show: [
+      ...Array.from({ length: head }, (_, i) => i),
+      ...Array.from({ length: tail }, (_, i) => n - tail + i),
+    ],
+    cut: [head, n - tail],
+  };
 }
 
 export function createInspector(host, { facts, reducedMotion }) {
@@ -211,7 +218,11 @@ export function createInspector(host, { facts, reducedMotion }) {
     r.dir.dataset.dir = frame.dir;
     r.desc.textContent = describe(frame.msg, frame.dir);
     const lines = jsonLines(frame.msg);
-    r.json.innerHTML = (lines.length > 26 ? [...lines.slice(0, 22), `<i class="j-dim">  … ${lines.length - 22} more lines</i>`] : lines).join('\n');
+    r.json.innerHTML = (
+      lines.length > 26
+        ? [...lines.slice(0, 22), `<i class="j-dim">  … ${lines.length - 22} more lines</i>`]
+        : lines
+    ).join('\n');
     renderCbor(frame.bytes);
     renderWire(frame.bytes);
     host.dataset.empty = 'false';
@@ -222,7 +233,13 @@ export function createInspector(host, { facts, reducedMotion }) {
 
   return {
     show,
-    setTransport(k) { transport = k; host.dataset.transport = k; if (cur) renderWire(cur.bytes); },
-    get current() { return cur; },
+    setTransport(k) {
+      transport = k;
+      host.dataset.transport = k;
+      if (cur) renderWire(cur.bytes);
+    },
+    get current() {
+      return cur;
+    },
   };
 }

@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: daemon
+issue: 20261112-fe75
+last_reviewed: 2026-11-22
+summary: Buzz when you are away, stay awake while work runs (protocol 0.12)
+---
+
 # Presence and keep-awake: buzz when you are away, stay awake while work runs
 
 > Status: built on branch `next` (issue 20261112-fe75). Protocol 0.12. Not yet run on the device or against a
@@ -20,7 +28,7 @@ while an agent or job runs is the silent failure of stepping away.
 The cards are always on the watch and can be answered as ever. `agentlink status` shows what the daemon
 believes:
 
-```
+```text
 presence: present (via freedesktop-screensaver, idle 3s of 120s)
   #2 terminal focused: yes (via x11)
 keep awake: held (setting ac, work running, on AC power, via systemd-inhibit)

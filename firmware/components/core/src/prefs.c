@@ -3,7 +3,8 @@
 #include "debug.h"
 #include "hal.h"
 
-/* The orientation default is a build choice: automatic needs the sensor's up axis checked on a wrist first. */
+/* The orientation default is a build choice: automatic needs the sensor's up axis checked on a
+ * wrist first. */
 #ifndef PREFS_ORIENT_DEFAULT
 #define PREFS_ORIENT_DEFAULT ORIENT_NORMAL
 #endif
@@ -33,7 +34,8 @@ void prefs_set_volume(uint8_t step)
     if (step == s_vol) return;
     s_vol = step;
     hal_pref_set("volume", step);
-    dbg_event("prefs", "volume", "\"step\":%u,\"percent\":%u", (unsigned)step, (unsigned)prefs_volume_percent());
+    dbg_event("prefs", "volume", "\"step\":%u,\"percent\":%u", (unsigned)step,
+              (unsigned)prefs_volume_percent());
 }
 
 orient_mode_t prefs_orient(void) { return s_orient; }

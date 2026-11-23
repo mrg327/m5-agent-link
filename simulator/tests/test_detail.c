@@ -1,6 +1,7 @@
-/* ANSWER-WINDOW.md on the device: the full text of a request (detail.c) is bound to its rid, arrives in
- * order, resumes after a lost link, fails closed on anything that does not add up; and the answer window
- * is counted on the device's own clock and ends the request when no word comes from the daemon. */
+/* ANSWER-WINDOW.md on the device: the full text of a request (detail.c) is bound to its rid,
+ * arrives in order, resumes after a lost link, fails closed on anything that does not add up; and
+ * the answer window is counted on the device's own clock and ends the request when no word comes
+ * from the daemon. */
 #include <stdio.h>
 #include <string.h>
 
@@ -8,12 +9,29 @@
 #include "detail.h"
 #include "model.h"
 
-void dbg_event(const char *c, const char *e, const char *f, ...) { (void)c; (void)e; (void)f; }
-void dbg_event_at(dbg_level_t l, const char *c, const char *e, const char *f, ...) { (void)l; (void)c; (void)e; (void)f; }
+void dbg_event(const char *c, const char *e, const char *f, ...)
+{
+    (void)c;
+    (void)e;
+    (void)f;
+}
+void dbg_event_at(dbg_level_t l, const char *c, const char *e, const char *f, ...)
+{
+    (void)l;
+    (void)c;
+    (void)e;
+    (void)f;
+}
 const char *dbg_q(const char *s) { return s; }
 
 static int failures;
-#define EXPECT(cond, msg) do { if (!(cond)) { printf("FAIL: %s (line %d)\n", msg, __LINE__); failures++; } } while (0)
+#define EXPECT(cond, msg)                                  \
+    do {                                                   \
+        if (!(cond)) {                                     \
+            printf("FAIL: %s (line %d)\n", msg, __LINE__); \
+            failures++;                                    \
+        }                                                  \
+    } while (0)
 
 static int s_sent;
 static uint32_t s_last_off, s_last_rid;
@@ -42,9 +60,7 @@ static attention_t request(uint32_t rid, uint32_t full_len)
 }
 
 static void chunk(uint32_t rid, uint32_t off, uint32_t total, const char *t, uint32_t now)
-{
-    detail_on_chunk(rid, 2, off, total, (const uint8_t *)t, (uint32_t)strlen(t), now);
-}
+{ detail_on_chunk(rid, 2, off, total, (const uint8_t *)t, (uint32_t)strlen(t), now); }
 
 int main(void)
 {
@@ -93,11 +109,13 @@ int main(void)
     /* a new request starts over: the old text is not the new request's */
     attention_t b = request(9, 5);
     detail_want(&b, 6000);
-    EXPECT(detail_text(7) == NULL && detail_state(9) == DETAIL_LOADING && s_last_rid == 9, "rid 9 replaces rid 7");
+    EXPECT(detail_text(7) == NULL && detail_state(9) == DETAIL_LOADING && s_last_rid == 9,
+           "rid 9 replaces rid 7");
 
     /* fail closed: a total that disagrees, a NUL, a refusal */
     chunk(9, 0, 6, "abcdef", 6010);
-    EXPECT(detail_state(9) == DETAIL_FAILED && detail_text(9) == NULL, "wrong total: failed, nothing shown");
+    EXPECT(detail_state(9) == DETAIL_FAILED && detail_text(9) == NULL,
+           "wrong total: failed, nothing shown");
     attention_t c = request(10, 3);
     detail_want(&c, 7000);
     detail_on_chunk(10, 2, 0, 3, (const uint8_t *)"a\0b", 3, 7010);
@@ -137,7 +155,8 @@ int main(void)
     EXPECT(model_attention_find(20) != NULL, "the daemon's clear gets a moment");
     model_attention_expire_ms(100001 + MODEL_WINDOW_GRACE_MS);
     EXPECT(model_attention_find(20) == NULL, "then it ends on the watch");
-    EXPECT(model_find(2)->back && model_find(2)->back_why == BACK_EXPIRED, "and the card says where it went");
+    EXPECT(model_find(2)->back && model_find(2)->back_why == BACK_EXPIRED,
+           "and the card says where it went");
     session_t moved = {.sid = 2, .state = SESS_WORK};
     model_upsert(&moved, SF_STATE);
     EXPECT(!model_find(2)->back, "the session moved on");
@@ -149,7 +168,8 @@ int main(void)
     EXPECT(!model_find(2)->back, "an answer already sent says Waiting, not On your computer");
     EXPECT(model_attention_left_ms(NULL, 0) == UINT32_MAX, "no window known");
 
-    /* A session's last message (LAST-MESSAGE.md §2.3): its own slot, bound to the session and the message id */
+    /* A session's last message (LAST-MESSAGE.md §2.3): its own slot, bound to the session and the
+     * message id */
     model_init();
     detail_reset();
     model_set_peer_minor(18);
@@ -176,7 +196,9 @@ int main(void)
     detail_on_chunk(40, 3, 0, 11, (const uint8_t *)"As request!", 11, 20010);
     EXPECT(detail_msg_got(3, 40) == 0, "a request's chunk never lands in the message");
     detail_on_msg_chunk(3, 40, 0, 11, (const uint8_t *)"Built it.\n\n", 11, 20020);
-    EXPECT(detail_msg_state(3, 40) == DETAIL_DONE && !strcmp(detail_msg_text(3, 40), "Built it.\n\n"), "whole");
+    EXPECT(detail_msg_state(3, 40) == DETAIL_DONE &&
+               !strcmp(detail_msg_text(3, 40), "Built it.\n\n"),
+           "whole");
     /* a request transfer meanwhile does not touch the message */
     session_t s2 = {.sid = 2, .state = SESS_INPUT};
     model_upsert(&s2, SF_STATE);
@@ -188,7 +210,8 @@ int main(void)
     session_t m2 = {.sid = 3, .lm = 41, .ll = 3, .lm_keys = 3};
     model_upsert(&m2, SF_LM);
     detail_tick(21100);
-    EXPECT(detail_msg_text(3, 40) == NULL && detail_msg_state(3, 41) == DETAIL_NONE, "replaced: forgotten");
+    EXPECT(detail_msg_text(3, 40) == NULL && detail_msg_state(3, 41) == DETAIL_NONE,
+           "replaced: forgotten");
     detail_want_msg(model_find(3), 21200);
     detail_on_msg_chunk(3, 41, 0, 4, (const uint8_t *)"abcd", 4, 21210);
     EXPECT(detail_msg_state(3, 41) == DETAIL_FAILED, "a length other than the session's: failed");

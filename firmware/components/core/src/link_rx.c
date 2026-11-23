@@ -14,6 +14,7 @@
 
 static const struct hdr_r *env_hdr(const struct envelope_r *e)
 {
+    /* clang-format off */
 #define H(n) case envelope_##n##_m_c: return &e->envelope_##n##_m.n##_hdr_m;
     switch (e->envelope_choice) {
     H(msg_hello) H(msg_welcome) H(msg_snapshot) H(msg_session_upd) H(msg_gone) H(msg_attention)
@@ -24,6 +25,7 @@ static const struct hdr_r *env_hdr(const struct envelope_r *e)
     H(msg_graph)
     }
 #undef H
+    /* clang-format on */
     return NULL;
 }
 
@@ -58,21 +60,48 @@ static uint32_t convert_session(const struct session *in, session_t *out)
         out->sub = (uint8_t)in->session_input_sub_m.session_input_sub_m.input_sub_choice;
         p |= SF_SUB;
     }
-    if (in->session_uint4tstr_present) { STR(in->session_uint4tstr.session_uint4tstr, out->repo); p |= SF_REPO; }
-    if (in->session_uint5tstr_present) { STR(in->session_uint5tstr.session_uint5tstr, out->branch); p |= SF_BRANCH; }
-    if (in->session_uint6tstr_present) { STR(in->session_uint6tstr.session_uint6tstr, out->tool); p |= SF_TOOL; }
-    if (in->session_uint7uint_present) { out->t0 = in->session_uint7uint.session_uint7uint; p |= SF_T0; }
-    if (in->session_uint8uint_present) { out->tst = in->session_uint8uint.session_uint8uint; p |= SF_TST; }
-    if (in->session_uint9tstr_present) { STR(in->session_uint9tstr.session_uint9tstr, out->summary); p |= SF_SUMMARY; }
-    if (in->session_uint17tstr_present) { STR(in->session_uint17tstr.session_uint17tstr, out->q); p |= SF_Q; }
+    if (in->session_uint4tstr_present) {
+        STR(in->session_uint4tstr.session_uint4tstr, out->repo);
+        p |= SF_REPO;
+    }
+    if (in->session_uint5tstr_present) {
+        STR(in->session_uint5tstr.session_uint5tstr, out->branch);
+        p |= SF_BRANCH;
+    }
+    if (in->session_uint6tstr_present) {
+        STR(in->session_uint6tstr.session_uint6tstr, out->tool);
+        p |= SF_TOOL;
+    }
+    if (in->session_uint7uint_present) {
+        out->t0 = in->session_uint7uint.session_uint7uint;
+        p |= SF_T0;
+    }
+    if (in->session_uint8uint_present) {
+        out->tst = in->session_uint8uint.session_uint8uint;
+        p |= SF_TST;
+    }
+    if (in->session_uint9tstr_present) {
+        STR(in->session_uint9tstr.session_uint9tstr, out->summary);
+        p |= SF_SUMMARY;
+    }
+    if (in->session_uint17tstr_present) {
+        STR(in->session_uint17tstr.session_uint17tstr, out->q);
+        p |= SF_Q;
+    }
     if (in->session_uint35tstr_present) {
         STR(in->session_uint35tstr.session_uint35tstr, out->queued);
         utf8_drop_partial(out->queued);
         p |= SF_QD;
     }
     /* The last message (proto 0.18): a delta carries only the keys that changed. */
-    if (in->session_uint36uint_present) { out->lm = in->session_uint36uint.session_uint36uint; out->lm_keys |= 1; }
-    if (in->session_uint37uint_present) { out->ll = in->session_uint37uint.session_uint37uint; out->lm_keys |= 2; }
+    if (in->session_uint36uint_present) {
+        out->lm = in->session_uint36uint.session_uint36uint;
+        out->lm_keys |= 1;
+    }
+    if (in->session_uint37uint_present) {
+        out->ll = in->session_uint37uint.session_uint37uint;
+        out->lm_keys |= 2;
+    }
     if (in->session_uint38tstr_present) {
         STR(in->session_uint38tstr.session_uint38tstr, out->lp);
         utf8_drop_partial(out->lp);
@@ -81,53 +110,100 @@ static uint32_t convert_session(const struct session *in, session_t *out)
     if (out->lm_keys) p |= SF_LM;
     if (in->session_tstr_l_present) {
         size_t n = in->session_tstr_l.session_tstr_l_tstr_count;
-        for (size_t i = 0; i < n && i < 3; i++) STR(in->session_tstr_l.session_tstr_l_tstr[i], out->rp[i]);
+        for (size_t i = 0; i < n && i < 3; i++)
+            STR(in->session_tstr_l.session_tstr_l_tstr[i], out->rp[i]);
         out->n_rp = (uint8_t)(n < 3 ? n : 3);
         p |= SF_RP;
     }
-    if (in->session_uint10bool_present) { out->seen = in->session_uint10bool.session_uint10bool; p |= SF_SEEN; }
-    if (in->session_uint11uint_present) { out->host = (uint8_t)in->session_uint11uint.session_uint11uint; p |= SF_HOST; }
-    if (in->session_uint12tstr_present) { STR(in->session_uint12tstr.session_uint12tstr, out->hn); p |= SF_HN; }
-    if (in->session_uint26bool_present) { out->hush = in->session_uint26bool.session_uint26bool; p |= SF_HUSH; }
-    if (in->session_uint13uint_present) { out->snz = in->session_uint13uint.session_uint13uint; p |= SF_SNZ; }
-    if (in->session_uint14bool_present) { out->ntf = in->session_uint14bool.session_uint14bool; p |= SF_NTF; }
-    if (in->session_uint15uint_present) { out->n = in->session_uint15uint.session_uint15uint; p |= SF_N; }
+    if (in->session_uint10bool_present) {
+        out->seen = in->session_uint10bool.session_uint10bool;
+        p |= SF_SEEN;
+    }
+    if (in->session_uint11uint_present) {
+        out->host = (uint8_t)in->session_uint11uint.session_uint11uint;
+        p |= SF_HOST;
+    }
+    if (in->session_uint12tstr_present) {
+        STR(in->session_uint12tstr.session_uint12tstr, out->hn);
+        p |= SF_HN;
+    }
+    if (in->session_uint26bool_present) {
+        out->hush = in->session_uint26bool.session_uint26bool;
+        p |= SF_HUSH;
+    }
+    if (in->session_uint13uint_present) {
+        out->snz = in->session_uint13uint.session_uint13uint;
+        p |= SF_SNZ;
+    }
+    if (in->session_uint14bool_present) {
+        out->ntf = in->session_uint14bool.session_uint14bool;
+        p |= SF_NTF;
+    }
+    if (in->session_uint15uint_present) {
+        out->n = in->session_uint15uint.session_uint15uint;
+        p |= SF_N;
+    }
     if (in->session_uint16bool_present) {
         out->step = in->session_uint16bool.session_uint16bool ? STEP_OK : STEP_FAIL;
         p |= SF_OK;
     }
-    if (in->session_uint19uint_present) { out->eta = in->session_uint19uint.session_uint19uint; p |= SF_ETA; }
-    if (in->session_uint20uint_present) { out->exit_code = (uint8_t)in->session_uint20uint.session_uint20uint; p |= SF_EXIT; }
-    /* GAUGES (proto 0.10). `ctx` keeps the wire value (255 = unknown) for model_upsert; a snapshot entry is
-     * used as it is, so it carries the known flags too. */
+    if (in->session_uint19uint_present) {
+        out->eta = in->session_uint19uint.session_uint19uint;
+        p |= SF_ETA;
+    }
+    if (in->session_uint20uint_present) {
+        out->exit_code = (uint8_t)in->session_uint20uint.session_uint20uint;
+        p |= SF_EXIT;
+    }
+    /* GAUGES (proto 0.10). `ctx` keeps the wire value (255 = unknown) for model_upsert; a snapshot
+     * entry is used as it is, so it carries the known flags too. */
     if (in->session_uint21uint_present) {
         uint32_t c = in->session_uint21uint.session_uint21uint;
         out->ctx = (uint8_t)(c > 100 ? MODEL_CTX_UNKNOWN : c);
         out->ctx_known = c <= 100;
         p |= SF_CTX;
     }
-    if (in->session_uint22tstr_present) { STR(in->session_uint22tstr.session_uint22tstr, out->mdl); p |= SF_MDL; }
+    if (in->session_uint22tstr_present) {
+        STR(in->session_uint22tstr.session_uint22tstr, out->mdl);
+        p |= SF_MDL;
+    }
     if (in->session_perm_mode_m_present) {
         out->pm = (uint8_t)in->session_perm_mode_m.session_perm_mode_m.perm_mode_choice;
         out->pm_known = true;
         p |= SF_PM;
     }
-    if (in->session_uint24uint_present) { out->pr = in->session_uint24uint.session_uint24uint; p |= SF_PR; }
+    if (in->session_uint24uint_present) {
+        out->pr = in->session_uint24uint.session_uint24uint;
+        p |= SF_PR;
+    }
     if (in->session_pr_state_m_present) {
         out->prs = (uint8_t)in->session_pr_state_m.session_pr_state_m.pr_state_choice;
         p |= SF_PRS;
     }
-    /* DONE-SUMMARY (proto 0.14): every figure is optional; lines are shown only with both halves. */
+    /* DONE-SUMMARY (proto 0.14): every figure is optional; lines are shown only with both
+     * halves. */
     done_sum_t *d = &out->sum;
-    if (in->session_uint30uint_present) { d->files = in->session_uint30uint.session_uint30uint; d->files_known = true; p |= SF_DONE; }
+    if (in->session_uint30uint_present) {
+        d->files = in->session_uint30uint.session_uint30uint;
+        d->files_known = true;
+        p |= SF_DONE;
+    }
     if (in->session_uint31uint_present && in->session_uint32uint_present) {
         d->added = in->session_uint31uint.session_uint31uint;
         d->removed = in->session_uint32uint.session_uint32uint;
         d->lines_known = true;
     }
     if (in->session_uint31uint_present || in->session_uint32uint_present) p |= SF_DONE;
-    if (in->session_uint33bool_present) { d->tests_pass = in->session_uint33bool.session_uint33bool; d->tests_known = true; p |= SF_DONE; }
-    if (in->session_uint34uint_present) { d->secs = in->session_uint34uint.session_uint34uint; d->secs_known = true; p |= SF_DONE; }
+    if (in->session_uint33bool_present) {
+        d->tests_pass = in->session_uint33bool.session_uint33bool;
+        d->tests_known = true;
+        p |= SF_DONE;
+    }
+    if (in->session_uint34uint_present) {
+        d->secs = in->session_uint34uint.session_uint34uint;
+        d->secs_known = true;
+        p |= SF_DONE;
+    }
     return p;
 }
 
@@ -137,22 +213,26 @@ static void apply_cfg(const struct device_cfg *c)
     if (c->device_cfg_privacy_m_present)
         s->privacy = (privacy_t)c->device_cfg_privacy_m.device_cfg_privacy_m.privacy_choice;
     if (c->device_cfg_alert_mode_m_present)
-        s->alert = (alert_mode_t)c->device_cfg_alert_mode_m.device_cfg_alert_mode_m.alert_mode_choice;
-    if (c->device_cfg_uint2uint_present) s->quiet_until = c->device_cfg_uint2uint.device_cfg_uint2uint;
+        s->alert =
+            (alert_mode_t)c->device_cfg_alert_mode_m.device_cfg_alert_mode_m.alert_mode_choice;
+    if (c->device_cfg_uint2uint_present)
+        s->quiet_until = c->device_cfg_uint2uint.device_cfg_uint2uint;
     if (c->device_cfg_uint3uint_present) {
         uint32_t b = c->device_cfg_uint3uint.device_cfg_uint3uint;
         hal_display_set_brightness(b > 255 ? 255 : (uint8_t)b);
     }
-    if (c->device_cfg_uint4tstr_present) STR(c->device_cfg_uint4tstr.device_cfg_uint4tstr, s->handle);
-    dbg_event("link", "cfg", "\"privacy\":%d,\"alert\":%d,\"quiet_until\":%u", (int)s->privacy, (int)s->alert,
-              (unsigned)s->quiet_until);
+    if (c->device_cfg_uint4tstr_present)
+        STR(c->device_cfg_uint4tstr.device_cfg_uint4tstr, s->handle);
+    dbg_event("link", "cfg", "\"privacy\":%d,\"alert\":%d,\"quiet_until\":%u", (int)s->privacy,
+              (int)s->alert, (unsigned)s->quiet_until);
     if (g_link.hooks.on_cfg) g_link.hooks.on_cfg();
 }
 
 static void on_welcome(const struct welcome *w)
 {
     if (w->welcome_major_l_major != 0) {
-        dbg_event_at(DBG_ERR, "link", "proto_mismatch", "\"major\":%u", (unsigned)w->welcome_major_l_major);
+        dbg_event_at(DBG_ERR, "link", "proto_mismatch", "\"major\":%u",
+                     (unsigned)w->welcome_major_l_major);
         return;
     }
     char host[33];
@@ -161,9 +241,11 @@ static void on_welcome(const struct welcome *w)
     hal_rtc_set_unix(w->welcome_time_sync_m.time_sync_uint0uint);
     model_settings()->tz_off_min = w->welcome_time_sync_m.time_sync_uint1int;
     g_link.welcomed = true;
-    model_set_peer_minor((uint8_t)(w->welcome_major_l_minor > 255 ? 255 : w->welcome_major_l_minor));
+    model_set_peer_minor(
+        (uint8_t)(w->welcome_major_l_minor > 255 ? 255 : w->welcome_major_l_minor));
     dbg_event("link", "welcome", "\"host\":%s,\"unix\":%u,\"tz_off\":%d", dbg_q(host),
-              (unsigned)w->welcome_time_sync_m.time_sync_uint0uint, (int)w->welcome_time_sync_m.time_sync_uint1int);
+              (unsigned)w->welcome_time_sync_m.time_sync_uint0uint,
+              (int)w->welcome_time_sync_m.time_sync_uint1int);
     apply_cfg(&w->welcome_device_cfg_m);
     /* Quick replies (proto 0.4): their presence means the daemon can type into terminals. */
     {
@@ -171,7 +253,8 @@ static void on_welcome(const struct welcome *w)
         const char *list[MODEL_MAX_REPLIES];
         int n = 0;
         if (w->welcome_tstr_l_present)
-            for (size_t i = 0; i < w->welcome_tstr_l.welcome_tstr_l_tstr_count && n < MODEL_MAX_REPLIES; i++) {
+            for (size_t i = 0;
+                 i < w->welcome_tstr_l.welcome_tstr_l_tstr_count && n < MODEL_MAX_REPLIES; i++) {
                 STR(w->welcome_tstr_l.welcome_tstr_l_tstr[i], buf[n]);
                 list[n] = buf[n];
                 n++;
@@ -180,7 +263,8 @@ static void on_welcome(const struct welcome *w)
     }
     model_set_voice(w->welcome_uint5bool_present && w->welcome_uint5bool.welcome_uint5bool);
     model_set_keys(w->welcome_uint6bool_present && w->welcome_uint6bool.welcome_uint6bool);
-    model_set_pointer(w->welcome_uint7bool_present && w->welcome_uint7bool.welcome_uint7bool); /* proto 0.20 */
+    /* proto 0.20 */
+    model_set_pointer(w->welcome_uint7bool_present && w->welcome_uint7bool.welcome_uint7bool);
     /* A welcome starts a new link, possibly with a restarted daemon whose request ids and
        session ids begin again. A card kept from before could then name a different request
        (issue 20261109-1173), so drop them all; the daemon re-sends the open ones next. */
@@ -215,31 +299,41 @@ static void on_attention(const struct attention *in, uint32_t now_ms)
     if (in->attention_uint4tstr_present) STR(in->attention_uint4tstr.attention_uint4tstr, a.text);
     if (in->attention_tstr_l_present) {
         size_t n = in->attention_tstr_l.attention_tstr_l_tstr_count;
-        for (size_t i = 0; i < n && i < 4; i++) STR(in->attention_tstr_l.attention_tstr_l_tstr[i], a.opts[a.n_opts++]);
+        for (size_t i = 0; i < n && i < 4; i++)
+            STR(in->attention_tstr_l.attention_tstr_l_tstr[i], a.opts[a.n_opts++]);
     }
     for (size_t i = 0; i < in->attention_action_m_l_action_m_count; i++)
         a.acts |= (uint8_t)(1u << in->attention_action_m_l_action_m[i].action_choice);
     if (in->attention_uint7uint_present) a.exp = in->attention_uint7uint.attention_uint7uint;
-    if (in->attention_uint8uint_present) a.grant_mask = (uint8_t)in->attention_uint8uint.attention_uint8uint;
-    /* The answer window (proto 0.11): what was left when the daemon sent it, counted on our own clock. */
-    if (in->attention_uint9uint_present && in->attention_uint10uint_present && in->attention_uint10uint.attention_uint10uint) {
-        uint32_t left = in->attention_uint9uint.attention_uint9uint, win = in->attention_uint10uint.attention_uint10uint;
+    if (in->attention_uint8uint_present)
+        a.grant_mask = (uint8_t)in->attention_uint8uint.attention_uint8uint;
+    /* The answer window (proto 0.11): what was left when the daemon sent it, counted on our own
+     * clock. */
+    if (in->attention_uint9uint_present && in->attention_uint10uint_present &&
+        in->attention_uint10uint.attention_uint10uint) {
+        uint32_t left = in->attention_uint9uint.attention_uint9uint,
+                 win = in->attention_uint10uint.attention_uint10uint;
         a.win_ms = win;
         a.deadline_ms = now_ms + (left < win ? left : win);
         if (!a.deadline_ms) a.deadline_ms = 1; /* 0 means "no window" */
     }
     a.len_known = model_peer_minor() >= 11;
-    if (in->attention_uint11uint_present) a.full_len = in->attention_uint11uint.attention_uint11uint;
+    if (in->attention_uint11uint_present)
+        a.full_len = in->attention_uint11uint.attention_uint11uint;
     if (in->attention_uint12bool_present) a.hush = in->attention_uint12bool.attention_uint12bool;
-    /* A standing rule (proto 0.13): rule, scope and wide together, from a daemon that speaks 0.13. */
-    if (model_peer_minor() >= 13 && in->attention_uint13tstr_present && in->attention_uint14uint_present &&
-        a.kind == ATT_APPROVAL && (a.acts & (1u << ACT_APPROVE)))
+    /* A standing rule (proto 0.13): rule, scope and wide together, from a daemon that speaks
+     * 0.13. */
+    if (model_peer_minor() >= 13 && in->attention_uint13tstr_present &&
+        in->attention_uint14uint_present && a.kind == ATT_APPROVAL &&
+        (a.acts & (1u << ACT_APPROVE)))
         model_attention_set_rule(&a, in->attention_uint13tstr.attention_uint13tstr.value,
-                                 in->attention_uint13tstr.attention_uint13tstr.len, in->attention_uint14uint.attention_uint14uint,
-                                 in->attention_uint15bool_present && in->attention_uint15bool.attention_uint15bool);
+                                 in->attention_uint13tstr.attention_uint13tstr.len,
+                                 in->attention_uint14uint.attention_uint14uint,
+                                 in->attention_uint15bool_present &&
+                                     in->attention_uint15bool.attention_uint15bool);
     model_attention_add(&a);
-    /* Multiple-choice questions (proto 0.18), kept with the request in PSRAM; a request without valid ones
-     * is shown as before (title, text, opts). */
+    /* Multiple-choice questions (proto 0.18), kept with the request in PSRAM; a request without
+     * valid ones is shown as before (title, text, opts). */
     if (model_peer_minor() >= 18 && in->attention_ask_q_m_l_present) {
         MODEL_EXT_BSS static ask_q_t qs[MODEL_MAX_QS];
         int n = 0;
@@ -253,7 +347,8 @@ static void on_attention(const struct attention *in, uint32_t now_ms)
             utf8_drop_partial(q->h);
             utf8_drop_partial(q->q);
             q->multi = w->ask_q_uint3bool_present && w->ask_q_uint3bool.ask_q_uint3bool;
-            for (size_t k = 0; k < w->ask_q_ask_opt_m_l_ask_opt_m_count && q->n_opts < MODEL_MAX_QOPTS; k++) {
+            for (size_t k = 0;
+                 k < w->ask_q_ask_opt_m_l_ask_opt_m_count && q->n_opts < MODEL_MAX_QOPTS; k++) {
                 const struct ask_opt *o = &w->ask_q_ask_opt_m_l_ask_opt_m[k];
                 STR(o->ask_opt_uint0tstr, q->label[q->n_opts]);
                 utf8_drop_partial(q->label[q->n_opts]);
@@ -265,7 +360,8 @@ static void on_attention(const struct attention *in, uint32_t now_ms)
             }
             if (q->n_opts) n++; /* a question with no options cannot be answered here */
         }
-        if (n == (int)l->attention_ask_q_m_l_ask_q_m_count) model_attention_set_questions(a.rid, qs, n);
+        if (n == (int)l->attention_ask_q_m_l_ask_q_m_count)
+            model_attention_set_questions(a.rid, qs, n);
     }
     if (g_link.hooks.on_attention) g_link.hooks.on_attention(model_attention_find(a.rid));
 }
@@ -287,24 +383,26 @@ static void on_result(const struct msg_result *m, uint32_t re_id, bool has_re)
     int err = r->result_err_m_present ? (int)r->result_err_m.result_err_m.result_err_choice : -1;
     char msg[48] = "";
     if (r->result_uint2tstr_present) STR(r->result_uint2tstr.result_uint2tstr, msg);
-    dbg_event("link", "result", "\"ok\":%s,\"err\":%d,\"op\":%d,\"msg\":%s", r->result_uint0bool ? "true" : "false",
-              err, op, dbg_q(msg));
+    dbg_event("link", "result", "\"ok\":%s,\"err\":%d,\"op\":%d,\"msg\":%s",
+              r->result_uint0bool ? "true" : "false", err, op, dbg_q(msg));
     if (g_link.hooks.on_result) g_link.hooks.on_result(op, sid, rid, r->result_uint0bool, err, msg);
     if (r->result_scroll_pos_m_present && g_link.hooks.on_scroll_pos) {
         /* terminal content: handed to the UI, never logged */
         const struct scroll_pos *p = &r->result_scroll_pos_m.result_scroll_pos_m;
         char preview[64] = "";
-        if (p->scroll_pos_uint3tstr_present) STR(p->scroll_pos_uint3tstr.scroll_pos_uint3tstr, preview);
-        g_link.hooks.on_scroll_pos(sid, p->scroll_pos_uint0uint, p->scroll_pos_uint1bool, p->scroll_pos_uint2uint_present,
+        if (p->scroll_pos_uint3tstr_present)
+            STR(p->scroll_pos_uint3tstr.scroll_pos_uint3tstr, preview);
+        g_link.hooks.on_scroll_pos(sid, p->scroll_pos_uint0uint, p->scroll_pos_uint1bool,
+                                   p->scroll_pos_uint2uint_present,
                                    p->scroll_pos_uint2uint.scroll_pos_uint2uint, preview);
     }
 }
 
 void link_rx_usage(const usage_t *u)
 {
-    dbg_event("link", "usage", "\"at\":%u,\"h5\":%d,\"h5r\":%u,\"h5o\":%u,\"wk\":%d,\"wkr\":%u", (unsigned)u->at,
-              u->h5.known ? u->h5.pct : -1, (unsigned)u->h5.resets, (unsigned)u->h5.out, u->wk.known ? u->wk.pct : -1,
-              (unsigned)u->wk.resets);
+    dbg_event("link", "usage", "\"at\":%u,\"h5\":%d,\"h5r\":%u,\"h5o\":%u,\"wk\":%d,\"wkr\":%u",
+              (unsigned)u->at, u->h5.known ? u->h5.pct : -1, (unsigned)u->h5.resets,
+              (unsigned)u->h5.out, u->wk.known ? u->wk.pct : -1, (unsigned)u->wk.resets);
     usage_t prev = *gauges_usage();
     gauges_set_usage(u);
     if (g_link.hooks.on_usage) g_link.hooks.on_usage(&prev, u);
@@ -318,44 +416,62 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
     uint32_t re = has_re ? h->hdr_uint2uint.hdr_uint2uint : 0;
     /* Replay protection arrives with the AEAD layer; until then only report odd ids. */
     if (id <= g_link.last_rx_id)
-        dbg_event_at(DBG_WARN, "link", "rx_id_not_monotonic", "\"id\":%u,\"last\":%u", (unsigned)id, (unsigned)g_link.last_rx_id);
-    else
-        g_link.last_rx_id = id;
-    dbg_event_at(DBG_DEBUG, "link", "rx", "\"type\":%d,\"id\":%u", (int)e->envelope_choice, (unsigned)id);
+        dbg_event_at(DBG_WARN, "link", "rx_id_not_monotonic", "\"id\":%u,\"last\":%u", (unsigned)id,
+                     (unsigned)g_link.last_rx_id);
+    else g_link.last_rx_id = id;
+    dbg_event_at(DBG_DEBUG, "link", "rx", "\"type\":%d,\"id\":%u", (int)e->envelope_choice,
+                 (unsigned)id);
 
     switch (e->envelope_choice) {
-    case envelope_msg_welcome_m_c: on_welcome(&e->envelope_msg_welcome_m.msg_welcome_welcome_m); break;
-    case envelope_msg_snapshot_m_c: on_snapshot(&e->envelope_msg_snapshot_m.msg_snapshot_snapshot_m); break;
+    case envelope_msg_welcome_m_c:
+        on_welcome(&e->envelope_msg_welcome_m.msg_welcome_welcome_m);
+        break;
+    case envelope_msg_snapshot_m_c:
+        on_snapshot(&e->envelope_msg_snapshot_m.msg_snapshot_snapshot_m);
+        break;
     case envelope_msg_session_upd_m_c: {
         session_t s;
-        uint32_t present = convert_session(&e->envelope_msg_session_upd_m.msg_session_upd_session_m, &s);
+        uint32_t present =
+            convert_session(&e->envelope_msg_session_upd_m.msg_session_upd_session_m, &s);
         model_upsert(&s, present);
         break;
     }
-    case envelope_msg_gone_m_c: model_remove(e->envelope_msg_gone_m.msg_gone_gone_m.gone_uint0uint); break;
-    case envelope_msg_attention_m_c: on_attention(&e->envelope_msg_attention_m.msg_attention_attention_m, now_ms); break;
+    case envelope_msg_gone_m_c:
+        model_remove(e->envelope_msg_gone_m.msg_gone_gone_m.gone_uint0uint);
+        break;
+    case envelope_msg_attention_m_c:
+        on_attention(&e->envelope_msg_attention_m.msg_attention_attention_m, now_ms);
+        break;
     case envelope_msg_clear_m_c: {
         const struct clear *c = &e->envelope_msg_clear_m.msg_clear_clear_m;
         int why = (int)c->clear_why_m.clear_why_choice;
-        /* the window ran out, or our own Open on PC handed it back: the terminal asks now, and the card says so */
+        /* the window ran out, or our own Open on PC handed it back: the terminal asks now, and the
+         * card says so */
         bool back = why == clear_why_expired_m_c || why == clear_why_handed_back_m_c;
-        bool had = back ? model_attention_went_back(c->clear_uint0uint, why == clear_why_handed_back_m_c ? BACK_HANDED : BACK_EXPIRED)
+        bool had = back ? model_attention_went_back(c->clear_uint0uint,
+                                                    why == clear_why_handed_back_m_c ? BACK_HANDED
+                                                                                     : BACK_EXPIRED)
                         : model_attention_clear(c->clear_uint0uint);
         if (had && g_link.hooks.on_cleared) g_link.hooks.on_cleared(c->clear_uint0uint, why);
         break;
     }
     case envelope_msg_detail_m_c: {
-        /* a chunk of a request's full text (proto 0.11), or of a session's last message (no rid, proto 0.18):
-         * detail.c checks it belongs to what was asked for */
+        /* a chunk of a request's full text (proto 0.11), or of a session's last message (no rid,
+         * proto 0.18): detail.c checks it belongs to what was asked for */
         const struct detail *d = &e->envelope_msg_detail_m.msg_detail_detail_m;
-        if (!d->detail_uint0uint_present && d->detail_uint1uint_present && d->detail_uint5uint_present &&
-            d->detail_uint3uint_present && d->detail_uint4uint_present)
-            detail_on_msg_chunk(d->detail_uint1uint.detail_uint1uint, d->detail_uint5uint.detail_uint5uint,
-                                d->detail_uint3uint.detail_uint3uint, d->detail_uint4uint.detail_uint4uint, d->detail_uint2tstr.value,
-                                (uint32_t)d->detail_uint2tstr.len, now_ms);
-        else if (d->detail_uint0uint_present && d->detail_uint3uint_present && d->detail_uint4uint_present)
-            detail_on_chunk(d->detail_uint0uint.detail_uint0uint, d->detail_uint1uint_present ? d->detail_uint1uint.detail_uint1uint : 0,
-                            d->detail_uint3uint.detail_uint3uint, d->detail_uint4uint.detail_uint4uint, d->detail_uint2tstr.value,
+        if (!d->detail_uint0uint_present && d->detail_uint1uint_present &&
+            d->detail_uint5uint_present && d->detail_uint3uint_present &&
+            d->detail_uint4uint_present)
+            detail_on_msg_chunk(
+                d->detail_uint1uint.detail_uint1uint, d->detail_uint5uint.detail_uint5uint,
+                d->detail_uint3uint.detail_uint3uint, d->detail_uint4uint.detail_uint4uint,
+                d->detail_uint2tstr.value, (uint32_t)d->detail_uint2tstr.len, now_ms);
+        else if (d->detail_uint0uint_present && d->detail_uint3uint_present &&
+                 d->detail_uint4uint_present)
+            detail_on_chunk(d->detail_uint0uint.detail_uint0uint,
+                            d->detail_uint1uint_present ? d->detail_uint1uint.detail_uint1uint : 0,
+                            d->detail_uint3uint.detail_uint3uint,
+                            d->detail_uint4uint.detail_uint4uint, d->detail_uint2tstr.value,
                             (uint32_t)d->detail_uint2tstr.len, now_ms);
         break;
     }
@@ -365,7 +481,8 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
         uint32_t drop = g->graph_uint3uint_present ? g->graph_uint3uint.graph_uint3uint : 0;
         dbg_event("link", "graph", "\"sid\":%u,\"n\":%u,\"drop\":%u", (unsigned)g->graph_uint0uint,
                   (unsigned)g->graph_node_l_node_count, (unsigned)drop);
-        graph_on_msg(g->graph_uint0uint, g->graph_node_l_node, g->graph_node_l_node_count, g->graph_la_l.graph_la_l_la,
+        graph_on_msg(g->graph_uint0uint, g->graph_node_l_node, g->graph_node_l_node_count,
+                     g->graph_la_l.graph_la_l_la,
                      g->graph_la_l_present ? g->graph_la_l.graph_la_l_la_count : 0, drop,
                      g->graph_uint4uint_present ? g->graph_uint4uint.graph_uint4uint : 0);
         break;
@@ -375,9 +492,11 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
     case envelope_msg_ping_m_c: link_tx_pong(id); break;
     case envelope_msg_transcript_m_c: {
         const struct transcript *t = &e->envelope_msg_transcript_m.msg_transcript_transcript_m;
-        MODEL_EXT_BSS static char text[VOICE_TEXT_MAX]; /* the user's own words: handed to the UI, never logged */
+        /* the user's own words: handed to the UI, never logged */
+        MODEL_EXT_BSS static char text[VOICE_TEXT_MAX];
         STR(t->transcript_uint1tstr, text);
-        dbg_event("link", "transcript", "\"aid\":%u,\"chars\":%u", (unsigned)t->transcript_uint0uint, (unsigned)strlen(text));
+        dbg_event("link", "transcript", "\"aid\":%u,\"chars\":%u",
+                  (unsigned)t->transcript_uint0uint, (unsigned)strlen(text));
         if (g_link.hooks.on_transcript) g_link.hooks.on_transcript(t->transcript_uint0uint, text);
         break;
     }
@@ -391,24 +510,31 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
             list[n] = words[n];
             n++;
         }
-        int typed = k->kb_cands_uint3uint_present ? (int)k->kb_cands_uint3uint.kb_cands_uint3uint : -1;
-        int err = k->kb_cands_result_err_m_present ? (int)k->kb_cands_result_err_m.kb_cands_result_err_m.result_err_choice : -1;
-        dbg_event("link", "kb_cands", "\"kid\":%u,\"seq\":%u,\"n\":%d,\"typed\":%d,\"err\":%d", (unsigned)k->kb_cands_uint0uint,
-                  (unsigned)k->kb_cands_uint1uint, n, typed, err);
-        if (g_link.hooks.on_kb_cands) g_link.hooks.on_kb_cands(k->kb_cands_uint0uint, k->kb_cands_uint1uint, list, n, typed, err);
+        int typed =
+            k->kb_cands_uint3uint_present ? (int)k->kb_cands_uint3uint.kb_cands_uint3uint : -1;
+        int err = k->kb_cands_result_err_m_present
+                      ? (int)k->kb_cands_result_err_m.kb_cands_result_err_m.result_err_choice
+                      : -1;
+        dbg_event("link", "kb_cands", "\"kid\":%u,\"seq\":%u,\"n\":%d,\"typed\":%d,\"err\":%d",
+                  (unsigned)k->kb_cands_uint0uint, (unsigned)k->kb_cands_uint1uint, n, typed, err);
+        if (g_link.hooks.on_kb_cands)
+            g_link.hooks.on_kb_cands(k->kb_cands_uint0uint, k->kb_cands_uint1uint, list, n, typed,
+                                     err);
         break;
     }
     case envelope_msg_usage_m_c: {
         const struct usage *in = &e->envelope_msg_usage_m.msg_usage_usage_m;
         usage_t u = {.at = in->usage_uint0uint};
-#define WIN(w, kp, kr, ko)                                                                    \
-        if (in->usage_uint##kp##uint_present && in->usage_uint##kr##uint_present) {           \
-            u.w.known = true;                                                                 \
-            u.w.pct = (uint8_t)(in->usage_uint##kp##uint.usage_uint##kp##uint > 100 ? 100     \
-                                : in->usage_uint##kp##uint.usage_uint##kp##uint);             \
-            u.w.resets = in->usage_uint##kr##uint.usage_uint##kr##uint;                       \
-            if (in->usage_uint##ko##uint_present) u.w.out = in->usage_uint##ko##uint.usage_uint##ko##uint; \
-        }
+#define WIN(w, kp, kr, ko)                                                        \
+    if (in->usage_uint##kp##uint_present && in->usage_uint##kr##uint_present) {   \
+        u.w.known = true;                                                         \
+        u.w.pct = (uint8_t)(in->usage_uint##kp##uint.usage_uint##kp##uint > 100   \
+                                ? 100                                             \
+                                : in->usage_uint##kp##uint.usage_uint##kp##uint); \
+        u.w.resets = in->usage_uint##kr##uint.usage_uint##kr##uint;               \
+        if (in->usage_uint##ko##uint_present)                                     \
+            u.w.out = in->usage_uint##ko##uint.usage_uint##ko##uint;              \
+    }
         WIN(h5, 1, 2, 3)
         WIN(wk, 4, 5, 6)
 #undef WIN
@@ -420,24 +546,30 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
         const struct zcbor_string *v = &b->fw_begin_uint2tstr.fw_begin_uint2tstr;
         bool has_ver = b->fw_begin_uint2tstr_present;
         const struct fw_patch *fp = &b->fw_begin_fw_patch_m.fw_begin_fw_patch_m;
-        ota_patch_t patch = {.psize = fp->fw_patch_uint0uint, .base = fp->fw_patch_uint1bstr.value,
-                             .base_len = fp->fw_patch_uint1bstr.len, .bsize = fp->fw_patch_uint2uint};
+        ota_patch_t patch = {.psize = fp->fw_patch_uint0uint,
+                             .base = fp->fw_patch_uint1bstr.value,
+                             .base_len = fp->fw_patch_uint1bstr.len,
+                             .bsize = fp->fw_patch_uint2uint};
         ota_on_begin(b->fw_begin_uint0uint, b->fw_begin_uint1bstr.value, b->fw_begin_uint1bstr.len,
                      has_ver ? (const char *)v->value : NULL, has_ver ? v->len : 0,
                      b->fw_begin_fw_patch_m_present ? &patch : NULL, now_ms);
         break;
     }
     case envelope_msg_fw_chunk_m_c: {
-        /* the data is flash, not a log line: the trace gets neither the bytes nor one event per chunk */
+        /* the data is flash, not a log line: the trace gets neither the bytes nor one event per
+         * chunk */
         const struct fw_chunk *c = &e->envelope_msg_fw_chunk_m.msg_fw_chunk_fw_chunk_m;
-        ota_on_chunk(c->fw_chunk_uint0uint, c->fw_chunk_uint1bstr.value, c->fw_chunk_uint1bstr.len, now_ms);
+        ota_on_chunk(c->fw_chunk_uint0uint, c->fw_chunk_uint1bstr.value, c->fw_chunk_uint1bstr.len,
+                     now_ms);
         break;
     }
     case envelope_msg_dbg_ui_state_req_m_c: dbg_on_ui_state_req(id); break;
     case envelope_msg_dbg_screenshot_req_m_c: dbg_on_screenshot_req(id); break;
     case envelope_msg_dbg_inject_input_m_c: {
-        const struct dbg_inject_input *in = &e->envelope_msg_dbg_inject_input_m.msg_dbg_inject_input_dbg_inject_input_m;
-        bool has_xy = in->dbg_inject_input_uint1int_present && in->dbg_inject_input_uint2int_present;
+        const struct dbg_inject_input *in =
+            &e->envelope_msg_dbg_inject_input_m.msg_dbg_inject_input_dbg_inject_input_m;
+        bool has_xy =
+            in->dbg_inject_input_uint1int_present && in->dbg_inject_input_uint2int_present;
         dbg_on_inject((int)in->dbg_inject_input_input_event_m.input_event_choice, has_xy,
                       has_xy ? in->dbg_inject_input_uint1int.dbg_inject_input_uint1int : 0,
                       has_xy ? in->dbg_inject_input_uint2int.dbg_inject_input_uint2int : 0);
@@ -445,18 +577,22 @@ void link_rx_dispatch(const struct envelope_r *e, uint32_t now_ms)
     }
     case envelope_msg_dbg_touch_m_c: {
         const struct dbg_touch *t = &e->envelope_msg_dbg_touch_m.msg_dbg_touch_dbg_touch_m;
-        bench_on_touch(t->dbg_touch_uint0uint, t->dbg_touch_uint1bstr.value, t->dbg_touch_uint1bstr.len, now_ms);
+        bench_on_touch(t->dbg_touch_uint0uint, t->dbg_touch_uint1bstr.value,
+                       t->dbg_touch_uint1bstr.len, now_ms);
         break;
     }
     case envelope_msg_dbg_bench_m_c: {
         const struct dbg_bench *b = &e->envelope_msg_dbg_bench_m.msg_dbg_bench_dbg_bench_m;
         bench_on_ctl((int)b->dbg_bench_bench_op_m.bench_op_choice,
-                     b->dbg_bench_uint1uint_present ? b->dbg_bench_uint1uint.dbg_bench_uint1uint : 0, now_ms);
+                     b->dbg_bench_uint1uint_present ? b->dbg_bench_uint1uint.dbg_bench_uint1uint
+                                                    : 0,
+                     now_ms);
         break;
     }
     case envelope_msg_dbg_set_log_level_m_c:
-        dbg_set_level((dbg_level_t)e->envelope_msg_dbg_set_log_level_m.msg_dbg_set_log_level_dbg_set_log_level_m
-                          .dbg_set_log_level_log_level_m.log_level_choice);
+        dbg_set_level((dbg_level_t)e->envelope_msg_dbg_set_log_level_m
+                          .msg_dbg_set_log_level_dbg_set_log_level_m.dbg_set_log_level_log_level_m
+                          .log_level_choice);
         break;
     default: break; /* hello, batt, audio, ... are not for the device */
     }

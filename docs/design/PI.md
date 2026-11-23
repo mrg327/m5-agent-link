@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: daemon
+issue: 20261116-f705
+last_reviewed: 2026-11-16
+summary: The pi coding agent extension
+---
+
 # pi coding agent
 
 Issue 20261116-f705. pi (`@earendil-works/pi-coding-agent`, checked with 0.85.1) has no shell hooks. Instead, it

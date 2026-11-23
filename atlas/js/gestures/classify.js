@@ -8,13 +8,18 @@
 
 const SWIPE = { right: 'swipe_r', left: 'swipe_l', down: 'swipe_d', up: 'swipe_u' };
 
-const wrap180 = (d) => { while (d > 180) d -= 360; while (d <= -180) d += 360; return d; };
+const wrap180 = (d) => {
+  while (d > 180) d -= 360;
+  while (d <= -180) d += 360;
+  return d;
+};
 const HIST = 8; // GESTURE_HIST: recent samples kept for the release speed
 
 /** Angle of a point around the screen centre, 0..360 from 12 o'clock, clockwise (gesture_angle_deg). */
 export function angleDeg(th, x, y) {
-  const dx = x - th.cx_px, dy = y - th.cy_px;
-  let deg = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+  const dx = x - th.cx_px,
+    dy = y - th.cy_px;
+  let deg = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
   deg = deg < 0 ? deg + 360 : deg >= 360 ? deg - 360 : deg;
   return { deg, r: Math.hypot(dx, dy) };
 }
@@ -30,17 +35,40 @@ export function angleDeg(th, x, y) {
  */
 export function createClassifier(cb, th) {
   const g = {
-    pressed: false, moved: false, longFired: false, tDown: 0,
-    x0: 0, y0: 0, x: 0, y: 0,
-    sectors: 0, rimCandidate: false, scrubbing: false, lastDeg: 0, arcDeg: 0, sector: 0,
-    centreStart: false, dragging: false, dragArmed: false, dragY: 0, hist: [],
-    aPending: false, aReleaseMs: 0,
-    btn: [0, 1].map(() => ({ down: false, longFired: false, consumed: false, second: false, tDown: 0 })),
+    pressed: false,
+    moved: false,
+    longFired: false,
+    tDown: 0,
+    x0: 0,
+    y0: 0,
+    x: 0,
+    y: 0,
+    sectors: 0,
+    rimCandidate: false,
+    scrubbing: false,
+    lastDeg: 0,
+    arcDeg: 0,
+    sector: 0,
+    centreStart: false,
+    dragging: false,
+    dragArmed: false,
+    dragY: 0,
+    hist: [],
+    aPending: false,
+    aReleaseMs: 0,
+    btn: [0, 1].map(() => ({
+      down: false,
+      longFired: false,
+      consumed: false,
+      second: false,
+      tDown: 0,
+    })),
   };
-  const emit = (kind, x, y, dur, extra) => cb({ kind, x: Math.trunc(x), y: Math.trunc(y), dur_ms: Math.trunc(dur), ...(extra || {}) });
+  const emit = (kind, x, y, dur, extra) =>
+    cb({ kind, x: Math.trunc(x), y: Math.trunc(y), dur_ms: Math.trunc(dur), ...(extra || {}) });
   const sectorOf = (deg) => {
     if (g.sectors < 2) return 0;
-    const s = Math.trunc(deg * g.sectors / 360);
+    const s = Math.trunc((deg * g.sectors) / 360);
     return s >= g.sectors ? g.sectors - 1 : s;
   };
 
@@ -49,7 +77,8 @@ export function createClassifier(cb, th) {
     if (g.sectors < 2) return;
     const width = 360 / g.sectors;
     const centre = (g.sector + 0.5) * width;
-    if (Math.abs(wrap180(deg - centre)) <= width / 2 + Math.min(th.scrub_hyst_deg, width / 3)) return;
+    if (Math.abs(wrap180(deg - centre)) <= width / 2 + Math.min(th.scrub_hyst_deg, width / 3))
+      return;
     const next = sectorOf(deg);
     if (next === g.sector) return;
     g.sector = next;
@@ -73,7 +102,10 @@ export function createClassifier(cb, th) {
     }
   }
 
-  const histPush = (x, y, t) => { g.hist.push({ x: Math.trunc(x), y: Math.trunc(y), t }); if (g.hist.length > HIST) g.hist.shift(); };
+  const histPush = (x, y, t) => {
+    g.hist.push({ x: Math.trunc(x), y: Math.trunc(y), t });
+    if (g.hist.length > HIST) g.hist.shift();
+  };
 
   // Velocity over the oldest sample still inside the flick window, in px/s; 0 if the finger rested (release_vel).
   function releaseVel(t) {
@@ -85,7 +117,7 @@ export function createClassifier(cb, th) {
     if (!best) return { vx: 0, vy: 0 };
     const dt = t - best.t;
     if (dt === 0) return { vx: 0, vy: 0 };
-    return { vx: (g.x - best.x) * 1000 / dt, vy: (g.y - best.y) * 1000 / dt };
+    return { vx: ((g.x - best.x) * 1000) / dt, vy: ((g.y - best.y) * 1000) / dt };
   }
 
   // Drag stream (SCROLL): every drag_step_px of vertical travel from a press inside the rim, counted
@@ -122,9 +154,21 @@ export function createClassifier(cb, th) {
     if (g.longFired) return;
 
     if (g.moved) {
-      const dx = g.x - g.x0, dy = g.y - g.y0;
-      if (dur > th.swipe_max_ms || (Math.abs(dx) < th.swipe_min_px && Math.abs(dy) < th.swipe_min_px)) return;
-      const k = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? SWIPE.right : SWIPE.left) : (dy > 0 ? SWIPE.down : SWIPE.up);
+      const dx = g.x - g.x0,
+        dy = g.y - g.y0;
+      if (
+        dur > th.swipe_max_ms ||
+        (Math.abs(dx) < th.swipe_min_px && Math.abs(dy) < th.swipe_min_px)
+      )
+        return;
+      const k =
+        Math.abs(dx) > Math.abs(dy)
+          ? dx > 0
+            ? SWIPE.right
+            : SWIPE.left
+          : dy > 0
+            ? SWIPE.down
+            : SWIPE.up;
       emit(k, g.x0, g.y0, dur, { dx, dy, flick: Math.hypot(vx, vy) >= th.flick_px_per_s });
       return;
     }
@@ -153,7 +197,8 @@ export function createClassifier(cb, th) {
         g.x = Math.trunc(x);
         g.y = Math.trunc(y);
         histPush(x, y, t);
-        if (Math.abs(x - g.x0) > th.tap_slop_px || Math.abs(y - g.y0) > th.tap_slop_px) g.moved = true;
+        if (Math.abs(x - g.x0) > th.tap_slop_px || Math.abs(y - g.y0) > th.tap_slop_px)
+          g.moved = true;
         if (g.rimCandidate) rimTrack(x, y);
         else if (g.centreStart) dragTrack(g.y, t);
       } else if (g.pressed) {
@@ -162,7 +207,8 @@ export function createClassifier(cb, th) {
     },
     button(btn, down, t) {
       if (btn < 0 || btn > 1) return;
-      const b = g.btn[btn], o = g.btn[1 - btn];
+      const b = g.btn[btn],
+        o = g.btn[1 - btn];
       if (down) {
         if (b.down) return;
         b.down = true;
@@ -184,7 +230,10 @@ export function createClassifier(cb, th) {
         const dur = t - b.tDown;
         if (btn === 1) emit('btn_b', 0, 0, dur);
         else if (b.second) emit('btn_a_double', 0, 0, dur);
-        else { g.aPending = true; g.aReleaseMs = t; }
+        else {
+          g.aPending = true;
+          g.aReleaseMs = t;
+        }
       }
     },
     tick(t) {
@@ -209,8 +258,14 @@ export function createClassifier(cb, th) {
       g.sectors = n;
       if (g.scrubbing) g.sector = sectorOf(g.lastDeg);
     },
-    get scrubbing() { return g.scrubbing; },
-    get dragging() { return g.dragging; },
-    get state() { return { ...g, hist: g.hist.map((s) => ({ ...s })), btn: g.btn.map((b) => ({ ...b })) }; },
+    get scrubbing() {
+      return g.scrubbing;
+    },
+    get dragging() {
+      return g.dragging;
+    },
+    get state() {
+      return { ...g, hist: g.hist.map((s) => ({ ...s })), btn: g.btn.map((b) => ({ ...b })) };
+    },
   };
 }

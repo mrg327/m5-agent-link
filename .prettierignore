@@ -1,0 +1,35 @@
+# Prettier ignore list. docs/conventions/js.md JS-1, structure.md S-GEN-03.
+# Phase 1 formats only first-party *.js, *.mjs and *.ts; every other type Prettier knows is
+# listed below so a bare `prettier --check .` stays inside that scope.
+
+# Vendored and generated
+atlas/vendor/
+atlas/data/facts.json
+atlas/css/tokens.generated.css
+protocol/vectors/
+firmware/components/core/src/fonts/
+firmware/managed_components/
+**/package-lock.json
+
+# Dependencies and build output
+**/node_modules/
+**/build/
+**/target/
+**/dist/
+
+# Not formatted by Prettier in phase 1
+*.md
+*.html
+*.json
+*.jsonc
+*.jsonl
+*.yml
+*.yaml
+*.css
+*.scss
+*.less
+.clang-format
+.clang-tidy
+*.vue
+*.graphql
+*.hbs

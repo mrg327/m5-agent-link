@@ -11,7 +11,22 @@ if (!document.documentElement.classList.contains('is-file')) boot();
 
 const FALLBACK_FACTS = {
   generated_from: 'fallback',
-  palette: { bg: '#000000', surface: '#0d1117', text: '#e6edf3', muted: '#8b949e', working: '#56b4e9', ask: '#f0e442', permission: '#e69f00', done: '#009e73', error: '#d55e00', idle: '#999999', amber: '#e69f00', danger: '#d55e00', success: '#009e73', accent: '#56b4e9' },
+  palette: {
+    bg: '#000000',
+    surface: '#0d1117',
+    text: '#e6edf3',
+    muted: '#8b949e',
+    working: '#56b4e9',
+    ask: '#f0e442',
+    permission: '#e69f00',
+    done: '#009e73',
+    error: '#d55e00',
+    idle: '#999999',
+    amber: '#e69f00',
+    danger: '#d55e00',
+    success: '#009e73',
+    accent: '#56b4e9',
+  },
   // TODO(fact): fallback only; the real list is extracted from ui_theme.c
   states: {
     work: { color: '#56b4e9', label: 'Working' },
@@ -26,7 +41,9 @@ const FALLBACK_FACTS = {
 };
 
 const CHAPTER_MODULES = {
-  intro, glance, build,
+  intro,
+  glance,
+  build,
   flow: () => import('./flow/chapter.js'),
   touch: () => import('./gestures/chapter.js'),
   sound: () => import('./sound/chapter.js'),
@@ -34,7 +51,10 @@ const CHAPTER_MODULES = {
 };
 
 function withTimeout(p, ms, what) {
-  return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(`${what} timed out`)), ms))]);
+  return Promise.race([
+    p,
+    new Promise((_, rej) => setTimeout(() => rej(new Error(`${what} timed out`)), ms)),
+  ]);
 }
 
 async function loadFacts() {
@@ -51,15 +71,28 @@ async function loadFacts() {
 async function boot() {
   const bus = createBus();
   const mq = matchMedia('(prefers-reduced-motion: reduce)');
-  const ctx = { facts: null, bus, watch: null, daemon: null, stage: null, reducedMotion: mq.matches, factsGenerated: false };
-  mq.addEventListener?.('change', (e) => { ctx.reducedMotion = e.matches; });
+  const ctx = {
+    facts: null,
+    bus,
+    watch: null,
+    daemon: null,
+    stage: null,
+    reducedMotion: mq.matches,
+    factsGenerated: false,
+  };
+  mq.addEventListener?.('change', (e) => {
+    ctx.reducedMotion = e.matches;
+  });
   window.atlas = ctx; // handy for poking from the console
 
   const { facts, generated } = await loadFacts();
   ctx.facts = facts;
   ctx.factsGenerated = generated;
 
-  ctx.stage = createStage(document.getElementById('stage'), { bus, reducedMotion: ctx.reducedMotion });
+  ctx.stage = createStage(document.getElementById('stage'), {
+    bus,
+    reducedMotion: ctx.reducedMotion,
+  });
 
   try {
     const rt = await withTimeout(import('./watch-runtime.js'), 15000, 'watch runtime');
@@ -105,7 +138,9 @@ async function mountChapters(ctx) {
 
 function wireScroll(ctx) {
   const sections = [...document.querySelectorAll('[data-chapter]')];
-  const links = new Map([...document.querySelectorAll('[data-nav]')].map((a) => [a.dataset.nav, a]));
+  const links = new Map(
+    [...document.querySelectorAll('[data-nav]')].map((a) => [a.dataset.nav, a]),
+  );
   let current = null;
 
   function enter(section) {
@@ -121,10 +156,15 @@ function wireScroll(ctx) {
     ctx.bus.emit('chapter:enter', { id });
   }
 
-  const io = new IntersectionObserver((entries) => {
-    const hit = entries.filter((e) => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-    if (hit && hit.target !== current) enter(hit.target);
-  }, { rootMargin: '-42% 0px -52% 0px', threshold: [0, 1] });
+  const io = new IntersectionObserver(
+    (entries) => {
+      const hit = entries
+        .filter((e) => e.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (hit && hit.target !== current) enter(hit.target);
+    },
+    { rootMargin: '-42% 0px -52% 0px', threshold: [0, 1] },
+  );
   sections.forEach((s) => io.observe(s));
   enter(sections[0]);
 
@@ -135,6 +175,15 @@ function wireScroll(ctx) {
     const max = document.documentElement.scrollHeight - innerHeight;
     bar.style.setProperty('--p', max > 0 ? (scrollY / max).toFixed(4) : '0');
   };
-  addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+  addEventListener(
+    'scroll',
+    () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(update);
+      }
+    },
+    { passive: true },
+  );
   update();
 }

@@ -1,0 +1,33 @@
+# atlas
+
+The Atlas: the project's living, visual explainer. A static site with no build step; the root
+`index.html` is the page and everything else lives here. The module owners, page structure and the
+`facts.json` schema are in [CONTRACT.md](CONTRACT.md).
+
+## Build and test
+
+```sh
+scripts/check atlas        # = python3 atlas/tools/extract.py --check && node --test atlas/test/*.test.mjs
+python3 atlas/tools/extract.py   # after any firmware, protocol or agentlinkd change; commit the output
+scripts/atlas --open       # serve on localhost:8700 (modules and WASM do not load from file://)
+```
+
+| Path | Concern |
+|---|---|
+| `js/` | ES modules: `main.js`, `bus.js`, `watch-runtime.js`, and one directory per area (`flow/`, `gestures/`, `proto/`, `replay/`, `sound/`, `stage/`) |
+| `css/` | Styles; `tokens.generated.css` is generated |
+| `data/facts.json` | Constants extracted from source (generated); `sample-trace.jsonl` for the replay |
+| `tools/extract.py` | Reads firmware, protocol and daemon sources and writes the generated files |
+| `tools/serve.mjs` | The static server behind `scripts/atlas` |
+| `test/*.test.mjs` | `node:test` suites: facts schema, gesture classifier, codecs, mock daemon, replay, sound |
+| `wasm/` | `core` + LVGL built with Emscripten ([wasm/README.md](wasm/README.md)) |
+| `vendor/` | `watch.{js,wasm}` from `wasm/build.sh`, and any vendored third-party code |
+
+## Rules that bind it
+
+- S-TOOL-02: modules follow the owner split in `CONTRACT.md`; cross-area calls go through `ctx` and
+  the bus. Follow [js.md](../docs/conventions/js.md).
+- S-DEP-06 / S-DEP-07: `wasm/web_main.c` uses only `core.h`; `wasm/web_hal.c` implements `hal.h` and
+  never includes `core`.
+- Generated files (S-GEN-01): `data/facts.json` and `css/tokens.generated.css` from
+  `tools/extract.py`; `vendor/watch.{js,wasm}` from `wasm/build.sh`. Never edit them by hand.

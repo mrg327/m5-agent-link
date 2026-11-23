@@ -1,0 +1,37 @@
+// markdownlint-cli2 config for `scripts/check docs` (docs/conventions/docs.md §5, §7).
+// Run: npx --yes markdownlint-cli2@0.24.0 '**/*.md'   (pinned in scripts/check.d/docs.sh)
+// Default rules, minus the ones below; each disabled rule says why.
+{
+  "config": {
+    "default": true,
+    // DOC-28: line length is not enforced.
+    "MD013": false,
+    // Tables are written compact (`|---|`, cells unpadded); aligning them churns every edit.
+    "MD060": false,
+    // GitHub autolinks bare URLs; research docs cite many sources that way.
+    "MD034": false,
+    // Code spans with significant spaces are deliberate (`# `, `^Merge `, `> `).
+    "MD038": false,
+    // A bold lead-in line as a label ("**macOS permissions**") is house style.
+    "MD036": false,
+    // Same heading text under different parents (each component's "Build", "Test").
+    "MD024": { "siblings_only": true }
+  },
+  "gitignore": true,
+  "ignores": [
+    // Vendored docs mirrored by scripts/fetch_docs.py (DOC-4)
+    "docs/StopWatch.md",
+    "docs/arduino/**",
+    "docs/esp_idf/**",
+    "docs/github/**",
+    "docs/guide/**",
+    "docs/tools/**",
+    "docs/uiflow2/**",
+    // Issue files: front matter and log written by scripts/issue, bodies are free-form notes from
+    // many agents (DOC-23 exempts them). issues/README.md is checked.
+    "issues/2*.md",
+    // A one-line `@AGENTS.md` import, not a document.
+    "**/CLAUDE.md",
+    "**/node_modules/**"
+  ]
+}

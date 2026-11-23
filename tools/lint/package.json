@@ -1,0 +1,15 @@
+{
+  "name": "agentlink-lint",
+  "private": true,
+  "description": "Pinned JavaScript lint tools for scripts/check lint (docs/conventions/js.md JS-2, JS-3, JS-4).",
+  "type": "module",
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "1.5.0",
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.5",
+    "eslint": "10.14.0",
+    "eslint-plugin-jsdoc": "65.4.3",
+    "globals": "17.14.0",
+    "typescript": "6.0.3"
+  }
+}

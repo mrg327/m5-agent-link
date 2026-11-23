@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 /* UI-V2 §3, one row per cell. Order matters only where two rows share a gesture and zone. */
+/* clang-format off */
 const nav_binding_t nav_bindings[] = {
     /* HOME: the deck. Nothing here is destructive: no centre press can approve (UI-V2 §3). */
     {MODE_HOME, G_TAP, ZONE_CENTRE, WHEN_ASKABLE, NAV_OPEN_ASK}, /* opens the options: a tap never approves */
@@ -166,9 +167,11 @@ const nav_binding_t nav_bindings[] = {
     {MODE_GRAPH, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_GRAPH, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
 };
+/* clang-format on */
 const int nav_n_bindings = (int)(sizeof nav_bindings / sizeof nav_bindings[0]);
 
-nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool request_pending, bool askable)
+nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool request_pending,
+                        bool askable)
 {
     askable = askable || request_pending;
     for (int i = 0; i < nav_n_bindings; i++) {
@@ -186,16 +189,20 @@ nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool
 
 const char *nav_mode_name(nav_mode_t m)
 {
-    static const char *const names[MODE_COUNT] = {"home", "agent", "ask", "scroll", "status", "watch", "voice", "keys", "read", "labs", "trackpad", "graph"};
+    static const char *const names[MODE_COUNT] = {"home",   "agent", "ask",      "scroll",
+                                                  "status", "watch", "voice",    "keys",
+                                                  "read",   "labs",  "trackpad", "graph"};
     return (unsigned)m < MODE_COUNT ? names[m] : "?";
 }
 
 const char *nav_action_name(nav_action_t a)
 {
     static const char *const names[NAV_COUNT] = {
-        "none", "focus", "open_agent", "open_ask", "open_status", "back", "home", "next", "prev", "next_attention", "pick_rim",
-        "scrub", "commit", "hold_press", "hold_release", "hold_long", "scroll_drag", "scroll_fling",
-        "scroll_catch", "page_newer", "to_bottom", "erase", "open_labs", "pointer"};
+        "none",      "focus",       "open_agent",   "open_ask",     "open_status",
+        "back",      "home",        "next",         "prev",         "next_attention",
+        "pick_rim",  "scrub",       "commit",       "hold_press",   "hold_release",
+        "hold_long", "scroll_drag", "scroll_fling", "scroll_catch", "page_newer",
+        "to_bottom", "erase",       "open_labs",    "pointer"};
     return (unsigned)a < NAV_COUNT ? names[a] : "?";
 }
 
@@ -206,31 +213,27 @@ bool nav_centre(int x, int y)
 }
 
 bool nav_hold_may_start(uint32_t shown_rid, uint32_t shown_since_ms, uint32_t rid, uint32_t now_ms)
-{
-    return rid && shown_rid == rid && now_ms - shown_since_ms >= NAV_CARD_ARM_MS;
-}
+{ return rid && shown_rid == rid && now_ms - shown_since_ms >= NAV_CARD_ARM_MS; }
 
 bool nav_long_swipe_down(int y_start, int y_end)
-{
-    return y_start < GESTURE_CY && y_end - y_start >= NAV_LONG_SWIPE_PX;
-}
+{ return y_start < GESTURE_CY && y_end - y_start >= NAV_LONG_SWIPE_PX; }
 
-int nav_scroll_lines(int dy_px)
-{
-    return dy_px / GESTURE_DRAG_STEP_PX * NAV_SCROLL_LINES_PER_STEP;
-}
+int nav_scroll_lines(int dy_px) { return dy_px / GESTURE_DRAG_STEP_PX * NAV_SCROLL_LINES_PER_STEP; }
 
-int nav_agent_items(sess_state_t state, bool typing, bool replies, bool queue_ok, bool queued, bool message, bool graph,
-                    agent_item_t *out, int cap)
+int nav_agent_items(sess_state_t state, bool typing, bool replies, bool queue_ok, bool queued,
+                    bool message, bool graph, agent_item_t *out, int cap)
 {
-    /* UI-V2 §4.2: Focus is button A on HOME and WATCH, Status the swipe down on HOME, so neither takes
-     * a row; a session that waits for input keeps Focus. Quick replies and Interrupt need a daemon that
-     * types into terminals (issue b150). */
+    /* UI-V2 §4.2: Focus is button A on HOME and WATCH, Status the swipe down on HOME, so neither
+     * takes a row; a session that waits for input keeps Focus. Quick replies and Interrupt need a
+     * daemon that types into terminals (issue b150). */
     agent_item_t list[8];
     int n = 0;
     bool reply = typing && replies;
+    /* clang-format off */
 #define ADD(id, hold) list[n++] = (agent_item_t){(id), (hold)}
-    /* what the agent said comes first once it has finished (LAST-MESSAGE.md): it is why the user looks */
+    /* clang-format on */
+    /* what the agent said comes first once it has finished (LAST-MESSAGE.md): it is why the user
+     * looks */
     if (message && state != SESS_START && state != SESS_WORK) ADD(AG_READ, false);
     ADD(AG_WATCH, false); /* first otherwise: tap, tap opens the monitor, a third tap focuses */
     if (graph) ADD(AG_GRAPH, false);
@@ -272,7 +275,8 @@ int nav_job_items(sess_state_t state, agent_item_t *out, int cap)
     if (state == SESS_START || state == SESS_WORK) {
         if (n < cap) out[n++] = (agent_item_t){AG_INTERRUPT, true};
     } else {
-        if ((state == SESS_DONE || state == SESS_ERROR) && n < cap) out[n++] = (agent_item_t){AG_RERUN, true};
+        if ((state == SESS_DONE || state == SESS_ERROR) && n < cap)
+            out[n++] = (agent_item_t){AG_RERUN, true};
         if (n < cap) out[n++] = (agent_item_t){AG_DISMISS, false};
     }
     return n;
@@ -286,19 +290,23 @@ int nav_ask_items(const attention_t *a, bool voice, ask_item_t *out, int cap)
     if (a->n_opts > 0) {
         for (int i = 0; i < a->n_opts && n < cap - 1; i++) {
             bool grants = (a->grant_mask >> i) & 1u;
-            /* in a permission every option answers the permission: the ones that do not grant deny it */
+            /* in a permission every option answers the permission: the ones that do not grant deny
+             * it */
             uint32_t hold = grants ? NAV_HOLD_MS : perm ? NAV_DENY_HOLD_MS : 0;
             out[n++] = (ask_item_t){ASK_OPT, i, hold, grants};
         }
     } else if (perm) {
-        if ((a->acts & (1u << ACT_APPROVE)) && n < cap - 1) out[n++] = (ask_item_t){ASK_APPROVE, -1, NAV_HOLD_MS, true};
-        if ((a->acts & (1u << ACT_DENY)) && n < cap - 1) out[n++] = (ask_item_t){ASK_DENY, -1, NAV_DENY_HOLD_MS, false};
+        if ((a->acts & (1u << ACT_APPROVE)) && n < cap - 1)
+            out[n++] = (ask_item_t){ASK_APPROVE, -1, NAV_HOLD_MS, true};
+        if ((a->acts & (1u << ACT_DENY)) && n < cap - 1)
+            out[n++] = (ask_item_t){ASK_DENY, -1, NAV_DENY_HOLD_MS, false};
         /* third, two steps from the default, so the plain Approve stays the one under the finger */
         if (a->has_rule && (a->acts & (1u << ACT_APPROVE)) && n < cap - 1)
             out[n++] = (ask_item_t){ASK_GRANT, -1, NAV_GRANT_HOLD_MS, true};
     }
     /* opens VOICE on this request; the hold-to-send there is the commit */
-    if (voice && (a->acts & (1u << ACT_DICTATE)) && n < cap - 1) out[n++] = (ask_item_t){ASK_DICTATE, -1, 0, false};
+    if (voice && (a->acts & (1u << ACT_DICTATE)) && n < cap - 1)
+        out[n++] = (ask_item_t){ASK_DICTATE, -1, 0, false};
     out[n++] = (ask_item_t){ASK_OPEN_PC, -1, 0, false}; /* always: the escape to the terminal */
     return n;
 }
@@ -309,7 +317,8 @@ int nav_question_items(const ask_q_t *q, bool voice, uint32_t picks, ask_item_t 
     if (!q || cap < 1) return 0;
     for (int i = 0; i < q->n_opts && i < MODEL_MAX_QOPTS && n < cap - 1; i++)
         out[n++] = (ask_item_t){ASK_QOPT, i, q->multi ? 0 : NAV_HOLD_MS, false};
-    if (voice && n < cap - 1) out[n++] = (ask_item_t){ASK_OTHER, -1, 0, false}; /* opens VOICE; its own hold commits */
+    /* opens VOICE; its own hold commits */
+    if (voice && n < cap - 1) out[n++] = (ask_item_t){ASK_OTHER, -1, 0, false};
     (void)picks; /* Send stays put while ticks change, so the list never jumps under the finger */
     if (q->multi && n < cap - 1) out[n++] = (ask_item_t){ASK_SEND, -1, NAV_HOLD_MS, false};
     out[n++] = (ask_item_t){ASK_OPEN_PC, -1, 0, false}; /* always: the escape to the terminal */
@@ -318,8 +327,11 @@ int nav_question_items(const ask_q_t *q, bool voice, uint32_t picks, ask_item_t 
 
 int nav_status_items(status_item_t *out, int cap)
 {
-    static const status_item_t rows[ST_COUNT] = {
-        {ST_QUIET, true}, {ST_SOUNDS, true}, {ST_PRIVACY, false}, {ST_SESSIONS, false}, {ST_FIRMWARE, false}};
+    static const status_item_t rows[ST_COUNT] = {{ST_QUIET, true},
+                                                 {ST_SOUNDS, true},
+                                                 {ST_PRIVACY, false},
+                                                 {ST_SESSIONS, false},
+                                                 {ST_FIRMWARE, false}};
     int n = 0;
     for (int i = 0; i < ST_COUNT && n < cap; i++) out[n++] = rows[i];
     return n;
@@ -327,8 +339,8 @@ int nav_status_items(status_item_t *out, int cap)
 
 int nav_quiet_step(uint32_t quiet_until, uint32_t now_unix)
 {
-    if (!quiet_until || quiet_until <= now_unix) return 1;             /* off → 30 min */
-    return quiet_until - now_unix <= NAV_QUIET_STEP1_S ? 2 : 0;         /* 30 min → 1 h → off */
+    if (!quiet_until || quiet_until <= now_unix) return 1;      /* off → 30 min */
+    return quiet_until - now_unix <= NAV_QUIET_STEP1_S ? 2 : 0; /* 30 min → 1 h → off */
 }
 
 uint32_t nav_quiet_next(uint32_t quiet_until, uint32_t now_unix)
@@ -355,14 +367,13 @@ int nav_rim_scrub(int *last, gesture_kind_t kind, int sector, int sectors)
 }
 
 int nav_list_scrub(int *last, gesture_kind_t kind, int sector)
-{
-    return nav_rim_scrub(last, kind, sector, NAV_LIST_SECTORS);
-}
+{ return nav_rim_scrub(last, kind, sector, NAV_LIST_SECTORS); }
 
 int nav_list_drag(int *acc, int dy)
 {
     *acc += dy;
-    int n = -(*acc / NAV_LIST_DRAG_PX); /* C division truncates toward zero, so both directions keep a remainder */
+    /* C division truncates toward zero, so both directions keep a remainder */
+    int n = -(*acc / NAV_LIST_DRAG_PX);
     *acc += n * NAV_LIST_DRAG_PX;
     return n;
 }

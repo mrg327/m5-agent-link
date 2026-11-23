@@ -7,9 +7,10 @@
 #define LV_USE_STDLIB_MALLOC LV_STDLIB_BUILTIN
 #define LV_MEM_SIZE (384 * 1024)
 #define LV_DEF_REFR_PERIOD 33
-/* Per-frame cache of anti-aliased circle edges (LVGL flushes it after every refresh): the ring alone
- * needs about 9 radii in one frame (capsule 228/222 + cap 3, selected 231/219 + cap 6, hold arc 230/220 + cap 5,
- * pip), the deck adds a few small ones. With the default 4 the large ones are recomputed several times a frame. */
+/* Per-frame cache of anti-aliased circle edges (LVGL flushes it after every refresh): the ring
+ * alone needs about 9 radii in one frame (capsule 228/222 + cap 3, selected 231/219 + cap 6, hold
+ * arc 230/220 + cap 5, pip), the deck adds a few small ones. With the default 4 the large ones are
+ * recomputed several times a frame. */
 #define LV_DRAW_SW_CIRCLE_CACHE_SIZE 12
 
 #define LV_USE_OS LV_OS_NONE
@@ -25,12 +26,13 @@
 #define LV_USE_DEMO_WIDGETS 0
 #define LV_BUILD_EXAMPLES 0
 
-/* Only what the UI uses is built: plain objects, labels, one line, flex rows, animations. No theme: every
- * object is styled by ui_theme / its screen, and the default theme allocated ~30 KB of styles (internal RAM
- * on the device) and looked each new object up against every widget class. The device has the same list in
- * firmware/sdkconfig.defaults; the two must stay in step, because the simulator's screenshots stand in for
- * the glass. */
-/* The display is RGB565; layers (a dimmed or fading container) are ARGB8888; glyphs are A8 masks. */
+/* Only what the UI uses is built: plain objects, labels, one line, flex rows, animations. No theme:
+ * every object is styled by ui_theme / its screen, and the default theme allocated ~30 KB of styles
+ * (internal RAM on the device) and looked each new object up against every widget class. The device
+ * has the same list in firmware/sdkconfig.defaults; the two must stay in step, because the
+ * simulator's screenshots stand in for the glass. */
+/* The display is RGB565; layers (a dimmed or fading container) are ARGB8888; glyphs are A8
+ * masks. */
 #define LV_DRAW_SW_SUPPORT_RGB565_SWAPPED 0
 #define LV_DRAW_SW_SUPPORT_RGB565A8 0
 #define LV_DRAW_SW_SUPPORT_RGB888 0

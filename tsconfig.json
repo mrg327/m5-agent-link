@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "target": "es2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "types": ["node"],
+    "typeRoots": ["./tools/lint/node_modules/@types"],
+    "skipLibCheck": true
+  },
+  "include": ["atlas/js", "atlas/test", "atlas/tools", "tools/board", "firmware/tools/fonts/*.mjs"],
+  "exclude": ["atlas/vendor", "**/node_modules"]
+}

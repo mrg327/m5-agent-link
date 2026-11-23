@@ -6,13 +6,36 @@ const facts = JSON.parse(readFileSync(new URL('../data/facts.json', import.meta.
 const css = readFileSync(new URL('../css/tokens.generated.css', import.meta.url), 'utf8');
 
 test('palette entries are hex colours', () => {
-  for (const k of ['bg', 'surface', 'text', 'muted', 'working', 'ask', 'permission', 'done', 'error', 'idle', 'amber', 'danger', 'success', 'accent']) {
+  for (const k of [
+    'bg',
+    'surface',
+    'text',
+    'muted',
+    'working',
+    'ask',
+    'permission',
+    'done',
+    'error',
+    'idle',
+    'amber',
+    'danger',
+    'success',
+    'accent',
+  ]) {
     assert.match(facts.palette[k], /^#[0-9a-f]{6}$/, k);
   }
 });
 
 test('states cover the seven CDDL states with palette colours', () => {
-  assert.deepEqual(Object.keys(facts.states), ['start', 'work', 'input', 'error', 'done', 'idle', 'ended']);
+  assert.deepEqual(Object.keys(facts.states), [
+    'start',
+    'work',
+    'input',
+    'error',
+    'done',
+    'idle',
+    'ended',
+  ]);
   const pal = new Set(Object.values(facts.palette));
   for (const s of Object.values(facts.states)) {
     assert.ok(pal.has(s.color));
@@ -24,49 +47,120 @@ test('states cover the seven CDDL states with palette colours', () => {
 
 test('gesture thresholds describe the ring recogniser, with no tap deferral', () => {
   const g = facts.gesture;
-  for (const k of ['long_press_ms', 'swipe_min_px', 'swipe_max_ms', 'tap_slop_px', 'btn_double_ms', 'rim_in_px', 'rim_out_px',
-    'rim_track_in_px', 'rim_track_out_px', 'scrub_start_deg', 'scrub_hyst_deg', 'hold_confirm_ms', 'hold_show_ms', 'centre_r_px']) {
+  for (const k of [
+    'long_press_ms',
+    'swipe_min_px',
+    'swipe_max_ms',
+    'tap_slop_px',
+    'btn_double_ms',
+    'rim_in_px',
+    'rim_out_px',
+    'rim_track_in_px',
+    'rim_track_out_px',
+    'scrub_start_deg',
+    'scrub_hyst_deg',
+    'hold_confirm_ms',
+    'hold_show_ms',
+    'centre_r_px',
+  ]) {
     assert.ok(Number.isInteger(g[k]) && g[k] > 0, k);
   }
-  for (const k of ['tap_defer_ms', 'double_tap_ms', 'defer_slack_ms']) assert.equal(g[k], undefined, k);
+  for (const k of ['tap_defer_ms', 'double_tap_ms', 'defer_slack_ms'])
+    assert.equal(g[k], undefined, k);
   assert.ok(g.rim_track_in_px < g.rim_in_px && g.rim_out_px < g.rim_track_out_px);
   assert.ok(g.hold_confirm_ms > g.long_press_ms && g.hold_show_ms < g.hold_confirm_ms);
 });
 
 test('ring facts: screens, per-kind shapes, pills and the gesture cases', () => {
-  assert.deepEqual(facts.screens.map((s) => s.id), ['ring', 'attention', 'agent', 'ask', 'scroll', 'status']);
+  assert.deepEqual(
+    facts.screens.map((s) => s.id),
+    ['ring', 'attention', 'agent', 'ask', 'scroll', 'status'],
+  );
   assert.deepEqual(Object.keys(facts.ring.kinds), ['work', 'ask', 'perm', 'done', 'error', 'idle']);
   assert.ok(facts.ring.merge_at >= 2 && facts.ring.max_segments >= facts.ring.merge_at);
   assert.equal(facts.ring.pills.approve, 'Review / Answer'); // the slot's button opens ASK; approving is a hold there
   const cases = facts.gesture_map.cases.map((c) => c.gesture);
-  for (const c of ['G_TAP', 'G_LONG_PRESS', 'G_SWIPE_DOWN', 'G_SCRUB', 'G_BTN_A', 'G_BTN_A_DOUBLE', 'G_BTN_B', 'G_DRAG']) assert.ok(cases.includes(c), c);
+  for (const c of [
+    'G_TAP',
+    'G_LONG_PRESS',
+    'G_SWIPE_DOWN',
+    'G_SCRUB',
+    'G_BTN_A',
+    'G_BTN_A_DOUBLE',
+    'G_BTN_B',
+    'G_DRAG',
+  ])
+    assert.ok(cases.includes(c), c);
   // the drag stream scrolls the terminal (SCROLL, and WATCH where it opens SCROLL, issue 5cbb) and moves the lists
   // (AGENT, ASK: UI-V3 §5.1) and the graph rows (GRAPH.md §4); the deck has no press binding
-  assert.deepEqual(facts.gesture_map.cases.filter((c) => c.gesture === 'G_DRAG').map((c) => c.mode), ['agent', 'ask', 'scroll', 'watch', 'read', 'graph']);
+  assert.deepEqual(
+    facts.gesture_map.cases.filter((c) => c.gesture === 'G_DRAG').map((c) => c.mode),
+    ['agent', 'ask', 'scroll', 'watch', 'read', 'graph'],
+  );
   assert.ok(!facts.gesture_map.cases.some((c) => c.mode === 'home' && c.gesture === 'G_PRESS'));
   // no swipe denies anywhere; the deck's swipe down opens STATUS, which has its own timeout and the quiet steps
-  assert.deepEqual(facts.gesture_map.cases.filter((c) => c.nav === 'NAV_DENY').map((c) => c.mode), []); // no swipe denies: deny is only its hold
-  assert.ok(facts.gesture_map.cases.some((c) => c.mode === 'home' && c.gesture === 'G_SWIPE_DOWN' && c.nav === 'NAV_OPEN_STATUS'));
+  assert.deepEqual(
+    facts.gesture_map.cases.filter((c) => c.nav === 'NAV_DENY').map((c) => c.mode),
+    [],
+  ); // no swipe denies: deny is only its hold
+  assert.ok(
+    facts.gesture_map.cases.some(
+      (c) => c.mode === 'home' && c.gesture === 'G_SWIPE_DOWN' && c.nav === 'NAV_OPEN_STATUS',
+    ),
+  );
   assert.ok(facts.gesture_map.cases.some((c) => c.mode === 'status'));
-  assert.ok(facts.gesture.status_timeout_ms > 0 && facts.gesture.quiet_step1_s < facts.gesture.quiet_step2_s);
-  assert.ok(facts.gesture.drag_step_px > 0 && facts.gesture.drag_step_px <= facts.gesture.tap_slop_px && facts.gesture.scroll_lines_per_step > 0);
-  assert.ok(facts.gesture.flick_px_per_s > 0 && facts.gesture.flick_window_ms > 0 && facts.gesture.flick_window_ms < facts.gesture.swipe_max_ms);
+  assert.ok(
+    facts.gesture.status_timeout_ms > 0 &&
+      facts.gesture.quiet_step1_s < facts.gesture.quiet_step2_s,
+  );
+  assert.ok(
+    facts.gesture.drag_step_px > 0 &&
+      facts.gesture.drag_step_px <= facts.gesture.tap_slop_px &&
+      facts.gesture.scroll_lines_per_step > 0,
+  );
+  assert.ok(
+    facts.gesture.flick_px_per_s > 0 &&
+      facts.gesture.flick_window_ms > 0 &&
+      facts.gesture.flick_window_ms < facts.gesture.swipe_max_ms,
+  );
 });
 
 test('haptics have steps with duty, the rim detent and the approve ramp', () => {
-  assert.deepEqual(Object.keys(facts.haptics).sort(),
-    ['approved', 'denied', 'deny_ramp', 'detent', 'done', 'error', 'hello', 'hold_ramp', 'permission', 'question', 'quiet_toggled', 'reject', 'reply_sent', 'scroll_stop', 'tick']);
+  assert.deepEqual(Object.keys(facts.haptics).sort(), [
+    'approved',
+    'denied',
+    'deny_ramp',
+    'detent',
+    'done',
+    'error',
+    'hello',
+    'hold_ramp',
+    'permission',
+    'question',
+    'quiet_toggled',
+    'reject',
+    'reply_sent',
+    'scroll_stop',
+    'tick',
+  ]);
   for (const steps of Object.values(facts.haptics)) {
     assert.ok(steps.length > 0);
     for (const s of steps) assert.ok(s.on_ms > 0 && s.off_ms >= 0 && s.duty > 0 && s.duty <= 100);
     assert.equal(steps.at(-1).off_ms, 0);
   }
   assert.equal(facts.haptic_motor.kick_duty, 100);
-  assert.deepEqual(facts.haptics.detent.map((s) => [s.on_ms, s.duty]), [[facts.haptic_motor.kick_ms, 100]]);
+  assert.deepEqual(
+    facts.haptics.detent.map((s) => [s.on_ms, s.duty]),
+    [[facts.haptic_motor.kick_ms, 100]],
+  );
   const ramp = facts.haptics.hold_ramp;
   assert.ok(ramp.at(-1).on_ms > ramp[0].on_ms && ramp.at(-2).off_ms < ramp[0].off_ms);
   const deny = facts.haptics.deny_ramp; // the opposite shape: pulses shrink, gaps grow
-  assert.ok(deny.at(-1).on_ms < deny[0].on_ms && deny.at(-1).off_ms === 0 && deny.at(-2).off_ms > deny[0].off_ms);
+  assert.ok(
+    deny.at(-1).on_ms < deny[0].on_ms &&
+      deny.at(-1).off_ms === 0 &&
+      deny.at(-2).off_ms > deny[0].off_ms,
+  );
 });
 
 test('link, usb, ble and display facts', () => {

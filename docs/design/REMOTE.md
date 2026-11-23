@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: daemon
+issue: [20261109-371b, 20261109-e9b2]
+last_reviewed: 2026-11-22
+summary: Remote sessions over SSH
+---
+
 # m5-agent-link: remote sessions over SSH
 
 Status: built (issue `20261109-371b`). The tunnel, auth and session path have been tested
@@ -11,6 +19,7 @@ Copilot CLI (or Claude Code) runs on a **remote Windows machine**. The watch and
 local ones, and the watch should be able to answer their questions and approvals.
 
 Out of scope:
+
 - A daemon or a watch link on the remote machine (DESIGN R10: one daemon per PC that owns a device).
 - A cloud relay (DESIGN R11). The only path is an SSH connection between the user's own
   machines. Prompt text crosses that encrypted channel and nothing else.
@@ -42,7 +51,7 @@ There are three problems:
 
 ## 3. Design
 
-```
+```text
 Windows (remote)                                       Mac (local)
 copilot ─hook─► agentlink-hook.exe                     agentlinkd ──BLE──► watch
                  │ AGENTLINK_REMOTE=tcp:127.0.0.1:47533      ▲
@@ -135,6 +144,7 @@ copilot ─hook─► agentlink-hook.exe                     agentlinkd ──BL
 ## 4. Setup
 
 Prerequisites:
+
 - On Windows: OpenSSH Server running, and `AllowTcpForwarding` left at its default (`yes`).
   `GatewayPorts` left at `no`, so the forward binds loopback only.
 - Copilot CLI hooks on Windows point at `agentlink-hook.exe`, as for a local Windows install
@@ -147,6 +157,7 @@ Prerequisites:
 - On the Mac: `agentlinkd` running, from this version on.
 
 Windows quirks seen on Windows 11 with OpenSSH 9.5:
+
 - **Admin accounts** ignore `~\.ssh\authorized_keys`: sshd reads
   `C:\ProgramData\ssh\administrators_authorized_keys`, which must be readable only by
   Administrators and SYSTEM
@@ -182,6 +193,7 @@ saved name is passed to ssh as a destination, as before.
 `remote setup` (also `add --setup`) onboards a machine from the Mac, and is safe to re-run
 (for example after `remote init --rotate` or a new hook build). The first run asks for the
 password once, so run it in a terminal:
+
 1. checks key login with `BatchMode`; if that fails it installs `--key`
    (default `~/.ssh/id_ed25519.pub`) with one password prompt (on Windows admin accounts,
    into `administrators_authorized_keys`);
@@ -211,6 +223,7 @@ On Linux the hook reports the kernel hostname, because bash doesn't export `HOST
 ### 4.2 Manual setup
 
 Once:
+
 ```sh
 # Mac
 agentlink remote init                  # ~/.agentlink/remote.token (0600); --rotate replaces it
@@ -218,12 +231,14 @@ ssh <win-host> mkdir .agentlink
 scp ~/.agentlink/remote.token <win-host>:.agentlink/remote.token
 ssh <win-host> icacls .agentlink\remote.token /inheritance:r /grant:r "%USERNAME%:R"
 ```
+
 ```powershell
 # Windows, user environment (new shells pick it up)
 setx AGENTLINK_REMOTE tcp:127.0.0.1:47533
 ```
 
 Each time:
+
 ```sh
 # Mac, in kitty (or tmux): opens the shell and the tunnel together
 agentlink ssh <win-host> [ssh args]    # = ssh -o ExitOnForwardFailure=yes -R 127.0.0.1:47533:~/.agentlink/remote-<id>.sock <win-host>

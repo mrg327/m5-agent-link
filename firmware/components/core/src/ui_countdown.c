@@ -1,16 +1,17 @@
-/* The answer window's countdown (ANSWER-WINDOW.md §5) in Sigil (GLYPHS.md rule 4: a countdown is an arc that
- * drains). One thin arc just inside the index ring: a whole circle when the window opens, its end running
- * back toward 12 o'clock as the time to answer on the watch runs out, the way a hold ring fills from there.
- * Shown with the request it belongs to (ASK, and its card on the deck), nowhere else. No text: the arc is the
- * whole readout.
+/* The answer window's countdown (ANSWER-WINDOW.md §5) in Sigil (GLYPHS.md rule 4: a countdown is an
+ * arc that drains). One thin arc just inside the index ring: a whole circle when the window opens,
+ * its end running back toward 12 o'clock as the time to answer on the watch runs out, the way a
+ * hold ring fills from there. Shown with the request it belongs to (ASK, and its card on the deck),
+ * nowhere else. No text: the arc is the whole readout.
  *
- * Geometry: the band r 213..216 (centre line 214.5, 3 px), round caps. That band is free on every screen: the
- * content stays inside r 205, the key hints reach r 207 and the index ring starts at r 218. The hold progress
- * draws over the index ring itself (r 218..233), so the two never meet. Chrome grey; white in the last
- * COUNTDOWN_LATE_MS, so the end is not a surprise.
+ * Geometry: the band r 213..216 (centre line 214.5, 3 px), round caps. That band is free on every
+ * screen: the content stays inside r 205, the key hints reach r 207 and the index ring starts at r
+ * 218. The hold progress draws over the index ring itself (r 218..233), so the two never meet.
+ * Chrome grey; white in the last COUNTDOWN_LATE_MS, so the end is not a surprise.
  *
- * Redraw discipline (UI-V2 §8a): it is a ui_arc (ui_kit.h), which moves in whole degrees and invalidates only
- * the piece between the old end and the new one, so a minute's countdown costs a few small redraws a second. */
+ * Redraw discipline (UI-V2 §8a): it is a ui_arc (ui_kit.h), which moves in whole degrees and
+ * invalidates only the piece between the old end and the new one, so a minute's countdown costs a
+ * few small redraws a second. */
 #include "ui_countdown.h"
 #include "ui_internal.h"
 #include "ui_kit.h"

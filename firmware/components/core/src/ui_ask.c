@@ -1,21 +1,24 @@
-/* The ASK screen in Sigil (docs/design/GLYPHS.md §5, docs/design/glyphs/ASK.md; the functions and the safety
- * rules are those of UI-V3 §4.3 and §1).
+/* The ASK screen in Sigil (docs/design/GLYPHS.md §5, docs/design/glyphs/ASK.md; the functions and
+ * the safety rules are those of UI-V3 §4.3 and §1).
  *
- * Top to bottom: the project's sigil (with the agent's mark beside it), what is asked (the request's title and
- * text, a question, a standing rule: content, so text, rule 1), and under it what can be done, as shapes:
- *   - a request without options of its own (a bare permission) is discs in fixed places: the first item is the
- *     primary disc, the other hold items (Deny, Always allow) stand left of it, a tap item (Dictate) sits between
- *     the key hints, and Open on PC is button A's key hint itself;
- *   - a request with options (the agent's own words: content) is a short list down a spine of discs: the
- *     selected row in the middle with its disc, its neighbours above and below as thin rings.
- * One item is selected (button B, the dial and a drag step through them; a tap on another selects it). Only
- * the selected item is lit in its colour, and only it can be held: its ring's path is drawn round it, and the
- * hold fills that ring. A grant whose text has not been read is dim. Results are one hero glyph; nothing here is
- * a word that is not the agent's or the user's.
+ * Top to bottom: the project's sigil (with the agent's mark beside it), what is asked (the
+ * request's title and text, a question, a standing rule: content, so text, rule 1), and under it
+ * what can be done, as shapes:
+ *   - a request without options of its own (a bare permission) is discs in fixed places: the first
+ *     item is the primary disc, the other hold items (Deny, Always allow) stand left of it, a tap
+ *     item (Dictate) sits between the key hints, and Open on PC is button A's key hint itself;
+ *   - a request with options (the agent's own words: content) is a short list down a spine of
+ *     discs: the selected row in the middle with its disc, its neighbours above and below as thin
+ *     rings.
+ * One item is selected (button B, the dial and a drag step through them; a tap on another selects
+ * it). Only the selected item is lit in its colour, and only it can be held: its ring's path is
+ * drawn round it, and the hold fills that ring. A grant whose text has not been read is dim.
+ * Results are one hero glyph; nothing here is a word that is not the agent's or the user's.
  *
- * The item list and the hold rules come from nav.c; this file draws the items and runs the one the user commits.
- * A hold is bound to the request id it started on and cancels when that request changes, clears or is
- * answered. What every glyph means is said in words in the report (rule 9), as before. */
+ * The item list and the hold rules come from nav.c; this file draws the items and runs the one the
+ * user commits. A hold is bound to the request id it started on and cancels when that request
+ * changes, clears or is answered. What every glyph means is said in words in the report (rule 9),
+ * as before. */
 #include <stdio.h>
 #include <string.h>
 
@@ -27,25 +30,28 @@
 #include "ui_ring.h"
 #include "ui_theme.h"
 
-/* ───────── geometry: centres. Content stays inside r 205; a touch is a centre touch inside r 150 ───────── */
+/* ───────── geometry: centres. Content stays inside r 205; a touch is a centre touch inside r 150
+ * ───────── */
 #define SIGIL_Y 50 /* as on HOME: the same mark in the same place */
 #define SIGIL_R 22
-#define MARK_DX 40      /* the marks beside the sigil: remote (left), the agent (right) */
-#define BLOCK_Y0 72     /* what is asked: title and text, centred as a block in y 72..176 */
+#define MARK_DX 40  /* the marks beside the sigil: remote (left), the agent (right) */
+#define BLOCK_Y0 72 /* what is asked: title and text, centred as a block in y 72..176 */
 #define BLOCK_H 104
 #define TITLE_W 256
-#define TEXT_W 292      /* a permission's text: the width it has always been measured at (UI-V3 §4.3a) */
-#define TEXT_W_Q 312    /* a question's */
+/* a permission's text: the width it has always been measured at (UI-V3 §4.3a) */
+#define TEXT_W 292
+#define TEXT_W_Q 312 /* a question's */
 #define TEXT_LINES 3
-#define MORE_LINES 2    /* a text that goes on: two lines and the book glyph */
+#define MORE_LINES 2 /* a text that goes on: two lines and the book glyph */
 #define MORE_H 30
-#define PIPS_Y 404      /* which question of several; which page of the reader */
+#define PIPS_Y 404 /* which question of several; which page of the reader */
 /* discs (a request without options of its own) */
-#define P_X 304 /* the primary disc with hold items beside it: its ring ends where a toast's sign begins */
+/* the primary disc with hold items beside it: its ring ends where a toast's sign begins */
+#define P_X 304
 #define P_Y 262
 #define P_R 74
 #define SOLO_X UI_CX /* the primary disc alone */
-#define LEFT_X 140 /* the other hold items: one, or two stacked */
+#define LEFT_X 140   /* the other hold items: one, or two stacked */
 #define LEFT_Y 262
 #define LEFT_R UI_DISC_R_SECONDARY
 #define LEFT2_X 146 /* two: smaller, and clear of button A's hint */
@@ -55,8 +61,9 @@
 #define DOCK_R 26
 #define DOCK_PITCH 62
 /* rows (a request with options): the selected row, and one neighbour above and below */
-#define SPINE_X 118 /* the spine's leftmost place: the selected disc stays inside the centre zone */
-#define ROW_GAP 26  /* between a disc and its text: clear of the hold ring */
+/* the spine's leftmost place: the selected disc stays inside the centre zone */
+#define SPINE_X 118
+#define ROW_GAP 26 /* between a disc and its text: clear of the hold ring */
 #define ROW_SEL_Y 262
 #define ROW_SEL_H 72 /* 7 mm: the selected row is the one that is held */
 #define ROW_NB_DY 60
@@ -75,7 +82,8 @@
 #define RGB_RING 0x6c6c73 /* a neighbour's ring: COL_TEXT3 */
 
 static lv_obj_t *s_root, *s_sigil, *s_mark[2], *s_pips, *s_title, *s_text, *s_more;
-static lv_obj_t *s_disc[ASK_MAX_ITEMS], *s_seldisc, *s_nb[2], *s_row[3]; /* rows: [0] above, [1] selected, [2] below */
+/* rows: [0] above, [1] selected, [2] below */
+static lv_obj_t *s_disc[ASK_MAX_ITEMS], *s_seldisc, *s_nb[2], *s_row[3];
 static lv_obj_t *s_hero, *s_res, *s_resmarks, *s_key[2];
 static uint32_t s_sid, s_rid, s_shown_ms, s_now;
 static ask_item_t s_items[ASK_MAX_ITEMS];
@@ -88,51 +96,61 @@ static bool s_holding, s_hold_fired, s_ramp_started;
 static uint32_t s_hold_t0, s_hold_rid, s_nudge_ms;
 static int s_hold_idx;
 /* The words of the screen: the report says them (rule 9); only the request's own are drawn. */
-static char s_header_txt[80], s_title_txt[48], s_text_txt[168], s_word_txt[24], s_opt_txt[MODEL_RULE_CAP + 8];
+static char s_header_txt[80], s_title_txt[48], s_text_txt[168], s_word_txt[24],
+    s_opt_txt[MODEL_RULE_CAP + 8];
 static char s_req_title[48];  /* the request's own title; the rule view's is its scope, in words */
 static char s_title_draw[48]; /* the title as drawn: what the agent sent, never a stand-in */
 static char s_title_lbl[48], s_res_txt[MODEL_RULE_CAP + 12], s_row_txt[3][64];
 static const char *s_after_words = "";
 static int s_blk_key, s_title_y, s_title_y_shown, s_text_w, s_row_key, s_resmark_y;
-static int s_spine = SPINE_X, s_spine_shown = SPINE_X; /* the rows' discs: the list is centred on what it holds */
+/* the rows' discs: the list is centred on what it holds */
+static int s_spine = SPINE_X, s_spine_shown = SPINE_X;
 static bool s_more_on;
-/* Read before you approve (UI-V3 §4.3a). A text that does not fit shows MORE_LINES lines and the book glyph; a
- * tap on it opens the reader, which pages through the whole text. Until its last page has been on screen,
- * nothing that grants permission can be held. A text the daemon cut (proto 0.11: it says so with `len`; older
- * daemons: it ends in an ellipsis or fills the buffer) is not the whole request: the reader fetches the full
- * text by request id (detail.c, ANSWER-WINDOW.md §4) and pages through it as it arrives, and the lock releases
- * only once all of it has arrived and its last page has been shown. A cut text the watch cannot fetch (an older
- * daemon, privacy meta, over DETAIL_CAP, a refused or failed transfer) can be read and denied here but only
- * approved on the PC. */
+/* Read before you approve (UI-V3 §4.3a). A text that does not fit shows MORE_LINES lines and the
+ * book glyph; a tap on it opens the reader, which pages through the whole text. Until its last page
+ * has been on screen, nothing that grants permission can be held. A text the daemon cut (proto
+ * 0.11: it says so with `len`; older daemons: it ends in an ellipsis or fills the buffer) is not
+ * the whole request: the reader fetches the full text by request id (detail.c, ANSWER-WINDOW.md §4)
+ * and pages through it as it arrives, and the lock releases only once all of it has arrived and its
+ * last page has been shown. A cut text the watch cannot fetch (an older daemon, privacy meta, over
+ * DETAIL_CAP, a refused or failed transfer) can be read and denied here but only approved on the
+ * PC. */
 #define READ_TITLE_Y 74
 #define READ_Y 104
 #define READ_W 320
 #define READ_LINES 7
 #define LOAD_Y 290
-#define ASK_BLOCK_CUT_TEXT 1 /* 0: a daemon-cut text the watch cannot fetch may be approved once its preview was read */
-#define GATE_TELL_MS 400     /* a finger resting this long on a locked Approve gets told why nothing happens */
-#define NUDGE_MS 600         /* a tap on a hold item: its ring starts and falls back */
+/* 0: a daemon-cut text the watch cannot fetch may be approved once its preview was read */
+#define ASK_BLOCK_CUT_TEXT 1
+/* a finger resting this long on a locked Approve gets told why nothing happens */
+#define GATE_TELL_MS 400
+#define NUDGE_MS 600 /* a tap on a hold item: its ring starts and falls back */
 #define NUDGE_PM 110
 static lv_obj_t *s_read, *s_read_lbl, *s_load;
 static bool s_long, s_cut, s_fetch, s_reading, s_read_ok, s_gate_press;
 static int s_page_i, s_pages, s_read_pad;
 static uint32_t s_read_ms, s_gate_t0;
-static uint32_t s_reader_len; /* bytes of text in the reader now; s_read_len: when its last page was shown */
+/* bytes of text in the reader now; s_read_len: when its last page was shown */
+static uint32_t s_reader_len;
 static uint32_t s_read_len;
-static uint32_t s_reader_got; /* detail bytes the reader was last loaded with, and the transfer's state then */
+/* detail bytes the reader was last loaded with, and the transfer's state then */
+static uint32_t s_reader_got;
 static detail_state_t s_reader_st;
-/* The request went back to the computer (window over, or handed back): ASK says so for BACK_MIN_MS. */
+/* The request went back to the computer (window over, or handed back): ASK says so for
+ * BACK_MIN_MS. */
 #define BACK_MIN_MS 3000
 static uint32_t s_back_ms; /* when that state first showed; 0 = not showing */
-#define ANSWERED_MIN_MS 900 /* the answered state stays this long, so a quick clear cannot make it flash */
+/* the answered state stays this long, so a quick clear cannot make it flash */
+#define ANSWERED_MIN_MS 900
 #define ANSWERED_RULE_MS 2500 /* a saved standing rule: long enough to read what was saved */
-/* "Always allow" (STANDING-RULES.md). While that item is selected the rule stands in place of the request, exactly
- * as Claude Code will save it (`Bash(npm test:*)`, one rule per line), with two glyphs over it: where it is saved
- * (the folder: this project; the hourglass: until the session ends) and how wide it is (the asterisk, in the
- * request's colour: a wildcard; the equals sign: exactly as written). Nothing is cut: a rule that needs more than
- * RULE_LINES lines locks the item (the report: "Rule too long for the watch"). The hold is bound to the hash of
- * the rule on screen: the daemon saves it only if that is the hash of its own rule, and a rule that changes under
- * a running hold cancels it. */
+/* "Always allow" (STANDING-RULES.md). While that item is selected the rule stands in place of the
+ * request, exactly as Claude Code will save it (`Bash(npm test:*)`, one rule per line), with two
+ * glyphs over it: where it is saved (the folder: this project; the hourglass: until the session
+ * ends) and how wide it is (the asterisk, in the request's colour: a wildcard; the equals sign:
+ * exactly as written). Nothing is cut: a rule that needs more than RULE_LINES lines locks the item
+ * (the report: "Rule too long for the watch"). The hold is bound to the hash of the rule on screen:
+ * the daemon saves it only if that is the hash of its own rule, and a rule that changes under a
+ * running hold cancels it. */
 #define RULE_LINES 2
 #define RULE_MARK_DX 22
 static lv_obj_t *s_scope, *s_breadth, *s_grule, *s_gsign;
@@ -141,12 +159,14 @@ static uint8_t s_rule_scope_shown;
 static char s_rule_txt[MODEL_RULE_CAP + 1];
 static uint32_t s_rule_hash_shown, s_hold_hash;
 static uint32_t s_answered_ms; /* when the answered state first showed; 0 = not showing */
-static bool s_keeping;         /* the request is gone but the answered state is still held on screen */
-/* Multiple-choice questions (proto 0.18, LAST-MESSAGE.md §3.3): one question at a time, its options as rows. A
- * single-choice option is picked by a hold on its own row; a multi-select one is ticked by a tap and the ticks
- * sent by holding Send; "Other" dictates a free answer. Each answer moves on to the next question and the last
- * one sends them all (cmd answer). The answers so far belong to the request: kept while VOICE takes an "Other"
- * answer, dropped when another request takes the screen. Nothing reaches the daemon before the last answer. */
+/* the request is gone but the answered state is still held on screen */
+static bool s_keeping;
+/* Multiple-choice questions (proto 0.18, LAST-MESSAGE.md §3.3): one question at a time, its options
+ * as rows. A single-choice option is picked by a hold on its own row; a multi-select one is ticked
+ * by a tap and the ticks sent by holding Send; "Other" dictates a free answer. Each answer moves on
+ * to the next question and the last one sends them all (cmd answer). The answers so far belong to
+ * the request: kept while VOICE takes an "Other" answer, dropped when another request takes the
+ * screen. Nothing reaches the daemon before the last answer. */
 static struct {
     uint32_t rid;
     int qi; /* the question on screen */
@@ -154,7 +174,8 @@ static struct {
 } s_q;
 static bool s_qmode; /* the request on screen has questions */
 static char s_qlabel[MODEL_MAX_QOPTS][64];
-MODEL_EXT_BSS static char s_qread[MODEL_MAX_QOPTS * 190 + 200]; /* the question and its options' descriptions */
+/* the question and its options' descriptions */
+MODEL_EXT_BSS static char s_qread[MODEL_MAX_QOPTS * 190 + 200];
 static bool s_qdesc; /* some option has a description: the reader shows them */
 
 static void paint(void);
@@ -166,7 +187,8 @@ static const attention_t *req(void)
     return a && (a->kind == ATT_APPROVAL || a->kind == ATT_QUESTION) ? a : NULL;
 }
 
-static const ask_q_t *cur_q(const attention_t *a) { return s_qmode && a ? model_attention_question(a->rid, s_q.qi) : NULL; }
+static const ask_q_t *cur_q(const attention_t *a)
+{ return s_qmode && a ? model_attention_question(a->rid, s_q.qi) : NULL; }
 static bool last_q(const attention_t *a) { return a && s_q.qi >= a->n_qs - 1; }
 
 /* What an item is called: the report's word for it (rule 9). */
@@ -193,9 +215,11 @@ static const char *text_of(const ask_item_t *it, const attention_t *a)
     return it->id == ASK_OPT ? a->opts[it->opt] : "";
 }
 
-static bool ticked(const ask_item_t *it) { return it->id == ASK_QOPT && ((s_q.picks[s_q.qi] >> it->opt) & 1u); }
+static bool ticked(const ask_item_t *it)
+{ return it->id == ASK_QOPT && ((s_q.picks[s_q.qi] >> it->opt) & 1u); }
 
-/* The glyph on an item's disc: what it does. A multi-select option's is its tick, when it has one. */
+/* The glyph on an item's disc: what it does. A multi-select option's is its tick, when it has
+ * one. */
 static const char *glyph_of(const ask_item_t *it, const attention_t *a)
 {
     const ask_q_t *q = cur_q(a);
@@ -212,11 +236,12 @@ static const char *glyph_of(const ask_item_t *it, const attention_t *a)
     }
 }
 
-/* Colour says what the item does: orange grants, vermillion denies, yellow answers a question, grey goes to the
- * PC. Never the only cue: the glyph says it too, and a hold item shows its ring. */
+/* Colour says what the item does: orange grants, vermillion denies, yellow answers a question, grey
+ * goes to the PC. Never the only cue: the glyph says it too, and a hold item shows its ring. */
 static uint32_t rgb_of(const ask_item_t *it)
 {
-    if (it->id == ASK_QOPT || it->id == ASK_OTHER || it->id == ASK_SEND) return RGB_ASK; /* answers, never grants */
+    /* answers, never grants */
+    if (it->id == ASK_QOPT || it->id == ASK_OTHER || it->id == ASK_SEND) return RGB_ASK;
     if (it->grants) return RGB_PERMISSION;
     if (it->hold_ms) return RGB_ERROR;
     return it->id == ASK_OPEN_PC ? RGB_IDLE : RGB_ASK;
@@ -224,7 +249,8 @@ static uint32_t rgb_of(const ask_item_t *it)
 
 static void show(lv_obj_t *o, bool on)
 {
-    if (on == !lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN)) return; /* LVGL invalidates even on a no-op */
+    /* LVGL invalidates even on a no-op */
+    if (on == !lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN)) return;
     if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
 }
@@ -265,14 +291,17 @@ static const char *reader_text(void)
     return d ? d : s_text_txt; /* a failed transfer shows the preview, which ends in its ellipsis */
 }
 
-/* The reader holds the whole request: a text that was never cut, or a cut one whose full text has arrived. */
-static bool text_complete(void) { return !s_cut || (s_fetch && detail_state(s_rid) == DETAIL_DONE); }
+/* The reader holds the whole request: a text that was never cut, or a cut one whose full text has
+ * arrived. */
+static bool text_complete(void)
+{ return !s_cut || (s_fetch && detail_state(s_rid) == DETAIL_DONE); }
 
 /* A cut text the watch will never have in full: approve only on the PC. */
-static bool text_unreachable(void) { return s_cut && (!s_fetch || detail_state(s_rid) == DETAIL_FAILED); }
+static bool text_unreachable(void)
+{ return s_cut && (!s_fetch || detail_state(s_rid) == DETAIL_FAILED); }
 
-/* The request's text keeps a grant shut: the whole of it has not been, or cannot be, read (its last page shown
- * while the reader held all of it). */
+/* The request's text keeps a grant shut: the whole of it has not been, or cannot be, read (its last
+ * page shown while the reader held all of it). */
 static bool text_locked(const ask_item_t *it)
 {
     if (!it->grants) return false;
@@ -287,7 +316,8 @@ static bool text_locked(const ask_item_t *it)
 static bool grant_locked(const ask_item_t *it)
 {
     if (!it->grants) return false;
-    if (it->id == ASK_GRANT && (!s_gview || !s_rule_fits)) return true; /* the rule is not on screen in full */
+    /* the rule is not on screen in full */
+    if (it->id == ASK_GRANT && (!s_gview || !s_rule_fits)) return true;
     return text_locked(it);
 }
 
@@ -304,7 +334,8 @@ static void reader_page(void)
     paint();
 }
 
-/* Measures the reader's text again (it grows as the full text arrives); the page on screen stays. */
+/* Measures the reader's text again (it grows as the full text arrives); the page on screen
+ * stays. */
 static void reader_load(void)
 {
     const char *t = reader_text();
@@ -312,9 +343,11 @@ static void reader_load(void)
     lv_point_t sz;
     lv_text_get_size(&sz, t, FONT_BODY, 0, 0, READ_W, LV_TEXT_FLAG_NONE);
     int lines = sz.y / lh;
-    for (size_t n = strlen(t); n > 0 && t[n - 1] == '\n' && lines > 1; n--) lines--; /* no page of blank lines at the end */
+    /* no page of blank lines at the end */
+    for (size_t n = strlen(t); n > 0 && t[n - 1] == '\n' && lines > 1; n--) lines--;
     s_pages = lines <= READ_LINES ? 1 : (lines + READ_LINES - 1) / READ_LINES;
-    s_read_pad = lines < READ_LINES ? (READ_LINES - lines) * lh / 2 : 0; /* a short text stands in the middle of the window */
+    /* a short text stands in the middle of the window */
+    s_read_pad = lines < READ_LINES ? (READ_LINES - lines) * lh / 2 : 0;
     if (s_page_i >= s_pages) s_page_i = s_pages - 1;
     s_reader_len = (uint32_t)strlen(t);
     s_reader_got = detail_got(s_rid);
@@ -341,16 +374,20 @@ static void reader_close(void)
 }
 
 /* Where the rule is saved, in words (the report) and as a glyph (the screen). */
-static const char *scope_title(uint8_t scope) { return scope == MODEL_RULE_PROJECT ? "Saved for this project" : "Until this session ends"; }
-static const char *scope_glyph(uint8_t scope) { return scope == MODEL_RULE_PROJECT ? ICON_FOLDER : ICON_WAIT; }
+static const char *scope_title(uint8_t scope)
+{ return scope == MODEL_RULE_PROJECT ? "Saved for this project" : "Until this session ends"; }
+static const char *scope_glyph(uint8_t scope)
+{ return scope == MODEL_RULE_PROJECT ? ICON_FOLDER : ICON_WAIT; }
 
 /* How wide the rule is: a wildcard is said, in the request's colour, never hidden. */
-static const char *breadth_note(bool wide) { return wide ? "Wide: * matches anything" : "Exactly as written"; }
+static const char *breadth_note(bool wide)
+{ return wide ? "Wide: * matches anything" : "Exactly as written"; }
 
-static bool grant_selected(void) { return s_sel >= 0 && s_sel < s_n && s_items[s_sel].id == ASK_GRANT; }
+static bool grant_selected(void)
+{ return s_sel >= 0 && s_sel < s_n && s_items[s_sel].id == ASK_GRANT; }
 
-/* Shows the rule in place of the request text while "Always allow" is selected; puts everything back when it
- * is not. Called on every refresh and on every change of selection. */
+/* Shows the rule in place of the request text while "Always allow" is selected; puts everything
+ * back when it is not. Called on every refresh and on every change of selection. */
 static void rule_view(const attention_t *a)
 {
     if (!a) {
@@ -359,24 +396,29 @@ static void rule_view(const attention_t *a)
     }
     bool on = !a->answer_sent && a->has_rule && !s_reading && !s_back_ms && grant_selected();
     if (on) {
-        bool changed = strcmp(s_rule_txt, a->rule) || s_rule_scope_shown != a->rule_scope || s_rule_wide_shown != a->rule_wide;
+        bool changed = strcmp(s_rule_txt, a->rule) || s_rule_scope_shown != a->rule_scope ||
+                       s_rule_wide_shown != a->rule_wide;
         if (changed || !s_gview) {
-            int lh = lv_font_get_line_height(FONT_BODY), mh = lv_font_get_line_height(FONT_ICON_M) + 6;
+            int lh = lv_font_get_line_height(FONT_BODY),
+                mh = lv_font_get_line_height(FONT_ICON_M) + 6;
             const lv_font_t *f = FONT_BODY;
             lv_point_t sz;
             lv_text_get_size(&sz, a->rule, FONT_BODY, 0, 0, TEXT_W, LV_TEXT_FLAG_NONE);
             int lines = sz.y / lh;
             s_rule_fits = lines >= 1 && lines <= RULE_LINES && sz.x <= TEXT_W;
-            if (s_rule_fits) { /* set large when all of it still fits: the same whole rule, never a part */
+            if (s_rule_fits) {
+                /* set large when all of it still fits: the same whole rule, never a part */
                 lv_text_get_size(&sz, a->rule, FONT_HEAD, 0, 0, TEXT_W, LV_TEXT_FLAG_NONE);
                 int big = sz.y / lv_font_get_line_height(FONT_HEAD);
-                if (big >= 1 && big <= RULE_LINES && sz.x <= TEXT_W) f = FONT_HEAD, lines = big, lh = lv_font_get_line_height(FONT_HEAD);
+                if (big >= 1 && big <= RULE_LINES && sz.x <= TEXT_W)
+                    f = FONT_HEAD, lines = big, lh = lv_font_get_line_height(FONT_HEAD);
             }
             snprintf(s_rule_txt, sizeof s_rule_txt, "%s", a->rule);
             s_rule_scope_shown = a->rule_scope;
             s_rule_wide_shown = a->rule_wide;
             s_rule_hash_shown = model_rule_hash(s_rule_txt, s_rule_scope_shown, s_rule_wide_shown);
-            if (s_rule_fits) { /* the two glyphs and the rule, centred as a block where the request was */
+            if (s_rule_fits) {
+                /* the two glyphs and the rule, centred as a block where the request was */
                 int y0 = BLOCK_Y0 + (BLOCK_H - mh - lines * lh) / 2;
                 ui_glyph_set_pos(s_scope, UI_CX - RULE_MARK_DX, y0 + mh / 2 - 3);
                 ui_glyph_set_pos(s_breadth, UI_CX + RULE_MARK_DX, y0 + mh / 2 - 3);
@@ -389,15 +431,17 @@ static void rule_view(const attention_t *a)
                 lv_obj_set_pos(s_grule, UI_CX - TEXT_W / 2, y0 + mh);
             }
             if (changed) hold_cancel(); /* a hold belongs to the rule it started on */
-            dbg_event("ui", "rule_view", "\"rid\":%u,\"fits\":%s,\"rh\":%u", (unsigned)a->rid, s_rule_fits ? "true" : "false",
-                      (unsigned)s_rule_hash_shown);
+            dbg_event("ui", "rule_view", "\"rid\":%u,\"fits\":%s,\"rh\":%u", (unsigned)a->rid,
+                      s_rule_fits ? "true" : "false", (unsigned)s_rule_hash_shown);
         }
     }
     s_gview = on;
-    snprintf(s_title_txt, sizeof s_title_txt, "%s", on ? scope_title(s_rule_scope_shown) : s_req_title);
+    snprintf(s_title_txt, sizeof s_title_txt, "%s",
+             on ? scope_title(s_rule_scope_shown) : s_req_title);
 }
 
-/* What is asked: the title over the text, centred as a block. A text of one or two short lines is set large. */
+/* What is asked: the title over the text, centred as a block. A text of one or two short lines is
+ * set large. */
 static void layout_text(bool perm, const char *text)
 {
     const attention_t *a = req();
@@ -406,12 +450,17 @@ static void layout_text(bool perm, const char *text)
     lv_text_get_size(&sz, text, FONT_BODY, 0, 0, w, LV_TEXT_FLAG_NONE);
     int lines = sz.y / lh;
     size_t tl = strlen(text);
-    /* the daemon clips with an ellipsis; a text that fills the model's buffer was clipped on arrival */
-    s_cut = (tl >= 3 && !memcmp(text + tl - 3, "\xE2\x80\xA6", 3)) || tl >= sizeof(((attention_t *)0)->text) - 1;
-    if (a && a->len_known && a->full_len > 0) s_cut = true; /* proto 0.11: the daemon says it is not the whole text */
-    if (s_qmode) s_cut = false; /* a question is all there is to it; its options' descriptions are what the reader adds */
-    /* long: not all of it is on screen. A text that goes on anyway (cut, or a question with descriptions) shows
-     * MORE_LINES lines, so a third line is already more than the screen holds */
+    /* the daemon clips with an ellipsis; a text that fills the model's buffer was clipped on
+     * arrival */
+    s_cut = (tl >= 3 && !memcmp(text + tl - 3, "\xE2\x80\xA6", 3)) ||
+            tl >= sizeof(((attention_t *)0)->text) - 1;
+    /* proto 0.11: the daemon says it is not the whole text */
+    if (a && a->len_known && a->full_len > 0) s_cut = true;
+    /* a question is all there is to it; its options' descriptions are what the reader adds */
+    if (s_qmode) s_cut = false;
+    /* long: not all of it is on screen. A text that goes on anyway (cut, or a question with
+     * descriptions) shows MORE_LINES lines, so a third line is already more than the screen
+     * holds */
     bool goes_on = s_cut || (s_qmode && s_qdesc);
     s_long = lines > (goes_on ? MORE_LINES : TEXT_LINES) || (s_qmode && s_qdesc);
     s_fetch = s_cut && detail_fetchable(a);
@@ -421,7 +470,8 @@ static void layout_text(bool perm, const char *text)
     if (!more) { /* short enough to be set large */
         lv_text_get_size(&sz, text, FONT_HEAD, 0, 0, w, LV_TEXT_FLAG_NONE);
         int big = sz.y / lv_font_get_line_height(FONT_HEAD);
-        if (big >= 1 && big <= 2) f = FONT_HEAD, lines = big, lh = lv_font_get_line_height(FONT_HEAD);
+        if (big >= 1 && big <= 2)
+            f = FONT_HEAD, lines = big, lh = lv_font_get_line_height(FONT_HEAD);
     }
     if (strcmp(s_text_txt, text)) { /* a different text has not been read */
         s_read_ok = false;
@@ -434,7 +484,8 @@ static void layout_text(bool perm, const char *text)
     s_more_on = more;
     s_title_y = y0;
     /* every style or size write invalidates, and refresh runs on each session delta: change-only */
-    int key = (perm << 30) | ((f == FONT_HEAD) << 29) | (more << 28) | (lines << 24) | ((th != 0) << 23) | (y0 << 12) | w;
+    int key = (perm << 30) | ((f == FONT_HEAD) << 29) | (more << 28) | (lines << 24) |
+              ((th != 0) << 23) | (y0 << 12) | w;
     if (key != s_blk_key) {
         s_blk_key = key;
         s_text_w = w;
@@ -447,9 +498,11 @@ static void layout_text(bool perm, const char *text)
     theme_set_text(s_title, s_title_lbl, sizeof s_title_lbl, s_title_draw);
 }
 
-/* ───────── the result states: one hero glyph, and under it only what was said or saved ───────── */
+/* ───────── the result states: one hero glyph, and under it only what was said or saved
+ * ───────── */
 
-static void set_result(const char *hero, lv_color_t col, const char *text, const char *marks, lv_color_t mark_col)
+static void set_result(const char *hero, lv_color_t col, const char *text, const char *marks,
+                       lv_color_t mark_col)
 {
     ui_glyph_set(s_hero, hero, col);
     theme_set_text(s_res, s_res_txt, sizeof s_res_txt, text);
@@ -461,8 +514,8 @@ static void set_result(const char *hero, lv_color_t col, const char *text, const
     ui_glyph_set(s_resmarks, marks, mark_col);
 }
 
-/* The request went back to the computer: the terminal shows its own prompt now (ANSWER-WINDOW.md §5). The
- * desktop, and the hourglass under it when it was the time that ran out. */
+/* The request went back to the computer: the terminal shows its own prompt now (ANSWER-WINDOW.md
+ * §5). The desktop, and the hourglass under it when it was the time that ran out. */
 static void show_back(const session_t *s, uint32_t now)
 {
     s_back_ms = now ? now : 1;
@@ -473,7 +526,8 @@ static void show_back(const session_t *s, uint32_t now)
     s_opt_txt[0] = 0;
     snprintf(s_word_txt, sizeof s_word_txt, "On your computer");
     snprintf(s_title_txt, sizeof s_title_txt, "%s", s_req_title);
-    set_result(ICON_COMPUTER, COL_TEXT2, "", s->back_why == BACK_HANDED ? "" : ICON_WAIT, COL_TEXT2);
+    set_result(ICON_COMPUTER, COL_TEXT2, "", s->back_why == BACK_HANDED ? "" : ICON_WAIT,
+               COL_TEXT2);
     paint();
     dbg_event("ui", "ask_back", "\"rid\":%u,\"why\":%d", (unsigned)s_rid, (int)s->back_why);
 }
@@ -493,15 +547,18 @@ static void answers_caption(const attention_t *a)
     size_t n = 0;
     s_opt_txt[0] = 0;
     for (int i = 0; i < q0->n_opts && n < sizeof s_opt_txt; i++)
-        if ((s_q.picks[0] >> i) & 1u) n += (size_t)snprintf(s_opt_txt + n, sizeof s_opt_txt - n, "%s\"%s\"", n ? ", " : "", q0->label[i]);
+        if ((s_q.picks[0] >> i) & 1u)
+            n += (size_t)snprintf(s_opt_txt + n, sizeof s_opt_txt - n, "%s\"%s\"", n ? ", " : "",
+                                  q0->label[i]);
 }
 
-/* The answer is out. The hero says which (the tick, the double tick, the cross, the paper plane); under it what
- * was said or saved (content), and the desktop: the computer has it now. */
+/* The answer is out. The hero says which (the tick, the double tick, the cross, the paper plane);
+ * under it what was said or saved (content), and the desktop: the computer has it now. */
 static void show_answered(const attention_t *a)
 {
-    static const char *const ticks[MODEL_MAX_QS + 1] = {"", ICON_CHECK, ICON_CHECK ICON_CHECK, ICON_CHECK ICON_CHECK ICON_CHECK,
-                                                        ICON_CHECK ICON_CHECK ICON_CHECK ICON_CHECK};
+    static const char *const ticks[MODEL_MAX_QS + 1] = {
+        "", ICON_CHECK, ICON_CHECK ICON_CHECK, ICON_CHECK ICON_CHECK ICON_CHECK,
+        ICON_CHECK ICON_CHECK ICON_CHECK ICON_CHECK};
     uint32_t rgb = RGB_DONE;
     const char *hero = ICON_CHECK, *word = "Approved", *marks = ICON_COMPUTER;
     char text[sizeof s_res_txt] = "";
@@ -523,14 +580,17 @@ static void show_answered(const attention_t *a)
         word = "Denied";
         hero = ICON_X;
         rgb = RGB_ERROR;
-    } else if (a->answer == ATT_ANSWER_REPLY || a->answer == ATT_ANSWER_DICTATE || a->answer == ATT_ANSWER_QUESTIONS) {
+    } else if (a->answer == ATT_ANSWER_REPLY || a->answer == ATT_ANSWER_DICTATE ||
+               a->answer == ATT_ANSWER_QUESTIONS) {
         word = "Sent";
         hero = ICON_SENT;
         rgb = RGB_ASK;
-        if (a->answer == ATT_ANSWER_REPLY) snprintf(s_opt_txt, sizeof s_opt_txt, "\"%s\"", a->opts[a->answer_opt % 4]);
+        if (a->answer == ATT_ANSWER_REPLY)
+            snprintf(s_opt_txt, sizeof s_opt_txt, "\"%s\"", a->opts[a->answer_opt % 4]);
         if (a->answer == ATT_ANSWER_QUESTIONS) answers_caption(a);
         if (a->answer == ATT_ANSWER_QUESTIONS && (a->n_qs != 1 || s_q.rid != a->rid)) {
-            marks = ticks[a->n_qs <= MODEL_MAX_QS ? a->n_qs : MODEL_MAX_QS]; /* how many answers: a tick each */
+            /* how many answers: a tick each */
+            marks = ticks[a->n_qs <= MODEL_MAX_QS ? a->n_qs : MODEL_MAX_QS];
             mark_col = lv_color_hex(RGB_ASK);
         } else if (a->answer == ATT_ANSWER_QUESTIONS && s_q.aids[0]) {
             marks = ICON_MIC ICON_COMPUTER; /* the user's own words */
@@ -547,25 +607,29 @@ static void show_answered(const attention_t *a)
     s_n = 0;
 }
 
-/* The question on screen: its options' names for the report (a tick before a ticked one) and the reader's text. */
+/* The question on screen: its options' names for the report (a tick before a ticked one) and the
+ * reader's text. */
 static void question_prep(const ask_q_t *q)
 {
     uint32_t picks = s_q.picks[s_q.qi];
     for (int i = 0; i < q->n_opts && i < MODEL_MAX_QOPTS; i++)
-        snprintf(s_qlabel[i], sizeof s_qlabel[i], "%s%s", q->multi && ((picks >> i) & 1u) ? ICON_DONE " " : "", q->label[i]);
+        snprintf(s_qlabel[i], sizeof s_qlabel[i], "%s%s",
+                 q->multi && ((picks >> i) & 1u) ? ICON_DONE " " : "", q->label[i]);
     size_t n = (size_t)snprintf(s_qread, sizeof s_qread, "%s", q->q);
     s_qdesc = false;
     for (int i = 0; i < q->n_opts && i < MODEL_MAX_QOPTS && n < sizeof s_qread; i++) {
         if (!q->desc[i][0]) continue;
-        n += (size_t)snprintf(s_qread + n, sizeof s_qread - n, "%s%s: %s", s_qdesc ? "\n" : "\n\n", q->label[i], q->desc[i]);
+        n += (size_t)snprintf(s_qread + n, sizeof s_qread - n, "%s%s: %s", s_qdesc ? "\n" : "\n\n",
+                              q->label[i], q->desc[i]);
         s_qdesc = true;
     }
 }
 
 /* ───────── the items: discs in fixed places, or rows down a spine ───────── */
 
-/* Where each item's disc stands (a request without options): the first item is the primary disc; the other hold
- * items stand left of it; tap items sit between the key hints; Open on PC is button A's key hint. */
+/* Where each item's disc stands (a request without options): the first item is the primary disc;
+ * the other hold items stand left of it; tap items sit between the key hints; Open on PC is button
+ * A's key hint. */
 static void place_discs(void)
 {
     int left[ASK_MAX_ITEMS], dock[ASK_MAX_ITEMS], nl = 0, nd = 0;
@@ -599,8 +663,9 @@ static int pc_index(void)
     return -1;
 }
 
-/* The text of row `slot` (0 above, 1 selected, 2 below), left of nothing, right of its disc. The selected row's
- * is set large when it fits one line, else on up to two lines; a neighbour's is one line. */
+/* The text of row `slot` (0 above, 1 selected, 2 below), left of nothing, right of its disc. The
+ * selected row's is set large when it fits one line, else on up to two lines; a neighbour's is one
+ * line. */
 static void row_text(int slot, const char *t, bool on)
 {
     show(s_row[slot], on && t[0]);
@@ -627,8 +692,9 @@ static void row_text(int slot, const char *t, bool on)
     lv_obj_set_pos(s_row[1], s_spine_shown + ROW_SEL_R + ROW_GAP, ROW_SEL_Y - lines * lh / 2);
 }
 
-/* The rows are centred as a list: the spine stands where the widest option, set large, would be centred with
- * its disc. One place for the whole list, so nothing moves sideways as the selection does. */
+/* The rows are centred as a list: the spine stands where the widest option, set large, would be
+ * centred with its disc. One place for the whole list, so nothing moves sideways as the selection
+ * does. */
 static void place_rows(const attention_t *a)
 {
     int maxw = 0;
@@ -646,11 +712,12 @@ static void place_rows(const attention_t *a)
     s_spine_shown = s_spine;
     ui_disc_set_pos(s_seldisc, s_spine, ROW_SEL_Y);
     for (int k = 0; k < 3; k++) lv_obj_set_x(s_row[k], s_spine + ROW_SEL_R + ROW_GAP);
-    for (int k = 0; k < 2; k++) ui_disc_set_pos(s_nb[k], s_spine, ROW_SEL_Y + (k ? ROW_NB_DY : -ROW_NB_DY));
+    for (int k = 0; k < 2; k++)
+        ui_disc_set_pos(s_nb[k], s_spine, ROW_SEL_Y + (k ? ROW_NB_DY : -ROW_NB_DY));
 }
 
-/* Draws the items. Only the selected one is lit; a grant that is still shut is dim; the selected hold item
- * shows where its ring will run. */
+/* Draws the items. Only the selected one is lit; a grant that is still shut is dim; the selected
+ * hold item shows where its ring will run. */
 static void paint_items(const attention_t *a, bool on)
 {
     bool rows = on && s_rows, discs = on && !s_rows;
@@ -661,7 +728,8 @@ static void paint_items(const attention_t *a, bool on)
         show(s_disc[i], used);
         if (!used) continue;
         const ask_item_t *it = &s_items[i];
-        bool sel = i == s_sel, shut = text_locked(it) || (it->id == ASK_GRANT && s_gview && !s_rule_fits);
+        bool sel = i == s_sel,
+             shut = text_locked(it) || (it->id == ASK_GRANT && s_gview && !s_rule_fits);
         ui_disc_set_r(s_disc[i], s_slot[i].r);
         ui_disc_set_pos(s_disc[i], s_slot[i].x, s_slot[i].y);
         ui_disc_set_glyph(s_disc[i], glyph_of(it, a));
@@ -682,30 +750,35 @@ static void paint_items(const attention_t *a, bool on)
     const char *g = glyph_of(it, a);
     bool shut = grant_locked(it);
     ui_disc_set_glyph(s_seldisc, g);
-    ui_disc_set_rgb(s_seldisc, shut || !g[0] ? 0 : rgb_of(it)); /* an unticked option: an empty disc */
+    /* an unticked option: an empty disc */
+    ui_disc_set_rgb(s_seldisc, shut || !g[0] ? 0 : rgb_of(it));
     ui_disc_set_state(s_seldisc, shut ? UI_DISC_DISABLED : UI_DISC_NORMAL);
     ui_disc_set_track(s_seldisc, it->hold_ms > 0);
     row_text(1, text_of(it, a), true);
     for (int k = 0; k < 2; k++) {
-        bool shown = k == 0 ? s_sel > 0 : s_sel < s_n - 1; /* the list has a top and a bottom: no wrap on the glass */
+        /* the list has a top and a bottom: no wrap on the glass */
+        bool shown = k == 0 ? s_sel > 0 : s_sel < s_n - 1;
         row_text(k ? 2 : 0, shown ? text_of(&s_items[s_sel + (k ? 1 : -1)], a) : "", shown);
         if (!shown) continue;
         const ask_item_t *nb = &s_items[s_sel + (k ? 1 : -1)];
-        /* a neighbour's ring: empty for a plain option, its tick in yellow once ticked, else what the item does */
+        /* a neighbour's ring: empty for a plain option, its tick in yellow once ticked, else what
+         * the item does */
         const char *ng = nb->id == ASK_QOPT ? (ticked(nb) && glyph_of(nb, a)[0] ? ICON_CHECK : "")
-                         : nb->id == ASK_OPT && !nb->hold_ms ? "" : glyph_of(nb, a);
+                         : nb->id == ASK_OPT && !nb->hold_ms ? ""
+                                                             : glyph_of(nb, a);
         ui_disc_set_glyph(s_nb[k], ng);
         ui_disc_set_rgb(s_nb[k], nb->id == ASK_QOPT && ng[0] ? RGB_ASK : RGB_RING);
     }
 }
 
-/* One painter for the whole screen: which parts show, from the state the rest of the file keeps. Every setter
- * is change-only, so it is called freely. */
+/* One painter for the whole screen: which parts show, from the state the rest of the file keeps.
+ * Every setter is change-only, so it is called freely. */
 static void paint(void)
 {
     const attention_t *a = req();
     bool result = s_back_ms || (a && a->answer_sent) || s_keeping;
-    bool pick = a && !result && !s_reading, read = a && !result && s_reading, rule = pick && s_gview;
+    bool pick = a && !result && !s_reading, read = a && !result && s_reading,
+         rule = pick && s_gview;
     bool last = s_page_i == s_pages - 1, done = text_complete() || text_unreachable();
     show(s_title, read || (pick && !rule && s_title_draw[0]));
     int ty = read ? READ_TITLE_Y : s_title_y;
@@ -729,7 +802,8 @@ static void paint(void)
     if (read) ui_pips_set(s_pips, s_pages, s_page_i);
     else if (pick && s_qmode && a->n_qs > 1) ui_pips_set(s_pips, a->n_qs, s_q.qi);
     else ui_pips_set(s_pips, 0, 0);
-    /* B steps through the items (nothing to step through with one); in the reader it turns the page, then closes */
+    /* B steps through the items (nothing to step through with one); in the reader it turns the
+     * page, then closes */
     show(s_key[1], read || (pick && s_n > 1));
     ui_key_hint_set(s_key[1], !read ? ICON_NEXT : last && done ? ICON_CHECK : ICON_CARET_DOWN);
 }
@@ -748,13 +822,16 @@ bool ui_ask_refresh(uint32_t now)
     const attention_t *a = req();
     if (!s || s->state == SESS_ENDED) return false;
     if (!a) {
-        /* cleared: hold the answered state on screen for a moment (a new request or input still takes over) */
-        if (s_answered_ms && now - s_answered_ms < (s_answered_rule ? ANSWERED_RULE_MS : ANSWERED_MIN_MS)) {
+        /* cleared: hold the answered state on screen for a moment (a new request or input still
+         * takes over) */
+        if (s_answered_ms &&
+            now - s_answered_ms < (s_answered_rule ? ANSWERED_RULE_MS : ANSWERED_MIN_MS)) {
             s_keeping = true;
             paint();
             return true;
         }
-        /* the window ran out (or Open on PC handed it back): say where the request is now, then go */
+        /* the window ran out (or Open on PC handed it back): say where the request is now, then
+         * go */
         if (!s_answered_ms && s_rid && s->back) {
             if (!s_back_ms) show_back(s, now);
             return now - s_back_ms < BACK_MIN_MS;
@@ -791,7 +868,8 @@ bool ui_ask_refresh(uint32_t now)
     const char *base = theme_basename(s->repo);
     char host[24];
     theme_host_prefix(host, sizeof host, s);
-    snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
+    snprintf(buf, sizeof buf, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(),
+             base[0] ? base : "(no folder)");
     if (q && a->n_qs > 1) { /* which question of how many */
         size_t n = strlen(buf);
         snprintf(buf + n, sizeof buf - n, "%s%d of %d", theme_sep(), s_q.qi + 1, a->n_qs);
@@ -801,14 +879,19 @@ bool ui_ask_refresh(uint32_t now)
     ui_glyph_set(s_mark[0], s->host ? ICON_G_WEB : "", COL_TEXT3);
     ui_glyph_set(s_mark[1], theme_agent_glyph(s->agent), COL_TEXT3);
     bool perm = a->kind == ATT_APPROVAL;
-    /* the title: the question's header, the request's own, else the tool. With none of them the report names
-     * the kind; the glass leaves the row out (the request's colour already says which) */
+    /* the title: the question's header, the request's own, else the tool. With none of them the
+     * report names the kind; the glass leaves the row out (the request's colour already says
+     * which) */
     const char *own = q ? q->h : a->title[0] ? a->title : s->tool;
     snprintf(s_title_draw, sizeof s_title_draw, "%s", own);
-    snprintf(s_req_title, sizeof s_req_title, "%s", own[0] ? own : q || !perm ? "Question" : "Permission request");
+    snprintf(s_req_title, sizeof s_req_title, "%s",
+             own[0]       ? own
+             : q || !perm ? "Question"
+                          : "Permission request");
     snprintf(s_title_txt, sizeof s_title_txt, "%s", s_req_title);
     layout_text(perm, q ? q->q : a->text);
-    if (s_fetch && !a->answer_sent) detail_want(a, now); /* the full text, while the user looks at the request */
+    /* the full text, while the user looks at the request */
+    if (s_fetch && !a->answer_sent) detail_want(a, now);
 
     if (!a->answer_sent) s_answered_ms = 0, s_answered_rule = false;
     else if (!s_answered_ms) s_answered_ms = now ? now : 1;
@@ -820,8 +903,8 @@ bool ui_ask_refresh(uint32_t now)
         if (s_listed != s_n) s_sel = 0; /* another list: back to the default */
         s_listed = s_n;
         s_rows = false;
-        for (int i = 0; i < s_n; i++)
-            if (s_items[i].id == ASK_OPT || s_items[i].id == ASK_QOPT) s_rows = true; /* options in words: rows */
+        for (int i = 0; i < s_n; i++) /* options in words: rows */
+            if (s_items[i].id == ASK_OPT || s_items[i].id == ASK_QOPT) s_rows = true;
         if (s_rows) place_rows(a);
         else place_discs();
         rule_view(a);
@@ -853,9 +936,11 @@ void ui_ask_open(uint32_t sid, uint32_t now)
     s_n = 0;
     ui_ask_refresh(now);
     ui_home_rim_mode(true); /* a rim drag dials through the items */
-    ring_set_still(ui_home_ring(), true); /* the sessions stay on the ring, settled: no comet behind a decision */
+    /* the sessions stay on the ring, settled: no comet behind a decision */
+    ring_set_still(ui_home_ring(), true);
     show(s_root, true);
-    dbg_event("ui", "ask", "\"sid\":%u,\"rid\":%u,\"items\":%d", (unsigned)sid, (unsigned)s_rid, s_n);
+    dbg_event("ui", "ask", "\"sid\":%u,\"rid\":%u,\"items\":%d", (unsigned)sid, (unsigned)s_rid,
+              s_n);
 }
 
 void ui_ask_close(void)
@@ -881,7 +966,8 @@ static int item_hit(int x, int y)
     }
     int best = -1, best_d = 0;
     for (int i = 0; i < s_n; i++) {
-        int dx = x - s_slot[i].x, dy = y - s_slot[i].y, r = s_slot[i].r + UI_DISC_SLACK, d = dx * dx + dy * dy;
+        int dx = x - s_slot[i].x, dy = y - s_slot[i].y, r = s_slot[i].r + UI_DISC_SLACK,
+            d = dx * dx + dy * dy;
         if (!s_slot[i].r || d > r * r || (best >= 0 && d >= best_d)) continue;
         best = i;
         best_d = d;
@@ -889,13 +975,14 @@ static int item_hit(int x, int y)
     return best;
 }
 
-/* A tap target of ASK lies at the point: ui.c lets a tap on one through although it is beyond the centre zone
- * (button A's hint, the disc between the hints). */
+/* A tap target of ASK lies at the point: ui.c lets a tap on one through although it is beyond the
+ * centre zone (button A's hint, the disc between the hints). */
 bool ui_ask_target_hit(int x, int y) { return item_hit(x, y) >= 0; }
 
-/* A hold acts on the item under the finger: it arms only when the press is on the selected item's own disc or
- * row. A press on another item is the start of a tap on that item. */
-static bool press_on_selected(const gesture_evt_t *g) { return s_n > 0 && item_hit(g->x, g->y) == s_sel; }
+/* A hold acts on the item under the finger: it arms only when the press is on the selected item's
+ * own disc or row. A press on another item is the start of a tap on that item. */
+static bool press_on_selected(const gesture_evt_t *g)
+{ return s_n > 0 && item_hit(g->x, g->y) == s_sel; }
 
 static int s_scrub_last, s_drag_acc;
 static bool s_drag_paged; /* the reader turns one page per touch */
@@ -914,8 +1001,9 @@ static void select_item(int i, const char *via, void (*haptic)(void))
     if (haptic) haptic();
 }
 
-/* The question on screen is answered: on to the next one, re-armed like a new card (the hold that answered it
- * cannot run on into the next one), or, after the last, every answer goes out at once. */
+/* The question on screen is answered: on to the next one, re-armed like a new card (the hold that
+ * answered it cannot run on into the next one), or, after the last, every answer goes out at
+ * once. */
 static void question_answered(const attention_t *a, uint32_t hold_ms)
 {
     if (!last_q(a)) {
@@ -934,8 +1022,8 @@ static void question_answered(const attention_t *a, uint32_t hold_ms)
     g_ui_actions->answer(s_sid, a->rid, s_q.picks, s_q.aids, a->n_qs, hold_ms);
 }
 
-/* VOICE took an "Other" answer for question qi of request rid: it stands for that question, and the screen
- * moves on (or, for the last question, everything goes out with this hold). */
+/* VOICE took an "Other" answer for question qi of request rid: it stands for that question, and the
+ * screen moves on (or, for the last question, everything goes out with this hold). */
 void ui_ask_other_done(uint32_t rid, int qi, uint32_t aid, uint32_t hold_ms)
 {
     const attention_t *a = model_attention_find(rid);
@@ -949,13 +1037,13 @@ void ui_ask_other_done(uint32_t rid, int qi, uint32_t aid, uint32_t hold_ms)
     question_answered(a, hold_ms);
 }
 
-/* Sends the answer for item `idx` of request `a`. Approve-class and deny items only arrive here from
- * a completed hold (or an injected long press that covered it); never from a tap. */
+/* Sends the answer for item `idx` of request `a`. Approve-class and deny items only arrive here
+ * from a completed hold (or an injected long press that covered it); never from a tap. */
 static void commit(const attention_t *a, int idx, uint32_t hold_ms)
 {
     const ask_item_t *it = &s_items[idx];
-    dbg_event("ui", "commit", "\"sid\":%u,\"rid\":%u,\"item\":%d,\"opt\":%d,\"hold_ms\":%u", (unsigned)s_sid,
-              (unsigned)a->rid, (int)it->id, it->opt, (unsigned)hold_ms);
+    dbg_event("ui", "commit", "\"sid\":%u,\"rid\":%u,\"item\":%d,\"opt\":%d,\"hold_ms\":%u",
+              (unsigned)s_sid, (unsigned)a->rid, (int)it->id, it->opt, (unsigned)hold_ms);
     const ask_q_t *q = cur_q(a);
     switch (it->id) {
     case ASK_QOPT:
@@ -964,7 +1052,8 @@ static void commit(const attention_t *a, int idx, uint32_t hold_ms)
             s_q.picks[s_q.qi] ^= 1u << it->opt;
             s_q.aids[s_q.qi] = 0;
             g_ui_actions->tick();
-            dbg_event("ui", "tick", "\"rid\":%u,\"qi\":%d,\"picks\":%u", (unsigned)a->rid, s_q.qi, (unsigned)s_q.picks[s_q.qi]);
+            dbg_event("ui", "tick", "\"rid\":%u,\"qi\":%d,\"picks\":%u", (unsigned)a->rid, s_q.qi,
+                      (unsigned)s_q.picks[s_q.qi]);
             ui_ask_refresh(s_now);
             break;
         }
@@ -987,12 +1076,12 @@ static void commit(const attention_t *a, int idx, uint32_t hold_ms)
     case ASK_GRANT: /* the rule on screen, and only if it is still the request's own */
         if (s_gview && s_rule_fits && a->has_rule && s_rule_hash_shown == a->rule_hash)
             g_ui_actions->grant(s_sid, a->rid, hold_ms, s_rule_hash_shown);
-        else
-            g_ui_actions->reject();
+        else g_ui_actions->reject();
         break;
     case ASK_DENY: g_ui_actions->deny(s_sid, a->rid); break;
     case ASK_DICTATE: ui_go_voice(a->rid, false); break;
-    case ASK_OPEN_PC: /* the terminal shows its prompt at once (proto 0.11): the request is handed back */
+    /* the terminal shows its prompt at once (proto 0.11): the request is handed back */
+    case ASK_OPEN_PC:
         g_ui_actions->open_request(s_sid, a->rid);
         ui_go_home();
         break;
@@ -1003,7 +1092,8 @@ static void commit(const attention_t *a, int idx, uint32_t hold_ms)
 bool ui_ask_back(void)
 {
     const attention_t *a = req();
-    if (!s_reading && s_qmode && a && !a->answer_sent && !s_back_ms && s_q.qi > 0) { /* the question before */
+    if (!s_reading && s_qmode && a && !a->answer_sent && !s_back_ms && s_q.qi > 0) {
+        /* the question before */
         hold_cancel();
         s_q.qi--;
         s_read_ok = false;
@@ -1020,7 +1110,8 @@ bool ui_ask_back(void)
     return true;
 }
 
-/* A tap on a hold item never commits it: the item's ring starts and falls back, and the toast names the hold. */
+/* A tap on a hold item never commits it: the item's ring starts and falls back, and the toast names
+ * the hold. */
 static void nudge(void)
 {
     if (s_holding || !sel_disc()) return;
@@ -1028,8 +1119,8 @@ static void nudge(void)
     set_progress(NUDGE_PM);
 }
 
-/* A locked grant item answers a tap by showing why: the reader if the text is unread, a toast if the watch
- * can never show all of it. */
+/* A locked grant item answers a tap by showing why: the reader if the text is unread, a toast if
+ * the watch can never show all of it. */
 static void grant_tell(const ask_item_t *it)
 {
     if (it->id == ASK_GRANT && s_gview && !s_rule_fits) {
@@ -1058,23 +1149,27 @@ static const char *hold_word(const ask_item_t *it)
 {
     if (it->id == ASK_QOPT) return "Hold to choose";
     if (it->id == ASK_SEND) return last_q(req()) ? "Hold to send" : "Hold for the next question";
-    return it->id == ASK_GRANT ? "Hold to always allow" : it->grants ? "Hold to approve" : "Hold to deny";
+    return it->id == ASK_GRANT ? "Hold to always allow"
+           : it->grants        ? "Hold to approve"
+                               : "Hold to deny";
 }
 
 /* The request's text: a tap on it opens the reader when there is more to read. */
 static bool on_text(const gesture_evt_t *g)
 {
-    return !s_gview && g->y >= BLOCK_Y0 && g->y < BLOCK_Y0 + BLOCK_H && g->x >= UI_CX - s_text_w / 2 - 10 &&
-           g->x <= UI_CX + s_text_w / 2 + 10;
+    return !s_gview && g->y >= BLOCK_Y0 && g->y < BLOCK_Y0 + BLOCK_H &&
+           g->x >= UI_CX - s_text_w / 2 - 10 && g->x <= UI_CX + s_text_w / 2 + 10;
 }
 
-/* Input while the reader is up. Nothing here can answer the request: a swipe down turns a page back and is
- * never the deny swipe, and holds do nothing. Button A is still Open on PC (handled by the caller). */
+/* Input while the reader is up. Nothing here can answer the request: a swipe down turns a page back
+ * and is never the deny swipe, and holds do nothing. Button A is still Open on PC (handled by the
+ * caller). */
 static bool read_act(nav_action_t act, const gesture_evt_t *g)
 {
     switch (act) {
     case NAV_COMMIT:
-        if (g->kind == G_TAP && s_now - s_read_ms < NAV_CARD_ARM_MS) return true; /* the tap that opened it, doubled */
+        /* the tap that opened it, doubled */
+        if (g->kind == G_TAP && s_now - s_read_ms < NAV_CARD_ARM_MS) return true;
         /* fallthrough */
     case NAV_NEXT:
         if (s_page_i < s_pages - 1) {
@@ -1094,7 +1189,8 @@ static bool read_act(nav_action_t act, const gesture_evt_t *g)
             g_ui_actions->tick();
         }
         return true;
-    case NAV_SCROLL_DRAG: { /* the page follows the finger: up is the next page, down the one before */
+    case NAV_SCROLL_DRAG: {
+        /* the page follows the finger: up is the next page, down the one before */
         int d = nav_list_drag(&s_drag_acc, g->dy);
         int to = s_page_i + (d > 0) - (d < 0);
         if (d && !s_drag_paged && to >= 0 && to < s_pages) {
@@ -1124,8 +1220,10 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
         if (act != NAV_HOLD_PRESS && act != NAV_HOLD_RELEASE && act != NAV_SCRUB) ui_go_home();
         return true;
     }
-    /* a result's burst covers the request (GLYPHS.md §3.7): nothing is armed, selected or sent under it */
-    if (ui_burst_active() && (act == NAV_HOLD_PRESS || act == NAV_COMMIT || act == NAV_HOLD_LONG)) return true;
+    /* a result's burst covers the request (GLYPHS.md §3.7): nothing is armed, selected or sent
+     * under it */
+    if (ui_burst_active() && (act == NAV_HOLD_PRESS || act == NAV_COMMIT || act == NAV_HOLD_LONG))
+        return true;
     if (s_reading && act != NAV_FOCUS) return read_act(act, g);
     if (act == NAV_SCROLL_DRAG) { /* the items follow the finger; a moving finger holds nothing */
         s_gate_press = false;
@@ -1144,14 +1242,16 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
     case NAV_HOLD_PRESS:
         s_hold_fired = false;
         s_drag_acc = 0;
-        if (it && it->hold_ms && grant_locked(it) && press_on_selected(g)) { /* locked: never arms */
+        if (it && it->hold_ms && grant_locked(it) && press_on_selected(g)) {
+            /* locked: never arms */
             s_gate_press = true;
             s_gate_t0 = s_now;
             return true;
         }
-        /* only a hold item arms a hold, only for the request on screen, only once it is armed, and only while
-         * its answer window runs */
-        if (it && it->hold_ms && press_on_selected(g) && nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now) &&
+        /* only a hold item arms a hold, only for the request on screen, only once it is armed, and
+         * only while its answer window runs */
+        if (it && it->hold_ms && press_on_selected(g) &&
+            nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now) &&
             model_attention_left_ms(a, s_now) > 0) {
             if (s_nudge_ms) { /* a tap's nudge is not the start of this ring */
                 s_nudge_ms = 0;
@@ -1170,11 +1270,11 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
         hold_cancel();
         return true;
     case NAV_COMMIT: {
-        /* the card must have been on screen a moment before a tap means anything: the tap that opened it, or
-         * a second one right behind it, would otherwise land on another item */
+        /* the card must have been on screen a moment before a tap means anything: the tap that
+         * opened it, or a second one right behind it, would otherwise land on another item */
         if (g->kind == G_TAP && s_now - s_shown_ms < NAV_CARD_ARM_MS) return true;
-        /* A tap acts on the item it lands on (UI-V3 §3.3), but never approves or denies: another item that
-         * needs a hold is only selected, and the toast says which hold it needs. */
+        /* A tap acts on the item it lands on (UI-V3 §3.3), but never approves or denies: another
+         * item that needs a hold is only selected, and the toast says which hold it needs. */
         if (it && (s_long || s_cut) && on_text(g)) { /* the text itself opens the reader */
             reader_open();
             g_ui_actions->tick();
@@ -1212,15 +1312,17 @@ bool ui_ask_act(nav_action_t act, const gesture_evt_t *g)
         return true;
     }
     case NAV_HOLD_LONG: /* injected input whose duration already covers the hold */
-        if (it && it->hold_ms && !grant_locked(it) && g->dur_ms >= it->hold_ms && !s_hold_fired && press_on_selected(g) &&
-            nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now) && model_attention_left_ms(a, s_now) > 0 &&
+        if (it && it->hold_ms && !grant_locked(it) && g->dur_ms >= it->hold_ms && !s_hold_fired &&
+            press_on_selected(g) && nav_hold_may_start(s_rid, s_shown_ms, a->rid, s_now) &&
+            model_attention_left_ms(a, s_now) > 0 &&
             (it->id != ASK_GRANT || s_rule_hash_shown == a->rule_hash)) {
             hold_cancel();
             s_hold_fired = true;
             commit(a, sel, g->dur_ms);
         }
         return true;
-    case NAV_FOCUS: /* button A: Open on PC, whatever is selected; the request goes back to the terminal */
+    /* button A: Open on PC, whatever is selected; the request goes back to the terminal */
+    case NAV_FOCUS:
         if (a && !a->answer_sent) g_ui_actions->open_request(s_sid, a->rid);
         else g_ui_actions->focus(s_sid);
         ui_go_home();
@@ -1244,9 +1346,11 @@ bool ui_ask_tick(uint32_t now)
     const attention_t *a = req();
     if (!model_find(s_sid)) return true;
     if (!a)
-        return !((s_answered_ms && now - s_answered_ms < (s_answered_rule ? ANSWERED_RULE_MS : ANSWERED_MIN_MS)) ||
+        return !((s_answered_ms &&
+                  now - s_answered_ms < (s_answered_rule ? ANSWERED_RULE_MS : ANSWERED_MIN_MS)) ||
                  (s_back_ms && now - s_back_ms < BACK_MIN_MS));
-    if (s_reading && s_fetch && (detail_got(s_rid) != s_reader_got || detail_state(s_rid) != s_reader_st)) {
+    if (s_reading && s_fetch &&
+        (detail_got(s_rid) != s_reader_got || detail_state(s_rid) != s_reader_st)) {
         reader_load(); /* more of the full text arrived */
         reader_page();
     }
@@ -1254,9 +1358,11 @@ bool ui_ask_tick(uint32_t now)
         s_nudge_ms = 0;
         set_progress(0);
     }
-    if (s_gate_press && now - s_gate_t0 >= GATE_TELL_MS) { /* a hold on a locked Approve: say why, once */
+    if (s_gate_press && now - s_gate_t0 >= GATE_TELL_MS) {
+        /* a hold on a locked Approve: say why, once */
         s_gate_press = false;
-        if (!a->answer_sent && s_sel < s_n && s_items[s_sel].hold_ms && grant_locked(&s_items[s_sel])) {
+        if (!a->answer_sent && s_sel < s_n && s_items[s_sel].hold_ms &&
+            grant_locked(&s_items[s_sel])) {
             ui_toast(lock_word(&s_items[s_sel]), rgb_of(&s_items[s_sel]));
             g_ui_actions->reject();
         }
@@ -1264,9 +1370,12 @@ bool ui_ask_tick(uint32_t now)
     if (s_holding && !s_hold_fired) {
         uint32_t el = now - s_hold_t0;
         const ask_item_t *it = s_hold_idx < s_n ? &s_items[s_hold_idx] : NULL;
-        if (a->rid != s_hold_rid || a->answer_sent || !it || !it->hold_ms || s_hold_idx != s_sel || grant_locked(it) ||
-            ui_burst_active() || model_attention_left_ms(a, now) == 0 || /* the window is over: nothing to answer */
-            (it->id == ASK_GRANT && (!a->has_rule || s_hold_hash != a->rule_hash || s_hold_hash != s_rule_hash_shown))) {
+        if (a->rid != s_hold_rid || a->answer_sent || !it || !it->hold_ms || s_hold_idx != s_sel ||
+            grant_locked(it) ||
+            /* the window is over: nothing to answer */
+            ui_burst_active() || model_attention_left_ms(a, now) == 0 ||
+            (it->id == ASK_GRANT &&
+             (!a->has_rule || s_hold_hash != a->rule_hash || s_hold_hash != s_rule_hash_shown))) {
             hold_cancel();
             return false;
         }
@@ -1274,7 +1383,8 @@ bool ui_ask_tick(uint32_t now)
         if (el >= NAV_HOLD_SHOW_MS) {
             if (!s_ramp_started) {
                 s_ramp_started = true;
-                if (it->grants || it->id == ASK_QOPT || it->id == ASK_SEND) g_ui_actions->hold_start();
+                if (it->grants || it->id == ASK_QOPT || it->id == ASK_SEND)
+                    g_ui_actions->hold_start();
                 else g_ui_actions->deny_hold_start();
             }
             ring_set_progress(ui_home_ring(), (int)(el * 1000 / it->hold_ms), rgb);
@@ -1292,7 +1402,8 @@ bool ui_ask_tick(uint32_t now)
     return false;
 }
 
-/* The legend of the screen (rule 9): every glyph, disc and ring above, in the words the screen used to show. */
+/* The legend of the screen (rule 9): every glyph, disc and ring above, in the words the screen used
+ * to show. */
 void ui_ask_report(ui_report_t *r)
 {
     const attention_t *a = req();
@@ -1305,9 +1416,12 @@ void ui_ask_report(ui_report_t *r)
     }
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
     if (s_title_txt[0]) ui_report_add(r, "%s", s_title_txt);
-    if (s_gview && !(a && a->answer_sent) && !s_keeping) { /* the rule in place of the request text */
-        ui_report_add(r, "%s", s_rule_fits ? s_rule_txt : "This rule is too long to show on the watch");
-        ui_report_add(r, "%s", s_rule_fits ? breadth_note(s_rule_wide_shown) : "Answer it on your computer");
+    if (s_gview && !(a && a->answer_sent) && !s_keeping) {
+        /* the rule in place of the request text */
+        ui_report_add(r, "%s",
+                      s_rule_fits ? s_rule_txt : "This rule is too long to show on the watch");
+        ui_report_add(r, "%s",
+                      s_rule_fits ? breadth_note(s_rule_wide_shown) : "Answer it on your computer");
     } else if (s_text_txt[0]) {
         ui_report_add(r, "%s", s_text_txt);
     }
@@ -1336,7 +1450,8 @@ void ui_ask_report(ui_report_t *r)
 }
 
 /* A text label: `lines` high, cut with dots beyond that. Positioned by its top-left corner. */
-static lv_obj_t *text(lv_obj_t *parent, const lv_font_t *f, lv_color_t col, lv_text_align_t align, int x, int y, int w, int lines)
+static lv_obj_t *text(lv_obj_t *parent, const lv_font_t *f, lv_color_t col, lv_text_align_t align,
+                      int x, int y, int w, int lines)
 {
     lv_obj_t *l = lv_label_create(parent);
     lv_obj_set_style_text_font(l, f, 0);
@@ -1363,18 +1478,23 @@ lv_obj_t *ui_ask_init(lv_obj_t *screen)
     s_mark[1] = ui_glyph_create(s_root, FONT_ICON_S, UI_CX + MARK_DX, SIGIL_Y);
 
     /* what is asked: content, so text (rule 1) */
-    s_title = text(s_root, FONT_BODY_STRONG, COL_TEXT2, LV_TEXT_ALIGN_CENTER, UI_CX - TITLE_W / 2, BLOCK_Y0, TITLE_W, 1);
+    s_title = text(s_root, FONT_BODY_STRONG, COL_TEXT2, LV_TEXT_ALIGN_CENTER, UI_CX - TITLE_W / 2,
+                   BLOCK_Y0, TITLE_W, 1);
     s_title_y_shown = BLOCK_Y0;
-    s_text = text(s_root, FONT_BODY, COL_TEXT, LV_TEXT_ALIGN_CENTER, UI_CX - TEXT_W / 2, BLOCK_Y0 + 26, TEXT_W, 1);
+    s_text = text(s_root, FONT_BODY, COL_TEXT, LV_TEXT_ALIGN_CENTER, UI_CX - TEXT_W / 2,
+                  BLOCK_Y0 + 26, TEXT_W, 1);
     s_text_w = TEXT_W;
     s_more = ui_glyph_create(s_root, FONT_ICON_M, UI_CX, BLOCK_Y0 + BLOCK_H - MORE_H / 2);
     /* "Always allow": the rule as it will be saved, under where and how wide; never an ellipsis */
     s_scope = ui_glyph_create(s_root, FONT_ICON_M, UI_CX - RULE_MARK_DX, BLOCK_Y0 + 20);
     s_breadth = ui_glyph_create(s_root, FONT_ICON_M, UI_CX + RULE_MARK_DX, BLOCK_Y0 + 20);
-    s_grule = text(s_root, FONT_BODY, COL_TEXT, LV_TEXT_ALIGN_CENTER, UI_CX - TEXT_W / 2, BLOCK_Y0 + 40, TEXT_W, RULE_LINES);
-    lv_label_set_long_mode(s_grule, LV_LABEL_LONG_MODE_CLIP); /* a rule that does not fit locks instead */
+    s_grule = text(s_root, FONT_BODY, COL_TEXT, LV_TEXT_ALIGN_CENTER, UI_CX - TEXT_W / 2,
+                   BLOCK_Y0 + 40, TEXT_W, RULE_LINES);
+    /* a rule that does not fit locks instead */
+    lv_label_set_long_mode(s_grule, LV_LABEL_LONG_MODE_CLIP);
     s_gsign = ui_glyph_create(s_root, FONT_ICON_L, UI_CX, BLOCK_Y0 + BLOCK_H / 2);
-    ui_glyph_set(s_gsign, ICON_ALWAYS ICON_REFUSED ICON_COMPUTER, lv_color_hex(RGB_PERMISSION)); /* not here: on the computer */
+    /* not here: on the computer */
+    ui_glyph_set(s_gsign, ICON_ALWAYS ICON_REFUSED ICON_COMPUTER, lv_color_hex(RGB_PERMISSION));
 
     /* the reader: a window READ_LINES tall over the whole text */
     s_read = lv_obj_create(s_root);
@@ -1398,7 +1518,8 @@ lv_obj_t *ui_ask_init(lv_obj_t *screen)
     for (int k = 0; k < 2; k++) {
         int y = ROW_SEL_Y + (k ? ROW_NB_DY : -ROW_NB_DY);
         s_nb[k] = ui_disc_create(s_root, SPINE_X, y, ROW_NB_R);
-        s_row[k ? 2 : 0] = text(s_root, FONT_BODY, COL_TEXT2, LV_TEXT_ALIGN_LEFT, SPINE_X + ROW_SEL_R + ROW_GAP, y - lh / 2, ROW_NB_W, 1);
+        s_row[k ? 2 : 0] = text(s_root, FONT_BODY, COL_TEXT2, LV_TEXT_ALIGN_LEFT,
+                                SPINE_X + ROW_SEL_R + ROW_GAP, y - lh / 2, ROW_NB_W, 1);
     }
     s_row[1] = text(s_root, FONT_HEAD, COL_TEXT, LV_TEXT_ALIGN_LEFT, SPINE_X + ROW_SEL_R + ROW_GAP,
                     ROW_SEL_Y - lv_font_get_line_height(FONT_HEAD) / 2, ROW_SEL_W, 1);
@@ -1406,19 +1527,23 @@ lv_obj_t *ui_ask_init(lv_obj_t *screen)
 
     /* a result: one hero glyph (rule 7); under it what was said or saved, and where it is now */
     s_hero = ui_glyph_create(s_root, FONT_ICON_HERO, UI_CX, HERO_Y);
-    s_res = text(s_root, FONT_BODY_STRONG, COL_TEXT, LV_TEXT_ALIGN_CENTER, UI_CX - 150, RES_TEXT_Y - 12, 300, 1);
+    s_res = text(s_root, FONT_BODY_STRONG, COL_TEXT, LV_TEXT_ALIGN_CENTER, UI_CX - 150,
+                 RES_TEXT_Y - 12, 300, 1);
     s_resmark_y = RES_MARK_Y;
     s_resmarks = ui_glyph_create(s_root, FONT_ICON_M, UI_CX, RES_MARK_Y);
 
-    /* rule 6: A opens the request on the computer, and its hint is that item; B steps to the next item */
+    /* rule 6: A opens the request on the computer, and its hint is that item; B steps to the next
+     * item */
     s_key[0] = ui_key_hint_create(s_root, UI_KEY_A);
     s_key[1] = ui_key_hint_create(s_root, UI_KEY_B);
     ui_key_hint_set(s_key[0], ICON_COMPUTER);
     ui_key_hint_set(s_key[1], ICON_NEXT);
 
-    lv_obj_t *hide[] = {s_title, s_text, s_more, s_scope, s_breadth, s_grule, s_gsign, s_read, s_load, s_seldisc, s_nb[0],
-                        s_nb[1], s_row[0], s_row[1], s_row[2], s_hero, s_res, s_resmarks};
-    for (size_t i = 0; i < sizeof hide / sizeof hide[0]; i++) lv_obj_add_flag(hide[i], LV_OBJ_FLAG_HIDDEN);
+    lv_obj_t *hide[] = {s_title,  s_text,   s_more,   s_scope,   s_breadth, s_grule,
+                        s_gsign,  s_read,   s_load,   s_seldisc, s_nb[0],   s_nb[1],
+                        s_row[0], s_row[1], s_row[2], s_hero,    s_res,     s_resmarks};
+    for (size_t i = 0; i < sizeof hide / sizeof hide[0]; i++)
+        lv_obj_add_flag(hide[i], LV_OBJ_FLAG_HIDDEN);
     for (int i = 0; i < ASK_MAX_ITEMS; i++) lv_obj_add_flag(s_disc[i], LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     return s_root;

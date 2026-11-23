@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: tools
+issue: 20261122-bb2e
+last_reviewed: 2026-11-22
+summary: Drive the real watch like a finger and measure what the user feels
+---
+
 # Bench: drive the real watch like a finger, measure what the user feels
 
 Issue 20261122-bb2e. Protocol 0.24 (§2). Code: `components/core/src/bench.c` (stroke player and frame timeline),
@@ -36,7 +44,7 @@ the glass itself is out of scope.
 Three debug messages (types 64 and up are debug, PROTOCOL.md §0). The daemon sends them only to a watch with proto
 0.24 or later that offers `feature_debug`.
 
-```
+```text
 mt_dbg_touch  = 70   ; daemon → device: one finger stroke to play
 mt_dbg_bench  = 71   ; daemon → device: start, stop or mark the frame timeline
 mt_dbg_frames = 72   ; device → daemon: timeline records
@@ -115,7 +123,7 @@ under a minute per task.
 Task scripts use the simulator's script language (simulator/README.md), so the same file runs in `ctest` and on
 the watch. The daemon's player understands this subset:
 
-```
+```text
 wait MS | tap X Y | hold X Y MS | swipe X1 Y1 X2 Y2 [MS] | btn A|B [long|double] | lift
 session SID STATE REPO [BRANCH [SUMMARY]] | attention RID SID approval|question ACTS GRANT TITLE|TEXT|OPT...
 bench mark N | expect_cmd OP | expect_screen NAME | question SID Q|ANSWER... | scrub DEG0 DEG1 [MS [RADIUS]]

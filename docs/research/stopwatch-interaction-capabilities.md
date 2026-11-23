@@ -41,6 +41,7 @@ Other docs touching this area: `docs/research/minimal-peripherals.md`, `docs/res
 **Multi-touch.** Not available to us today (single-point reader). The datasheet's "true two-point" is a feature of the chip, but self-capacitive two-point has ghosting ambiguity and we have no register documentation, so treat as **not possible for planning**.
 
 **Edge / bezel use for a "ring scrub".**
+
 - The glass is round but the sensor is a rectangular-ish self-cap pattern; the vendor's own firmware uses "swipe from the top edge toward the centre" to show the battery (`docs/guide/usage.md:19`), so touches near the rim are reported. Accuracy at the very rim (outer ~15 px) **[unverified]**: expect compression/clamping; the driver code already clamps to 465 (`board/display.cpp:215-216`).
 - The physical bezel is not touch-sensitive. Treat the usable annulus as r ~ 170-225 px from centre (233,233). Our existing glance tap already uses `dist >= 150 px` as "on the ring" (`core/ui_ring.c:85`).
 - **Angular resolution at r = 200 px** [estimate]: 1 px of arc = 360/(2*pi*200) = **0.29 deg**. Rest jitter of +-2 px ~ +-0.6 deg. A 10 deg step = 35 px of arc; the existing 60 px swipe threshold (`core/gesture.h:9`) = 17 deg. At 100 Hz sampling a 1 rev/s circular swipe moves 12.6 px (3.6 deg) per sample, which is easily tracked. With N sessions on the ring, sector width is 360/N: N=8 -> 45 deg (157 px of arc), N=16 -> 22 deg (78 px). Sessions up to `RING_MAX_SEGMENTS = 32` (`core/ui_ring.h:6`) would be 11 deg (39 px), marginal for finger selection but fine for "scrub with detents".
@@ -199,6 +200,7 @@ From `idf_size.py` run read-only on the existing `firmware/build/agentlink.map` 
 The previous USB-only map (`build-usb/agentlink.map`) shows DIRAM 185 915 B used, so BLE cost about +20.7 KB of static DIRAM in that comparison (the +57 KB figure from checkpoint 003 includes runtime heap, which a map cannot show). **Static free DIRAM (135 KB) is not free heap**: the two LVGL draw buffers take 2 x 44.7 KB = ~89 KB of internal DMA RAM at runtime (`board/display.cpp:28,181-183`), leaving roughly **~45 KB** for stacks (btn/haptic 3 KB each, main task 8 KB, NimBLE/USB tasks), FreeRTOS objects, the LVGL heap allocations <= 16 KB, and BLE internal buffers [estimate; no runtime heap print exists in the code]. `.bss` also holds the 8 x ~4 KB RX frame pool (32 KiB, `core/app.c:26-28`).
 
 Implications:
+
 - Do **not** add large internal buffers. Anything big (canvas, image caches, snapshots) must be PSRAM (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384` sends allocations >16 KB there, `fw/sdkconfig.defaults:17`). PSRAM is plentiful: 8 MB, of which the panel framebuffer uses ~0.43 MB.
 - An IMU driver adds small RAM (config blob is 8 KB in flash, streamed to the chip, not held in RAM) plus a task stack (~3 KB). A sound driver adds I2S DMA buffers (few KB).
 - Reducing the draw-buffer height (e.g. 48 -> 32 lines) would free ~30 KB internal but costs more flush chunks.

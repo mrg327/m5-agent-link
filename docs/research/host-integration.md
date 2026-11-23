@@ -22,6 +22,7 @@ Evidence legend: **[V]** verified by fetching the doc or inspecting the local ma
 ### 1.1 GitHub Copilot CLI
 
 #### 1.1.1 Hooks [V]
+
 Source: https://docs.github.com/en/copilot/reference/hooks-reference
 
 * Hooks are loaded from (policy → user → project → plugins) and **all are combined**:
@@ -56,10 +57,12 @@ Source: https://docs.github.com/en/copilot/reference/hooks-reference
 * Hooks are **not enabled for cloud agent in a useful way** for this project (sandbox, restricted network); ignore.
 
 #### 1.1.2 Session state on disk [V, local machine inspection]
+
 Layout observed at `~/.copilot/` (names only):
 `config.json`, `settings.json` (keys: `voice, model, allowedUrls, showReasoning`), `mcp-config.json`, `permissions-config.json`, `open-sessions-state.json`, `sidebar-sessions-state/*.json`, `session-state/`, `session-store.db` (SQLite, tables incl. `sessions`, `turns`, `checkpoints`, `session_files`, `session_refs`, `search_index`), `hooks/` (absent by default), `installed-plugins/`, `logs/`, `ide/`, `servers/`.
 
 `~/.copilot/session-state/<uuid>/` contains:
+
 * `workspace.yaml` – `id, cwd, git_root, repository, host_type, branch, client_name (e.g. github/cli), name, summary_count, created_at, updated_at`.
 * `events.jsonl` – one JSON object per line: `{type, data, id, timestamp, parentId}`.
 * `inuse.<PID>.lock` and `inuse.<PID>.hold` – **the owning copilot process PID is encoded in the filename** (observed `inuse.29310.lock`; `ps` confirmed PID 29310 was the `copilot` process on tty `s003`). This gives a free session-id ↔ PID ↔ TTY mapping without hooks.
@@ -68,6 +71,7 @@ Layout observed at `~/.copilot/` (names only):
 `open-sessions-state.json`: map `sessionId → {schemaVersion, openedAt, refreshedAt, working: bool}`. A `working` boolean is directly usable as a coarse busy/idle signal. **[V structure; semantics inferred]**
 
 `events.jsonl` event types seen across ~40 sessions (counts omitted): `session.start`, `session.resume`, `session.shutdown`, `session.error`, `session.warning`, `session.task_complete {summary, success}`, `session.mode_changed`, `session.model_change`, `session.compaction_start/complete`, `user.message`, `assistant.turn_start`, `assistant.turn_end {turnId, model}`, `assistant.message`, `tool.execution_start`, `tool.execution_complete`, `permission.requested`, `permission.completed`, `human_response.recorded {requestId, toolCallId, actor, response}`, `abort {reason}`, `subagent.started/completed`, `system.notification {content, kind{type, shellId, exitCode, description}}`, `model.*`, `session.usage_record`.
+
 * `session.start.data` has `sessionId, copilotVersion, producer, context{cwd}, alreadyInUse, remoteSteerable`.
 * `permission.requested.data` has `requestId, permissionRequest{kind, toolCallId, fullCommandText, shellType, intention, commands, possiblePaths, possibleUrls, canOfferSessionApproval, ...}`; matched by `permission.completed`. **State machine from the log:**
   * `user.message` / `assistant.turn_start` → WORKING
@@ -78,14 +82,17 @@ Layout observed at `~/.copilot/` (names only):
 * **Privacy:** `events.jsonl` contains prompts, full command text, and file contents. The daemon must send only derived status plus a short, truncated label (repo name, branch) to the watch; never raw events.
 
 #### 1.1.3 MCP mechanism
+
 * `~/.copilot/mcp-config.json` configures MCP servers. An MCP server is a tool *provider* that the model calls; it can't passively observe agent state, and relying on the model to call a "report_status" tool is unreliable. **Not recommended as a status source.** It can be useful for the reverse direction (watch → agent: e.g. a "what's the user's quick reply" tool) but that increases the injection surface (§5).
 * `remoteSteerable` in `session.start` and `client_name` fields suggest a remote-control feature exists in the CLI **[inferred; not documented in what was fetched; follow up in https://github.com/github/copilot-cli]**.
 
 #### 1.1.4 Other
+
 * The `github/copilot-cli` repo docs and `copilot help` document config dir layout (https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-config-dir-reference [referenced by the hooks page, V]). The `COPILOT_HOME` env var relocates `~/.copilot`.
 * Terminal bell / OSC: not verified for Copilot CLI; do not depend on it.
 
 ### 1.2 Claude Code [V: https://code.claude.com/docs/en/hooks]
+
 * Hook events: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `PermissionDenied`, `PostToolUse`, `PostToolUseFailure`, `Notification`, `SubagentStart/Stop`, `Stop`, `StopFailure`, `TeammateIdle`, `PreCompact`, `SessionEnd`, `CwdChanged`, etc.
 * Hook handler types: command (JSON on stdin), HTTP (POST), MCP tool, prompt, agent.
 * Configured in `~/.claude/settings.json` (user), `.claude/settings.json` / `.claude/settings.local.json` (project). Common input includes `session_id`, `transcript_path`, `cwd`, `hook_event_name` **[M]**.
@@ -93,23 +100,28 @@ Layout observed at `~/.copilot/` (names only):
 * Transcripts at `~/.claude/projects/<encoded-cwd>/<session>.jsonl` **[M]** as a fallback.
 
 ### 1.3 OpenAI Codex CLI
+
 * `notify = ["program", "args"]` in `~/.codex/config.toml`: Codex runs the program with a JSON argument (event `agent-turn-complete` with thread id, cwd, last assistant message) **[M]**. Docs: https://developers.openai.com/codex/config-advanced (page contains a `notify` section [V that it exists; payload details M]). Only "turn complete" is delivered through `notify` historically; newer builds also have TUI notifications (`tui.notifications`) using OSC 9 **[M]**; approval-requested events may be available there **[M, verify]**.
 * Fallback: session rollouts under `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` **[M]**; tail them like Copilot's `events.jsonl`.
 * Codex has also introduced a hooks system similar to Claude's in newer versions **[M, verify]**.
 
 ### 1.4 Gemini CLI [V: https://github.com/google-gemini/gemini-cli/blob/main/docs/hooks/reference.md]
+
 * Events: `BeforeTool`, `AfterTool`, `BeforeAgent`, `AfterAgent`, `BeforeModel`, `BeforeToolSelection`, `AfterModel`, `SessionStart`, `SessionEnd`, `Notification` (`notification_type: "ToolPermission"`), `PreCompress`. Configured in `settings.json` (`~/.gemini/settings.json`); command hooks get JSON on stdin.
 * Mapping: `Notification/ToolPermission` → needs approval; `AfterAgent` → done; `BeforeAgent` → working.
 
 ### 1.5 Aider [M]
+
 * No hooks. Options: `--notifications` + `--notifications-command` (runs a command when the LLM finishes and awaits input) **[M, verify in https://aider.chat/docs/config/options.html]**; `.aider.chat.history.md` and `.aider.input.history` in cwd as logs; otherwise process inspection. Status granularity is just "waiting for input".
 
 ### 1.6 VS Code Copilot agent mode [M]
+
 * VS Code supports agent hooks in the PascalCase/snake_case "VS Code compatible" format (same format the CLI accepts, confirmed by the hooks page [V]). Docs: https://code.visualstudio.com/docs/copilot/customization/hooks **[M URL]**.
 * Chat sessions persist in VS Code's workspaceStorage (`state.vscdb` SQLite / `chatSessions/*.json`) **[M]**, an unstable format.
 * Best: a tiny **companion VS Code extension** that (1) reports state from the `vscode.chat`/extension APIs available (limited) and (2) exposes a `vscode://agentlink.focus?...` URI handler to focus the window/terminal (§2). Hooks supply status.
 
 ### 1.7 Generic fallbacks (any agent, any terminal)
+
 | Method | What it gives | Limits |
 |---|---|---|
 | **Process inspection** (`ps`, `psutil`, `sysinfo` crate, `gopsutil`) | Detect agent processes by name (`copilot`, `claude`, `codex`, `gemini`, `aider`), cwd, tty, parent chain, CPU activity (busy vs idle) | No semantic state; CPU heuristic is noisy; macOS cwd of other processes needs `proc_pidinfo`/`lsof` (works for same user) |
@@ -127,13 +139,16 @@ Layout observed at `~/.copilot/` (names only):
 ## 2. Focusing a window / tab / pane per OS
 
 ### 2.0 Strategy: two-level focus
+
 1. **Pane/tab selection inside the terminal** using the terminal's own API (tmux/WezTerm/kitty/iTerm2/Windows Terminal).
 2. **Bring the OS window forward** (activate app / raise window).
 Do (1) first, then (2). Many terminals' APIs (`wezterm cli activate-pane`, `kitten @ focus-window`) only change the focus *within* the app and do not raise the app → still need (2).
 
 ### 2.1 macOS
+
 * **App activation:** `NSRunningApplication(processIdentifier:).activate(options: .activateAllWindows)` (macOS 14 changed to `activate()`, and cooperative activation rules: an app can't be force-activated by another unless the user is interacting; `open -a`/AppleScript `activate` still works in practice **[M]**). Alternative: `open -b com.apple.Terminal`.
 * **Terminal.app** (AppleScript): windows/tabs expose `tty`. Focus by tty:
+
   ```applescript
   tell application "Terminal"
     repeat with w in windows
@@ -147,17 +162,19 @@ Do (1) first, then (2). Many terminals' APIs (`wezterm cli activate-pane`, `kitt
     end repeat
   end tell
   ```
+
   The first AppleScript call from the daemon triggers an **Automation (Apple Events/TCC) permission prompt** per target app. `NSAppleEventsUsageDescription` is needed when the daemon is a signed app bundle.
 * **iTerm2:** AppleScript `tell application "iTerm2" ... repeat with s in sessions of t ... if tty of s is ... then select s`; or Python API `iterm2.Session.async_activate()` using `ITERM_SESSION_ID` (format `w0t0p0:GUID`; the GUID is the session id) **[M]**. Needs "Enable Python API" in settings.
 * **Ghostty:** has macOS AppleScript support in newer versions **[M, verify]** (1.3 added scripting dictionary), and `ghostty +...` CLI actions are limited. Fallback: activate the app + Accessibility window title match.
 * **WezTerm:** `wezterm cli activate-pane --pane-id $WEZTERM_PANE` (+ activate app by bundle id `com.github.wez.wezterm`). `WEZTERM_PANE` and `WEZTERM_UNIX_SOCKET` env vars give the target.
 * **kitty:** `kitten @ --to unix:$KITTY_LISTEN_ON focus-window --match id:$KITTY_WINDOW_ID` + activate app.
 * **tmux:** `tmux select-window -t $TMUX_PANE; tmux select-pane -t $TMUX_PANE` then find the client terminal (`tmux list-clients -F '#{client_tty} #{client_pid}'`) and focus that terminal via the above.
-* **VS Code integrated terminal:** `TERM_PROGRAM=vscode`, `VSCODE_IPC_HOOK_CLI` (a unix socket for the window, usable by `code` CLI), `VSCODE_GIT_ASKPASS_*`. Options: (a) companion extension with `vscode.window.registerUriHandler` for `vscode://agentlink.agentlink/focus?pid=...` which finds the `Terminal` whose `processId` matches (`vscode.window.terminals[i].processId` is a Promise<number>) and calls `terminal.show()`; `open vscode://...` raises the correct VS Code window (the URI goes to the last active window, so also pass the folder; or use `code --reuse-window <folder>`); (b) simpler: `code -r <cwd>` raises the window for the folder but not the terminal. **[M]**
+* **VS Code integrated terminal:** `TERM_PROGRAM=vscode`, `VSCODE_IPC_HOOK_CLI` (a unix socket for the window, usable by `code` CLI), `VSCODE_GIT_ASKPASS_*`. Options: (a) companion extension with `vscode.window.registerUriHandler` for `vscode://agentlink.agentlink/focus?pid=...` which finds the `Terminal` whose `processId` matches (`vscode.window.terminals[i].processId` is a `Promise<number>`) and calls `terminal.show()`; `open vscode://...` raises the correct VS Code window (the URI goes to the last active window, so also pass the folder; or use `code --reuse-window <folder>`); (b) simpler: `code -r <cwd>` raises the window for the folder but not the terminal. **[M]**
 * **Accessibility fallback (any app):** AXUIElement (`kAXRaiseAction`, `AXMain`, `AXFocused`) to raise a specific window by title; requires **Accessibility permission** (System Settings → Privacy & Security → Accessibility) for the daemon binary; grant is tied to code signature/path, so sign the binary or the grant is lost on each rebuild. Enumerate windows with `CGWindowListCopyWindowInfo` (no permission for names of own-user windows except Screen Recording for titles on macOS 10.15+) **[M]**.
 * Tooling: AppleScript/JXA via `osascript`; Rust `objc2` crates, Swift helper, or Python `pyobjc`. Hammerspoon (`hs.window.filter`) is a popular existing implementation of this idea.
 
 ### 2.2 Windows
+
 * **Windows Terminal:** env `WT_SESSION` (GUID of the pane/tab) and `WT_PROFILE_ID`. `wt.exe -w 0 focus-tab -t N` focuses by *index* in a window; `wt -w <window-id-or-name> focus-tab` and `move-focus` exist. There is **no documented "focus by WT_SESSION GUID"** API **[M]**; workable approach: map PID → console/pseudo-console → find `WindowsTerminal.exe` ancestor → raise the top-level HWND (`SetForegroundWindow`), and use UI Automation to select the tab whose name matches the title (tab `TabItem` elements expose `SelectionItemPattern.Select()`). Window naming (`wt -w mywin`) at launch makes `wt -w mywin focus-tab -t N` scriptable.
   Docs: https://learn.microsoft.com/en-us/windows/terminal/command-line-arguments [M URL].
 * **Finding the window for a PID:** walk the parent chain (`CreateToolhelp32Snapshot` / psutil) from the agent PID to the first process owning a visible top-level window (`EnumWindows` + `GetWindowThreadProcessId`). For conhost-hosted consoles `GetConsoleWindow()` works only in the same console (use `AttachConsole`); for Windows Terminal the HWND belongs to `WindowsTerminal.exe` (the shell is a child of `OpenConsole.exe`, whose parent is `WindowsTerminal.exe`) **[M]**.
@@ -169,10 +186,11 @@ Do (1) first, then (2). Many terminals' APIs (`wezterm cli activate-pane`, `kitt
   * Registry `ForegroundLockTimeout=0` (global, discouraged).
   * Since the user just touched the watch (hardware input, not Windows input), Windows won't count it as user input; expect the taskbar button to **flash** instead of focusing when all else fails. Best UX: run the daemon with a user-session helper process and use the Alt trick or UIAutomation `SetFocus()`.
 * **UI Automation (UIA):** `IUIAutomation::ElementFromHandle`, `FindFirst(TabItem by Name)`, `SelectionItemPattern.Select()`; Rust `windows` crate (`windows::Win32::UI::Accessibility`), Python `uiautomation`/`pywinauto`, .NET `System.Windows.Automation`.
-* **VS Code:** same as macOS (extension + URI handler). 
+* **VS Code:** same as macOS (extension + URI handler).
 * **WSL:** agents running inside WSL expose `WT_SESSION` and `WSL_DISTRO_NAME`; hook shim should be a Windows exe invoked via interop or talk over localhost (WSL2 mirrored networking / `localhost` forwarding).
 
 ### 2.3 Linux
+
 * **X11:** `wmctrl -i -a <hex-window-id>` or `xdotool windowactivate <id>`; map PID → window via `_NET_WM_PID` (`xprop`, `xdotool search --pid`), **`$WINDOWID`** (set by xterm/many VTE/kitty/Alacritty terminals) is the simplest reliable id. Programmatic: `x11rb`/`xcb`, send `_NET_ACTIVE_WINDOW` client message. Terminals with multiple tabs sharing one PID (gnome-terminal) can't be tab-selected from X11; use the tmux layer or terminal APIs.
 * **Wayland** forbids clients from stealing focus or enumerating other clients' windows; compositor-specific paths:
   * **GNOME/Mutter:** `xdg-activation` token requires prior user interaction; `gdbus call org.gnome.Shell.Eval` is restricted since 41/42 (disabled unless unsafe mode). Options: a **GNOME Shell extension** exposing a D-Bus method `Focus(window_id)` (this is how "Window Calls" / "Focused Window D-Bus" extensions work), or `window-calls` extension via `gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell/Extensions/Windows --method org.gnome.Shell.Extensions.Windows.Activate <id>` **[M]**. Needs the user to install the extension.
@@ -184,6 +202,7 @@ Do (1) first, then (2). Many terminals' APIs (`wezterm cli activate-pane`, `kitt
 * `XDG_SESSION_TYPE` (`x11`/`wayland`) tells which branch to take.
 
 ### 2.4 Mapping an agent process to its window/tab/pane
+
 Capture at **hook time** (in the shim, which is a descendant of the agent) a "focus handle" and send it with every event; this beats retroactive process-tree guessing:
 
 ```json
@@ -195,6 +214,7 @@ Capture at **hook time** (in the shim, which is a descendant of the agent) a "fo
 ```
 
 Resolution order in the daemon:
+
 1. tmux (`TMUX_PANE`) → select pane, then resolve the client terminal and continue below.
 2. Terminal-native id env (`WEZTERM_PANE`, `KITTY_WINDOW_ID`, `ITERM_SESSION_ID`, `WT_SESSION`, `WINDOWID`) → terminal API.
 3. TTY match: macOS Terminal/iTerm2 AppleScript `tty`; WezTerm `tty_name`; Linux `/proc/<pid>/stat` tty_nr.
@@ -207,10 +227,12 @@ Copilot-specific: `inuse.<PID>.lock` in the session dir maps session id → agen
 ## 3. Transport between daemon and watch
 
 ### 3.0 Requirements
+
 * Low rate (status ≈ a few events/s, small payload), tiny MCU parser, multi-host, optional encryption/auth, reconnection, power-friendly.
 * Direction: PC → watch (status, session list with labels/colors/state), watch → PC (focus session X, optional approve/deny, acknowledgements).
 
 ### 3.1 USB CDC serial (ESP32-S3 USB-Serial/JTAG)
+
 * The device enumerates as VID `0x303a` PID `0x1001` (Espressif USB JTAG/serial debug unit); the daemon finds it by VID/PID via `serialport::available_ports()` (`UsbPortInfo{vid,pid,serial_number}`). Caveat: the same port is the console/`esptool` flashing port, and DTR/RTS toggling can **reset the chip into bootloader** (the USB-Serial/JTAG peripheral decodes DTR/RTS patterns). Open the port with DTR/RTS explicitly de-asserted (or use `usb-serial-jtag` driver config `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG` and keep logs off the protocol channel) **[M; Espressif docs: https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/api-guides/usb-serial-jtag-console.html]**. Alternative: TinyUSB CDC as a separate composite interface (different PID).
 * Single link per USB cable → inherently one PC at a time (unless using a USB hub with host-switching—irrelevant). USB also powers/charges the watch.
 * **Framing options:**
@@ -222,6 +244,7 @@ Copilot-specific: `inuse.<PID>.lock` in the session dir maps session id → agen
 * Recommendation: **COBS + CBOR (or JSON-in-COBS during bring-up)** with `{ver, seq, type}` envelope; keep a text-only debug mode.
 
 ### 3.2 BLE GATT
+
 * ESP32-S3 supports BLE 5 (NimBLE or Bluedroid; NimBLE is lighter). Watch is the **peripheral/GATT server**; daemons are **centrals/clients**.
 * Custom service pattern: **Nordic UART Service (NUS)** `6E400001-B5A3-F393-E0A9-E50E24DCCA9E` with RX (write/write-without-response) `…0002…` and TX (notify) `…0003…`: super common, supported by every library and by tools like nRF Connect for debugging. Alternative: a **custom 128-bit service** with separate characteristics: `status` (notify), `command` (write), `sessions` (read/indicate), `auth` (write), giving typed access and easier versioning. A message-oriented design on NUS needs its own framing (reuse COBS/CBOR) because ATT MTU (23 default, up to ~247 after MTU exchange; `bleak`/`btleplug` negotiate automatically on most OSes) limits chunk size.
 * **Bonding/LE Secure Connections:** use LESC with *Passkey Entry* (watch displays 6-digit number on the round screen, user types it on the PC OS pairing dialog) or *Numeric Comparison* (both show; confirm on watch touch) → MITM-protected link, encrypted, bonded keys stored in NVS. Mark characteristics as `ENC`/`AUTHEN` so unauthenticated centrals can't write. **Note:** OS pairing dialogs are OS-specific and poorly scriptable; Windows/macOS/Linux BlueZ differ; btleplug/bleak can't drive bonding on every platform (bleak supports `pair()` on Windows/BlueZ; on macOS pairing is triggered implicitly by accessing a protected characteristic). A more portable alternative is **application-layer pairing** over an unencrypted-but-unprivileged channel (see §5).
@@ -231,6 +254,7 @@ Copilot-specific: `inuse.<PID>.lock` in the session dir maps session id → agen
 * Cons: pairing UX across 3 OSes, background BLE permissions (macOS needs `NSBluetoothAlwaysUsageDescription` and TCC Bluetooth prompt for a bundled app; Linux needs BlueZ ≥5.5x and user in `bluetooth` group; Windows needs a packaged/unpackaged app with Bluetooth capability for some APIs).
 
 ### 3.3 Wi-Fi
+
 * **Discovery:** mDNS/DNS-SD. Daemon advertises `_agentlink._tcp.local` (txt: `ver`, `host_id`, `fp=<pubkey fingerprint>`); the watch browses (ESP-IDF `mdns` component supports query/browse) **or** the watch advertises and daemons connect in. Direction choice: **watch connects out to daemons** makes it easy for N PCs (each PC is a server) but needs inbound firewall rules on PCs (Windows firewall prompt; macOS "accept incoming connections" prompt); **daemons connect in to the watch** (watch runs a small WebSocket/TCP server) needs no PC firewall changes but the watch holds N sockets and must be discoverable. Corporate/guest networks often block mDNS & client-to-client traffic (AP isolation) → Wi-Fi works best at home; document fallback to USB.
 * **Protocols:** WebSocket (`esp_websocket_client`, `ESPAsyncWebServer`) with JSON/CBOR frames; **MQTT** (ESP-MQTT, broker e.g. Mosquitto/embedded `rumqttd`; topics `agentlink/<host>/status`, `agentlink/<host>/cmd`) naturally supports multi-host fan-in, retained "last status", and LWT (last-will for offline detection); raw TCP + COBS also works. **ESPHome native API (protobuf over TCP with Noise encryption)** is a good precedent: Noise_NNpsk0 with pre-shared key, plus mDNS discovery by Home Assistant.
 * **TLS:** ESP-IDF mbedTLS; use either self-signed cert pinned at pairing (store SHA-256 fingerprint) or **Noise protocol** (`snow` crate / `noise-c`) with a PSK or static keys exchanged during pairing; avoids CA/cert-expiry hassle on a LAN device. Copilot's own `http` hook requires https (or localhost) [V] but that is the hook→daemon hop, separate from daemon→watch.
@@ -238,6 +262,7 @@ Copilot-specific: `inuse.<PID>.lock` in the session dir maps session id → agen
 * Projects: **ESPHome**, **Tasmota** (MQTT), **WLED** (WebSocket + mDNS), **Home Assistant** (MQTT discovery), **Moonraker/Klipper** (WebSocket JSON-RPC), **ntfy**/Pushover for notification-only.
 
 ### 3.4 One watch, multiple PCs at once
+
 | Approach | How | Notes |
 |---|---|---|
 | **BLE multi-central** | Watch peripheral, each PC daemon a central; each message tagged `host_id`; watch keeps per-host session lists | Up to ~3–4 reliable links; each daemon bonds separately. Good wireless story, no infra |
@@ -253,6 +278,7 @@ Watch-side data model: `hosts[host_id] → {name, transport, last_seen, sessions
 ## 4. Daemon implementation and packaging
 
 ### 4.1 Language comparison
+
 | | Rust | Go | Python | Node/Electron |
 |---|---|---|---|---|
 | Single binary / small | Yes (5–15 MB) | Yes (10–20 MB) | PyInstaller/Nuitka (30–80 MB, AV false positives on Windows) | Bundled runtime (50–200 MB) |
@@ -268,12 +294,14 @@ Watch-side data model: `hosts[host_id] → {name, transport, last_seen, sessions
 **Recommendation: Rust core daemon** with thin per-OS focus modules (and shell-outs to `osascript`, `wezterm`, `kitten`, `tmux`, `swaymsg`, `hyprctl`, `wmctrl` where that's the most stable API), `serialport` + `btleplug`, `notify` for file watching, `sysinfo` for processes, `ciborium`/`minicbor` + `cobs`. If team velocity matters more: Go (`go.bug.st/serial` + `tinygo bluetooth`) is nearly as good. Python is ideal for the first spike (bleak + pyserial + psutil + AppleScript) and could be swapped later because the protocol is transport-agnostic.
 
 Component split (keeps privileges tight):
+
 * `agentlinkd` – long-running per-user daemon: transport manager, state aggregator, focus dispatcher, localhost IPC server (unix socket / named pipe) for hooks.
 * `agentlink-hook` – ~100 KB shim called by agent hooks; reads stdin JSON + env + ppid chain; connects to daemon IPC (unix socket `$XDG_RUNTIME_DIR/agentlink.sock`, `~/Library/Application Support/...`, Windows named pipe `\\.\pipe\agentlink`), **fails silently and quickly** if the daemon is down (never block the agent; Copilot hook timeout default 30 s [V]).
 * `agentlink-vscode` (optional extension) – focus/URI handler, terminal pid mapping.
 * Optional GNOME-shell extension for Wayland.
 
 ### 4.2 Autostart
+
 * **macOS:** per-user LaunchAgent `~/Library/LaunchAgents/dev.agentlink.plist` (`RunAtLoad`, `KeepAlive`) — must be a **LaunchAgent (GUI session)**, not a LaunchDaemon, so it can talk to WindowServer/AppleScript. For TCC grants, wrap in a signed `.app` bundle (`LSUIElement=true` for no Dock icon), use `SMAppService` (macOS 13+) for login item registration. Notarize to avoid Gatekeeper trouble.
 * **Linux:** `systemctl --user` unit (`~/.config/systemd/user/agentlinkd.service`, `WantedBy=graphical-session.target`, needs `DISPLAY`/`WAYLAND_DISPLAY` imported: `systemctl --user import-environment`) or XDG autostart `.desktop`. Add a udev rule for the watch serial device (`SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", ATTRS{idProduct}=="1001", TAG+="uaccess"`) and membership in `dialout`/`uucp` otherwise.
 * **Windows:** Task Scheduler "At log on" task (`schtasks /create /sc onlogon /tn AgentLink /tr ...` run as the interactive user, **not** SYSTEM, so the daemon is in the user's desktop session and can focus windows) or `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. A Windows Service runs in session 0 and **cannot** show/focus windows — avoid.
@@ -285,9 +313,11 @@ Component split (keeps privileges tight):
 ## 5. Security
 
 ### 5.1 Threat model
+
 Assets: the user's PC session (anything focus/approve can do), prompts/code that flow to the watch, agent permissions. Attackers: a nearby BLE device, another LAN host, a malicious process on the same PC (including a prompt-injected agent), a stolen/lost watch, a malicious repo that ships `.github/hooks` (note: repo hooks run arbitrary commands, which is why Copilot gates them with folder trust [V "Repository ... hooks require workspace admission"]).
 
 ### 5.2 Pairing and authentication
+
 * **Pair once, per host:** the watch shows a **6-digit PIN or QR** on the round screen; the daemon's tray/CLI prompts for it. Run an authenticated key exchange (SPAKE2/PAKE or ECDH with SAS comparison, or BLE LESC passkey), then persist a per-host **long-term key** (daemon: OS keychain/Keychain/DPAPI/Secret Service; watch: NVS with flash encryption enabled). Prefer a pairing window that is **opened by physical action** (long-press on watch + explicit "pair" in tray) and expires after ~60 s.
 * **Every command watch→PC is authenticated:** AEAD (ChaCha20-Poly1305 via Noise `snow`, or HMAC-SHA256) over `{host_id, counter/nonce, ts, session_id, action}`; reject replays (monotonic counter), stale timestamps, unknown sessions. Revocation list on both sides.
 * Transport security is **not** a substitute: BLE LESC protects the link but any app on the paired PC could still talk to the characteristic via the OS; USB serial is accessible to any local process of that user (OS device permissions only). So do app-layer auth even on USB (cheap).
@@ -298,6 +328,7 @@ Assets: the user's PC session (anything focus/approve can do), prompts/code that
 * **Firmware/updates:** signed OTA (ESP-IDF secure boot v2) if distributed.
 
 ### 5.3 Why remote approval of permission prompts is risky
+
 1. **Blind approval / consent fatigue:** a 1.3" round screen can't display a full command, diff, or path list (Copilot's `permission.requested` carries `fullCommandText`, `commands`, `possiblePaths`, `possibleUrls` [V local schema]) — users will tap "approve" on a truncated label. Attackers can craft commands where the harmless-looking prefix hides a payload (`npm test && curl … | sh`).
 2. **Prompt injection → approval request → human taps yes:** the agent's requests may be triggered by malicious content in a repo/web page; the permission prompt is the *last line of defense*, and putting it on a glance-and-tap device weakens it. Copilot's `permissionRequest` hook with `behavior: allow` bypasses the normal flow [V], so a bug in the daemon (or a spoofed watch message) becomes **remote code execution on the PC** (`allow` for shell tools).
 3. **Attack surface:** BLE/Wi-Fi/USB channel → anyone who pairs or replays can approve. A compromised or lookalike watch (or MITM without app-layer auth) approves arbitrary commands. Time-of-check/time-of-use: approval for request A must not apply to B; bind to `requestId` + hash of full command + `toolCallId` and expire in seconds.
@@ -311,7 +342,7 @@ Mitigations if offered at all: default **off**; only for low-risk classes (read-
 
 ## 6. Recommended architecture
 
-```
+```text
  agent CLI ──hook──▶ agentlink-hook (shim) ──unix sock/pipe──▶ agentlinkd ──▶ transport(s) ──▶ watch
  (Copilot/Claude/…)          ▲ env + ppid chain                   │  ▲ state aggregator,          (USB / BLE / Wi-Fi)
         └─ events.jsonl ─ file watcher (fallback/backfill) ───────┘  │ focus dispatcher
@@ -321,19 +352,23 @@ Mitigations if offered at all: default **off**; only for low-risk classes (read-
 ### Options and tradeoffs
 
 **A. Hooks-first + per-terminal focus drivers (recommended).**
+
 * Status: agent hooks → shim → daemon; file-tail and process scan as fallback/backfill.
 * Focus: handle captured in hook; driver by `TERM_PROGRAM`/env; OS-level raise fallback.
 * Pros: precise, event-driven (no polling), cheap, works with Copilot out of the box. Cons: requires installing hook config per agent; Aider/VS Code limited; many focus drivers to maintain.
 
 **B. PTY-wrapper (`agentlink run -- <agent>`).**
+
 * Pros: agent-agnostic (works with Aider/anything), sees OSC/bell/prompt text, exact tty. Cons: intrusive, breaks terminal features if sloppy, users forget to use it; still needs focus drivers.
 
 **C. Passive observation only (files + process scan + terminal APIs).**
+
 * Pros: zero agent config. Cons: coarse states, depends on undocumented formats (Copilot `events.jsonl`, Codex rollouts), polling/inotify overhead.
 
 **D. VS Code/terminal-embedded extension model.** Extension reports status & focuses terminals (the only reliable way to focus a specific VS Code integrated terminal). Complements A for VS Code users.
 
 ### Transport options
+
 | Option | Pros | Cons | Verdict |
 |---|---|---|---|
 | USB CDC (COBS+CBOR) | Zero pairing friction, reliable, charges, simple libs, debuggable | One host at a time, cable, DTR/RTS reset gotcha | **v1 baseline** |
@@ -356,6 +391,7 @@ Build the **protocol first and transport-agnostic** (envelope `{v, host, seq, ty
 (Focus method is determined by the *terminal*, not the agent; the agent column only changes the status source.)
 
 ### Suggested phasing
+
 1. **Spike:** Python or Rust CLI: Copilot hook shim → daemon → JSON-lines over CDC to the watch; focus via tmux/WezTerm/Terminal.app on macOS only.
 2. **v1:** Rust `agentlinkd` with tray, autostart, Copilot + Claude hooks, macOS/Windows/X11 focus drivers, USB transport, app-layer pairing (PIN), focus only.
 3. **v2:** BLE multi-host, Gemini/Codex/Aider, Linux Wayland drivers, VS Code extension.
@@ -364,6 +400,7 @@ Build the **protocol first and transport-agnostic** (envelope `{v, host, seq, ty
 ---------------------------------------------------------------------------
 
 ## 7. Gaps and things to verify before building
+
 * Confirm via a dump-env test hook that Copilot `command`/`exec` hooks inherit `TERM_PROGRAM`, `WT_SESSION`, `ITERM_SESSION_ID`, `TMUX_PANE` and that `ppid` chain reaches the terminal (not fully verified).
 * Verify whether Copilot CLI `remoteSteerable` / remote features expose a documented API (see https://github.com/github/copilot-cli).
 * Codex `notify` payload and newer hook/approval events; Aider `--notifications-command`; Ghostty AppleScript support; Windows Terminal "focus tab by WT_SESSION" – all [M] items above.
@@ -372,6 +409,7 @@ Build the **protocol first and transport-agnostic** (envelope `{v, host, seq, ty
 * The `https://docs.github.com/en/copilot/reference/hooks-reference` page was truncated during fetch (payload sections for `preToolUse`, `permissionRequest`, `agentStop` not read in full); the schema for those should be read directly before implementing the shim.
 
 ## 8. Sources
+
 * Copilot hooks reference [V]: https://docs.github.com/en/copilot/reference/hooks-reference
 * Copilot CLI config dir reference (linked from the above): https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-config-dir-reference
 * github/copilot-cli repo: https://github.com/github/copilot-cli

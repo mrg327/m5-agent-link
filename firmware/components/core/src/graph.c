@@ -20,16 +20,22 @@ void graph_reset(void)
 
 const graph_t *graph_get(uint32_t sid) { return sid && s_g.have && s_g.sid == sid ? &s_g : NULL; }
 
-void graph_on_msg(uint32_t sid, const uint32_t *node, size_t n, const uint32_t *la, size_t nla, uint32_t drop,
-                  uint32_t gen)
+void graph_on_msg(uint32_t sid, const uint32_t *node, size_t n, const uint32_t *la, size_t nla,
+                  uint32_t drop, uint32_t gen)
 {
     if (!sid || (s_w.sid && sid != s_w.sid)) return;
     size_t skip = n > GRAPH_NODES ? n - GRAPH_NODES : 0;
-    graph_t g = {.sid = sid, .count = (uint8_t)(n - skip), .drop = drop + (uint32_t)skip, .gen = gen, .have = true};
+    graph_t g = {.sid = sid,
+                 .count = (uint8_t)(n - skip),
+                 .drop = drop + (uint32_t)skip,
+                 .gen = gen,
+                 .have = true};
     for (size_t i = 0; i < g.count; i++) g.node[i] = (uint16_t)(node[skip + i] & 0x7ffu);
-    for (size_t i = 0; i < nla && i < GRAPH_LANES; i++) g.la[i] = (uint8_t)(la[i] > GL_OTHER ? GL_OTHER : la[i]);
-    if (s_g.have && s_g.sid == g.sid && s_g.count == g.count && s_g.drop == g.drop && s_g.gen == g.gen &&
-        !memcmp(s_g.node, g.node, sizeof g.node) && !memcmp(s_g.la, g.la, sizeof g.la))
+    for (size_t i = 0; i < nla && i < GRAPH_LANES; i++)
+        g.la[i] = (uint8_t)(la[i] > GL_OTHER ? GL_OTHER : la[i]);
+    if (s_g.have && s_g.sid == g.sid && s_g.count == g.count && s_g.drop == g.drop &&
+        s_g.gen == g.gen && !memcmp(s_g.node, g.node, sizeof g.node) &&
+        !memcmp(s_g.la, g.la, sizeof g.la))
         return;
     g.rev = s_g.rev + 1;
     s_g = g;

@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # Conventions
 
 How code, docs and changes are written in this repository, and how each rule is checked. Issue
@@ -52,10 +59,20 @@ Reformatting is one commit per language, listed in `.git-blame-ignore-revs` so `
 
 ## Phases
 
-| Phase | Lands |
-|---|---|
-| 0 | These pages, `.editorconfig`, `scripts/check`, the check list in `AGENTS.md` |
-| 1 | Formatter configs and one reformat per language (clang-format, rustfmt, Ruff, Prettier), markdownlint, typos, offline link check; CI calls `scripts/check` |
-| 2 | Generated-code markers, the structure check (include and crate rules), `ARCHITECTURE.md`, CODEOWNERS, doc front matter |
-| 3 | Linters on changed lines with baselines: clang-tidy, the clippy table, Ruff's wider set and mypy, ESLint with `checkJs` |
-| 4 | Doc coverage (Doxygen, `missing_docs`, Ruff `D`, JSDoc), the commit-message check, per-component `AGENTS.md` |
+All five phases have landed (issues 20261122-db53 and 20261123-2436). What remains is shrinking the
+baselines, which happens one touched file at a time.
+
+| Phase | Landed | `scripts/check` area |
+|---|---|---|
+| 0 | These pages, `.editorconfig`, `scripts/check`, the check list in `AGENTS.md` | all |
+| 1 | `.clang-format`, `ruff.toml`, `.prettierrc.json`, `rustfmt.toml`; one reformat per language, listed in `.git-blame-ignore-revs`; typos, markdownlint and the link check; CI calls `scripts/check` | `format`, `docs` |
+| 2 | The structure check (include, crate, HAL and README rules), `ARCHITECTURE.md`, `.github/CODEOWNERS`, `.gitattributes`, front matter on design and convention docs with a generated index | `structure`, `docs` |
+| 3 | Linters with baselines that only shrink: clang-tidy (`lint_c.py`), clippy with the workspace lint table (`lint_rust.py`), Ruff and mypy (`lint_py.py`), ESLint and `tsc --checkJs` (`lint_js.py`) | `lint`, `daemon` |
+| 4 | Doc coverage for public C, Rust, Python and JS items (`doc_coverage.py`), the commit-message check and hook, per-component `AGENTS.md` and READMEs | `docs`, `commits` |
+
+Baselines live in `scripts/check.d/baselines/`. When a change fixes findings, the check fails with
+"baseline can shrink": run the script with `--update-baseline` and commit the smaller file with the fix.
+
+Still open: Doxygen itself (not installed here; `doc_coverage.py` counts the same gap), clang-tidy for
+`firmware/main` and the C++ board files (they are not in the simulator's compile database), and a
+scheduled job for `doc_meta.py --stale`.

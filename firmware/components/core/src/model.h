@@ -12,13 +12,32 @@
 #define MODEL_RULE_CAP 160 /* the daemon's standing::RULE_CAP */
 
 /* AGENT_SHELL is a job: a command the user started in a terminal (JOBS.md, proto 0.9). */
-typedef enum { AGENT_COPILOT = 0, AGENT_CLAUDE = 1, AGENT_CLOUD = 2, AGENT_SHELL = 3, AGENT_PI = 4, AGENT_OTHER = 15 } agent_t;
 typedef enum {
-    SESS_START = 0, SESS_WORK = 1, SESS_INPUT = 2, SESS_ERROR = 3,
-    SESS_DONE = 4, SESS_IDLE = 5, SESS_ENDED = 6
+    AGENT_COPILOT = 0,
+    AGENT_CLAUDE = 1,
+    AGENT_CLOUD = 2,
+    AGENT_SHELL = 3,
+    AGENT_PI = 4,
+    AGENT_OTHER = 15
+} agent_t;
+typedef enum {
+    SESS_START = 0,
+    SESS_WORK = 1,
+    SESS_INPUT = 2,
+    SESS_ERROR = 3,
+    SESS_DONE = 4,
+    SESS_IDLE = 5,
+    SESS_ENDED = 6
 } sess_state_t;
 typedef enum { ATT_APPROVAL = 0, ATT_QUESTION = 1, ATT_ERROR = 2, ATT_DONE = 3 } att_kind_t;
-typedef enum { ACT_APPROVE = 0, ACT_DENY = 1, ACT_FOCUS = 2, ACT_REPLY = 3, ACT_ACK = 4, ACT_DICTATE = 5 } att_action_t;
+typedef enum {
+    ACT_APPROVE = 0,
+    ACT_DENY = 1,
+    ACT_FOCUS = 2,
+    ACT_REPLY = 3,
+    ACT_ACK = 4,
+    ACT_DICTATE = 5
+} att_action_t;
 typedef enum { PRIVACY_META = 0, PRIVACY_PREVIEW = 1, PRIVACY_FULL = 2 } privacy_t;
 typedef enum { ALERT_FULL = 0, ALERT_QUIET = 1, ALERT_SILENT = 2 } alert_mode_t;
 
@@ -34,9 +53,9 @@ typedef enum { ALERT_FULL = 0, ALERT_QUIET = 1, ALERT_SILENT = 2 } alert_mode_t;
 #define MODEL_EXT_BSS
 #endif
 
-/* The summary of the turn that just ended (DONE-SUMMARY.md, proto 0.14). Each figure is shown only once
- * known: an unknown one is absent, never 0. Valid while the session is done / error; any change of state
- * clears it, and a delta carrying any of keys 30-34 replaces the whole of it. */
+/* The summary of the turn that just ended (DONE-SUMMARY.md, proto 0.14). Each figure is shown only
+ * once known: an unknown one is absent, never 0. Valid while the session is done / error; any
+ * change of state clears it, and a delta carrying any of keys 30-34 replaces the whole of it. */
 typedef struct {
     bool files_known, lines_known, tests_known, secs_known;
     bool tests_pass;
@@ -49,75 +68,116 @@ typedef struct {
     sess_state_t state;
     uint8_t sub; /* 0 approval, 1 question; meaningful when state == SESS_INPUT */
     char repo[33], branch[33], tool[25], summary[81];
-    uint8_t host;  /* 0 = the daemon's PC, 1.. = a remote host */
-    char hn[17];   /* remote host name; empty for host 0 or an old daemon */
+    uint8_t host;     /* 0 = the daemon's PC, 1.. = a remote host */
+    char hn[17];      /* remote host name; empty for host 0 or an old daemon */
     uint32_t t0, tst; /* unix seconds: start, last state change */
     bool seen;
-    uint32_t snz;   /* snoozed until (unix); 0 = not snoozed */
-    bool ntf;       /* "notify when done" is armed */
-    uint32_t n;     /* tool steps in the current turn */
-    uint8_t step;   /* step_state_t of step n: STEP_RUNNING while the daemon sent no `ok` */
-    steps_t steps;  /* the last STEPS_MAX steps, built by model_upsert() from n / ok / the step text */
-    bool no_scroll; /* device-side: the daemon answered a scroll with `unsupported`; hide the item */
-    /* The agent's closing question and its answers for the Reply list (proto 0.5); "" / 0 = none. */
+    uint32_t snz; /* snoozed until (unix); 0 = not snoozed */
+    bool ntf;     /* "notify when done" is armed */
+    uint32_t n;   /* tool steps in the current turn */
+    uint8_t step; /* step_state_t of step n: STEP_RUNNING while the daemon sent no `ok` */
+    /* the last STEPS_MAX steps, built by model_upsert() from n / ok / the step text */
+    steps_t steps;
+    /* device-side: the daemon answered a scroll with `unsupported`; hide the item */
+    bool no_scroll;
+    /* The agent's closing question and its answers for the Reply list (proto 0.5); "" / 0 =
+     * none. */
     char q[128];
     char rp[3][64];
     uint8_t n_rp;
-    /* The start of the message queued for when the session can take input (proto 0.17); "" = none. */
+    /* The start of the message queued for when the session can take input (proto 0.17); "" =
+     * none. */
     char queued[97];
-    /* The agent's last message (proto 0.18, LAST-MESSAGE.md): its id (0 = none), its length in bytes as the
-     * reader shows it, and its start (one paragraph, "" under privacy meta). The text itself is fetched with
-     * detail_want_msg() when the reader opens. */
+    /* The agent's last message (proto 0.18, LAST-MESSAGE.md): its id (0 = none), its length in
+     * bytes as the reader shows it, and its start (one paragraph, "" under privacy meta). The text
+     * itself is fetched with detail_want_msg() when the reader opens. */
     uint32_t lm, ll;
     char lp[164];
     uint8_t lm_keys; /* in a delta with SF_LM: which of lm (1), ll (2), lp (4) it carried */
-    /* A job (AGENT_SHELL): the expected total run time, 0 = unknown, and the exit status once it ended. */
+    /* A job (AGENT_SHELL): the expected total run time, 0 = unknown, and the exit status once it
+     * ended. */
     uint32_t eta;
     uint8_t exit_code;
-    /* Readouts from the agent's status line and hooks (GAUGES.md, proto 0.10). Each is shown only once
-     * known: ctx_known false = no context figure (never drawn as 0 %); pm_known false = no mode reported;
-     * pr 0 = no open pull request; mdl "" = model unknown. */
+    /* Readouts from the agent's status line and hooks (GAUGES.md, proto 0.10). Each is shown only
+     * once known: ctx_known false = no context figure (never drawn as 0 %); pm_known false = no
+     * mode reported; pr 0 = no open pull request; mdl "" = model unknown. */
     bool ctx_known, pm_known;
-    uint8_t ctx;  /* context window used, percent 0-100 */
-    uint8_t pm;   /* perm_mode_t */
-    uint8_t prs;  /* pr_state_t */
+    uint8_t ctx; /* context window used, percent 0-100 */
+    uint8_t pm;  /* perm_mode_t */
+    uint8_t prs; /* pr_state_t */
     uint32_t pr;
     char mdl[17];
-    /* Device-side (ANSWER-WINDOW.md): this session's last request went back to the computer (its answer
-     * window ran out, or Open on PC handed it back) and the terminal asks now. Cleared by a new request or a
-     * change of state. */
+    /* Device-side (ANSWER-WINDOW.md): this session's last request went back to the computer (its
+     * answer window ran out, or Open on PC handed it back) and the terminal asks now. Cleared by a
+     * new request or a change of state. */
     bool back;
     uint8_t back_why; /* BACK_EXPIRED / BACK_HANDED */
-    /* Presence (PRESENCE.md, proto 0.12): read only together with SF_HUSH in the same delta; the user is
-     * looking at this session's terminal, so its finish need not buzz. Not a state of the session. */
+    /* Presence (PRESENCE.md, proto 0.12): read only together with SF_HUSH in the same delta; the
+     * user is looking at this session's terminal, so its finish need not buzz. Not a state of the
+     * session. */
     bool hush;
     done_sum_t sum;
 } session_t;
 enum { BACK_EXPIRED = 0, BACK_HANDED = 1 };
 
 /* Wire values of session.pm and session.prs (protocol/agentlink.cddl). */
-typedef enum { PM_DEFAULT = 0, PM_PLAN = 1, PM_ACCEPT_EDITS = 2, PM_AUTO = 3, PM_DONT_ASK = 4, PM_BYPASS = 5 } perm_mode_t;
-typedef enum { PRS_NONE = 0, PRS_PENDING = 1, PRS_APPROVED = 2, PRS_CHANGES = 3, PRS_DRAFT = 4 } pr_state_t;
+typedef enum {
+    PM_DEFAULT = 0,
+    PM_PLAN = 1,
+    PM_ACCEPT_EDITS = 2,
+    PM_AUTO = 3,
+    PM_DONT_ASK = 4,
+    PM_BYPASS = 5
+} perm_mode_t;
+typedef enum {
+    PRS_NONE = 0,
+    PRS_PENDING = 1,
+    PRS_APPROVED = 2,
+    PRS_CHANGES = 3,
+    PRS_DRAFT = 4
+} pr_state_t;
 #define MODEL_CTX_UNKNOWN 255 /* session.ctx on the wire: the figure is gone (after /compact) */
 
 /* Which fields of a session delta were present on the wire. */
 enum {
-    SF_AGENT = 1 << 0, SF_STATE = 1 << 1, SF_SUB = 1 << 2, SF_REPO = 1 << 3, SF_BRANCH = 1 << 4,
-    SF_TOOL = 1 << 5, SF_T0 = 1 << 6, SF_TST = 1 << 7, SF_SUMMARY = 1 << 8, SF_SEEN = 1 << 9,
+    SF_AGENT = 1 << 0,
+    SF_STATE = 1 << 1,
+    SF_SUB = 1 << 2,
+    SF_REPO = 1 << 3,
+    SF_BRANCH = 1 << 4,
+    SF_TOOL = 1 << 5,
+    SF_T0 = 1 << 6,
+    SF_TST = 1 << 7,
+    SF_SUMMARY = 1 << 8,
+    SF_SEEN = 1 << 9,
     SF_NO_SCROLL = 1 << 10, /* not on the wire: set by the device itself */
-    SF_HOST = 1 << 11, SF_HN = 1 << 12, SF_SNZ = 1 << 13, SF_NTF = 1 << 14, SF_N = 1 << 15,
+    SF_HOST = 1 << 11,
+    SF_HN = 1 << 12,
+    SF_SNZ = 1 << 13,
+    SF_NTF = 1 << 14,
+    SF_N = 1 << 15,
     SF_OK = 1 << 16, /* with SF_OK, `step` is STEP_OK or STEP_FAIL */
-    SF_Q = 1 << 17, SF_RP = 1 << 18, SF_ETA = 1 << 19, SF_EXIT = 1 << 20,
-    SF_CTX = 1 << 21, SF_MDL = 1 << 22, SF_PM = 1 << 23, SF_PR = 1 << 24, SF_PRS = 1 << 25,
+    SF_Q = 1 << 17,
+    SF_RP = 1 << 18,
+    SF_ETA = 1 << 19,
+    SF_EXIT = 1 << 20,
+    SF_CTX = 1 << 21,
+    SF_MDL = 1 << 22,
+    SF_PM = 1 << 23,
+    SF_PR = 1 << 24,
+    SF_PRS = 1 << 25,
     SF_BACK = 1 << 26, /* not on the wire: set by the device (model_attention_went_back) */
-    SF_HUSH = 1 << 27, /* proto 0.12: with the delta that enters done / error, `hush` says whether to stay quiet */
-    SF_DONE = 1 << 28, /* proto 0.14: any of keys 30-34 was present: `sum` replaces the session's whole summary */
-    SF_QD = 1 << 29,   /* proto 0.17: the queued message's start */
-    SF_LM = 1 << 30    /* proto 0.18: the last message (lm, ll, lp; any of keys 36-38) */
+    /* proto 0.12: with the delta that enters done / error, `hush` says whether to stay quiet */
+    SF_HUSH = 1 << 27,
+    /* proto 0.14: any of keys 30-34 was present: `sum` replaces the session's whole summary */
+    SF_DONE = 1 << 28,
+    SF_QD = 1 << 29, /* proto 0.17: the queued message's start */
+    SF_LM = 1 << 30  /* proto 0.18: the last message (lm, ll, lp; any of keys 36-38) */
 };
 
-/* One question of a multiple-choice request (Claude Code AskUserQuestion; proto 0.18, LAST-MESSAGE.md §3). The
- * buffers have room past the daemon's caps (header 16, question 160, label 48, description 120 bytes). */
+/* One question of a multiple-choice request (Claude Code AskUserQuestion; proto 0.18,
+ * LAST-MESSAGE.md §3). The buffers have room past the daemon's caps (header 16, question 160, label
+ * 48, description 120 bytes). */
 #define MODEL_MAX_QS 4
 #define MODEL_MAX_QOPTS 4
 typedef struct {
@@ -134,44 +194,56 @@ typedef struct {
     char title[41], text[165];
     char opts[4][25];
     uint8_t n_opts;
-    uint8_t acts; /* bitmask of 1 << att_action_t */
+    uint8_t acts;       /* bitmask of 1 << att_action_t */
     uint8_t grant_mask; /* bit i set: opts[i] grants permission (approve-class, hold to commit) */
-    uint32_t exp; /* unix, 0 = none */
-    /* The answer window (proto 0.11, ANSWER-WINDOW.md), on the device's own millisecond clock: the daemon
-     * sends what is left when it sends the request, so a reconnect or a clock difference cannot skew it. */
-    uint32_t deadline_ms; /* when the window ends; 0 = no window known (an older daemon, or a notice) */
-    uint32_t win_ms;      /* the whole window */
-    /* The full text (proto 0.11): len_known says the daemon reports whether `text` is whole, and full_len is
-     * the full text's length in bytes when it is not (0: `text` is the whole text). */
+    uint32_t exp;       /* unix, 0 = none */
+    /* The answer window (proto 0.11, ANSWER-WINDOW.md), on the device's own millisecond clock: the
+     * daemon sends what is left when it sends the request, so a reconnect or a clock difference
+     * cannot skew it. */
+    /* when the window ends; 0 = no window known (an older daemon, or a notice) */
+    uint32_t deadline_ms;
+    uint32_t win_ms; /* the whole window */
+    /* The full text (proto 0.11): len_known says the daemon reports whether `text` is whole, and
+     * full_len is the full text's length in bytes when it is not (0: `text` is the whole text). */
     bool len_known;
     uint32_t full_len;
-    /* Presence (PRESENCE.md, proto 0.12): the user is looking at this request's terminal; no buzz, glow or
-     * reminders. The card and the answers are as ever. */
+    /* Presence (PRESENCE.md, proto 0.12): the user is looking at this request's terminal; no buzz,
+     * glow or reminders. The card and the answers are as ever. */
     bool hush;
-    /* A standing rule (STANDING-RULES.md, proto 0.13): "Always allow" may save `rule`, exactly as Claude Code
-     * saves it (one rule per line), for this session or this project. has_rule only for a rule that arrived
-     * whole and that the watch can show as it is (printable ASCII and line breaks); rule_hash binds the grant
-     * to what was shown. */
+    /* A standing rule (STANDING-RULES.md, proto 0.13): "Always allow" may save `rule`, exactly as
+     * Claude Code saves it (one rule per line), for this session or this project. has_rule only for
+     * a rule that arrived whole and that the watch can show as it is (printable ASCII and line
+     * breaks); rule_hash binds the grant to what was shown. */
     bool has_rule;
-    bool rule_wide;  /* it ends in a wildcard: it matches more than this request */
+    bool rule_wide;     /* it ends in a wildcard: it matches more than this request */
     uint8_t rule_scope; /* MODEL_RULE_SESSION / MODEL_RULE_PROJECT */
     char rule[MODEL_RULE_CAP + 1];
     uint32_t rule_hash;
-    /* Multiple-choice questions (proto 0.18): how many; their text is model_attention_question(). */
+    /* Multiple-choice questions (proto 0.18): how many; their text is
+     * model_attention_question(). */
     uint8_t n_qs;
-    bool answer_sent; /* an answer (approve/deny/reply/dictate) is out; waiting for clear */
-    uint8_t answer;   /* what was sent: ATT_ANSWER_* */
+    bool answer_sent;   /* an answer (approve/deny/reply/dictate) is out; waiting for clear */
+    uint8_t answer;     /* what was sent: ATT_ANSWER_* */
     uint8_t answer_opt; /* option index for ATT_ANSWER_REPLY */
 } attention_t;
-enum { ATT_ANSWER_NONE = 0, ATT_ANSWER_APPROVE, ATT_ANSWER_DENY, ATT_ANSWER_REPLY, ATT_ANSWER_DICTATE, ATT_ANSWER_GRANT,
-       ATT_ANSWER_QUESTIONS };
+enum {
+    ATT_ANSWER_NONE = 0,
+    ATT_ANSWER_APPROVE,
+    ATT_ANSWER_DENY,
+    ATT_ANSWER_REPLY,
+    ATT_ANSWER_DICTATE,
+    ATT_ANSWER_GRANT,
+    ATT_ANSWER_QUESTIONS
+};
 enum { MODEL_RULE_SESSION = 0, MODEL_RULE_PROJECT = 1 };
-/* FNV-1a 32 over the rule's bytes, a 0 byte, the scope and the wide flag (the daemon's standing::hash). */
+/* FNV-1a 32 over the rule's bytes, a 0 byte, the scope and the wide flag (the daemon's
+ * standing::hash). */
 uint32_t model_rule_hash(const char *rule, uint8_t scope, bool wide);
-/* Sets has_rule / rule / rule_scope / rule_wide / rule_hash from what arrived; refuses (has_rule false) a rule
- * that is empty, cut, longer than MODEL_RULE_CAP, holds a byte the watch cannot show as it is, or has a
- * scope this build does not know. */
-void model_attention_set_rule(attention_t *a, const uint8_t *rule, size_t len, uint32_t scope, bool wide);
+/* Sets has_rule / rule / rule_scope / rule_wide / rule_hash from what arrived; refuses (has_rule
+ * false) a rule that is empty, cut, longer than MODEL_RULE_CAP, holds a byte the watch cannot show
+ * as it is, or has a scope this build does not know. */
+void model_attention_set_rule(attention_t *a, const uint8_t *rule, size_t len, uint32_t scope,
+                              bool wide);
 
 typedef struct { uint32_t waiting, error, running, done_unseen; } model_counts_t;
 
@@ -196,17 +268,20 @@ const session_t *model_find(uint32_t sid);
 /* Fills idx[] (size >= MODEL_MAX_SESSIONS) with session slots in display priority order. */
 size_t model_sorted(uint8_t *idx);
 const session_t *model_at(uint8_t slot);
-/* True while the session is snoozed. now_unix 0 = clock unknown: a snooze can never be judged, so off. */
+/* True while the session is snoozed. now_unix 0 = clock unknown: a snooze can never be judged, so
+ * off. */
 bool model_session_snoozed(const session_t *s, uint32_t now_unix);
-/* Called after every session upsert (daemon delta or device-side change) with a copy of the session as
- * it was (`before`, NULL for a new session), the session now, and the fields the delta carried. */
-typedef void (*model_session_hook_t)(const session_t *before, const session_t *now, uint32_t present);
+/* Called after every session upsert (daemon delta or device-side change) with a copy of the session
+ * as it was (`before`, NULL for a new session), the session now, and the fields the delta
+ * carried. */
+typedef void (*model_session_hook_t)(const session_t *before, const session_t *now,
+                                     uint32_t present);
 void model_set_session_hook(model_session_hook_t hook);
 model_counts_t model_counts(void);
 
 void model_attention_add(const attention_t *a);
-/* The questions of request `rid` (proto 0.18), stored with it: call after model_attention_add(); n is clamped to
- * MODEL_MAX_QS and the request's n_qs set to it. */
+/* The questions of request `rid` (proto 0.18), stored with it: call after model_attention_add(); n
+ * is clamped to MODEL_MAX_QS and the request's n_qs set to it. */
 void model_attention_set_questions(uint32_t rid, const ask_q_t *qs, int n);
 /* Question i of request `rid`, or NULL. */
 const ask_q_t *model_attention_question(uint32_t rid, int i);
@@ -220,14 +295,16 @@ const attention_t *model_attention_first(void);
  * (the daemon rejected the command). */
 void model_attention_set_answer(uint32_t rid, uint8_t answer, uint8_t opt);
 void model_attention_expire(uint32_t now_unix);
-/* Drops requests whose answer window ended more than MODEL_WINDOW_GRACE_MS ago without the daemon's clear
- * (the link is down): they went back to the computer. */
+/* Drops requests whose answer window ended more than MODEL_WINDOW_GRACE_MS ago without the daemon's
+ * clear (the link is down): they went back to the computer. */
 #define MODEL_WINDOW_GRACE_MS 1500
 void model_attention_expire_ms(uint32_t now_ms);
 /* Request `rid` went back to the computer (the daemon's clear expired / handed_back, or the local
- * deadline): its session is marked `back` (BACK_*), and the request removed. False if it was not there. */
+ * deadline): its session is marked `back` (BACK_*), and the request removed. False if it was not
+ * there. */
 bool model_attention_went_back(uint32_t rid, uint8_t why);
-/* Milliseconds left in `a`'s answer window at now_ms; 0 when it has ended; UINT32_MAX when none is known. */
+/* Milliseconds left in `a`'s answer window at now_ms; 0 when it has ended; UINT32_MAX when none is
+ * known. */
 uint32_t model_attention_left_ms(const attention_t *a, uint32_t now_ms);
 /* The daemon's protocol minor from its welcome (0 until one arrives). */
 void model_set_peer_minor(uint8_t minor);
@@ -245,7 +322,8 @@ bool model_quiet_active(uint32_t now_unix);
 void model_set_host(const char *host);
 const char *model_host(void);
 /* Quick replies from the welcome (proto 0.4, issue b150). `typing` is true when the daemon sent the
- * list at all: it can then type into terminals (quick replies and interrupt). Reset by each welcome. */
+ * list at all: it can then type into terminals (quick replies and interrupt). Reset by each
+ * welcome. */
 #define MODEL_MAX_REPLIES 6
 void model_set_replies(const char *const *replies, int n, bool typing);
 int model_reply_count(void);
@@ -257,7 +335,8 @@ bool model_voice(void);
 /* The daemon decodes swipe strokes (welcome.keys, proto 0.7); reset by each welcome. */
 void model_set_keys(bool on);
 bool model_keys(void);
-/* The daemon can drive its machine's pointer (welcome.pointer, proto 0.20): the trackpad (EXPERIMENTS.md). */
+/* The daemon can drive its machine's pointer (welcome.pointer, proto 0.20): the trackpad
+ * (EXPERIMENTS.md). */
 void model_set_pointer(bool on);
 bool model_pointer(void);
 

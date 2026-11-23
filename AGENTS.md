@@ -12,7 +12,15 @@ scripts/issue log ID "…"      # as you go
 scripts/issue close ID fixed "commit …; checks …"
 ```
 
-The design docs are under `docs/design/` and the repository map is in `README.md`.
+The design docs are under `docs/design/` ([index](docs/design/README.md)) and the repository map is
+in `README.md`.
+
+## Per-component guides
+
+Read the `AGENTS.md` for the directory you work in. Each names the check to run, where new code goes
+and the gotchas found there (each directory's `CLAUDE.md` loads it):
+[firmware](firmware/AGENTS.md), [simulator](simulator/AGENTS.md), [daemon](daemon/AGENTS.md),
+[protocol](protocol/AGENTS.md), [atlas](atlas/AGENTS.md), [bench](bench/AGENTS.md).
 
 ## Conventions and checks
 
@@ -24,13 +32,15 @@ Run the checks before you commit, and name them when you close an issue:
 
 ```sh
 scripts/check --changed    # the areas your branch touches
-scripts/check sim daemon   # or name areas: sim daemon protocol atlas firmware docs
+scripts/check sim daemon   # or name areas: format structure commits docs lint
+                           #   protocol atlas daemon sim firmware
 scripts/check --list       # the exact command behind each area
 ```
 
 `firmware` builds only where ESP-IDF is on `PATH`, so run it after `. ~/esp/esp-idf/export.sh` when
 you touch firmware. A SKIP in the summary means that area did not run, not that it passed.
 
+Once per clone, `git config core.hooksPath scripts/hooks` makes git check each commit message.
 Commit subjects are `area: summary (issue ID)`, as in `git log` ([changes.md](docs/conventions/changes.md)).
 
 **Project tenet: glyphs over words.** We should use the least amount of text possible and represent

@@ -21,9 +21,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - name: Validate vectors against CDDL
-        run: uv run protocol/tools/validate_vectors.py
-      - name: Regenerate vectors
-        run: uv run protocol/tools/gen_vectors.py
-      - name: Check for vector drift
-        run: git diff --exit-code protocol/vectors
+      - name: Validate vectors against CDDL, regenerate, check for drift
+        run: scripts/check protocol

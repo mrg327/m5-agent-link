@@ -8,8 +8,14 @@ function harness(opts = {}) {
   let t = 1_793_995_200_000;
   const q = [];
   const timers = {
-    setTimeout: (fn, ms) => { const h = { fn, at: t + ms, live: true }; q.push(h); return h; },
-    clearTimeout: (h) => { h.live = false; },
+    setTimeout: (fn, ms) => {
+      const h = { fn, at: t + ms, live: true };
+      q.push(h);
+      return h;
+    },
+    clearTimeout: (h) => {
+      h.live = false;
+    },
   };
   const advance = (ms) => {
     const end = t + ms;
@@ -27,7 +33,12 @@ function harness(opts = {}) {
   const daemon = createMockDaemon({ bus, timers, now: () => t, ...opts });
   const rx = [];
   let txCb;
-  const watch = { onTx: (f) => { txCb = f; }, deliver: (b) => rx.push(decodeMsg(b)) };
+  const watch = {
+    onTx: (f) => {
+      txCb = f;
+    },
+    deliver: (b) => rx.push(decodeMsg(b)),
+  };
   daemon.attach(watch);
   const send = (msg) => txCb(encodeMsg(msg));
   return { daemon, events, rx, send, advance };
@@ -46,7 +57,10 @@ test('hello → welcome (re) + snapshot, then deltas for demo, all CDDL-decodabl
   assert.equal(welcome.b.host.name, 'your-laptop');
   assert.equal(welcome.b.host.id.length, 16);
   assert.equal(snap.t, 'snapshot');
-  assert.deepEqual(snap.b.sessions.map((s) => s.sid), [1, 2]);
+  assert.deepEqual(
+    snap.b.sessions.map((s) => s.sid),
+    [1, 2],
+  );
   assert.ok(snap.id > welcome.id);
   h.advance(12000);
   const kinds = h.rx.slice(2).map((m) => m.t);
@@ -55,11 +69,19 @@ test('hello → welcome (re) + snapshot, then deltas for demo, all CDDL-decodabl
   assert.ok(done && done.b.sid === 1 && done.b.tst > 0);
   assert.ok(!('repo' in done.b) && !('ag' in done.b)); // delta, not the full object
   const ids = h.rx.map((m) => m.id);
-  assert.deepEqual(ids, [...ids].sort((a, b) => a - b));
+  assert.deepEqual(
+    ids,
+    [...ids].sort((a, b) => a - b),
+  );
   // wire-level: every frame is an integer-keyed map with t, id and a body map
   for (const ev of h.events.filter((e) => e.type === 'watch:rx')) {
     const env = decode(ev.detail.bytes);
-    assert.ok(env instanceof Map && typeof env.get(0) === 'number' && typeof env.get(1) === 'number' && env.get(3) instanceof Map);
+    assert.ok(
+      env instanceof Map &&
+        typeof env.get(0) === 'number' &&
+        typeof env.get(1) === 'number' &&
+        env.get(3) instanceof Map,
+    );
     assert.deepEqual(encode(env), ev.detail.bytes);
   }
   assert.ok(h.events.some((e) => e.type === 'watch:tx' && e.detail.msg.t === 'hello'));
@@ -84,7 +106,10 @@ test('ping, focus, stale approve, unsupported', () => {
   assert.equal(byRe[4].b.err, 'stale');
   assert.equal(byRe[5].b.err, 'stale'); // no live request yet
   assert.equal(byRe[6].b.err, 'unsupported');
-  assert.deepEqual(h.events.filter((e) => e.type === 'pc:focus').map((e) => e.detail), [{ sid: 2, ok: true }]);
+  assert.deepEqual(
+    h.events.filter((e) => e.type === 'pc:focus').map((e) => e.detail),
+    [{ sid: 2, ok: true }],
+  );
 });
 
 test('attention scenario: approve after the hold clears the request', () => {
@@ -121,8 +146,14 @@ test('scenarios: busy has 8 sessions, pause/resume, loop, inject', () => {
   h.daemon.inject({ sid: 20, st: 'done' });
   h.daemon.inject({ gone: 20 });
   h.advance(10);
-  assert.deepEqual(h.rx.slice(-3).map((m) => m.t), ['session_upd', 'session_upd', 'gone']);
-  assert.deepEqual(h.daemon.scenarios.map((s) => s.name), ['demo', 'single', 'attention', 'ring', 'busy']);
+  assert.deepEqual(
+    h.rx.slice(-3).map((m) => m.t),
+    ['session_upd', 'session_upd', 'gone'],
+  );
+  assert.deepEqual(
+    h.daemon.scenarios.map((s) => s.name),
+    ['demo', 'single', 'attention', 'ring', 'busy'],
+  );
 });
 
 test('a second hello (device reboot) resends welcome and a current snapshot', () => {
@@ -133,6 +164,9 @@ test('a second hello (device reboot) resends welcome and a current snapshot', ()
   h.rx.length = 0;
   h.send(hello(1));
   h.advance(100);
-  assert.deepEqual(h.rx.map((m) => m.t), ['welcome', 'snapshot']);
+  assert.deepEqual(
+    h.rx.map((m) => m.t),
+    ['welcome', 'snapshot'],
+  );
   assert.equal(h.rx[1].b.sessions.length, 1);
 });

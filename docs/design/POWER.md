@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: firmware
+issue: 20261113-ee04
+last_reviewed: 2026-11-22
+summary: 'Power report: where the battery goes'
+---
+
 # Power report: where the battery goes
 
 Issue 20261113-ee04. Protocol 0.19 ([PROTOCOL.md](PROTOCOL.md) §6f). Code: `components/core/src/power_report.c`
@@ -67,7 +75,7 @@ user's own logger. It also keeps the last report of each device for `agentlink s
 
 ## `agentlink power`
 
-```
+```text
 agentlink power [--csv PATH] [--device HEXPREFIX] [--hours H | --all] [--capacity-mah 450] [--json]
 ```
 

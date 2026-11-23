@@ -5,8 +5,9 @@
 
 #include "ui_theme.h"
 
-/* Three rows: the selected one in the middle, a neighbour either side. The list wraps, so a short list
- * never shows an item twice. The selected row never moves, so its capsule is one static object. */
+/* Three rows: the selected one in the middle, a neighbour either side. The list wraps, so a short
+ * list never shows an item twice. The selected row never moves, so its capsule is one static
+ * object. */
 #define ROWS 3
 #define MID 1
 #define LIST_PITCH 62
@@ -30,7 +31,8 @@ typedef struct {
     char shown_icon[ROWS][8];
     int n, sel, prog;
     wheel_style_t style;
-    int cy, pitch, sel_h, hit_mid, hit_nb; /* capsule height; touch-zone heights of the selected row and a neighbour */
+    /* capsule height; touch-zone heights of the selected row and a neighbour */
+    int cy, pitch, sel_h, hit_mid, hit_nb;
     lv_obj_t *cap, *ring, *row[ROWS], *ico[ROWS];
 } wheel_t;
 
@@ -39,7 +41,8 @@ static wheel_t *data(const lv_obj_t *w) { return lv_obj_get_user_data((lv_obj_t 
 static int cap_w(const wheel_t *d) { return d->style == WHEEL_STYLE_LIST ? LIST_W : BUTTON_W; }
 static int cap_h(const wheel_t *d) { return d->sel_h; }
 
-/* Whether row r shows an item: +k and -k are different items unless n == 2k, which shows on the next side only. */
+/* Whether row r shows an item: +k and -k are different items unless n == 2k, which shows on the
+ * next side only. */
 static bool row_shown(const wheel_t *d, int r)
 {
     int off = r - MID, k = off < 0 ? -off : off;
@@ -47,9 +50,7 @@ static bool row_shown(const wheel_t *d, int r)
 }
 
 static const wheel_item_t *row_item(const wheel_t *d, int r)
-{
-    return &d->items[((d->sel + r - MID) % d->n + d->n) % d->n];
-}
+{ return &d->items[((d->sel + r - MID) % d->n + d->n) % d->n]; }
 
 /* The lighter fill that grows across the capsule while a hold is in progress. */
 static lv_color_t fill_of(const wheel_t *d)
@@ -67,12 +68,14 @@ static void cap_draw(lv_event_t *e)
     lv_area_t a;
     lv_obj_get_coords(d->cap, &a);
     int x2 = a.x1 + (lv_area_get_width(&a) * d->prog + 999) / 1000 - 1;
-    lv_area_t saved = l->_clip_area; /* draw the whole capsule shape, but only the part the hold has reached */
+    /* draw the whole capsule shape, but only the part the hold has reached */
+    lv_area_t saved = l->_clip_area;
     if (x2 >= saved.x1 && a.x1 <= saved.x2) {
         l->_clip_area.x2 = x2 < saved.x2 ? x2 : saved.x2;
         lv_draw_rect_dsc_t r;
         lv_draw_rect_dsc_init(&r);
-        r.bg_color = lv_color_mix(lv_color_white(), fill_of(d), d->style == WHEEL_STYLE_BUTTON ? 45 : 22);
+        r.bg_color =
+            lv_color_mix(lv_color_white(), fill_of(d), d->style == WHEEL_STYLE_BUTTON ? 45 : 22);
         r.bg_opa = LV_OPA_COVER;
         r.radius = LV_RADIUS_CIRCLE;
         lv_draw_rect(l, &r, &a);
@@ -108,13 +111,15 @@ static void render(lv_obj_t *w)
     }
     lv_obj_remove_flag(d->cap, LV_OBJ_FLAG_HIDDEN);
     bool filled = !list && s->rgb;
-    lv_color_t fg = list ? (s->hold ? lv_color_hex(s->rgb) : COL_TEXT) : (filled ? COL_ON_ACCENT : COL_TEXT);
+    lv_color_t fg =
+        list ? (s->hold ? lv_color_hex(s->rgb) : COL_TEXT) : (filled ? COL_ON_ACCENT : COL_TEXT);
     theme_set_bg_color(d->cap, fill_of(d));
     theme_set_text_color(d->row[MID], fg);
     theme_set_text_color(d->ico[MID], fg);
     /* the label ends before the hold ring, so a long label cannot run under it */
     int ring = s->hold ? RING_D + RING_PAD + 4 : 0;
-    int lw = list ? LIST_W - LIST_TEXT_X - 14 - ring : BUTTON_W - 2 * (ring > 24 ? ring : 24); /* BUTTON text stays centred */
+    /* BUTTON text stays centred */
+    int lw = list ? LIST_W - LIST_TEXT_X - 14 - ring : BUTTON_W - 2 * (ring > 24 ? ring : 24);
     if (lv_obj_get_width(d->row[MID]) != lw) lv_obj_set_width(d->row[MID], lw);
     if (s->hold) {
         lv_obj_remove_flag(d->ring, LV_OBJ_FLAG_HIDDEN);
@@ -137,7 +142,9 @@ lv_obj_t *wheel_create_at(lv_obj_t *parent, wheel_layout_t lay)
     d->style = lay.style;
     d->cy = lay.cy;
     bool list = d->style == WHEEL_STYLE_LIST;
-    if (lay.sel_h) { /* tall hold row: the touch zones are the capsule and a 56 / 34 px band for each neighbour */
+    if (lay.sel_h) {
+        /* tall hold row: the touch zones are the capsule and a 56 / 34 px band for each
+         * neighbour */
         d->sel_h = d->hit_mid = lay.sel_h;
         d->hit_nb = list ? 56 : 34;
         d->pitch = lay.dy1 ? lay.dy1 : (d->sel_h + d->hit_nb + 1) / 2;
@@ -183,7 +190,8 @@ lv_obj_t *wheel_create_at(lv_obj_t *parent, wheel_layout_t lay)
         lv_obj_set_style_text_color(ic, sel ? COL_TEXT : COL_TEXT3, 0);
         lv_label_set_text(ic, "");
         int ih = lv_font_get_line_height(FONT_ICON_M);
-        lv_obj_set_pos(ic, left + (list ? LIST_ICON_X : 16), y - ih / 2); /* a BUTTON item may carry an icon too */
+        /* a BUTTON item may carry an icon too */
+        lv_obj_set_pos(ic, left + (list ? LIST_ICON_X : 16), y - ih / 2);
         lv_obj_set_width(ic, 36);
     }
     d->ring = lv_obj_create(w); /* the hold ring: a 20 px outline at the capsule's right end */
@@ -241,7 +249,8 @@ const wheel_item_t *wheel_item(const lv_obj_t *w, int i)
 int wheel_hit(const lv_obj_t *w, int x, int y)
 {
     const wheel_t *d = data(w);
-    if (lv_obj_has_flag(w, LV_OBJ_FLAG_HIDDEN) || x < 233 - cap_w(d) / 2 - HIT_PAD || x > 233 + cap_w(d) / 2 + HIT_PAD)
+    if (lv_obj_has_flag(w, LV_OBJ_FLAG_HIDDEN) || x < 233 - cap_w(d) / 2 - HIT_PAD ||
+        x > 233 + cap_w(d) / 2 + HIT_PAD)
         return -1;
     for (int r = 0; r < ROWS; r++) {
         int cy = d->cy + (r - MID) * d->pitch, h = r == MID ? d->hit_mid : d->hit_nb;

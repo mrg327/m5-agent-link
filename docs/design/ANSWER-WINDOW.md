@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: daemon
+issue: 20261112-a9d5
+last_reviewed: 2026-11-12
+summary: More time to answer, and all of a long request (protocol 0.11)
+---
+
 # Answer window and full text: more time to answer, and all of a long request
 
 > Status: built on branch `next` (issue 20261112-a9d5). Protocol 0.11. Not yet run on the device or against a

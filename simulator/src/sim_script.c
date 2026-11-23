@@ -1,3 +1,4 @@
+/* clang-format off */
 /* Scripted input. A script is expanded up front into a timeline of primitive events (mouse, keys,
  * IMU, frames, checks) that are replayed in real time through the same paths as real input.
  *
@@ -82,8 +83,9 @@
  *   expect_cmd OP                   the device sent a cmd OP (focus ack ... graph, CDDL names without cmd_op_) since
  *                                   the script began or the last expect_cmd
  *   px_reset | expect_px_max PX     redraw budget: pixels flushed since px_reset must stay within PX
- *                                   (the log line also reports core_step host CPU as cpu_us, not asserted)
- */
+ *                                   (the log line also reports core_step host CPU as cpu_us, not
+ * asserted) */
+/* clang-format on */
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
@@ -106,13 +108,72 @@
 
 static char s_script_dir[512] = ".";
 
-typedef enum { E_PTR, E_BTN, E_MOTION, E_CONNECT, E_RX, E_UI, E_SHOT, E_EXPECT_SCREEN, E_EXPECT_LABEL, E_EXPECT_NO_LABEL, E_SESSION, E_JOB, E_GAUGE, E_DONE, E_USAGE, E_REMOTE, E_DROP, E_ATTENTION, E_RESULT, E_CLEAR, E_CFG, E_RTC, E_DELTA, E_PX_RESET, E_EXPECT_PX_MAX, E_MIC, E_TRANSCRIPT, E_CANDS, E_POSE, E_COVER, E_PREF, E_FB_MARK, E_EXPECT_FB_FLIPPED, E_EXPECT_FLIPPED, E_ATTENTION_WIN, E_SERVE_DETAIL, E_DETAIL, E_MESSAGE, E_GRAPH, E_ASK, E_EXPECT_COUNTDOWN, E_HUSH, E_RULE, E_FW_IMAGE, E_FW_PATCH, E_FW_EXPECT_SLOT, E_FW_BEGIN, E_FW_CHUNK, E_BATTERY, E_SKIP, E_KIT, E_QUESTION, E_STROKE, E_BENCH, E_BENCH_SAVE, E_BENCH_EXPECT, E_EXPECT_CMD, E_QUIT } ev_kind_t;
+typedef enum {
+    E_PTR,
+    E_BTN,
+    E_MOTION,
+    E_CONNECT,
+    E_RX,
+    E_UI,
+    E_SHOT,
+    E_EXPECT_SCREEN,
+    E_EXPECT_LABEL,
+    E_EXPECT_NO_LABEL,
+    E_SESSION,
+    E_JOB,
+    E_GAUGE,
+    E_DONE,
+    E_USAGE,
+    E_REMOTE,
+    E_DROP,
+    E_ATTENTION,
+    E_RESULT,
+    E_CLEAR,
+    E_CFG,
+    E_RTC,
+    E_DELTA,
+    E_PX_RESET,
+    E_EXPECT_PX_MAX,
+    E_MIC,
+    E_TRANSCRIPT,
+    E_CANDS,
+    E_POSE,
+    E_COVER,
+    E_PREF,
+    E_FB_MARK,
+    E_EXPECT_FB_FLIPPED,
+    E_EXPECT_FLIPPED,
+    E_ATTENTION_WIN,
+    E_SERVE_DETAIL,
+    E_DETAIL,
+    E_MESSAGE,
+    E_GRAPH,
+    E_ASK,
+    E_EXPECT_COUNTDOWN,
+    E_HUSH,
+    E_RULE,
+    E_FW_IMAGE,
+    E_FW_PATCH,
+    E_FW_EXPECT_SLOT,
+    E_FW_BEGIN,
+    E_FW_CHUNK,
+    E_BATTERY,
+    E_SKIP,
+    E_KIT,
+    E_QUESTION,
+    E_STROKE,
+    E_BENCH,
+    E_BENCH_SAVE,
+    E_BENCH_EXPECT,
+    E_EXPECT_CMD,
+    E_QUIT
+} ev_kind_t;
 
 typedef struct {
     uint32_t at_ms;
     ev_kind_t kind;
     int a, b, c;
-    char *text;    /* file, expected string, or hex */
+    char *text; /* file, expected string, or hex */
 } ev_t;
 
 static ev_t *s_ev;
@@ -137,16 +198,20 @@ static void swipe(uint32_t *t, int x1, int y1, int x2, int y2, int ms)
 {
     const int steps = 8;
     add(*t, E_PTR, 1, x1, y1, NULL);
-    for (int i = 1; i <= steps; i++) add(*t + (uint32_t)(ms * i / steps), E_PTR, 1, x1 + (x2 - x1) * i / steps, y1 + (y2 - y1) * i / steps, NULL);
+    for (int i = 1; i <= steps; i++)
+        add(*t + (uint32_t)(ms * i / steps), E_PTR, 1, x1 + (x2 - x1) * i / steps,
+            y1 + (y2 - y1) * i / steps, NULL);
     add(*t + (uint32_t)ms + 5, E_PTR, 0, x2, y2, NULL);
     *t += (uint32_t)ms + 120;
 }
 
-/* A finger moving straight down (dy > 0) or up, one sample every 16 ms, then lifted where it stopped. */
+/* A finger moving straight down (dy > 0) or up, one sample every 16 ms, then lifted where it
+ * stopped. */
 static void drag(uint32_t *t, int x, int y, int dy, int ms)
 {
     int steps = ms / 16 > 2 ? ms / 16 : 2;
-    for (int i = 0; i <= steps; i++) add(*t + (uint32_t)(ms * i / steps), E_PTR, 1, x, y + dy * i / steps, NULL);
+    for (int i = 0; i <= steps; i++)
+        add(*t + (uint32_t)(ms * i / steps), E_PTR, 1, x, y + dy * i / steps, NULL);
     add(*t + (uint32_t)ms + 16, E_PTR, 0, x, y + dy, NULL);
     *t += (uint32_t)ms + 150;
 }
@@ -164,7 +229,8 @@ static void scrub(uint32_t *t, int d0, int d1, int ms, int radius)
     int steps = ms / 8 > 2 ? ms / 8 : 2;
     for (int i = 0; i <= steps; i++) {
         float rad = (float)(d0 + (d1 - d0) * i / steps) * 3.14159265f / 180.0f;
-        int x = 233 + (int)lroundf((float)radius * sinf(rad)), y = 233 - (int)lroundf((float)radius * cosf(rad));
+        int x = 233 + (int)lroundf((float)radius * sinf(rad)),
+            y = 233 - (int)lroundf((float)radius * cosf(rad));
         add(*t + (uint32_t)(ms * i / steps), E_PTR, 1, x, y, NULL);
         if (i == steps) add(*t + (uint32_t)ms + 8, E_PTR, 0, x, y, NULL);
     }
@@ -173,7 +239,8 @@ static void scrub(uint32_t *t, int d0, int d1, int ms, int radius)
 
 #define STROKE_MAX 200
 
-/* One finger stroke: down on the first point, one sample per 33 ms (the LVGL read rate), up on the last. */
+/* One finger stroke: down on the first point, one sample per 33 ms (the LVGL read rate), up on the
+ * last. */
 static void stroke(uint32_t *t, const int (*p)[2], int n)
 {
     for (int i = 0; i < n; i++) add(*t + 33u * (uint32_t)i, E_PTR, 1, p[i][0], p[i][1], NULL);
@@ -261,7 +328,8 @@ static bool parse_line(char *line, uint32_t *t)
         bool held = strstr(rest, "held") != NULL; /* past the 1.2 s hold-to-send */
         bool lng = strstr(rest, "long") != NULL || held, dbl = strstr(rest, "double") != NULL;
         int bi = rest[0] == 'B';
-        if (strstr(rest, " down") || strstr(rest, " up")) { /* a press held across other commands (a shot mid-hold) */
+        if (strstr(rest, " down") || strstr(rest, " up")) {
+            /* a press held across other commands (a shot mid-hold) */
             add(*t, E_BTN, bi, strstr(rest, " down") != NULL, 0, NULL);
             *t += 20;
         } else if (dbl) {
@@ -285,7 +353,10 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "word") && arg[0]) {
         if (!word_stroke(t, arg)) return false;
     } else if (!strcmp(cmd, "key") && arg[0]) {
-        int cp = !strcmp(arg, "space") ? 0x20 : !strcmp(arg, "bksp") ? 0x08 : !strcmp(arg, "layer") ? 0x0e : (unsigned char)arg[0];
+        int cp = !strcmp(arg, "space")   ? 0x20
+                 : !strcmp(arg, "bksp")  ? 0x08
+                 : !strcmp(arg, "layer") ? 0x0e
+                                         : (unsigned char)arg[0];
         if (!key_centre(cp, &a, &b)) return false;
         tap(t, a, b);
     } else if (!strcmp(cmd, "cands") && arg[0]) {
@@ -321,7 +392,9 @@ static bool parse_line(char *line, uint32_t *t)
     } else if (!strcmp(cmd, "usage") && arg[0]) {
         add(*t, E_USAGE, 0, 0, 0, arg);
         *t += 50;
-    } else if ((!strcmp(cmd, "step") || !strcmp(cmd, "snooze") || !strcmp(cmd, "notify") || !strcmp(cmd, "queued")) && arg[0]) {
+    } else if ((!strcmp(cmd, "step") || !strcmp(cmd, "snooze") || !strcmp(cmd, "notify") ||
+                !strcmp(cmd, "queued")) &&
+               arg[0]) {
         char line[160];
         snprintf(line, sizeof line, "%s %s", cmd, arg);
         add(*t, E_DELTA, 0, 0, 0, line);
@@ -352,8 +425,9 @@ static bool parse_line(char *line, uint32_t *t)
         add(*t, E_MIC, 0, 0, 0, path);
         *t += 50;
     } else if (!strcmp(cmd, "transcript")) {
-        add(*t, E_TRANSCRIPT, 0, 0, 0, rest); /* answers the device's current recording; "" = nothing heard.
-                                                 * `rest`, not `arg`: a transcript can be 2 KB */
+        /* answers the device's current recording; "" = nothing heard.
+         * `rest`, not `arg`: a transcript can be 2 KB */
+        add(*t, E_TRANSCRIPT, 0, 0, 0, rest);
         *t += 50;
     } else if (!strcmp(cmd, "clear") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_CLEAR, a, 0, 0, arg);
@@ -366,14 +440,18 @@ static bool parse_line(char *line, uint32_t *t)
         *t += 100;
     } else if (!strcmp(cmd, "pose") && arg[0]) {
         /* pose NAME | X Y Z: what the simulated IMU reports from now on (milli-g, screen axes) */
-        static const struct { const char *name; int x, y, z; } poses[] = {
-            {"face_up", 0, 0, 1000},    {"face_down", 0, 0, -1000}, {"upright", 0, -1000, 0},
-            {"upside_down", 0, 1000, 0}, {"hanging", 0, -700, 150},  {"reading", 0, -300, 800},
-            {"stand_flipped", 0, 900, 300}};
+        static const struct {
+            const char *name;
+            int x, y, z;
+        } poses[] = {{"face_up", 0, 0, 1000},       {"face_down", 0, 0, -1000},
+                     {"upright", 0, -1000, 0},      {"upside_down", 0, 1000, 0},
+                     {"hanging", 0, -700, 150},     {"reading", 0, -300, 800},
+                     {"stand_flipped", 0, 900, 300}};
         int x = 0, y = 0, z = 0;
         bool ok = sscanf(rest, "%d %d %d", &x, &y, &z) == 3;
         for (size_t i = 0; !ok && i < sizeof poses / sizeof *poses; i++)
-            if (!strcmp(arg, poses[i].name)) x = poses[i].x, y = poses[i].y, z = poses[i].z, ok = true;
+            if (!strcmp(arg, poses[i].name))
+                x = poses[i].x, y = poses[i].y, z = poses[i].z, ok = true;
         if (!ok) return false;
         add(*t, E_POSE, x, y, z, NULL);
         *t += 20;
@@ -495,7 +573,8 @@ static bool parse_line(char *line, uint32_t *t)
         if (sscanf(rest, "%15s %479[^\n]", what, rest2) < 1) return false;
         if (!strcmp(what, "start")) add(*t, E_BENCH, 0, 0, 0, NULL);
         else if (!strcmp(what, "stop")) add(*t, E_BENCH, 1, 0, 0, NULL);
-        else if (!strcmp(what, "mark") && sscanf(rest2, "%d", &a) == 1) add(*t, E_BENCH, 2, a, 0, NULL);
+        else if (!strcmp(what, "mark") && sscanf(rest2, "%d", &a) == 1)
+            add(*t, E_BENCH, 2, a, 0, NULL);
         else if (!strcmp(what, "save") && rest2[0]) add(*t, E_BENCH_SAVE, 0, 0, 0, rest2);
         else if (!strcmp(what, "expect") && rest2[0]) add(*t, E_BENCH_EXPECT, 0, 0, 0, rest2);
         else return false;
@@ -522,7 +601,7 @@ bool sim_script_load(const char *path)
         fprintf(stderr, "cannot open script %s\n", path);
         return false;
     }
-    char line[4096]; /* a transcript line holds up to 2 KB (issue f97a) */
+    char line[4096];  /* a transcript line holds up to 2 KB (issue f97a) */
     uint32_t t = 300; /* let the first frame render */
     for (int no = 1; fgets(line, sizeof line, f); no++) {
         if (!parse_line(line, &t)) {
@@ -533,7 +612,8 @@ bool sim_script_load(const char *path)
     }
     fclose(f);
     add(t + 200, E_QUIT, 0, 0, 0, NULL);
-    for (size_t i = 1; i < s_n; i++) { /* stable: overlapping primitives (a chord) are added out of order */
+    for (size_t i = 1; i < s_n; i++) {
+        /* stable: overlapping primitives (a chord) are added out of order */
         ev_t k = s_ev[i];
         size_t j = i;
         for (; j > 0 && s_ev[j - 1].at_ms > k.at_ms; j--) s_ev[j] = s_ev[j - 1];
@@ -579,7 +659,8 @@ static void run_rule(const char *spec)
         unsigned v;
         if (p[0] == '\\' && p[1] == 'n') s_rule_text[o++] = '\n', p++;
         else if (p[0] == '\\' && p[1] == 't') s_rule_text[o++] = '\t', p++;
-        else if (p[0] == '\\' && p[1] == 'x' && sscanf(p + 2, "%2x", &v) == 1) s_rule_text[o++] = (char)v, p += 3;
+        else if (p[0] == '\\' && p[1] == 'x' && sscanf(p + 2, "%2x", &v) == 1)
+            s_rule_text[o++] = (char)v, p += 3;
         else s_rule_text[o++] = *p;
     }
     s_rule_text[o] = 0;
@@ -588,7 +669,8 @@ static void run_rule(const char *spec)
 
 static void run_session(const char *spec)
 {
-    /* session SID STATE REPO|- [BRANCH|- [summary text...]] ("-" for REPO: a session with no folder) */
+    /* session SID STATE REPO|- [BRANCH|- [summary text...]] ("-" for REPO: a session with no
+     * folder) */
     unsigned sid;
     char st[16], repo[33], branch[33] = "";
     int n = 0;
@@ -600,7 +682,11 @@ static void run_session(const char *spec)
     if (!strcmp(branch, "-")) branch[0] = 0;
     if (!strcmp(repo, "-")) repo[0] = 0;
     uint32_t now = theme_now_unix();
-    session_t d = {.sid = sid, .agent = (agent_t)(sid % 3), .state = SESS_WORK, .t0 = now - 3600 + sid, .tst = now - 40 - 53 * sid};
+    session_t d = {.sid = sid,
+                   .agent = (agent_t)(sid % 3),
+                   .state = SESS_WORK,
+                   .t0 = now - 3600 + sid,
+                   .tst = now - 40 - 53 * sid};
     uint32_t present = SF_AGENT | SF_STATE | SF_SUB | SF_REPO | SF_T0 | SF_TST | SF_SEEN;
     if (branch[0]) {
         snprintf(d.branch, sizeof d.branch, "%s", branch);
@@ -626,7 +712,8 @@ static void run_session(const char *spec)
     model_upsert(&d, present);
 }
 
-/* question SID Q|ANSWER...: the agent's closing question and up to three answers (proto 0.5, the Reply list). */
+/* question SID Q|ANSWER...: the agent's closing question and up to three answers (proto 0.5, the
+ * Reply list). */
 static void run_question(const char *spec)
 {
     unsigned sid;
@@ -647,8 +734,9 @@ static void run_question(const char *spec)
     model_upsert(&d, SF_Q | SF_RP);
 }
 
-/* job SID run|done|fail REPO ELAPSED_S ETA_S EXIT [command line...]: a terminal job (JOBS.md, proto 0.9).
- * ELAPSED_S is how long it has run (or ran: a done / fail job ended 5 s ago); ETA_S 0 = no estimate. */
+/* job SID run|done|fail REPO ELAPSED_S ETA_S EXIT [command line...]: a terminal job (JOBS.md, proto
+ * 0.9). ELAPSED_S is how long it has run (or ran: a done / fail job ended 5 s ago); ETA_S 0 = no
+ * estimate. */
 static void run_job(const char *spec)
 {
     unsigned sid, el, eta, code;
@@ -661,11 +749,17 @@ static void run_job(const char *spec)
     }
     uint32_t now = theme_now_unix();
     bool ended = strcmp(st, "run") != 0;
-    session_t d = {.sid = sid, .agent = AGENT_SHELL, .state = !ended ? SESS_WORK : !strcmp(st, "done") ? SESS_DONE : SESS_ERROR,
-                   .eta = eta, .exit_code = (uint8_t)code};
+    session_t d = {.sid = sid,
+                   .agent = AGENT_SHELL,
+                   .state = !ended                ? SESS_WORK
+                            : !strcmp(st, "done") ? SESS_DONE
+                                                  : SESS_ERROR,
+                   .eta = eta,
+                   .exit_code = (uint8_t)code};
     d.tst = ended ? now - 5 : now - el;
     d.t0 = d.tst - (ended ? el : 0);
-    uint32_t present = SF_AGENT | SF_STATE | SF_REPO | SF_T0 | SF_TST | SF_SEEN | SF_ETA | SF_TOOL | SF_BRANCH;
+    uint32_t present =
+        SF_AGENT | SF_STATE | SF_REPO | SF_T0 | SF_TST | SF_SEEN | SF_ETA | SF_TOOL | SF_BRANCH;
     if (ended) present |= SF_EXIT;
     snprintf(d.repo, sizeof d.repo, "%s", repo);
     snprintf(d.branch, sizeof d.branch, "main");
@@ -680,7 +774,8 @@ static void run_job(const char *spec)
 /* gauge SID CTX|- [MODEL|- [MODE|- [PR [STATE]]]]: a proto 0.10 session delta (GAUGES.md) */
 static void run_gauge(const char *spec)
 {
-    static const char *const modes[] = {"default", "plan", "accept_edits", "auto", "dont_ask", "bypass"};
+    static const char *const modes[] = {"default", "plan",     "accept_edits",
+                                        "auto",    "dont_ask", "bypass"};
     static const char *const states[] = {"none", "pending", "approved", "changes", "draft"};
     unsigned sid, pr = 0;
     char ctx[8], mdl[24] = "", mode[16] = "", st[12] = "";
@@ -713,7 +808,8 @@ static void run_gauge(const char *spec)
     model_upsert(&d, present);
 }
 
-/* done SID FILES|- ADDED/REMOVED|- pass|fail|- SECS|-: a proto 0.14 session delta (DONE-SUMMARY.md) */
+/* done SID FILES|- ADDED/REMOVED|- pass|fail|- SECS|-: a proto 0.14 session delta
+ * (DONE-SUMMARY.md) */
 static void run_done(const char *spec)
 {
     unsigned sid;
@@ -725,14 +821,28 @@ static void run_done(const char *spec)
     }
     session_t d = {.sid = sid};
     unsigned a, r;
-    if (strcmp(files, "-")) { d.sum.files = (uint32_t)strtoul(files, NULL, 10); d.sum.files_known = true; }
-    if (sscanf(lines, "%u/%u", &a, &r) == 2) { d.sum.added = a; d.sum.removed = r; d.sum.lines_known = true; }
-    if (strcmp(tests, "-")) { d.sum.tests_pass = !strcmp(tests, "pass"); d.sum.tests_known = true; }
-    if (strcmp(secs, "-")) { d.sum.secs = (uint32_t)strtoul(secs, NULL, 10); d.sum.secs_known = true; }
+    if (strcmp(files, "-")) {
+        d.sum.files = (uint32_t)strtoul(files, NULL, 10);
+        d.sum.files_known = true;
+    }
+    if (sscanf(lines, "%u/%u", &a, &r) == 2) {
+        d.sum.added = a;
+        d.sum.removed = r;
+        d.sum.lines_known = true;
+    }
+    if (strcmp(tests, "-")) {
+        d.sum.tests_pass = !strcmp(tests, "pass");
+        d.sum.tests_known = true;
+    }
+    if (strcmp(secs, "-")) {
+        d.sum.secs = (uint32_t)strtoul(secs, NULL, 10);
+        d.sum.secs_known = true;
+    }
     model_upsert(&d, SF_DONE);
 }
 
-/* usage H5|- H5_RESET_S H5_OUT_S|- WK|- WK_RESET_S [AGE_S]: a daemon `usage` relative to the clock */
+/* usage H5|- H5_RESET_S H5_OUT_S|- WK|- WK_RESET_S [AGE_S]: a daemon `usage` relative to the
+ * clock */
 static void run_usage(const char *spec)
 {
     char h5[8], h5r[16], h5o[16], wk[8], wkr[16];
@@ -748,11 +858,13 @@ static void run_usage(const char *spec)
         u.h5 = (usage_win_t){true, (uint8_t)atoi(h5), now + (uint32_t)strtoul(h5r, NULL, 10),
                              strcmp(h5o, "-") ? now + (uint32_t)strtoul(h5o, NULL, 10) : 0};
     }
-    if (strcmp(wk, "-")) u.wk = (usage_win_t){true, (uint8_t)atoi(wk), now + (uint32_t)strtoul(wkr, NULL, 10), 0};
+    if (strcmp(wk, "-"))
+        u.wk = (usage_win_t){true, (uint8_t)atoi(wk), now + (uint32_t)strtoul(wkr, NULL, 10), 0};
     link_rx_usage(&u);
 }
 
-/* step SID N [ok|fail] [text...] | snooze SID UNIX|off | notify SID on|off: protocol 0.3 session deltas */
+/* step SID N [ok|fail] [text...] | snooze SID UNIX|off | notify SID on|off: protocol 0.3 session
+ * deltas */
 static void run_delta(const char *spec)
 {
     char cmd[8], w[16] = "";
@@ -805,7 +917,8 @@ static void run_delta(const char *spec)
     model_upsert(&d, present);
 }
 
-/* remote SID HOST [NAME]: mark an existing session as running on a remote host (delta, like the wire) */
+/* remote SID HOST [NAME]: mark an existing session as running on a remote host (delta, like the
+ * wire) */
 static void run_remote(const char *spec)
 {
     unsigned sid, host;
@@ -829,7 +942,8 @@ static void fail(const char *what, const char *want);
 
 static uint32_t s_rx_id = 100; /* ids of scripted daemon messages; the device does not check them */
 
-static struct zcbor_string zs(const char *str) { return (struct zcbor_string){.value = (const uint8_t *)str, .len = strlen(str)}; }
+static struct zcbor_string zs(const char *str)
+{ return (struct zcbor_string){.value = (const uint8_t *)str, .len = strlen(str)}; }
 
 static void inject_env(struct envelope_r *env, const char *what)
 {
@@ -880,7 +994,8 @@ static void run_attention_ex(char *spec, bool win, uint32_t left, uint32_t win_m
     unsigned rid, sid, grant;
     char kind[12], actl[48];
     int n = 0;
-    if (sscanf(spec, "%u %u %11s %47s %u %n", &rid, &sid, kind, actl, &grant, &n) != 5 || enum_of(kind, kinds, 4) < 0) {
+    if (sscanf(spec, "%u %u %11s %47s %u %n", &rid, &sid, kind, actl, &grant, &n) != 5 ||
+        enum_of(kind, kinds, 4) < 0) {
         fail("bad attention", spec);
         return;
     }
@@ -895,7 +1010,8 @@ static void run_attention_ex(char *spec, bool win, uint32_t left, uint32_t win_m
     for (char *tok = strtok(actl, ","); tok; tok = strtok(NULL, ",")) {
         int k = enum_of(tok, acts, 6);
         if (k >= 0 && a->attention_action_m_l_action_m_count < 6)
-            a->attention_action_m_l_action_m[a->attention_action_m_l_action_m_count++].action_choice = k;
+            a->attention_action_m_l_action_m[a->attention_action_m_l_action_m_count++]
+                .action_choice = k;
     }
     a->attention_uint8uint_present = true;
     a->attention_uint8uint.attention_uint8uint = grant;
@@ -909,7 +1025,8 @@ static void run_attention_ex(char *spec, bool win, uint32_t left, uint32_t win_m
         a->attention_uint12bool.attention_uint12bool = true;
     }
     if (s_rule_on) {
-        a->attention_uint13tstr_present = a->attention_uint14uint_present = a->attention_uint15bool_present = true;
+        a->attention_uint13tstr_present = a->attention_uint14uint_present =
+            a->attention_uint15bool_present = true;
         a->attention_uint13tstr.attention_uint13tstr = zs(s_rule_text);
         a->attention_uint14uint.attention_uint14uint = s_rule_scope;
         a->attention_uint15bool.attention_uint15bool = s_rule_wide;
@@ -930,17 +1047,19 @@ static void run_attention_ex(char *spec, bool win, uint32_t left, uint32_t win_m
             a->attention_uint4tstr.attention_uint4tstr = zs(f);
         } else if (i < 6) {
             a->attention_tstr_l_present = true;
-            a->attention_tstr_l.attention_tstr_l_tstr[a->attention_tstr_l.attention_tstr_l_tstr_count++] = zs(f);
+            a->attention_tstr_l
+                .attention_tstr_l_tstr[a->attention_tstr_l.attention_tstr_l_tstr_count++] = zs(f);
         }
     }
     inject_env(&env, "attention");
 }
 
-/* result ok | result err CODE | result pos LINES AT_BOTTOM [TOTAL|- [PREVIEW...]]: answers the device's
- * most recent command. */
+/* result ok | result err CODE | result pos LINES AT_BOTTOM [TOTAL|- [PREVIEW...]]: answers the
+ * device's most recent command. */
 static void run_result(char *spec)
 {
-    static const char *const errs[] = {"stale", "denied", "unsupported", "no_window", "timeout", "internal"};
+    static const char *const errs[] = {"stale",     "denied",  "unsupported",
+                                       "no_window", "timeout", "internal"};
     char word[12], code[16] = "";
     if (sscanf(spec, "%11s %15s", word, code) < 1) {
         fail("bad result", spec);
@@ -972,7 +1091,8 @@ static void run_result(char *spec)
         }
         if (n > 0 && spec[n]) {
             p->scroll_pos_uint3tstr_present = true;
-            p->scroll_pos_uint3tstr.scroll_pos_uint3tstr = zs(spec + n); /* points into the event's text */
+            /* points into the event's text */
+            p->scroll_pos_uint3tstr.scroll_pos_uint3tstr = zs(spec + n);
         }
     } else if (!m->msg_result_result_m.result_uint0bool) {
         int e = enum_of(code, errs, 6);
@@ -988,7 +1108,8 @@ static void run_cfg(const char *spec)
     static const char *const privacy[] = {"meta", "preview", "full"};
     char key[12], val[12];
     int v;
-    if (sscanf(spec, "%11s %11s", key, val) != 2 || strcmp(key, "privacy") || (v = enum_of(val, privacy, 3)) < 0) {
+    if (sscanf(spec, "%11s %11s", key, val) != 2 || strcmp(key, "privacy") ||
+        (v = enum_of(val, privacy, 3)) < 0) {
         fail("bad cfg", spec);
         return;
     }
@@ -1011,7 +1132,8 @@ static void run_transcript(const char *text)
     env.envelope_msg_transcript_m.msg_transcript_hdr_m.hdr_uint1uint = ++s_rx_id;
     struct transcript *t = &env.envelope_msg_transcript_m.msg_transcript_transcript_m;
     t->transcript_uint0uint = voice_aid();
-    t->transcript_uint1tstr = (struct zcbor_string){.value = (const uint8_t *)text, .len = strlen(text)};
+    t->transcript_uint1tstr =
+        (struct zcbor_string){.value = (const uint8_t *)text, .len = strlen(text)};
     t->transcript_uint2uint = 0;
     inject_env(&env, "transcript");
 }
@@ -1019,7 +1141,8 @@ static void run_transcript(const char *text)
 /* cands TYPED|- [err CODE] WORD...: what the daemon's decoder answered for the open keyboard */
 static void run_cands(char *spec)
 {
-    static const char *const errs[] = {"stale", "denied", "unsupported", "no_window", "timeout", "internal"};
+    static const char *const errs[] = {"stale",     "denied",  "unsupported",
+                                       "no_window", "timeout", "internal"};
     static struct envelope_r env;
     memset(&env, 0, sizeof env);
     env.envelope_choice = envelope_msg_kb_cands_m_c;
@@ -1049,14 +1172,16 @@ static void run_cands(char *spec)
 }
 
 /* One `detail` chunk as the daemon sends it. */
-static void inject_detail(uint32_t rid, uint32_t sid, uint32_t off, uint32_t total, const char *text, size_t len)
+static void inject_detail(uint32_t rid, uint32_t sid, uint32_t off, uint32_t total,
+                          const char *text, size_t len)
 {
     static struct envelope_r env;
     memset(&env, 0, sizeof env);
     env.envelope_choice = envelope_msg_detail_m_c;
     env.envelope_msg_detail_m.msg_detail_hdr_m.hdr_uint1uint = ++s_rx_id;
     struct detail *d = &env.envelope_msg_detail_m.msg_detail_detail_m;
-    d->detail_uint0uint_present = d->detail_uint1uint_present = d->detail_uint3uint_present = d->detail_uint4uint_present = true;
+    d->detail_uint0uint_present = d->detail_uint1uint_present = d->detail_uint3uint_present =
+        d->detail_uint4uint_present = true;
     d->detail_uint0uint.detail_uint0uint = rid;
     d->detail_uint1uint.detail_uint1uint = sid;
     d->detail_uint3uint.detail_uint3uint = off;
@@ -1090,12 +1215,14 @@ static void inject_result(uint32_t re, bool ok)
     inject_env(&res, "result");
 }
 
-/* `cmd detail {sid, arg: off}` without a rid: the session's last message in chunks carrying lm, then ok; stale
- * for another session or none. */
+/* `cmd detail {sid, arg: off}` without a rid: the session's last message in chunks carrying lm,
+ * then ok; stale for another session or none. */
 static void serve_message(const struct cmd *c, uint32_t id)
 {
     uint32_t sid = c->cmd_uint1uint_present ? c->cmd_uint1uint.cmd_uint1uint : 0;
-    uint32_t off = c->cmd_arg_m_present && c->cmd_arg_m.cmd_arg_m.cmd_arg_choice == cmd_arg_uint_c ? c->cmd_arg_m.cmd_arg_m.cmd_arg_uint : 0;
+    uint32_t off = c->cmd_arg_m_present && c->cmd_arg_m.cmd_arg_m.cmd_arg_choice == cmd_arg_uint_c
+                       ? c->cmd_arg_m.cmd_arg_m.cmd_arg_uint
+                       : 0;
     sim_log("fake_daemon_message", "\"sid\":%u,\"off\":%u", (unsigned)sid, (unsigned)off);
     if (!s_msg_lm || sid != s_msg_sid) {
         inject_result(id, false);
@@ -1109,12 +1236,14 @@ static void serve_message(const struct cmd *c, uint32_t id)
         env.envelope_choice = envelope_msg_detail_m_c;
         env.envelope_msg_detail_m.msg_detail_hdr_m.hdr_uint1uint = ++s_rx_id;
         struct detail *d = &env.envelope_msg_detail_m.msg_detail_detail_m;
-        d->detail_uint1uint_present = d->detail_uint3uint_present = d->detail_uint4uint_present = d->detail_uint5uint_present = true;
+        d->detail_uint1uint_present = d->detail_uint3uint_present = d->detail_uint4uint_present =
+            d->detail_uint5uint_present = true;
         d->detail_uint1uint.detail_uint1uint = sid;
         d->detail_uint3uint.detail_uint3uint = off;
         d->detail_uint4uint.detail_uint4uint = s_msg_len;
         d->detail_uint5uint.detail_uint5uint = s_msg_lm;
-        d->detail_uint2tstr = (struct zcbor_string){.value = (const uint8_t *)s_msg + off, .len = n};
+        d->detail_uint2tstr =
+            (struct zcbor_string){.value = (const uint8_t *)s_msg + off, .len = n};
         size_t len = 0;
         if (cbor_encode_envelope(buf, sizeof buf, &env, &len) != ZCBOR_SUCCESS) {
             fail("cannot encode", "detail");
@@ -1135,7 +1264,8 @@ static void serve_graph(const struct cmd *c, uint32_t id)
 {
     uint32_t sid = c->cmd_uint1uint_present ? c->cmd_uint1uint.cmd_uint1uint : 0;
     struct graph *g = &s_graph_env.envelope_msg_graph_m.msg_graph_graph_m;
-    sim_log("fake_daemon_graph", "\"sid\":%u,\"nodes\":%u", (unsigned)sid, (unsigned)g->graph_node_l_node_count);
+    sim_log("fake_daemon_graph", "\"sid\":%u,\"nodes\":%u", (unsigned)sid,
+            (unsigned)g->graph_node_l_node_count);
     if (!s_graph_on || sid != g->graph_uint0uint) {
         inject_result(id, false);
         return;
@@ -1149,7 +1279,8 @@ static void serve_graph(const struct cmd *c, uint32_t id)
 
 static void run_graph(const char *spec)
 {
-    static const char *const kinds[] = {"other", "read", "edit", "shell", "search", "web", "agent", "ask", "plan", "git", "test", "mcp"};
+    static const char *const kinds[] = {"other", "read", "edit", "shell", "search", "web",
+                                        "agent", "ask",  "plan", "git",   "test",   "mcp"};
     if (!strcmp(spec, "off")) {
         s_graph_on = false;
         return;
@@ -1169,7 +1300,8 @@ static void run_graph(const char *spec)
             g->graph_la_l_present = true;
             for (char *p = tok + 3; *p && g->graph_la_l.graph_la_l_la_count < 8; p += *p == ',') {
                 char *end;
-                g->graph_la_l.graph_la_l_la[g->graph_la_l.graph_la_l_la_count++] = (uint32_t)strtoul(p, &end, 10);
+                g->graph_la_l.graph_la_l_la[g->graph_la_l.graph_la_l_la_count++] =
+                    (uint32_t)strtoul(p, &end, 10);
                 p = end;
             }
         } else if (!strncmp(tok, "drop=", 5)) {
@@ -1184,7 +1316,10 @@ static void run_graph(const char *spec)
             int got = sscanf(tok, "%15[^:]:%7[^:]:%u:%3s", kind, st, &lane, fl);
             int k = enum_of(kind, kinds, 12);
             if (k < 0 && kind[0] >= '0' && kind[0] <= '9') k = atoi(kind) & 15;
-            int state = !strcmp(st, "run") ? 0 : !strcmp(st, "ok") ? 1 : !strcmp(st, "fail") ? 2 : -1;
+            int state = !strcmp(st, "run")    ? 0
+                        : !strcmp(st, "ok")   ? 1
+                        : !strcmp(st, "fail") ? 2
+                                              : -1;
             if (got < 3 || k < 0 || state < 0 || lane > 7 || g->graph_node_l_node_count >= 64) {
                 fail("bad graph node", tok);
                 return;
@@ -1197,10 +1332,12 @@ static void run_graph(const char *spec)
     }
     s_graph_on = true;
     sim_link_set_tx_tap(on_device_tx);
-    sim_log("fake_daemon_graph_set", "\"sid\":%u,\"nodes\":%u", (unsigned)g->graph_uint0uint, (unsigned)g->graph_node_l_node_count);
+    sim_log("fake_daemon_graph_set", "\"sid\":%u,\"nodes\":%u", (unsigned)g->graph_uint0uint,
+            (unsigned)g->graph_node_l_node_count);
 }
 
-/* message SID LM TEXT | message SID off | message_meta SID LM LEN: the session delta the daemon sends at a stop. */
+/* message SID LM TEXT | message SID off | message_meta SID LM LEN: the session delta the daemon
+ * sends at a stop. */
 static void run_message(const char *spec, bool meta)
 {
     unsigned sid, lm = 0, len = 0;
@@ -1249,7 +1386,8 @@ static void run_message(const char *spec, bool meta)
     env.envelope_msg_session_upd_m.msg_session_upd_hdr_m.hdr_uint1uint = ++s_rx_id;
     struct session *se = &env.envelope_msg_session_upd_m.msg_session_upd_session_m;
     se->session_uint0uint = sid;
-    se->session_uint36uint_present = se->session_uint37uint_present = se->session_uint38tstr_present = true;
+    se->session_uint36uint_present = se->session_uint37uint_present =
+        se->session_uint38tstr_present = true;
     se->session_uint36uint.session_uint36uint = lm;
     se->session_uint37uint.session_uint37uint = len;
     se->session_uint38tstr.session_uint38tstr = zs(lp);
@@ -1274,7 +1412,8 @@ static void run_ask(char *spec)
     a->attention_uint0uint = rid;
     a->attention_uint1uint = sid;
     a->attention_att_kind_m.att_kind_choice = 1; /* question */
-    a->attention_action_m_l_action_m[a->attention_action_m_l_action_m_count++].action_choice = 2; /* focus */
+    /* focus */
+    a->attention_action_m_l_action_m[a->attention_action_m_l_action_m_count++].action_choice = 2;
     a->attention_uint9uint_present = a->attention_uint10uint_present = true;
     a->attention_uint9uint.attention_uint9uint = left;
     a->attention_uint10uint.attention_uint10uint = win;
@@ -1303,7 +1442,8 @@ static void run_ask(char *spec)
                 q->ask_q_uint3bool_present = !strcmp(f, "multi");
                 q->ask_q_uint3bool.ask_q_uint3bool = q->ask_q_uint3bool_present;
             } else if (q->ask_q_ask_opt_m_l_ask_opt_m_count < 4) {
-                struct ask_opt *o = &q->ask_q_ask_opt_m_l_ask_opt_m[q->ask_q_ask_opt_m_l_ask_opt_m_count++];
+                struct ask_opt *o =
+                    &q->ask_q_ask_opt_m_l_ask_opt_m[q->ask_q_ask_opt_m_l_ask_opt_m_count++];
                 char *eq = strchr(f, '=');
                 if (eq) {
                     *eq = 0;
@@ -1317,27 +1457,34 @@ static void run_ask(char *spec)
     static char title[24];
     struct ask_q *q0 = &l->attention_ask_q_m_l_ask_q_m[0];
     if (nq > 1) snprintf(title, sizeof title, "%d questions", nq);
-    else snprintf(title, sizeof title, "%.*s", (int)q0->ask_q_uint0tstr.len, (const char *)q0->ask_q_uint0tstr.value);
+    else
+        snprintf(title, sizeof title, "%.*s", (int)q0->ask_q_uint0tstr.len,
+                 (const char *)q0->ask_q_uint0tstr.value);
     a->attention_uint3tstr_present = a->attention_uint4tstr_present = true;
     a->attention_uint3tstr.attention_uint3tstr = zs(title);
     a->attention_uint4tstr.attention_uint4tstr = q0->ask_q_uint1tstr;
-    if (nq == 1 && !q0->ask_q_uint3bool_present) { /* what an older device answers by reply: the labels */
+    if (nq == 1 && !q0->ask_q_uint3bool_present) {
+        /* what an older device answers by reply: the labels */
         a->attention_tstr_l_present = true;
         for (size_t i = 0; i < q0->ask_q_ask_opt_m_l_ask_opt_m_count; i++)
-            a->attention_tstr_l.attention_tstr_l_tstr[a->attention_tstr_l.attention_tstr_l_tstr_count++] =
+            a->attention_tstr_l
+                .attention_tstr_l_tstr[a->attention_tstr_l.attention_tstr_l_tstr_count++] =
                 q0->ask_q_ask_opt_m_l_ask_opt_m[i].ask_opt_uint0tstr;
-        a->attention_action_m_l_action_m[a->attention_action_m_l_action_m_count++].action_choice = 3; /* reply */
+        a->attention_action_m_l_action_m[a->attention_action_m_l_action_m_count++].action_choice =
+            3; /* reply */
         a->attention_uint8uint_present = true;
     }
     sim_log("fake_daemon_ask", "\"rid\":%u,\"questions\":%d", rid, nq);
     inject_env(&env, "attention");
 }
 
-/* ── bench (BENCH.md): strokes and timeline control as the daemon sends them; the records the device sends back ── */
+/* ── bench (BENCH.md): strokes and timeline control as the daemon sends them; the records the
+ * device sends back ── */
 
-static const char *const kCmdOps[] = {"focus", "ack", "snooze", "approve", "deny", "reply", "cancel", "detail",
-                                      "notify_done", "quiet", "scroll", "type", "dictate", "kb_pick", "kb_del",
-                                      "kb_send", "kb_end", "rerun", "unqueue", "answer", "pointer", "graph"};
+static const char *const kCmdOps[] = {
+    "focus",       "ack",   "snooze",  "approve", "deny",    "reply",   "cancel", "detail",
+    "notify_done", "quiet", "scroll",  "type",    "dictate", "kb_pick", "kb_del", "kb_send",
+    "kb_end",      "rerun", "unqueue", "answer",  "pointer", "graph"};
 static uint32_t s_cmds_seen; /* bit per cmd op since the last expect_cmd */
 static uint8_t *s_dump;      /* records received after `bench stop` */
 static size_t s_dump_n;
@@ -1352,7 +1499,8 @@ static void send_stroke(int dt, const char *text)
     size_t n = 0;
     int x, y, used = 0, skip = 0;
     sscanf(text, "%*d%n", &skip);
-    for (const char *p = text + skip; n < BENCH_MAX_POINTS && sscanf(p, "%d %d%n", &x, &y, &used) == 2; p += used) {
+    for (const char *p = text + skip;
+         n < BENCH_MAX_POINTS && sscanf(p, "%d %d%n", &x, &y, &used) == 2; p += used) {
         pts[4 * n] = (uint8_t)x, pts[4 * n + 1] = (uint8_t)(x >> 8);
         pts[4 * n + 2] = (uint8_t)y, pts[4 * n + 3] = (uint8_t)(y >> 8);
         n++;
@@ -1397,7 +1545,8 @@ static void on_bench_frames(const struct dbg_frames *f)
     s_dump_n += n;
     if (f->dbg_frames_uint2bool) {
         s_dump_last = true;
-        sim_log("bench_dump", "\"recs\":%u,\"lost\":%u", (unsigned)s_dump_n, (unsigned)f->dbg_frames_uint3uint);
+        sim_log("bench_dump", "\"recs\":%u,\"lost\":%u", (unsigned)s_dump_n,
+                (unsigned)f->dbg_frames_uint3uint);
     }
 }
 
@@ -1408,7 +1557,8 @@ static void bench_save(const char *path)
         return;
     }
     FILE *fp = fopen(path, "wb");
-    if (!fp || fwrite(s_dump, BENCH_REC_BYTES, s_dump_n, fp) != s_dump_n) fail("cannot write", path);
+    if (!fp || fwrite(s_dump, BENCH_REC_BYTES, s_dump_n, fp) != s_dump_n)
+        fail("cannot write", path);
     if (fp) fclose(fp);
 }
 
@@ -1457,13 +1607,16 @@ static void on_device_tx(const uint8_t *frame, size_t len)
         serve_graph(c, env.envelope_msg_cmd_m.msg_cmd_hdr_m.hdr_uint1uint);
         return;
     }
-    if (c->cmd_op_m.cmd_op_choice == 7 && !c->cmd_uint2uint_present) { /* no rid: a last message (proto 0.18) */
+    if (c->cmd_op_m.cmd_op_choice == 7 && !c->cmd_uint2uint_present) {
+        /* no rid: a last message (proto 0.18) */
         serve_message(c, env.envelope_msg_cmd_m.msg_cmd_hdr_m.hdr_uint1uint);
         return;
     }
     if (c->cmd_op_m.cmd_op_choice != 7 || !s_serve_rid) return;
     uint32_t rid = c->cmd_uint2uint_present ? c->cmd_uint2uint.cmd_uint2uint : 0;
-    uint32_t off = c->cmd_arg_m_present && c->cmd_arg_m.cmd_arg_m.cmd_arg_choice == cmd_arg_uint_c ? c->cmd_arg_m.cmd_arg_m.cmd_arg_uint : 0;
+    uint32_t off = c->cmd_arg_m_present && c->cmd_arg_m.cmd_arg_m.cmd_arg_choice == cmd_arg_uint_c
+                       ? c->cmd_arg_m.cmd_arg_m.cmd_arg_uint
+                       : 0;
     uint32_t id = env.envelope_msg_cmd_m.msg_cmd_hdr_m.hdr_uint1uint;
     sim_log("fake_daemon_detail", "\"rid\":%u,\"off\":%u", (unsigned)rid, (unsigned)off);
     static struct envelope_r res;
@@ -1588,7 +1741,8 @@ static void run_fw_chunk(uint32_t off, uint32_t len)
 
 static void run_clear(int rid, const char *spec)
 {
-    static const char *const whys[] = {"answered_pc", "answered_dev", "expired", "cancelled", "handed_back"};
+    static const char *const whys[] = {"answered_pc", "answered_dev", "expired", "cancelled",
+                                       "handed_back"};
     char why[16] = "answered_pc";
     sscanf(spec, "%*d %15s", why);
     int w = enum_of(why, whys, 5);
@@ -1624,8 +1778,9 @@ static void run(const ev_t *e)
     case E_BENCH_EXPECT: bench_expect(e->text); break;
     case E_EXPECT_CMD: expect_cmd(e->text); break;
     case E_SHOT: {
-        /* writing the PNG takes real time (a few hundred ms on a slow disk); the script's timeline waits for it,
-         * so the events behind it keep their spacing (a tap's press and release never land in one poll) */
+        /* writing the PNG takes real time (a few hundred ms on a slow disk); the script's timeline
+         * waits for it, so the events behind it keep their spacing (a tap's press and release never
+         * land in one poll) */
         uint64_t t0 = hal_time_us();
         if (!sim_save_png(e->text)) fail("cannot write", e->text);
         else sim_log("screenshot", "\"file\":\"%s\"", e->text);
@@ -1648,7 +1803,8 @@ static void run(const ev_t *e)
     case E_EXPECT_PX_MAX: {
         uint32_t px = core_px_flushed() - s_px0;
         sim_log("px", "\"flushed\":%u,\"max\":%d,\"cpu_us\":%llu", (unsigned)px, e->a,
-                (unsigned long long)(sim_core_cpu_us() - s_cpu0)); /* informational: host CPU, not asserted */
+                /* informational: host CPU, not asserted */
+                (unsigned long long)(sim_core_cpu_us() - s_cpu0));
         if (px > (uint32_t)e->a) {
             char buf[48];
             snprintf(buf, sizeof buf, "%u px", (unsigned)px);
@@ -1696,12 +1852,16 @@ static void run(const ev_t *e)
         char key[16] = "", val[16] = "";
         if (sscanf(e->text, "%15s %15s", key, val) != 2) fail("bad pref", e->text);
         else if (!strcmp(key, "volume")) prefs_set_volume((uint8_t)atoi(val));
-        else if (!strcmp(key, "orient")) prefs_set_orient(!strcmp(val, "flipped") ? ORIENT_FLIPPED : !strcmp(val, "auto") ? ORIENT_AUTO : ORIENT_NORMAL);
+        else if (!strcmp(key, "orient"))
+            prefs_set_orient(!strcmp(val, "flipped") ? ORIENT_FLIPPED
+                             : !strcmp(val, "auto")  ? ORIENT_AUTO
+                                                     : ORIENT_NORMAL);
         else fail("bad pref", e->text);
         break;
     }
     case E_EXPECT_FLIPPED:
-        if (core_display_flipped() != (e->a != 0)) fail(e->a ? "UI should be turned" : "UI should be upright", "");
+        if (core_display_flipped() != (e->a != 0))
+            fail(e->a ? "UI should be turned" : "UI should be upright", "");
         break;
     case E_FB_MARK: sim_fb_mark(); break;
     case E_EXPECT_FB_FLIPPED: {
@@ -1716,12 +1876,14 @@ static void run(const ev_t *e)
     case E_FW_IMAGE: {
         unsigned size = 0;
         char mode[16] = "";
-        if (sscanf(e->text, "%u %15s", &size, mode) < 1 || !sim_fw_image(size, mode)) fail("bad fw_image", e->text);
+        if (sscanf(e->text, "%u %15s", &size, mode) < 1 || !sim_fw_image(size, mode))
+            fail("bad fw_image", e->text);
         break;
     }
     case E_FW_PATCH: {
         const char *path = getenv("AGENTLINK_SIM_PATCH");
-        if (!path || !path[0] || !sim_fw_patch(path, e->text ? e->text : "")) fail("bad fw_patch", path ? path : "");
+        if (!path || !path[0] || !sim_fw_patch(path, e->text ? e->text : ""))
+            fail("bad fw_patch", path ? path : "");
         break;
     }
     case E_FW_EXPECT_SLOT:
@@ -1736,7 +1898,8 @@ static void run(const ev_t *e)
         else sim_set_battery_pct(pct, !strcmp(chg, "chg"));
         break;
     }
-    case E_KIT: ui_kit_demo(e->a); break; /* a gallery page of the Sigil primitives (ui_kit.h); 0 hides it */
+    /* a gallery page of the Sigil primitives (ui_kit.h); 0 hides it */
+    case E_KIT: ui_kit_demo(e->a); break;
     case E_SKIP:
         sim_skip_time((uint32_t)e->a);
         s_t0 += (uint32_t)e->a; /* the script's own timeline does not move with it */
@@ -1749,7 +1912,8 @@ static void run(const ev_t *e)
         /* LVGL's heap at the end of the script: on the device these are internal-RAM allocations */
         lv_mem_monitor_t m;
         lv_mem_monitor(&m);
-        sim_log("mem", "\"lvgl_used\":%u,\"lvgl_peak\":%u", (unsigned)(m.total_size - m.free_size), (unsigned)m.max_used);
+        sim_log("mem", "\"lvgl_used\":%u,\"lvgl_peak\":%u", (unsigned)(m.total_size - m.free_size),
+                (unsigned)m.max_used);
         s_next = s_n;
         break;
     }
@@ -1765,7 +1929,8 @@ bool sim_script_poll(uint32_t now_ms)
     while (s_next < s_n && now_ms - s_t0 >= s_ev[s_next].at_ms && !s_failed) {
         const ev_t *e = &s_ev[s_next++];
         run(e);
-        if (e->kind == E_QUIT || e->kind == E_SKIP || e->kind == E_SHOT) break; /* `now` is stale after a skip or a shot */
+        /* `now` is stale after a skip or a shot */
+        if (e->kind == E_QUIT || e->kind == E_SKIP || e->kind == E_SHOT) break;
     }
     return s_next < s_n && !s_failed;
 }

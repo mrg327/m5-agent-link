@@ -1,8 +1,17 @@
+---
+status: superseded
+owner: ui
+last_reviewed: 2026-11-22
+superseded_by: UI-V2.md
+summary: '"Ring": select a session, act with one gesture'
+---
+
 # UI proposal: "Ring": select a session, act with one gesture
 
 Status: **implemented** (branch `ui-ring`; simulator-verified, firmware builds, not yet validated on the device). It replaces the old glance → list → detail screens.
 
 **Implementation notes and deviations**
+
 - Code: `ui_home.c` (screen), `ui_ring.c` (segments, per-segment invalidation in ≤ 30° chunks), `gesture.c` (rim recogniser, buttons), `feedback.c`, `ui_theme.c` (Okabe-Ito).
 - Drag stream: no extra HAL queue. LVGL polls touch every 10 ms on the single UI thread, so the stream is naturally the latest point; the simulator uses the same path.
 - Ack: the protocol has an `ack` op (1), but the daemon stores nothing, so the device also dims the segment locally (`seen`).
@@ -29,7 +38,7 @@ session's state.**
 
 ## 2. The screen
 
-```
+```text
               ╭── segment per session (colour = state) ──╮
            ╭──────────────────────────────────────────────╮
           │   ◜ ▬▬▬ ▬▬▬ ▬▬▬                              │

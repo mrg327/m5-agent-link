@@ -1,7 +1,7 @@
-/* power.c timers (POWER.md): idle display-off, face-down, glow, and a stamp taken later than the step's clock.
- * Issue 20261122-f724: a request that arrives while the link drains stamps the activity with a fresh clock, and
- * power_tick() then runs with the step's earlier one; on the watch every request that arrived on a lit display
- * turned it off. */
+/* power.c timers (POWER.md): idle display-off, face-down, glow, and a stamp taken later than the
+ * step's clock. Issue 20261122-f724: a request that arrives while the link drains stamps the
+ * activity with a fresh clock, and power_tick() then runs with the step's earlier one; on the watch
+ * every request that arrived on a lit display turned it off. */
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -15,7 +15,8 @@ void hal_display_set_power(bool on) { g_panel = on; }
 hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
 {
     (void)wake_after_s;
-    return state == HAL_POWER_DEEP ? HAL_POWER_ACTIVE : state; /* DEEP refused, as with USB present */
+    /* DEEP refused, as with USB present */
+    return state == HAL_POWER_DEEP ? HAL_POWER_ACTIVE : state;
 }
 hal_wake_t hal_wake_reason(void) { return (hal_wake_t)0; }
 static uint32_t g_retained;
@@ -28,15 +29,16 @@ void preport_save(uint32_t now_ms) { (void)now_ms; }
 void preport_unsave(void) {}
 void ui_glow(uint32_t rgb) { (void)rgb; }
 void ui_glow_hide(void) {}
-void dbg_event(const char *cat, const char *ev, const char *fields_fmt, ...) { (void)cat, (void)ev, (void)fields_fmt; }
+void dbg_event(const char *cat, const char *ev, const char *fields_fmt, ...)
+{ (void)cat, (void)ev, (void)fields_fmt; }
 
 static int g_fail;
-#define CHECK(c)                                                                                                   \
-    do {                                                                                                           \
-        if (!(c)) {                                                                                                \
-            fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #c);                                           \
-            g_fail = 1;                                                                                            \
-        }                                                                                                          \
+#define CHECK(c)                                                         \
+    do {                                                                 \
+        if (!(c)) {                                                      \
+            fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #c); \
+            g_fail = 1;                                                  \
+        }                                                                \
     } while (0)
 
 int main(void)
@@ -56,8 +58,8 @@ int main(void)
     CHECK(power_display_on());
     CHECK(!power_activity(70010)); /* already on: the next touch goes to the UI */
 
-    /* f724: a request stamped 5 ms after this step's clock; the step's own power_tick must not read that as
-     * 49 days idle */
+    /* f724: a request stamped 5 ms after this step's clock; the step's own power_tick must not read
+     * that as 49 days idle */
     power_attention(0xff8800, 80005);
     power_tick(80000);
     CHECK(power_display_on());

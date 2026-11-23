@@ -23,8 +23,10 @@ const usage_t *gauges_usage(void) { return &s_usage; }
 bool gauges_live(const usage_win_t *w, uint32_t at, uint32_t now)
 {
     if (!w->known || at == 0 || now <= 100000) return false; /* unknown, or the clock is not set */
-    if (now >= w->resets) return false;                       /* the window has reset: the old figure is wrong */
-    return now < at + GAUGES_STALE_S || at > now;              /* a reading from the future is the clocks disagreeing: show it */
+    /* the window has reset: the old figure is wrong */
+    if (now >= w->resets) return false;
+    /* a reading from the future is the clocks disagreeing: show it */
+    return now < at + GAUGES_STALE_S || at > now;
 }
 
 static bool pick(const usage_win_t *w, uint32_t now, usage_win_t *out)

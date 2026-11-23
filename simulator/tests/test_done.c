@@ -1,18 +1,35 @@
-/* DONE-SUMMARY.md on the device: which parts of the done summary are shown, their words, what gives way when
- * the line is too wide, and how the model keeps the summary (cleared by a change of state, replaced whole by
- * a delta that carries any of it). */
+/* DONE-SUMMARY.md on the device: which parts of the done summary are shown, their words, what gives
+ * way when the line is too wide, and how the model keeps the summary (cleared by a change of state,
+ * replaced whole by a delta that carries any of it). */
 #include <stdio.h>
 #include <string.h>
 
 #include "debug.h"
 #include "done.h"
 
-void dbg_event(const char *c, const char *e, const char *f, ...) { (void)c; (void)e; (void)f; }
-void dbg_event_at(dbg_level_t l, const char *c, const char *e, const char *f, ...) { (void)l; (void)c; (void)e; (void)f; }
+void dbg_event(const char *c, const char *e, const char *f, ...)
+{
+    (void)c;
+    (void)e;
+    (void)f;
+}
+void dbg_event_at(dbg_level_t l, const char *c, const char *e, const char *f, ...)
+{
+    (void)l;
+    (void)c;
+    (void)e;
+    (void)f;
+}
 const char *dbg_q(const char *s) { return s; }
 
 static int failures;
-#define EXPECT(cond, msg) do { if (!(cond)) { printf("FAIL: %s (line %d)\n", msg, __LINE__); failures++; } } while (0)
+#define EXPECT(cond, msg)                                  \
+    do {                                                   \
+        if (!(cond)) {                                     \
+            printf("FAIL: %s (line %d)\n", msg, __LINE__); \
+            failures++;                                    \
+        }                                                  \
+    } while (0)
 
 /* 10 px per character; a 3-byte icon counts as one */
 static int measure(const char *t)
@@ -36,10 +53,19 @@ int main(void)
     done_sum_t none = {0};
     EXPECT(!done_known(&none), "nothing known: no line");
 
-    done_sum_t all = {.files_known = true, .files = 3, .lines_known = true, .added = 120, .removed = 14,
-                      .tests_known = true, .tests_pass = true, .secs_known = true, .secs = 252};
+    done_sum_t all = {.files_known = true,
+                      .files = 3,
+                      .lines_known = true,
+                      .added = 120,
+                      .removed = 14,
+                      .tests_known = true,
+                      .tests_pass = true,
+                      .secs_known = true,
+                      .secs = 252};
     line(&all, 1000, txt, sizeof txt, &l);
-    EXPECT(strstr(txt, "3 files \xC2\xB7 +120 \xE2\x80\x93" "14 \xC2\xB7 ") == txt, "files, lines, in that order");
+    EXPECT(strstr(txt, "3 files \xC2\xB7 +120 \xE2\x80\x93"
+                       "14 \xC2\xB7 ") == txt,
+           "files, lines, in that order");
     EXPECT(strstr(txt, "tests passed \xC2\xB7 4m 12s") != NULL, "tests, then the time");
     EXPECT(!l.fail[DONE_TESTS], "passed tests are not drawn as a failure");
 
@@ -57,17 +83,26 @@ int main(void)
 
     done_sum_t failed = {.tests_known = true, .tests_pass = false, .secs_known = true, .secs = 37};
     line(&failed, 1000, txt, sizeof txt, &l);
-    EXPECT(l.fail[DONE_TESTS] && !l.fail[DONE_TIME], "failed tests are the one part in the error colour");
+    EXPECT(l.fail[DONE_TESTS] && !l.fail[DONE_TIME],
+           "failed tests are the one part in the error colour");
     EXPECT(strstr(txt, "tests failed \xC2\xB7 37s") != NULL, "tests failed, then the time");
 
-    /* too wide: "tests passed" shortens first, then the lines go, then the time, then the files; the tests stay */
-    int full = measure("3 files") + measure(" \xC2\xB7 +120 \xE2\x80\x93" "14") + measure(" \xC2\xB7 \xEE\x86\x84 tests passed") + measure(" \xC2\xB7 4m 12s");
+    /* too wide: "tests passed" shortens first, then the lines go, then the time, then the files;
+     * the tests stay */
+    int full = measure("3 files") +
+               measure(" \xC2\xB7 +120 \xE2\x80\x93"
+                       "14") +
+               measure(" \xC2\xB7 \xEE\x86\x84 tests passed") + measure(" \xC2\xB7 4m 12s");
     line(&all, full - 1, txt, sizeof txt, &l);
-    EXPECT(l.on[DONE_LINES] && l.on[DONE_TIME] && strstr(txt, "\xEE\x86\x84 passed") && !strstr(txt, "tests"), "the tests word shortens first");
+    EXPECT(l.on[DONE_LINES] && l.on[DONE_TIME] && strstr(txt, "\xEE\x86\x84 passed") &&
+               !strstr(txt, "tests"),
+           "the tests word shortens first");
     line(&all, full - 70, txt, sizeof txt, &l);
     EXPECT(!l.on[DONE_LINES] && l.on[DONE_FILES] && l.on[DONE_TIME], "then the lines give way");
-    EXPECT(strstr(txt, "3 files \xC2\xB7 ") == txt && !strstr(txt, "+120"), "the separator follows the survivors");
-    line(&all, measure("3 files") + measure(" \xC2\xB7 \xEE\x86\x84 passed") + 5, txt, sizeof txt, &l);
+    EXPECT(strstr(txt, "3 files \xC2\xB7 ") == txt && !strstr(txt, "+120"),
+           "the separator follows the survivors");
+    line(&all, measure("3 files") + measure(" \xC2\xB7 \xEE\x86\x84 passed") + 5, txt, sizeof txt,
+         &l);
     EXPECT(!l.on[DONE_TIME] && l.on[DONE_FILES] && l.on[DONE_TESTS], "then the time");
     line(&all, measure("\xEE\x86\x84 passed") + 5, txt, sizeof txt, &l);
     EXPECT(!l.on[DONE_FILES] && l.on[DONE_TESTS], "then the files");
@@ -82,11 +117,13 @@ int main(void)
     session_t d = {.sid = 4, .sum = all};
     model_upsert(&d, SF_DONE);
     const session_t *m = model_find(4);
-    EXPECT(m && m->sum.files_known && m->sum.files == 3 && m->sum.secs == 252, "the summary is stored");
+    EXPECT(m && m->sum.files_known && m->sum.files == 3 && m->sum.secs == 252,
+           "the summary is stored");
     session_t part = {.sid = 4, .sum = {.secs_known = true, .secs = 90}};
     model_upsert(&part, SF_DONE);
     m = model_find(4);
-    EXPECT(!m->sum.files_known && !m->sum.tests_known && m->sum.secs == 90, "a delta with any key replaces the whole summary");
+    EXPECT(!m->sum.files_known && !m->sum.tests_known && m->sum.secs == 90,
+           "a delta with any key replaces the whole summary");
     session_t quiet = {.sid = 4, .summary = "x"};
     model_upsert(&quiet, SF_SUMMARY);
     EXPECT(model_find(4)->sum.secs == 90, "a delta without the keys leaves it");

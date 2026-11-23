@@ -10,8 +10,8 @@ MODEL_EXT_BSS struct envelope_r g_rx_env;
 MODEL_EXT_BSS struct envelope_r g_tx_env;
 
 #define HELLO_RETRY_MS 3000
-/* While welcomed on another transport with USB plugged in, offer a hello on USB this often: a daemon
- * there takes the link over (USB is preferred when plugged in). */
+/* While welcomed on another transport with USB plugged in, offer a hello on USB this often: a
+ * daemon there takes the link over (USB is preferred when plugged in). */
 #define USB_PREFER_MS 5000
 #define USB_PREFER_BACKOFF_MS 30000
 static uint32_t s_usb_offer_gap = USB_PREFER_MS;
@@ -62,7 +62,8 @@ void link_on_state(hal_link_kind_t kind, bool connected)
     for (int k = 0; k < LINK_N_KINDS; k++) g_link.connected |= g_link.up[k];
     if (connected) {
         if (g_link.welcomed) {
-            /* stay on the active transport, unless USB arrives: it is preferred, so offer it a hello */
+            /* stay on the active transport, unless USB arrives: it is preferred, so offer it a
+             * hello */
             if (kind == HAL_LINK_USB && g_link.kind != HAL_LINK_USB) hello_on(HAL_LINK_USB);
             return;
         }
@@ -96,7 +97,8 @@ void link_on_frame_from(hal_link_kind_t kind, const uint8_t *frame, size_t len)
     int rc = cbor_decode_envelope(frame, len, &g_rx_env, &used);
     if (rc != ZCBOR_SUCCESS) {
         /* Unknown message types land here too; the protocol says to ignore them. */
-        dbg_event_at(DBG_DEBUG, "link", "rx_undecodable", "\"len\":%u,\"rc\":%d", (unsigned)len, rc);
+        dbg_event_at(DBG_DEBUG, "link", "rx_undecodable", "\"len\":%u,\"rc\":%d", (unsigned)len,
+                     rc);
         return;
     }
     if (g_link.welcomed && kind != g_link.kind) {
@@ -121,9 +123,7 @@ void link_on_frame_from(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 }
 
 void link_on_frame(const uint8_t *frame, size_t len)
-{
-    link_on_frame_from(link_active_kind(), frame, len);
-}
+{ link_on_frame_from(link_active_kind(), frame, len); }
 
 void link_tick(uint32_t now_ms)
 {
@@ -139,7 +139,8 @@ void link_tick(uint32_t now_ms)
     if (g_link.welcomed && g_link.kind != HAL_LINK_USB && g_link.up[HAL_LINK_USB] &&
         now_ms - g_link.hello_ms[HAL_LINK_USB] >= s_usb_offer_gap) {
         /* A USB daemon would take the link over. A host that is attached but not reading fills the
-         * USB buffer and each send can block 200 ms, so back off while the offer does not go out. */
+         * USB buffer and each send can block 200 ms, so back off while the offer does not go
+         * out. */
         g_link.hello_ms[HAL_LINK_USB] = now_ms;
         s_usb_offer_gap = link_tx_hello(HAL_LINK_USB) ? USB_PREFER_MS : USB_PREFER_BACKOFF_MS;
     }
@@ -172,20 +173,24 @@ static struct cmd *begin_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t 
     return &m->msg_cmd_cmd_m;
 }
 
-/* Numbers, registers and sends the cmd begun with begin_cmd(). `arg_log` is -1 for no scalar arg. */
+/* Numbers, registers and sends the cmd begun with begin_cmd(). `arg_log` is -1 for no scalar
+ * arg. */
 static bool finish_cmd(link_op_t op, uint32_t sid, uint32_t rid, uint32_t hold_ms, int arg_log)
 {
     struct msg_cmd *m = &g_tx_env.envelope_msg_cmd_m;
     uint32_t id = ++g_link.tx_id;
     m->msg_cmd_hdr_m.hdr_uint1uint = id;
     /* Unanswered commands are simply overwritten by newer ones. */
-    g_link.pending[id % LINK_MAX_PENDING] = (pending_cmd_t){.id = id, .op = (int)op, .sid = sid, .rid = rid};
+    g_link.pending[id % LINK_MAX_PENDING] =
+        (pending_cmd_t){.id = id, .op = (int)op, .sid = sid, .rid = rid};
     uint8_t buf[64];
     size_t len = 0;
     if (cbor_encode_envelope(buf, sizeof buf, &g_tx_env, &len) != ZCBOR_SUCCESS) return false;
-    dbg_event("link", "tx_cmd", "\"id\":%u,\"op\":%d,\"sid\":%u,\"rid\":%u,\"hold_ms\":%u,\"arg\":%d,\"q\":%d",
+    dbg_event("link", "tx_cmd",
+              "\"id\":%u,\"op\":%d,\"sid\":%u,\"rid\":%u,\"hold_ms\":%u,\"arg\":%d,\"q\":%d",
               (unsigned)id, (int)op, (unsigned)sid, (unsigned)rid, (unsigned)hold_ms, arg_log,
-              m->msg_cmd_cmd_m.cmd_uint6bool_present && m->msg_cmd_cmd_m.cmd_uint6bool.cmd_uint6bool);
+              m->msg_cmd_cmd_m.cmd_uint6bool_present &&
+                  m->msg_cmd_cmd_m.cmd_uint6bool.cmd_uint6bool);
     bench_note(BENCH_CMD, (uint32_t)op);
     return hal_link_send(g_link.kind, buf, len);
 }
@@ -234,7 +239,8 @@ bool link_send_approve_rule(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32
     return finish_cmd(LINK_OP_APPROVE, sid, rid, hold_ms, -1);
 }
 
-bool link_send_answer(uint32_t sid, uint32_t rid, const uint32_t *picks, const uint32_t *aids, int n, uint32_t hold_ms)
+bool link_send_answer(uint32_t sid, uint32_t rid, const uint32_t *picks, const uint32_t *aids,
+                      int n, uint32_t hold_ms)
 {
     if (n < 1 || n > 4) return false;
     struct cmd *c = begin_cmd(LINK_OP_ANSWER, sid, rid, hold_ms);
@@ -248,10 +254,12 @@ bool link_send_answer(uint32_t sid, uint32_t rid, const uint32_t *picks, const u
         a->answer_aids_aids[i] = aids[i];
     }
     p->answer_picks_picks_count = a->answer_aids_aids_count = (size_t)n;
-    dbg_event("link", "tx_answer", "\"rid\":%u,\"n\":%d,\"picks\":[%u,%u,%u,%u],\"aids\":[%u,%u,%u,%u]", (unsigned)rid, n,
-              (unsigned)picks[0], (unsigned)(n > 1 ? picks[1] : 0), (unsigned)(n > 2 ? picks[2] : 0),
-              (unsigned)(n > 3 ? picks[3] : 0), (unsigned)aids[0], (unsigned)(n > 1 ? aids[1] : 0),
-              (unsigned)(n > 2 ? aids[2] : 0), (unsigned)(n > 3 ? aids[3] : 0));
+    dbg_event("link", "tx_answer",
+              "\"rid\":%u,\"n\":%d,\"picks\":[%u,%u,%u,%u],\"aids\":[%u,%u,%u,%u]", (unsigned)rid,
+              n, (unsigned)picks[0], (unsigned)(n > 1 ? picks[1] : 0),
+              (unsigned)(n > 2 ? picks[2] : 0), (unsigned)(n > 3 ? picks[3] : 0), (unsigned)aids[0],
+              (unsigned)(n > 1 ? aids[1] : 0), (unsigned)(n > 2 ? aids[2] : 0),
+              (unsigned)(n > 3 ? aids[3] : 0));
     return finish_cmd(LINK_OP_ANSWER, sid, rid, hold_ms, -1);
 }
 
@@ -285,7 +293,8 @@ bool link_send_pointer(int dx, int dy, int btn, int n, int wheel)
     }
     /* moves are many and small: only clicks and scrolls are logged */
     if (btn >= 0 || wheel)
-        dbg_event("link", "tx_pointer", "\"dx\":%d,\"dy\":%d,\"btn\":%d,\"n\":%d,\"wheel\":%d", dx, dy, btn, n, wheel);
+        dbg_event("link", "tx_pointer", "\"dx\":%d,\"dy\":%d,\"btn\":%d,\"n\":%d,\"wheel\":%d", dx,
+                  dy, btn, n, wheel);
     return finish_cmd(LINK_OP_POINTER, 0, 0, 0, -1);
 }
 
@@ -300,6 +309,7 @@ bool link_send_scroll(uint32_t sid, int unit, int delta, uint32_t seq)
     a->cmd_arg_scroll_arg_m.scroll_arg_uint1int = delta;
     a->cmd_arg_scroll_arg_m.scroll_arg_uint2uint_present = true;
     a->cmd_arg_scroll_arg_m.scroll_arg_uint2uint.scroll_arg_uint2uint = seq;
-    dbg_event("link", "tx_scroll", "\"unit\":%d,\"delta\":%d,\"seq\":%u", unit, delta, (unsigned)seq);
+    dbg_event("link", "tx_scroll", "\"unit\":%d,\"delta\":%d,\"seq\":%u", unit, delta,
+              (unsigned)seq);
     return finish_cmd(LINK_OP_SCROLL, sid, 0, 0, -1);
 }

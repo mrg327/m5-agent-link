@@ -1,6 +1,7 @@
 /* Sound bank: short game-style cues (8-bit blips to FM chimes and layered fanfares) for the
  * speaker (ES8311 + AW8737A), defined as data so the Atlas can audition them in a browser
- * (atlas/js/sound/synth.js) with the same synth the watch will run. atlas/tools/extract.py copies the bank into atlas/data/facts.json.
+ * (atlas/js/sound/synth.js) with the same synth the watch will run. atlas/tools/extract.py copies
+ * the bank into atlas/data/facts.json.
  *
  * Synth (the contract both renderers follow):
  * - 16 kHz mono. A sound has up to SND_TRACKS tracks rendered independently and summed (chords,
@@ -27,7 +28,17 @@
 
 #define SND_RATE 16000
 
-typedef enum { SND_SQ12 = 0, SND_SQ25, SND_SQ50, SND_TRI, SND_SAW, SND_NOISE, SND_SINE, SND_FM, SND_BELL } snd_wave_t;
+typedef enum {
+    SND_SQ12 = 0,
+    SND_SQ25,
+    SND_SQ50,
+    SND_TRI,
+    SND_SAW,
+    SND_NOISE,
+    SND_SINE,
+    SND_FM,
+    SND_BELL
+} snd_wave_t;
 
 #define SND_TRACKS 3
 
@@ -45,8 +56,9 @@ typedef struct {
     const char *id;   /* "done", "input", ... */
     const char *when; /* when it plays, for people */
     const char *pick; /* id of the chosen sound in snd_bank */
-    uint8_t repeat;   /* plays the pick this many times (a short cue repeats to get attention); 0 = once */
-    uint16_t gap_ms;  /* silence between repeats */
+    /* plays the pick this many times (a short cue repeats to get attention); 0 = once */
+    uint8_t repeat;
+    uint16_t gap_ms; /* silence between repeats */
 } snd_role_t;
 
 typedef struct {

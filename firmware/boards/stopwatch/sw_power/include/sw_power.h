@@ -1,5 +1,5 @@
-// StopWatch power management (M5PM1) and IO expander (M5IOE1). C API so that callers do not
-// include the vendor headers; see sw_power.cpp for why this is a separate component.
+/* StopWatch power management (M5PM1) and IO expander (M5IOE1). C API so that callers do not
+ * include the vendor headers; see sw_power.cpp for why this is a separate component. */
 #pragma once
 
 #include <stdbool.h>

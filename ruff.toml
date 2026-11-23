@@ -1,0 +1,44 @@
+# Ruff config for the repository's Python tools. docs/conventions/python.md
+# Run as `uvx ruff@0.17.6 format` / `uvx ruff@0.17.6 check` (or `scripts/check python`).
+required-version = "==0.17.6"
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+  "firmware/managed_components",
+  "firmware/build-*",
+  "**/build",
+  "**/node_modules",
+  "atlas/vendor",
+]
+
+[format]
+quote-style = "double"
+docstring-code-format = true
+
+[lint]
+# Phase 3 (python.md PY-2): the full set. Findings that predate it are counted per rule and file in
+# scripts/check.d/baselines/lint_py.txt, which only shrinks (scripts/check.d/lint_py.py).
+select = [
+  "E", "W",   # pycodestyle
+  "F",        # pyflakes
+  "I",        # import order (isort)
+  "N",        # pep8-naming: Google naming
+  "D",        # docstrings, google convention below
+  "UP",       # pyupgrade to 3.11 idioms (X | None, builtin generics)
+  "B",        # bugbear: mutable defaults, loop-variable closures
+  "SIM",      # simplify; SIM115 = open() without `with`
+  "C4",       # comprehensions
+  "BLE",      # no blind `except Exception`
+  "RUF",      # Ruff's own checks
+  "PLW1510",  # subprocess.run without check=
+]
+ignore = [
+  "D105",     # magic methods need no docstring
+  "D107",     # document __init__ arguments in the class docstring (Google)
+]
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.per-file-ignores]
+"**/test_*.py" = ["D"]

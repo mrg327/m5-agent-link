@@ -1,5 +1,5 @@
-// CO5300 466x466 round AMOLED over QSPI via the M5GFX Panel_AMOLED (as in the factory firmware),
-// plus the LVGL display / touch glue.
+/* CO5300 466x466 round AMOLED over QSPI via the M5GFX Panel_AMOLED (as in the factory firmware),
+ * plus the LVGL display / touch glue. */
 #include <stdlib.h>
 #include <string.h>
 
@@ -32,16 +32,19 @@ static const char *TAG = "sw-display";
 #ifdef CONFIG_AGENTLINK_DISPLAY_DIRECT_DMA
 #define SW_DIRECT 1
 /* 466*34*2 = 31688 B: a full-width band fits one ESP32-S3 SPI transaction (<= 32 KB), so M5GFX
- * starts it with a single DMA and returns at once (larger pushes busy-wait on all but the last 32 KB). */
+ * starts it with a single DMA and returns at once (larger pushes busy-wait on all but the last 32
+ * KB). */
 #define LV_BUF_LINES 34
 #else
 #define SW_DIRECT 0
 #define LV_BUF_LINES 48 /* two 466x48 RGB565 partial buffers (~44 KB each) */
-#define FLUSH_CHUNK_PX 8192 /* the factory firmware chunks large pushes to dodge an M5GFX SIMD copy issue */
+/* the factory firmware chunks large pushes to dodge an M5GFX SIMD copy issue */
+#define FLUSH_CHUNK_PX 8192
 #endif
 
-class Panel_CO5300 : public lgfx::Panel_AMOLED {
-public:
+class Panel_CO5300 : public lgfx::Panel_AMOLED
+{
+  public:
     Panel_CO5300()
     {
         _cfg.memory_width = _cfg.panel_width = 480;
@@ -52,6 +55,7 @@ public:
 
     const uint8_t *getInitCommands(uint8_t listno) const override
     {
+        /* clang-format off */
         static constexpr uint8_t list0[] = {
             0x11, 0 + CMD_INIT_DELAY, 150, /* sleep out */
             0xC4, 1, 0x80,
@@ -63,22 +67,22 @@ public:
             0x29, 0, /* display on */
             0xFF, 0xFF,
         };
+        /* clang-format on */
         return listno == 0 ? list0 : nullptr;
     }
 
-    // Re-run the init commands (sleep-out, TE, brightness mode, display on) after a panel sleep.
+    /* Re-run the init commands (sleep-out, TE, brightness mode, display on) after a panel sleep. */
     void reinitAfterRail()
     {
         startWrite(true);
-        for (uint8_t i = 0; auto cmds = getInitCommands(i); i++) {
-            command_list(cmds);
-        }
+        for (uint8_t i = 0; auto cmds = getInitCommands(i); i++) { command_list(cmds); }
         endWrite();
     }
 };
 
-class M5StopWatchGfx : public M5GFX {
-public:
+class M5StopWatchGfx : public M5GFX
+{
+  public:
     lgfx::Bus_SPI bus;
     Panel_CO5300 panel;
 
@@ -114,11 +118,9 @@ public:
         setPanel(&panel);
         lgfx::pinMode(PIN_TE, lgfx::pin_mode_t::input_pullup);
 
-        if (!LGFX_Device::init_impl(use_reset, use_clear)) {
-            return false;
-        }
+        if (!LGFX_Device::init_impl(use_reset, use_clear)) { return false; }
 #if !SW_DIRECT
-        // Full-screen PSRAM framebuffer: partial LVGL flushes become 2-px aligned QSPI pushes.
+        /* Full-screen PSRAM framebuffer: partial LVGL flushes become 2-px aligned QSPI pushes. */
         if (panel.initPanelFb()) {
             auto fb = panel.getPanelFb();
             if (fb) {
@@ -139,38 +141,41 @@ static lv_display_t *s_disp;
 static bool s_powered = true;
 static uint8_t s_brightness = 160;
 
-static uint32_t tick_cb(void)
-{
-    return (uint32_t)(esp_timer_get_time() / 1000);
-}
+static uint32_t tick_cb(void) { return (uint32_t)(esp_timer_get_time() / 1000); }
 
 #ifdef CONFIG_AGENTLINK_DISPLAY_STATS
-static struct { uint32_t n, px; int64_t cpu_us, wait_us, te_us, t0; } s_st;
+static struct {
+    uint32_t n, px;
+    int64_t cpu_us, wait_us, te_us, t0;
+} s_st;
 static void stats_tick(void)
 {
     int64_t now = esp_timer_get_time();
     if (!s_st.t0) s_st.t0 = now;
     if (now - s_st.t0 < 5000000) return;
-    ESP_LOGI(TAG, "flush %u x, %u px, cpu %lld us, dma wait %lld us, te wait %lld us in %lld ms", (unsigned)s_st.n,
-             (unsigned)s_st.px, s_st.cpu_us, s_st.wait_us, s_st.te_us, (now - s_st.t0) / 1000);
+    ESP_LOGI(TAG, "flush %u x, %u px, cpu %lld us, dma wait %lld us, te wait %lld us in %lld ms",
+             (unsigned)s_st.n, (unsigned)s_st.px, s_st.cpu_us, s_st.wait_us, s_st.te_us,
+             (now - s_st.t0) / 1000);
     s_st = {};
     s_st.t0 = now;
 }
 #define ST_T0() int64_t st_t0 = esp_timer_get_time()
 #define ST_ADD(field) (s_st.field += esp_timer_get_time() - st_t0)
 #else
+/* clang-format off */
 #define ST_T0() do {} while (0)
 #define ST_ADD(field) do {} while (0)
+/* clang-format on */
 #endif
 
-/* UI turned by 180 degrees (hal_display_set_rotation_180): LVGL renders upright and rotates only the
- * pointer; here the band is reversed in place (a w x h block turned 180 degrees is the same pixels in
- * reverse order) and its area mirrored. The even/odd edges of rounder_cb survive the mirroring. */
-static void flush_rotate(lv_display_t *disp, lv_area_t *rot, const lv_area_t **area, uint8_t *px_map)
+/* UI turned by 180 degrees (hal_display_set_rotation_180): LVGL renders upright and rotates only
+ * the pointer; here the band is reversed in place (a w x h block turned 180 degrees is the same
+ * pixels in reverse order) and its area mirrored. The even/odd edges of rounder_cb survive the
+ * mirroring. */
+static void flush_rotate(lv_display_t *disp, lv_area_t *rot, const lv_area_t **area,
+                         uint8_t *px_map)
 {
-    if (lv_display_get_rotation(disp) != LV_DISPLAY_ROTATION_180) {
-        return;
-    }
+    if (lv_display_get_rotation(disp) != LV_DISPLAY_ROTATION_180) { return; }
     uint16_t *p = (uint16_t *)px_map;
     for (size_t i = 0, j = (size_t)lv_area_get_size(*area); i + 1 < j; i++, j--) {
         uint16_t t = p[i];
@@ -183,9 +188,11 @@ static void flush_rotate(lv_display_t *disp, lv_area_t *rot, const lv_area_t **a
 }
 
 #if SW_DIRECT
-static bool s_dma_ok;  /* draw buffers are internal DMA-capable RAM (a PSRAM fallback would need cache writeback) */
+/* draw buffers are internal DMA-capable RAM (a PSRAM fallback would need cache writeback) */
+static bool s_dma_ok;
 static bool s_pending; /* a band is still on the wire and its bus transaction is open */
-static uint16_t *s_shot; /* hal_display_snapshot capture (PSRAM), filled by flush_cb while s_capture */
+/* hal_display_snapshot capture (PSRAM), filled by flush_cb while s_capture */
+static uint16_t *s_shot;
 static bool s_capture;
 
 #ifdef CONFIG_AGENTLINK_DISPLAY_TE
@@ -214,12 +221,8 @@ static void te_init(void)
         err = gpio_install_isr_service(0);
         err = err == ESP_ERR_INVALID_STATE ? ESP_OK : err;
     }
-    if (err == ESP_OK) {
-        err = gpio_isr_handler_add(PIN_TE, te_isr, nullptr);
-    }
-    if (err == ESP_OK) {
-        gpio_intr_disable(PIN_TE); /* armed only while a frame waits */
-    }
+    if (err == ESP_OK) { err = gpio_isr_handler_add(PIN_TE, te_isr, nullptr); }
+    if (err == ESP_OK) { gpio_intr_disable(PIN_TE); /* armed only while a frame waits */ }
     s_te_on = err == ESP_OK;
     ESP_LOGI(TAG, "TE sync %s", s_te_on ? "on" : "off");
 }
@@ -259,7 +262,8 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
     int32_t h = lv_area_get_height(area);
     if (s_capture && s_shot) {
         for (int32_t y = 0; y < h; y++) {
-            memcpy(&s_shot[(area->y1 + y) * SW_PANEL_W + area->x1], px_map + y * w * 2, (size_t)w * 2);
+            memcpy(&s_shot[(area->y1 + y) * SW_PANEL_W + area->x1], px_map + y * w * 2,
+                   (size_t)w * 2);
         }
     }
     lv_draw_sw_rgb565_swap(px_map, (uint32_t)(w * h)); /* the CO5300 takes big-endian RGB565 */
@@ -286,12 +290,11 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
     s_st.px += (uint32_t)(w * h);
 #endif
     ST_ADD(cpu_us);
-    if (!s_dma_ok) {
-        lv_display_flush_ready(disp);
-    }
+    if (!s_dma_ok) { lv_display_flush_ready(disp); }
 }
 
-/* LVGL calls this before reusing a buffer that is still being flushed (and treats it as flushed after). */
+/* LVGL calls this before reusing a buffer that is still being flushed (and treats it as flushed
+ * after). */
 static void flush_wait_cb(lv_display_t *disp)
 {
     (void)disp;
@@ -340,7 +343,7 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 }
 #endif
 
-// CO5300 needs even start/odd end coordinates.
+/* CO5300 needs even start/odd end coordinates. */
 static void rounder_cb(lv_event_t *e)
 {
     lv_area_t *a = (lv_area_t *)lv_event_get_param(e);
@@ -407,7 +410,8 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
     (void)indev;
     static lv_point_t last = {0, 0};
     uint16_t x, y;
-    if (sw_touch_read(&x, &y)) { /* read while dark too: a tap wakes the display (the core spends it) */
+    if (sw_touch_read(&x, &y)) {
+        /* read while dark too: a tap wakes the display (the core spends it) */
         last.x = x >= SW_PANEL_W ? SW_PANEL_W - 1 : x;
         last.y = y >= SW_PANEL_H ? SW_PANEL_H - 1 : y;
         data->state = LV_INDEV_STATE_PRESSED;
@@ -419,15 +423,11 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 
 lv_indev_t *hal_touch_create(lv_display_t *disp)
 {
-    if (!sw_touch_init()) {
-        return nullptr;
-    }
+    if (!sw_touch_init()) { return nullptr; }
     lv_indev_t *indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(indev, touch_read_cb);
-    if (disp) {
-        lv_indev_set_display(indev, disp);
-    }
+    if (disp) { lv_indev_set_display(indev, disp); }
     return indev;
 }
 
@@ -436,27 +436,21 @@ lv_indev_t *hal_touch_create(lv_display_t *disp)
 void hal_display_set_brightness(uint8_t level)
 {
     s_brightness = level;
-    if (!s_gfx) {
-        return;
-    }
+    if (!s_gfx) { return; }
     xSemaphoreTake(s_gfx_mtx, portMAX_DELAY);
     dma_finish_locked();
-    if (s_powered) {
-        s_gfx->panel.setBrightness(level);
-    }
+    if (s_powered) { s_gfx->panel.setBrightness(level); }
     xSemaphoreGive(s_gfx_mtx);
 }
 
 /* Display off = brightness 0, nothing else. The panel keeps running and LVGL keeps drawing into it,
- * so on wake only the brightness changes. Two attempts to sleep the CO5300 (rail cut + re-init, then
- * sleep-in/out) both woke with a scrambled picture (mixed frames, shifted copy), so the panel's own
- * sleep stays unused until it can be debugged on the bench. An AMOLED at brightness 0 emits nothing;
- * the driver IC still draws a few mA, and deep sleep covers long idle on battery. */
+ * so on wake only the brightness changes. Two attempts to sleep the CO5300 (rail cut + re-init,
+ * then sleep-in/out) both woke with a scrambled picture (mixed frames, shifted copy), so the
+ * panel's own sleep stays unused until it can be debugged on the bench. An AMOLED at brightness 0
+ * emits nothing; the driver IC still draws a few mA, and deep sleep covers long idle on battery. */
 void hal_display_set_power(bool on)
 {
-    if (!s_gfx || on == s_powered) {
-        return;
-    }
+    if (!s_gfx || on == s_powered) { return; }
     xSemaphoreTake(s_gfx_mtx, portMAX_DELAY);
     dma_finish_locked();
     s_powered = on;
@@ -478,16 +472,10 @@ void hal_display_set_rotation_180(bool flipped)
 size_t hal_display_snapshot(uint32_t offset, uint8_t *dst, size_t max_len)
 {
     const size_t total = (size_t)SW_PANEL_W * SW_PANEL_H * 2;
-    if (!s_disp || offset >= total || !dst) {
-        return 0;
-    }
+    if (!s_disp || offset >= total || !dst) { return 0; }
     if (offset == 0 || !s_shot) {
-        if (!s_shot) {
-            s_shot = (uint16_t *)heap_caps_malloc(total, MALLOC_CAP_SPIRAM);
-        }
-        if (!s_shot) {
-            return 0;
-        }
+        if (!s_shot) { s_shot = (uint16_t *)heap_caps_malloc(total, MALLOC_CAP_SPIRAM); }
+        if (!s_shot) { return 0; }
         s_capture = true;
         lv_obj_invalidate(lv_display_get_screen_active(s_disp));
         lv_refr_now(s_disp);
@@ -506,9 +494,7 @@ size_t hal_display_snapshot(uint32_t offset, uint8_t *dst, size_t max_len)
 {
     const size_t row_bytes = (size_t)SW_PANEL_W * 2;
     const size_t total = row_bytes * SW_PANEL_H;
-    if (!s_gfx || offset >= total || !dst) {
-        return 0;
-    }
+    if (!s_gfx || offset >= total || !dst) { return 0; }
     static uint16_t row[SW_PANEL_W];
     size_t written = 0;
     xSemaphoreTake(s_gfx_mtx, portMAX_DELAY);
@@ -516,7 +502,7 @@ size_t hal_display_snapshot(uint32_t offset, uint8_t *dst, size_t max_len)
         size_t pos = offset + written;
         int y = (int)(pos / row_bytes);
         size_t in_row = pos % row_bytes;
-        // TODO(verify on device): read-back goes through the PSRAM framebuffer panel.
+        /* TODO(verify on device): read-back goes through the PSRAM framebuffer panel. */
         s_gfx->readRect(0, y, SW_PANEL_W, 1, (lgfx::rgb565_t *)row);
         size_t n = row_bytes - in_row;
         if (n > max_len - written) n = max_len - written;

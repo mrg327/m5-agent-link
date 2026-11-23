@@ -10,6 +10,7 @@ to PSRAM first; raise the budget only on purpose, after checking firmware/tools/
 
     ram_budget.py LIBCORE.a MAX_BYTES        exit 77 (skipped) without GNU size (e.g. macOS)
 """
+
 import shutil
 import subprocess
 import sys
@@ -36,12 +37,20 @@ for line in out.splitlines():
     name, n = parts[0], int(parts[1])
     if name == ".ext_ram.bss":
         ext += n
-    elif name in (".bss", ".data") or name.startswith((".bss.", ".data.")) and not name.startswith(".data.rel.ro"):
+    elif (
+        name in (".bss", ".data")
+        or name.startswith((".bss.", ".data."))
+        and not name.startswith(".data.rel.ro")
+    ):
         internal += n
         per_obj[obj] = per_obj.get(obj, 0) + n
 print(f"ram_budget: core static RAM {internal} B internal (budget {budget} B), {ext} B in PSRAM")
 if internal > budget:
     top = sorted(per_obj.items(), key=lambda kv: -kv[1])[:5]
-    print("ram_budget: FAIL: over budget. Largest objects: " + ", ".join(f"{o} {n} B" for o, n in top))
-    print("ram_budget: move large static tables to PSRAM (MODEL_EXT_BSS) or shrink them; see firmware/tools/check_dram.py")
+    print(
+        "ram_budget: FAIL: over budget. Largest objects: " + ", ".join(f"{o} {n} B" for o, n in top)
+    )
+    print(
+        "ram_budget: move large static tables to PSRAM (MODEL_EXT_BSS) or shrink them; see firmware/tools/check_dram.py"
+    )
     sys.exit(1)

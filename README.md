@@ -5,7 +5,7 @@ A wearable control surface for AI coding agents. A small device (initially the
 agent, and Claude Code sessions. When an agent finishes or needs input, it buzzes,
 and a double-tap brings that agent's terminal to the front on your PC.
 
-```
+```text
  agents ──hooks──► agentlinkd (PC, Rust) ──BLE / USB / WebSocket──► device firmware (ESP32 + LVGL)
                         │                                                │
                    ~/.agentlink/trace (JSONL)                    `#` debug lines over USB
@@ -55,17 +55,20 @@ scripts/atlas --open        # serves index.html at http://localhost:8700/
 Run the daemon (`cargo run -p agentlinkd` in `daemon/`; see `daemon/README.md`). It serves USB, BLE and a WebSocket simulator link at once. On macOS, `daemon/tools/launchd.sh install` runs it as a launchd agent that starts at login (see `daemon/README.md`).
 
 **macOS permissions**
+
 - **Bluetooth:** allow the terminal (or the `agentlinkd` binary) under System Settings › Privacy & Security › Bluetooth, or BLE scanning finds nothing. Under launchd, the `agentlinkd` binary needs its own grant.
 - **Automation:** to focus Terminal.app, allow your terminal/`agentlinkd` to control Terminal under System Settings › Privacy & Security › Automation.
 
 **kitty:** add this to `kitty.conf`, then restart kitty (a config reload is not enough):
-```
+
+```text
 allow_remote_control socket-only
 listen_on unix:/tmp/kitty
 ```
 
 **Terminal jobs:** to see builds, tests and other long commands on the watch (run time, an estimate, how
 they ended; [docs/design/JOBS.md](docs/design/JOBS.md)), add one line to `~/.zshrc` or `~/.bashrc`:
+
 ```sh
 eval "$(agentlink shell-init zsh)"   # or: bash
 ```

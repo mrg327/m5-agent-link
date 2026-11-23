@@ -24,3 +24,7 @@ atlas/wasm/build/
 
 # bench records the task scripts save when run by hand from the repo root (bench save FILE)
 /*.bin
+
+# JS lint tools (npm ci --prefix tools/lint) and linter caches
+node_modules/
+.ruff_cache/

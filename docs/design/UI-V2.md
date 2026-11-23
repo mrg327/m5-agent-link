@@ -1,6 +1,16 @@
-> **[UI-V3.md](UI-V3.md) supersedes this document's look, wording and back gesture** (swipe right goes back); the interaction model and safety rules below still stand.
+---
+status: superseded
+owner: ui
+last_reviewed: 2026-11-22
+superseded_by: UI-V3.md
+summary: '"Deck": switch context, pick from a list, answer from the watch; its interaction and safety rules stand'
+---
 
 # UI v2: "Deck": switch context, pick from a list, answer from the watch
+
+> **[UI-V3.md](UI-V3.md) supersedes this document's look, wording and back gesture** (swipe right goes back); the interaction model and safety rules below still stand.
+
+<!-- markdownlint-disable MD029 -- decisions are numbered across lists so later text can cite them -->
 
 Status: **decided; Phases 1–5 (HOME deck, AGENT wheel, ASK with the approval broker, SCROLL with the kitty and tmux drivers, STATUS with quiet mode) implemented in the simulator**. SCROLL left the wheel on 2026-11-09 (decision 27) and is entered by a drag on WATCH since 2026-11-10 (decision 29) (branch `ui-v2`, not yet validated on the device). Supersedes the Ring UI ([UI-RING.md](UI-RING.md)) and DESIGN.md §6, §6a (device side) and §8 (palette). Inputs: the Ring UX review (simulator pass, 2026-11-07), the user's v2 brief and answers (§9), and `docs/research/{stopwatch-interaction-capabilities,wearable-glance-gestures,minimal-peripherals}.md`.
 
@@ -14,7 +24,7 @@ The watch answers one question per glance and one gesture per intent. **Context 
 
 Six modes, one screen each. HOME is the only place you can stay, except WATCH, which stays until you leave it. Every other mode returns to HOME on commit, on **B long**, on the **A+B chord** (Home), or on timeout.
 
-```
+```text
                  lift / button / touch-wake              attention arrives
    ┌─────┐ ──────────────────────────────► ┌──────────┐ ───────────────────► ┌──────────┐
    │ OFF │ ◄──────── 10 s idle ─────────── │   HOME   │ ◄── commit/back ──── │   ASK    │
@@ -75,6 +85,7 @@ One table, every input × mode. "—" means ignored (and logged). Thresholds: lo
 GRAPH (proto 0.22, [GRAPH.md](GRAPH.md) §4; UI-V3 §4.11) is not a column above: it has no tap, swipe up/down/left or A binding. Rim scrub and a vertical centre drag move one row per detent, B short moves one row older, and back is swipe right, a centre long-press or B long (to HOME); the A+B chord is Home.
 
 Why this is conflict-free:
+
 - The centre and the rim are disjoint hit regions (r < 150 vs r ≥ 160); a press between them is a rim press. A scrub that starts in the annulus never becomes a swipe; a swipe or drag that starts in the centre never becomes a scrub.
 - **The centre's vertical motion has one meaning per mode:** HOME opens things (up = AGENT, down = STATUS), AGENT/ASK go back or deny (down only), STATUS goes back (up only, the reverse of the swipe that opened it; down is ignored there). Session switching is horizontal (left/right) or on the rim, so it can never be mistaken for a deny or a scroll drag. Deny exists only in ASK, and only as the strict swipe or the hold item.
 - The wheel is moved by the rim and B, never by a vertical drag, so the wheel and the deny swipe cannot overlap.
@@ -98,7 +109,7 @@ Display 466 × 466, centre (233, 233). Fonts: Montserrat 16/20/24/32 (existing).
 
 Glanceable: *which* session, *what state*, *what it just did*. One gesture deeper: everything else.
 
-```
+```text
                      ╭──────────────────────────────────────╮
                   ╭──╯  ▬▬  ▬▬▬▬  ▬▬  ▬▬▬▬▬  ▬▬  ▬▬▬  ▬▬  ╰──╮    index ring, 6 px, pinned order,
                 ╭─╯                                          ╰─╮  selected = 14 px + underline
@@ -136,7 +147,7 @@ Before/after reference: the Ring screenshots `20_mixed_error.png`, `30_perm_card
 
 User decision §9.1: tapping the centre opens a screen where gestures act on that one agent. **The screen is the wheel, with gestures layered on it, not a blank gesture pad.** A gesture pad makes every command invisible: the user must remember that "swipe left = snooze" and gets no confirmation of what is about to fire, which is exactly the discoverability failure the research warns about (watchOS gives each scene one visible primary action; the Actions Ring and Surface Dial show the menu while you gesture). The wheel keeps every available action on screen with its state, while the gestures are shortcuts that bypass the list: hold = the destructive item, swipe down = deny/back, A = default, B/scrub = move. Each row carries its shortcut tag so the two layers teach each other.
 
-```
+```text
               ╭──────────────────────────────────────╮
            ╭──╯                                      ╰──╮
          ╭─╯            Claude Code · webapp            ╰─╮   16 px header: which agent and session
@@ -169,6 +180,7 @@ User decision §9.1: tapping the centre opens a screen where gestures act on tha
 Nothing that has another path takes a row (decision 27, 2026-11-09): **Focus** is button A on HOME and WATCH (on a Done session it also acknowledges), **Status** is the swipe down on HOME. A session that waits for input keeps Focus.
 
 Items in *italics* need a daemon that types into terminals (decision 28: the welcome carries `replies`, proto 0.4):
+
 - **Reply…** turns the wheel into the reply list (header `Reply · <repo>`, items in the answer colour). When the agent's turn ended on a question (proto 0.5), the question shows above the list in 20 px and its answers come first (`Yes, go ahead` / `No`, or the options of an "A or B?" question); the user's own `~/.agentlink/replies.txt` entries follow. There are no built-in replies, so without a question or a file the item is hidden (decision 30). Tap or A sends `cmd_op_type` with the reply's index; the daemon types it and Enter. The toast reads `Sent "Continue"`. The device never sends text. The daemon refuses (toast with its reason) while the session has an open request, waits on an approval or question, or shows a numbered selection list.
 - **Reply now** (Working, daemon proto ≥ 0.17, PROTOCOL §6d) opens the reply list in queue mode: the fixed replies and Dictate, without Keyboard or the session's own answers (header `Reply to <repo>`). A pick sends `type` with `q: true`; Dictate opens VOICE whose hold button reads **Send** and sends `dictate` with `q: true` (toast "Sent"). The daemon types it at once, mid-turn (2026-11-13: waiting for the turn to end made replies stale; the user owns the consequences); it holds the message only while the agent waits on an approval or a question. While the session holds one (`qd`), the screen shows `Queued: <qd>` under the gauge readout and every state adds **Cancel queued** (`unqueue`).
 - **Interrupt** is a hold item (deny colour, `HOLD` tag, 1.2 s): it sends `cmd_op_cancel` with the measured `hold_ms`, and the daemon sends Esc to the terminal. A tap only says "Hold to confirm".
@@ -183,7 +195,7 @@ Items in *italics* need a daemon that types into terminals (decision 28: the wel
 
 ### 4.3 ASK: the agent's question
 
-```
+```text
               ╭──────────────────────────────────────╮
            ╭──╯        Claude Code · webapp            ╰──╮
          ╭─╯                                            ╰─╮
@@ -216,7 +228,7 @@ Items in *italics* need a daemon that types into terminals (decision 28: the wel
 
 User decision §9.3: scrolling is by vertical swipe, not by rim scrub. The centre behaves like a trackpad or a scroll wheel: the terminal moves with the finger, at once, and keeps gliding after a fast release.
 
-```
+```text
               ╭──────────────────────────────────────╮
            ╭──╯            webapp · kitty              ╰──╮   16 px header: session · terminal kind
          ╭─╯                                            ╰─╮
@@ -247,7 +259,7 @@ User decision §9.3: scrolling is by vertical swipe, not by rim scrub. The centr
 
 ### 4.5 STATUS
 
-```
+```text
               ╭──────────────────────────────────────╮
            ╭──╯        ◦ BLE · dev-mac                ╰──╮  16 px: transport · host (amber "Offline · stale 4m" when down)
          ╭─╯            82 %  ▬▬▬▬▬▬▬▬▬▬▭▭             ╰─╮  24 px percent beside a round-capped gauge; ⚡ while charging
@@ -283,7 +295,7 @@ Unchanged intent, two fixes carried from `2702775`: the first touch after a glow
 
 A live monitor for one running session on the small screen. Opened by the "Watch" item (§4.2). The watched session is the deck's selection: B and the rim move the deck, and the watch follows. Only one session is watched at a time, and only while this screen is open.
 
-```
+```text
               ╭──────────────────────────────────────╮
            ╭──╯                                      ╰──╮
          ╭─╯           Claude Code · webapp            ╰─╮   16 px header: agent · repo (host name first when remote)
@@ -375,7 +387,7 @@ The device side is entered from WATCH since 2026-11-10 (§4.4, decision 29).
 
 ### 6.1 Protocol (`protocol/agentlink.cddl`)
 
-```
+```text
 cmd_op_scroll = 10
 feature_scroll = 7                 ; advertised by the daemon in welcome.feats
 
@@ -426,7 +438,7 @@ Sources of options, in order of precedence:
 
 Flow for a question:
 
-```
+```text
 attention{kind=question, opts=["Yes","Yes, and run tests","No"]} ─► glow + 3 short
 wake ─► ASK: title + text, wheel with 3 options + "Open on PC", default = first
 scrub / B ─► detent per option      tap / A ─► cmd_op_reply{rid, arg=i} + "Sent" haptic
@@ -481,6 +493,7 @@ Three layers, so the look and the interaction model can change independently (us
 | **Presentation** | `ui_theme.h/.c` (tokens: palette, fonts, pill tint, key caps, badge angles), `ui_ring.c` (index ring), `ui_wheel.c` (the list component), `ui_home.c` (deck card), `ui_agent.c` (wheel screen: labels for action ids, header, badges), `ui_ask.c` (request text, option labels and colours, answer line; runs the hold the model allows), `ui_scroll.c` (counter, chevrons, privacy-gated preview line, the 50 ms coalescer and the predicted position), `ui_status.c` (link and battery header with the capsule gauge, row labels, the A badge's word per row) | how things look and where they sit | which gesture triggered an action |
 
 What a change touches:
+
 - **Reskin** (Capsules → something else): `ui_theme.h` tokens and the draw code in `ui_ring.c` / `ui_wheel.c` / `ui_home.c` / `ui_agent.c`. No gesture logic, no safety rule, no test script changes.
 - **Gesture remap** (say, swipe left opens the wheel): one row in `nav_bindings[]`, plus its description in `atlas/tools/extract.py`. No drawing code.
 - **New mode** (ASK, STATUS, WATCH): a `MODE_*` value, its rows in the table, a screen file with `open/close/act/tick/report`, and one case each in `enter_mode()`, `ui_tick()`, `ui_report()` and `ui_on_gesture()` in `ui.c`. SCROLL followed this recipe exactly (Phase 4); it also added one gesture kind (`G_DRAG`, with `dx/dy/flick` on every event) in `gesture.c`, which no other mode binds. STATUS followed it too (Phase 5) with no new gesture kind: ten rows in the table, `ui_status.c`, and the four cases in `ui.c`. Quiet's effect on alerts is one `model_quiet_active()` check in `app.c` (`on_attention`, `act_nag`), not in any screen.

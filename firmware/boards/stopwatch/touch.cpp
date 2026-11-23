@@ -1,4 +1,4 @@
-// CST820B capacitive touch (I2C 0x15, INT on G13, reset via IOE1 PYG4).
+/* CST820B capacitive touch (I2C 0x15, INT on G13, reset via IOE1 PYG4). */
 #include <stdint.h>
 
 #include "driver/gpio.h"
@@ -41,15 +41,14 @@ static void IRAM_ATTR int_isr(void *arg)
 static void int_init(void)
 {
     static bool done;
-    if (done) {
-        return;
-    }
+    if (done) { return; }
     done = true;
     gpio_config_t io = {};
     io.pin_bit_mask = 1ULL << SW_PIN_TOUCH_INT;
     io.mode = GPIO_MODE_INPUT;
     io.pull_up_en = GPIO_PULLUP_ENABLE;
-    io.intr_type = GPIO_INTR_ANYEDGE; /* the pulse polarity is configurable on the CST820: count both */
+    /* the pulse polarity is configurable on the CST820: count both */
+    io.intr_type = GPIO_INTR_ANYEDGE;
     esp_err_t err = gpio_config(&io);
     if (err == ESP_OK) {
         err = gpio_install_isr_service(0);
@@ -64,9 +63,7 @@ static void int_init(void)
 #endif
 
 static bool rd(uint8_t reg, uint8_t *buf, size_t len)
-{
-    return i2c_master_transmit_receive(s_dev, &reg, 1, buf, len, 50) == ESP_OK;
-}
+{ return i2c_master_transmit_receive(s_dev, &reg, 1, buf, len, 50) == ESP_OK; }
 
 void sw_touch_reset(void)
 {
@@ -103,16 +100,12 @@ bool sw_touch_init(void)
 bool sw_touch_read(uint16_t *x, uint16_t *y)
 {
     uint8_t b[7];
-    if (!s_dev) {
-        return false;
-    }
+    if (!s_dev) { return false; }
 #ifdef CONFIG_AGENTLINK_TOUCH_INT
     uint32_t edges = s_int_edges;
     bool edge = edges != s_int_seen;
     int64_t now = esp_timer_get_time();
-    if (s_gate && !s_down && !edge && now - s_last_rd_us < TOUCH_FORCE_US) {
-        return false;
-    }
+    if (s_gate && !s_down && !edge && now - s_last_rd_us < TOUCH_FORCE_US) { return false; }
     s_int_seen = edges;
     s_last_rd_us = now;
 #endif
@@ -139,12 +132,8 @@ bool sw_touch_read(uint16_t *x, uint16_t *y)
 
 void sw_touch_sleep(bool sleep)
 {
-    if (!s_dev) {
-        return;
-    }
-    if (sleep == s_asleep) {
-        return;
-    }
+    if (!s_dev) { return; }
+    if (sleep == s_asleep) { return; }
     s_asleep = sleep;
     if (sleep) {
         uint8_t cmd[2] = {REG_SLEEP, 0x03}; /* deep sleep: no touch reports until a reset */
@@ -154,7 +143,4 @@ void sw_touch_sleep(bool sleep)
     }
 }
 
-bool hal_touch_covered(void)
-{
-    return s_cover;
-}
+bool hal_touch_covered(void) { return s_cover; }

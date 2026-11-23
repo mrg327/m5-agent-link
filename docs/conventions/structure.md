@@ -1,15 +1,23 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # Structure
 
 Where code lives, which component may depend on which, where new code goes, and which files are
 generated. The repository map for newcomers is in [`README.md`](../../README.md); this page holds the
 rules behind it. Code-level rules are in [c.md](c.md), [rust.md](rust.md), [python.md](python.md) and
-[js.md](js.md); protocol names are in [protocol.md](protocol.md).
+[js.md](js.md); protocol names are in [protocol.md](protocol.md). The tour of the code, with the
+data flow of one request and these invariants in one list, is [`ARCHITECTURE.md`](../../ARCHITECTURE.md).
 
 The model is the one Google, Chromium and Kubernetes use: a directory is the unit of build, ownership
 and docs, and every allowed dependency direction is written down where a script can check it
 ([checkdeps](https://chromium.googlesource.com/chromium/src/+/HEAD/buildtools/checkdeps/README.md),
 [import-boss](https://pkg.go.dev/k8s.io/kubernetes@v1.31.1/cmd/import-boss)). Each rule below has an
-ID; the phase 2 structure check prints that ID with every finding.
+ID; the structure check (`scripts/check structure`, below) prints that ID with every finding.
 
 ## Top level
 
@@ -30,14 +38,13 @@ The tree is split by component, not by language.
 | `tools/` | Standalone developer tools with their own README: `board/`, `linux/` | JS, C |
 
 - **S-TOP-01** A new top-level directory needs a row in the `README.md` repository map and in this
-  table, because an unlisted directory has no owner and no check. `planned: phase 2` (structure check).
-  Baseline: `design/`, `scripts/`, `tools/` and `issues/` are missing from the `README.md` map.
+  table, because an unlisted directory has no owner and no check. `checked: scripts/check structure`. Baseline: none.
 
 ## Layering
 
 ### Firmware and its hosts (C)
 
-```
+```text
    firmware/main      simulator harness       atlas/wasm/web_main.c
    (main.c)           (main.c, sim_script.c,
         |              tests/)  white-box
@@ -63,11 +70,11 @@ runs against two host HALs (simulator, WASM) is the standing proof that the port
 - **S-DEP-01** `core` may include its own `include/`, `src/` and `third_party/`, `hal.h`,
   `agentlink_proto/include`, `lvgl.h` and the C library. It never includes `boards/`, `main/`,
   `simulator/` or `atlas/` headers. `checked: build` (ESP-IDF include isolation: `core` REQUIRES only
-  `agentlink_hal agentlink_proto lvgl__lvgl`; the simulator build) and `planned: phase 2` (include
-  script, for a clear message). Baseline: none.
+  `agentlink_hal agentlink_proto lvgl__lvgl`; the simulator build) and `checked: scripts/check structure`
+  (for a clear message). Baseline: none.
 - **S-DEP-02** In `core`, ESP-IDF and FreeRTOS headers appear only inside `#ifdef ESP_PLATFORM`, with
   a host fallback beside them, so the same file builds in the simulator. `checked: simulator build`;
-  `planned: phase 2`. Current sites, all guarded: `core/src/ring.h:15-17` (lock types),
+  `checked: scripts/check structure`. Current sites, all guarded: `core/src/ring.h:15-17` (lock types),
   `core/src/model.h:28-29` (`EXT_RAM_BSS_ATTR`).
 - **S-DEP-03** `agentlink_hal` is header-only and includes only the C library and `lvgl.h` (it hands
   out `lv_display_t` and `lv_indev_t`). It includes nothing else from the project. `checked: build`
@@ -78,31 +85,32 @@ runs against two host HALs (simulator, WASM) is the standing proof that the port
 - **S-DEP-05** `boards/<name>/` may include `hal.h`, its own headers and sub-components (for example
   `boards/stopwatch/sw_power`), ESP-IDF and managed vendor components. It never includes `core` or
   `agentlink_proto` headers, because a board is an adapter, not a client. `checked: build` (the board
-  does not REQUIRE `core`); `planned: phase 2`. Baseline: none.
+  does not REQUIRE `core`); `checked: scripts/check structure`. Baseline: none.
 - **S-DEP-06** `firmware/main` includes `hal.h`, `lvgl.h`, ESP-IDF and only the public `core.h`, never
-  `core/src/*`. The same holds for `atlas/wasm/web_main.c`. `checked: build`; `planned: phase 2`.
+  `core/src/*`. The same holds for `atlas/wasm/web_main.c`. `checked: build`; `checked: scripts/check structure`.
   Baseline: none.
 - **S-DEP-07** A host HAL (`simulator/src/sim_*.c` in the `agentlink_hal` library, `atlas/wasm/web_hal.c`)
   includes `hal.h`, `lvgl.h`, its platform (SDL2, Emscripten) and its own headers; never `core`.
-  `planned: phase 2`. Baseline: none.
+  `checked: scripts/check structure`. Baseline: none.
 - **S-DEP-08** The simulator harness (`simulator/src/main.c`, `sim_script.c`, `sim_fw_image.c`) and
   `simulator/tests/*.c` are white-box: they may include `core/src` private headers and the codec
   headers. This is the one sanctioned exception to "public header only"; keep new reach-ins in the
   script runner or a test, not in the host HAL. `review`. Widest today: `sim_script.c:92-104`
   (13 private headers).
 - **S-DEP-09** No `#include` path contains `..`. A relative include bypasses the include-path isolation
-  that S-DEP-01 to 05 rely on ([Bazel C++](https://bazel.build/docs/bazel-and-cpp)). `planned: phase 2`.
+  that S-DEP-01 to 05 rely on ([Bazel C++](https://bazel.build/docs/bazel-and-cpp)). `checked: scripts/check structure`.
   Baseline: none (`third_party/` included).
 - **S-DEP-10** Every function declared in `hal.h` is defined by every HAL: each `boards/<name>/`, the
   simulator and `atlas/wasm`. A feature a board lacks is a `caps` flag plus a no-op, never a missing
-  symbol. `checked: link` (each of the three builds fails on a missing definition). Baseline: none.
+  symbol. `checked: link` (each of the three builds fails on a missing definition) and `checked: scripts/check structure`
+  (names the missing function before a build). Baseline: none.
 
 ### Inside `core`
 
 `core` is one ESP-IDF component, so the build cannot separate its files. The tiers below are what the
 code follows today; the include script makes them visible.
 
-```
+```text
    glue    app  link*  ota  power  power_report  debug.c  bench     (may include anything in core)
      |
    ui      ui_*.c                                 (lvgl.h, hal.h, services, pure, leaves)
@@ -116,25 +124,25 @@ code follows today; the include script makes them visible.
 
 - **S-CORE-01** Pure modules include no `hal.h`, no `lvgl.h` and no `ui*.h` other than the leaf
   `ui_icons.h`, so each builds alone in a `simulator/tests` binary. `checked: ctest` (the test
-  binaries link only the module) and `planned: phase 2`. Baseline: none.
+  binaries link only the module) and `checked: scripts/check structure`. Baseline: none.
 - **S-CORE-02** Service modules may use `hal.h` and the send functions in `link.h`, but not LVGL or
-  any UI header. `planned: phase 2`. Baseline: none.
+  any UI header. `checked: scripts/check structure`. Baseline: none.
 - **S-CORE-03** UI files (`ui_*.c`) never include glue headers (`app.h`, `link.h`, `link_internal.h`,
   `ota.h`, `power.h`, `power_report.h`, `bench.h`); a screen reports a user action upward through the
   `ui_actions_t` callbacks given to `ui_init()`, which keeps screens testable from a script.
-  `planned: phase 2`. Baseline: `core/src/ui_ring.c:8` (`power.h`, for `power_display_on()`),
+  `checked: scripts/check structure`. Baseline: `core/src/ui_ring.c:8` (`power.h`, for `power_display_on()`),
   `core/src/ui_theme.c:7` (`app.h`, for `app_now_unix()`).
 - **S-CORE-04** LVGL is called from UI files and the glue tier only, and only from `core_step()`'s
   thread (`core/README.md`). Glue use today: `app.c`, `bench.c`/`bench.h` (synthetic input),
   `ota.c:11` (only `lv_tick_get()` as the clock, since `hal.h` has no millisecond clock). `review`;
-  `planned: phase 2` for the include half.
+  `checked: scripts/check structure` for the include half.
 - **S-CORE-05** Core decides by `hal_board_info()->caps`, not by board name. `review`. Baseline:
   `core/src/link_tx.c:37-41` maps the board string to the wire `device_class`, which is the one
   accepted use.
 
 ### Daemon crates (Rust)
 
-```
+```text
    agentlinkd ----> agentlink-proto      agentlink-hook   (no workspace deps)
        |  \-------> agentlink-keys
        \----------> agentlink-delta
@@ -142,14 +150,14 @@ code follows today; the include script makes them visible.
 ```
 
 - **S-CRATE-01** Library crates (`agentlink-proto`, `agentlink-keys`, `agentlink-delta`) depend on no
-  workspace crate. `planned: phase 2` (`cargo metadata` assertion). Baseline: none.
+  workspace crate. `checked: scripts/check structure` (reads each crate's `Cargo.toml`). Baseline: none.
 - **S-CRATE-02** Binary crates depend on library crates, never on another binary; `agentlinkd` and the
   `agentlink` CLI talk over IPC. `checked: cargo` (a binary crate cannot be a dependency) and
-  `planned: phase 2`. Baseline: none.
+  `checked: scripts/check structure`. Baseline: none.
 - **S-CRATE-03** `agentlink-hook` depends on no workspace crate. It stays tiny and fail-open, and it
-  speaks JSON to the daemon socket, not the wire protocol. `planned: phase 2`. Baseline: none.
+  speaks JSON to the daemon socket, not the wire protocol. `checked: scripts/check structure`. Baseline: none.
 - **S-CRATE-04** Workspace crate dependencies are declared through `[workspace.dependencies]`.
-  `review`. Baseline: `agentlinkd/Cargo.toml` uses `path =` for `agentlink-keys` and `agentlink-delta`.
+  `checked: scripts/check structure`. Baseline: `agentlinkd/Cargo.toml` uses `path =` for `agentlink-keys` and `agentlink-delta`.
 
 ### Scripts and tools (Python, JS)
 
@@ -190,7 +198,8 @@ code follows today; the include script makes them visible.
 - **S-NEW-07 Doc.** A design doc is `docs/design/<NAME>.md` (upper case, hyphens), started from
   [templates/design-doc.md](templates/design-doc.md) with the front matter in [docs.md](docs.md).
   Background research goes in `docs/research/`. The rest of `docs/` is fetched vendor documentation:
-  do not add our own pages there. `planned: phase 2` (front matter check).
+  do not add our own pages there. Front matter: `checked: scripts/check docs (doc_meta.py)`; the
+  rest `review`.
 
 ## Generated, vendored and derived files
 
@@ -199,7 +208,9 @@ code follows today; the include script makes them visible.
 - **S-GEN-02** A generated file starts with a `GENERATED by <generator> from <input>. Do not edit.`
   line (or the generator's own banner) and is listed as `linguist-generated` in `.gitattributes`, so
   GitHub collapses its diff ([GitHub docs](https://docs.github.com/en/repositories/working-with-files/managing-files/customizing-how-changed-files-appear-on-github)).
-  `planned: phase 2`. Baseline: no `.gitattributes` exists; only `tokens.generated.css` has the line.
+  `checked: scripts/check structure` for the `.gitattributes` half (`.gitattributes` marks every row below `linguist-generated`
+  and the vendored code and doc mirrors `linguist-vendored`); `review` for the marker line, which JSON
+  and binary files cannot carry. Baseline: none; only `tokens.generated.css` has the marker line.
 - **S-GEN-03** Formatters and linters skip generated and vendored files. `planned: phase 1`.
 
 | Files | Generator (input) | Check today |
@@ -221,10 +232,9 @@ Hand-kept mirrors, not generated, that must move together: `ui_icons.h` with the
 ## Directory READMEs
 
 - **S-DOC-01** Every build unit (a top-level directory, an ESP-IDF component or board, a crate, a
-  host HAL) has a `README.md`, or a row in its parent's README table that names it. `planned: phase 2`.
-  Baseline: `atlas/` (has `CONTRACT.md`, no README), `firmware/components/agentlink_proto` and
-  `boards/stopwatch/sw_power` (no row in `firmware/README.md`), `agentlink-keys` and `agentlink-delta`
-  (no row in `daemon/README.md`), `daemon/integrations/`, `daemon/tools/`.
+  host HAL, a standalone tool) has a `README.md`, or a row in the nearest README above it that names
+  it: a table row whose first cell, or a list item whose first code span, is its path. A top-level
+  directory's parent row is the `README.md` repository map. `checked: scripts/check structure`. Baseline: none.
 - **S-DOC-02** A README says, in this order and briefly: what the directory is (one or two lines); how
   to build and test it (the exact commands, the same as its `scripts/check` area); a file or
   subdirectory → concern table; the dependency rules from this page that bind it, by ID; the generated
@@ -245,7 +255,7 @@ Hand-kept mirrors, not generated, that must move together: `ui_icons.h` with the
 
 - **S-OWN-01** Phase 2 adds `.github/CODEOWNERS`, advisory only: merges are local and need no review.
   It serves as a map of who answers for what. Last matching pattern wins, so broad paths come first.
-  Every top-level directory gets an entry. `planned: phase 2`.
+  Every top-level directory gets an entry. `checked: scripts/check structure`. The file is `.github/CODEOWNERS`.
 
 The proposed map uses roles. In the file each role becomes the maintainer's handle until there are
 more people.
@@ -264,24 +274,29 @@ more people.
 | `scripts/`, `tools/`, `.github/`, `docs/conventions/` | tooling |
 | `docs/design/`, `docs/research/`, `issues/` | maintainer |
 
-## The structure check (phase 2)
+## The structure check
 
-`scripts/check structure` runs one Python stdlib script. Rules live in one table in the script's
-directory, keyed by the IDs above; each finding prints
+`scripts/check structure` runs one Python stdlib script, `scripts/check.d/structure.py` (under a
+second). Its rule table is at the top of the script, keyed by the IDs above; each finding prints
 `path:line: S-ID message - how to fix`, and existing findings are counted in a baseline that may only
-shrink ([README](README.md)). It verifies:
+shrink ([README](README.md)): `scripts/check.d/baselines/structure.txt`, one `RULE-ID key` per line;
+an entry that no longer occurs fails as stale, and `--update-baseline` rewrites the file. It verifies:
 
-1. **Includes** (S-DEP-01 to 09, S-CORE-01 to 03): parse every `#include` in `firmware/`, `simulator/`
-   and `atlas/wasm/`, map each header to the component that owns it, and test the edge against the
-   rule table. No `..` paths.
+1. **Includes** (S-DEP-01 to 09, S-CORE-01 to 04): parse every `#include` in `firmware/`, `simulator/`
+   and `atlas/wasm/`, resolve it through the builds' include directories to the unit that owns the
+   header (or an external family: C library, LVGL, ESP-IDF, vendor, SDL2, Emscripten, POSIX), and test
+   the edge against the rule table, including the core tiers. ESP-IDF headers in core must sit under
+   `#ifdef ESP_PLATFORM`. No `..` paths. S-DEP-08 reach-ins are allowed, not reviewed.
 2. **HAL completeness** (S-DEP-10): every non-inline function in `hal.h` has a definition in each HAL,
-   so a missing one is named before the link step.
-3. **Crates** (S-CRATE-01 to 03): `cargo metadata --no-deps` from `daemon/`, workspace edges only.
-4. **Generated files** (S-GEN-02): each row of the table above has its marker line and a
-   `.gitattributes` entry; the cheap generators (vectors, atlas facts, zcbor codec) regenerate into a
-   temporary directory and diff.
+   (every `boards/<name>/`, `simulator/src/sim_*.c`, `atlas/wasm/web_hal.c`), so a missing one is named
+   before the link step.
+3. **Crates** (S-CRATE-01 to 04): each workspace member's `Cargo.toml` (no cargo needed), workspace
+   edges only, against the allowed graph; a `path =` dependency is S-CRATE-04.
+4. **Generated files** (S-GEN-02): each row of the table above, and each vendored path, is marked in
+   `.gitattributes` (`git check-attr`). Not yet: the marker line, and regenerate-and-diff for the zcbor
+   codec (the vectors and atlas facts are diffed by `scripts/check protocol` and `atlas`).
 5. **Maps and READMEs** (S-TOP-01, S-DOC-01, S-OWN-01): every top-level directory is in the
-   `README.md` map and `CODEOWNERS`; every build unit has a README or a parent row; every path named in
-   a README exists.
-6. **Source lists**: every `core/src/*.c` appears in `CORE_SRCS`, so a new file is not silently left
+   `README.md` map, this page's Top level table and `CODEOWNERS`; every build unit has a README or a
+   parent row. Not yet: every path named in a README exists (S-DOC-03).
+6. **Source lists** (S-NEW-01): every `core/src/*.c` appears in `CORE_SRCS`, so a new file is not silently left
    out of one of the three builds (none missing today).

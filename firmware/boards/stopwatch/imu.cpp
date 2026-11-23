@@ -1,12 +1,12 @@
-// BMI270 six-axis IMU (I2C 0x68 on the system bus). Only the accelerometer runs, in the sensor's
-// low-power mode at 25 Hz; a small task reads it 10 times a second and hands gravity samples to core
-// (core/motion.c decides what they mean). The sensor's interrupt is not on an ESP32 pin: it goes
-// to PM1 GPIO0 (shared with the RTC) and PM1 raises G12, so reading is by polling instead. The feature
-// engine (wrist gestures, any-motion) is loaded but not used: its config file is uploaded so a later
-// change can switch a feature on without touching the bring-up.
-//
-// Power (BMI270 datasheet, not measured here): accelerometer-only low-power mode at 25 Hz is in the
-// region of 14 uA; the gyroscope stays off. The ESP32 side costs one 6-byte I2C read per 100 ms.
+/* BMI270 six-axis IMU (I2C 0x68 on the system bus). Only the accelerometer runs, in the sensor's
+ * low-power mode at 25 Hz; a small task reads it 10 times a second and hands gravity samples to
+ * core (core/motion.c decides what they mean). The sensor's interrupt is not on an ESP32 pin: it
+ * goes to PM1 GPIO0 (shared with the RTC) and PM1 raises G12, so reading is by polling instead. The
+ * feature engine (wrist gestures, any-motion) is loaded but not used: its config file is uploaded
+ * so a later change can switch a feature on without touching the bring-up.
+ *
+ * Power (BMI270 datasheet, not measured here): accelerometer-only low-power mode at 25 Hz is in the
+ * region of 14 uA; the gyroscope stays off. The ESP32 side costs one 6-byte I2C read per 100 ms. */
 #include <stdint.h>
 #include <string.h>
 
@@ -57,9 +57,7 @@ static esp_err_t wr(uint8_t reg, uint8_t val)
 }
 
 static esp_err_t rd(uint8_t reg, uint8_t *buf, size_t n)
-{
-    return i2c_master_transmit_receive(s_dev, &reg, 1, buf, n, 50);
-}
+{ return i2c_master_transmit_receive(s_dev, &reg, 1, buf, n, 50); }
 
 static esp_err_t wr_burst(uint8_t reg, const uint8_t *data, size_t n)
 {
@@ -69,8 +67,8 @@ static esp_err_t wr_burst(uint8_t reg, const uint8_t *data, size_t n)
     return i2c_master_transmit(s_dev, b, n + 1, 100);
 }
 
-/* Datasheet 4.4: power save off, INIT_CTRL 0, burst the file to INIT_DATA (the word address first), INIT_CTRL 1,
- * then INTERNAL_STATUS reports init_ok (message 1) within 20 ms. */
+/* Datasheet 4.4: power save off, INIT_CTRL 0, burst the file to INIT_DATA (the word address first),
+ * INIT_CTRL 1, then INTERNAL_STATUS reports init_ok (message 1) within 20 ms. */
 static bool upload_config(void)
 {
     if (wr(REG_PWR_CONF, 0x00) != ESP_OK) return false;
@@ -79,8 +77,10 @@ static bool upload_config(void)
     for (size_t off = 0; off < bmi270_config_file_len; off += UPLOAD_CHUNK) {
         uint16_t word = (uint16_t)(off / 2);
         uint8_t addr[2] = {(uint8_t)(word & 0x0F), (uint8_t)(word >> 4)};
-        size_t n = bmi270_config_file_len - off < UPLOAD_CHUNK ? bmi270_config_file_len - off : UPLOAD_CHUNK;
-        if (wr_burst(REG_INIT_ADDR_0, addr, 2) != ESP_OK || wr_burst(REG_INIT_DATA, bmi270_config_file + off, n) != ESP_OK) {
+        size_t n = bmi270_config_file_len - off < UPLOAD_CHUNK ? bmi270_config_file_len - off
+                                                               : UPLOAD_CHUNK;
+        if (wr_burst(REG_INIT_ADDR_0, addr, 2) != ESP_OK ||
+            wr_burst(REG_INIT_DATA, bmi270_config_file + off, n) != ESP_OK) {
             return false;
         }
     }
@@ -94,9 +94,10 @@ static bool upload_config(void)
     return false;
 }
 
-/* The chip sits rotated on the board: its X and Y are the screen's Y and X (the factory firmware swaps them
- * too). Signs: z is checked on the bench (face up reads +1 g); the x and y signs are the datasheet's and not
- * yet checked against a moved watch, so core keeps a sign switch for the orientation axis. */
+/* The chip sits rotated on the board: its X and Y are the screen's Y and X (the factory firmware
+ * swaps them too). Signs: z is checked on the bench (face up reads +1 g); the x and y signs are the
+ * datasheet's and not yet checked against a moved watch, so core keeps a sign switch for the
+ * orientation axis. */
 static bool read_mg(int16_t *x, int16_t *y, int16_t *z)
 {
     uint8_t b[6];
@@ -114,7 +115,8 @@ static bool bring_up(void)
     uint8_t id = 0;
     if (wr(REG_CMD, CMD_SOFT_RESET) != ESP_OK) return false;
     vTaskDelay(pdMS_TO_TICKS(10));
-    /* the first transaction after a reset may be NACKed and leaves the master "busy": reset the bus and retry */
+    /* the first transaction after a reset may be NACKed and leaves the master "busy": reset the bus
+     * and retry */
     esp_err_t err = ESP_FAIL;
     for (int i = 0; i < 5 && err != ESP_OK; i++) {
         err = rd(REG_CHIP_ID, &id, 1);
@@ -128,12 +130,14 @@ static bool bring_up(void)
     if (!upload_config()) return false;
     ESP_LOGI(TAG, "config file %u bytes uploaded in %d ms", (unsigned)bmi270_config_file_len,
              (int)((esp_timer_get_time() - t0) / 1000));
-    /* accelerometer only; low-power filter, average of 4, 25 Hz; +-4 g; then the sensor may save power between samples */
-    if (wr(REG_ACC_CONF, 0x26) != ESP_OK || wr(REG_ACC_RANGE, 0x01) != ESP_OK || wr(REG_PWR_CTRL, 0x04) != ESP_OK) {
+    /* accelerometer only; low-power filter, average of 4, 25 Hz; +-4 g; then the sensor may save
+     * power between samples */
+    if (wr(REG_ACC_CONF, 0x26) != ESP_OK || wr(REG_ACC_RANGE, 0x01) != ESP_OK ||
+        wr(REG_PWR_CTRL, 0x04) != ESP_OK) {
         return false;
     }
     if (wr(REG_PWR_CONF, 0x03) != ESP_OK) return false; /* adv_power_save + fifo_self_wakeup */
-    vTaskDelay(pdMS_TO_TICKS(200));                    /* a few samples at 25 Hz */
+    vTaskDelay(pdMS_TO_TICKS(200));                     /* a few samples at 25 Hz */
     uint8_t conf = 0, e = 0xFF;
     rd(REG_ACC_CONF, &conf, 1);
     rd(REG_ERR, &e, 1);
@@ -184,7 +188,8 @@ static void imu_task(void *)
     }
 }
 
-// Adds the device and checks the chip ID (one short read); the rest runs in the task. Returns whether a BMI270 answered.
+/* Adds the device and checks the chip ID (one short read); the rest runs in the task. Returns
+ * whether a BMI270 answered. */
 bool sw_imu_init(void)
 {
     i2c_device_config_t cfg = {};
@@ -209,10 +214,7 @@ bool sw_imu_init(void)
     return true;
 }
 
-void hal_motion_set_callback(hal_motion_cb_t cb)
-{
-    s_cb = cb;
-}
+void hal_motion_set_callback(hal_motion_cb_t cb) { s_cb = cb; }
 
 void hal_motion_stream_tilt(bool enable)
 {

@@ -28,9 +28,9 @@ extern "C" {
 typedef enum { HAL_SHAPE_ROUND = 0, HAL_SHAPE_RECT = 1 } hal_shape_t;
 
 typedef struct {
-    const char *board;        /* "m5stopwatch", "sim", ... */
-    const char *fw_version;   /* semver */
-    uint8_t uid[8];           /* stable device id */
+    const char *board;      /* "m5stopwatch", "sim", ... */
+    const char *fw_version; /* semver */
+    uint8_t uid[8];         /* stable device id */
     bool has_display;
     hal_shape_t shape;
     uint16_t width, height;
@@ -45,8 +45,8 @@ const hal_board_info_t *hal_board_info(void);
 
 /* ───────────── time ───────────── */
 
-uint64_t hal_time_us(void);               /* monotonic since boot */
-uint32_t hal_rtc_get_unix(void);          /* wall clock (RTC), 0 if unknown */
+uint64_t hal_time_us(void);      /* monotonic since boot */
+uint32_t hal_rtc_get_unix(void); /* wall clock (RTC), 0 if unknown */
 void hal_rtc_set_unix(uint32_t unix_s);
 
 /* ───────────── display & touch (LVGL) ───────────── */
@@ -56,14 +56,15 @@ void hal_rtc_set_unix(uint32_t unix_s);
 lv_display_t *hal_display_create(void);
 /* Create the LVGL pointer input device for touch; NULL if the board has no touch. */
 lv_indev_t *hal_touch_create(lv_display_t *disp);
-/* True while the touch controller reports two or more contacts at once: a palm or a whole hand over the glass
- * (the CST820B has no contact-size field). Core uses it only to silence an alert in progress. */
+/* True while the touch controller reports two or more contacts at once: a palm or a whole hand over
+ * the glass (the CST820B has no contact-size field). Core uses it only to silence an alert in
+ * progress. */
 bool hal_touch_covered(void);
-void hal_display_set_power(bool on);       /* panel sleep + rail; off = no pixels lit */
+void hal_display_set_power(bool on);            /* panel sleep + rail; off = no pixels lit */
 void hal_display_set_brightness(uint8_t level); /* 0..255 */
-/* Draw the UI turned by 180 degrees. Sets the LVGL display rotation (which also turns pointer coordinates);
- * the flush callback of the board turns each band's pixels and area, so the glass shows the UI upside down.
- * Call from the LVGL thread; the caller redraws the screen. */
+/* Draw the UI turned by 180 degrees. Sets the LVGL display rotation (which also turns pointer
+ * coordinates); the flush callback of the board turns each band's pixels and area, so the glass
+ * shows the UI upside down. Call from the LVGL thread; the caller redraws the screen. */
 void hal_display_set_rotation_180(bool flipped);
 
 /* ───────────── buttons ───────────── */
@@ -77,14 +78,15 @@ void hal_buttons_set_callback(hal_button_cb_t cb);
 /* ───────────── motion (IMU) ───────────── */
 
 typedef enum {
-    HAL_MOTION_LIFT = 0,      /* device raised to read (a hardware or scripted lift gesture) */
-    HAL_MOTION_DROP = 1,      /* device let go / hanging again */
+    HAL_MOTION_LIFT = 0, /* device raised to read (a hardware or scripted lift gesture) */
+    HAL_MOTION_DROP = 1, /* device let go / hanging again */
     HAL_MOTION_SHAKE = 2,
-    HAL_MOTION_TILT = 3,      /* periodic gravity sample while streaming, see x_mg/y_mg/z_mg */
+    HAL_MOTION_TILT = 3, /* periodic gravity sample while streaming, see x_mg/y_mg/z_mg */
 } hal_motion_kind_t;
-/* The accelerometer reading in screen axes, in milli-g: x to the right, y towards 6 o'clock (down the
- * screen), z out of the glass towards the viewer. A watch lying face up and still reads z = +1000,
- * face down z = -1000; held upright (12 o'clock up) y = -1000. All motion logic is in core/motion.c. */
+/* The accelerometer reading in screen axes, in milli-g: x to the right, y towards 6 o'clock (down
+ * the screen), z out of the glass towards the viewer. A watch lying face up and still reads z =
+ * +1000, face down z = -1000; held upright (12 o'clock up) y = -1000. All motion logic is in
+ * core/motion.c. */
 typedef struct {
     hal_motion_kind_t kind;
     int16_t x_mg, y_mg, z_mg;
@@ -92,8 +94,8 @@ typedef struct {
 } hal_motion_evt_t;
 typedef void (*hal_motion_cb_t)(const hal_motion_evt_t *evt);
 void hal_motion_set_callback(hal_motion_cb_t cb);
-/* Start or stop TILT samples (about 10 Hz on the watch, low-power accelerometer mode). Core turns them
- * on at start for raise-to-wake, face-down silence and orientation. */
+/* Start or stop TILT samples (about 10 Hz on the watch, low-power accelerometer mode). Core turns
+ * them on at start for raise-to-wake, face-down silence and orientation. */
 void hal_motion_stream_tilt(bool enable);
 
 /* ───────────── haptics & sound ───────────── */
@@ -114,7 +116,8 @@ void *hal_audio_alloc(size_t bytes);
 
 /* ───────────── stored preferences ───────────── */
 
-/* Small persistent numbers (NVS on the watch; RAM only in the simulator). `key` is at most 15 characters. */
+/* Small persistent numbers (NVS on the watch; RAM only in the simulator). `key` is at most 15
+ * characters. */
 uint32_t hal_pref_get(const char *key, uint32_t fallback);
 void hal_pref_set(const char *key, uint32_t value);
 
@@ -133,9 +136,9 @@ void hal_mic_stop(void);
 /* ───────────── power ───────────── */
 
 typedef enum {
-    HAL_POWER_ACTIVE = 0,     /* display on, full speed */
-    HAL_POWER_STANDBY = 1,    /* display off, light sleep, link kept alive */
-    HAL_POWER_DEEP = 2,       /* link off, only wake sources powered */
+    HAL_POWER_ACTIVE = 0,  /* display on, full speed */
+    HAL_POWER_STANDBY = 1, /* display off, light sleep, link kept alive */
+    HAL_POWER_DEEP = 2,    /* link off, only wake sources powered */
 } hal_power_state_t;
 /* Apply rails/clock policy for a state. DEEP may not return (board reboots on wake);
  * wake_after_s = 0 means wake only on lift/button. Returns the state actually entered: a board
@@ -147,21 +150,31 @@ hal_wake_t hal_wake_reason(void);
 /* One word that survives DEEP (RTC memory); 0 after a power-on or reset. */
 uint32_t hal_retained_get(void);
 void hal_retained_set(uint32_t v);
-/* Short name of the cause of the last chip reset ("poweron", "panic", "brownout", ...), for crash reports. */
+/* Short name of the cause of the last chip reset ("poweron", "panic", "brownout", ...), for crash
+ * reports. */
 const char *hal_reset_reason(void);
-typedef struct { uint8_t percent; bool charging; bool usb_present; } hal_battery_t;
+typedef struct {
+    uint8_t percent;
+    bool charging;
+    bool usb_present;
+} hal_battery_t;
 hal_battery_t hal_battery_read(void);
 
 /* ── power report (docs/design/POWER.md, proto 0.19) ── */
-/* The voltages behind the last hal_battery_read(), in mV: the last raw battery reading (0 before the first),
- * the filtered one the percent comes from, and the input (USB / charger) voltage. No bus traffic of its own. */
-typedef struct { uint16_t mv; uint16_t mv_filt; uint16_t vin_mv; } hal_battery_mv_t;
+/* The voltages behind the last hal_battery_read(), in mV: the last raw battery reading (0 before
+ * the first), the filtered one the percent comes from, and the input (USB / charger) voltage. No
+ * bus traffic of its own. */
+typedef struct {
+    uint16_t mv;
+    uint16_t mv_filt;
+    uint16_t vin_mv;
+} hal_battery_mv_t;
 hal_battery_mv_t hal_battery_mv(void);
-/* How long the DEEP that ended with this boot lasted, in ms (the board's clock across the sleep); 0 when this
- * boot did not end a DEEP, or the time is not known. */
+/* How long the DEEP that ended with this boot lasted, in ms (the board's clock across the sleep); 0
+ * when this boot did not end a DEEP, or the time is not known. */
 uint32_t hal_deep_slept_ms(void);
-/* A few more words that survive DEEP like hal_retained_get() (RTC memory, zero after a power-on or reset).
- * Core keeps the power report's unsent figures here (power_report.c). */
+/* A few more words that survive DEEP like hal_retained_get() (RTC memory, zero after a power-on or
+ * reset). Core keeps the power report's unsent figures here (power_report.c). */
 #define HAL_RETAINED_WORDS 10
 uint32_t *hal_retained_words(void);
 
@@ -169,44 +182,54 @@ uint32_t *hal_retained_words(void);
 
 /* A transport carries opaque protocol frames (already CBOR+envelope encoded).
  * Framing (COBS, BLE fragmentation, WebSocket frames) is the transport's job. */
-/* A port is one transport connection: USB, the first and second BLE central, and the simulator's WebSocket. A
- * board with one BLE connection never reports HAL_LINK_BLE2 (MULTI-LINK.md). */
-typedef enum { HAL_LINK_USB = 0, HAL_LINK_BLE = 1, HAL_LINK_WS = 2, HAL_LINK_BLE2 = 3 } hal_link_kind_t;
+/* A port is one transport connection: USB, the first and second BLE central, and the simulator's
+ * WebSocket. A board with one BLE connection never reports HAL_LINK_BLE2 (MULTI-LINK.md). */
+typedef enum {
+    HAL_LINK_USB = 0,
+    HAL_LINK_BLE = 1,
+    HAL_LINK_WS = 2,
+    HAL_LINK_BLE2 = 3
+} hal_link_kind_t;
 #define HAL_LINK_PORTS 4
-static inline bool hal_link_is_ble(int port) { return port == HAL_LINK_BLE || port == HAL_LINK_BLE2; }
+static inline bool hal_link_is_ble(int port)
+{ return port == HAL_LINK_BLE || port == HAL_LINK_BLE2; }
 typedef void (*hal_link_rx_cb_t)(hal_link_kind_t kind, const uint8_t *frame, size_t len);
 typedef void (*hal_link_state_cb_t)(hal_link_kind_t kind, bool connected);
 
 void hal_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state);
 /* Returns false if that transport is not connected or the frame is too large. */
 bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len);
-/* While the watch drives the PC live (SCROLL), ask that port for low latency: BLE requests a 15–30 ms
- * connection interval; false returns to the interval the central chose. No-op on other ports. */
+/* While the watch drives the PC live (SCROLL), ask that port for low latency: BLE requests a 15–30
+ * ms connection interval; false returns to the interval the central chose. No-op on other ports. */
 void hal_link_interactive(hal_link_kind_t port, bool on);
-/* While a firmware update streams in, ask that port for throughput: BLE requests the shortest connection
- * interval (7.5 ms), or the interactive one if the central refuses it; false undoes it. No-op on other ports. */
+/* While a firmware update streams in, ask that port for throughput: BLE requests the shortest
+ * connection interval (7.5 ms), or the interactive one if the central refuses it; false undoes it.
+ * No-op on other ports. */
 void hal_link_bulk(hal_link_kind_t port, bool on);
-/* The shortest BLE connection interval in force, in microseconds; 0 when no central is connected (or no BLE). */
+/* The shortest BLE connection interval in force, in microseconds; 0 when no central is connected
+ * (or no BLE). */
 uint32_t hal_link_ble_interval_us(void);
 
 /* ───────────── firmware update (OTA, FIRMWARE.md §9, proto 0.15) ───────────── */
 
-/* Writing a new app image into the spare app slot, in order, from offset 0. Core drives the transfer
- * (core/ota.c); the board owns the flash and the trust check. A call that does not return HAL_OTA_OK ends
- * the transfer, and hal_ota_error() then says why in a few words ("Signature not trusted"). */
+/* Writing a new app image into the spare app slot, in order, from offset 0. Core drives the
+ * transfer (core/ota.c); the board owns the flash and the trust check. A call that does not return
+ * HAL_OTA_OK ends the transfer, and hal_ota_error() then says why in a few words ("Signature not
+ * trusted"). */
 typedef enum {
     HAL_OTA_OK = 0,
-    HAL_OTA_BAD = 1,         /* the image is refused: too big, not an app for this chip, hash or signature */
+    /* the image is refused: too big, not an app for this chip, hash or signature */
+    HAL_OTA_BAD = 1,
     HAL_OTA_FAIL = 2,        /* the flash failed */
     HAL_OTA_UNSUPPORTED = 3, /* this board cannot update itself */
 } hal_ota_result_t;
 /* Opens the spare slot for an image of `size` bytes, dropping any write in progress. */
 hal_ota_result_t hal_ota_begin(uint32_t size);
-/* Appends the next `len` bytes. May block for a flash erase (tens of ms). The first bytes are checked
- * for an app image header. */
+/* Appends the next `len` bytes. May block for a flash erase (tens of ms). The first bytes are
+ * checked for an app image header. */
 hal_ota_result_t hal_ota_write(const uint8_t *data, size_t len);
-/* All `size` bytes written: verifies the image (an app for this chip, its hash, and a signature by the key
- * the running firmware was signed with) and makes it boot next. */
+/* All `size` bytes written: verifies the image (an app for this chip, its hash, and a signature by
+ * the key the running firmware was signed with) and makes it boot next. */
 hal_ota_result_t hal_ota_finish(void);
 /* Drops a write in progress; the spare slot is left unused. Safe to call when none is open. */
 void hal_ota_abort(void);
@@ -216,13 +239,14 @@ const char *hal_ota_error(void);
 bool hal_ota_unconfirmed(void);
 /* Keeps the running image (cancels the rollback). No-op when it is already confirmed. */
 void hal_ota_confirm(void);
-/* Delta update (proto 0.21): the running app slot, read back as the base a patch applies to. Reads `len` bytes
- * at `off`; HAL_OTA_BAD past the slot's end, HAL_OTA_UNSUPPORTED on a board without OTA. */
+/* Delta update (proto 0.21): the running app slot, read back as the base a patch applies to. Reads
+ * `len` bytes at `off`; HAL_OTA_BAD past the slot's end, HAL_OTA_UNSUPPORTED on a board without
+ * OTA. */
 hal_ota_result_t hal_ota_base_read(uint32_t off, void *buf, size_t len);
 /* The running app slot's size in bytes; 0 when there is none to read (no OTA). */
 uint32_t hal_ota_base_size(void);
-/* Restarts the device (into the new image after hal_ota_finish(), else the same one). Does not return on
- * the watch; the simulator logs it and carries on. */
+/* Restarts the device (into the new image after hal_ota_finish(), else the same one). Does not
+ * return on the watch; the simulator logs it and carries on. */
 void hal_restart(void);
 
 /* ───────────── debug / observability (DESIGN §0) ───────────── */

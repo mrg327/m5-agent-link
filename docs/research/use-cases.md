@@ -6,6 +6,7 @@ quotes are from search excerpts. Items marked **[inferred]** are my synthesis, n
 ## 1. Multi-agent workflows and what hurts
 
 ### How people run agents in parallel
+
 - **Git worktrees + tmux panes/tabs** are the dominant pattern. Claude Code shipped native worktree
   support on 2026-02-21; people run 3-5 agents on one repo, one worktree each.
   - https://docs.bswen.com/blog/2026-03-21-git-worktrees-parallel-claude-code/
@@ -28,6 +29,7 @@ quotes are from search excerpts. Items marked **[inferred]** are my synthesis, n
     - The payload includes `message`.
 
 ### Pain points (with evidence)
+
 | Pain | Evidence |
 |---|---|
 | Agent silently blocked on a prompt | "three of them are sitting on permission prompts you never saw, and the one that finished five minutes ago is waiting for you to notice" (https://www.developersdigest.tech/blog/agent-manager-tmux-tui-claude-code-codex-opencode) |
@@ -56,6 +58,7 @@ quotes are from search excerpts. Items marked **[inferred]** are my synthesis, n
 | tmux TUIs (Agent-Manager, tmux-agent-switcher, cmux, agent-deck, Herdr) | Per-agent status icons, attention queue, answer blocked agents without attaching | Only visible if you are looking at that screen or machine. Often scrape output. Single host. |
 
 **Feature matrix (what exists)** (✓ = reported; ? = not verified):
+
 - Approve/deny from phone: Happy ✓, Claude mobile ✓, Omnara ✓.
 - Quick/canned replies: not documented in my sources (?).
 - Voice input: Happy ✓. Others ?.
@@ -64,6 +67,7 @@ quotes are from search excerpts. Items marked **[inferred]** are my synthesis, n
 - Cross-machine, multi-CLI (Copilot + Claude + Codex) glanceable view that also raises the right window: **not found**. This is our niche.
 
 ## 3. Information value at a glance (466x466 round display)
+
 Ranking is my judgment **[inferred]**, informed by the pain points above.
 
 1. **State**: running / needs input / done / error. This is the primary signal and needs color, haptic and a distinct icon.
@@ -93,6 +97,7 @@ Display design notes **[inferred]**: ring-of-dots overview (one dot per agent, c
 | Free-form command execution | Low | Very high | Never |
 
 **Approval guardrails** (proposal):
+
 - Show the full tool name and the first ~80 characters of the command; require a long-press or a two-button press to approve.
 - Deny is a single tap.
 - Allow-list by risk tier: file reads and edits inside the worktree are approvable on the watch. Shell commands with network, `rm`, `git push`, or anything outside the repo get "Open on PC" only.
@@ -101,6 +106,7 @@ Display design notes **[inferred]**: ring-of-dots overview (one dot per agent, c
 - The mechanism depends on the CLI. Copilot `preToolUse` hooks can approve or deny, so hook-based gating is feasible. For prompts rendered in the TUI, only keystroke injection is possible, which is fragile; verify before promising it.
 
 ## 5. Team and enterprise considerations
+
 - **Local-only first.** Many corporate networks block third-party relays (ntfy.sh, Pushover, vendor tunnels). Design: host daemon on the LAN talks directly to the watch over Wi-Fi, with mDNS or a configured address; one daemon per PC; the watch aggregates. Omnara's `--no-tunnel` local mode shows demand for this.
 - **Remote/SSH dev boxes:** a daemon on the box cannot reach the watch directly if the box is in a remote network. Use a small local aggregator or an outbound-only connection from the box to a user-run hub **[inferred]**. Keep a self-hosted relay as an option.
 - **Prompt privacy on a wearable.** A watch face is visible to bystanders and screens can be seen over the shoulder. Default to metadata only (state, agent label); redact command text and message summaries until a wrist-raise or tap reveals them. Add a "private mode" toggle and a per-repo redaction rule (secrets, tokens, customer names). Never store content on the watch after the screen sleeps.
@@ -110,6 +116,7 @@ Display design notes **[inferred]**: ring-of-dots overview (one dot per agent, c
 - **Lost device:** remote-wipe of pairing from the host; short-lived tokens.
 
 ## 6. Gaps and uncertainties
+
 - No Reddit threads were retrieved; HN/blog coverage is only partial.
 - Not researched in depth: Codex cloud, Jules, Devin notification features; VibeTunnel; ntfy/Pushover hook recipes; Copilot cloud agent attention flow.
 - Omnara facts come from a third-party doc, not official docs.
@@ -119,6 +126,7 @@ Display design notes **[inferred]**: ring-of-dots overview (one dot per agent, c
 ## Top 10 use cases for v1/v2/v3
 
 **v1: Glance and route (read-only plus focus)**
+
 1. **Needs-input alert with identity.** Haptic and color alert naming repo/branch/machine. This is the number-one pain.
 2. **Attention queue / ring overview** across all agents and machines, with oldest-waiting first.
 3. **Focus the agent's window on the right PC** with one gesture (the signature feature).
@@ -135,6 +143,7 @@ Display design notes **[inferred]**: ring-of-dots overview (one dot per agent, c
 10. **Team/enterprise mode.** Audit log, admin policy, redaction rules, multi-user hub, self-hosted relay for SSH dev boxes and cloud agents.
 
 ## Anti-features to avoid
+
 - **One-tap "approve all" / "always allow" / switching to bypass permissions** from the watch. It feeds the 93% rubber-stamp problem.
 - **Approving without showing what is being approved.** No generic "Approve?" screens.
 - **Cloud relay as a requirement.** Local-only must work; any cloud path is opt-in.

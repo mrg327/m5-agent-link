@@ -1,0 +1,6 @@
+# Known findings of scripts/check.d/structure.py: `RULE-ID key`, one per line.
+# This list only shrinks. Fix one, then delete its line (or --update-baseline).
+S-CORE-03 firmware/components/core/src/ui_ring.c power.h
+S-CORE-03 firmware/components/core/src/ui_theme.c app.h
+S-CRATE-04 agentlinkd agentlink-delta
+S-CRATE-04 agentlinkd agentlink-keys

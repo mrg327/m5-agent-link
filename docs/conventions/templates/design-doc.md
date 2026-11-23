@@ -1,9 +1,10 @@
 ---
 status: draft            # draft | accepted | implemented | superseded
-owner: your-agent-name   # an AGENT_NAME or a person's handle
+owner: ui                # a role: architecture | protocol | firmware | daemon | ui | tools | conventions
 issue: YYYYMMDD-xxxx     # the tracking issue; a list if several
 last_reviewed: YYYY-MM-DD
 # superseded_by: OTHER.md  (only when status is superseded)
+summary: 'What it lets the user do, in one line (the index shows it)'
 ---
 
 # Feature name: what it lets the user do, in one line

@@ -27,17 +27,19 @@ void bench_on_touch(uint32_t dt_ms, const uint8_t *pts, size_t len, uint32_t now
 {
     size_t n = len / 4;
     if (n == 0 || n > BENCH_MAX_POINTS || dt_ms == 0 || dt_ms > 2000) {
-        dbg_event_at(DBG_WARN, "bench", "touch_bad", "\"n\":%u,\"dt\":%u", (unsigned)n, (unsigned)dt_ms);
+        dbg_event_at(DBG_WARN, "bench", "touch_bad", "\"n\":%u,\"dt\":%u", (unsigned)n,
+                     (unsigned)dt_ms);
         return;
     }
     for (size_t i = 0; i < n; i++) {
         s_pts[i][0] = rd16(pts + 4 * i);
         s_pts[i][1] = rd16(pts + 4 * i + 2);
     }
-    /* A stroke that arrives while another plays lifts that one first: the next read reports the lift. */
+    /* A stroke that arrives while another plays lifts that one first: the next read reports the
+     * lift. */
     s_play = (play_t){.playing = true, .t0 = now_ms, .dt = dt_ms, .n = (uint16_t)n};
-    dbg_event("bench", "touch", "\"n\":%u,\"dt\":%u,\"x\":%d,\"y\":%d", (unsigned)n, (unsigned)dt_ms, s_pts[0][0],
-              s_pts[0][1]);
+    dbg_event("bench", "touch", "\"n\":%u,\"dt\":%u,\"x\":%d,\"y\":%d", (unsigned)n,
+              (unsigned)dt_ms, s_pts[0][0], s_pts[0][1]);
 }
 
 bool bench_playing(void) { return s_play.playing; }
@@ -57,7 +59,8 @@ static struct {
     /* the last touch state, for down / up records */
     bool touch_down;
 } s;
-static uint8_t *s_recs; /* BENCH_MAX_RECS records, allocated at the first start (PSRAM on the watch) */
+/* BENCH_MAX_RECS records, allocated at the first start (PSRAM on the watch) */
+static uint8_t *s_recs;
 
 static void put32(uint8_t *p, uint32_t v)
 {
@@ -90,8 +93,9 @@ bool bench_touch(uint32_t now_ms, bool *down, int32_t *x, int32_t *y)
     if (s_play.playing) {
         played = true;
         uint32_t i = (now_ms - s_play.t0) / s_play.dt;
-        /* The touch is polled, and a read can come tens of ms late while a frame renders: the stroke's clock
-         * starts at the first read that plays it, so the watch sees the whole stroke, a short tap included. */
+        /* The touch is polled, and a read can come tens of ms late while a frame renders: the
+         * stroke's clock starts at the first read that plays it, so the watch sees the whole
+         * stroke, a short tap included. */
         if (!s_play.seen) {
             late_ms = now_ms - s_play.t0;
             s_play.seen = true;
@@ -112,7 +116,8 @@ bool bench_touch(uint32_t now_ms, bool *down, int32_t *x, int32_t *y)
     if (*down != s.touch_down) {
         s.touch_down = *down;
         int32_t cx = *x < 0 ? 0 : *x > 4095 ? 4095 : *x, cy = *y < 0 ? 0 : *y > 4095 ? 4095 : *y;
-        record(*down ? BENCH_DOWN : BENCH_UP, hal_time_us(), late_ms * 1000, 0, (uint32_t)cx << 12 | (uint32_t)cy);
+        record(*down ? BENCH_DOWN : BENCH_UP, hal_time_us(), late_ms * 1000, 0,
+               (uint32_t)cx << 12 | (uint32_t)cy);
     }
     return played;
 }
@@ -183,8 +188,9 @@ void bench_on_ctl(int op, uint32_t arg, uint32_t now_ms)
         s.touch_down = down;
         s.rec = true;
         s.t0_us = hal_time_us();
-        /* A run starts with the user looking: the display wakes. The step's own time: power_tick() later in this
-         * step compares against it unsigned, and a later stamp would read as an idle eternity. */
+        /* A run starts with the user looking: the display wakes. The step's own time: power_tick()
+         * later in this step compares against it unsigned, and a later stamp would read as an idle
+         * eternity. */
         power_activity(now_ms);
         dbg_event("bench", "start", NULL);
         break;

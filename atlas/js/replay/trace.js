@@ -19,7 +19,9 @@ export function parseTrace(text) {
       const d = JSON.parse(s);
       if (d && typeof d === 'object' && typeof d.kind === 'string') rows.push(d);
       else bad++;
-    } catch { bad++; }
+    } catch {
+      bad++;
+    }
   }
   const tsOf = (d) => (typeof d.ts_us === 'number' ? d.ts_us / 1000 : Date.parse(d.ts));
   rows.sort((a, b) => tsOf(a) - tsOf(b));
@@ -28,12 +30,19 @@ export function parseTrace(text) {
   const sessions = new Map();
   const focus = [];
   const attention = [];
-  let first = Infinity, last = -Infinity;
-  const touch = (t) => { if (Number.isFinite(t)) { first = Math.min(first, t); last = Math.max(last, t); } };
+  let first = Infinity,
+    last = -Infinity;
+  const touch = (t) => {
+    if (Number.isFinite(t)) {
+      first = Math.min(first, t);
+      last = Math.max(last, t);
+    }
+  };
 
   const sess = (sid) => {
     let s = sessions.get(sid);
-    if (!s) sessions.set(sid, (s = { sid, ag: 'other', repo: '', br: '', steps: [], endedAt: null }));
+    if (!s)
+      sessions.set(sid, (s = { sid, ag: 'other', repo: '', br: '', steps: [], endedAt: null }));
     return s;
   };
 
@@ -50,32 +59,73 @@ export function parseTrace(text) {
       if (body.repo) s.repo = basename(body.repo);
       if (body.br) s.br = body.br;
       if (body.st) {
-        s.steps.push({ t, st: body.st, sub: body.sub ?? null, tool: body.tool || '', patch: stripPatch(body) });
+        s.steps.push({
+          t,
+          st: body.st,
+          sub: body.sub ?? null,
+          tool: body.tool || '',
+          patch: stripPatch(body),
+        });
       }
       touch(t);
     } else if (d.kind === 'gone' && (d.src === 'registry' || d.dir === 'out')) {
       const sid = body.sid ?? m.sid ?? d.sid;
-      if (sid != null) { sess(sid).endedAt = t; touch(t); }
+      if (sid != null) {
+        sess(sid).endedAt = t;
+        touch(t);
+      }
     } else if (d.kind === 'attention' && d.dir === 'out') {
       attention.push({ t, sid: body.sid ?? d.sid, kind: body.kind, title: body.title || '' });
       touch(t);
     } else if (d.kind === 'focus' && d.src === 'audit') {
       focus.push({ t, sid: d.sid ?? m.cmd?.sid, ok: m.ok !== false });
       touch(t);
-    } else if (d.kind === 'cmd' && d.dir === 'in' && body.op === 'focus' && !rows.some((r) => r.src === 'audit' && r.kind === 'focus')) {
+    } else if (
+      d.kind === 'cmd' &&
+      d.dir === 'in' &&
+      body.op === 'focus' &&
+      !rows.some((r) => r.src === 'audit' && r.kind === 'focus')
+    ) {
       focus.push({ t, sid: body.sid ?? d.sid, ok: true });
       touch(t);
     }
   }
-  const list = [...sessions.values()].filter((s) => s.steps.length).sort((a, b) => a.steps[0].t - b.steps[0].t);
-  if (!Number.isFinite(first)) { first = 0; last = 0; }
-  return { sessions: list, focus, attention, start: first, end: last, duration: last - first, bad, rows: rows.length };
+  const list = [...sessions.values()]
+    .filter((s) => s.steps.length)
+    .sort((a, b) => a.steps[0].t - b.steps[0].t);
+  if (!Number.isFinite(first)) {
+    first = 0;
+    last = 0;
+  }
+  return {
+    sessions: list,
+    focus,
+    attention,
+    start: first,
+    end: last,
+    duration: last - first,
+    bad,
+    rows: rows.length,
+  };
 }
 
 // The patch handed to ctx.daemon.inject: only the keys the protocol's `session` map knows.
 function stripPatch(b) {
   const out = {};
-  for (const k of ['sid', 'ag', 'st', 'sub', 'repo', 'br', 'tool', 'sum', 't0', 'tst', 'seen', 'host']) {
+  for (const k of [
+    'sid',
+    'ag',
+    'st',
+    'sub',
+    'repo',
+    'br',
+    'tool',
+    'sum',
+    't0',
+    'tst',
+    'seen',
+    'host',
+  ]) {
     if (b[k] !== undefined) out[k] = b[k];
   }
   if (typeof out.repo === 'string') out.repo = basename(out.repo);
@@ -90,7 +140,8 @@ export function buildTimeline(trace) {
     if (s.endedAt != null) ev.push({ t: s.endedAt, type: 'gone', sid: s.sid });
   }
   for (const f of trace.focus) ev.push({ t: f.t, type: 'focus', sid: f.sid, ok: f.ok });
-  for (const a of trace.attention) ev.push({ t: a.t, type: 'attention', sid: a.sid, kind: a.kind, title: a.title });
+  for (const a of trace.attention)
+    ev.push({ t: a.t, type: 'attention', sid: a.sid, kind: a.kind, title: a.title });
   return ev.sort((a, b) => a.t - b.t);
 }
 
@@ -99,6 +150,9 @@ export function stateAt(session, t) {
   if (t < session.steps[0].t) return null;
   if (session.endedAt != null && t >= session.endedAt) return null;
   let cur = session.steps[0];
-  for (const s of session.steps) { if (s.t <= t) cur = s; else break; }
+  for (const s of session.steps) {
+    if (s.t <= t) cur = s;
+    else break;
+  }
   return cur;
 }

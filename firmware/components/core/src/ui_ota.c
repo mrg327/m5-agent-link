@@ -1,17 +1,18 @@
-/* The Updating overlay in Sigil (docs/design/GLYPHS.md §5): full screen over everything while a firmware update
- * runs. One hero glyph inside a progress arc, and nothing spelled out:
+/* The Updating overlay in Sigil (docs/design/GLYPHS.md §5): full screen over everything while a
+ * firmware update runs. One hero glyph inside a progress arc, and nothing spelled out:
  *
  *   - updating: the download glyph in the working blue, the arc filling round it from 12 o'clock;
- *   - the link is down (the transfer resumes when the computer is back): the plug in amber, the arc grey;
+ *   - the link is down (the transfer resumes when the computer is back): the plug in amber, the arc
+ *     grey;
  *   - restarting: the working glyph in green inside the closed green ring;
- *   - the one control, hold B to cancel: B's key hint with the cross, its hold ring partly drawn (a press does
- *     nothing, a hold does);
+ *   - the one control, hold B to cancel: B's key hint with the cross, its hold ring partly drawn (a
+ *     press does nothing, a hold does);
  *   - the version being installed: small digits under the arc (a value that cannot be drawn).
  *
- * The words (Updating, the percentage, Waiting for the computer…, Hold B to cancel, Restarting…) are in the
- * report (rule 9). A percent step repaints only the piece of arc it adds (ui_arc_set): the overlay is full
- * screen, and redrawing all of it from PSRAM on each percent slowed a delta update's flash writes by half
- * (issue 203f). */
+ * The words (Updating, the percentage, Waiting for the computer…, Hold B to cancel, Restarting…)
+ * are in the report (rule 9). A percent step repaints only the piece of arc it adds (ui_arc_set):
+ * the overlay is full screen, and redrawing all of it from PSRAM on each percent slowed a delta
+ * update's flash writes by half (issue 203f). */
 #include <stdio.h>
 #include <string.h>
 
@@ -23,7 +24,7 @@
 #define HERO_Y UI_CX
 #define ARC_R 112 /* centre line: the hero glyph (128 px) sits inside with room to spare */
 #define ARC_W 10
-#define VER_Y 374 /* under the arc, between the key hints */
+#define VER_Y 374   /* under the arc, between the key hints */
 #define HOLD_PM 700 /* B's hold ring as drawn: a hold in progress */
 
 static lv_obj_t *s_root, *s_arc, *s_hero, *s_ver, *s_cancel;
@@ -47,7 +48,8 @@ void ui_ota_init(lv_obj_t *layer)
     lv_obj_set_style_text_color(s_ver, COL_TEXT3, 0);
     lv_obj_set_style_text_align(s_ver, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(s_ver, LV_LABEL_LONG_MODE_DOTS);
-    int w = 2 * (UI_KEY_B_X - UI_CX - UI_DISC_R_KEY - 12), h = lv_font_get_line_height(FONT_CAPTION);
+    int w = 2 * (UI_KEY_B_X - UI_CX - UI_DISC_R_KEY - 12),
+        h = lv_font_get_line_height(FONT_CAPTION);
     lv_obj_set_size(s_ver, w, h);
     lv_obj_set_pos(s_ver, UI_CX - w / 2, VER_Y - h / 2);
     lv_label_set_text(s_ver, "");
@@ -62,10 +64,12 @@ static void refresh(void)
 {
     uint32_t rgb = s_restarting ? RGB_SUCCESS : RGB_ACCENT;
     bool stalled = s_waiting && !s_restarting;
-    ui_arc_set(s_arc, s_restarting ? 1000 : (int)s_pct_v * 10, stalled ? COL_TEXT3 : lv_color_hex(rgb), COL_FILL2);
+    ui_arc_set(s_arc, s_restarting ? 1000 : (int)s_pct_v * 10,
+               stalled ? COL_TEXT3 : lv_color_hex(rgb), COL_FILL2);
     if (stalled) ui_glyph_set(s_hero, ICON_OFFLINE, lv_color_hex(RGB_AMBER));
     else ui_glyph_set(s_hero, s_restarting ? ICON_WORKING : ICON_UPDATE, lv_color_hex(rgb));
-    if (lv_obj_has_flag(s_cancel, LV_OBJ_FLAG_HIDDEN) != s_restarting) { /* past the point of cancelling */
+    if (lv_obj_has_flag(s_cancel, LV_OBJ_FLAG_HIDDEN) != s_restarting) {
+        /* past the point of cancelling */
         if (s_restarting) lv_obj_add_flag(s_cancel, LV_OBJ_FLAG_HIDDEN);
         else lv_obj_remove_flag(s_cancel, LV_OBJ_FLAG_HIDDEN);
     }

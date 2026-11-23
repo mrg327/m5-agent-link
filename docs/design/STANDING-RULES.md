@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: daemon
+issue: 20261112-7f85
+last_reviewed: 2026-11-12
+summary: '"Always allow this" from the watch (protocol 0.13)'
+---
+
 # Standing rules: "always allow this" from the watch
 
 > Status: built on branch `next` (issue 20261112-7f85). Protocol 0.13. Run against the real hook and daemon

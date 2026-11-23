@@ -1,0 +1,5 @@
+# rustfmt config for the daemon workspace: rustfmt defaults, stated explicitly (docs/conventions/).
+# rustfmt finds this file from daemon/ by searching parent directories.
+# edition matches [workspace.package] in daemon/Cargo.toml.
+edition = "2021"
+max_width = 100

@@ -1,7 +1,8 @@
-/* hal_ota_* for the simulator: the image is buffered in RAM and checked the way the watch does, with a
- * stand-in trust rule (the last 4 KB of an image start with E7 02 when it is "signed"). The running slot a
- * delta update reads as its base is whatever sim_ota_set_running() was given (none by default).
- * $AGENTLINK_SIM_OTA_WRITE_US makes each write take that long, like the watch's flash (issue 203f). */
+/* hal_ota_* for the simulator: the image is buffered in RAM and checked the way the watch does,
+ * with a stand-in trust rule (the last 4 KB of an image start with E7 02 when it is "signed"). The
+ * running slot a delta update reads as its base is whatever sim_ota_set_running() was given (none
+ * by default). $AGENTLINK_SIM_OTA_WRITE_US makes each write take that long, like the watch's flash
+ * (issue 203f). */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -97,7 +98,8 @@ hal_ota_result_t hal_ota_finish(void)
         snprintf(s_err, sizeof s_err, "Incomplete image");
         return HAL_OTA_BAD;
     }
-    if (!s_raw && (s_size < SIG_TAIL || s_buf[s_size - SIG_TAIL] != 0xE7 || s_buf[s_size - SIG_TAIL + 1] != 0x02)) {
+    if (!s_raw && (s_size < SIG_TAIL || s_buf[s_size - SIG_TAIL] != 0xE7 ||
+                   s_buf[s_size - SIG_TAIL + 1] != 0x02)) {
         snprintf(s_err, sizeof s_err, "Signature not trusted");
         return HAL_OTA_BAD;
     }

@@ -1,6 +1,7 @@
-/* Power report (docs/design/POWER.md): state-time accounting, the report cadence (at the welcome, every 5 min,
- * 30 s after a refused send, none to a daemon below 0.19, figures kept while unlinked) and the figures a deep
- * sleep keeps in RTC memory. Builds power_report.c against stubbed HAL, link, power and UI; no simulator. */
+/* Power report (docs/design/POWER.md): state-time accounting, the report cadence (at the welcome,
+ * every 5 min, 30 s after a refused send, none to a daemon below 0.19, figures kept while unlinked)
+ * and the figures a deep sleep keeps in RTC memory. Builds power_report.c against stubbed HAL,
+ * link, power and UI; no simulator. */
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -32,7 +33,8 @@ hal_battery_t hal_battery_read(void)
     s_battery_reads++;
     return (hal_battery_t){.percent = 63, .charging = false, .usb_present = false};
 }
-hal_battery_mv_t hal_battery_mv(void) { return (hal_battery_mv_t){.mv = 3871, .mv_filt = 3880, .vin_mv = 0}; }
+hal_battery_mv_t hal_battery_mv(void)
+{ return (hal_battery_mv_t){.mv = 3871, .mv_filt = 3880, .vin_mv = 0}; }
 bool link_send_power(const link_power_t *p)
 {
     s_n_tries++;
@@ -41,19 +43,25 @@ bool link_send_power(const link_power_t *p)
     s_n_sent++;
     return true;
 }
-void dbg_event(const char *c, const char *e, const char *f, ...) { (void)c; (void)e; (void)f; }
+void dbg_event(const char *c, const char *e, const char *f, ...)
+{
+    (void)c;
+    (void)e;
+    (void)f;
+}
 
 static int failures;
-#define EXPECT(cond, msg)                                                    \
-    do {                                                                     \
-        if (!(cond)) {                                                       \
-            printf("FAIL: %s (line %d)\n", msg, __LINE__);                   \
-            failures++;                                                      \
-        }                                                                    \
+#define EXPECT(cond, msg)                                  \
+    do {                                                   \
+        if (!(cond)) {                                     \
+            printf("FAIL: %s (line %d)\n", msg, __LINE__); \
+            failures++;                                    \
+        }                                                  \
     } while (0)
 
 static uint32_t s_now;
-/* Runs the core loop's ticks for ms, one every step_ms, as core_step does (50 ms with the display off). */
+/* Runs the core loop's ticks for ms, one every step_ms, as core_step does (50 ms with the display
+ * off). */
 static void run(uint32_t ms, uint32_t step_ms)
 {
     for (uint32_t end = s_now + ms; s_now < end;) {
@@ -106,15 +114,18 @@ static void test_cadence(void)
     preport_on_link(true, s_now);
     run(20, 20);
     EXPECT(s_n_sent == 1, "a report right after the welcome");
-    EXPECT(s_sent[0].seq == 0 && s_sent[0].on >= 20000 && s_sent[0].lk <= 40, "the first covers the time since boot");
-    EXPECT(s_sent[0].mv == 3871 && s_sent[0].mvf == 3880 && s_sent[0].pct == 63, "battery voltages and percent");
+    EXPECT(s_sent[0].seq == 0 && s_sent[0].on >= 20000 && s_sent[0].lk <= 40,
+           "the first covers the time since boot");
+    EXPECT(s_sent[0].mv == 3871 && s_sent[0].mvf == 3880 && s_sent[0].pct == 63,
+           "battery voltages and percent");
     run(PREPORT_EVERY_MS - 40, 20);
     EXPECT(s_n_sent == 1, "not before 5 minutes");
     run(40, 20);
     EXPECT(s_n_sent == 2, "every 5 minutes while linked");
     EXPECT(s_sent[1].seq == 1, "seq counts the reports");
     uint32_t sum = s_sent[1].on + s_sent[1].dim + s_sent[1].off + s_sent[1].deep;
-    EXPECT(sum >= PREPORT_EVERY_MS - 20 && sum <= PREPORT_EVERY_MS + 20, "a report covers the 5 minutes since the last");
+    EXPECT(sum >= PREPORT_EVERY_MS - 20 && sum <= PREPORT_EVERY_MS + 20,
+           "a report covers the 5 minutes since the last");
     EXPECT(s_sent[1].lk == sum, "linked the whole time");
 
     /* a refused send: the figures stay and the next try is 30 s later */
@@ -197,13 +208,15 @@ static void test_deep(void)
     s_wake = HAL_WAKE_BUTTON;
     s_slept_ms = 7200000;
     boot();
-    EXPECT(preport_times()->off >= 600950 && preport_times()->deep == 7200000 && preport_times()->nd == 1,
+    EXPECT(preport_times()->off >= 600950 && preport_times()->deep == 7200000 &&
+               preport_times()->nd == 1,
            "kept figures plus the sleep");
     EXPECT(!preport_unpack(s_words, &t, &seq), "used once");
     s_welcomed = true;
     preport_on_link(true, s_now);
     run(20, 20);
-    EXPECT(s_n_sent == 1 && s_sent[0].deep == 7200000 && s_sent[0].nd == 1, "the report after the wake carries it");
+    EXPECT(s_n_sent == 1 && s_sent[0].deep == 7200000 && s_sent[0].nd == 1,
+           "the report after the wake carries it");
 
     /* a power-on: RTC words are ignored even if something is there */
     preport_pack(&(preport_times_t){.on = 5}, 9, s_words);

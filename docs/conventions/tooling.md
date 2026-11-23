@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # Tooling experiments
 
 What we measured before choosing the C checkers, so phase 1 and phase 3 start from facts. Issue
@@ -43,7 +50,7 @@ AllowShortFunctionsOnASingleLine: All
 AllowShortEnumsOnASingleLine: true
 AllowShortRecordOnASingleLine: Always
 AlignAfterOpenBracket: Align
-AlignTrailingComments: {Kind: Leave}
+AlignTrailingComments: {Kind: Always, OverEmptyLines: 0}  # Leave is not idempotent in 23.1.5
 AlignEscapedNewlines: Left
 SortIncludes: Never
 IncludeBlocks: Preserve
@@ -112,8 +119,32 @@ Functions over 60 lines, counted with blank lines and comments: 17. The longest 
 (279, `sim_script.c`), `link_rx_dispatch` (149), `run` (145, `sim_script.c`), `ui_on_gesture` (143)
 and `ui_home_card_update` (133).
 
-Phase 3 plan: land the candidate `.clang-tidy` and run it on changed lines with
-`clang-tidy-diff.py`; the 602 current warnings are the baseline.
+**Landed (phase 3).** The candidate is the root `.clang-tidy`, with the decisions of c.md:
+`ShortStatementLines: 1`, `TypedefIgnoredRegexp: '^[a-z0-9_]+_fn$'`, `TAG` allowed, and
+clang-analyzer moved out of the default run. `scripts/check.d/lint_c.py` runs it over the whole
+tree, not changed lines, against a per-check, per-file baseline that only shrinks:
+
+- The compile database is configured in `${XDG_CACHE_HOME:-~/.cache}/agentlink-check/sim-db/<hash of
+  the worktree path>`. Configure is enough for clang-tidy (no generated headers). LVGL is cloned once
+  into `.../agentlink-check/src/lvgl-<tag>` and shared through `FETCHCONTENT_SOURCE_DIR_LVGL`.
+- 75 files: the 60 before plus the 15 simulator tests and `test_vectors.c`. A header finding is
+  counted once. Aliased findings (`bugprone-unchecked-string-to-number-conversion,cert-err34-c`) are
+  counted under the non-CERT name.
+- The `nm` backstop compiles only core's 63 objects (not LVGL) and checks every exported symbol
+  against the three `*IgnoredRegexp` allowlists in `.clang-tidy`. Nothing first-party fails it;
+  only `third_party/detools` would, and it is ignored.
+
+| Run (4 cores) | Wall time | Findings |
+|---|---|---|
+| Default, warm | 6 s | 741 |
+| Default, cold (configure + core objects) | 12 s | 741 |
+| `--analyzer`, warm | 62 s | 756 |
+
+A first run in a new cache also clones LVGL (about 480 MB, 20 to 30 s). Baseline by check:
+braces 503, identifier-naming 83 (68 global constants, mostly `sound_bank.c`, and 15 variables),
+unchecked string-to-number 64, function-size 31, suspicious-string-compare 24,
+use-internal-linkage 12 (tests), implicit-widening 8, assignment-in-if 4, float-loop-counter 3,
+integer-division 2, branch-clone 2, five checks with 1 each, and 15 clang-analyzer findings.
 
 ## 3. `idf.py clang-check` on the firmware
 
@@ -159,7 +190,7 @@ need one written, and `sw_power.h` has two `//` comments. A run with `WARN_AS_ER
 that is done, so the coverage counts are the baseline: `/**` comments may only go up, and undocumented
 functions only down. Candidate Doxyfile (paths from the repository root):
 
-```
+```text
 INPUT = firmware/components/core/include firmware/components/agentlink_hal/include \
         firmware/boards/stopwatch/sw_power/include
 FILE_PATTERNS = *.h

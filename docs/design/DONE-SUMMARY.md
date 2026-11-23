@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: ui
+issue: 20261112-d01e
+last_reviewed: 2026-11-22
+summary: What the turn did, at a glance (protocol 0.14)
+---
+
 # Done summary: what the turn did, at a glance
 
 > Status: built on branch `done-summary` (issue 20261112-d01e). Protocol 0.14. Simulator-verified; not run on the
@@ -10,7 +18,7 @@
 A finished agent card said little more than that it finished. It now says what the turn did: how many files it
 changed, how many lines it added and removed, whether the tests passed, and how long it took:
 
-```
+```text
         ✓ Done  1m 34s
         ━━━━━━━───────            (context capsule, GAUGES.md)
    3 files · +120 –14 · ✓ passed · 4m 12s

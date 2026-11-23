@@ -1,5 +1,6 @@
-/* Tabular digits (UI-V3 2.1): every Figtree font draws 0-9 with one advance, so a ticking time, a count or a
- * percentage never moves its neighbours. Measures real strings in every size the UI uses. */
+/* Tabular digits (UI-V3 2.1): every Figtree font draws 0-9 with one advance, so a ticking time, a
+ * count or a percentage never moves its neighbours. Measures real strings in every size the UI
+ * uses. */
 #include <stdio.h>
 
 #include "lvgl.h"
@@ -29,12 +30,14 @@ int main(void)
     static const struct {
         const char *name;
         const lv_font_t *f;
-    } fonts[] = {{"caption 20/500", FONT_CAPTION}, {"body 20/400", FONT_BODY}, {"strong 20/600", FONT_BODY_STRONG},
-                 {"head 24/600", FONT_HEAD}, {"title 34/600", FONT_TITLE}, {"num 56/600", FONT_NUM}};
+    } fonts[] = {{"caption 20/500", FONT_CAPTION},    {"body 20/400", FONT_BODY},
+                 {"strong 20/600", FONT_BODY_STRONG}, {"head 24/600", FONT_HEAD},
+                 {"title 34/600", FONT_TITLE},        {"num 56/600", FONT_NUM}};
     for (unsigned i = 0; i < sizeof fonts / sizeof fonts[0]; i++) {
         const lv_font_t *f = fonts[i].f;
         char a[8], b[8];
-        for (int d = 1; d <= 9; d++) { /* each digit against 0, alone and inside the shapes the UI prints */
+        for (int d = 1; d <= 9; d++) {
+            /* each digit against 0, alone and inside the shapes the UI prints */
             snprintf(a, sizeof a, "%d", d);
             same(fonts[i].name, f, a, "0");
             snprintf(a, sizeof a, "%d:%d%d", d, d, d);

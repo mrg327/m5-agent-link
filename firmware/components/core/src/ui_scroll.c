@@ -1,19 +1,23 @@
-/* The SCROLL screen in Sigil (docs/design/GLYPHS.md §5; UI-V2 §4.4 for what it does): the centre is a trackpad
- * for the focused terminal's scrollback. A drag step is one wheel line, a release at speed glides on, B pages,
- * A jumps back to the live bottom. The first step on an idle link goes out at once, later ones are summed into
- * one cmd_op_scroll per NAV_SCROLL_COALESCE_MS; the daemon's scroll_pos corrects the position and (privacy
- * >= preview) brings the line at the top of the view.
+/* The SCROLL screen in Sigil (docs/design/GLYPHS.md §5; UI-V2 §4.4 for what it does): the centre is
+ * a trackpad for the focused terminal's scrollback. A drag step is one wheel line, a release at
+ * speed glides on, B pages, A jumps back to the live bottom. The first step on an idle link goes
+ * out at once, later ones are summed into one cmd_op_scroll per NAV_SCROLL_COALESCE_MS; the
+ * daemon's scroll_pos corrects the position and (privacy >= preview) brings the line at the top of
+ * the view.
  *
  * What is on the glass:
  *   - whose terminal: the project's sigil and the agent's mark under it, as on the deck;
- *   - the scrollback as a column of bars, one a line, each as long as its line number makes it, so the column
- *     moves with the finger like the text it stands for. The row in the middle is where the view is: the
- *     terminal's own line when the daemon sends one (text: terminal content), a bright bar otherwise. Rows
- *     under it are the lines down to the live bottom; there are none when the view is live, and the live
- *     glyph stands there instead, in the session's colour. Rows above stop at the top of the scrollback;
- *   - how far up, as geometry (rule 4): a track bent along the left of the screen with a thumb, at the lower
- *     end when live. It is on the left because the finger comes in from the right. No number;
- *   - the hints: A is the live glyph (back to the bottom, and out), B a page down; neither while live.
+ *   - the scrollback as a column of bars, one a line, each as long as its line number makes it, so
+ *     the column moves with the finger like the text it stands for. The row in the middle is where
+ *     the view is: the terminal's own line when the daemon sends one (text: terminal content), a
+ *     bright bar otherwise. Rows under it are the lines down to the live bottom; there are none
+ *     when the view is live, and the live glyph stands there instead, in the session's colour. Rows
+ *     above stop at the top of the scrollback;
+ *   - how far up, as geometry (rule 4): a track bent along the left of the screen with a thumb, at
+ *     the lower end when live. It is on the left because the finger comes in from the right. No
+ *     number;
+ *   - the hints: A is the live glyph (back to the bottom, and out), B a page down; neither while
+ *     live.
  * The report still says "[142] lines up" / "Live" and the preview (rule 9). */
 #include <math.h>
 #include <stdio.h>
@@ -30,28 +34,30 @@
 /* Geometry: centres. */
 #define SIGIL_Y 50
 #define SIGIL_R 22
-#define MARK_Y 84          /* the agent's mark, as on the deck */
-#define VIEW_Y 228         /* the row where the view is: the preview line, or a bright bar */
-#define PREVIEW_W 330      /* from the column's left edge: it is a line of the column */
-#define ROWS 5             /* bars above the view, and as many under it */
+#define MARK_Y 84     /* the agent's mark, as on the deck */
+#define VIEW_Y 228    /* the row where the view is: the preview line, or a bright bar */
+#define PREVIEW_W 330 /* from the column's left edge: it is a line of the column */
+#define ROWS 5        /* bars above the view, and as many under it */
 #define ROW_PITCH 18
-#define ROW_GAP 28         /* from the view row to the first bar */
+#define ROW_GAP 28 /* from the view row to the first bar */
 #define BAR_H 6
-#define BAR_X 100          /* a bar starts here plus its indent ... */
-#define BAR_INDENT 16      /* ... of 0 to 3 of these ... */
-#define BAR_MIN 56         /* ... and is this long at least, */
-#define BAR_VAR 144        /* this much longer at most: it ends at x 348 or before */
+#define BAR_X 100     /* a bar starts here plus its indent ... */
+#define BAR_INDENT 16 /* ... of 0 to 3 of these ... */
+#define BAR_MIN 56    /* ... and is this long at least, */
+#define BAR_VAR 144   /* this much longer at most: it ends at x 348 or before */
 #define MAP_X0 (BAR_X - 4)
 #define MAP_X1 (BAR_X + 3 * BAR_INDENT + BAR_MIN + BAR_VAR + 4)
 #define MAP_HALF (ROW_GAP + (ROWS - 1) * ROW_PITCH + BAR_H) /* the column's half height */
-#define LIVE_Y 300         /* the live glyph, under the view row */
-#define TRACK_R 182        /* the position track: left of the column, from 235 degrees (live) up to 305 */
+#define LIVE_Y 300                                          /* the live glyph, under the view row */
+/* the position track: left of the column, from 235 degrees (live) up to 305 */
+#define TRACK_R 182
 #define TRACK_W 10
 #define TRACK_START 235
 #define TRACK_SPAN 70
-#define THUMB_LEN 150      /* per mille of the track */
-#define STOP_GAP_MS 400     /* the end-of-scrollback thud repeats at most this often */
-#define UNKNOWN_TOTAL_SOFT 100 /* total unknown: the thumb sits at lines/(lines+this), so 100 lines = half way */
+#define THUMB_LEN 150   /* per mille of the track */
+#define STOP_GAP_MS 400 /* the end-of-scrollback thud repeats at most this often */
+/* total unknown: the thumb sits at lines/(lines+this), so 100 lines = half way */
+#define UNKNOWN_TOTAL_SOFT 100
 
 static int s_fast_port = -1; /* the port asked for the short interval, -1 none */
 static lv_obj_t *s_root, *s_sigil, *s_marks, *s_map, *s_live, *s_preview, *s_track, *s_key[2];
@@ -73,7 +79,7 @@ static int s_detent_lines; /* finger-driven lines since the last detent */
 /* glide: velocity (px/s, up < 0), sub-step travel carried between ticks, clock */
 static float s_glide_v, s_glide_px;
 static uint32_t s_glide_ms, s_glide_t0;
-static bool s_caught; /* the current touch stopped a glide: its tap must not leave */
+static bool s_caught;  /* the current touch stopped a glide: its tap must not leave */
 static int s_last_dir; /* -1 up (older), +1 down (newer): which end can "stop" */
 static uint32_t s_stop_ms;
 
@@ -91,8 +97,8 @@ static bool live(void) { return s_at_bottom || s_lines_above == 0; }
 
 /* ───────── the column of bars ───────── */
 
-/* A line's bar, from its number: the same line is the same bar wherever it is on screen, so the column moves
- * as a whole when the view does. An indent and a length, like a line of a program. */
+/* A line's bar, from its number: the same line is the same bar wherever it is on screen, so the
+ * column moves as a whole when the view does. An indent and a length, like a line of a program. */
 static void bar_of(uint32_t line, int *x, int *w)
 {
     uint32_t h = line * 2654435761u;
@@ -114,8 +120,8 @@ static void bar(lv_layer_t *l, int x, int cy, int w, int h, lv_color_t c)
     lv_draw_rect(l, &r, &a);
 }
 
-/* Row k above the view (k > 0) is line lines_above + k, an older one; row k under it is a newer one, down to
- * line 0, the live bottom. The further from the view, the dimmer. */
+/* Row k above the view (k > 0) is line lines_above + k, an older one; row k under it is a newer
+ * one, down to line 0, the live bottom. The further from the view, the dimmer. */
 static void on_map_draw(lv_event_t *e)
 {
     static const uint8_t shade[ROWS] = {0x58, 0x48, 0x38, 0x2a, 0x1e};
@@ -134,7 +140,8 @@ static void on_map_draw(lv_event_t *e)
             bar(l, x, VIEW_Y + dy, w, BAR_H, c);
         }
     }
-    if (!s_map_text) { /* no line to show (privacy, or none sent): the view row is the brightest bar */
+    if (!s_map_text) {
+        /* no line to show (privacy, or none sent): the view row is the brightest bar */
         bar_of(s_map_lines, &x, &w);
         bar(l, x, VIEW_Y, w, BAR_H + 2, COL_TEXT);
     }
@@ -146,12 +153,14 @@ static void render(void)
     uint32_t rgb = s ? theme_session_rgb(s) : RGB_ACCENT;
     bool at_live = live();
     show(s_live, at_live);
-    for (int i = 0; i < 2; i++) show(s_key[i], !(at_live && s_have_pos)); /* at the bottom neither Bottom nor Page does anything */
+    /* at the bottom neither Bottom nor Page does anything */
+    for (int i = 0; i < 2; i++) show(s_key[i], !(at_live && s_have_pos));
     if (at_live) {
         ui_glyph_set(s_live, ICON_LIVE, lv_color_hex(rgb));
         s_count_txt[0] = 0;
     } else {
-        snprintf(s_count_txt, sizeof s_count_txt, "%u", (unsigned)s_lines_above); /* in words: the report */
+        /* in words: the report */
+        snprintf(s_count_txt, sizeof s_count_txt, "%u", (unsigned)s_lines_above);
     }
     bool prev = preview_allowed() && s_preview_txt[0];
     show(s_preview, prev);
@@ -167,7 +176,8 @@ static void render(void)
     int permille = 0;
     if (!at_live) {
         if (s_has_total && s_total > 0) permille = (int)((uint64_t)s_lines_above * 1000 / s_total);
-        else permille = (int)((uint64_t)s_lines_above * 1000 / (s_lines_above + UNKNOWN_TOTAL_SOFT));
+        else
+            permille = (int)((uint64_t)s_lines_above * 1000 / (s_lines_above + UNKNOWN_TOTAL_SOFT));
     }
     ui_track_set(s_track, permille, THUMB_LEN, lv_color_hex(rgb), COL_FILL2);
 }
@@ -180,9 +190,11 @@ bool ui_scroll_refresh(uint32_t now)
     const char *base = theme_basename(s->repo);
     char host[24], marks[24];
     theme_host_prefix(host, sizeof host, s);
-    snprintf(s_header_txt, sizeof s_header_txt, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
+    snprintf(s_header_txt, sizeof s_header_txt, "%s%s%s%s", host, theme_agent_name(s->agent),
+             theme_sep(), base[0] ? base : "(no folder)");
     ui_sigil_set_name(s_sigil, base);
-    snprintf(marks, sizeof marks, "%s%s", s->host ? ICON_G_WEB " " : "", theme_agent_glyph(s->agent)); /* remote: the globe first */
+    snprintf(marks, sizeof marks, "%s%s", s->host ? ICON_G_WEB " " : "",
+             theme_agent_glyph(s->agent)); /* remote: the globe first */
     theme_set_text(s_marks, s_marks_txt, sizeof s_marks_txt, marks);
     render();
     return true;
@@ -205,12 +217,14 @@ void ui_scroll_open(uint32_t sid, uint32_t now)
     s_preview_txt[0] = 0;
     lv_label_set_text(s_preview, "");
     if (g_ui_actions->sectors) g_ui_actions->sectors(0); /* the rim is unused here */
-    ring_set_track(ui_home_ring(), 0, RGB_ACCENT); /* ... and says so: one grey ring, no sessions to scrub */
+    /* ... and says so: one grey ring, no sessions to scrub */
+    ring_set_track(ui_home_ring(), 0, RGB_ACCENT);
     ui_scroll_refresh(now);
     show(s_root, true);
     s_fast_port = ui_link_transport();
     if (s_fast_port >= 0) hal_link_interactive((hal_link_kind_t)s_fast_port, true);
-    dbg_event("ui", "scroll", "\"sid\":%u,\"preview_allowed\":%s", (unsigned)sid, preview_allowed() ? "true" : "false");
+    dbg_event("ui", "scroll", "\"sid\":%u,\"preview_allowed\":%s", (unsigned)sid,
+              preview_allowed() ? "true" : "false");
 }
 
 void ui_scroll_close(void)
@@ -341,7 +355,8 @@ bool ui_scroll_act(nav_action_t a, const gesture_evt_t *g)
         return true;
     case NAV_SCROLL_DRAG:
         s_dragged = true;
-        push(nav_scroll_lines(g->dy), true); return true;
+        push(nav_scroll_lines(g->dy), true);
+        return true;
     case NAV_SCROLL_FLING: fling(g->vy); return true;
     case NAV_PAGE_NEWER: page(1); return true;
     case NAV_TO_BOTTOM:
@@ -364,8 +379,8 @@ bool ui_scroll_tick(uint32_t now)
     return now - s_last_input > NAV_SCROLL_TIMEOUT_MS;
 }
 
-void ui_scroll_on_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total, uint32_t total,
-                      const char *preview)
+void ui_scroll_on_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total,
+                      uint32_t total, const char *preview)
 {
     if (sid && sid != s_sid) return;
     bool was_bottom = s_have_pos && s_at_bottom;
@@ -382,8 +397,9 @@ void ui_scroll_on_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool h
         stop_haptic();
         glide_stop();
     }
-    dbg_event("ui", "scroll_pos", "\"lines_above\":%u,\"at_bottom\":%s,\"total\":%d,\"preview\":%s", (unsigned)lines_above,
-              at_bottom ? "true" : "false", has_total ? (int)total : -1, preview[0] && preview_allowed() ? "shown" : "none");
+    dbg_event("ui", "scroll_pos", "\"lines_above\":%u,\"at_bottom\":%s,\"total\":%d,\"preview\":%s",
+              (unsigned)lines_above, at_bottom ? "true" : "false", has_total ? (int)total : -1,
+              preview[0] && preview_allowed() ? "shown" : "none");
     render();
 }
 
@@ -393,7 +409,8 @@ void ui_scroll_report(ui_report_t *r)
     r->has_sel_sid = session() != NULL;
     r->sel_sid = s_sid;
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
-    if (s_count_txt[0]) ui_report_add(r, "[%s] lines up", s_count_txt); /* the number brackets keep "1" apart from "11" */
+    /* the number brackets keep "1" apart from "11" */
+    if (s_count_txt[0]) ui_report_add(r, "[%s] lines up", s_count_txt);
     else ui_report_add(r, "Live");
     if (!lv_obj_has_flag(s_preview, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_preview_txt);
 }
@@ -423,7 +440,8 @@ lv_obj_t *ui_scroll_init(lv_obj_t *screen)
     s_sigil = ui_sigil_create(s_root, UI_CX, SIGIL_Y, SIGIL_R);
     s_marks = line(s_root, FONT_CAPTION, COL_TEXT3, MARK_Y, 120);
 
-    /* the scrollback: the column, the view's own line over its middle row, the live glyph under it */
+    /* the scrollback: the column, the view's own line over its middle row, the live glyph under
+     * it */
     s_map = lv_obj_create(s_root);
     lv_obj_remove_style_all(s_map);
     lv_obj_remove_flag(s_map, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);

@@ -12,7 +12,7 @@ Camp). That ROM sets reserved upper bits in the **event type** of every LE Adver
 `0x20` instead of `0x00` (ADV_IND, connectable), `0x23` instead of `0x03`, `0x24` instead of
 `0x04` (SCAN_RSP). The kernel's Bluetooth core accepts only 0–4, logs
 
-```
+```text
 Bluetooth: hci0: unknown advertising packet type: 0x20
 ```
 

@@ -1,4 +1,5 @@
-/* Display power policy: idle timeout, wake on input, brief glow for alerts while the display is off. */
+/* Display power policy: idle timeout, wake on input, brief glow for alerts while the display is
+ * off. */
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>

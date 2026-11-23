@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # Changes: issues, branches, commits, merges
 
 How a change gets from an idea to `main`. Issue 20261122-db53 (phase 0). The rules borrow Google's
@@ -88,19 +95,25 @@ Co-Authored-By: <agent and model> <noreply address>
 - **CHG-16. Subject is `area: summary (issue ID)`.** `area` is lowercase, from the list below. The
   issue ID is the full `YYYYMMDD-xxxx`; several go as `(issues 20261122-761f, 20261122-f724)`.
   Commits that only edit the tracker use `issue:` and may name short IDs (`issue: claim db53`).
-  `planned: phase 4`
+  `checked: scripts/check commits` (scripts/check.d/commit_msg.py); the check accepts the ID in the
+  subject or the body
 - **CHG-17. Imperative mood:** "add", "fix", "drop", as if completing "this commit will …". Not
-  "added", "adds" or "adding". `review`
+  "added", "adds" or "adding". `review`; `checked: scripts/check commits`
+  (scripts/check.d/commit_msg.py) refuses a short list of leading words (`added`, `fixes`,
+  `updating`, …)
 - **CHG-18. Subject at most 72 characters,** with no trailing full stop. Move detail to the body.
-  `planned: phase 4`
+  `checked: scripts/check commits` (scripts/check.d/commit_msg.py)
 - **CHG-19. The subject stands alone.** "fix bug", "wip", "phase 1", "updates" say nothing in
-  `git log --oneline`; Google lists them as bad examples. `planned: phase 4` (a short deny list)
+  `git log --oneline`; Google lists them as bad examples. `checked: scripts/check commits`
+  (scripts/check.d/commit_msg.py, a short deny list)
 - **CHG-20. A blank line, then a body for any non-trivial change.** The body says *why* first, then
   *what*; the diff already shows *how*. Quantify claims ("463 s -> 33 s"). Keep it self-contained:
   a reader should not need the chat or the issue to follow it. `review`
 - **CHG-21. Wrap the body at 72 columns.** Long URLs, paths and pasted output may run over.
-  `planned: phase 4`
-- **CHG-22. Trailers go last, one per line, after a blank line.** `planned: phase 4`
+  `checked: scripts/check commits` (scripts/check.d/commit_msg.py; lines with a URL, lines indented
+  4 spaces and fenced code are exempt)
+- **CHG-22. Trailers go last, one per line, after a blank line.** `checked: scripts/check commits`
+  (scripts/check.d/commit_msg.py)
 
 Good:
 
@@ -142,8 +155,9 @@ history at 2026-11-22):
   `atlas`, `bench`, `board`, `tools`, `scripts`, `docs`, `ci`, `issue`. Inside a component, a module
   or crate name is fine when the change stays in it: `ui`, `nav`, `power`, `ble`, `ota`, `voice`,
   `jobs`, `keys`, `core` (firmware); `agentlinkd`, `agentlink`, `hook` (daemon). Spell each one
-  one way: `issue` not `issues`, `protocol` not `proto`, `sim` not `simulator`. `review`
-  (`planned: phase 4` warns on an area not in this list)
+  one way: `issue` not `issues`, `protocol` not `proto`, `sim` not `simulator`. `review`;
+  `checked: scripts/check commits` (scripts/check.d/commit_msg.py) fails on `issues`, `proto`,
+  `simulator` and `hooks`, and warns on an area not in this list
 - **CHG-24. A change across two areas** names both, comma-separated: `docs, protocol: …`. Three or
   more usually means the commit should be split. `review`
 - **CHG-25. A protocol version bump** goes in the summary, not the area:
@@ -156,7 +170,8 @@ history at 2026-11-22):
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Git treats the key case-insensitively;
   write it `Co-Authored-By`. A human runs every agent and is responsible for what it commits, as in
   the [Linux AI policy](https://docs.kernel.org/process/coding-assistants.html). An agent never adds
-  `Signed-off-by:`. `planned: phase 4` (required when `AGENT_NAME` is set)
+  `Signed-off-by:`. `checked: scripts/check commits` (scripts/check.d/commit_msg.py: spelling
+  always; the hook also requires the trailer and refuses `Signed-off-by:` when `AGENT_NAME` is set)
 - **CHG-27. Other trailers we use:** `Claude-Session:` (the session link the Claude Code harness
   adds), `Fixes: <12-char sha> ("subject")` when a commit repairs an earlier one, and
   `Co-Authored-By:` for a second human. No `Link:` or `Closes:` to private URLs. `review`
@@ -184,7 +199,8 @@ commit-message check will look at new commits only and never rewrite history.
 - **CHG-28. Merge subject: `Merge branch 'x': summary (issues …)`**, naming what the branch adds
   and every issue it closes, e.g.
   `Merge branch 'bench': drive the watch like a finger, frame timeline and task report (issue 20261122-bb2e)`.
-  Merge subjects may exceed 72 characters. `planned: phase 4`
+  Merge subjects may exceed 72 characters. `checked: scripts/check commits`
+  (scripts/check.d/commit_msg.py)
 - **CHG-29. Merging `main` into a branch** keeps git's default `Merge branch 'main' into x`; add a
   summary when it brings something the branch depends on. `review`
 - **CHG-30. Close the branch's issues right after the merge** (`issue: close …`), with the merge
@@ -198,16 +214,40 @@ git diff --stat                    # one logical change? generated files include
 scripts/issue log ID "…"           # what you did and what you checked
 ```
 
-## 8. Planned commit-message check (phase 4)
+## 8. The commit-message check
 
-A `scripts/check commits` step, also usable as a `commit-msg` hook, will check every commit on the
-branch that is not yet on `main`:
+`scripts/check.d/commit_msg.py` checks the rules of §5 and §6 marked `checked: scripts/check
+commits`. It runs in two ways:
 
-1. subject matches `^[a-z0-9/_-]+(, [a-z0-9/_-]+)*: \S` or `^Merge `;
-2. subject is at most 72 characters (merges exempt) and does not end in `.`;
-3. a work commit (not `issue:`, not a merge) names an issue ID `\d{8}-[0-9a-f]{4}`;
-4. subject is not on a short deny list (`fix bug`, `wip`, `update`, `phase \d`);
-5. a blank line follows the subject, and body lines are at most 72 columns (URLs exempt);
-6. a `Co-Authored-By:` trailer is present when `AGENT_NAME` is set; no agent `Signed-off-by:`.
+```sh
+git config core.hooksPath scripts/hooks          # once per clone: the commit-msg hook
+python3 scripts/check.d/commit_msg.py            # every commit on HEAD after the cutoff
+python3 scripts/check.d/commit_msg.py --range main..HEAD   # one branch's commits
+```
+
+The hook (`scripts/hooks/commit-msg`) checks the message you are writing, before the commit exists;
+if it fails, fix the message and retry with
+`git commit -e -F "$(git rev-parse --git-dir)/COMMIT_EDITMSG"`. `fixup!` and `squash!` commits pass
+the hook, since they are squashed away. Run without `--file`, the script checks every commit after
+the cutoff in `scripts/check.d/baselines/commit_msg_since.txt`, the last commit before the check
+existed, so older history is never checked and never rewritten. A merge is checked against CHG-28
+only. CI needs full history for this (`fetch-depth: 0`).
+
+What it checks:
+
+1. subject matches `^[a-z0-9/_-]+(, [a-z0-9/_-]+)*: \S`, or is a merge (CHG-16, CHG-28);
+2. an area is spelled one way (`issue` not `issues`); an area outside the §5 list warns (CHG-23);
+3. subject is at most 72 characters (merges exempt) and does not end in `.` (CHG-18);
+4. a work commit (not `issue:`, not a merge) names an issue ID `\d{8}-[0-9a-f]{4}` in the subject
+   or the body; a merge named `Merge branch 'x': …` names one too (CHG-16, CHG-28);
+5. the summary is not on a short deny list (`fix bug`, `wip`, `update`, `phase \d`) and does not
+   start with `added`, `fixes`, `updating` and the like (CHG-19, CHG-17);
+6. a blank line follows the subject, and body lines are at most 72 columns (URLs, indented lines
+   and fenced code exempt) (CHG-20, CHG-21);
+7. trailers come last, in one paragraph, and `Co-Authored-By` is spelled so (CHG-22, CHG-26);
+8. in the hook, when `AGENT_NAME` is set: a `Co-Authored-By:` trailer is present and there is no
+   `Signed-off-by:` (CHG-26).
 
 Each failure prints `commit:line: CHG-n message — how to fix`, so an agent can amend and retry.
+Of the 50 commits before the cutoff, 30 would have failed: 24 on subject length, 15 on body
+wrapping, 7 on `Co-authored-by` spelling, 4 on the subject shape and 2 on merge subjects.

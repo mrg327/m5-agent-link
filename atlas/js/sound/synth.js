@@ -15,7 +15,11 @@ export function durationMs(sound) {
 }
 
 function renderTrack(steps, out, rate) {
-  let phase = 0, mphase = 0, nphase = 0, lfsr = 1, i0 = 0;
+  let phase = 0,
+    mphase = 0,
+    nphase = 0,
+    lfsr = 1,
+    i0 = 0;
   for (const s of steps) {
     const len = samples(s.ms, rate);
     const ramp = Math.max(1, Math.min(Math.round(0.002 * rate), Math.floor(len / 4)));
@@ -65,7 +69,8 @@ export function render(sound, rate = 16000) {
 
 // A role's cue: the pick played `times` times with `gapMs` of silence between (snd_role_t).
 export function repeat(pcm, times = 1, gapMs = 0, rate = 16000) {
-  const gap = samples(gapMs, rate), n = Math.max(1, times);
+  const gap = samples(gapMs, rate),
+    n = Math.max(1, times);
   const out = new Float32Array(n * pcm.length + (n - 1) * gap);
   for (let k = 0; k < n; k++) out.set(pcm, k * (pcm.length + gap));
   return out;

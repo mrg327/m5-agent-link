@@ -26,10 +26,15 @@ EMSCRIPTEN_KEEPALIVE void wasm_deliver(int kind, int len)
 }
 EMSCRIPTEN_KEEPALIVE void wasm_link_up(int kind, int up) { web_link_up(kind, up); }
 EMSCRIPTEN_KEEPALIVE const uint32_t *wasm_fb_ptr(void) { return web_framebuffer(); }
-/* Returns 1 and fills wasm_dirty_ptr() (x1,y1,x2,y2 inclusive) if pixels changed since last call. */
+/* Returns 1 and fills wasm_dirty_ptr() (x1,y1,x2,y2 inclusive) if pixels changed since last
+ * call. */
 EMSCRIPTEN_KEEPALIVE int wasm_take_dirty(void) { return web_take_dirty(); }
 EMSCRIPTEN_KEEPALIVE const int *wasm_dirty_ptr(void) { return web_dirty_rect(); }
 EMSCRIPTEN_KEEPALIVE const char *wasm_screen_name(void) { return core_screen_name(); }
-EMSCRIPTEN_KEEPALIVE int wasm_fps(void) { extern uint32_t app_fps(void); return (int)app_fps(); }
+EMSCRIPTEN_KEEPALIVE int wasm_fps(void)
+{
+    extern uint32_t app_fps(void);
+    return (int)app_fps();
+}
 EMSCRIPTEN_KEEPALIVE void wasm_dump_ui_state(void) { core_dump_ui_state(); }
 EMSCRIPTEN_KEEPALIVE void wasm_set_wallclock(unsigned unix_s) { web_set_wallclock(unix_s); }

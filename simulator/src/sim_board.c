@@ -1,4 +1,5 @@
-/* Board-level hal.h functions for the simulator: info, time, buttons, motion, haptics, power, debug. */
+/* Board-level hal.h functions for the simulator: info, time, buttons, motion, haptics, power,
+ * debug. */
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,8 +44,10 @@ uint64_t hal_time_us(void)
 
 void sim_skip_time(uint32_t ms) { s_skip_us += (uint64_t)ms * 1000u; }
 
-static bool s_rtc_unknown; /* set to 0: the clock stays unknown, as on a board whose RTC was never set */
-uint32_t hal_rtc_get_unix(void) { return s_rtc_unknown ? 0 : (uint32_t)((int64_t)time(NULL) + s_rtc_offset); }
+/* set to 0: the clock stays unknown, as on a board whose RTC was never set */
+static bool s_rtc_unknown;
+uint32_t hal_rtc_get_unix(void)
+{ return s_rtc_unknown ? 0 : (uint32_t)((int64_t)time(NULL) + s_rtc_offset); }
 void hal_rtc_set_unix(uint32_t unix_s)
 {
     s_rtc_unknown = unix_s == 0;
@@ -72,8 +75,11 @@ void sim_motion_poll(uint32_t now_ms)
 {
     if (!s_tilt_stream || !s_motion_cb || (int32_t)(now_ms - s_pose_next_ms) < 0) return;
     s_pose_next_ms = now_ms + 100;
-    hal_motion_evt_t e = {.kind = HAL_MOTION_TILT, .x_mg = (int16_t)s_pose[0], .y_mg = (int16_t)s_pose[1],
-                          .z_mg = (int16_t)s_pose[2], .t_us = hal_time_us()};
+    hal_motion_evt_t e = {.kind = HAL_MOTION_TILT,
+                          .x_mg = (int16_t)s_pose[0],
+                          .y_mg = (int16_t)s_pose[1],
+                          .z_mg = (int16_t)s_pose[2],
+                          .t_us = hal_time_us()};
     s_motion_cb(&e);
 }
 
@@ -101,7 +107,8 @@ void hal_pref_set(const char *key, uint32_t value)
 
 void sim_input_button(int btn, bool down)
 {
-    if (s_button_cb) s_button_cb(btn ? HAL_BTN_B : HAL_BTN_A, down ? HAL_BTN_DOWN : HAL_BTN_UP, hal_time_us());
+    if (s_button_cb)
+        s_button_cb(btn ? HAL_BTN_B : HAL_BTN_A, down ? HAL_BTN_DOWN : HAL_BTN_UP, hal_time_us());
 }
 
 void sim_input_motion(hal_motion_kind_t kind)
@@ -158,11 +165,15 @@ void sim_set_battery_pct(unsigned pct, bool charging)
 
 hal_battery_t hal_battery_read(void)
 {
-    if (s_batt_chg >= 0) return (hal_battery_t){.percent = (uint8_t)s_batt_pct, .charging = s_batt_chg, .usb_present = s_batt_chg};
-    return (hal_battery_t){.percent = (uint8_t)s_batt_pct, .charging = false, .usb_present = !s_on_battery};
+    if (s_batt_chg >= 0)
+        return (hal_battery_t){
+            .percent = (uint8_t)s_batt_pct, .charging = s_batt_chg, .usb_present = s_batt_chg};
+    return (hal_battery_t){
+        .percent = (uint8_t)s_batt_pct, .charging = false, .usb_present = !s_on_battery};
 }
 
-/* The power report's voltages, derived from the scripted percent (the device's own linear 3.3-4.2 V map). */
+/* The power report's voltages, derived from the scripted percent (the device's own linear 3.3-4.2 V
+ * map). */
 hal_battery_mv_t hal_battery_mv(void)
 {
     hal_battery_t b = hal_battery_read();
@@ -193,7 +204,7 @@ void sim_log(const char *ev, const char *fmt, ...)
         va_end(ap);
     }
     char line[300];
-    snprintf(line, sizeof line, "{\"ts_us\":%llu,\"cat\":\"sim\",\"ev\":\"%s\"%s%s}", (unsigned long long)hal_time_us(),
-             ev, body[0] ? "," : "", body);
+    snprintf(line, sizeof line, "{\"ts_us\":%llu,\"cat\":\"sim\",\"ev\":\"%s\"%s%s}",
+             (unsigned long long)hal_time_us(), ev, body[0] ? "," : "", body);
     hal_debug_line(line);
 }

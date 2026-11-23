@@ -47,7 +47,8 @@ static void render_track(const snd_track_t *t, int16_t *out, size_t max)
     for (unsigned k = 0; k < t->n; k++) {
         const snd_step_t *s = &t->steps[k];
         size_t len = samples(s->ms);
-        size_t ramp = len / 4 < 32 ? len / 4 : 32; /* 2 ms at 16 kHz, at most a quarter of the step */
+        /* 2 ms at 16 kHz, at most a quarter of the step */
+        size_t ramp = len / 4 < 32 ? len / 4 : 32;
         if (ramp < 1) ramp = 1;
         float amp = s->vol / 15.f * 0.5f;
         float ratio = s->wave == SND_FM ? 2.f : 3.5f, index = s->wave == SND_FM ? 2.5f : 3.f;
@@ -132,11 +133,13 @@ void sound_play(const char *role)
         cache[i].pcm = pcm;
         cache[i].r = r;
     }
-    /* A finish can arrive as both an attention and a session change: play it once, not restarted. */
+    /* A finish can arrive as both an attention and a session change: play it once, not
+     * restarted. */
     static const snd_role_t *last;
     static uint64_t last_us;
     uint64_t now = hal_time_us();
-    if (r == last && now - last_us < 300000 && now - last_us < cache[i].n * 1000000ull / SND_RATE) return;
+    if (r == last && now - last_us < 300000 && now - last_us < cache[i].n * 1000000ull / SND_RATE)
+        return;
     last = r;
     last_us = now;
     hal_audio_play(cache[i].pcm, cache[i].n);

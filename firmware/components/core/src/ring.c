@@ -12,8 +12,7 @@ void ring_mutex_unlock(ring_mutex_t *m) { xSemaphoreGive(m->h); }
 #else
 static void spin(atomic_flag *f)
 {
-    while (atomic_flag_test_and_set_explicit(f, memory_order_acquire)) {
-    }
+    while (atomic_flag_test_and_set_explicit(f, memory_order_acquire)) {}
 }
 static void lock(ring_t *r) { spin(&r->lock); }
 static void unlock(ring_t *r) { atomic_flag_clear_explicit(&r->lock, memory_order_release); }
@@ -65,8 +64,8 @@ bool ring_pop(ring_t *r, void *item)
     return ok;
 }
 
-/* The free slot at the tail is the pusher's alone until count covers it, and the slot at the head is the
- * popper's until head moves past it; the lock only guards head and count. */
+/* The free slot at the tail is the pusher's alone until count covers it, and the slot at the head
+ * is the popper's until head moves past it; the lock only guards head and count. */
 bool ring_push_n(ring_t *r, const void *item, size_t n)
 {
     if (n > r->item_size) n = r->item_size;

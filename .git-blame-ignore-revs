@@ -1,0 +1,14 @@
+# Commits that only reformat code (no behaviour change), hidden from `git blame`.
+#
+# GitHub's blame view reads this file automatically. For local `git blame`, run once per clone:
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# One full 40-character commit hash per line, with a comment line above it saying what it did.
+# Add a commit here only when it is purely mechanical (a formatter run, a comment-style change).
+
+# tools: reformat Python with Ruff 0.17.6, 100 columns
+9cf2d3fe6f043a921f3d2a6069bbd4793e25f7c3
+# atlas, tools: reformat JS and TS with Prettier 3.10.1
+0c2d4e44cc4851ae533cee31d0d6c5f59a998753
+# firmware, sim: reformat C and C++ with clang-format 23.1.5 (and // to /* */)
+6932c6bf650932902a5c24e4dc82b6bd795cb2e8

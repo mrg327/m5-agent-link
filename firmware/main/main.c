@@ -37,9 +37,7 @@ void app_main(void)
 #else
     lv_init();
     lv_display_t *disp = hal_display_create();
-    if (disp == NULL) {
-        ESP_LOGE(TAG, "display init failed");
-    }
+    if (disp == NULL) { ESP_LOGE(TAG, "display init failed"); }
     hal_touch_create(disp);
     hello_screen();
     hal_debug_line("{\"cat\":\"ui\",\"ev\":\"hello\"}");

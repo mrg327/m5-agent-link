@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: daemon
+issue: [20261113-da11, 20261113-bcd9]
+last_reviewed: 2026-11-13
+summary: Read what the agent said, answer what it asks (protocol 0.18)
+---
+
 # Last message and questions: read what the agent said, answer what it asks
 
 > Status: built on branch `response` (issues 20261113-da11 and 20261113-bcd9). Protocol 0.18. Run against the
