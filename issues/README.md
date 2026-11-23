@@ -74,6 +74,9 @@ You may use a unique prefix of an ID.
 
 ## Checks to run before closing
 
+`scripts/check --changed` runs the checks for the areas your branch touches, and `scripts/check AREA…`
+runs named ones; it wraps the commands below ([docs/conventions/](../docs/conventions/README.md)).
+
 | Area | Command |
 |---|---|
 | firmware / simulator | `cmake -S simulator -B build/sim -G Ninja && cmake --build build/sim && ctest --test-dir build/sim -j 16 --output-on-failure` |

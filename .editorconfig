@@ -1,0 +1,70 @@
+# Editor defaults for this repository (https://editorconfig.org).
+# Indent sizes match what the existing files use. max_line_length is the limit from
+# docs/conventions; editors only show it, and the formatters will check it (phase 1).
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{c,h,cpp}]
+max_line_length = 100
+
+[*.rs]
+max_line_length = 100
+
+[*.py]
+max_line_length = 100
+
+[*.{js,mjs,cjs,ts,json,jsonl,css,html}]
+indent_size = 2
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.toml]
+indent_size = 4
+
+[{CMakeLists.txt,*.cmake}]
+indent_size = 4
+
+# CDDL: 2-space continuation, with groups aligned by hand.
+[*.cddl]
+indent_size = 2
+
+[{Makefile,*.mk,Kbuild}]
+indent_style = tab
+
+# Markdown: two trailing spaces are a hard line break, so do not strip them.
+[*.md]
+trim_trailing_whitespace = false
+
+# Patches: a context line for an empty line is a lone space.
+[*.patch]
+trim_trailing_whitespace = unset
+insert_final_newline = unset
+
+# Vendored and generated code keeps its upstream style.
+[firmware/components/core/third_party/**]
+indent_style = unset
+indent_size = unset
+trim_trailing_whitespace = unset
+insert_final_newline = unset
+max_line_length = unset
+
+[firmware/components/agentlink_proto/{include,src}/{zcbor_*,agentlink_codec_*}]
+indent_style = unset
+indent_size = unset
+trim_trailing_whitespace = unset
+insert_final_newline = unset
+max_line_length = unset
+
+# Pages fetched from the vendor by scripts/fetch_docs.py.
+[docs/{StopWatch.md,arduino/**,esp_idf/**,github/**,guide/**,uiflow2/**}]
+trim_trailing_whitespace = unset
+insert_final_newline = unset
