@@ -64,6 +64,8 @@ ba = "ba"
 dout = "dout"
 # "mis-tap": a tap that lands on the wrong target
 mis = "mis"
+# clang-analyzer check group (clang-analyzer-optin.*), in scripts/check.d/lint_c.py
+optin = "optin"
 # Active noise cancelling
 anc = "anc"
 # Test data: deliberate fragments and near-misses

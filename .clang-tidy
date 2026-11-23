@@ -1,0 +1,63 @@
+# clang-tidy for first-party C (docs/conventions/c.md, tooling.md §2). Pinned: clang-tidy 23.1.4
+# (PyPI wheel). Run as `python3 scripts/check.d/lint_c.py` over the simulator's compile database;
+# findings that predate it are held in scripts/check.d/baselines/lint_c.txt, which only shrinks.
+#
+# clang-analyzer-* is off here because it costs ~80 % of the run time; `lint_c.py --analyzer` adds
+# it. Most of the CERT checks below alias bugprone-/misc- ones; lint_c.py counts an alias once.
+#
+# Naming notes:
+# - A file-scope `static` is a *global* to clang-tidy (StaticVariable* means function-local only),
+#   so GlobalVariablePrefix/GlobalConstantPrefix `s_` covers C-NAME-02; extern globals pass through
+#   the IgnoredRegexps (`g_` for mutable externs, the module prefix for public tables, `font_` for
+#   fonts).
+# - GlobalFunctionPrefix 'MODULE_' is a sentinel: a public function outside the module allowlist in
+#   GlobalFunctionIgnoredRegexp is flagged, and its fix-it is meaningless. Never run with --fix.
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-signed-bitwise,
+  cert-err34-c,cert-env33-c,cert-fio38-c,cert-flp30-c,cert-msc30-c,cert-msc32-c,
+  cert-str34-c,cert-dcl37-c,cert-arr39-c,cert-int09-c,cert-msc33-c,cert-sig30-c,
+  misc-*,
+  -misc-include-cleaner,
+  readability-braces-around-statements,
+  readability-function-size,
+  readability-identifier-naming
+# First-party headers only: not LVGL, third_party/, the font tables, zcbor or agentlink_codec_*.
+HeaderFilterRegex: '(firmware/components|firmware/boards|simulator)/'
+ExcludeHeaderFilterRegex: '(third_party/|/fonts/|/zcbor_|/agentlink_codec_|/lv_conf\.h$|/_deps/|/build[^/]*/)'
+CheckOptions:
+  # C-SIZE-01
+  readability-function-size.LineThreshold: 60
+  # C-STY-04: a one-line `if (x) y;` is fine; a body on its own line needs braces.
+  readability-braces-around-statements.ShortStatementLines: 1
+  bugprone-narrowing-conversions.WarnOnIntegerToFloatingPointNarrowingConversion: false
+  bugprone-unused-return-value.AllowCastToVoid: true
+  # C-NAME-03..05
+  readability-identifier-naming.MacroDefinitionCase: UPPER_CASE
+  readability-identifier-naming.TypedefCase: lower_case
+  readability-identifier-naming.TypedefSuffix: _t
+  readability-identifier-naming.TypedefIgnoredRegexp: '^[a-z0-9_]+_fn$'
+  readability-identifier-naming.EnumConstantCase: UPPER_CASE
+  readability-identifier-naming.StructCase: lower_case
+  readability-identifier-naming.EnumCase: lower_case
+  readability-identifier-naming.UnionCase: lower_case
+  readability-identifier-naming.MemberCase: lower_case
+  # C-NAME-01: static functions are Function, public ones GlobalFunction.
+  readability-identifier-naming.FunctionCase: lower_case
+  readability-identifier-naming.GlobalFunctionCase: lower_case
+  readability-identifier-naming.GlobalFunctionPrefix: 'MODULE_'
+  readability-identifier-naming.GlobalFunctionIgnoredRegexp: '^(app|bench|cbor|core|dbg|detail|done|feedback|gauges|gesture|graph|hal|keys|link|model|motion|nav|ota|power|preport|prefs|ring|sess|sha256|sim|snd|sound|steps|theme|ui|voice|wheel|ws|agent)_[a-z0-9_]+$'
+  readability-identifier-naming.ParameterCase: lower_case
+  readability-identifier-naming.LocalVariableCase: lower_case
+  readability-identifier-naming.LocalConstantCase: lower_case
+  readability-identifier-naming.StaticVariableCase: lower_case
+  # C-NAME-02: file-scope variables and tables are s_<name>. The four g_ externs are C-MOD-04's,
+  # TAG is ESP-IDF's log tag.
+  readability-identifier-naming.GlobalVariableCase: lower_case
+  readability-identifier-naming.GlobalVariablePrefix: s_
+  readability-identifier-naming.GlobalVariableIgnoredRegexp: '^(g_[a-z0-9_]+|TAG)$'
+  readability-identifier-naming.GlobalConstantCase: lower_case
+  readability-identifier-naming.GlobalConstantPrefix: s_
+  readability-identifier-naming.GlobalConstantIgnoredRegexp: '^(font_[a-z0-9_]+|(app|bench|cbor|core|dbg|detail|done|feedback|gauges|gesture|graph|hal|keys|link|model|motion|nav|ota|power|preport|prefs|ring|sess|sha256|sim|snd|sound|steps|theme|ui|voice|wheel|ws|agent)_[a-z0-9_]+)$'
