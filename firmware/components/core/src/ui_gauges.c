@@ -403,9 +403,12 @@ void ui_gauges_status_report(ui_report_t *r)
 
 #define READOUT_Y 108 /* the row's centre in the parent AGENT gives */
 #define READOUT_H 32
+#define READOUT_W 208 /* the window AGENT gives the row (ui_agent.c READOUT_W) */
+#define READOUT_GAP 10
+#define PR_GAP 3
 
 static lv_obj_t *s_readout, *s_model, *s_mode, *s_pr, *s_pr_n;
-static char s_readout_txt[64], s_model_txt[20], s_pr_txt[16];
+static char s_readout_txt[64], s_model_txt[20], s_mdl[20], s_pr_txt[16];
 static const char *s_mode_glyph = "";
 
 /* The permission mode as a glyph, only when it is not the default (status by exception): plan is
@@ -445,7 +448,7 @@ void ui_gauges_agent_create(lv_obj_t *root)
     lv_obj_set_flex_flow(s_readout, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(s_readout, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(s_readout, 10, 0);
+    lv_obj_set_style_pad_column(s_readout, READOUT_GAP, 0);
     lv_obj_remove_flag(s_readout, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     lv_obj_align(s_readout, LV_ALIGN_TOP_MID, 0, READOUT_Y - READOUT_H / 2);
     s_model = label(s_readout, FONT_CAPTION, COL_TEXT2);
@@ -455,13 +458,41 @@ void ui_gauges_agent_create(lv_obj_t *root)
     lv_obj_set_size(pr, LV_SIZE_CONTENT, READOUT_H);
     lv_obj_set_flex_flow(pr, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(pr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(pr, 3, 0);
+    lv_obj_set_style_pad_column(pr, PR_GAP, 0);
     lv_obj_remove_flag(pr, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     s_pr = pr;
     lv_obj_t *g = label(pr, FONT_ICON_M, COL_TEXT);
     lv_label_set_text_static(g, ICON_PR);
     s_pr_n = label(pr, FONT_BODY_STRONG, COL_TEXT);
     lv_obj_add_flag(s_readout, LV_OBJ_FLAG_HIDDEN);
+}
+
+static int32_t text_w(const char *t, const lv_font_t *f)
+{
+    lv_point_t sz;
+    lv_text_get_size(&sz, t, f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    return sz.x;
+}
+
+/* The row fits its window: the mode glyph and the pull request's number are never cut, the model's
+ * name gives way and ends in an ellipsis (`out` gets what is drawn). */
+static void fit_model(char *out, size_t cap, const char *mdl, const char *mode, const char *pr)
+{
+    int32_t room = READOUT_W;
+    if (mode[0]) room -= text_w(mode, FONT_ICON_M) + READOUT_GAP;
+    if (pr[0]) {
+        room -= text_w(ICON_PR, FONT_ICON_M) + PR_GAP + text_w(pr, FONT_BODY_STRONG) + READOUT_GAP;
+    }
+    snprintf(out, cap, "%s", mdl);
+    size_t n = strlen(out);
+    while (n > 0 && text_w(out, FONT_CAPTION) > room) {
+        do { /* a character at a time */
+            n--;
+        } while (n > 0 && ((uint8_t)mdl[n] & 0xc0) == 0x80);
+        while (n > 0 && mdl[n - 1] == ' ') n--;
+        snprintf(out, cap, "%.*s\xE2\x80\xA6", (int)n, mdl);
+    }
+    if (n == 0) out[0] = 0;
 }
 
 void ui_gauges_agent_update(const session_t *s, bool shown)
@@ -473,18 +504,20 @@ void ui_gauges_agent_update(const session_t *s, bool shown)
     snprintf(s_readout_txt, sizeof s_readout_txt, "%s", buf);
     show(s_readout, on);
     if (!on) return;
-    theme_set_text(s_model, s_model_txt, sizeof s_model_txt, s->mdl);
-    show(s_model, s->mdl[0] != 0);
     uint32_t rgb = 0xffffff;
     const char *mode = mode_glyph(s, &rgb);
+    char n[12] = "", drawn[sizeof s_model_txt];
+    if (s->pr) snprintf(n, sizeof n, "%u", (unsigned)s->pr);
+    snprintf(s_mdl, sizeof s_mdl, "%s", s->mdl);
+    fit_model(drawn, sizeof drawn, s->mdl, mode, n);
+    theme_set_text(s_model, s_model_txt, sizeof s_model_txt, drawn);
+    show(s_model, drawn[0] != 0);
     if (mode != s_mode_glyph) {
         s_mode_glyph = mode;
         lv_label_set_text_static(s_mode, mode);
     }
     theme_set_text_color(s_mode, lv_color_hex(rgb));
     show(s_mode, mode[0] != 0);
-    char n[12] = "";
-    if (s->pr) snprintf(n, sizeof n, "%u", (unsigned)s->pr);
     theme_set_text(s_pr_n, s_pr_txt, sizeof s_pr_txt, n);
     lv_color_t c = lv_color_hex(pr_rgb(s->prs));
     theme_set_text_color(lv_obj_get_child(s_pr, 0), c);
@@ -494,6 +527,13 @@ void ui_gauges_agent_update(const session_t *s, bool shown)
 
 void ui_gauges_agent_report(ui_report_t *r)
 {
-    if (s_readout_txt[0] && !lv_obj_has_flag(s_readout, LV_OBJ_FLAG_HIDDEN))
+    if (!s_readout_txt[0] || lv_obj_has_flag(s_readout, LV_OBJ_FLAG_HIDDEN)) return;
+    /* a name cut to fit is reported as drawn */
+    const char *at = s_mdl[0] ? strstr(s_readout_txt, s_mdl) : NULL;
+    if (at && strcmp(s_model_txt, s_mdl) != 0) {
+        ui_report_add(r, "%.*s%s%s", (int)(at - s_readout_txt), s_readout_txt, s_model_txt,
+                      at + strlen(s_mdl));
+    } else {
         ui_report_add(r, "%s", s_readout_txt);
+    }
 }

@@ -124,6 +124,7 @@ static void take(detail_t *d, uint32_t off, uint32_t total, const uint8_t *text,
         return;
     }
     memcpy(d->text + off, text, len);
+    model_show_hidden(d->text + off, len); /* chunks end on characters */
     d->got = off + len;
     d->text[d->got] = 0;
     d->last_ms = now_ms;

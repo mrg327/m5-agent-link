@@ -303,8 +303,9 @@ void ui_report_add(ui_report_t *r, const char *fmt, ...)
     if (r->n_visible >= 8) return;
     va_list ap;
     va_start(ap, fmt);
-    vsnprintf(r->visible[r->n_visible++], sizeof r->visible[0], fmt, ap);
+    vsnprintf(r->visible[r->n_visible], sizeof r->visible[0], fmt, ap);
     va_end(ap);
+    model_utf8_drop_partial(r->visible[r->n_visible++]); /* a cut label: no stray lead byte */
 }
 
 void ui_report(ui_report_t *r)

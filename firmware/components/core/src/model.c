@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "debug.h"
+#include "ui_icons.h"
 
 MODEL_EXT_BSS static session_t s_sessions[MODEL_MAX_SESSIONS];
 static bool s_used[MODEL_MAX_SESSIONS];
@@ -79,11 +80,44 @@ bool model_pointer(void) { return s_pointer; }
 
 uint32_t model_rev(void) { return s_rev; }
 
+void model_utf8_drop_partial(char *s)
+{
+    size_t n = strlen(s), i = n;
+    while (i > 0 && ((uint8_t)s[i - 1] & 0xc0) == 0x80) i--;
+    if (i == 0) return;
+    uint8_t lead = (uint8_t)s[i - 1];
+    size_t need = lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : lead >= 0xc0 ? 2 : 1;
+    if (n - (i - 1) < need) s[i - 1] = 0;
+}
+
+#define HIDDEN_MARK "\xEF\xBF\xBD" /* U+FFFD: text the daemon could not have us draw */
+
+void model_show_hidden(char *s, size_t len)
+{
+    for (size_t i = 0; i + 3 <= len; i++) {
+        if (memcmp(s + i, HIDDEN_MARK, 3) == 0) {
+            memcpy(s + i, ICON_EYE_OFF, 3); /* the same length, so the copy stays in place */
+            i += 2;
+        }
+    }
+}
+
 void model_copy_str(char *dst, size_t cap, const uint8_t *src, size_t len)
 {
-    if (len >= cap) len = cap - 1;
+    static const char ellipsis[] = "\xE2\x80\xA6";
+    if (cap == 0) return;
+    bool cut = len >= cap;
+    bool mark = cut && cap > sizeof ellipsis;
+    if (cut) len = cap - (mark ? sizeof ellipsis : 1);
     memcpy(dst, src, len);
     dst[len] = 0;
+    model_utf8_drop_partial(dst);
+    if (mark) { /* a cut text never reads as whole (an older daemon cuts by characters) */
+        len = strlen(dst);
+        while (len > 0 && dst[len - 1] == ' ') len--;
+        memcpy(dst + len, ellipsis, sizeof ellipsis);
+    }
+    model_show_hidden(dst, strlen(dst));
 }
 
 uint32_t model_rule_hash(const char *rule, uint8_t scope, bool wide)

@@ -128,6 +128,7 @@ sim_script_test(sim_link_two_ble link_two_ble.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
   PASS_REGULAR_EXPRESSION "\"ev\":\"welcome\".*\"ev\":\"up\",\"transport\":3.*\"ev\":\"down\",\"transport\":1.*\"fake_tx\",\"transport\":3.*\"ev\":\"welcome\"")
 sim_script_test(sim_ring_empty ring_empty.txt)
+sim_script_test(sim_strings_clip strings_clip.txt)
 sim_script_test(sim_ring_one one_session.txt)
 sim_script_test(sim_ring_busy busy.txt)
 sim_script_test(sim_ring_states ring_states.txt)

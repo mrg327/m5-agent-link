@@ -29,17 +29,6 @@ static const struct hdr_r *env_hdr(const struct envelope_r *e)
     return NULL;
 }
 
-/* A copy cut at the buffer's end may stop inside a multi-byte character: drop the stub. */
-static void utf8_drop_partial(char *s)
-{
-    size_t n = strlen(s), i = n;
-    while (i > 0 && ((uint8_t)s[i - 1] & 0xc0) == 0x80) i--;
-    if (i == 0) return;
-    uint8_t lead = (uint8_t)s[i - 1];
-    size_t need = lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : lead >= 0xc0 ? 2 : 1;
-    if (n - (i - 1) < need) s[i - 1] = 0;
-}
-
 /* Wire session → model session; returns the mask of fields that were present. */
 static uint32_t convert_session(const struct session *in, session_t *out)
 {
@@ -90,7 +79,6 @@ static uint32_t convert_session(const struct session *in, session_t *out)
     }
     if (in->session_uint35tstr_present) {
         STR(in->session_uint35tstr.session_uint35tstr, out->queued);
-        utf8_drop_partial(out->queued);
         p |= SF_QD;
     }
     /* The last message (proto 0.18): a delta carries only the keys that changed. */
@@ -104,7 +92,6 @@ static uint32_t convert_session(const struct session *in, session_t *out)
     }
     if (in->session_uint38tstr_present) {
         STR(in->session_uint38tstr.session_uint38tstr, out->lp);
-        utf8_drop_partial(out->lp);
         out->lm_keys |= 4;
     }
     if (out->lm_keys) p |= SF_LM;
@@ -344,17 +331,13 @@ static void on_attention(const struct attention *in, uint32_t now_ms)
             memset(q, 0, sizeof *q);
             STR(w->ask_q_uint0tstr, q->h);
             STR(w->ask_q_uint1tstr, q->q);
-            utf8_drop_partial(q->h);
-            utf8_drop_partial(q->q);
             q->multi = w->ask_q_uint3bool_present && w->ask_q_uint3bool.ask_q_uint3bool;
             for (size_t k = 0;
                  k < w->ask_q_ask_opt_m_l_ask_opt_m_count && q->n_opts < MODEL_MAX_QOPTS; k++) {
                 const struct ask_opt *o = &w->ask_q_ask_opt_m_l_ask_opt_m[k];
                 STR(o->ask_opt_uint0tstr, q->label[q->n_opts]);
-                utf8_drop_partial(q->label[q->n_opts]);
                 if (o->ask_opt_uint1tstr_present) {
                     STR(o->ask_opt_uint1tstr.ask_opt_uint1tstr, q->desc[q->n_opts]);
-                    utf8_drop_partial(q->desc[q->n_opts]);
                 }
                 if (q->label[q->n_opts][0]) q->n_opts++;
             }
