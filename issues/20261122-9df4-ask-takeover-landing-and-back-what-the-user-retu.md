@@ -1,11 +1,11 @@
 ---
 id: 20261122-9df4
 title: ASK takeover, landing and back: what the user returns to after an interruption, a drop or an answer
-status: open
+status: claimed
 severity: med
 area: firmware
 platforms: any
-owner:
+owner: claude-code/takeover@linux-dev
 created: 2026-11-22T19:20:13Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -38,3 +38,4 @@ Repros under simulator/scripts/ux (branch ux-profile)/events.
 ## Log
 
 - 2026-11-22T19:20:13Z · claude-code@linux-dev · linux-x86_64 · 3724645: filed
+- 2026-11-23T07:05:43Z · claude-code/takeover@linux-dev · linux-x86_64 · ab35617+dirty: claimed

@@ -1,11 +1,11 @@
 ---
 id: 20261122-4b25
 title: A late result err after approving shows over another session's card; a failed approval reads as success
-status: open
+status: claimed
 severity: high
 area: firmware
 platforms: any
-owner:
+owner: claude-code/takeover@linux-dev
 created: 2026-11-22T19:20:12Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -31,3 +31,5 @@ Code: app.c on_result (toast only). Should: name the session the failure belongs
 ## Log
 
 - 2026-11-22T19:20:13Z · claude-code@linux-dev · linux-x86_64 · 3724645: filed
+- 2026-11-23T07:05:43Z · claude-code/takeover@linux-dev · linux-x86_64 · ab35617+dirty: claimed
+- 2026-11-23T07:05:50Z · claude-code/takeover@linux-dev · linux-x86_64 · ab35617+dirty: on_result: a refused approve/deny/reply/dictate/answer brings its request back on its own session through ui_offer_attention (ASK, unless the user composes: then it waits as 883f), and the refusal glyph shows over it. If ASK is already open on it, ASK restores itself as before.

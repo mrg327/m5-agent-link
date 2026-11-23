@@ -478,16 +478,21 @@ static void on_attention(const attention_t *a)
         /* a new request */
         if (a->rid != s_muted_rid || a->sid != s_muted_sid) s_muted_rid = s_muted_sid = 0;
     }
-    if (!power_display_on() || ui_glow_active()) return; /* a glow: the first touch reveals it */
     if (a->kind == ATT_DONE) return;
-    /* Jump to the new request unless the user is already looking at an unanswered one. */
+    bool error = a->kind == ATT_ERROR;
+    if (!power_display_on() || ui_glow_active()) {
+        /* nobody saw it: the touch or the raised wrist that wakes the display shows it (issue
+         * 20261122-5f79) */
+        ui_wait_attention(a->sid, error, rgb);
+        return;
+    }
+    /* The deck already shows another unanswered request: the new one is a segment on the ring. */
     ui_report_t r;
     ui_report(&r);
-    bool busy_elsewhere = r.has_sel_sid && r.sel_sid != a->sid &&
-                          (strcmp(r.screen, "attention") == 0 || strcmp(r.screen, "ask") == 0);
-    if (busy_elsewhere) return;
-    if (a->kind == ATT_ERROR) ui_show_session(a->sid);
-    else ui_show_attention(a->sid); /* a permission or question opens ASK (UI-V2 §2) */
+    if (r.has_sel_sid && r.sel_sid != a->sid && strcmp(r.screen, "attention") == 0) return;
+    /* ASK (or the card, for an error) opens unless the user composes, reads or answers another
+     * request: then it waits (UI-V2 §2, issue 20261122-883f) */
+    ui_offer_attention(a->sid, error, rgb);
 }
 
 /* A session moved into done or error: buzz when it was armed with Notify, or the watch is on it. */
@@ -523,10 +528,18 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
         return;
     }
     /* The daemon refused an answer: the request is unanswered again, so ASK restores its
-     * options. */
+     * options, and the request comes back on its own session wherever the user has moved since
+     * (issue 20261122-4b25): the refusal below shows over it, not over another card. */
     if (rid && (op == LINK_OP_APPROVE || op == LINK_OP_DENY || op == LINK_OP_REPLY ||
-                op == LINK_OP_DICTATE || op == LINK_OP_ANSWER))
+                op == LINK_OP_DICTATE || op == LINK_OP_ANSWER)) {
         model_attention_set_answer(rid, ATT_ANSWER_NONE, 0);
+        const attention_t *a = model_attention_find(rid);
+        if (a && !ui_asking(a->sid)) {
+            uint32_t rgb = a->kind == ATT_QUESTION ? RGB_ASK : RGB_PERMISSION;
+            if (!power_display_on() || ui_glow_active()) ui_wait_attention(a->sid, false, rgb);
+            else ui_offer_attention(a->sid, false, rgb);
+        }
+    }
     if (op == LINK_OP_SCROLL && sid) {
         if (err == 2) {
             /* unsupported: this terminal has no scroll API; the item disappears for the session */
@@ -612,6 +625,14 @@ static bool is_touch_gesture(gesture_kind_t k)
  * a finger that stays down nor the tap/swipe emitted after its release reaches the UI. */
 static bool s_swallow_touch;
 
+/* The screen changed under a finger that is still down, and not by that finger (a request took
+ * over, a screen closed itself): the rest of the contact is not for the new screen (issue
+ * 20261122-09b8). `seq` is ui_mode_seq() from before. */
+static void swallow_if_moved(uint32_t seq)
+{
+    if (ui_mode_seq() != seq && s_gesture.pressed) s_swallow_touch = true;
+}
+
 static void dispatch(const gesture_evt_t *g)
 {
     log_gesture(g);
@@ -623,11 +644,9 @@ static void dispatch(const gesture_evt_t *g)
         return;
     }
     if (g->kind == G_PRESS) s_swallow_touch = false; /* a new contact */
-    bool glow = ui_glow_active();
     if (power_activity(app_now_ms())) {
-        /* first touch only wakes the display (a glow: reveals the request) */
-        uint32_t sid = glow ? ui_pending_attention_sid() : 0;
-        if (sid) ui_show_attention(sid);
+        /* first touch only wakes the display and shows what buzzed while it was dark */
+        ui_reveal_attention();
         if (touch && s_gesture.pressed) s_swallow_touch = true;
         dbg_event("power", "wake_input", "\"touch\":%s", touch ? "true" : "false");
         return;
@@ -674,11 +693,9 @@ static void drain_link(uint32_t now)
  * selected. */
 static void on_raise(uint32_t now)
 {
-    bool glow = ui_glow_active();
     ui_note_motion();
     if (power_activity(now)) {
-        uint32_t sid = glow ? ui_pending_attention_sid() : 0;
-        if (sid) ui_show_attention(sid);
+        ui_reveal_attention();
         dbg_event("power", "wake_motion", NULL);
     }
 }
@@ -801,10 +818,12 @@ uint32_t core_step(void)
     /* first: the time since the last step goes to the state that held during it */
     preport_tick(now);
     drain_input(now);
+    uint32_t seq = ui_mode_seq();
     if (motion_take_raise()) on_raise(now);
     cover_step();
     drain_link(now);
     power_tick(now);
+    swallow_if_moved(seq);
     uint32_t wait = lv_timer_handler();
 
     gesture_evt_t g;
@@ -820,7 +839,9 @@ uint32_t core_step(void)
     if (keys_active()) power_activity(now); /* the keyboard keeps the display on */
     /* stay awake while dictating */
     if (voice_state() == VOICE_REC || voice_state() == VOICE_WAIT) power_activity(now);
+    seq = ui_mode_seq();
     ui_tick(now);
+    swallow_if_moved(seq);
     orientation_step();
     dbg_tick(now);
     bench_tick(now);

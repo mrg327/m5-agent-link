@@ -1,11 +1,11 @@
 ---
 id: 20261122-883f
 title: A request on another session tears down KEYS, VOICE, READ, GRAPH, STATUS, LABS: typed text and recordings are lost
-status: open
+status: claimed
 severity: high
 area: firmware
 platforms: any
-owner:
+owner: claude-code/takeover@linux-dev
 created: 2026-11-22T19:20:12Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -32,3 +32,5 @@ Should: while the user composes (KEYS, VOICE) or reads, glow/buzz/badge instead 
 ## Log
 
 - 2026-11-22T19:20:12Z · claude-code@linux-dev · linux-x86_64 · 3724645: filed
+- 2026-11-23T07:05:43Z · claude-code/takeover@linux-dev · linux-x86_64 · ab35617+dirty: claimed
+- 2026-11-23T07:05:50Z · claude-code/takeover@linux-dev · linux-x86_64 · ab35617+dirty: Choice: no automatic takeover of KEYS, VOICE, READ, GRAPH, STATUS, LABS, TRACKPAD (and of ASK on another request). The request buzzes as before and waits: a dot of its colour at 12 o'clock on the rim (ui.c ui_offer_attention/wait_step; report line 'waiting SID'). It opens (ASK, or the card for an error) when the user is next back on the deck or WATCH. HOME, AGENT, WATCH and SCROLL still take over (nothing typed is lost there; WATCH/SCROLL resume). Applies to a request on the same session too (keys_refusal.txt updated). Quiet/hush unchanged: they never took over less, now they wait the same way.

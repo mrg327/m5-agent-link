@@ -1,11 +1,11 @@
 ---
 id: 20261122-09b8
 title: A finger already down when ASK takes over carries in: its long press is ASK's back and closes the request unseen
-status: open
+status: claimed
 severity: med
 area: firmware
 platforms: any
-owner:
+owner: claude-code/takeover@linux-dev
 created: 2026-11-22T19:20:13Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -31,3 +31,5 @@ Code: app.c dispatch: s_swallow_touch is set on a wake, not when a mode change h
 ## Log
 
 - 2026-11-22T19:20:13Z · claude-code@linux-dev · linux-x86_64 · 3724645: filed
+- 2026-11-23T07:05:43Z · claude-code/takeover@linux-dev · linux-x86_64 · ab35617+dirty: claimed
+- 2026-11-23T07:05:50Z · claude-code/takeover@linux-dev · linux-x86_64 · ab35617+dirty: core_step: a mode change made by the link (drain_link) or by a screen closing itself (ui_tick) while a finger is down sets s_swallow_touch, as a wake does (swallow_if_moved). Buttons held across the change are not swallowed (out of scope here).
