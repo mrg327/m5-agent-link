@@ -32,3 +32,5 @@ jobs:
           components: rustfmt
       - name: Formatting, structure, commit messages and docs
         run: scripts/check format structure commits docs
+      - name: Python and JS linters against their baselines
+        run: scripts/check lint

@@ -69,6 +69,7 @@ area_steps() {
     lint)
         # Linters with baselines that only shrink (docs/conventions/README.md).
         echo "step|.|uv|python3 scripts/check.d/lint_py.py"
+        echo "step|.|npm|python3 scripts/check.d/lint_js.py"
         ;;
     structure)
         echo "step|.|python3|python3 scripts/check.d/structure.py"
@@ -114,6 +115,7 @@ areas_for_path() {
     case "$1" in
     *.c | *.h | *.cpp | *.hpp | *.py | *.js | *.mjs | *.ts | *.rs) echo "format lint" ;;
     ruff.toml | scripts/check.d/lint_*.py | scripts/check.d/baselines/lint_*) echo "lint" ;;
+    eslint.config.mjs | tsconfig.json | */tsconfig.json | tools/lint/*) echo "lint" ;;
     .clang-format | .clang-format-ignore | ruff.toml | rustfmt.toml) echo "format" ;;
     .prettierrc.json | .prettierignore | scripts/check.d/format.sh) echo "format" ;;
     esac
