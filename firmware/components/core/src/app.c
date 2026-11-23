@@ -486,10 +486,14 @@ static void on_attention(const attention_t *a)
         ui_wait_attention(a->sid, error, rgb);
         return;
     }
-    /* The deck already shows another unanswered request: the new one is a segment on the ring. */
+    /* The deck already shows another unanswered request: the new one is a segment on the ring, and
+     * opens once the user has left the deck (answered that one, say). */
     ui_report_t r;
     ui_report(&r);
-    if (r.has_sel_sid && r.sel_sid != a->sid && strcmp(r.screen, "attention") == 0) return;
+    if (r.has_sel_sid && r.sel_sid != a->sid && strcmp(r.screen, "attention") == 0) {
+        ui_wait_attention(a->sid, error, rgb);
+        return;
+    }
     /* ASK (or the card, for an error) opens unless the user composes, reads or answers another
      * request: then it waits (UI-V2 §2, issue 20261122-883f) */
     ui_offer_attention(a->sid, error, rgb);

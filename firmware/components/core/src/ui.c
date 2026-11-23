@@ -21,6 +21,7 @@ static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch, *s_vo
     *s_read, *s_labs, *s_trackpad, *s_graph;
 static nav_mode_t s_mode = MODE_HOME;
 static uint32_t s_mode_seq; /* counts mode changes (ui_mode_seq) */
+static uint32_t s_mode_sid; /* the session selected when the mode opened */
 static int s_rel_y;
 static bool s_link_up, s_animate = true;
 static uint32_t s_seen_rev;
@@ -185,6 +186,7 @@ static void enter_mode(nav_mode_t m)
     if (s_mode == MODE_GRAPH) ui_graph_close();
     s_mode = m;
     s_mode_seq++;
+    s_mode_sid = ui_home_sel_sid();
     ui_home_set_card_shown(m == MODE_HOME);
     if (m == MODE_AGENT) ui_agent_open(ui_home_sel_sid(), s_now_ms);
     else if (m == MODE_ASK) ui_ask_open(ui_home_sel_sid(), s_now_ms);
@@ -345,10 +347,7 @@ static const attention_t *askable_for(uint32_t sid)
 
 /* Taking over now would lose work, or hide a request the user is answering. */
 static bool takeover_blocked(uint32_t sid)
-{
-    if (mode_keeps_work(s_mode)) return true;
-    return s_mode == MODE_ASK && !ui_asking(sid);
-}
+{ return mode_keeps_work(s_mode) || (s_mode == MODE_ASK && !ui_asking(sid)); }
 
 static void wait_clear(void)
 {
@@ -359,8 +358,11 @@ static void wait_clear(void)
 static void take_over(uint32_t sid, bool error)
 {
     wait_clear();
-    if (error && !askable_for(sid)) ui_show_session(sid);
-    else ui_show_attention(sid);
+    if (error && !askable_for(sid)) {
+        ui_show_session(sid);
+    } else {
+        ui_show_attention(sid);
+    }
 }
 
 void ui_wait_attention(uint32_t sid, bool error, uint32_t rgb)
@@ -374,20 +376,23 @@ void ui_wait_attention(uint32_t sid, bool error, uint32_t rgb)
 
 void ui_offer_attention(uint32_t sid, bool error, uint32_t rgb)
 {
-    if (takeover_blocked(sid)) ui_wait_attention(sid, error, rgb);
-    else take_over(sid, error);
+    if (takeover_blocked(sid)) {
+        ui_wait_attention(sid, error, rgb);
+    } else {
+        take_over(sid, error);
+    }
 }
 
 void ui_reveal_attention(void)
 {
-    if (s_wait_sid && !takeover_blocked(s_wait_sid)) take_over(s_wait_sid, s_wait_error);
+    if (s_wait_sid && !takeover_blocked(s_wait_sid)) { take_over(s_wait_sid, s_wait_error); }
 }
 
 /* Per step: drop what no longer waits, offer it on the way back to the deck or WATCH, show the
  * dot elsewhere. */
 static void wait_step(void)
 {
-    if (!s_wait_sid) return;
+    if (!s_wait_sid) { return; }
     bool still = s_wait_error ? model_find(s_wait_sid) != NULL : askable_for(s_wait_sid) != NULL;
     /* gone, answered on the PC, or the user opened it */
     if (!still || ui_asking(s_wait_sid)) {
@@ -399,9 +404,13 @@ static void wait_step(void)
         return;
     }
     bool pip = s_mode != MODE_HOME;
-    if (pip == lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN)) {
-        if (pip) lv_obj_remove_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
-        else lv_obj_add_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
+    if (pip != lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN)) {
+        return; /* already so: no redraw */
+    }
+    if (pip) {
+        lv_obj_remove_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -424,8 +433,9 @@ void ui_report(ui_report_t *r)
     }
     ui_burst_report(r);
     if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_toast_txt);
-    if (!lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN))
+    if (!lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN)) {
         ui_report_add(r, "waiting %u", (unsigned)s_wait_sid);
+    }
     if (s_mode == MODE_AGENT) ui_agent_report(r);
     else if (s_mode == MODE_ASK) ui_ask_report(r);
     else if (s_mode == MODE_SCROLL) ui_scroll_report(r);
@@ -526,6 +536,18 @@ bool ui_glow_active(void) { return !lv_obj_has_flag(s_glow, LV_OBJ_FLAG_HIDDEN);
 
 /* ───────── per-step ───────── */
 
+/* The session a screen was opened on ended under it and the screen closed to the deck: say so, as
+ * WATCH does, instead of dropping there silently (issue 20261122-9df4, UX-PROFILE E7). */
+static void say_session_ended(nav_mode_t was, uint32_t sid)
+{
+    bool on_session = was == MODE_AGENT || was == MODE_ASK || was == MODE_SCROLL ||
+                      was == MODE_VOICE || was == MODE_KEYS || was == MODE_READ ||
+                      was == MODE_GRAPH;
+    if (!on_session || s_mode != MODE_HOME || !sid) { return; }
+    const session_t *s = model_find(sid);
+    if (!s || s->state == SESS_ENDED) { ui_toast("Session ended", RGB_IDLE); }
+}
+
 void ui_tick(uint32_t now_ms)
 {
     s_now_ms = now_ms;
@@ -537,6 +559,8 @@ void ui_tick(uint32_t now_ms)
     ui_burst_tick(now_ms);
     if (model_rev() != s_seen_rev) {
         s_seen_rev = model_rev();
+        nav_mode_t was = s_mode;
+        uint32_t was_sid = s_mode_sid; /* the deck may move off a session that left */
         ui_home_refresh(now_ms);
         if (s_mode == MODE_AGENT && !ui_agent_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_ASK && !ui_ask_refresh(now_ms)) leave_mode();
@@ -553,6 +577,7 @@ void ui_tick(uint32_t now_ms)
             enter_mode(MODE_HOME);
             ui_toast("Session ended", RGB_IDLE);
         }
+        say_session_ended(was, was_sid);
     }
     ui_home_tick(now_ms);
     if (s_mode == MODE_AGENT && ui_agent_tick(now_ms)) enter_mode(MODE_HOME);

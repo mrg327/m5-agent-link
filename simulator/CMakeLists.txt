@@ -312,6 +312,12 @@ sim_script_test(sim_keys_refusal keys_refusal.txt
 # finger already down when ASK opens is swallowed; a wake after an unseen glow opens the request.
 sim_script_test(sim_takeover_keys_waits takeover_keys_waits.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_takeover_status_waits takeover_status_waits.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# The session READ is open on ends: the deck says "Session ended" (9df4, UX-PROFILE E7).
+sim_script_test(sim_takeover_session_ended takeover_session_ended.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# A second request that arrives in ASK opens once the first is answered (9df4, UX-PROFILE E5).
+sim_script_test(sim_takeover_second_request takeover_second_request.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# AGENT keeps its selected item across a state change of the session (9df4, UX-PROFILE E9).
+sim_script_test(sim_takeover_agent_keeps_item takeover_agent_keeps_item.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_takeover_late_err takeover_late_err.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
   PASS_REGULAR_EXPRESSION "\"result\",\"ok\":false,\"err\":0,\"op\":3.*\"mode\":\"ask\".*\"text\":\"Out of date\"")
