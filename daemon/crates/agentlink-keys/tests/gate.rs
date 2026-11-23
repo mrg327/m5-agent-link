@@ -43,6 +43,10 @@ fn accuracy_gate_on_common_words() {
 
 /// CPU time of the calling thread, so time-slicing with other processes does not count.
 #[cfg(unix)]
+#[expect(
+    unsafe_code,
+    reason = "clock_gettime(2) has no safe std equivalent for thread CPU time"
+)]
 fn thread_cpu_ms() -> f64 {
     let mut ts = libc::timespec {
         tv_sec: 0,

@@ -5,6 +5,8 @@
 //! *window* is raised but the tab is not selected. When several windows belong to one
 //! WindowsTerminal.exe process (tab drag-out / `wt -w`), the first one found is used.
 
+#![expect(unsafe_code, reason = "Win32 FFI: the OS binding for raising a window")]
+
 use super::{FocusError, HostCtx};
 use std::collections::HashMap;
 use windows::core::BOOL;

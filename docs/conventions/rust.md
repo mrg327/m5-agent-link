@@ -16,8 +16,9 @@ upstream guides for everything else.
 
 Each rule ends with how it is checked: `checked: <tool>`, `review`, or `planned: phase N`
 ([README](README.md#how-a-rule-becomes-enforced)). CI (`.github/workflows/daemon.yml`) runs
-`cargo fmt --check`, `cargo clippy --workspace -- -D warnings` and `cargo test --workspace`, so
-any lint set to `warn` fails CI as soon as it is enabled. That is why new lints land with a baseline.
+`cargo test --workspace` on Linux, macOS and Windows, and `scripts/check.d/lint_rust.py` (clippy with
+the [lint table](#8-lint-table), against a baseline that only shrinks) once for all three targets.
+`cargo fmt --check` runs in `scripts/check format`.
 
 ## 1. Base
 
@@ -25,7 +26,7 @@ any lint set to `warn` fails CI as soon as it is enabled. That is why new lints 
   default `max_width = 100` already matches the 100-column C limit and Google's Rust guide. Use
   `#[rustfmt::skip]` only for hand-aligned tables or generated code. `checked: cargo fmt --check`
 - **RS-2. Clippy's default groups are clean.** `clippy::all` (correctness, suspicious, style,
-  complexity, perf) gives no warnings in the workspace. `checked: cargo clippy -D warnings`
+  complexity, perf) gives no warnings in the workspace beyond the baseline. `checked: scripts/check lint (lint_rust.py, baseline 765)`
 - **RS-3. Follow the API Guidelines checklist.** These are the sections that matter most here:
   - Naming: **C-CASE** (RFC 430 casing), **C-CONV** (`as_` is free and borrowed, `to_` is costly,
     `into_` consumes), **C-GETTER** (no `get_` prefix), **C-ITER** / **C-ITER-TY**,
@@ -39,7 +40,7 @@ any lint set to `warn` fails CI as soon as it is enabled. That is why new lints 
   - We skip C-METADATA, C-RELNOTES, C-HTML-ROOT and C-STABLE, as Fuchsia does: nothing here is
     published to crates.io.
 
-  `review`; partly `planned: phase 3` (pedantic covers some of C-CONV and C-GETTER)
+  `review`; partly `checked: scripts/check lint (lint_rust.py, baseline 765)` (pedantic covers some of C-CONV and C-GETTER)
 - **RS-4. Names are short and say what the thing is.** Use at most two short words, and don't repeat
   the module name (`focus::Error`, not `focus::FocusError`, in new code). Avoid `Manager`,
   `Service` and `Factory` (Microsoft M-SHORT-NAMES, M-WEASEL-WORDS). Constructors are `new`, and
@@ -106,8 +107,8 @@ This is what the code does today, written down so new code matches.
   smoke.rs`, `agentlink-keys/tests/gate.rs`, `agentlink-proto/tests/vectors.rs`). Tools that are run
   by hand go in `examples/`. `review`
 - **RS-13. Every file starts with `//!` saying what it is for** in one to three lines, and why if
-  that is not obvious. Most files already do (see `pointer.rs`). `review`; `planned: phase 4`
-  (`missing_docs` covers public modules)
+  that is not obvious. Most files already do (see `pointer.rs`). `review`; in library crates also
+  `missing_docs` (RS-31)
 - **RS-14. Keep `pub` narrow.** Use `pub(crate)` for items shared inside a crate. Library crates
   re-export their API from `lib.rs`, and each item has one public path (M-SINGLE-ITEM-PATH).
   `review`
@@ -151,9 +152,9 @@ A panic in `agentlinkd` takes down the link to the watch for every session, so w
 (Microsoft M-PANIC-IS-STOP, M-PANIC-ON-BUG).
 
 - **RS-19. No `unwrap()` and no `expect()` outside tests.** Use `?`, `ok_or`, `let … else`,
-  `unwrap_or` / `unwrap_or_default`, or a `match`. `planned: phase 3` (`clippy::unwrap_used`,
-  `clippy::expect_used`, with a baseline)
-- **RS-20. Tests may unwrap and expect.** `daemon/clippy.toml` will carry:
+  `unwrap_or` / `unwrap_or_default`, or a `match`. `checked: scripts/check lint (lint_rust.py, baseline 142)` (`clippy::unwrap_used` 128,
+  `clippy::expect_used` 14)
+- **RS-20. Tests may unwrap and expect.** `daemon/clippy.toml` carries:
 
   ```toml
   allow-unwrap-in-tests = true
@@ -162,11 +163,11 @@ A panic in `agentlinkd` takes down the link to the watch for every session, so w
   allow-indexing-slicing-in-tests = true
   ```
 
-  `planned: phase 3` (this file lands with the lint table; it is not added in phase 0)
+  `checked: daemon/clippy.toml`
 - **RS-21. A justified exception uses `#[expect]` with a reason**, on the smallest item that
   needs it, never `#[allow]`. If the reason goes away, `#[expect]` warns that it is no longer
-  needed. `checked: review` today; `planned: phase 3` (`clippy::allow_attributes`,
-  `allow_attributes_without_reason`)
+  needed. `checked: scripts/check lint (lint_rust.py, baseline 57)` (`clippy::allow_attributes` 28,
+  `clippy::allow_attributes_without_reason` 29)
 
   ```rust
   #[expect(clippy::expect_used, reason = "the regex is a literal; a bad one is a build-time bug")]
@@ -176,9 +177,9 @@ A panic in `agentlinkd` takes down the link to the watch for every session, so w
 - **RS-22. Mutex poisoning is not a reason to unwrap.** Most of today's unwraps are `.lock()
   .unwrap()` (69 of the 105 in `agentlinkd`). New code uses `.lock().unwrap_or_else(PoisonError::
   into_inner)` or the crate's small `lock()` helper once one exists. Converting the existing calls is
-  a mechanical baseline item. `review`; `planned: phase 3`
+  a mechanical baseline item. `review`; counted in `clippy::unwrap_used` (RS-19)
 - **RS-23. `panic!`, `unreachable!`, `todo!` and `unimplemented!`.** `todo!` and `unimplemented!`
-  never reach `main` (`planned: phase 3`, `clippy::todo`, `clippy::unimplemented` at deny).
+  never reach `main` (`clippy::todo`, `clippy::unimplemented` at deny, `checked: scripts/check lint (lint_rust.py, baseline 0)`).
   `unreachable!` is allowed for a state the types cannot rule out, and carries a message that says
   why it cannot happen. An explicit `panic!` is allowed only for a broken invariant, with the values
   in the message (M-PANIC-MESSAGE). `review`
@@ -198,13 +199,17 @@ in `agentlinkd/src/focus/windows_terminal.rs` and `agentlink-hook/src/main.rs`, 
 `agentlinkd/src/keepawake.rs`.
 
 - **RS-26. `proto`, `keys`, `delta` and `agentlink` forbid unsafe** with `#![forbid(unsafe_code)]`
-  in their crate root (`tests/` may use `libc` for timing). `planned: phase 3`
+  in their crate root (`tests/` may use `libc` for timing, under `#[expect(unsafe_code, reason)]`).
+  `checked: rustc`
 - **RS-27. In `agentlinkd` and `agentlink-hook`, unsafe lives only in OS-binding modules**, which
-  carry `#![expect(unsafe_code, reason = "…")]` at the top of the module. `planned: phase 3`
-  (workspace `unsafe_code = "deny"`)
+  carry `#![expect(unsafe_code, reason = "…")]` at the top of the module (`pointer::mac`,
+  `pointer::win`, `focus::windows_terminal`), or `#[expect]` on the one function when the module is
+  mostly safe code (`keepawake`, `agentlink-hook`'s `process_table`). Workspace
+  `unsafe_code = "deny"`: `checked: scripts/check lint (lint_rust.py, baseline 0)`
 - **RS-28. Every `unsafe` block has a `// SAFETY:` comment just above it** that says why the call
-  is sound. Every `unsafe fn` has a `# Safety` doc section. `planned: phase 3`
-  (`clippy::undocumented_unsafe_blocks`)
+  is sound. Every `unsafe fn` has a `# Safety` doc section, and its body still wraps each unsafe
+  operation in an `unsafe` block. `checked: scripts/check lint (lint_rust.py, baseline 5)` (`clippy::undocumented_unsafe_blocks` 2,
+  `unsafe_op_in_unsafe_fn` 3)
 - **RS-29. Wrap unsafe in a small safe function**, so callers never write `unsafe` themselves.
   `review`
 
@@ -215,10 +220,10 @@ in `agentlinkd/src/focus/windows_terminal.rs` and `agentlink-hook/src/main.rs`, 
   already have crate docs. `review`
 - **RS-31. Every `pub` item in a library crate has `///` docs.** The first line is a summary of
   about 15 words or fewer (M-FIRST-DOC-SENTENCE), and the comment says what the code does not.
-  `planned: phase 4` (`missing_docs = "warn"` on library crates)
+  `checked: scripts/check lint (lint_rust.py, baseline 59)` (`#![warn(missing_docs)]` in each library's `lib.rs`)
 - **RS-32. A `pub fn` that returns `Result` has `# Errors`, and one that can panic has
-  `# Panics`.** `unsafe fn` has `# Safety`. `planned: phase 3` (pedantic `missing_errors_doc`,
-  `missing_panics_doc`; `missing_safety_doc` is already on)
+  `# Panics`.** `unsafe fn` has `# Safety`. `checked: scripts/check lint (lint_rust.py, baseline 6)` (pedantic
+  `missing_errors_doc` 5, `missing_panics_doc` 1; `missing_safety_doc` is on by default)
 - **RS-33. Examples in docs are doc tests that compile and run, and use `?` instead of `unwrap`**
   (C-QUESTION-MARK). `checked: cargo test --workspace` (runs doc tests)
 - **RS-34. Link related items with intra-doc links** (`` [`Envelope::from_bytes`] ``) rather than
@@ -227,14 +232,14 @@ in `agentlinkd/src/focus/windows_terminal.rs` and `agentlink-hook/src/main.rs`, 
 - **RS-35. No design essays or work logs in doc comments.** Design goes in `docs/design/`, and
   history goes in commits and issues (M-NO-META-DESIGN-DOCUMENTATION). `review`
 
-## 8. Planned lint table
+## 8. Lint table
 
-`planned: phase 3, lands with a baseline.` This goes into `daemon/Cargo.toml`. Each crate opts in
-with `[lints] workspace = true`. It is Microsoft's
+This is `[workspace.lints]` in `daemon/Cargo.toml`, and each crate opts in with
+`[lints] workspace = true`. It is Microsoft's
 [M-STATIC-VERIFICATION](https://microsoft.github.io/rust-guidelines/guidelines/universal/) table, plus
-our panic, unsafe and doc lints, and minus the pedantic lints that fight this codebase. Lints that
-have existing hits run on changed lines only until their count reaches zero
-([README](README.md#how-a-rule-becomes-enforced)).
+our panic, unsafe and doc lints, and minus the pedantic lints that fight this codebase. Existing
+hits are counted per lint and file in a baseline that only shrinks (see [Lint
+baseline](#lint-baseline)).
 
 ```toml
 [workspace.lints.rust]
@@ -306,10 +311,100 @@ Notes:
 - `nursery` stays off, because its lints are still being developed.
 - `restriction` is never enabled as a group (the clippy README says so). Lints from it are picked
   one at a time, as above.
-- CI runs clippy without `--all-targets` today, so tests and examples are not linted. Phase 3 adds
-  `--all-targets`, which is safe because `clippy.toml` exempts tests from the panic lints.
-- Each `#[allow]` that exists today (8 of them) becomes an `#[expect(..., reason = "…")]` when
-  `allow_attributes` lands.
+- Clippy runs with `--all-targets`, so tests, examples and build scripts are linted too. That is
+  safe because `clippy.toml` exempts tests from the panic lints.
+- Each `#[allow]` that exists today becomes an `#[expect(..., reason = "…")]` as its file is
+  touched; they are in the baseline under `clippy::allow_attributes`.
+
+### Lint baseline
+
+`scripts/check.d/lint_rust.py` (run by `scripts/check lint` and the `clippy` job of
+`.github/workflows/daemon.yml`) runs `cargo clippy --workspace --all-targets --message-format=json`
+in `daemon/` for `x86_64-unknown-linux-gnu`, `aarch64-apple-darwin` and `x86_64-pc-windows-msvc`, and
+counts each finding once per lint and file, whichever targets report it. It compares the counts with
+`scripts/check.d/baselines/lint_rust.txt` (`RULE<TAB>path<TAB>count`). It fails on:
+
+- a compile error or a deny-level lint, which is never baselined;
+- a new (lint, file) pair, or a count that went up, and it prints those findings. This replaces
+  `cargo clippy -- -D warnings`;
+- a count that went down: run `python3 scripts/check.d/lint_rust.py --update-baseline` and commit
+  the smaller baseline with the fix.
+
+Why all three targets in one run: about 40 `cfg(target_os)` blocks mean each OS compiles different
+code, and some warnings exist on one OS only (25 `dead_code`, 3 `unused_imports` and the
+`unsafe_op_in_unsafe_fn` hits are Windows-only). Cross-checking all three from one host keeps a
+single exact baseline, the same on every machine. `cargo clippy` does not link, so it needs only the
+targets' standard libraries: `rustup target add aarch64-apple-darwin x86_64-pc-windows-msvc`.
+The lint set changes with the clippy version, so the script needs clippy 0.1.95 (Rust 1.95) and CI
+pins `dtolnay/rust-toolchain@1.95.0`. Raising the pin means re-running `--update-baseline`. Build
+output goes to `$CARGO_TARGET_DIR`, or `~/.cache/agentlink-check/cargo-lint` (honouring
+`XDG_CACHE_HOME`).
+
+Baseline on 2026-11-22: 765 findings in 310 (lint, file) pairs, by crate `agentlinkd` 526,
+`agentlink` 100, `agentlink-keys` 54, `agentlink-proto` 42, `agentlink-hook` 25, `agentlink-delta` 18.
+
+| Lint | Findings | Files |
+|---|--:|--:|
+| `clippy::unwrap_used` | 128 | 25 |
+| `clippy::clone_on_ref_ptr` | 85 | 14 |
+| `missing_docs` | 59 | 9 |
+| `clippy::doc_markdown` | 54 | 22 |
+| `clippy::cast_lossless` | 36 | 7 |
+| `clippy::allow_attributes_without_reason` | 29 | 13 |
+| `clippy::allow_attributes` | 28 | 13 |
+| `clippy::assertions_on_result_states` | 25 | 13 |
+| `dead_code` | 25 | 9 |
+| `clippy::redundant_closure_for_method_calls` | 23 | 17 |
+| `clippy::unreadable_literal` | 20 | 7 |
+| `clippy::duration_suboptimal_units` | 19 | 10 |
+| `clippy::format_push_string` | 19 | 5 |
+| `clippy::ignored_unit_patterns` | 15 | 7 |
+| `clippy::map_unwrap_or` | 15 | 10 |
+| `clippy::expect_used` | 14 | 7 |
+| `clippy::many_single_char_names` | 13 | 8 |
+| `clippy::semicolon_outside_block` | 13 | 8 |
+| `clippy::needless_pass_by_value` | 12 | 11 |
+| `clippy::wildcard_imports` | 10 | 6 |
+| `clippy::items_after_statements` | 9 | 6 |
+| `clippy::map_err_ignore` | 9 | 5 |
+| `clippy::borrow_as_ptr` | 8 | 4 |
+| `clippy::renamed_function_params` | 8 | 7 |
+| `clippy::semicolon_if_nothing_returned` | 8 | 3 |
+| `clippy::deref_by_slicing` | 7 | 5 |
+| `clippy::assigning_clones` | 6 | 3 |
+| `clippy::match_same_arms` | 6 | 4 |
+| `clippy::missing_errors_doc` | 5 | 3 |
+| `clippy::single_match_else` | 5 | 5 |
+| `clippy::default_trait_access` | 4 | 2 |
+| `clippy::needless_continue` | 4 | 4 |
+| `clippy::ignore_without_reason` | 3 | 3 |
+| `clippy::unnecessary_wraps` | 3 | 3 |
+| `unsafe_op_in_unsafe_fn` | 3 | 1 |
+| `unused_imports` | 3 | 3 |
+| `clippy::checked_conversions` | 2 | 2 |
+| `clippy::float_cmp` | 2 | 1 |
+| `clippy::option_option` | 2 | 1 |
+| `clippy::ref_option` | 2 | 1 |
+| `clippy::struct_field_names` | 2 | 2 |
+| `clippy::too_long_first_doc_paragraph` | 2 | 1 |
+| `clippy::undocumented_unsafe_blocks` | 2 | 2 |
+| `clippy::unnested_or_patterns` | 2 | 2 |
+| `missing_debug_implementations` | 2 | 2 |
+| `clippy::decimal_bitwise_operands` | 1 | 1 |
+| `clippy::drop_non_drop` | 1 | 1 |
+| `clippy::enum_glob_use` | 1 | 1 |
+| `clippy::format_collect` | 1 | 1 |
+| `clippy::if_not_else` | 1 | 1 |
+| `clippy::manual_let_else` | 1 | 1 |
+| `clippy::manual_midpoint` | 1 | 1 |
+| `clippy::missing_panics_doc` | 1 | 1 |
+| `clippy::needless_raw_string_hashes` | 1 | 1 |
+| `clippy::range_plus_one` | 1 | 1 |
+| `clippy::unnecessary_safety_comment` | 1 | 1 |
+| `clippy::unused_async` | 1 | 1 |
+| `clippy::unused_result_ok` | 1 | 1 |
+| `clippy::unused_self` | 1 | 1 |
+| **Total** | **765** | **310** |
 
 ## Where the code stands today
 
@@ -357,4 +452,5 @@ Other baseline items:
   `[workspace.dependencies]` (RS-8).
 - One `mod.rs` (`agentlinkd/src/focus/mod.rs`) (RS-10).
 - 8 `#[allow]` attributes, of which 3 have a reason comment (RS-21).
-- No `daemon/clippy.toml` and no `[workspace.lints]` yet (section 8).
+- `daemon/clippy.toml` and `[workspace.lints]` landed in phase 3 (section 8); the table above was
+  measured before them, with tests left out, so its numbers differ from the lint baseline.

@@ -26,6 +26,9 @@
 //! See [`Decoder::set_context`] for the context rules and [`Decoder::decode_taps`] for the tap
 //! policy. [`eval`] and [`synth`] hold the synthetic evaluation harness.
 
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
+
 mod context;
 mod decode;
 pub mod eval;

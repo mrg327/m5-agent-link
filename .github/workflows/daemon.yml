@@ -40,11 +40,31 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: daemon
-      # The commands of `scripts/check daemon`, run directly: that area also runs the pi step,
+      # The test step of `scripts/check daemon`, run directly: that area also runs the pi step,
       # which has its own job below, and this matrix includes Windows. Formatting (cargo fmt
-      # --check) runs in checks.yml as part of `scripts/check format`.
-      - run: cargo clippy --workspace -- -D warnings
+      # --check) runs in checks.yml as part of `scripts/check format`; clippy runs in the job below.
       - run: cargo test --workspace
+
+  clippy:
+    # lint_rust.py lints the Linux, macOS and Windows targets in one run (cfg(target_os) code
+    # included) against scripts/check.d/baselines/lint_rust.txt, so one Linux job covers the
+    # matrix. The toolchain is pinned: a new clippy adds lints and would move the baseline.
+    name: clippy (all targets)
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/daemon/target
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux BLE dependencies
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
+          targets: aarch64-apple-darwin, x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: daemon
+      - run: python3 scripts/check.d/lint_rust.py
 
   pi-extension:
     name: pi extension (node)

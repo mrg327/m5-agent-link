@@ -1,5 +1,7 @@
 //! agentlink: the CLI window into the daemon (DESIGN §0: auditability).
 
+#![forbid(unsafe_code)]
+
 mod bench;
 mod graph;
 mod hooks;

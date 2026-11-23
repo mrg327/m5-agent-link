@@ -304,6 +304,10 @@ impl Inhibitor for ChildInhibitor {
         }
     }
 
+    #[cfg_attr(
+        unix,
+        expect(unsafe_code, reason = "kill(2) on the inhibitor's process group")
+    )]
     fn release(&mut self) {
         if let Some(mut c) = self.child.take() {
             #[cfg(unix)]

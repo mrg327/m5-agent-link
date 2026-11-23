@@ -88,6 +88,11 @@ impl Pointer for Unsupported {
 
 #[cfg(target_os = "macos")]
 mod mac {
+    #![expect(
+        unsafe_code,
+        reason = "CoreGraphics FFI: the OS binding for pointer events"
+    )]
+
     use super::*;
     use std::ffi::c_void;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -263,6 +268,11 @@ mod mac {
 
 #[cfg(windows)]
 mod win {
+    #![expect(
+        unsafe_code,
+        reason = "SendInput FFI: the OS binding for pointer events"
+    )]
+
     use super::*;
     use windows::Win32::UI::Input::KeyboardAndMouse::{
         SendInput, INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,

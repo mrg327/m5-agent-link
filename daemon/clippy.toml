@@ -1,0 +1,6 @@
+# Clippy settings for the workspace (docs/conventions/rust.md RS-20). The lint levels are in
+# Cargo.toml [workspace.lints]; this file only exempts tests from the panic lints.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true

@@ -49,7 +49,8 @@ area_steps() {
         echo "then|.|ctest|ctest --test-dir build/sim -j 16 --output-on-failure"
         ;;
     daemon)
-        echo "step|daemon|cargo|cargo clippy --workspace -- -D warnings"
+        # clippy with the workspace lint table, all three OS targets, against its baseline
+        echo "step|.|cargo|python3 scripts/check.d/lint_rust.py"
         echo "step|daemon|cargo|cargo test --workspace"
         echo "step|.|node|node --test daemon/integrations/pi/*.test.ts"
         ;;
