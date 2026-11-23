@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # C conventions
 
 How to write C in `firmware/` and `simulator/`. The board files under `firmware/boards/` are C++ only

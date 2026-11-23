@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # Rust: the `daemon/` workspace
 
 How Rust is written in `daemon/`. Issue 20261122-db53 (phase 0). We follow the

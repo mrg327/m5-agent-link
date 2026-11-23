@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: ui
+issue: 20261114-8c3d
+last_reviewed: 2026-11-14
+summary: Sigil STATUS, LABS, TRACKPAD and the update overlay as built
+---
+
 # Sigil as built: STATUS, LABS, TRACKPAD, the update overlay
 
 Part of [GLYPHS.md](../GLYPHS.md) (§5). What each of these screens draws, where, and what every glyph means.

@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: firmware
+last_reviewed: 2026-11-22
+summary: Firmware architecture, the HAL, boards, OTA (§9), StopWatch gotchas (§12)
+---
+
 # Firmware architecture (draft)
 
 > Status: **[P] draft for discussion.** The target is the StopWatch first (DESIGN.md R10). The code is designed so a second board needs only a new BSP.

@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: ui
+issue: 20261114-8c3d
+last_reviewed: 2026-11-22
+summary: '"Sigil": the glyph-first design system'
+---
+
 # m5-agent-link: Sigil, the glyph-first watch UI
 
 Status: **design system, being built** on branch `glyphs` (issue `20261114-8c3d`). It replaces the

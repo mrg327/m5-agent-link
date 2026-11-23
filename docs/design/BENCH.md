@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: tools
+issue: 20261122-bb2e
+last_reviewed: 2026-11-22
+summary: Drive the real watch like a finger and measure what the user feels
+---
+
 # Bench: drive the real watch like a finger, measure what the user feels
 
 Issue 20261122-bb2e. Protocol 0.24 (§2). Code: `components/core/src/bench.c` (stroke player and frame timeline),

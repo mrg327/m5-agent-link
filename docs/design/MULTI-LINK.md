@@ -1,3 +1,11 @@
+---
+status: accepted
+owner: daemon
+issue: 20261114-101b
+last_reviewed: 2026-11-22
+summary: One watch, several machines
+---
+
 # m5-agent-link: one watch, several machines
 
 Status: **phase 1 built** on branch `multilink` (issue `20261114-101b`). The spike numbers in §9 were measured on the

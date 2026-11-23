@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: firmware
+issue: 20261113-ee04
+last_reviewed: 2026-11-22
+summary: 'Power report: where the battery goes'
+---
+
 # Power report: where the battery goes
 
 Issue 20261113-ee04. Protocol 0.19 ([PROTOCOL.md](PROTOCOL.md) §6f). Code: `components/core/src/power_report.c`

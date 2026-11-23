@@ -1,3 +1,11 @@
+---
+status: accepted
+owner: ui
+issue: 20261111-7732
+last_reviewed: 2026-11-10
+summary: Audit of the watch as it stood before v3 (2026-11-10)
+---
+
 # UI profile: the watch as it stood before v3
 
 Audit date 2026-11-10, `main` at `ff33ff3` (UI v2 "Deck"). Method: every simulator script that takes

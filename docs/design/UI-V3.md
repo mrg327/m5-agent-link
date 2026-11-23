@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: ui
+issue: 20261111-7732
+last_reviewed: 2026-11-22
+summary: '"Halo": the Apple-style overhaul; its look is replaced by GLYPHS.md, its gestures and safety rules stand'
+---
+
 # UI v3: "Halo"
 
 Status: **implemented in the simulator on branch `ui-v3`; not yet validated on the device** (issue 7732). Answers [UI-PROFILE.md](UI-PROFILE.md).

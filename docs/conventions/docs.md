@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: [20261122-db53, 20261123-2436]
+last_reviewed: 2026-11-22
+---
+
 # Docs: where they live, how they are written, how they are checked
 
 How Markdown in this repository is organised and written. Issue 20261122-db53 (phase 0). We treat docs
@@ -61,32 +68,47 @@ enough.
 
 ### Front matter
 
-Design docs will carry YAML front matter, so an index and a freshness report can be generated from
-them:
+Every design doc and convention page starts with YAML front matter; the design-doc index and the
+freshness report are generated from it:
 
 ```yaml
 ---
 status: draft            # draft | accepted | implemented | superseded
-owner: claude-code       # who answers questions about it: an AGENT_NAME or a person's handle
-issue: 20261122-db53     # the issue that tracks the work; a list if several
+owner: ui                # a role, never a person: architecture | protocol | firmware | daemon | ui | tools | conventions
+issue: 20261122-db53     # optional: the issue that tracks the work; [a, b] if several
 last_reviewed: 2026-11-22
-superseded_by: UI-V3.md  # only when status is superseded
+superseded_by: UI-V3.md  # only when status is superseded; a relative path
+summary: 'One line for the index'  # optional; otherwise the first sentence of the intro
 ---
 ```
 
-- **DOC-8. Every file in `docs/design/` and `docs/conventions/` has this front matter.**
-  `planned: phase 2` (a front-matter check in `scripts/check docs`)
-- **DOC-9. `status` is one of `draft`, `accepted`, `implemented`, `superseded`.** `superseded`
-  needs `superseded_by`, and its target must exist. `planned: phase 2`
-- **DOC-10. Bump `last_reviewed` whenever you check a doc against the code,** not only when you
-  edit it. A scheduled report lists `implemented` docs not reviewed for 90 days, as a tracker issue,
-  not a failing build. `planned: phase 4`
-- **DOC-11. `docs/INDEX.md` is generated from the front matter** and committed; the check
-  regenerates it and diffs. `planned: phase 2`
+`draft`: being written or argued. `accepted`: agreed, and partly built or not a build plan at all
+(an audit, a convention page). `implemented`: the code it describes is in `main`. `superseded`: a
+newer doc replaces it (DOC-7). The owner is a role because the agents and people behind a role
+change; ask whoever works on that area. Docs written before the issue tracker (2026-11-09) have no
+`issue`.
 
-Today none of the 29 design docs has front matter. 18 put a `Status:` line and an issue ID in their
-first lines, in free text ("Status: built on branch `next` (issue 20261112-a9d5)"). Phase 2 moves
-those into the fields above; until then, keep writing the `Status:` line.
+- **DOC-8. Every file in `docs/design/` (except its `README.md`, the index) and
+  `docs/conventions/` (except `templates/`) has this front matter:** `status`, `owner`
+  and `last_reviewed` required, no other keys than those above, each `issue` a file in `issues/`.
+  The H1 follows it. `checked: scripts/check docs (doc_meta.py)`
+- **DOC-9. `status` is one of `draft`, `accepted`, `implemented`, `superseded`.** `superseded`
+  needs `superseded_by`, and its target must exist. `checked: scripts/check docs (doc_meta.py)`
+- **DOC-10. Bump `last_reviewed` whenever you check a doc against the code,** not only when you
+  edit it. `checked: scripts/check docs (doc_meta.py)`: a real `YYYY-MM-DD` date, not in the
+  future. `python3 scripts/check.d/doc_meta.py --stale 90 --status implemented` lists the docs not
+  reviewed for 90 days (a report, exit 0, not a failing build); a scheduled job that files it as a
+  tracker issue is `planned: phase 4`.
+- **DOC-11. The index in [`docs/design/README.md`](../design/README.md) is generated from the front
+  matter** (between its `index:start` and `index:end` markers; the text above them is written by
+  hand) and committed. Change a row by editing the doc's front matter, then run
+  `python3 scripts/check.d/doc_meta.py --write`. `checked: scripts/check docs (doc_meta.py)`, which
+  regenerates the index and fails if it differs.
+
+The free-text `Status:` line that 18 design docs carried before front matter (2026-11-22) stays where
+it says more than the field (what is not yet verified on the device, which branch). Do not start a
+new one that only repeats `status`; when the two disagree, the front matter is right and the line
+is fixed.
 
 ## 3. Decision records
 
@@ -269,8 +291,9 @@ or scoped, as listed in §5.
 | Check | Rules | When |
 |---|---|---|
 | `scripts/check docs` (`scripts/check.d/docs.sh`): `links.py`, typos, markdownlint-cli2 on own docs (§5) | DOC-23 – DOC-27, DOC-30, DOC-31 | `checked` (phase 1) |
-| Front matter, `superseded_by` targets, `docs/INDEX.md` regenerate-and-diff, README per component | DOC-3, DOC-8, DOC-9, DOC-11 | `planned: phase 2` |
-| Weekly: external links, docs past `last_reviewed`, docs naming paths that no longer exist; files one tracker issue | DOC-10, DOC-26 | `planned: phase 4` |
+| `scripts/check docs` (`scripts/check.d/doc_meta.py`): front matter, `superseded_by` targets, issue IDs, the `docs/design/README.md` index regenerate-and-diff | DOC-8 – DOC-11 | `checked` (phase 2) |
+| README per component | DOC-3 | `planned: phase 2` |
+| Weekly: external links, docs past `last_reviewed` (`doc_meta.py --stale 90 --status implemented`, by hand until then), docs naming paths that no longer exist; files one tracker issue | DOC-10, DOC-26 | `planned: phase 4` |
 | Vale (Google style) on `docs/design/` at suggestion level | DOC-16 | `planned: phase 4` |
 
 `links.py` prints `path:line: DOC-n message — how to fix`; typos and markdownlint print

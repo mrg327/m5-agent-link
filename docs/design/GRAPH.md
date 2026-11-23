@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: ui
+issue: 20261113-e3d4
+last_reviewed: 2026-11-22
+summary: 'The agent graph: tool calls as glyphs on lanes (protocol 0.22)'
+---
+
 # Agent graph (proto 0.22, issue e3d4)
 
 A `git log --graph` for one agent session: the tool calls of the current turn as glyphs on lanes. Lane 0

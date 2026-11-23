@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: ui
+issue: 20261114-8c3d
+last_reviewed: 2026-11-14
+summary: Sigil AGENT and READ screens as built
+---
+
 # Sigil: AGENT and READ as built
 
 Part of [GLYPHS.md](../GLYPHS.md) (§5, the rows AGENT and READ). Files: `firmware/components/core/src/ui_agent.c`,

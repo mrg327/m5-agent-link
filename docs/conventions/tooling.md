@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # Tooling experiments
 
 What we measured before choosing the C checkers, so phase 1 and phase 3 start from facts. Issue

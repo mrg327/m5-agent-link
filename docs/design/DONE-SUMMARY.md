@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: ui
+issue: 20261112-d01e
+last_reviewed: 2026-11-22
+summary: What the turn did, at a glance (protocol 0.14)
+---
+
 # Done summary: what the turn did, at a glance
 
 > Status: built on branch `done-summary` (issue 20261112-d01e). Protocol 0.14. Simulator-verified; not run on the

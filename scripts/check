@@ -75,6 +75,7 @@ area_steps() {
     docs)
         echo "step|.|./scripts/check.d/docs.sh|scripts/check.d/docs.sh"
         echo "step|.|python3|python3 scripts/check.d/doc_coverage.py"
+        echo "step|.|python3|python3 scripts/check.d/doc_meta.py"
         ;;
     esac
 }
@@ -100,7 +101,7 @@ areas_for_path() {
     esac
     case "$1" in
     docs/* | *.md | _typos.toml | .markdownlint-cli2.jsonc) echo "docs" ;;
-    scripts/check.d/docs.sh | scripts/check.d/links.py | scripts/check.d/doc_coverage.py) echo "docs" ;;
+    scripts/check.d/docs.sh | scripts/check.d/links.py | scripts/check.d/doc_coverage.py | scripts/check.d/doc_meta.py) echo "docs" ;;
     esac
     # Structure and commit messages are fast (under a second), so any change runs them.
     case "$1" in

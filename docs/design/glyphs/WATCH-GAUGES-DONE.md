@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: ui
+issue: 20261114-8c3d
+last_reviewed: 2026-11-14
+summary: Sigil WATCH, the gauges and the done row as built
+---
+
 # Sigil: WATCH, the gauges and the done row, as built
 
 Part of [GLYPHS.md](../GLYPHS.md) §5 (issue `20261114-8c3d`). It describes three rows of that table as they are on

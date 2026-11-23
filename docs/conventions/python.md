@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # Python
 
 Python here is tooling: code generators, vector validators, end-to-end tests that drive the daemon,
@@ -49,28 +56,33 @@ planned: phase 1 (`ruff format --check` blocking).
 **PY-2. Lint with Ruff, explicit rule list.** Never `select = ["ALL"]`: new rules would switch on with
 every upgrade. Phase 1 blocks on `E4,E7,E9,F` everywhere. The wider list below runs on changed lines
 with a per-file, per-rule count baseline that may only shrink; a rule blocks everywhere once its count
-is zero. planned: phase 1 (narrow set), phase 3 (full set, baseline).
+is zero. checked: `scripts/check lint` (`lint_py.py`, baseline 492 Ruff findings); the table under
+[Lint baseline](#lint-baseline-phase-3) splits it by rule.
 
 **PY-3. Type-check with `mypy --strict`.** Each script is checked in its own environment, so imports
 from its PEP 723 dependencies resolve:
 
 ```sh
-uv run --no-project --with mypy --with-requirements protocol/tools/gen_vectors.py \
-    mypy --strict protocol/tools/gen_vectors.py
+uv run --no-project --with mypy==2.4.1 --with-requirements protocol/tools/gen_vectors.py \
+    mypy --strict --python-version=3.11 protocol/tools/gen_vectors.py
 ```
 
-New files must pass with zero errors. Existing files carry an error count in the baseline (1,165 today)
-that may only shrink. We do not add `ANN` to Ruff: mypy's `disallow_untyped_defs` already covers it.
-planned: phase 3.
+A script with no PEP 723 block gets the `--with` packages of the `# uv run --with … python FILE` line
+in its header (the `daemon/tools/*_e2e.py` scripts), or none. There is no `mypy.ini`: the flags are
+on the command line in `lint_py.py`, and the mypy cache lives under
+`${XDG_CACHE_HOME:-~/.cache}/agentlink-check/mypy/`. Each run counts only errors in its own file.
+New files must pass with zero errors. Existing files carry an error count in the baseline that may
+only shrink. We do not add `ANN` to Ruff: mypy's `disallow_untyped_defs` already covers it.
+checked: `scripts/check lint` (`lint_py.py`, baseline 1,195 mypy errors).
 
-**PY-4. Pin the tool versions.** `scripts/check` runs `uvx ruff@0.17.6` and a pinned mypy, so every
+**PY-4. Pin the tool versions.** `scripts/check` runs `uvx ruff@0.17.6` and `mypy==2.4.1`, so every
 machine and CI get the same findings. A version bump is its own commit, with any new findings fixed
 or baselined in it. planned: phase 1.
 
-### Planned `ruff.toml` (repository root)
+### `ruff.toml` (repository root)
 
 A `ruff.toml`, not a `pyproject.toml`: a root `pyproject.toml` would make `uv run` treat the
-repository as a Python project. Not created in phase 0.
+repository as a Python project. The `[lint]` part below is live since phase 3.
 
 ```toml
 # Ruff config for the repository's Python tools. docs/conventions/python.md
@@ -110,7 +122,10 @@ convention = "google"
 "**/test_*.py" = ["D"]
 ```
 
-### Planned `mypy.ini` (repository root)
+### `mypy.ini` (not created)
+
+`lint_py.py` passes these settings as flags instead (`--strict --python-version=3.11 --cache-dir=…`);
+`kitty` imports are baselined as `import-not-found` rather than ignored. A file would look like:
 
 ```ini
 # mypy config for the repository's Python tools. docs/conventions/python.md
@@ -182,7 +197,8 @@ them as arguments. Use `pathlib`, not string joins. Never write a home path, hos
 into output that gets committed: this repository is public. checked: review.
 
 **PY-13. `subprocess` without a shell.** Pass a list, not a string with `shell=True`, and pass
-`check=True` or test `returncode` yourself. planned: phase 3 (`PLW1510`); review for `shell=True`.
+`check=True` or test `returncode` yourself. checked: `scripts/check lint` (`lint_py.py`, baseline 13) (`PLW1510`);
+review for `shell=True`.
 
 ## Code
 
@@ -190,29 +206,29 @@ into output that gets committed: this repository is public. checked: review.
 parameters; `CapWords` for classes; exceptions end in `Error`; `CAPS_WITH_UNDER` for module
 constants; one leading `_` for internals. Module file names never contain `-`. Avoid single-letter
 names outside counters, comprehensions and math (`l`, `O`, `I` never: E741). Names that come from the
-protocol keep the CDDL spelling (see [protocol.md](protocol.md)). planned: phase 3 (`N`,
-`E741`).
+protocol keep the CDDL spelling (see [protocol.md](protocol.md)). checked: `scripts/check lint` (`lint_py.py`, baseline 13)
+(`N`, `E741`).
 
 **PY-15. Type every function signature.** Parameters and return types on every `def`, including
 private helpers. Use `X | None`, builtin generics (`list[str]`) and `collections.abc` for
-parameters. Use `Any` only at a JSON or CBOR boundary, and narrow it right away. planned: phase 3
-(mypy strict, `UP`).
+parameters. Use `Any` only at a JSON or CBOR boundary, and narrow it right away.
+checked: `scripts/check lint` (`lint_py.py`, baseline 1,204) (mypy strict, `UP`).
 
 **PY-16. Errors.** No bare `except:` and no `except Exception` that swallows: catch the narrowest type
 and keep `try` blocks short. Do not use `assert` to check inputs; raise `ValueError` or a module
-`…Error`. In e2e tests `assert` is fine, since they are tests. planned: phase 3 (`E722`,
-`BLE`, `B`); review for `assert`.
+`…Error`. In e2e tests `assert` is fine, since they are tests. checked: `scripts/check lint` (`lint_py.py`, baseline 7)
+(`E722`, `BLE`, `B`); review for `assert`.
 
 **PY-17. No mutable defaults, no closures over loop variables.** Use `None` and create the list in
-the body; bind loop values as default arguments or with `functools.partial`. checked: planned:
-phase 3 (`B006`, `B008`, `B023`).
+the body; bind loop values as default arguments or with `functools.partial`.
+checked: `scripts/check lint` (`lint_py.py`, baseline 1) (`B006`, `B008`, `B023`).
 
 **PY-18. One statement per line, one import per line.** No `if x: y`, no `a; b`, no
-`import a, b`. Imports are grouped stdlib, third-party, local, and sorted. planned: phase 1
-(`E401`, `E701`, `E702`), phase 3 (`I`).
+`import a, b`. Imports are grouped stdlib, third-party, local, and sorted.
+checked: `scripts/check lint` (`lint_py.py`, baseline 31) (`E401` 19, `I001` 12; `E701`, `E702` at zero).
 
 **PY-19. Use `with` for files and sockets.** Never `open(...).read()` without a context manager.
-planned: phase 3 (`SIM115`).
+checked: `scripts/check lint` (`lint_py.py`, baseline 48) (`SIM115`).
 
 **PY-20. Logging, if used, takes `%` arguments.** `log.info("sent %d frames", n)`, not an f-string, so
 the string is only built when the level is on. Plain `print` to stdout is fine for scripts.
@@ -225,7 +241,7 @@ docstring says what the script does and how to run it; it replaces the `#` comme
 e2e scripts start with today. Summary line ends with a period and fits in one line. `Args:`,
 `Returns:` (or `Yields:`) and `Raises:` sections follow when they add information; `Returns:` may be
 left out when the summary already says it. Classes list `Attributes:` and their `__init__`
-arguments. planned: phase 3 (`D`, google convention), blocking in phase 4.
+arguments. checked: `scripts/check lint` (`lint_py.py`, baseline 186) (`D`, google convention), blocking in phase 4.
 
 ```python
 def decode_frame(buf: bytes, *, strict: bool = True) -> Frame:
@@ -259,12 +275,43 @@ tests `test_<function>_<state>`; run with `uv run --with pytest pytest path`. ch
 ## Running the checks
 
 ```sh
-scripts/check python         # planned: phase 1 (format + narrow lint), phase 3 (full lint, mypy)
+scripts/check format                             # ruff format --check (PY-1)
+scripts/check lint                               # runs lint_py.py among the other languages
+python3 scripts/check.d/lint_py.py               # Ruff + mypy against the baseline
+python3 scripts/check.d/lint_py.py --no-mypy     # Ruff only, under a second
+python3 scripts/check.d/lint_py.py --update-baseline   # after fixing findings: shrink the baseline
+uvx ruff@0.17.6 check FILES                      # Ruff alone, with ruff.toml
 ```
 
-Until then, run Ruff by hand without touching the repository config:
+A failure prints `path:line: RULE message` for each finding of a (rule, file) pair that grew, then
+the counts. A pair that went down also fails, with "baseline can shrink": rerun with
+`--update-baseline` and commit the smaller baseline with the fix. A full run takes about 5 s with a
+warm cache (mypy in parallel, one process per file; 23 s with `-j1`) and about 75 s cold, when uv
+first installs mypy and each script's dependencies.
 
-```sh
-uvx ruff@0.17.6 format --check --line-length 100 FILES
-uvx ruff@0.17.6 check --select E4,E7,E9,F FILES
-```
+### Lint baseline (phase 3)
+
+Measured 2026-11-22 over 26 files (`scripts/check.d/baselines/lint_py.txt`, 230 (rule, file) pairs,
+1,687 findings: Ruff 492, mypy 1,195).
+
+| Ruff rule | Count | | mypy code | Count |
+|---|---|---|---|---|
+| `E501` line too long | 162 | | `no-untyped-call` | 949 |
+| `D103` public function docstring | 120 | | `no-untyped-def` | 178 |
+| `SIM115` `open` without `with` | 48 | | `name-defined` | 15 |
+| `D102` public method docstring | 37 | | `union-attr` | 13 |
+| `E401` several imports on one line | 19 | | `var-annotated` | 9 |
+| `PLW1510` `subprocess.run` without `check` | 13 | | `assignment` | 8 |
+| `I001` unsorted imports | 12 | | `import-untyped` | 5 |
+| `E741` ambiguous name | 11 | | `attr-defined` | 4 |
+| `D101` public class docstring | 11 | | `import-not-found` | 3 |
+| `D100` module docstring | 10 | | `operator` | 3 |
+| `UP041` `socket.timeout` alias | 9 | | `index` | 3 |
+| `BLE001` blind `except` | 5 | | `type-arg` | 2 |
+| `D205`, `D209`, `E731`, `SIM105`, `C416` | 3 each | | `type-var`, `no-any-return`, `arg-type` | 1 each |
+| `D403`, `F541`, `RUF001`, `RUF021`, `C408` | 2 each | | | |
+| `B023`, `B905`, `N806`, `N818`, `RUF005`, `RUF007`, `RUF046`, `RUF059`, `SIM102`, `SIM905` | 1 each | | | |
+
+`scripts/check.d/` is first-party and linted like the rest: `lint_py.py` and `doc_meta.py` are
+clean, while `structure.py` (35), `links.py` (5), `commit_msg.py` (2) and `doc_coverage.py` (1)
+carry baseline entries, mostly `D103`.

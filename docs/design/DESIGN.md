@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: architecture
+last_reviewed: 2026-11-22
+summary: 'The overall design: requirements, architecture, decisions'
+---
+
 # m5-agent-link: design (working draft)
 
 > Status: **under discussion**. Inputs: user requirements (2026-11-06) and `docs/research/*.md`.

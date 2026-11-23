@@ -1,3 +1,10 @@
+---
+status: implemented
+owner: protocol
+last_reviewed: 2026-11-22
+summary: 'The wire protocol: envelope, messages, versions, AEAD'
+---
+
 # agentlink protocol v0 (draft)
 
 > Status: **[D] v0 decisions: integer CBOR keys, always-on app-layer AEAD, zcbor C codegen.** The protocol is transport-agnostic and device-agnostic. See DESIGN.md §3.1 and §5.

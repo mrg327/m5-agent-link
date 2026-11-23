@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: daemon
+issue: [20261109-371b, 20261109-e9b2]
+last_reviewed: 2026-11-22
+summary: Remote sessions over SSH
+---
+
 # m5-agent-link: remote sessions over SSH
 
 Status: built (issue `20261109-371b`). The tunnel, auth and session path have been tested

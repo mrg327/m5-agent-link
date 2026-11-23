@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # JavaScript
 
 JavaScript here is the Atlas (a browser app with Node tests), the design board's Node server, the

@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: firmware
+issue: 20261112-fe29
+last_reviewed: 2026-11-22
+summary: Raise to wake, face-down silence, orientation, palm cover, tones
+---
+
 # Motion: raise to wake, face-down silence, orientation, palm cover, confirmation tones
 
 Issue 20261112-fe29. Code: `components/core/src/motion.c` (the logic, pure, tested with scripted poses),

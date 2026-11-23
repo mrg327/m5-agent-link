@@ -1,3 +1,11 @@
+---
+status: superseded
+owner: ui
+last_reviewed: 2026-11-22
+superseded_by: UI-V3.md
+summary: '"Deck": switch context, pick from a list, answer from the watch; its interaction and safety rules stand'
+---
+
 # UI v2: "Deck": switch context, pick from a list, answer from the watch
 
 > **[UI-V3.md](UI-V3.md) supersedes this document's look, wording and back gesture** (swipe right goes back); the interaction model and safety rules below still stand.

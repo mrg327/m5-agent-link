@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: ui
+issue: 20261114-8c3d
+last_reviewed: 2026-11-14
+summary: Sigil ASK screen as built
+---
+
 # ASK in Sigil
 
 Status: **built in the simulator** on branch `glyphs-ask` (issue `20261114-8c3d`); not on the device.

@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # Structure
 
 Where code lives, which component may depend on which, where new code goes, and which files are
@@ -191,7 +198,8 @@ code follows today; the include script makes them visible.
 - **S-NEW-07 Doc.** A design doc is `docs/design/<NAME>.md` (upper case, hyphens), started from
   [templates/design-doc.md](templates/design-doc.md) with the front matter in [docs.md](docs.md).
   Background research goes in `docs/research/`. The rest of `docs/` is fetched vendor documentation:
-  do not add our own pages there. `planned: phase 2` (front matter check).
+  do not add our own pages there. Front matter: `checked: scripts/check docs (doc_meta.py)`; the
+  rest `review`.
 
 ## Generated, vendored and derived files
 

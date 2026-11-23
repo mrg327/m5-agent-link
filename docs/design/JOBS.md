@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: daemon
+issue: 20261111-2e5f
+last_reviewed: 2026-11-22
+summary: Terminal commands on the watch (protocol 0.9)
+---
+
 # Jobs: terminal commands on the watch
 
 > Status: built on branch `jobs` (issue 20261111-2e5f). Protocol 0.9.

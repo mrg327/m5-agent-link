@@ -1,3 +1,11 @@
+---
+status: accepted
+owner: ui
+issue: 20261122-761f
+last_reviewed: 2026-11-22
+summary: 'The watch as the user meets it: speed, content, interruptions (2026-11-22)'
+---
+
 # UX profile: the watch as the user meets it
 
 Issue 20261122-761f, 2026-11-22, main at 426be1f plus branch `ux-profile`. [UI-PROFILE.md](UI-PROFILE.md) audited

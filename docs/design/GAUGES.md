@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: daemon
+issue: 20261112-2777
+last_reviewed: 2026-11-22
+summary: Plan usage and context on the watch (protocol 0.10)
+---
+
 # Gauges: plan usage and context on the watch
 
 > Status: built on branch `next` (issue 20261112-2777). Protocol 0.10. Not yet run on the device.

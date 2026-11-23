@@ -1,3 +1,11 @@
+---
+status: superseded
+owner: ui
+last_reviewed: 2026-11-22
+superseded_by: UI-V2.md
+summary: '"Ring": select a session, act with one gesture'
+---
+
 # UI proposal: "Ring": select a session, act with one gesture
 
 Status: **implemented** (branch `ui-ring`; simulator-verified, firmware builds, not yet validated on the device). It replaces the old glance → list → detail screens.

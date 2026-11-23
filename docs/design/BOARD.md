@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: tools
+last_reviewed: 2026-11-22
+summary: The design board (tools/board)
+---
+
 # Design board: plan
 
 Status: approved 2026-11-09 (all three open questions answered as recommended). B1 (gallery) and B2 (notes) built; the board server now reloads itself on edit. B3 next.

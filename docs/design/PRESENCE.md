@@ -1,3 +1,11 @@
+---
+status: implemented
+owner: daemon
+issue: 20261112-fe75
+last_reviewed: 2026-11-22
+summary: Buzz when you are away, stay awake while work runs (protocol 0.12)
+---
+
 # Presence and keep-awake: buzz when you are away, stay awake while work runs
 
 > Status: built on branch `next` (issue 20261112-fe75). Protocol 0.12. Not yet run on the device or against a

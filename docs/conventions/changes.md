@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # Changes: issues, branches, commits, merges
 
 How a change gets from an idea to `main`. Issue 20261122-db53 (phase 0). The rules borrow Google's

@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # Conventions
 
 How code, docs and changes are written in this repository, and how each rule is checked. Issue

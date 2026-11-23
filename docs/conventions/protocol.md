@@ -1,3 +1,10 @@
+---
+status: accepted
+owner: conventions
+issue: 20261122-db53
+last_reviewed: 2026-11-22
+---
+
 # Protocol: names, numbers, versions
 
 Rules for the wire protocol between `agentlinkd` and a device, and for how each language spells a
