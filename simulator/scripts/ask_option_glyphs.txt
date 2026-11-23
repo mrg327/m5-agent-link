@@ -1,0 +1,37 @@
+# A permission option's glyph is read from its grant-mask bit and its label together (UX-PROFILE
+# C4, issue 67d1): a mask with every bit set cannot make "No" a plain grant, a mask of 0 cannot
+# make "Allow" a deny, "Always allow" is the double tick, and one grant option still has a Deny.
+connect
+rtc 1800000000
+rx a400020101020103a5008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 2 input webapp feat/login
+attention 7 2 approval approve,deny,focus 255 Run shell command|rm -rf node_modules|Yes|No
+wait 700
+expect_screen ask
+expect_label > Yes HOLD (grants)
+expect_label No HOLD (unclear)
+expect_label Deny HOLD
+expect_label 4 options
+# the unclear option is never sent from the watch: held to the end, nothing goes out
+btn B
+wait 600
+hold 233 262 1800
+wait 300
+expect_screen ask
+expect_label > No HOLD (unclear)
+clear 7
+wait 300
+attention 8 2 approval approve,deny,focus 0 Run shell command|rm -rf node_modules|Allow|Always allow|Deny
+wait 700
+expect_label > Allow HOLD (grants)
+expect_label Always allow HOLD (always)
+expect_label Deny HOLD (denies)
+expect_label 4 options
+clear 8
+wait 300
+attention 9 2 approval approve,deny,focus 1 Run shell command|npm test|Yes
+wait 700
+expect_label > Yes HOLD (grants)
+expect_label Deny HOLD
+expect_label 3 options
+quit

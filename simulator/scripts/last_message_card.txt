@@ -14,14 +14,17 @@ tap 233 380
 wait 500
 expect_screen read
 expect_label Last message
-expect_label Reading 1 of 3
+expect_label Reading 1 of 4
 shot lastmsg_reader.png
 btn B
 wait 350
-expect_label Reading 2 of 3
+expect_label Reading 2 of 4
 btn B
 wait 350
-expect_label Reading 3 of 3
+expect_label Reading 3 of 4
+btn B
+wait 350
+expect_label Reading 4 of 4
 shot lastmsg_reader_last.png
 btn B
 wait 350
@@ -31,7 +34,7 @@ expect_label Reply
 shot lastmsg_end.png
 swipe 150 233 380 233 200
 wait 350
-expect_label Reading 3 of 3
+expect_label Reading 4 of 4
 swipe 150 233 380 233 200
 wait 350
 expect_screen ring

@@ -45,7 +45,10 @@ const lv_font_t *ui_glyph_font(const char *icons, int px);
  * 40, r / 10 above. */
 lv_obj_t *ui_sigil_create(lv_obj_t *parent, int cx, int cy, int r);
 void ui_sigil_set_name(lv_obj_t *s, const char *name); /* "" (no folder): the dashed-folder glyph */
-void ui_sigil_set_color(lv_obj_t *s, lv_color_t c);    /* white until set */
+/* A session's sigil: its folder's name; with no folder, the dashed folder ringed by arcs drawn from
+ * the session id, so two sessions without a folder still look apart (UX-PROFILE C6). */
+void ui_sigil_set_session(lv_obj_t *s, const char *name, uint32_t sid);
+void ui_sigil_set_color(lv_obj_t *s, lv_color_t c); /* white until set */
 void ui_sigil_set_pos(lv_obj_t *s, int cx, int cy);
 /* The same mark inside a screen's own draw callback (screen coordinates; w 0 = the stroke for
  * r). */

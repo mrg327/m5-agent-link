@@ -1,0 +1,17 @@
+# A permission with no title, text or tool says nothing about what it grants (UX-PROFILE C4, issue
+# 67d1): the eye struck through stands where the request would be, Approve is shut (a full hold
+# sends nothing), and Deny still works.
+connect
+rtc 1800000000
+rx a400020101020103a5008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 2 input webapp feat/login
+attention 7 2 approval approve,deny,focus 0 |
+wait 700
+expect_screen ask
+expect_label Nothing to read
+expect_label > Approve HOLD
+hold 233 262 1800
+wait 300
+expect_screen ask
+expect_label > Approve HOLD
+quit

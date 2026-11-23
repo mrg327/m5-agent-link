@@ -215,7 +215,7 @@ static void render(void)
     bool answer = !s_queue && s_qi >= 0;
     snprintf(s_header_txt, sizeof s_header_txt, "%s %s", answer ? "Answer for" : "Reply to",
              base[0] ? base : "(no folder)");
-    ui_sigil_set_name(s_sigil, base);
+    ui_sigil_set_session(s_sigil, base, s ? s->sid : 0);
     ui_glyph_set(s_head, answer ? ICON_QUESTION : ICON_REPLY,
                  answer ? lv_color_hex(RGB_ASK) : COL_TEXT2);
     bool rec = st == VOICE_REC, wait = st == VOICE_WAIT, text = st == VOICE_TEXT,

@@ -185,7 +185,7 @@ wait 500
 expect_screen read
 expect_label Cloud agent · api
 expect_label Last message
-expect_label Reading 1 of 3
+expect_label Reading 1 of 4
 expect_no_label Loading
 shot sigil_read_page.png
 # a page at rest redraws nothing
@@ -194,11 +194,14 @@ wait 1500
 expect_px_max 0
 btn B
 wait 350
-expect_label Reading 2 of 3
+expect_label Reading 2 of 4
 shot sigil_read_page2.png
 tap 233 200
 wait 350
-expect_label Reading 3 of 3
+expect_label Reading 3 of 4
+btn B
+wait 350
+expect_label Reading 4 of 4
 shot sigil_read_last.png
 btn B
 wait 350
@@ -218,7 +221,7 @@ tap 296 97
 wait 400
 expect_screen read
 expect_label Last message
-expect_label Reading 1 of 3
+expect_label Reading 1 of 4
 # button A opens the session on the computer from any page (op 0)
 btn A
 wait 400

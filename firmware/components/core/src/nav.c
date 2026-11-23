@@ -1,5 +1,6 @@
 #include "nav.h"
 
+#include <ctype.h>
 #include <stddef.h>
 #include <stdlib.h>
 
@@ -282,32 +283,93 @@ int nav_job_items(sess_state_t state, agent_item_t *out, int cap)
     return n;
 }
 
+/* True when `s` starts with the word `w` (ASCII, any case): the next character is not a letter. */
+static bool starts_word(const char *s, const char *w)
+{
+    for (; *w; s++, w++) {
+        if (tolower((unsigned char)*s) != (unsigned char)*w) return false;
+    }
+    return !isalpha((unsigned char)*s);
+}
+
+/* True when `s` contains `w` (ASCII, any case). */
+static bool has_phrase(const char *s, const char *w)
+{
+    for (; *s; s++) {
+        size_t i = 0;
+        while (w[i] && tolower((unsigned char)s[i]) == (unsigned char)w[i]) i++;
+        if (!w[i]) return true;
+    }
+    return false;
+}
+
+unsigned nav_opt_reads(const char *label)
+{
+    static const char *const grant[] = {"yes",    "allow", "approve", "accept",
+                                        "always", "ok",    "okay",    "proceed"};
+    static const char *const deny[] = {"no",    "deny",  "reject",           "decline", "cancel",
+                                       "never", "don't", "don\xE2\x80\x99t", "do not",  "stop"};
+    static const char *const always[] = {"don't ask",  "don\xE2\x80\x99t ask",
+                                         "do not ask", "without ask",
+                                         "always",     "for this session"};
+    unsigned r = 0;
+    if (!label) return 0;
+    while (*label == ' ') label++;
+    for (size_t i = 0; i < sizeof grant / sizeof grant[0]; i++) {
+        if (starts_word(label, grant[i])) r |= NAV_OPT_GRANT;
+    }
+    for (size_t i = 0; i < sizeof deny / sizeof deny[0]; i++) {
+        if (starts_word(label, deny[i])) r |= NAV_OPT_DENY;
+    }
+    for (size_t i = 0; i < sizeof always / sizeof always[0]; i++) {
+        if (has_phrase(label, always[i])) r |= NAV_OPT_ALWAYS;
+    }
+    /* "keep going without asking" grants from now on; "No, and don't ask" still refuses */
+    if ((r & NAV_OPT_ALWAYS) && !(r & NAV_OPT_DENY)) r |= NAV_OPT_GRANT;
+    if (r & NAV_OPT_DENY) r &= ~(unsigned)NAV_OPT_ALWAYS;
+    return r;
+}
+
 int nav_ask_items(const attention_t *a, bool voice, ask_item_t *out, int cap)
 {
     int n = 0;
     if (!a || cap < 1) return 0;
     bool perm = a->kind == ATT_APPROVAL;
     if (a->n_opts > 0) {
-        for (int i = 0; i < a->n_opts && n < cap - 1; i++) {
-            bool grants = (a->grant_mask >> i) & 1u;
+        int n_opts = a->n_opts < 4 ? a->n_opts : 4;
+        bool denies = false; /* some option plainly refuses */
+        for (int i = 0; i < n_opts && n < cap - 1; i++) {
+            /* bits past n_opts mean nothing */
+            bool bit = (a->grant_mask >> i) & 1u;
+            unsigned reads = perm ? nav_opt_reads(a->opts[i]) : 0;
+            /* a grant by its bit or by its words: a mask only ever adds a hold */
+            bool grants = bit || (reads & NAV_OPT_GRANT);
+            bool unclear = grants && (reads & NAV_OPT_DENY);
             /* in a permission every option answers the permission: the ones that do not grant deny
              * it */
             uint32_t hold = grants ? NAV_HOLD_MS : perm ? NAV_DENY_HOLD_MS : 0;
-            out[n++] = (ask_item_t){ASK_OPT, i, hold, grants};
+            out[n++] =
+                (ask_item_t){ASK_OPT, i, hold, grants, grants && (reads & NAV_OPT_ALWAYS), unclear};
+            if (perm && !grants) denies = true;
+        }
+        /* a permission the watch could only grant: Deny after the options */
+        if (perm && !denies && (a->acts & (1u << ACT_DENY)) && n < cap - 1) {
+            out[n++] = (ask_item_t){ASK_DENY, -1, NAV_DENY_HOLD_MS, false, false, false};
         }
     } else if (perm) {
         if ((a->acts & (1u << ACT_APPROVE)) && n < cap - 1)
-            out[n++] = (ask_item_t){ASK_APPROVE, -1, NAV_HOLD_MS, true};
+            out[n++] = (ask_item_t){ASK_APPROVE, -1, NAV_HOLD_MS, true, false, false};
         if ((a->acts & (1u << ACT_DENY)) && n < cap - 1)
-            out[n++] = (ask_item_t){ASK_DENY, -1, NAV_DENY_HOLD_MS, false};
+            out[n++] = (ask_item_t){ASK_DENY, -1, NAV_DENY_HOLD_MS, false, false, false};
         /* third, two steps from the default, so the plain Approve stays the one under the finger */
         if (a->has_rule && (a->acts & (1u << ACT_APPROVE)) && n < cap - 1)
-            out[n++] = (ask_item_t){ASK_GRANT, -1, NAV_GRANT_HOLD_MS, true};
+            out[n++] = (ask_item_t){ASK_GRANT, -1, NAV_GRANT_HOLD_MS, true, false, false};
     }
     /* opens VOICE on this request; the hold-to-send there is the commit */
     if (voice && (a->acts & (1u << ACT_DICTATE)) && n < cap - 1)
-        out[n++] = (ask_item_t){ASK_DICTATE, -1, 0, false};
-    out[n++] = (ask_item_t){ASK_OPEN_PC, -1, 0, false}; /* always: the escape to the terminal */
+        out[n++] = (ask_item_t){ASK_DICTATE, -1, 0, false, false, false};
+    /* always: the escape to the terminal */
+    out[n++] = (ask_item_t){ASK_OPEN_PC, -1, 0, false, false, false};
     return n;
 }
 
@@ -316,12 +378,15 @@ int nav_question_items(const ask_q_t *q, bool voice, uint32_t picks, ask_item_t 
     int n = 0;
     if (!q || cap < 1) return 0;
     for (int i = 0; i < q->n_opts && i < MODEL_MAX_QOPTS && n < cap - 1; i++)
-        out[n++] = (ask_item_t){ASK_QOPT, i, q->multi ? 0 : NAV_HOLD_MS, false};
+        out[n++] = (ask_item_t){ASK_QOPT, i, q->multi ? 0 : NAV_HOLD_MS, false, false, false};
     /* opens VOICE; its own hold commits */
-    if (voice && n < cap - 1) out[n++] = (ask_item_t){ASK_OTHER, -1, 0, false};
+    if (voice && n < cap - 1) out[n++] = (ask_item_t){ASK_OTHER, -1, 0, false, false, false};
     (void)picks; /* Send stays put while ticks change, so the list never jumps under the finger */
-    if (q->multi && n < cap - 1) out[n++] = (ask_item_t){ASK_SEND, -1, NAV_HOLD_MS, false};
-    out[n++] = (ask_item_t){ASK_OPEN_PC, -1, 0, false}; /* always: the escape to the terminal */
+    if (q->multi && n < cap - 1) {
+        out[n++] = (ask_item_t){ASK_SEND, -1, NAV_HOLD_MS, false, false, false};
+    }
+    /* always: the escape to the terminal */
+    out[n++] = (ask_item_t){ASK_OPEN_PC, -1, 0, false, false, false};
     return n;
 }
 

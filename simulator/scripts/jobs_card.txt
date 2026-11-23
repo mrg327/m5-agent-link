@@ -20,7 +20,8 @@ shot job_eta.png
 job 5 run webapp 260 200 0 cargo test --workspace
 wait 700
 expect_label 4m 2
-expect_label progress 100%
+# past its estimate: the full arc turns amber, never "about to finish" (issue 4094)
+expect_label past its estimate
 job 5 done webapp 192 200 0 cargo test --workspace
 wait 400
 expect_label Finished

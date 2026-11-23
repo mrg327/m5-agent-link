@@ -50,6 +50,12 @@ bool detail_msg_fetchable(const session_t *s)
            model_settings()->privacy != PRIVACY_META;
 }
 
+bool detail_msg_whole(const session_t *s)
+{
+    size_t n = s ? strlen(s->lp) : 0;
+    return n && s->ll == n && n <= DETAIL_MSG_WHOLE && !strpbrk(s->lp, " \n");
+}
+
 static void fail(detail_t *d, const char *why)
 {
     dbg_event("detail", "failed", "\"rid\":%u,\"why\":\"%s\",\"got\":%u,\"lm\":%u",

@@ -296,7 +296,7 @@ void ui_glyph_set_pos(lv_obj_t *o, int cx, int cy)
 
 typedef struct {
     uint8_t h[UI_SIGIL_HASH];
-    bool named;
+    bool named, keyed;
     int16_t r;
     lv_color_t col;
 } sigil_t;
@@ -313,26 +313,31 @@ void ui_sigil_hash(const char *name, uint8_t h[UI_SIGIL_HASH])
     memcpy(h, out, UI_SIGIL_HASH);
 }
 
+/* Ring i of a sigil (0 outermost): one byte picks the sectors, two more force at least two;
+ * neighbours merge into one arc. */
+static void sigil_ring(lv_layer_t *l, const uint8_t h[UI_SIGIL_HASH], int i, int cx, int cy, int r,
+                       int w, lv_color_t c)
+{
+    unsigned bits = h[i] | 1u << (h[3 + i] % 8) | 1u << (h[6 + i] % 8);
+    int rr = (int)lroundf((float)r * (1.0f - (float)i * 0.3f));
+    for (int a = 0; a < 8;) {
+        if (!(bits >> a & 1)) {
+            a++;
+            continue;
+        }
+        int b = a;
+        while (b + 1 < 8 && (bits >> (b + 1) & 1)) b++;
+        arc(l, cx, cy, rr, w, a * 45 + 9, (b + 1) * 45 - 9, c);
+        a = b + 1;
+    }
+}
+
 void ui_sigil_paint(lv_layer_t *l, const uint8_t h[UI_SIGIL_HASH], int cx, int cy, int r, int w,
                     lv_color_t c)
 {
     if (w <= 0) w = sigil_w(r);
     if (!in_clip(l, cx, cy, r + 1)) return;
-    for (int i = 0; i < 3; i++) {
-        /* one byte picks the sectors, two more force at least two; neighbours merge into one arc */
-        unsigned bits = h[i] | 1u << (h[3 + i] % 8) | 1u << (h[6 + i] % 8);
-        int rr = (int)lroundf((float)r * (1.0f - (float)i * 0.3f));
-        for (int a = 0; a < 8;) {
-            if (!(bits >> a & 1)) {
-                a++;
-                continue;
-            }
-            int b = a;
-            while (b + 1 < 8 && (bits >> (b + 1) & 1)) b++;
-            arc(l, cx, cy, rr, w, a * 45 + 9, (b + 1) * 45 - 9, c);
-            a = b + 1;
-        }
-    }
+    for (int i = 0; i < 3; i++) sigil_ring(l, h, i, cx, cy, r, w, c);
     if (h[9] & 1) { /* the core: a dot, or a bar */
         int cr = (int)lroundf((float)r * 0.12f);
         dot(l, cx, cy, cr < 2 ? 2 : cr, c);
@@ -354,10 +359,18 @@ static void sigil_draw(lv_event_t *e)
     sigil_t *s = lv_obj_get_user_data(o);
     int cx, cy;
     centre_of(o, &cx, &cy);
-    if (s->named) ui_sigil_paint(lv_event_get_layer(e), s->h, cx, cy, s->r, 0, s->col);
-    else
-        ui_glyph_draw(lv_event_get_layer(e), ui_glyph_font(ICON_NO_FOLDER, s->r * 2),
-                      ICON_NO_FOLDER, cx, cy, s->col, LV_OPA_COVER);
+    lv_layer_t *l = lv_event_get_layer(e);
+    if (s->named) {
+        ui_sigil_paint(l, s->h, cx, cy, s->r, 0, s->col);
+    } else if (s->keyed) { /* no folder: the dashed folder, ringed by the session's own arcs */
+        if (in_clip(l, cx, cy, s->r + 1))
+            sigil_ring(l, s->h, 0, cx, cy, s->r, sigil_w(s->r), s->col);
+        ui_glyph_draw(l, ui_glyph_font(ICON_NO_FOLDER, s->r * 3 / 2), ICON_NO_FOLDER, cx, cy,
+                      s->col, LV_OPA_COVER);
+    } else {
+        ui_glyph_draw(l, ui_glyph_font(ICON_NO_FOLDER, s->r * 2), ICON_NO_FOLDER, cx, cy, s->col,
+                      LV_OPA_COVER);
+    }
 }
 
 lv_obj_t *ui_sigil_create(lv_obj_t *parent, int cx, int cy, int r)
@@ -370,17 +383,25 @@ lv_obj_t *ui_sigil_create(lv_obj_t *parent, int cx, int cy, int r)
     return o;
 }
 
-void ui_sigil_set_name(lv_obj_t *o, const char *name)
+void ui_sigil_set_session(lv_obj_t *o, const char *name, uint32_t sid)
 {
     sigil_t *s = lv_obj_get_user_data(o);
     uint8_t h[UI_SIGIL_HASH] = {0};
-    bool named = name && name[0];
+    bool named = name && name[0], keyed = !named && sid;
     if (named) ui_sigil_hash(name, h);
-    if (named == s->named && !memcmp(h, s->h, sizeof h)) return;
+    if (keyed) { /* a key no folder name can have: the session's own number */
+        char k[16];
+        snprintf(k, sizeof k, "\x01sid %u", (unsigned)sid);
+        ui_sigil_hash(k, h);
+    }
+    if (named == s->named && keyed == s->keyed && !memcmp(h, s->h, sizeof h)) return;
     s->named = named;
+    s->keyed = keyed;
     memcpy(s->h, h, sizeof h);
     lv_obj_invalidate(o);
 }
+
+void ui_sigil_set_name(lv_obj_t *o, const char *name) { ui_sigil_set_session(o, name, 0); }
 
 void ui_sigil_set_color(lv_obj_t *o, lv_color_t c)
 {

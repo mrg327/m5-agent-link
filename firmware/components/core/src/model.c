@@ -197,6 +197,34 @@ static void apply(session_t *dst, const session_t *src, uint32_t present)
     }
 }
 
+/* The pool is full (UX-PROFILE C3): frees the slot of the session that matters least, so a new
+ * session's request is never invisible. Only a session nothing is pending on may go: no request,
+ * not working, not failed, not holding an unseen finish; an ended one first, then the one whose
+ * state changed longest ago. The daemon still has it: its next delta brings it back. Returns -1
+ * when every session still matters. */
+static int evict_slot(void)
+{
+    int best = -1;
+    for (int i = 0; i < MODEL_MAX_SESSIONS; i++) {
+        const session_t *s = &s_sessions[i];
+        if (!s_used[i] || model_attention_for_sid(s->sid)) continue;
+        bool ended = s->state == SESS_ENDED;
+        if (!ended && s->state != SESS_IDLE && !(s->state == SESS_DONE && s->seen)) continue;
+        if (best >= 0) {
+            const session_t *b = &s_sessions[best];
+            bool b_ended = b->state == SESS_ENDED;
+            if (b_ended && !ended) continue;
+            if (b_ended == ended && b->tst <= s->tst) continue;
+        }
+        best = i;
+    }
+    if (best < 0) return -1;
+    dbg_event_at(DBG_WARN, "model", "session_evicted", "\"sid\":%u,\"why\":\"pool_full\"",
+                 (unsigned)s_sessions[best].sid);
+    model_remove(s_sessions[best].sid);
+    return best;
+}
+
 void model_upsert(const session_t *delta, uint32_t present)
 {
     int slot = find_slot(delta->sid);
@@ -204,6 +232,7 @@ void model_upsert(const session_t *delta, uint32_t present)
     if (slot < 0) {
         for (int i = 0; i < MODEL_MAX_SESSIONS && slot < 0; i++)
             if (!s_used[i]) slot = i;
+        if (slot < 0) slot = evict_slot(); /* a new session, and with it its request, stays seen */
         if (slot < 0) {
             dbg_event_at(DBG_WARN, "model", "session_dropped", "\"sid\":%u,\"why\":\"pool_full\"",
                          (unsigned)delta->sid);

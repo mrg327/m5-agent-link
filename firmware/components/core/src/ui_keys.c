@@ -215,7 +215,7 @@ static void render(void)
     const char *base = s ? theme_basename(s->repo) : "";
     snprintf(s_header_txt, sizeof s_header_txt, "Type%s%s", theme_sep(),
              base[0] ? base : "(no folder)");
-    ui_sigil_set_name(s_sigil, base);
+    ui_sigil_set_session(s_sigil, base, s ? s->sid : 0);
     const keys_cands_t *c = keys_cands();
     const char *status = c->err >= 0 ? err_text(c->err) : c->n ? "" : "Swipe the letters";
     snprintf(s_status_txt, sizeof s_status_txt, "%s", status);

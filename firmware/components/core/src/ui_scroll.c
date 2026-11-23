@@ -192,7 +192,7 @@ bool ui_scroll_refresh(uint32_t now)
     theme_host_prefix(host, sizeof host, s);
     snprintf(s_header_txt, sizeof s_header_txt, "%s%s%s%s", host, theme_agent_name(s->agent),
              theme_sep(), base[0] ? base : "(no folder)");
-    ui_sigil_set_name(s_sigil, base);
+    ui_sigil_set_session(s_sigil, base, s->sid);
     snprintf(marks, sizeof marks, "%s%s", s->host ? ICON_G_WEB " " : "",
              theme_agent_glyph(s->agent)); /* remote: the globe first */
     theme_set_text(s_marks, s_marks_txt, sizeof s_marks_txt, marks);
