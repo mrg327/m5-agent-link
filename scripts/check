@@ -7,7 +7,7 @@
 # "Checks to run before closing" table in issues/README.md names the same areas.
 #
 # Usage: scripts/check [AREA...] [--changed] [--list] [--fail-fast]
-#   AREA         one or more of: format structure commits docs protocol atlas daemon sim
+#   AREA         one or more of: format structure commits docs lint protocol atlas daemon sim
 #                firmware (default: all)
 #   --changed    pick areas from files changed against main (commits, staged, unstaged, untracked)
 #   --list       print each area and the commands it runs, then exit
@@ -27,9 +27,9 @@ set -euo pipefail
 ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 cd "$ROOT"
 
-ALL_AREAS="format structure commits sim daemon protocol atlas firmware docs"
+ALL_AREAS="format structure commits lint sim daemon protocol atlas firmware docs"
 # Fast areas first, so a quick failure shows up before the long builds.
-RUN_ORDER="format structure commits docs protocol atlas daemon sim firmware"
+RUN_ORDER="format structure commits docs lint protocol atlas daemon sim firmware"
 
 # area_steps AREA: one step per line, fields separated by '|':
 #   mode|dir|tools|command
@@ -65,6 +65,10 @@ area_steps() {
     firmware)
         echo "step|.|idf.py python3|idf.py -C firmware build"
         echo "then|.|python3|python3 firmware/tools/check_dram.py"
+        ;;
+    lint)
+        # Linters with baselines that only shrink (docs/conventions/README.md).
+        echo "step|.|uv|python3 scripts/check.d/lint_py.py"
         ;;
     structure)
         echo "step|.|python3|python3 scripts/check.d/structure.py"
@@ -108,7 +112,8 @@ areas_for_path() {
     *) echo "structure commits" ;;
     esac
     case "$1" in
-    *.c | *.h | *.cpp | *.hpp | *.py | *.js | *.mjs | *.ts | *.rs) echo "format" ;;
+    *.c | *.h | *.cpp | *.hpp | *.py | *.js | *.mjs | *.ts | *.rs) echo "format lint" ;;
+    ruff.toml | scripts/check.d/lint_*.py | scripts/check.d/baselines/lint_*) echo "lint" ;;
     .clang-format | .clang-format-ignore | ruff.toml | rustfmt.toml) echo "format" ;;
     .prettierrc.json | .prettierignore | scripts/check.d/format.sh) echo "format" ;;
     esac

@@ -16,8 +16,29 @@ quote-style = "double"
 docstring-code-format = true
 
 [lint]
-# Phase 1: syntax and undefined-name errors only.
-# Planned (python.md PY-2): "E4", "E7", "E9", "F" blocking everywhere, then the full set
-# "E", "W", "F", "I", "N", "D", "UP", "B", "SIM", "C4", "BLE", "RUF", "PLW1510" with a baseline,
-# ignore D105 and D107, pydocstyle convention "google".
-select = ["E9", "F63", "F7", "F82"]
+# Phase 3 (python.md PY-2): the full set. Findings that predate it are counted per rule and file in
+# scripts/check.d/baselines/lint_py.txt, which only shrinks (scripts/check.d/lint_py.py).
+select = [
+  "E", "W",   # pycodestyle
+  "F",        # pyflakes
+  "I",        # import order (isort)
+  "N",        # pep8-naming: Google naming
+  "D",        # docstrings, google convention below
+  "UP",       # pyupgrade to 3.11 idioms (X | None, builtin generics)
+  "B",        # bugbear: mutable defaults, loop-variable closures
+  "SIM",      # simplify; SIM115 = open() without `with`
+  "C4",       # comprehensions
+  "BLE",      # no blind `except Exception`
+  "RUF",      # Ruff's own checks
+  "PLW1510",  # subprocess.run without check=
+]
+ignore = [
+  "D105",     # magic methods need no docstring
+  "D107",     # document __init__ arguments in the class docstring (Google)
+]
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.per-file-ignores]
+"**/test_*.py" = ["D"]
