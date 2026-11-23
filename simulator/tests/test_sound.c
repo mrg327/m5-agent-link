@@ -6,7 +6,13 @@
 #include "sound.h"
 
 static int failures;
-#define EXPECT(cond, msg) do { if (!(cond)) { printf("FAIL: %s (line %d)\n", msg, __LINE__); failures++; } } while (0)
+#define EXPECT(cond, msg)                                  \
+    do {                                                   \
+        if (!(cond)) {                                     \
+            printf("FAIL: %s (line %d)\n", msg, __LINE__); \
+            failures++;                                    \
+        }                                                  \
+    } while (0)
 
 static hal_board_info_t s_info = {.has_speaker = true};
 static uint64_t s_now_us = 1000000;

@@ -50,7 +50,7 @@ AllowShortFunctionsOnASingleLine: All
 AllowShortEnumsOnASingleLine: true
 AllowShortRecordOnASingleLine: Always
 AlignAfterOpenBracket: Align
-AlignTrailingComments: {Kind: Leave}
+AlignTrailingComments: {Kind: Always, OverEmptyLines: 0}  # Leave is not idempotent in 23.1.5
 AlignEscapedNewlines: Left
 SortIncludes: Never
 IncludeBlocks: Preserve

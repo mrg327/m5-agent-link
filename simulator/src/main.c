@@ -19,14 +19,16 @@ static uint32_t timed_core_step(void)
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &a);
     uint32_t wait = core_step();
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &b);
-    s_cpu_ns += (uint64_t)(b.tv_sec - a.tv_sec) * 1000000000u + (uint64_t)b.tv_nsec - (uint64_t)a.tv_nsec;
+    s_cpu_ns +=
+        (uint64_t)(b.tv_sec - a.tv_sec) * 1000000000u + (uint64_t)b.tv_nsec - (uint64_t)a.tv_nsec;
     return wait;
 }
 
 static void usage(const char *argv0)
 {
     fprintf(stderr,
-            "usage: %s [--headless] [--no-ws] [--script FILE] [--idle-off SECONDS] [--battery] [--deep-after SECONDS]\n"
+            "usage: %s [--headless] [--no-ws] [--script FILE] [--idle-off SECONDS] [--battery] "
+            "[--deep-after SECONDS]\n"
             "          [--wake timer|button [--tries N] [--slept S]]\n"
             "  --headless   no window (framebuffer still rendered, screenshots work)\n"
             "  --no-ws      do not connect to ws://127.0.0.1:7878 (scripts can inject frames)\n"
@@ -52,7 +54,8 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--script") && i + 1 < argc) script = argv[++i];
         else if (!strcmp(argv[i], "--idle-off") && i + 1 < argc) idle_s = (uint32_t)atoi(argv[++i]);
         else if (!strcmp(argv[i], "--battery")) battery = true;
-        else if (!strcmp(argv[i], "--deep-after") && i + 1 < argc) deep_s = (uint32_t)atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--deep-after") && i + 1 < argc)
+            deep_s = (uint32_t)atoi(argv[++i]);
         else if (!strcmp(argv[i], "--tries") && i + 1 < argc) tries = (uint32_t)atoi(argv[++i]);
         else if (!strcmp(argv[i], "--slept") && i + 1 < argc) slept_s = (uint32_t)atoi(argv[++i]);
         else if (!strcmp(argv[i], "--wake") && i + 1 < argc) {
@@ -60,8 +63,7 @@ int main(int argc, char **argv)
             if (!strcmp(w, "timer")) wake = HAL_WAKE_TIMER;
             else if (!strcmp(w, "button")) wake = HAL_WAKE_BUTTON;
             else return usage(argv[0]), 2;
-        }
-        else return usage(argv[0]), 2;
+        } else return usage(argv[0]), 2;
     }
 
     sim_display_set_headless(headless);

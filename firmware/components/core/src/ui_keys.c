@@ -1,21 +1,24 @@
-/* The KEYS screen in Sigil (docs/design/GLYPHS.md §5; issue 1e57 for what it does): a swipe keyboard for one
- * session. Opened by Keyboard at the end of the Reply list. The watch only draws the keys and records strokes
- * (keys.c); the daemon decodes them into words and types them into the terminal, then reports candidates back.
+/* The KEYS screen in Sigil (docs/design/GLYPHS.md §5; issue 1e57 for what it does): a swipe
+ * keyboard for one session. Opened by Keyboard at the end of the Reply list. The watch only draws
+ * the keys and records strokes (keys.c); the daemon decodes them into words and types them into the
+ * terminal, then reports candidates back.
  *
  * What is on the glass:
  *   - who gets the words: the keyboard glyph beside the project's sigil;
- *   - the candidates (text: rule 1), the typed one on a yellow capsule; a tap on one swaps the typed word.
- *     Before anything is typed, a drawn swipe in their place says what to do ("Swipe the letters");
- *   - a refusal as a sign above them (rule 8): the keyboard and an hourglass (busy), the terminal and the
- *     prohibit glyph (not kitty), ...;
- *   - the keys: bare letters (text entry: rule 1), no boxes; the three keys that are not characters are
- *     capsules with a glyph: the layer key shows the characters it leads to, space a space bar, delete the
- *     backspace glyph;
- *   - under the keys the two hints: A is the paper plane inside a second ring, the ring a hold fills (A held
- *     1.2 s sends, Enter; a short press only lights that ring), B deletes the last word.
- * B held, a double tap below the keys or the A+B chord leave, and the daemon erases what was not sent. Sent is
- * a burst (rule 7). No text is composed or shown here beyond the candidates. The report names all of it in the
- * words the screen used to show (rule 9). */
+ *   - the candidates (text: rule 1), the typed one on a yellow capsule; a tap on one swaps the
+ *     typed word. Before anything is typed, a drawn swipe in their place says what to do ("Swipe
+ *     the letters");
+ *   - a refusal as a sign above them (rule 8): the keyboard and an hourglass (busy), the terminal
+ *     and the prohibit glyph (not kitty), ...;
+ *   - the keys: bare letters (text entry: rule 1), no boxes; the three keys that are not characters
+ *     are capsules with a glyph: the layer key shows the characters it leads to, space a space bar,
+ *     delete the backspace glyph;
+ *   - under the keys the two hints: A is the paper plane inside a second ring, the ring a hold
+ *     fills (A held 1.2 s sends, Enter; a short press only lights that ring), B deletes the last
+ *     word.
+ * B held, a double tap below the keys or the A+B chord leave, and the daemon erases what was not
+ * sent. Sent is a burst (rule 7). No text is composed or shown here beyond the candidates. The
+ * report names all of it in the words the screen used to show (rule 9). */
 #include <stdio.h>
 #include <string.h>
 
@@ -32,24 +35,25 @@
 #define HEAD_SIGIL_R 22
 #define HEAD_GLYPH_X (UI_CX - 28) /* a 28 px glyph, a 10 px gap, the sigil: centred as a pair */
 #define HEAD_SIGIL_X (UI_CX + 19)
-#define SIGN_Y 104    /* a refusal */
-#define SWIPE_Y 120   /* the drawn swipe, before anything is typed */
-#define CAND_Y 132    /* the candidates' row: its top; the keys begin at KEYS_TOP_Y 170 */
+#define SIGN_Y 104  /* a refusal */
+#define SWIPE_Y 120 /* the drawn swipe, before anything is typed */
+#define CAND_Y 132  /* the candidates' row: its top; the keys begin at KEYS_TOP_Y 170 */
 #define CAND_H 32
-#define CAND_X 38     /* three slots of 128 px, 4 px apart: where a tap picks one */
+#define CAND_X 38 /* three slots of 128 px, 4 px apart: where a tap picks one */
 #define CAND_W 128
 #define CAND_STEP 132
-#define CAND_PAD 14   /* the typed word's capsule: this much wider than the word on each side */
+#define CAND_PAD 14 /* the typed word's capsule: this much wider than the word on each side */
 #define N_SLOTS 3
 #define TRAIL_PTS 64
 #define FADE_MS 250
-#define SPECIAL_H 40  /* the capsule of a key that is not a character */
+#define SPECIAL_H 40 /* the capsule of a key that is not a character */
 #define SPECIAL_PAD 4
-/* Under the key block (it ends at KEYS_BOTTOM_Y 386) the glass is 100 px wide: the two hints sit there side by
- * side, their hold rings inside r 207. */
+/* Under the key block (it ends at KEYS_BOTTOM_Y 386) the glass is 100 px wide: the two hints sit
+ * there side by side, their hold rings inside r 207. */
 #define HINT_Y 409
 #define HINT_DX 44
-#define HINT_RING 25  /* A's second ring: where ui_kit.c draws a key hint's hold (3 px out, 3 wide) */
+/* A's second ring: where ui_kit.c draws a key hint's hold (3 px out, 3 wide) */
+#define HINT_RING 25
 #define FLASH_MS 1800 /* how long a sign or a lit ring answers a gesture */
 
 static lv_obj_t *s_root, *s_draw, *s_head, *s_sigil, *s_swipe, *s_sign, *s_slot[N_SLOTS], *s_trail;
@@ -61,7 +65,8 @@ static int s_trail_n;
 static bool s_holding, s_ramp_started, s_was_down;
 static uint32_t s_hold_t0, s_bottom_tap_ms;
 static bool s_bottom_tapped;
-static const char *s_flash = ""; /* what the screen answers a gesture with, in words, while it shows: "Hold to send", "Offline" */
+/* what the screen answers a gesture with, in words, while it shows: "Hold to send", "Offline" */
+static const char *s_flash = "";
 static uint32_t s_flash_until;
 static const char *s_sign_shown; /* the words whose sign is on screen (NULL: none) */
 
@@ -90,7 +95,8 @@ static void hold_cancel(void)
 
 static const char *err_text(int err)
 {
-    static const char *const t[] = {"Out of date", "Busy", "Not kitty", "No window", "Timed out", "Failed"};
+    static const char *const t[] = {"Out of date", "Busy",      "Not kitty",
+                                    "No window",   "Timed out", "Failed"};
     return err >= 0 && err < 6 ? t[err] : "Failed";
 }
 
@@ -119,7 +125,9 @@ static void on_draw(lv_event_t *e)
     t.align = LV_TEXT_ALIGN_CENTER;
     t.text_local = 1;
     for (int i = 0; i < n; i++) {
-        if (k[i].x > clip->x2 || k[i].x + k[i].w <= clip->x1 || k[i].y > clip->y2 || k[i].y + k[i].h <= clip->y1) continue;
+        if (k[i].x > clip->x2 || k[i].x + k[i].w <= clip->x1 || k[i].y > clip->y2 ||
+            k[i].y + k[i].h <= clip->y1)
+            continue;
         int cx = k[i].x + k[i].w / 2, cy = k[i].y + k[i].h / 2;
         char txt[8] = {(char)k[i].cp, 0};
         const char *s = txt;
@@ -135,7 +143,8 @@ static void on_draw(lv_event_t *e)
             capsule(l, cx + 21, cy + 2, 3, 9, COL_TEXT3);
             continue;
         }
-        if (k[i].cp == KEYS_CP_LAYER) s = keys_layer() ? "abc" : "123"; /* the characters the key leads to */
+        /* the characters the key leads to */
+        if (k[i].cp == KEYS_CP_LAYER) s = keys_layer() ? "abc" : "123";
         t.font = special ? FONT_CAPTION : FONT_HEAD;
         t.color = special ? COL_TEXT2 : COL_TEXT;
         t.text = s;
@@ -204,7 +213,8 @@ static void render(void)
 {
     const session_t *s = model_find(s_sid);
     const char *base = s ? theme_basename(s->repo) : "";
-    snprintf(s_header_txt, sizeof s_header_txt, "Type%s%s", theme_sep(), base[0] ? base : "(no folder)");
+    snprintf(s_header_txt, sizeof s_header_txt, "Type%s%s", theme_sep(),
+             base[0] ? base : "(no folder)");
     ui_sigil_set_name(s_sigil, base);
     const keys_cands_t *c = keys_cands();
     const char *status = c->err >= 0 ? err_text(c->err) : c->n ? "" : "Swipe the letters";
@@ -216,7 +226,8 @@ static void render(void)
     ui_arc_set(s_ring_a, 0, COL_TEXT, s_flash[0] && !offline ? COL_TEXT : theme_dim(RGB_KEY_A, 40));
     if (c->rev == s_cands_rev) return;
     s_cands_rev = c->rev;
-    for (int i = 0; i < N_SLOTS; i++) set_slot(i, i < c->n ? c->word[i] : "", i < c->n, i == c->typed);
+    for (int i = 0; i < N_SLOTS; i++)
+        set_slot(i, i < c->n ? c->word[i] : "", i < c->n, i == c->typed);
 }
 
 static void flash(const char *words)
@@ -301,7 +312,8 @@ static bool on_layer_key(const keys_pt_t *p)
     keys_key_t k[KEYS_MAX_KEYS];
     int n = keys_layout(keys_layer(), k, KEYS_MAX_KEYS);
     for (int i = 0; i < n; i++)
-        if (k[i].cp == KEYS_CP_LAYER && p->x >= k[i].x && p->x < k[i].x + k[i].w && p->y >= k[i].y && p->y < k[i].y + k[i].h)
+        if (k[i].cp == KEYS_CP_LAYER && p->x >= k[i].x && p->x < k[i].x + k[i].w &&
+            p->y >= k[i].y && p->y < k[i].y + k[i].h)
             return true;
     return false;
 }
@@ -349,7 +361,8 @@ static void update_trail(void)
         s_was_down = true;
         int n = l->n < TRAIL_PTS ? l->n : TRAIL_PTS;
         if (n >= 2 && n != s_trail_n) {
-            for (int i = 0; i < n; i++) s_pts[i] = (lv_point_precise_t){l->pts[l->n - n + i].x, l->pts[l->n - n + i].y};
+            for (int i = 0; i < n; i++)
+                s_pts[i] = (lv_point_precise_t){l->pts[l->n - n + i].x, l->pts[l->n - n + i].y};
             lv_line_set_points(s_trail, s_pts, (uint32_t)n);
             theme_set_opa(s_trail, LV_OPA_COVER);
             show(s_trail, true);
@@ -417,7 +430,8 @@ void ui_keys_report(ui_report_t *r)
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
     if (s_status_txt[0]) ui_report_add(r, "%s", s_status_txt);
     const keys_cands_t *c = keys_cands();
-    for (int i = 0; i < c->n && i < N_SLOTS; i++) ui_report_add(r, "%s%s", i == c->typed ? "> " : "", c->word[i]);
+    for (int i = 0; i < c->n && i < N_SLOTS; i++)
+        ui_report_add(r, "%s%s", i == c->typed ? "> " : "", c->word[i]);
 }
 
 lv_obj_t *ui_keys_init(lv_obj_t *screen)
@@ -469,8 +483,9 @@ lv_obj_t *ui_keys_init(lv_obj_t *screen)
     lv_obj_set_style_line_rounded(s_trail, true, 0);
     lv_obj_add_flag(s_trail, LV_OBJ_FLAG_HIDDEN);
 
-    /* rule 6: what the buttons do. The key block reaches down to where the hints usually are, so they sit in
-     * the glass below it, side by side. A sends on a hold: the second ring round its hint is the ring to fill. */
+    /* rule 6: what the buttons do. The key block reaches down to where the hints usually are, so
+     * they sit in the glass below it, side by side. A sends on a hold: the second ring round its
+     * hint is the ring to fill. */
     s_ring_a = ui_arc_create(s_root, UI_CX - HINT_DX, HINT_Y, HINT_RING, 3);
     ui_arc_set(s_ring_a, 0, COL_TEXT, theme_dim(RGB_KEY_A, 40));
     s_key_a = ui_key_hint_create(s_root, UI_KEY_A);

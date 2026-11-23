@@ -21,16 +21,21 @@
 typedef enum { OTA_IDLE, OTA_RECV, OTA_RESTART } ota_state_t;
 
 #define OTA_BUF 4096 /* base hashing reads, then the rebuilt image batched into flash writes */
-/* Delta updates (issue 203f): one 2 KB patch chunk can rebuild most of the image, many seconds of flash
- * writes. So the patch is kept whole in PSRAM and acked as it arrives, like an image, and the decoder gets it
- * OTA_FEED bytes at a time for about OTA_SLICE_MS per main-loop pass, which keeps the screen and the buttons
- * running. Once the whole patch is in, a `go` ack repeating `next` every OTA_KEEPALIVE_MS keeps the daemon's
- * 10 s ack timeout from firing while the rest is rebuilt (with nothing unanswered it changes nothing else). */
-#define OTA_SLICE_MS 40 /* each 4 KB flash write takes ~35 ms; a pass costs ~25 ms more, so take a few per pass */
-#define OTA_FEED 16 /* a heatshrink back-reference rebuilds at most 1 KB: one call is a few flash writes at most */
+/* Delta updates (issue 203f): one 2 KB patch chunk can rebuild most of the image, many seconds of
+ * flash writes. So the patch is kept whole in PSRAM and acked as it arrives, like an image, and the
+ * decoder gets it OTA_FEED bytes at a time for about OTA_SLICE_MS per main-loop pass, which keeps
+ * the screen and the buttons running. Once the whole patch is in, a `go` ack repeating `next` every
+ * OTA_KEEPALIVE_MS keeps the daemon's 10 s ack timeout from firing while the rest is rebuilt (with
+ * nothing unanswered it changes nothing else). */
+/* each 4 KB flash write takes ~35 ms; a pass costs ~25 ms more, so take a few per pass */
+#define OTA_SLICE_MS 40
+/* a heatshrink back-reference rebuilds at most 1 KB: one call is a few flash writes at most */
+#define OTA_FEED 16
 #define OTA_KEEPALIVE_MS 3000
-#define OTA_PATCH_MAX (1024u * 1024u) /* a bigger patch is refused; the daemon then sends the image */
-#define OTA_PATCH_MIN_ALLOC (32u * 1024u) /* above CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL: lands in PSRAM */
+/* a bigger patch is refused; the daemon then sends the image */
+#define OTA_PATCH_MAX (1024u * 1024u)
+/* above CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL: lands in PSRAM */
+#define OTA_PATCH_MIN_ALLOC (32u * 1024u)
 
 static struct {
     ota_state_t st;
@@ -40,18 +45,21 @@ static struct {
     char ver[32];
     sha256_t ctx;
     bool waiting;
-    /* delta update: psize 0 = a whole image; `next` then counts patch bytes received, `applied` decoded */
+    /* delta update: psize 0 = a whole image; `next` then counts patch bytes received, `applied`
+     * decoded */
     uint32_t psize, bsize, out, fill, applied, keep_ms;
     uint8_t base[32];
-    int64_t boff;               /* the decoder's position in the base (it seeks relative to it) */
-    hal_ota_result_t werr;      /* a flash write the decoder's output hit */
-    bool overflow;              /* the patch rebuilt more than `size` bytes */
+    int64_t boff;                /* the decoder's position in the base (it seeks relative to it) */
+    hal_ota_result_t werr;       /* a flash write the decoder's output hit */
+    bool overflow;               /* the patch rebuilt more than `size` bytes */
     uint32_t step_max_ms, steps; /* the longest decoder step, how many there were (ota_done) */
 } s;
-/* PSRAM: the decoder (~2.3 KB, mostly heatshrink's 2 KB window) and the buffer stay off internal RAM. */
+/* PSRAM: the decoder (~2.3 KB, mostly heatshrink's 2 KB window) and the buffer stay off internal
+ * RAM. */
 MODEL_EXT_BSS static struct detools_apply_patch_t s_dt;
 MODEL_EXT_BSS static uint8_t s_buf[OTA_BUF];
-static uint8_t *s_patch; /* the patch received so far (malloc, PSRAM); outside `s`, which begin clears */
+/* the patch received so far (malloc, PSRAM); outside `s`, which begin clears */
+static uint8_t *s_patch;
 static bool s_unconfirmed;
 static uint32_t s_boot_ms;
 
@@ -75,9 +83,7 @@ static unsigned pct(void)
 }
 
 static void ack(int st, const char *msg)
-{
-    link_send_fw_ack(st, s.st == OTA_IDLE ? 0 : s.next, msg);
-}
+{ link_send_fw_ack(st, s.st == OTA_IDLE ? 0 : s.next, msg); }
 
 static void free_patch(void)
 {
@@ -85,8 +91,8 @@ static void free_patch(void)
     s_patch = NULL;
 }
 
-/* Ends the transfer (the slot is already dropped or finished) and gives the screen, the radio and the
- * display timer back. */
+/* Ends the transfer (the slot is already dropped or finished) and gives the screen, the radio and
+ * the display timer back. */
 static void close_transfer(void)
 {
     if (s.st != OTA_IDLE) hal_link_bulk(s.port, false);
@@ -95,8 +101,9 @@ static void close_transfer(void)
     ui_ota_hide();
 }
 
-/* A reason the user should see goes out as a toast: `toast` in words (the report, the log), `sign` on the glass
- * (GLYPHS.md rule 8: "download, cross" for a cancelled update, "download, hourglass" for one that timed out). */
+/* A reason the user should see goes out as a toast: `toast` in words (the report, the log), `sign`
+ * on the glass (GLYPHS.md rule 8: "download, cross" for a cancelled update, "download, hourglass"
+ * for one that timed out). */
 static void stop(const char *why, const char *toast, const char *sign, bool tell)
 {
     hal_ota_abort();
@@ -112,10 +119,11 @@ static const char *err_text(const char *fallback)
     return e && e[0] ? e : fallback;
 }
 
-/* GLYPHS.md rule 8: a failed update has no picture, so the glass shows the error glyph and a short number. This
- * is the number for each reason the watch can give (ota.c's own, and the flash drivers' in boards/ and the
- * simulator); the words still go to the daemon in the ack, to the log and to the report. Words not listed here
- * show the ack's status (3: the update was bad, 4: the flash failed). */
+/* GLYPHS.md rule 8: a failed update has no picture, so the glass shows the error glyph and a short
+ * number. This is the number for each reason the watch can give (ota.c's own, and the flash
+ * drivers' in boards/ and the simulator); the words still go to the daemon in the ack, to the log
+ * and to the report. Words not listed here show the ack's status (3: the update was bad, 4: the
+ * flash failed). */
 static int fail_code(int st, const char *msg)
 {
     static const struct {
@@ -123,14 +131,27 @@ static int fail_code(int st, const char *msg)
         uint8_t code;
     } k[] = {
         /* the image is not what it should be */
-        {"Checksum mismatch", 11}, {"Signature not trusted", 12}, {"Not an app image", 13}, {"Built for another chip", 14},
-        {"Not agentlink firmware", 15}, {"Image incomplete", 16}, {"Incomplete image", 16}, {"Image too big", 17},
-        {"Image too small", 18}, {"Image longer than announced", 19}, {"Write past the end", 19},
+        {"Checksum mismatch", 11},
+        {"Signature not trusted", 12},
+        {"Not an app image", 13},
+        {"Built for another chip", 14},
+        {"Not agentlink firmware", 15},
+        {"Image incomplete", 16},
+        {"Incomplete image", 16},
+        {"Image too big", 17},
+        {"Image too small", 18},
+        {"Image longer than announced", 19},
+        {"Write past the end", 19},
         /* the patch is not */
-        {"Too much data", 21}, {"Bad patch", 22},
+        {"Too much data", 21},
+        {"Bad patch", 22},
         /* the watch could not take it */
-        {"No spare app slot", 31}, {"Flash error", 32}, {"No update open", 33}, {"Out of memory", 34},
-        {"Update refused", 35}, {"This watch can't update itself", 36},
+        {"No spare app slot", 31},
+        {"Flash error", 32},
+        {"No update open", 33},
+        {"Out of memory", 34},
+        {"Update refused", 35},
+        {"This watch can't update itself", 36},
     };
     for (size_t i = 0; i < sizeof k / sizeof k[0]; i++)
         if (!strcmp(k[i].msg, msg)) return k[i].code;
@@ -143,7 +164,8 @@ static void fail_transfer(int st, const char *msg)
     char num[12];
     int code = fail_code(st, msg);
     hal_ota_abort();
-    dbg_event("ota", "ota_bad", "\"st\":%d,\"msg\":%s,\"next\":%u,\"code\":%d", st, dbg_q(msg), (unsigned)s.next, code);
+    dbg_event("ota", "ota_bad", "\"st\":%d,\"msg\":%s,\"next\":%u,\"code\":%d", st, dbg_q(msg),
+              (unsigned)s.next, code);
     ack(st, msg);
     close_transfer();
     snprintf(num, sizeof num, "%d", code);
@@ -151,8 +173,8 @@ static void fail_transfer(int st, const char *msg)
     feedback_reject();
 }
 
-/* The first `p->bsize` bytes of the running slot hash to `p->base`. Blocks the main loop while it reads
- * them (estimated well under a second for a 1.3 MB image; `hash_ms` in ota_begin). */
+/* The first `p->bsize` bytes of the running slot hash to `p->base`. Blocks the main loop while it
+ * reads them (estimated well under a second for a 1.3 MB image; `hash_ms` in ota_begin). */
 static bool base_matches(const ota_patch_t *p)
 {
     if (p->bsize == 0 || p->bsize > hal_ota_base_size()) return false;
@@ -169,7 +191,8 @@ static bool base_matches(const ota_patch_t *p)
     return !memcmp(got, p->base, 32);
 }
 
-/* detools callbacks: the base is read where the decoder says, the image goes out in OTA_BUF pieces. */
+/* detools callbacks: the base is read where the decoder says, the image goes out in OTA_BUF
+ * pieces. */
 static int base_read(void *arg, uint8_t *buf, size_t len)
 {
     (void)arg;
@@ -222,8 +245,9 @@ static void patch_failed(int err)
 {
     dbg_event("ota", "ota_patch_error", "\"err\":%d,\"out\":%u", err, (unsigned)s.out);
     if (s.werr != HAL_OTA_OK)
-        fail_transfer(s.werr == HAL_OTA_FAIL ? 4 : 3,
-                      s.werr == HAL_OTA_FAIL ? err_text("Flash error") : err_text("Update refused"));
+        fail_transfer(s.werr == HAL_OTA_FAIL ? 4 : 3, s.werr == HAL_OTA_FAIL
+                                                          ? err_text("Flash error")
+                                                          : err_text("Update refused"));
     else fail_transfer(3, s.overflow ? "Too much data" : "Bad patch");
 }
 
@@ -233,8 +257,8 @@ static bool same_patch(const ota_patch_t *p)
     return s.psize == p->psize && s.bsize == p->bsize && !memcmp(s.base, p->base, 32);
 }
 
-void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char *ver, size_t ver_len,
-                  const ota_patch_t *patch, uint32_t now_ms)
+void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char *ver,
+                  size_t ver_len, const ota_patch_t *patch, uint32_t now_ms)
 {
     if (size == 0) {
         if (s.st == OTA_RECV) {
@@ -249,22 +273,26 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
         ack(3, "Bad update request");
         return;
     }
-    if (s.st == OTA_RECV && size == s.size && !memcmp(sha, s.sha, 32) && same_patch(patch)) { /* the daemon came back: carry on */
+    if (s.st == OTA_RECV && size == s.size && !memcmp(sha, s.sha, 32) && same_patch(patch)) {
+        /* the daemon came back: carry on */
         s.last_ms = now_ms;
         s.waiting = false;
-        dbg_event("ota", "ota_resume", "\"next\":%u,\"size\":%u", (unsigned)s.next, (unsigned)s.size);
+        dbg_event("ota", "ota_resume", "\"next\":%u,\"size\":%u", (unsigned)s.next,
+                  (unsigned)s.size);
         ui_ota_progress(pct(), false);
         ack(0, NULL);
         return;
     }
     const char *busy = NULL;
     if (s.st != OTA_IDLE) busy = "Already updating";
-    else if (voice_state() == VOICE_REC || voice_state() == VOICE_WAIT) busy = "Recording a message";
+    else if (voice_state() == VOICE_REC || voice_state() == VOICE_WAIT)
+        busy = "Recording a message";
     else if (keys_active()) busy = "Typing a message";
     else {
         const hal_board_info_t *bi = hal_board_info();
         hal_battery_t b = hal_battery_read();
-        if (bi->has_battery && b.percent < OTA_MIN_BATTERY && !b.charging && !b.usb_present) busy = "Battery too low";
+        if (bi->has_battery && b.percent < OTA_MIN_BATTERY && !b.charging && !b.usb_present)
+            busy = "Battery too low";
     }
     if (busy) {
         dbg_event("ota", "ota_busy", "\"msg\":%s", dbg_q(busy));
@@ -277,8 +305,8 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
         bool ok = base_matches(patch);
         hash_ms = lv_tick_get() - t0;
         if (!ok) {
-            dbg_event("ota", "ota_base_mismatch", "\"bsize\":%u,\"have\":%u,\"ms\":%u", (unsigned)patch->bsize,
-                      (unsigned)hal_ota_base_size(), (unsigned)hash_ms);
+            dbg_event("ota", "ota_base_mismatch", "\"bsize\":%u,\"have\":%u,\"ms\":%u",
+                      (unsigned)patch->bsize, (unsigned)hal_ota_base_size(), (unsigned)hash_ms);
             ack(3, "Base mismatch");
             return;
         }
@@ -286,9 +314,11 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
     if (patch) {
         free_patch();
         if (patch->psize <= OTA_PATCH_MAX)
-            s_patch = malloc(patch->psize > OTA_PATCH_MIN_ALLOC ? patch->psize : OTA_PATCH_MIN_ALLOC);
+            s_patch =
+                malloc(patch->psize > OTA_PATCH_MIN_ALLOC ? patch->psize : OTA_PATCH_MIN_ALLOC);
         if (!s_patch) {
-            dbg_event("ota", "ota_bad", "\"st\":3,\"msg\":\"Patch too big\",\"psize\":%u", (unsigned)patch->psize);
+            dbg_event("ota", "ota_bad", "\"st\":3,\"msg\":\"Patch too big\",\"psize\":%u",
+                      (unsigned)patch->psize);
             ack(3, "Patch too big");
             return;
         }
@@ -300,7 +330,8 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
                                                    : err_text("Flash error");
         hal_ota_abort();
         free_patch();
-        dbg_event("ota", "ota_bad", "\"st\":%d,\"msg\":%s,\"next\":0", r == HAL_OTA_FAIL ? 4 : 3, dbg_q(msg));
+        dbg_event("ota", "ota_bad", "\"st\":%d,\"msg\":%s,\"next\":0", r == HAL_OTA_FAIL ? 4 : 3,
+                  dbg_q(msg));
         ack(r == HAL_OTA_FAIL ? 4 : 3, msg);
         return;
     }
@@ -327,8 +358,8 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
     ui_ota_progress(0, false);
     feedback_tick();
     if (patch)
-        dbg_event("ota", "ota_begin", "\"size\":%u,\"ver\":%s,\"patch\":%u,\"hash_ms\":%u", (unsigned)size,
-                  dbg_q(s.ver), (unsigned)s.psize, (unsigned)hash_ms);
+        dbg_event("ota", "ota_begin", "\"size\":%u,\"ver\":%s,\"patch\":%u,\"hash_ms\":%u",
+                  (unsigned)size, dbg_q(s.ver), (unsigned)s.psize, (unsigned)hash_ms);
     else dbg_event("ota", "ota_begin", "\"size\":%u,\"ver\":%s", (unsigned)size, dbg_q(s.ver));
     ack(0, NULL);
 }
@@ -343,15 +374,18 @@ static void finish(uint32_t now_ms)
     }
     hal_ota_result_t r = hal_ota_finish();
     if (r != HAL_OTA_OK) {
-        fail_transfer(r == HAL_OTA_FAIL ? 4 : 3, r == HAL_OTA_FAIL ? err_text("Flash error") : err_text("Update refused"));
+        fail_transfer(r == HAL_OTA_FAIL ? 4 : 3,
+                      r == HAL_OTA_FAIL ? err_text("Flash error") : err_text("Update refused"));
         return;
     }
     if (s.psize)
-        dbg_event("ota", "ota_done", "\"size\":%u,\"ver\":%s,\"ms\":%u,\"steps\":%u,\"step_max_ms\":%u",
-                  (unsigned)s.size, dbg_q(s.ver), (unsigned)(now_ms - s.begin_ms), (unsigned)s.steps,
-                  (unsigned)s.step_max_ms);
-    else dbg_event("ota", "ota_done", "\"size\":%u,\"ver\":%s,\"ms\":%u", (unsigned)s.size, dbg_q(s.ver),
-                   (unsigned)(now_ms - s.begin_ms));
+        dbg_event("ota", "ota_done",
+                  "\"size\":%u,\"ver\":%s,\"ms\":%u,\"steps\":%u,\"step_max_ms\":%u",
+                  (unsigned)s.size, dbg_q(s.ver), (unsigned)(now_ms - s.begin_ms),
+                  (unsigned)s.steps, (unsigned)s.step_max_ms);
+    else
+        dbg_event("ota", "ota_done", "\"size\":%u,\"ver\":%s,\"ms\":%u", (unsigned)s.size,
+                  dbg_q(s.ver), (unsigned)(now_ms - s.begin_ms));
     ack(1, NULL);
     s.st = OTA_RESTART;
     s.restart_at = now_ms + OTA_RESTART_DELAY_MS;
@@ -445,7 +479,8 @@ static void apply_step(uint32_t now_ms)
     } while (s.applied < s.next && lv_tick_get() - t0 < OTA_SLICE_MS);
     note_step(t0);
     s.last_ms = now_ms; /* still working: not idle */
-    /* the whole patch is in and acked: nothing is unanswered, so this only tells the daemon we are alive */
+    /* the whole patch is in and acked: nothing is unanswered, so this only tells the daemon we are
+     * alive */
     if (s.next == s.psize && now_ms - s.keep_ms >= OTA_KEEPALIVE_MS) {
         s.keep_ms = now_ms;
         dbg_event("ota", "ota_keepalive", "\"out\":%u", (unsigned)s.out);
@@ -463,11 +498,13 @@ void ota_on_link(bool welcomed, uint32_t now_ms)
         hal_ota_confirm();
         s_unconfirmed = false;
         dbg_event("ota", "ota_confirm", "\"after_ms\":%u", (unsigned)(now_ms - s_boot_ms));
-        /* Only here: a power-on or USB flash boots a confirmed image, a re-welcome finds s_unconfirmed cleared. */
+        /* Only here: a power-on or USB flash boots a confirmed image, a re-welcome finds
+         * s_unconfirmed cleared. */
         char msg[40];
         snprintf(msg, sizeof msg, "Updated to %s", hal_board_info()->fw_version);
         dbg_event("ota", "ota_updated_tone", "\"fw\":%s", dbg_q(hal_board_info()->fw_version));
-        ui_toast_sign(msg, ICON_UPDATE ICON_CHECK, hal_board_info()->fw_version, RGB_SUCCESS); /* "download, tick" and the version */
+        /* "download, tick" and the version */
+        ui_toast_sign(msg, ICON_UPDATE ICON_CHECK, hal_board_info()->fw_version, RGB_SUCCESS);
         feedback_updated();
     }
     if (s.st == OTA_RECV) {
@@ -486,7 +523,8 @@ void ota_cancel(uint32_t now_ms)
 void ota_tick(uint32_t now_ms)
 {
     apply_step(now_ms);
-    if (s.st == OTA_RECV && now_ms - s.last_ms >= OTA_IDLE_TIMEOUT_MS) stop("timeout", "Update timed out", ICON_UPDATE ICON_WAIT, true);
+    if (s.st == OTA_RECV && now_ms - s.last_ms >= OTA_IDLE_TIMEOUT_MS)
+        stop("timeout", "Update timed out", ICON_UPDATE ICON_WAIT, true);
     if (s.st == OTA_RESTART && (int32_t)(now_ms - s.restart_at) >= 0) {
         hal_restart(); /* does not return on the watch */
         close_transfer();

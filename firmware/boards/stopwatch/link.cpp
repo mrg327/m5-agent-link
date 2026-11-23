@@ -1,4 +1,4 @@
-// hal_link_* dispatcher: fans out to the USB and BLE transports.
+/* hal_link_* dispatcher: fans out to the USB and BLE transports. */
 #include "board_priv.h"
 #include "hal.h"
 

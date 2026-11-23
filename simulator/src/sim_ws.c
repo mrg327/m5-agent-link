@@ -56,7 +56,8 @@ bool ws_connect(const char *host, int port, const char *path)
     s_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (s_fd < 0) return false;
     struct sockaddr_in a = {.sin_family = AF_INET, .sin_port = htons((uint16_t)port)};
-    if (inet_pton(AF_INET, host, &a.sin_addr) != 1 || connect(s_fd, (struct sockaddr *)&a, sizeof a) != 0) {
+    if (inet_pton(AF_INET, host, &a.sin_addr) != 1 ||
+        connect(s_fd, (struct sockaddr *)&a, sizeof a) != 0) {
         ws_close();
         return false;
     }
@@ -65,21 +66,24 @@ bool ws_connect(const char *host, int port, const char *path)
     setsockopt(s_fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof one);
 #endif
     char req[256];
-    int n = snprintf(req, sizeof req,
-                     "GET %s HTTP/1.1\r\nHost: %s:%d\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
-                     "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n",
-                     path, host, port);
+    int n =
+        snprintf(req, sizeof req,
+                 "GET %s HTTP/1.1\r\nHost: %s:%d\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                 "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+                 path, host, port);
     if (!write_all((const uint8_t *)req, (size_t)n)) {
         ws_close();
         return false;
     }
-    /* Read the HTTP response head (blocking, bounded) so a wrong server is reported as a failed connect. */
+    /* Read the HTTP response head (blocking, bounded) so a wrong server is reported as a failed
+     * connect. */
     char head[1024];
     size_t len = 0;
     for (;;) {
         struct pollfd pf = {s_fd, POLLIN, 0};
         if (len >= sizeof head - 1 || poll(&pf, 1, 2000) <= 0) break;
-        ssize_t r = recv(s_fd, head + len, 1, 0); /* byte-wise: never consume frame bytes after the head */
+        /* byte-wise: never consume frame bytes after the head */
+        ssize_t r = recv(s_fd, head + len, 1, 0);
         if (r <= 0) break;
         len += (size_t)r;
         if (len >= 4 && memcmp(head + len - 4, "\r\n\r\n", 4) == 0) {

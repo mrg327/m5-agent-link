@@ -18,9 +18,10 @@
 #define DEEP_AFTER_MS (10u * 60u * 1000u)
 /* After a timer wake the display stays off; this long to reconnect, then DEEP again. */
 #define RECONNECT_WINDOW_MS (90u * 1000u)
-/* Timer wakes to look for the host (FIRMWARE.md "DEEP"): 5 → 60 min, ~4 h in all, then buttons only.
- * Off by default: a woken watch can only reach the host over BLE, and the Linux host has no working
- * BLE (USB only), so a timer wake just burns battery. Build with POWER_TIMER_WAKES=1 to turn back on. */
+/* Timer wakes to look for the host (FIRMWARE.md "DEEP"): 5 → 60 min, ~4 h in all, then buttons
+ * only. Off by default: a woken watch can only reach the host over BLE, and the Linux host has no
+ * working BLE (USB only), so a timer wake just burns battery. Build with POWER_TIMER_WAKES=1 to
+ * turn back on. */
 #ifndef POWER_TIMER_WAKES
 #define POWER_TIMER_WAKES 0
 #endif
@@ -63,7 +64,8 @@ void power_init(void)
 /* After the display exists: a timer wake is only a reconnect attempt, so nothing lights up. */
 void power_start(uint32_t now_ms)
 {
-    dbg_event("power", "wake", "\"timer\":%s,\"tries\":%u", s_timer_wake ? "true" : "false", (unsigned)s_tries);
+    dbg_event("power", "wake", "\"timer\":%s,\"tries\":%u", s_timer_wake ? "true" : "false",
+              (unsigned)s_tries);
     s_last_activity = now_ms; /* idle and DEEP timers count from boot, not from clock zero */
     s_off_since = now_ms;
     if (!s_timer_wake) return;
@@ -112,8 +114,9 @@ void power_attention(uint32_t rgb, uint32_t now_ms)
     s_glow_until = now_ms + GLOW_MS;
 }
 
-/* True once `ms` have passed since `since`. Signed, so a stamp taken later than this step's clock (a request that
- * arrived while the link drained, issue 20261122-f724) reads as no time passed, not as 49 days. */
+/* True once `ms` have passed since `since`. Signed, so a stamp taken later than this step's clock
+ * (a request that arrived while the link drained, issue 20261122-f724) reads as no time passed, not
+ * as 49 days. */
 static bool passed(uint32_t now_ms, uint32_t since, uint32_t ms)
 {
     int32_t d = (int32_t)(now_ms - since);
@@ -130,14 +133,20 @@ void power_tick(uint32_t now_ms)
         return;
     }
     if (link_connected()) reset_retries();
-    uint32_t deep_after = s_timer_wake && RECONNECT_WINDOW_MS < s_deep_after_ms ? RECONNECT_WINDOW_MS : s_deep_after_ms;
+    uint32_t deep_after = s_timer_wake && RECONNECT_WINDOW_MS < s_deep_after_ms
+                              ? RECONNECT_WINDOW_MS
+                              : s_deep_after_ms;
     if (!s_on && !s_glowing && !s_deep && passed(now_ms, s_off_since, deep_after) && may_deep()) {
-        uint32_t wake_after_s = POWER_TIMER_WAKES && s_tries < N_RETRY ? kRetryMin[s_tries] * 60u : 0;
+        uint32_t wake_after_s =
+            POWER_TIMER_WAKES && s_tries < N_RETRY ? kRetryMin[s_tries] * 60u : 0;
         hal_retained_set(s_tries + 1);
         s_deep = true;
-        dbg_event("power", "deep", "\"wake_after_s\":%u,\"tries\":%u", (unsigned)wake_after_s, (unsigned)s_tries);
-        preport_save(now_ms); /* the unsent power report figures wait in RTC memory for the next boot */
-        if (hal_power_enter(HAL_POWER_DEEP, wake_after_s) != HAL_POWER_DEEP) { /* on the device DEEP does not return */
+        dbg_event("power", "deep", "\"wake_after_s\":%u,\"tries\":%u", (unsigned)wake_after_s,
+                  (unsigned)s_tries);
+        /* the unsent power report figures wait in RTC memory for the next boot */
+        preport_save(now_ms);
+        if (hal_power_enter(HAL_POWER_DEEP, wake_after_s) != HAL_POWER_DEEP) {
+            /* on the device DEEP does not return */
             preport_unsave();
             s_deep = false; /* refused (USB present, button held): count again from now and retry */
             s_off_since = now_ms;
@@ -145,7 +154,8 @@ void power_tick(uint32_t now_ms)
             dbg_event("power", "deep_refused", "\"tries\":%u", (unsigned)s_tries);
         }
     }
-    if (s_on && !s_glowing && motion_face_down() && passed(now_ms, s_last_activity, FACE_DOWN_OFF_MS)) {
+    if (s_on && !s_glowing && motion_face_down() &&
+        passed(now_ms, s_last_activity, FACE_DOWN_OFF_MS)) {
         set_display(false);
         s_off_since = now_ms;
         return;

@@ -6,14 +6,24 @@
 #include "ring.h"
 
 static int failures;
-#define EXPECT(cond, msg) do { if (!(cond)) { printf("FAIL: %s (line %d)\n", msg, __LINE__); failures++; } } while (0)
+#define EXPECT(cond, msg)                                  \
+    do {                                                   \
+        if (!(cond)) {                                     \
+            printf("FAIL: %s (line %d)\n", msg, __LINE__); \
+            failures++;                                    \
+        }                                                  \
+    } while (0)
 
 /* A frame slot as app.c queues them: a short header and a mostly unused tail. */
-typedef struct { uint16_t len; uint8_t data[64]; } slot_t;
-static size_t used(const void *stored) { return offsetof(slot_t, data) + ((const slot_t *)stored)->len; }
+typedef struct {
+    uint16_t len;
+    uint8_t data[64];
+} slot_t;
+static size_t used(const void *stored)
+{ return offsetof(slot_t, data) + ((const slot_t *)stored)->len; }
 
-/* The sized calls copy outside the lock: one pusher and one popper on other threads must still see every
- * item whole and in order. */
+/* The sized calls copy outside the lock: one pusher and one popper on other threads must still see
+ * every item whole and in order. */
 #define STRESS_N 200000
 static ring_t s_sr;
 static slot_t s_sstore[4];
@@ -42,7 +52,8 @@ static void stress(void)
         if (!ring_pop_n(&s_sr, &out, used)) continue;
         uint32_t seq;
         memcpy(&seq, out.data, sizeof seq);
-        if (seq != i || out.len != 5 + i % 60 || out.data[out.len - 1] != (uint8_t)(i & 0xFF)) bad++;
+        if (seq != i || out.len != 5 + i % 60 || out.data[out.len - 1] != (uint8_t)(i & 0xFF))
+            bad++;
         i++;
     }
     pthread_join(t, NULL);
@@ -66,7 +77,8 @@ int main(void)
     for (int i = 0; i < 3; i++) {
         memset(&out, 0x11, sizeof out);
         EXPECT(ring_pop_n(&r, &out, used), "items come back");
-        EXPECT(out.len == 4 + i && out.data[0] == 'a' + i && out.data[out.len - 1] == 'a' + i, "in order, with their bytes");
+        EXPECT(out.len == 4 + i && out.data[0] == 'a' + i && out.data[out.len - 1] == 'a' + i,
+               "in order, with their bytes");
         EXPECT(out.data[out.len] == 0x11, "only the used bytes are copied out");
     }
     EXPECT(!ring_pop_n(&r, &out, used), "an empty ring pops nothing");
@@ -74,7 +86,8 @@ int main(void)
     /* the sized calls and the whole-item calls work on the same ring, and wrap */
     in.len = 64;
     memset(in.data, 'z', 64);
-    EXPECT(ring_push(&r, &in) && ring_push_n(&r, &in, sizeof in + 100), "an oversized count is clamped to the slot");
+    EXPECT(ring_push(&r, &in) && ring_push_n(&r, &in, sizeof in + 100),
+           "an oversized count is clamped to the slot");
     EXPECT(ring_pop_n(&r, &out, used) && out.data[63] == 'z', "a full slot survives the sized pop");
     EXPECT(ring_pop(&r, &out) && out.len == 64, "and the plain pop");
 

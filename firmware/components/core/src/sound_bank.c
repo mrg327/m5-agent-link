@@ -1,6 +1,7 @@
 /* The sound bank (format and synth: sound_bank.h). Melodies are original; MIDI note names in
  * the comments. Add a candidate by adding its steps and one snd_bank line; add a moment by
- * adding a snd_roles line. Keep cues short, echo tail included: done under 1.5 s, input under 150 ms. */
+ * adding a snd_roles line. Keep cues short, echo tail included: done under 1.5 s, input under 150
+ * ms. */
 #include "sound_bank.h"
 
 #include <string.h>
@@ -11,6 +12,7 @@
 /* T(steps): one track of a sound */
 #define T(a) {a, N_OF(a)}
 
+/* clang-format off */
 const snd_role_t snd_roles[] = {
     {"done", "A session you armed with Notify when done (or are watching) finishes", "done-ff", 1, 0},
     {"input", "An agent asks a question or needs your approval", "input-ff", 3, 90},
@@ -225,15 +227,18 @@ const snd_sound_t snd_bank[] = {
     {"updated-flourish", "updated", "Flourish", {T(updated_flourish)}, 0, 0},
     {"updated-chime", "updated", "Chime", {T(updated_chime)}, 0, 0},
 };
+/* clang-format on */
 const unsigned snd_bank_count = sizeof snd_bank / sizeof snd_bank[0];
 
-const snd_role_t *snd_role(const char *id) {
+const snd_role_t *snd_role(const char *id)
+{
     for (unsigned r = 0; r < snd_role_count; r++)
         if (strcmp(snd_roles[r].id, id) == 0) return &snd_roles[r];
     return NULL;
 }
 
-const snd_sound_t *snd_for(const char *role) {
+const snd_sound_t *snd_for(const char *role)
+{
     const snd_role_t *r = snd_role(role);
     for (unsigned i = 0; r && i < snd_bank_count; i++)
         if (strcmp(snd_bank[i].id, r->pick) == 0) return &snd_bank[i];

@@ -1,5 +1,5 @@
-/* Decodes the `cbor_hex` of every vector json file in protocol/vectors and checks that re-encoding gives the same bytes.
- * usage: test_vectors <vectors-dir> */
+/* Decodes the `cbor_hex` of every vector json file in protocol/vectors and checks that re-encoding
+ * gives the same bytes. usage: test_vectors <vectors-dir> */
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,7 +26,10 @@ static char *read_file(const char *path)
     long n = ftell(f);
     fseek(f, 0, SEEK_SET);
     char *buf = malloc((size_t)n + 1);
-    if (buf && fread(buf, 1, (size_t)n, f) != (size_t)n) { free(buf); buf = NULL; }
+    if (buf && fread(buf, 1, (size_t)n, f) != (size_t)n) {
+        free(buf);
+        buf = NULL;
+    }
     if (buf) buf[n] = 0;
     fclose(f);
     return buf;
@@ -53,10 +56,16 @@ static int check_vector(const char *path, const char *name)
 {
     uint8_t want[4096], got[4096];
     char *json = read_file(path);
-    if (!json) { printf("FAIL %s: unreadable\n", name); return 1; }
+    if (!json) {
+        printf("FAIL %s: unreadable\n", name);
+        return 1;
+    }
     int n = extract_cbor(json, want, sizeof want);
     free(json);
-    if (n <= 0) { printf("FAIL %s: no cbor_hex\n", name); return 1; }
+    if (n <= 0) {
+        printf("FAIL %s: no cbor_hex\n", name);
+        return 1;
+    }
 
     size_t used = 0, out_len = 0;
     memset(&g_env, 0, sizeof g_env);
@@ -66,7 +75,10 @@ static int check_vector(const char *path, const char *name)
         return 1;
     }
     rc = cbor_encode_envelope(got, sizeof got, &g_env, &out_len);
-    if (rc != ZCBOR_SUCCESS) { printf("FAIL %s: encode rc=%d\n", name, rc); return 1; }
+    if (rc != ZCBOR_SUCCESS) {
+        printf("FAIL %s: encode rc=%d\n", name, rc);
+        return 1;
+    }
     if (out_len != (size_t)n || memcmp(got, want, out_len) != 0) {
         printf("FAIL %s: re-encoded bytes differ (%zu vs %d)\n", name, out_len, n);
         return 1;
@@ -77,9 +89,15 @@ static int check_vector(const char *path, const char *name)
 
 int main(int argc, char **argv)
 {
-    if (argc < 2) { fprintf(stderr, "usage: %s <vectors-dir>\n", argv[0]); return 2; }
+    if (argc < 2) {
+        fprintf(stderr, "usage: %s <vectors-dir>\n", argv[0]);
+        return 2;
+    }
     DIR *d = opendir(argv[1]);
-    if (!d) { perror("opendir"); return 2; }
+    if (!d) {
+        perror("opendir");
+        return 2;
+    }
     int failed = 0, total = 0;
     struct dirent *e;
     while ((e = readdir(d))) {

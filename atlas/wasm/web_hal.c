@@ -1,5 +1,5 @@
-/* hal.h for the browser: framebuffer for JS to blit, input and link driven from JS, haptics and debug
- * lines delivered through Module.hooks. Mirrors simulator/src/sim_*.c. */
+/* hal.h for the browser: framebuffer for JS to blit, input and link driven from JS, haptics and
+ * debug lines delivered through Module.hooks. Mirrors simulator/src/sim_*.c. */
 #include <emscripten.h>
 #include <stdio.h>
 #include <string.h>
@@ -13,10 +13,21 @@
 #define BUF_ROWS 40
 
 static const hal_board_info_t s_info = {
-    .board = "web", .fw_version = "0.1.0-web", .uid = {0x77, 0x65, 0x62, 0, 0, 0, 0, 1},
-    .has_display = true, .shape = HAL_SHAPE_ROUND, .width = W, .height = H, .color = true,
-    .has_touch = true, .has_imu = false, .has_haptic = true, .has_speaker = false, .has_mic = false,
-    .has_battery = true, .num_buttons = 2,
+    .board = "web",
+    .fw_version = "0.1.0-web",
+    .uid = {0x77, 0x65, 0x62, 0, 0, 0, 0, 1},
+    .has_display = true,
+    .shape = HAL_SHAPE_ROUND,
+    .width = W,
+    .height = H,
+    .color = true,
+    .has_touch = true,
+    .has_imu = false,
+    .has_haptic = true,
+    .has_speaker = false,
+    .has_mic = false,
+    .has_battery = true,
+    .num_buttons = 2,
 };
 
 static uint16_t s_fb[W * H];
@@ -25,7 +36,10 @@ static uint16_t s_buf1[W * BUF_ROWS], s_buf2[W * BUF_ROWS];
 static int s_dirty[4];
 static bool s_has_dirty, s_power = true;
 static uint8_t s_brightness = 255;
-static struct { bool down; int x, y; } s_ptr;
+static struct {
+    bool down;
+    int x, y;
+} s_ptr;
 static hal_button_cb_t s_button_cb;
 static hal_motion_cb_t s_motion_cb;
 static hal_link_rx_cb_t s_rx;
@@ -165,7 +179,8 @@ void web_pointer(bool down, int x, int y)
 void hal_buttons_set_callback(hal_button_cb_t cb) { s_button_cb = cb; }
 void web_button(int btn, bool down)
 {
-    if (s_button_cb) s_button_cb(btn ? HAL_BTN_B : HAL_BTN_A, down ? HAL_BTN_DOWN : HAL_BTN_UP, hal_time_us());
+    if (s_button_cb)
+        s_button_cb(btn ? HAL_BTN_B : HAL_BTN_A, down ? HAL_BTN_DOWN : HAL_BTN_UP, hal_time_us());
 }
 void hal_motion_set_callback(hal_motion_cb_t cb) { s_motion_cb = cb; }
 void hal_motion_stream_tilt(bool enable) { (void)enable; }
@@ -178,12 +193,28 @@ void web_motion(int kind)
 /* ── haptics, power, battery, debug ── */
 
 void hal_haptic_play(const uint16_t *on_off_ms, size_t count) { js_haptic(on_off_ms, (int)count); }
-void hal_audio_play(const int16_t *pcm, size_t n) { (void)pcm; (void)n; }
+void hal_audio_play(const int16_t *pcm, size_t n)
+{
+    (void)pcm;
+    (void)n;
+}
 void hal_audio_set_volume(uint8_t percent) { (void)percent; }
 bool hal_touch_covered(void) { return false; }
-uint32_t hal_pref_get(const char *key, uint32_t fallback) { (void)key; return fallback; }
-void hal_pref_set(const char *key, uint32_t value) { (void)key; (void)value; }
-void *hal_audio_alloc(size_t bytes) { (void)bytes; return NULL; }
+uint32_t hal_pref_get(const char *key, uint32_t fallback)
+{
+    (void)key;
+    return fallback;
+}
+void hal_pref_set(const char *key, uint32_t value)
+{
+    (void)key;
+    (void)value;
+}
+void *hal_audio_alloc(size_t bytes)
+{
+    (void)bytes;
+    return NULL;
+}
 hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s)
 {
     (void)wake_after_s;
@@ -204,9 +235,11 @@ size_t hal_mic_read(int16_t *pcm, size_t max)
     return 0;
 }
 void hal_mic_stop(void) {}
-hal_battery_t hal_battery_read(void) { return (hal_battery_t){.percent = 80, .charging = false, .usb_present = true}; }
+hal_battery_t hal_battery_read(void)
+{ return (hal_battery_t){.percent = 80, .charging = false, .usb_present = true}; }
 /* Power report (POWER.md): the browser watch is on USB at 80 % (4.02 V), never sleeps deep. */
-hal_battery_mv_t hal_battery_mv(void) { return (hal_battery_mv_t){.mv = 4020, .mv_filt = 4020, .vin_mv = 5000}; }
+hal_battery_mv_t hal_battery_mv(void)
+{ return (hal_battery_mv_t){.mv = 4020, .mv_filt = 4020, .vin_mv = 5000}; }
 uint32_t hal_deep_slept_ms(void) { return 0; }
 static uint32_t s_retained_words[HAL_RETAINED_WORDS];
 uint32_t *hal_retained_words(void) { return s_retained_words; }
@@ -227,20 +260,43 @@ bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len)
     return true;
 }
 
-void hal_link_interactive(hal_link_kind_t port, bool on) { (void)port; (void)on; }
-void hal_link_bulk(hal_link_kind_t port, bool on) { (void)port; (void)on; }
+void hal_link_interactive(hal_link_kind_t port, bool on)
+{
+    (void)port;
+    (void)on;
+}
+void hal_link_bulk(hal_link_kind_t port, bool on)
+{
+    (void)port;
+    (void)on;
+}
 uint32_t hal_link_ble_interval_us(void) { return 0; }
 
-/* Firmware update (FIRMWARE.md §9): the web watch has no flash to write. A transfer is refused, so the
- * update screen is never reached here. */
-hal_ota_result_t hal_ota_begin(uint32_t size) { (void)size; return HAL_OTA_UNSUPPORTED; }
-hal_ota_result_t hal_ota_write(const uint8_t *data, size_t len) { (void)data; (void)len; return HAL_OTA_UNSUPPORTED; }
+/* Firmware update (FIRMWARE.md §9): the web watch has no flash to write. A transfer is refused, so
+ * the update screen is never reached here. */
+hal_ota_result_t hal_ota_begin(uint32_t size)
+{
+    (void)size;
+    return HAL_OTA_UNSUPPORTED;
+}
+hal_ota_result_t hal_ota_write(const uint8_t *data, size_t len)
+{
+    (void)data;
+    (void)len;
+    return HAL_OTA_UNSUPPORTED;
+}
 hal_ota_result_t hal_ota_finish(void) { return HAL_OTA_UNSUPPORTED; }
 void hal_ota_abort(void) {}
 const char *hal_ota_error(void) { return "This watch can't update itself"; }
 bool hal_ota_unconfirmed(void) { return false; }
 void hal_ota_confirm(void) {}
-hal_ota_result_t hal_ota_base_read(uint32_t off, void *buf, size_t len) { (void)off; (void)buf; (void)len; return HAL_OTA_UNSUPPORTED; }
+hal_ota_result_t hal_ota_base_read(uint32_t off, void *buf, size_t len)
+{
+    (void)off;
+    (void)buf;
+    (void)len;
+    return HAL_OTA_UNSUPPORTED;
+}
 uint32_t hal_ota_base_size(void) { return 0; }
 void hal_restart(void) {}
 

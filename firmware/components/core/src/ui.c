@@ -15,25 +15,29 @@
 #define TOAST_MS 1800
 
 const ui_actions_t *g_ui_actions;
-static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch, *s_voice, *s_keys, *s_read, *s_labs, *s_trackpad, *s_graph;
+static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch, *s_voice, *s_keys,
+    *s_read, *s_labs, *s_trackpad, *s_graph;
 static nav_mode_t s_mode = MODE_HOME;
 static int s_rel_y;
 static bool s_link_up, s_animate = true;
 static uint32_t s_seen_rev;
 static uint32_t s_now_ms;
 
-/* Black under the sign, so what a screen has there rests while it shows: the slot between the two key hints
- * (x 125..341, y 340..406), and above the hints' rings a wider band for a row of text (x 113..353, y 326..346).
- * Only on the screens that keep content there (toast_blanks_slot): elsewhere the sign's own black margin is all. */
+/* Black under the sign, so what a screen has there rests while it shows: the slot between the two
+ * key hints (x 125..341, y 340..406), and above the hints' rings a wider band for a row of text (x
+ * 113..353, y 326..346). Only on the screens that keep content there (toast_blanks_slot): elsewhere
+ * the sign's own black margin is all. */
 #define TOAST_MASK_W 216
 #define TOAST_MASK_Y 340
 #define TOAST_MASK_H 66
 #define TOAST_BAND_W 240
 #define TOAST_BAND_Y 326
 #define TOAST_BAND_H 20
-static lv_obj_t *s_toast, *s_toast_mask[2]; /* a sign (GLYPHS.md rule 8, §3.7) on the key-hint row */
+/* a sign (GLYPHS.md rule 8, §3.7) on the key-hint row */
+static lv_obj_t *s_toast, *s_toast_mask[2];
 static uint32_t s_toast_until_ms;
-static char s_toast_txt[64]; /* the toast in words: the report and the log; the screen shows its glyphs */
+/* the toast in words: the report and the log; the screen shows its glyphs */
+static char s_toast_txt[64];
 static lv_obj_t *s_glow, *s_glow_ring;
 
 lv_obj_t *ui_new_screen(void)
@@ -51,13 +55,18 @@ static void create_overlays(void)
 {
     lv_obj_t *top = lv_layer_top();
     ui_ota_init(top); /* under the toast, so a refusal shows over it */
-    /* One slot on every screen: between the two key hints, which stay in sight beside a sign of one or two
-     * glyphs; a sign that carries content is wider and covers them while it shows (its black margin). */
+    /* One slot on every screen: between the two key hints, which stay in sight beside a sign of one
+     * or two glyphs; a sign that carries content is wider and covers them while it shows (its black
+     * margin). */
     for (int i = 0; i < 2; i++) {
         lv_obj_t *m = s_toast_mask[i] = lv_obj_create(top);
         lv_obj_remove_style_all(m);
-        if (i == 0) lv_obj_set_size(m, TOAST_MASK_W, TOAST_MASK_H), lv_obj_set_pos(m, UI_CX - TOAST_MASK_W / 2, TOAST_MASK_Y);
-        else lv_obj_set_size(m, TOAST_BAND_W, TOAST_BAND_H), lv_obj_set_pos(m, UI_CX - TOAST_BAND_W / 2, TOAST_BAND_Y);
+        if (i == 0)
+            lv_obj_set_size(m, TOAST_MASK_W, TOAST_MASK_H),
+                lv_obj_set_pos(m, UI_CX - TOAST_MASK_W / 2, TOAST_MASK_Y);
+        else
+            lv_obj_set_size(m, TOAST_BAND_W, TOAST_BAND_H),
+                lv_obj_set_pos(m, UI_CX - TOAST_BAND_W / 2, TOAST_BAND_Y);
         lv_obj_set_style_radius(m, i == 0 ? 14 : 0, 0);
         lv_obj_set_style_bg_color(m, COL_BG, 0);
         lv_obj_set_style_bg_opa(m, LV_OPA_COVER, 0);
@@ -165,27 +174,30 @@ static void enter_mode(nav_mode_t m)
     else if (m == MODE_STATUS) {
         ui_home_refresh(s_now_ms); /* the ring shows sessions again, e.g. after AGENT -> Status */
         ui_status_open(s_now_ms);
-    }
-    else if (m == MODE_WATCH) ui_watch_open(ui_home_sel_sid(), s_now_ms);
-    else if (m == MODE_VOICE) ui_voice_open(ui_home_sel_sid(), s_voice_rid, s_voice_queue, s_voice_qi, s_voice_qlast, s_now_ms);
+    } else if (m == MODE_WATCH) ui_watch_open(ui_home_sel_sid(), s_now_ms);
+    else if (m == MODE_VOICE)
+        ui_voice_open(ui_home_sel_sid(), s_voice_rid, s_voice_queue, s_voice_qi, s_voice_qlast,
+                      s_now_ms);
     else if (m == MODE_KEYS) ui_keys_open(ui_home_sel_sid(), s_now_ms);
     else if (m == MODE_READ) ui_read_open(ui_home_sel_sid(), s_now_ms);
     else if (m == MODE_LABS) {
         ui_home_refresh(s_now_ms);
         ui_labs_open(s_now_ms);
-    }
-    else if (m == MODE_TRACKPAD) ui_trackpad_open(s_now_ms);
+    } else if (m == MODE_TRACKPAD) ui_trackpad_open(s_now_ms);
     else if (m == MODE_GRAPH) ui_graph_open(ui_home_sel_sid(), s_now_ms);
     else ui_home_refresh(s_now_ms); /* the ring shows sessions again */
-    if (m != MODE_HOME && m != MODE_KEYS) { /* deeper modes rise into place; KEYS records strokes at once */
-        lv_obj_t *const roots[MODE_COUNT] = {NULL, s_agent, s_ask, s_scroll, s_status, s_watch, s_voice, s_keys, s_read, s_labs, s_trackpad, s_graph};
+    if (m != MODE_HOME && m != MODE_KEYS) {
+        /* deeper modes rise into place; KEYS records strokes at once */
+        lv_obj_t *const roots[MODE_COUNT] = {NULL,     s_agent, s_ask,      s_scroll,
+                                             s_status, s_watch, s_voice,    s_keys,
+                                             s_read,   s_labs,  s_trackpad, s_graph};
         ui_motion_enter(roots[m]);
     }
     dbg_event("ui", "mode", "\"mode\":\"%s\"", nav_mode_name(m));
 }
 
-/* ASK or SCROLL opened over WATCH goes back to WATCH when it closes, if the watched session is still there.
- * TRACKPAD goes back to the experiments it was opened from. */
+/* ASK or SCROLL opened over WATCH goes back to WATCH when it closes, if the watched session is
+ * still there. TRACKPAD goes back to the experiments it was opened from. */
 static void leave_mode(void)
 {
     if (s_mode == MODE_TRACKPAD) {
@@ -211,7 +223,8 @@ void ui_go_home(void) { leave_mode(); }
 /* Back, as a screen asks for it (hold still off the rows): the ASK reader closes first. */
 void ui_go_back(void)
 {
-    if (!(s_mode == MODE_ASK && ui_ask_back()) && !(s_mode == MODE_READ && ui_read_back())) leave_mode();
+    if (!(s_mode == MODE_ASK && ui_ask_back()) && !(s_mode == MODE_READ && ui_read_back()))
+        leave_mode();
     g_ui_actions->tick();
 }
 void ui_go_watch(void) { enter_mode(MODE_WATCH); }
@@ -251,9 +264,11 @@ void ui_pointer_failed(int err, const char *msg)
     if (s_mode == MODE_TRACKPAD) ui_trackpad_failed(err, msg);
 }
 
-void ui_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total, uint32_t total, const char *preview)
+void ui_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total,
+                   uint32_t total, const char *preview)
 {
-    if (s_mode == MODE_SCROLL) ui_scroll_on_pos(sid, lines_above, at_bottom, has_total, total, preview);
+    if (s_mode == MODE_SCROLL)
+        ui_scroll_on_pos(sid, lines_above, at_bottom, has_total, total, preview);
 }
 
 /* An attention always lands on the deck, whatever was open. */
@@ -266,7 +281,9 @@ void ui_show_session(uint32_t sid)
 /* A permission or question opens ASK on its session (UI-V2 §2); done/error only update the card. */
 void ui_show_attention(uint32_t sid)
 {
-    uint32_t resume = s_mode == MODE_WATCH ? ui_watch_sid() : s_mode == MODE_ASK || s_mode == MODE_SCROLL ? s_resume_watch_sid : 0;
+    uint32_t resume = s_mode == MODE_WATCH                          ? ui_watch_sid()
+                      : s_mode == MODE_ASK || s_mode == MODE_SCROLL ? s_resume_watch_sid
+                                                                    : 0;
     ui_show_session(sid);
     if (ui_home_sel_sid() == sid && ui_home_askable()) {
         enter_mode(MODE_ASK);
@@ -277,7 +294,8 @@ void ui_show_attention(uint32_t sid)
 uint32_t ui_pending_attention_sid(void)
 {
     const attention_t *a = model_attention_first();
-    return a && !a->answer_sent && (a->kind == ATT_APPROVAL || a->kind == ATT_QUESTION) ? a->sid : 0;
+    return a && !a->answer_sent && (a->kind == ATT_APPROVAL || a->kind == ATT_QUESTION) ? a->sid
+                                                                                        : 0;
 }
 
 void ui_report_add(ui_report_t *r, const char *fmt, ...)
@@ -336,20 +354,22 @@ static void rise(lv_obj_t *o, int px)
 
 void ui_motion_enter(lv_obj_t *content) { rise(content, UI_MOTION_RISE); }
 
-/* The screens whose own rows and discs lie between the key hints, under the sign: HOME (its summary's second
- * row, the graph strip, the book disc), AGENT (the queued message; Dictate and Keyboard), READ (the page
- * dots), STATUS (the About disc), LABS and TRACKPAD (their own sign for why the trackpad cannot start or work).
- * A rebuilt screen that puts content there adds its mode. */
+/* The screens whose own rows and discs lie between the key hints, under the sign: HOME (its
+ * summary's second row, the graph strip, the book disc), AGENT (the queued message; Dictate and
+ * Keyboard), READ (the page dots), STATUS (the About disc), LABS and TRACKPAD (their own sign for
+ * why the trackpad cannot start or work). A rebuilt screen that puts content there adds its
+ * mode. */
 static bool toast_blanks_slot(void)
 {
-    return s_mode == MODE_HOME || s_mode == MODE_AGENT || s_mode == MODE_READ || s_mode == MODE_STATUS ||
-           s_mode == MODE_LABS || s_mode == MODE_TRACKPAD;
+    return s_mode == MODE_HOME || s_mode == MODE_AGENT || s_mode == MODE_READ ||
+           s_mode == MODE_STATUS || s_mode == MODE_LABS || s_mode == MODE_TRACKPAD;
 }
 
-/* A toast is a sign (GLYPHS.md rule 8): the glyphs the vocabulary has for its words, in its colour. The words
- * stay what the callers pass and what the report and the log say. Words without a glyph yet draw the info
- * glyph: a toast never spells them out. Only content is text: what was sent (`Sent "..."`), a short number
- * the vocabulary puts after the glyph ("Snoozed 30 min": the moon and 30). */
+/* A toast is a sign (GLYPHS.md rule 8): the glyphs the vocabulary has for its words, in its colour.
+ * The words stay what the callers pass and what the report and the log say. Words without a glyph
+ * yet draw the info glyph: a toast never spells them out. Only content is text: what was sent
+ * (`Sent "..."`), a short number the vocabulary puts after the glyph ("Snoozed 30 min": the moon
+ * and 30). */
 static void toast_show(const char *words, const char *icons, const char *content, uint32_t rgb)
 {
     snprintf(s_toast_txt, sizeof s_toast_txt, "%s", words);
@@ -365,9 +385,7 @@ static void toast_show(const char *words, const char *icons, const char *content
 }
 
 void ui_toast_sign(const char *words, const char *icons, const char *content, uint32_t rgb)
-{
-    toast_show(words, icons, content ? content : "", rgb);
-}
+{ toast_show(words, icons, content ? content : "", rgb); }
 
 void ui_toast(const char *text, uint32_t rgb)
 {
@@ -379,7 +397,8 @@ void ui_toast(const char *text, uint32_t rgb)
     }
     if (!g) g = ICON_INFO;
     size_t n = 0;
-    while ((uint8_t)g[n] == 0xEE && g[n + 1] && g[n + 2] && n + 3 < sizeof icons) n += 3; /* the icons: 3 bytes each */
+    /* the icons: 3 bytes each */
+    while ((uint8_t)g[n] == 0xEE && g[n + 1] && g[n + 2] && n + 3 < sizeof icons) n += 3;
     memcpy(icons, g, n);
     icons[n] = 0;
     if (!content[0]) snprintf(content, sizeof content, "%s", g[n] == ' ' ? g + n + 1 : g + n);
@@ -401,7 +420,8 @@ bool ui_glow_active(void) { return !lv_obj_has_flag(s_glow, LV_OBJ_FLAG_HIDDEN);
 void ui_tick(uint32_t now_ms)
 {
     s_now_ms = now_ms;
-    if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN) && (int32_t)(now_ms - s_toast_until_ms) >= 0) {
+    if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN) &&
+        (int32_t)(now_ms - s_toast_until_ms) >= 0) {
         lv_obj_add_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
         for (int i = 0; i < 2; i++) lv_obj_add_flag(s_toast_mask[i], LV_OBJ_FLAG_HIDDEN);
     }
@@ -411,7 +431,8 @@ void ui_tick(uint32_t now_ms)
         ui_home_refresh(now_ms);
         if (s_mode == MODE_AGENT && !ui_agent_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_ASK && !ui_ask_refresh(now_ms)) leave_mode();
-        if (s_mode == MODE_SCROLL && !ui_scroll_refresh(now_ms)) enter_mode(MODE_HOME); /* the session is gone */
+        /* the session is gone */
+        if (s_mode == MODE_SCROLL && !ui_scroll_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_STATUS) ui_status_refresh(now_ms);
         if (s_mode == MODE_VOICE && !ui_voice_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_KEYS && !ui_keys_refresh(now_ms)) enter_mode(MODE_HOME);
@@ -431,7 +452,8 @@ void ui_tick(uint32_t now_ms)
     if (s_mode == MODE_STATUS && ui_status_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_WATCH) ui_watch_tick(now_ms);
     if (s_mode == MODE_VOICE && ui_voice_tick(now_ms)) { /* sent */
-        /* an answer to a request goes back to ASK, which shows it pending until the daemon's clear */
+        /* an answer to a request goes back to ASK, which shows it pending until the daemon's
+         * clear */
         const attention_t *a = ui_voice_rid() ? model_attention_find(ui_voice_rid()) : NULL;
         uint32_t sid = a ? a->sid : 0;
         enter_mode(MODE_HOME);
@@ -446,7 +468,10 @@ void ui_tick(uint32_t now_ms)
     if (s_mode == MODE_LABS && ui_labs_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_TRACKPAD) ui_trackpad_tick(now_ms);
     /* the answer window runs on the request it belongs to: on ASK, and on its card on the deck */
-    ui_countdown_show(s_mode == MODE_ASK ? ui_ask_request() : s_mode == MODE_HOME ? ui_home_sel_request() : NULL, now_ms);
+    ui_countdown_show(s_mode == MODE_ASK    ? ui_ask_request()
+                      : s_mode == MODE_HOME ? ui_home_sel_request()
+                                            : NULL,
+                      now_ms);
 }
 
 /* The interaction layer maps the gesture to an action; mode changes are handled here, everything
@@ -455,23 +480,31 @@ bool ui_on_gesture(const gesture_evt_t *g)
 {
     if (g->kind == G_RELEASE) s_rel_y = g->y;
     nav_zone_t zone = nav_centre(g->x, g->y) ? ZONE_CENTRE : ZONE_RIM;
-    /* The deck's book disc and graph strip sit between the key hints and reach past the centre zone: a tap
-     * on one is a tap on it, not on the rim (a drag there still scrubs the sessions). */
+    /* The deck's book disc and graph strip sit between the key hints and reach past the centre
+     * zone: a tap on one is a tap on it, not on the rim (a drag there still scrubs the
+     * sessions). */
     if (zone == ZONE_RIM && s_mode == MODE_HOME && (g->kind == G_TAP || g->kind == G_DOUBLE_TAP) &&
         (ui_home_read_hit(g->x, g->y) || ui_home_strip_hit(g->x, g->y)))
         zone = ZONE_CENTRE;
-    /* ASK's Open on PC is button A's hint, and a tap item sits between the hints: both beyond the centre zone */
-    if (zone == ZONE_RIM && s_mode == MODE_ASK && (g->kind == G_TAP || g->kind == G_DOUBLE_TAP) && ui_ask_target_hit(g->x, g->y))
+    /* ASK's Open on PC is button A's hint, and a tap item sits between the hints: both beyond the
+     * centre zone */
+    if (zone == ZONE_RIM && s_mode == MODE_ASK && (g->kind == G_TAP || g->kind == G_DOUBLE_TAP) &&
+        ui_ask_target_hit(g->x, g->y))
         zone = ZONE_CENTRE;
-    /* So do the discs of AGENT's orbit and of READ's: a touch on one (a tap, or the press of a hold) is a touch
-     * on it; a slide along the bezel still dials. */
-    if (zone == ZONE_RIM && (g->kind == G_TAP || g->kind == G_DOUBLE_TAP || g->kind == G_PRESS || g->kind == G_LONG_PRESS) &&
-        ((s_mode == MODE_AGENT && ui_agent_hit(g->x, g->y)) || (s_mode == MODE_READ && ui_read_hit(g->x, g->y))))
+    /* So do the discs of AGENT's orbit and of READ's: a touch on one (a tap, or the press of a
+     * hold) is a touch on it; a slide along the bezel still dials. */
+    if (zone == ZONE_RIM &&
+        (g->kind == G_TAP || g->kind == G_DOUBLE_TAP || g->kind == G_PRESS ||
+         g->kind == G_LONG_PRESS) &&
+        ((s_mode == MODE_AGENT && ui_agent_hit(g->x, g->y)) ||
+         (s_mode == MODE_READ && ui_read_hit(g->x, g->y))))
         zone = ZONE_CENTRE;
-    nav_action_t a = nav_lookup(s_mode, g->kind, zone, ui_home_request_pending(), ui_home_askable());
-    if (a != NAV_NONE && g->kind != G_PRESS && g->kind != G_RELEASE && g->kind != G_MOVE) /* moves: a stream */
-        dbg_event("ui", "nav", "\"mode\":\"%s\",\"gesture\":\"%s\",\"action\":\"%s\"", nav_mode_name(s_mode),
-                  gesture_name(g->kind), nav_action_name(a));
+    nav_action_t a =
+        nav_lookup(s_mode, g->kind, zone, ui_home_request_pending(), ui_home_askable());
+    /* moves: a stream */
+    if (a != NAV_NONE && g->kind != G_PRESS && g->kind != G_RELEASE && g->kind != G_MOVE)
+        dbg_event("ui", "nav", "\"mode\":\"%s\",\"gesture\":\"%s\",\"action\":\"%s\"",
+                  nav_mode_name(s_mode), gesture_name(g->kind), nav_action_name(a));
     switch (a) {
     case NAV_OPEN_AGENT:
         ui_home_note_input();
@@ -479,12 +512,14 @@ bool ui_on_gesture(const gesture_evt_t *g)
             g_ui_actions->reject();
             return true;
         }
-        if (g->kind == G_TAP && ui_home_read_hit(g->x, g->y)) { /* the card's book disc (LAST-MESSAGE.md) */
+        if (g->kind == G_TAP && ui_home_read_hit(g->x, g->y)) {
+            /* the card's book disc (LAST-MESSAGE.md) */
             enter_mode(MODE_READ);
             g_ui_actions->tick();
             return true;
         }
-        if (g->kind == G_TAP && ui_home_strip_hit(g->x, g->y)) { /* the card's graph strip (GRAPH.md §5) */
+        if (g->kind == G_TAP && ui_home_strip_hit(g->x, g->y)) {
+            /* the card's graph strip (GRAPH.md §5) */
             enter_mode(MODE_GRAPH);
             g_ui_actions->tick();
             return true;
@@ -512,8 +547,10 @@ bool ui_on_gesture(const gesture_evt_t *g)
         g_ui_actions->tick();
         return true;
     case NAV_BACK:
-        if (g->kind == G_SWIPE_DOWN && !nav_long_swipe_down(g->y, s_rel_y)) return true; /* too short: ignored */
-        if (s_mode == MODE_ASK && ui_ask_back()) { /* the reader closes first; the request stays on screen */
+        /* too short: ignored */
+        if (g->kind == G_SWIPE_DOWN && !nav_long_swipe_down(g->y, s_rel_y)) return true;
+        if (s_mode == MODE_ASK && ui_ask_back()) {
+            /* the reader closes first; the request stays on screen */
             g_ui_actions->tick();
             return true;
         }
@@ -521,14 +558,14 @@ bool ui_on_gesture(const gesture_evt_t *g)
             g_ui_actions->tick();
             return true;
         }
-        if (s_mode == MODE_SCROLL && g->kind == G_TAP && ui_scroll_caught()) return true; /* it stopped a glide */
-        if (s_mode == MODE_SCROLL && g->kind == G_SWIPE_RIGHT && ui_scroll_dragged()) return true; /* a flick that scrolled */
+        /* it stopped a glide */
+        if (s_mode == MODE_SCROLL && g->kind == G_TAP && ui_scroll_caught()) return true;
+        /* a flick that scrolled */
+        if (s_mode == MODE_SCROLL && g->kind == G_SWIPE_RIGHT && ui_scroll_dragged()) return true;
         leave_mode();
         g_ui_actions->tick();
         return true;
-    case NAV_HOME:
-        enter_mode(MODE_HOME);
-        return true;
+    case NAV_HOME: enter_mode(MODE_HOME); return true;
     case NAV_SCROLL_DRAG:
         if (s_mode != MODE_WATCH) break; /* SCROLL's own drags go to the screen below */
         {

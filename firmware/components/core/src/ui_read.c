@@ -1,16 +1,18 @@
-/* The READ screen in Sigil (docs/design/GLYPHS.md §5; LAST-MESSAGE.md §1): the agent's last message, fetched from
- * the daemon as it is read (detail.c, proto 0.18), then what to do about it.
+/* The READ screen in Sigil (docs/design/GLYPHS.md §5; LAST-MESSAGE.md §1): the agent's last
+ * message, fetched from the daemon as it is read (detail.c, proto 0.18), then what to do about it.
  *
- * The reader is the message and nothing else in words (a summary: rule 1): the session's sigil and its agent's
- * mark at the top, seven lines of the text, and on the key-hint row the page dots, with a small ring beside
- * them that fills as the rest of the message arrives (the error glyph when it did not). Button B's hint is the
- * caret while there is more to read and the reply arrow on the last page.
- * Past the last page the actions are discs (rule 5): an orbit arched over the sigil, Dictate, Reply, Read
- * again, Open on PC, and under the sigil the end of the message, as a reminder of what is being answered.
+ * The reader is the message and nothing else in words (a summary: rule 1): the session's sigil and
+ * its agent's mark at the top, seven lines of the text, and on the key-hint row the page dots, with
+ * a small ring beside them that fills as the rest of the message arrives (the error glyph when it
+ * did not). Button B's hint is the caret while there is more to read and the reply arrow on the
+ * last page. Past the last page the actions are discs (rule 5): an orbit arched over the sigil,
+ * Dictate, Reply, Read again, Open on PC, and under the sigil the end of the message, as a reminder
+ * of what is being answered.
  *
- * Nothing here sends anything to the agent: a page turn only reads, and the discs only open VOICE or the Reply
- * list, whose own holds and taps send. Until the whole message has arrived the reader shows what it has (the
- * preview first). Every glyph is named in words in the report (rule 9), as before. */
+ * Nothing here sends anything to the agent: a page turn only reads, and the discs only open VOICE
+ * or the Reply list, whose own holds and taps send. Until the whole message has arrived the reader
+ * shows what it has (the preview first). Every glyph is named in words in the report (rule 9), as
+ * before. */
 #include <stdio.h>
 #include <string.h>
 
@@ -25,21 +27,22 @@
 /* Geometry: centres unless a top is named. */
 #define SIGIL_Y 50
 #define SIGIL_R 22
-#define MARK_Y 84        /* the agent's mark, as on the deck */
-#define READ_Y 124       /* top of the text: seven lines, 320 px wide, as the legibility pass set them */
+#define MARK_Y 84 /* the agent's mark, as on the deck */
+/* top of the text: seven lines, 320 px wide, as the legibility pass set them */
+#define READ_Y 124
 #define READ_W 320
 #define READ_LINES 7
-#define PIPS_Y UI_KEY_Y  /* the page dots: on the key-hint row, between the two hints */
-#define LOAD_R 9         /* the ring that fills as the message arrives */
+#define PIPS_Y UI_KEY_Y /* the page dots: on the key-hint row, between the two hints */
+#define LOAD_R 9        /* the ring that fills as the message arrives */
 #define LOAD_W 3
-#define LOAD_GAP 20      /* from the last page dot to the ring's centre */
+#define LOAD_GAP 20                     /* from the last page dot to the ring's centre */
 #define LOAD_HALF (LOAD_R + LOAD_W + 2) /* half the side of the ring's own small parent */
 /* the end: an orbit over the sigil, the message's last lines under it */
 #define ARCH_SPAN 222
 #define ARCH_PITCH 50
 #define END_SIGIL_Y 204
 #define END_SIGIL_R 40
-#define TAIL_Y 262       /* top of three lines */
+#define TAIL_Y 262 /* top of three lines */
 #define TAIL_W 250
 #define TAIL_LINES 3
 
@@ -63,7 +66,8 @@ MODEL_EXT_BSS static char s_tail_txt[120];
 static uint32_t s_sid, s_lm, s_now, s_page_ms, s_opened_ms;
 static int s_page_i, s_pages, s_drag_acc, s_scrub_last, s_load_x = -1;
 static bool s_drag_paged, s_end;
-static uint32_t s_loaded_got; /* message bytes the reader was last laid out with, and the transfer's state then */
+/* message bytes the reader was last laid out with, and the transfer's state then */
+static uint32_t s_loaded_got;
 static detail_state_t s_loaded_st;
 
 static void show(lv_obj_t *o, bool on)
@@ -89,8 +93,8 @@ static bool failed(void) { return detail_msg_state(s_sid, s_lm) == DETAIL_FAILED
 /* Button B's hint, by the word it had: the glyph is the vocabulary's. */
 static void set_b(const char *word) { ui_key_hint_set(s_hint[1], theme_glyph(word)); }
 
-/* How much of the message is here: a ring that fills beside the page dots (no total known yet: an empty ring),
- * the error glyph when the rest did not load, nothing once it is all here. */
+/* How much of the message is here: a ring that fills beside the page dots (no total known yet: an
+ * empty ring), the error glyph when the rest did not load, nothing once it is all here. */
 static void loading(void)
 {
     bool done = complete(), bad = failed();
@@ -105,7 +109,8 @@ static void loading(void)
     show(s_load_err, bad);
     if (done || bad) return;
     uint32_t got = detail_msg_got(s_sid, s_lm), total = detail_msg_total(s_sid, s_lm);
-    ui_arc_set(lv_obj_get_child(s_load, 0), total ? (int)((uint64_t)got * 1000 / total) : 0, COL_TEXT, COL_TEXT3);
+    ui_arc_set(lv_obj_get_child(s_load, 0), total ? (int)((uint64_t)got * 1000 / total) : 0,
+               COL_TEXT, COL_TEXT3);
 }
 
 static void page(void)
@@ -127,7 +132,8 @@ static void load(void)
     lv_point_t sz;
     lv_text_get_size(&sz, t, FONT_BODY, 0, 0, READ_W, LV_TEXT_FLAG_NONE);
     int lines = sz.y / lh;
-    for (size_t n = strlen(t); n > 0 && t[n - 1] == '\n' && lines > 1; n--) lines--; /* no page of blank lines at the end */
+    /* no page of blank lines at the end */
+    for (size_t n = strlen(t); n > 0 && t[n - 1] == '\n' && lines > 1; n--) lines--;
     s_pages = lines <= READ_LINES ? 1 : (lines + READ_LINES - 1) / READ_LINES;
     if (s_page_i >= s_pages) s_page_i = s_pages - 1;
     s_loaded_got = detail_msg_got(s_sid, s_lm);
@@ -163,11 +169,14 @@ static void end_open(void)
     size_t len = strlen(t);
     while (len && (t[len - 1] == '\n' || t[len - 1] == ' ')) len--;
     size_t from = len > 60 ? len - 60 : 0;
-    while (from && from < len && ((uint8_t)t[from] & 0xc0) == 0x80) from++; /* never mid-character */
+    /* never mid-character */
+    while (from && from < len && ((uint8_t)t[from] & 0xc0) == 0x80) from++;
     const char *nl = memchr(t + from, '\n', len - from);
-    if (from && nl && (size_t)(nl - t) + 1 < len) from = (size_t)(nl - t) + 1; /* start on a line of its own */
+    /* start on a line of its own */
+    if (from && nl && (size_t)(nl - t) + 1 < len) from = (size_t)(nl - t) + 1;
     while (from < len && (t[from] == '\n' || t[from] == ' ')) from++;
-    snprintf(s_tail_txt, sizeof s_tail_txt, "%s%.*s", from ? "\xE2\x80\xA6" : "", (int)(len - from), t + from);
+    snprintf(s_tail_txt, sizeof s_tail_txt, "%s%.*s", from ? "\xE2\x80\xA6" : "", (int)(len - from),
+             t + from);
     lv_label_set_text_static(s_tail, s_tail_txt);
     show(s_page_box, false);
     show(s_end_box, true);
@@ -191,16 +200,20 @@ bool ui_read_refresh(uint32_t now)
 {
     s_now = now;
     const session_t *s = session();
-    /* a new prompt clears the message; a new stop replaces it: either way this text is no longer the one */
+    /* a new prompt clears the message; a new stop replaces it: either way this text is no longer
+     * the one */
     if (!s || s->state == SESS_ENDED || !s->lm || s->lm != s_lm || !s->lp[0]) return false;
     const char *base = theme_basename(s->repo);
     char host[24], marks[sizeof s_marks_txt];
     theme_host_prefix(host, sizeof host, s);
-    /* who said it, in words: the agent and the project; on the glass the sigil and the agent's mark */
-    snprintf(s_header_txt, sizeof s_header_txt, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
+    /* who said it, in words: the agent and the project; on the glass the sigil and the agent's
+     * mark */
+    snprintf(s_header_txt, sizeof s_header_txt, "%s%s%s%s", host, theme_agent_name(s->agent),
+             theme_sep(), base[0] ? base : "(no folder)");
     ui_sigil_set_name(s_sigil, base);
     ui_sigil_set_name(s_end_sigil, base);
-    snprintf(marks, sizeof marks, "%s%s", s->host ? ICON_G_WEB " " : "", theme_agent_glyph(s->agent));
+    snprintf(marks, sizeof marks, "%s%s", s->host ? ICON_G_WEB " " : "",
+             theme_agent_glyph(s->agent));
     theme_set_text(s_marks, s_marks_txt, sizeof s_marks_txt, marks);
     if (s_end) end_draw(); /* its colour follows the session */
     return true;
@@ -227,7 +240,8 @@ void ui_read_open(uint32_t sid, uint32_t now)
     show(s_root, true);
     /* reading what it said is seeing it */
     if (s && s->state == SESS_DONE && !s->seen) g_ui_actions->ack(sid);
-    dbg_event("ui", "read", "\"sid\":%u,\"lm\":%u,\"pages\":%d", (unsigned)sid, (unsigned)s_lm, s_pages);
+    dbg_event("ui", "read", "\"sid\":%u,\"lm\":%u,\"pages\":%d", (unsigned)sid, (unsigned)s_lm,
+              s_pages);
 }
 
 void ui_read_close(void)
@@ -243,10 +257,12 @@ bool ui_read_back(void)
     return true;
 }
 
-/* The discs of the end reach past the centre zone (r 150): ui.c lets a touch on one through as a centre touch. */
+/* The discs of the end reach past the centre zone (r 150): ui.c lets a touch on one through as a
+ * centre touch. */
 bool ui_read_hit(int x, int y)
 {
-    return s_end && !lv_obj_has_flag(s_root, LV_OBJ_FLAG_HIDDEN) && ui_orbit_hit(s_orbit, x, y) >= 0;
+    return s_end && !lv_obj_has_flag(s_root, LV_OBJ_FLAG_HIDDEN) &&
+           ui_orbit_hit(s_orbit, x, y) >= 0;
 }
 
 /* The next page; past the last one (all of it here) the end picker. */
@@ -282,7 +298,8 @@ static void end_commit(const end_item_t *it)
     g_ui_actions->tick();
     switch (it->id) {
     case END_DICTATE: /* typed into the session, or queued if it is working again (proto 0.17) */
-        ui_go_voice(0, (s->state == SESS_WORK || s->state == SESS_START) && model_peer_minor() >= 17);
+        ui_go_voice(0,
+                    (s->state == SESS_WORK || s->state == SESS_START) && model_peer_minor() >= 17);
         break;
     case END_REPLY: ui_go_replies(); break;
     case END_AGAIN:
@@ -305,7 +322,8 @@ bool ui_read_act(nav_action_t a, const gesture_evt_t *g)
         return true;
     case NAV_HOLD_RELEASE: return true;
     case NAV_HOLD_LONG:
-        if (s_end && ui_orbit_hit(s_orbit, g->x, g->y) >= 0) return true; /* held on a disc: nothing */
+        /* held on a disc: nothing */
+        if (s_end && ui_orbit_hit(s_orbit, g->x, g->y) >= 0) return true;
         ui_go_back(); /* held still: the end picker closes first, then the reader */
         return true;
     case NAV_FOCUS:
@@ -313,15 +331,19 @@ bool ui_read_act(nav_action_t a, const gesture_evt_t *g)
         ui_go_home();
         return true;
     case NAV_COMMIT:
-        /* the tap that opened it, or one right behind a page or the picker appearing, means nothing */
-        if (g->kind == G_TAP && (s_now - s_page_ms < NAV_CARD_ARM_MS || s_now - s_opened_ms < NAV_CARD_ARM_MS)) return true;
+        /* the tap that opened it, or one right behind a page or the picker appearing, means
+         * nothing */
+        if (g->kind == G_TAP &&
+            (s_now - s_page_ms < NAV_CARD_ARM_MS || s_now - s_opened_ms < NAV_CARD_ARM_MS))
+            return true;
         if (!s_end) {
             next_page();
             return true;
         }
         {
             int hit = g->kind == G_TAP ? ui_orbit_hit(s_orbit, g->x, g->y) : -1;
-            if (hit >= 0 && hit != s_sel) end_select(hit, "tap", NULL); /* the disc you touch is the one you get */
+            /* the disc you touch is the one you get */
+            if (hit >= 0 && hit != s_sel) end_select(hit, "tap", NULL);
             end_commit(s_sel < s_n ? &s_items[s_sel] : NULL);
         }
         return true;
@@ -360,7 +382,8 @@ void ui_read_tick(uint32_t now)
     s_now = now;
     const session_t *s = session();
     if (s) detail_want_msg(s, now); /* resumes a transfer a lost link interrupted */
-    if (!s_end && (detail_msg_got(s_sid, s_lm) != s_loaded_got || detail_msg_state(s_sid, s_lm) != s_loaded_st)) {
+    if (!s_end && (detail_msg_got(s_sid, s_lm) != s_loaded_got ||
+                   detail_msg_state(s_sid, s_lm) != s_loaded_st)) {
         load(); /* more of the message arrived */
         page();
     }
@@ -374,14 +397,16 @@ void ui_read_report(ui_report_t *r)
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
     ui_report_add(r, "%s", s_title_txt);
     if (s_end) {
-        for (int k = 0; k < s_n && k < 4; k++) ui_report_add(r, "%s%s", k == 0 ? "> " : "", s_items[(s_sel + k) % s_n].label);
+        for (int k = 0; k < s_n && k < 4; k++)
+            ui_report_add(r, "%s%s", k == 0 ? "> " : "", s_items[(s_sel + k) % s_n].label);
         return;
     }
     ui_report_add(r, "Reading %d of %d", s_page_i + 1, s_pages);
     if (!complete()) ui_report_add(r, failed() ? "Not loaded" : "Loading");
     /* the first visible line of the page, so a script can tell what is on screen */
     const char *t = text();
-    for (int skip = s_page_i * READ_LINES; skip > 0 && *t; skip--) { /* by line breaks: close enough for a check */
+    for (int skip = s_page_i * READ_LINES; skip > 0 && *t; skip--) {
+        /* by line breaks: close enough for a check */
         const char *nl = strchr(t, '\n');
         if (!nl) break;
         t = nl + 1;
@@ -415,16 +440,19 @@ lv_obj_t *ui_read_init(lv_obj_t *screen)
     lv_obj_set_size(s_marks, 120, clh);
     lv_obj_set_pos(s_marks, UI_CX - 60, MARK_Y - clh / 2);
     lv_label_set_text(s_marks, "");
-    s_read = box(s_page_box, UI_CX - READ_W / 2, READ_Y, READ_W, READ_LINES * lh); /* a window READ_LINES tall over the whole message */
+    /* a window READ_LINES tall over the whole message */
+    s_read = box(s_page_box, UI_CX - READ_W / 2, READ_Y, READ_W, READ_LINES * lh);
     s_lbl = lv_label_create(s_read);
     lv_obj_set_style_text_font(s_lbl, FONT_BODY, 0);
     lv_obj_set_style_text_color(s_lbl, COL_TEXT, 0);
-    lv_obj_set_style_text_align(s_lbl, LV_TEXT_ALIGN_LEFT, 0); /* prose and lists read from a left edge */
+    /* prose and lists read from a left edge */
+    lv_obj_set_style_text_align(s_lbl, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_width(s_lbl, READ_W);
     lv_label_set_text_static(s_lbl, "");
     s_pips = ui_pips_create(s_page_box, UI_CX, PIPS_Y);
     /* the loading ring is an arc in a small parent that moves it to the end of the dots */
-    s_load = box(s_page_box, UI_CX - LOAD_HALF, PIPS_Y - LOAD_HALF, 2 * LOAD_HALF + 1, 2 * LOAD_HALF + 1);
+    s_load = box(s_page_box, UI_CX - LOAD_HALF, PIPS_Y - LOAD_HALF, 2 * LOAD_HALF + 1,
+                 2 * LOAD_HALF + 1);
     ui_arc_create(s_load, LOAD_HALF, LOAD_HALF, LOAD_R, LOAD_W);
     s_load_err = ui_glyph_create(s_page_box, FONT_ICON_S, UI_CX, PIPS_Y);
     ui_glyph_set(s_load_err, ICON_ERROR, lv_color_hex(RGB_ERROR));

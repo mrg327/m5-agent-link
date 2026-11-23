@@ -1,7 +1,7 @@
-/* How the index ring paints (UI-V3 §3.1): one arc primitive with round caps, a round dot (the pip), and
- * one capsule per session whose motion tells the kind: a comet on a dim capsule (working), a 1 Hz pulse
- * (question, permission), a flicker then solid (error), one sweep then solid (done), still (idle). The
- * object, its segments and the animation clock live in ui_ring.c. */
+/* How the index ring paints (UI-V3 §3.1): one arc primitive with round caps, a round dot (the pip),
+ * and one capsule per session whose motion tells the kind: a comet on a dim capsule (working), a 1
+ * Hz pulse (question, permission), a flicker then solid (error), one sweep then solid (done), still
+ * (idle). The object, its segments and the animation clock live in ui_ring.c. */
 #include "ui_ring_internal.h"
 
 #include <math.h>
@@ -55,7 +55,8 @@ int ring_anim_level(const ring_data_t *d, const ring_slot_t *s, int span, uint32
     }
     uint32_t t = now - s->entry_ms;
     switch (s->s.kind) {
-    case RING_WORK: return (int)(now % WORK_PERIOD_MS * (uint32_t)span / WORK_PERIOD_MS / COMET_STEP_DEG);
+    case RING_WORK:
+        return (int)(now % WORK_PERIOD_MS * (uint32_t)span / WORK_PERIOD_MS / COMET_STEP_DEG);
     case RING_ASK: return tri_level(now, ASK_PERIOD_MS, PULSE_LEVELS);
     case RING_PERM: return tri_level(now, PERM_PERIOD_MS, PULSE_LEVELS);
     case RING_DONE: return t >= DONE_SWEEP_MS ? DONE_STEPS : (int)(t * DONE_STEPS / DONE_SWEEP_MS);
@@ -68,7 +69,8 @@ int ring_anim_level(const ring_data_t *d, const ring_slot_t *s, int span, uint32
 static void dot(lv_layer_t *l, int r_mid, int diam, int deg, lv_color_t c)
 {
     float rad = (float)deg * (float)M_PI / 180.0f;
-    int x = CX + (int)lroundf((float)r_mid * sinf(rad)), y = CY - (int)lroundf((float)r_mid * cosf(rad));
+    int x = CX + (int)lroundf((float)r_mid * sinf(rad)),
+        y = CY - (int)lroundf((float)r_mid * cosf(rad));
     lv_draw_rect_dsc_t d;
     lv_draw_rect_dsc_init(&d);
     d.bg_color = c;
@@ -78,7 +80,8 @@ static void dot(lv_layer_t *l, int r_mid, int diam, int deg, lv_color_t c)
     lv_draw_rect(l, &d, &a);
 }
 
-static bool needs_you(uint8_t kind) { return kind == RING_ASK || kind == RING_PERM || kind == RING_ERROR; }
+static bool needs_you(uint8_t kind)
+{ return kind == RING_ASK || kind == RING_PERM || kind == RING_ERROR; }
 
 void ring_draw_slot(lv_layer_t *l, const ring_data_t *d, int i)
 {
@@ -123,9 +126,8 @@ void ring_draw_slot(lv_layer_t *l, const ring_data_t *d, int i)
             ring_arc(l, out, w, a0, a1, theme_dim(rgb, rest));
         }
         break;
-    default:
-        ring_arc(l, out, w, a0, a1, theme_dim(rgb, rest));
-        break;
+    default: ring_arc(l, out, w, a0, a1, theme_dim(rgb, rest)); break;
     }
-    if (needs && !s->s.selected && !d->ambient) dot(l, PIP_R, PIP_D, (a0 + a1) / 2, theme_dim(rgb, 100));
+    if (needs && !s->s.selected && !d->ambient)
+        dot(l, PIP_R, PIP_D, (a0 + a1) / 2, theme_dim(rgb, 100));
 }

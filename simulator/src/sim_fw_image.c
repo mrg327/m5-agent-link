@@ -1,6 +1,6 @@
-/* The script's synthetic firmware image: `fw_image` makes one, `fw_begin` / `fw_send` offer it to the device.
- * `fw_patch` loads a delta-OTA fixture instead (protocol/fixtures/ota): the image is new.bin, the chunks carry
- * the patch, and the device's running slot is base.bin. */
+/* The script's synthetic firmware image: `fw_image` makes one, `fw_begin` / `fw_send` offer it to
+ * the device. `fw_patch` loads a delta-OTA fixture instead (protocol/fixtures/ota): the image is
+ * new.bin, the chunks carry the patch, and the device's running slot is base.bin. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

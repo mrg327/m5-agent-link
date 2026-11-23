@@ -1,29 +1,33 @@
-/* The WATCH screen in Sigil (docs/design/GLYPHS.md §5 WATCH, UI-V2 §4.7): a live monitor for one session, drawn
- * as a lane of glyph nodes like GRAPH (GRAPH.md §4), turned on its side and blown up. Time runs left to right.
+/* The WATCH screen in Sigil (docs/design/GLYPHS.md §5 WATCH, UI-V2 §4.7): a live monitor for one
+ * session, drawn as a lane of glyph nodes like GRAPH (GRAPH.md §4), turned on its side and blown
+ * up. Time runs left to right.
  *
  *   - Who: the project's sigil at the top and the agent's mark under it, as on the deck.
- *   - While the session works, the lane crosses the screen through its centre. The current step is the hero
- *     node in the middle: its tool as a 96 px glyph in a ring (a running step, with a comet going round), a
- *     filled disc once it has returned, a red one when it failed. The steps before it are smaller discs to its
- *     left, shrinking and dimming towards the bezel; where older steps were dropped the lane fades out. To the
- *     right the lane runs on into the step count in a badge (a count: rule 4) and a few dashes: what is to come.
- *   - Under the lane: the time in this state as a tally of minutes, and the selected step's argument, which is
- *     the one piece of text (rule 1: the agent's step summary). A tool the watch has a glyph for is not spelled
- *     out; any other step keeps its whole text. A tap on an earlier node selects it; a new step, or a tap on the
- *     hero, selects the current one again.
- *   - When the session is not working the lane gives way to its state as a 128 px glyph with the time in that
- *     state as dots round it, and the done row (ui_done.c) under it. A session that waits for you is opened by
- *     a tap on the glyph, as before (nav.c): the report still says `Answer`.
+ *   - While the session works, the lane crosses the screen through its centre. The current step is
+ *     the hero node in the middle: its tool as a 96 px glyph in a ring (a running step, with a
+ *     comet going round), a filled disc once it has returned, a red one when it failed. The steps
+ *     before it are smaller discs to its left, shrinking and dimming towards the bezel; where older
+ *     steps were dropped the lane fades out. To the right the lane runs on into the step count in a
+ *     badge (a count: rule 4) and a few dashes: what is to come.
+ *   - Under the lane: the time in this state as a tally of minutes, and the selected step's
+ *     argument, which is the one piece of text (rule 1: the agent's step summary). A tool the watch
+ *     has a glyph for is not spelled out; any other step keeps its whole text. A tap on an earlier
+ *     node selects it; a new step, or a tap on the hero, selects the current one again.
+ *   - When the session is not working the lane gives way to its state as a 128 px glyph with the
+ *     time in that state as dots round it, and the done row (ui_done.c) under it. A session that
+ *     waits for you is opened by a tap on the glyph, as before (nav.c): the report still says
+ *     `Answer`.
  *
- * The screen follows the deck's selection: the rim and B move the deck's selection through ui_home_act(), and the
- * watched session follows it. The index ring keeps showing the sessions. The step timeline itself is built by
- * the model (steps.c); this file only draws it. Nothing here is destructive and nothing times out.
+ * The screen follows the deck's selection: the rim and B move the deck's selection through
+ * ui_home_act(), and the watched session follows it. The index ring keeps showing the sessions. The
+ * step timeline itself is built by the model (steps.c); this file only draws it. Nothing here is
+ * destructive and nothing times out.
  *
- * What every mark means is said in words in the report (rule 9), in the lines the text screen had: the header,
- * `[ok] Read · src/main.c` for each earlier step, the tool, the argument, the state word and its caption,
- * `Answer`, and `Step 3 · 1:35` or the done line. Redraw discipline (UI-V2 §8a): the lane is one object; a delta
- * invalidates only the part of it that changed (the earlier nodes, the hero, the badge), and a tick only the two
- * ends of the comet. */
+ * What every mark means is said in words in the report (rule 9), in the lines the text screen had:
+ * the header, `[ok] Read · src/main.c` for each earlier step, the tool, the argument, the state
+ * word and its caption, `Answer`, and `Step 3 · 1:35` or the done line. Redraw discipline (UI-V2
+ * §8a): the lane is one object; a delta invalidates only the part of it that changed (the earlier
+ * nodes, the hero, the badge), and a tick only the two ends of the comet. */
 #include <stdio.h>
 #include <string.h>
 
@@ -33,41 +37,44 @@
 #include "ui_kit.h"
 #include "ui_theme.h"
 
-/* Geometry: centres. The content circle is r 205; the key hints sit at (101, 365) and (365, 365). */
+/* Geometry: centres. The content circle is r 205; the key hints sit at (101, 365) and (365,
+ * 365). */
 #define SIGIL_Y 50
 #define SIGIL_R 22
 #define MARK_Y 84
-#define LANE_Y 202       /* the lane */
-#define STATE_Y 206      /* not working: the state glyph, where the deck has it */
-#define LANE_HALF 80     /* the lane object is this high either side of its line */
-#define LANE_W 4         /* the line (GRAPH.md: 4 px) */
-#define HERO_R 72        /* the current step: a ring of this outer radius, a 96 px glyph inside */
+#define LANE_Y 202   /* the lane */
+#define STATE_Y 206  /* not working: the state glyph, where the deck has it */
+#define LANE_HALF 80 /* the lane object is this high either side of its line */
+#define LANE_W 4     /* the line (GRAPH.md: 4 px) */
+#define HERO_R 72    /* the current step: a ring of this outer radius, a 96 px glyph inside */
 #define HERO_RING 6
-#define COMET_DEG 100    /* the bright part of a running ring */
+#define COMET_DEG 100 /* the bright part of a running ring */
 #define COMET_STEP_MS 66
 #define COMET_STEP_DEG 12 /* one turn in two seconds */
-#define BADGE_X 319      /* the step count: a pill that starts here, on the lane */
+#define BADGE_X 319       /* the step count: a pill that starts here, on the lane */
 #define BADGE_H 30
 #define BADGE_PAD 9
-#define DASH_W 8         /* what is to come: three dashes that fade */
+#define DASH_W 8 /* what is to come: three dashes that fade */
 #define DASH_GAP 8
-#define FADE_STEPS 4     /* dropped steps: the lane fades out towards the bezel */
+#define FADE_STEPS 4 /* dropped steps: the lane fades out towards the bezel */
 #define FADE_DX 7
-#define SEL_GAP 4        /* the selection ring round an earlier node */
+#define SEL_GAP 4 /* the selection ring round an earlier node */
 #define TALLY_Y 290
-#define LINE1_Y 316      /* the argument: two rows, as the deck's summary */
+#define LINE1_Y 316 /* the argument: two rows, as the deck's summary */
 #define LINE2_Y 340
 #define LINE1_W 300
-#define LINE2_W 220      /* its ends stop short of the key hints' rings */
-#define DOTS_R 88        /* not working: the time in state round the glyph */
+#define LINE2_W 220 /* its ends stop short of the key hints' rings */
+#define DOTS_R 88   /* not working: the time in state round the glyph */
 #define DONE_ROW_Y 320
 
-/* The steps before the current one, by how far back they are (1 = the one before): where, how large, in which
- * icon font and how bright. The furthest one ends 4 px inside the content circle. */
+/* The steps before the current one, by how far back they are (1 = the one before): where, how
+ * large, in which icon font and how bright. The furthest one ends 4 px inside the content
+ * circle. */
 static const struct {
     int16_t x, r;
     uint8_t px, bright;
-} k_back[STEPS_MAX] = {{UI_CX, HERO_R, 96, 100}, {129, 22, 28, 85}, {83, 17, 20, 70}, {47, 13, 20, 55}};
+} k_back[STEPS_MAX] = {
+    {UI_CX, HERO_R, 96, 100}, {129, 22, 28, 85}, {83, 17, 20, 70}, {47, 13, 20, 55}};
 
 typedef struct {
     const char *glyph; /* an ICON_* literal */
@@ -81,10 +88,11 @@ typedef struct {
     bool older;             /* steps before the first node were dropped */
     uint32_t step;          /* the badge: steps so far this turn; 0 = none */
     uint32_t rgb;
-    int sel;                /* the selected node (its index); count - 1 = the hero */
+    int sel; /* the selected node (its index); count - 1 = the hero */
 } lane_t;
 
-static lv_obj_t *s_root, *s_sigil, *s_marks, *s_lane, *s_tally, *s_line1, *s_line2, *s_hero, *s_dots;
+static lv_obj_t *s_root, *s_sigil, *s_marks, *s_lane, *s_tally, *s_line1, *s_line2, *s_hero,
+    *s_dots;
 static lv_obj_t *s_badge[2], *s_key[2], *s_word[2];
 static uint32_t s_sid, s_now, s_sel_n, s_last_n, s_comet_ms;
 static int s_comet_deg;
@@ -96,7 +104,8 @@ static char s_header_txt[64], s_marks_txt[24], s_tool_txt[48], s_arg_txt[48], s_
 MODEL_EXT_BSS static char s_row_txt[STEPS_MAX][STEP_TEXT_MAX + 8];
 static const char *s_mark_txt[STEPS_MAX];
 static int s_rows;
-/* The text on glass and the caches of its two rows (in PSRAM, with the rows above: the screen's larger statics). */
+/* The text on glass and the caches of its two rows (in PSRAM, with the rows above: the screen's
+ * larger statics). */
 MODEL_EXT_BSS static char s_text[96], s_line1_txt[96], s_line2_txt[96];
 
 static void show(lv_obj_t *o, bool on)
@@ -118,7 +127,8 @@ static void copy_cut(char *dst, size_t cap, const char *src, size_t len)
     dst[len] = 0;
 }
 
-/* "Tool · argument" (the daemon's sum) split at the first separator; a bare tool name has no argument. */
+/* "Tool · argument" (the daemon's sum) split at the first separator; a bare tool name has no
+ * argument. */
 static void split_step(const char *text, char *tool, size_t tcap, char *arg, size_t acap)
 {
     const char *sep = strstr(text, " \xC2\xB7 ");
@@ -134,7 +144,9 @@ static void split_step(const char *text, char *tool, size_t tcap, char *arg, siz
 static void clock_text(char *dst, size_t cap, uint32_t secs)
 {
     if (secs < 3600) snprintf(dst, cap, "%u:%02u", (unsigned)(secs / 60), (unsigned)(secs % 60));
-    else snprintf(dst, cap, "%u:%02u:%02u", (unsigned)(secs / 3600), (unsigned)(secs / 60 % 60), (unsigned)(secs % 60));
+    else
+        snprintf(dst, cap, "%u:%02u:%02u", (unsigned)(secs / 3600), (unsigned)(secs / 60 % 60),
+                 (unsigned)(secs % 60));
 }
 
 /* Time in the current state, frozen at the moment the link dropped, like the deck's card. */
@@ -147,14 +159,18 @@ static bool time_in_state(const session_t *s, uint32_t *secs)
     return true;
 }
 
-/* The caption under the state word, for the report: how long ago it happened, in the words of the state. */
+/* The caption under the state word, for the report: how long ago it happened, in the words of the
+ * state. */
 static void state_caption(const session_t *s, char *dst, size_t cap)
 {
     uint32_t secs;
     char t[16];
     dst[0] = 0;
-    const char *lead = s->state == SESS_DONE ? "Finished" : s->state == SESS_ERROR ? "Stopped"
-                       : s->state == SESS_INPUT ? "Waiting" : s->state == SESS_IDLE ? "No activity for" : "";
+    const char *lead = s->state == SESS_DONE    ? "Finished"
+                       : s->state == SESS_ERROR ? "Stopped"
+                       : s->state == SESS_INPUT ? "Waiting"
+                       : s->state == SESS_IDLE  ? "No activity for"
+                                                : "";
     if (!lead[0]) return;
     if (!time_in_state(s, &secs)) {
         if (s->state == SESS_DONE || s->state == SESS_ERROR) snprintf(dst, cap, "%s", lead);
@@ -187,7 +203,8 @@ static void footer_words(const session_t *s, char *buf, size_t cap)
 static bool same_word(const char *a, const char *b)
 {
     for (; *a && *b; a++, b++) {
-        char x = *a >= 'A' && *a <= 'Z' ? (char)(*a + 32) : *a, y = *b >= 'A' && *b <= 'Z' ? (char)(*b + 32) : *b;
+        char x = *a >= 'A' && *a <= 'Z' ? (char)(*a + 32) : *a,
+             y = *b >= 'A' && *b <= 'Z' ? (char)(*b + 32) : *b;
         if (x != y) return false;
     }
     return !*a && !*b;
@@ -200,11 +217,12 @@ static bool one_of(const char *tool, const char *const *names)
     return false;
 }
 
-/* A shell command that is a test run or git, by its first words (the daemon's turn.rs and graph.rs know more;
- * this only picks the glyph). */
+/* A shell command that is a test run or git, by its first words (the daemon's turn.rs and graph.rs
+ * know more; this only picks the glyph). */
 static const char *shell_glyph(const char *cmd)
 {
-    static const char *const runners[] = {"pytest", "ctest", "jest", "vitest", "tox", "rspec", "phpunit", NULL};
+    static const char *const runners[] = {"pytest", "ctest", "jest",    "vitest",
+                                          "tox",    "rspec", "phpunit", NULL};
     char first[16];
     size_t n = strcspn(cmd, " ");
     copy_cut(first, sizeof first, cmd, n);
@@ -213,19 +231,24 @@ static const char *shell_glyph(const char *cmd)
     return ICON_G_SHELL;
 }
 
-/* The tool of a step as a glyph: the kinds of the agent graph (graph.rs kind_of), from the tool's name. NULL
- * when the watch has no glyph that says it (the step then keeps its text). A sub-agent's
+/* The tool of a step as a glyph: the kinds of the agent graph (graph.rs kind_of), from the tool's
+ * name. NULL when the watch has no glyph that says it (the step then keeps its text). A sub-agent's
  * step leads with the agent ("explore: bash"): the tool is what follows. */
 static const char *tool_glyph(const char *tool, const char *arg)
 {
     static const char *const read[] = {"view", "read", "read_file", "notebookread", NULL};
-    static const char *const edit[] = {"edit", "create", "write", "multiedit", "notebookedit", "apply_patch", NULL};
-    static const char *const shell[] = {"bash", "shell", "powershell", "write_bash", "read_bash", "stop_bash", "bashoutput", "killshell", NULL};
+    static const char *const edit[] = {"edit",         "create",      "write", "multiedit",
+                                       "notebookedit", "apply_patch", NULL};
+    static const char *const shell[] = {"bash",       "shell",     "powershell",
+                                        "write_bash", "read_bash", "stop_bash",
+                                        "bashoutput", "killshell", NULL};
     static const char *const search[] = {"grep", "glob", "ls", "lsp", "code_search", NULL};
     static const char *const web[] = {"web_fetch", "webfetch", "websearch", "web_search", NULL};
-    static const char *const agent[] = {"task", "agent", "read_agent", "write_agent", "list_agents", NULL};
+    static const char *const agent[] = {"task",        "agent",       "read_agent",
+                                        "write_agent", "list_agents", NULL};
     static const char *const ask[] = {"ask_user", "askuserquestion", NULL};
-    static const char *const plan[] = {"todowrite", "sql", "update_todo", "report_intent", "exitplanmode", "enterplanmode", NULL};
+    static const char *const plan[] = {
+        "todowrite", "sql", "update_todo", "report_intent", "exitplanmode", "enterplanmode", NULL};
     const char *sub = strstr(tool, ": ");
     while (sub && strstr(sub + 2, ": ")) sub = strstr(sub + 2, ": ");
     if (sub) tool = sub + 2;
@@ -240,9 +263,9 @@ static const char *tool_glyph(const char *tool, const char *arg)
     return NULL;
 }
 
-/* A step's text as a node: its glyph, and what is left to say in text (`shown`, cap >= 2). A named tool leaves
- * its argument; an MCP tool (mcp__server__tool, server-tool) is the plug and keeps its name; anything else is
- * prose or a tool the watch does not know: `fallback` and the whole text. */
+/* A step's text as a node: its glyph, and what is left to say in text (`shown`, cap >= 2). A named
+ * tool leaves its argument; an MCP tool (mcp__server__tool, server-tool) is the plug and keeps its
+ * name; anything else is prose or a tool the watch does not know: `fallback` and the whole text. */
 static const char *step_node(const char *text, const char *fallback, char *shown, size_t cap)
 {
     char tool[48], arg[STEP_TEXT_MAX + 48];
@@ -270,7 +293,8 @@ static void circle(lv_layer_t *l, int x, int y, int r, lv_color_t c)
     lv_draw_rect(l, &d, &a);
 }
 
-/* A ring of outer radius r, or (a0 < a1) the arc of it from a0 to a1 degrees clockwise from 12 o'clock. */
+/* A ring of outer radius r, or (a0 < a1) the arc of it from a0 to a1 degrees clockwise from 12
+ * o'clock. */
 static void ring(lv_layer_t *l, int x, int y, int r, int w, int a0, int a1, lv_color_t c)
 {
     lv_draw_arc_dsc_t d;
@@ -310,8 +334,10 @@ static void hline(lv_layer_t *l, int x1, int x2, int y, lv_color_t c, lv_opa_t o
     lv_draw_line(l, &d);
 }
 
-/* The hero's glyph is 96 px where the font has it (the node kinds, the working glyph, the question), 64 px otherwise. */
-static const lv_font_t *icon_font(const char *glyph, int px) { return px > 28 ? ui_glyph_font(glyph, px) : px == 28 ? FONT_ICON_M : FONT_ICON_S; }
+/* The hero's glyph is 96 px where the font has it (the node kinds, the working glyph, the
+ * question), 64 px otherwise. */
+static const lv_font_t *icon_font(const char *glyph, int px)
+{ return px > 28 ? ui_glyph_font(glyph, px) : px == 28 ? FONT_ICON_M : FONT_ICON_S; }
 
 static int badge_w(uint32_t n)
 {
@@ -323,13 +349,15 @@ static int badge_w(uint32_t n)
     return w < BADGE_H ? BADGE_H : w;
 }
 
-/* A node as GRAPH draws one: a disc in the lane's colour with the glyph in black once it has returned, red when
- * it failed, a ring with the glyph in colour while it runs (the hero's ring is drawn by the caller). */
+/* A node as GRAPH draws one: a disc in the lane's colour with the glyph in black once it has
+ * returned, red when it failed, a ring with the glyph in colour while it runs (the hero's ring is
+ * drawn by the caller). */
 static void node(lv_layer_t *l, const node_t *nd, int x, int y, int back, uint32_t rgb)
 {
     int r = k_back[back].r;
     /* a failed step keeps its red: dimmed it would read as amber */
-    lv_color_t c = nd->state == STEP_FAIL ? lv_color_hex(RGB_DANGER) : theme_dim(rgb, k_back[back].bright);
+    lv_color_t c =
+        nd->state == STEP_FAIL ? lv_color_hex(RGB_DANGER) : theme_dim(rgb, k_back[back].bright);
     const lv_font_t *f = icon_font(nd->glyph, k_back[back].px);
     if (nd->state == STEP_RUNNING) {
         circle(l, x, y, r, COL_BG); /* the lane does not show through the ring */
@@ -351,12 +379,14 @@ static void lane_draw(lv_event_t *e)
     int ox = a.x1, y = (a.y1 + a.y2) / 2, hero = ox + UI_CX, prior = v->count - 1;
     lv_color_t col = lv_color_hex(v->rgb), line = theme_dim(v->rgb, 70);
 
-    /* the past: from the oldest node shown to the hero, fading out beyond it where steps were dropped */
+    /* the past: from the oldest node shown to the hero, fading out beyond it where steps were
+     * dropped */
     int x_old = ox + k_back[prior].x;
     if (v->older) {
         int x = x_old - k_back[prior].r - 2;
         for (int f = 0; f < FADE_STEPS && x - FADE_DX >= ox + 26; f++, x -= FADE_DX)
-            hline(l, x - FADE_DX, x, y, line, (lv_opa_t)(LV_OPA_COVER * (FADE_STEPS - f) / (FADE_STEPS + 1)));
+            hline(l, x - FADE_DX, x, y, line,
+                  (lv_opa_t)(LV_OPA_COVER * (FADE_STEPS - f) / (FADE_STEPS + 1)));
     }
     hline(l, x_old, hero, y, line, LV_OPA_COVER);
     /* what is to come: on to the step count, then three dashes that fade */
@@ -410,7 +440,8 @@ static void lane_draw(lv_event_t *e)
     }
 }
 
-/* Invalidates a box of the lane given in the lane's own coordinates about its line (x, and y from the line). */
+/* Invalidates a box of the lane given in the lane's own coordinates about its line (x, and y from
+ * the line). */
 static void lane_inv(int x1, int y1, int x2, int y2)
 {
     lv_area_t a;
@@ -420,16 +451,19 @@ static void lane_inv(int x1, int y1, int x2, int y2)
     lv_obj_invalidate_area(s_lane, &box);
 }
 
-/* Takes what the lane is to show and redraws what differs: the earlier nodes, the hero, the badge. */
+/* Takes what the lane is to show and redraws what differs: the earlier nodes, the hero, the
+ * badge. */
 static void lane_set(const lane_t *v)
 {
     const lane_t *o = &s_v;
     bool all = (v->count > 0) != (o->count > 0) || v->rgb != o->rgb;
     bool past = all || v->count != o->count || v->older != o->older || v->sel != o->sel;
     bool hero = all, badge = all || v->step != o->step;
-    for (int i = 0; i + 1 < v->count && !past; i++) past = v->node[i].glyph != o->node[i].glyph || v->node[i].state != o->node[i].state;
+    for (int i = 0; i + 1 < v->count && !past; i++)
+        past = v->node[i].glyph != o->node[i].glyph || v->node[i].state != o->node[i].state;
     if (!hero && v->count > 0)
-        hero = v->node[v->count - 1].glyph != o->node[o->count - 1].glyph || v->node[v->count - 1].state != o->node[o->count - 1].state;
+        hero = v->node[v->count - 1].glyph != o->node[o->count - 1].glyph ||
+               v->node[v->count - 1].state != o->node[o->count - 1].state;
     s_v = *v;
     int r1 = k_back[1].r + SEL_GAP + 3;
     if (past) lane_inv(24, -r1, UI_CX - HERO_R - 1, r1);
@@ -446,9 +480,12 @@ static void comet_step(void)
     int rm = HERO_R - HERO_RING / 2, pad = HERO_RING / 2 + 3;
     for (int k = 0; k < 2; k++) {
         int a0 = old + ends[k], a1 = s_comet_deg + ends[k];
-        int x0 = (int)(((int32_t)rm * lv_trigo_sin((int16_t)(a0 % 360))) >> 15), y0 = -(int)(((int32_t)rm * lv_trigo_cos((int16_t)(a0 % 360))) >> 15);
-        int x1 = (int)(((int32_t)rm * lv_trigo_sin((int16_t)(a1 % 360))) >> 15), y1 = -(int)(((int32_t)rm * lv_trigo_cos((int16_t)(a1 % 360))) >> 15);
-        lane_inv(UI_CX + LV_MIN(x0, x1) - pad, LV_MIN(y0, y1) - pad, UI_CX + LV_MAX(x0, x1) + pad, LV_MAX(y0, y1) + pad);
+        int x0 = (int)(((int32_t)rm * lv_trigo_sin((int16_t)(a0 % 360))) >> 15),
+            y0 = -(int)(((int32_t)rm * lv_trigo_cos((int16_t)(a0 % 360))) >> 15);
+        int x1 = (int)(((int32_t)rm * lv_trigo_sin((int16_t)(a1 % 360))) >> 15),
+            y1 = -(int)(((int32_t)rm * lv_trigo_cos((int16_t)(a1 % 360))) >> 15);
+        lane_inv(UI_CX + LV_MIN(x0, x1) - pad, LV_MIN(y0, y1) - pad, UI_CX + LV_MAX(x0, x1) + pad,
+                 LV_MAX(y0, y1) + pad);
     }
 }
 
@@ -457,7 +494,8 @@ static int lane_hit(int x, int y)
 {
     const lane_t *v = &s_v;
     for (int i = 0; i < v->count; i++) {
-        int back = v->count - 1 - i, dx = x - k_back[back].x, dy = y - LANE_Y, r = k_back[back].r + UI_DISC_SLACK;
+        int back = v->count - 1 - i, dx = x - k_back[back].x, dy = y - LANE_Y,
+            r = k_back[back].r + UI_DISC_SLACK;
         if (dx * dx + dy * dy <= r * r) return i;
     }
     return -1;
@@ -465,8 +503,8 @@ static int lane_hit(int x, int y)
 
 /* ───────── text ───────── */
 
-/* Text for two rows of different widths: `first` gets the words of `text` that fit `w` px (one word at least;
- * its row cuts a longer one with dots), and the rest is returned. */
+/* Text for two rows of different widths: `first` gets the words of `text` that fit `w` px (one word
+ * at least; its row cuts a longer one with dots), and the rest is returned. */
 static const char *split_rows(const char *text, int w, char *first, size_t cap)
 {
     size_t n = strlen(text), best = 0;
@@ -506,7 +544,8 @@ static void set_text(const char *text)
 
 /* ───────── render ───────── */
 
-/* The time in this state: a tally under the lane while it works, dots round the state glyph otherwise. */
+/* The time in this state: a tally under the lane while it works, dots round the state glyph
+ * otherwise. */
 static void render_time(const session_t *s)
 {
     uint32_t secs = 0, rgb = theme_session_rgb(s);
@@ -525,9 +564,11 @@ static void render(void)
     char host[24], marks[24];
     theme_host_prefix(host, sizeof host, s);
     const char *base = theme_basename(s->repo);
-    snprintf(s_header_txt, sizeof s_header_txt, "%s%s%s%s", host, theme_agent_name(s->agent), theme_sep(), base[0] ? base : "(no folder)");
+    snprintf(s_header_txt, sizeof s_header_txt, "%s%s%s%s", host, theme_agent_name(s->agent),
+             theme_sep(), base[0] ? base : "(no folder)");
     ui_sigil_set_name(s_sigil, base);
-    snprintf(marks, sizeof marks, "%s%s", s->host ? ICON_G_WEB " " : "", theme_agent_glyph(s->agent));
+    snprintf(marks, sizeof marks, "%s%s", s->host ? ICON_G_WEB " " : "",
+             theme_agent_glyph(s->agent));
     theme_set_text(s_marks, s_marks_txt, sizeof s_marks_txt, marks);
 
     const steps_t *t = &s->steps;
@@ -544,8 +585,12 @@ static void render(void)
     s_tool_txt[0] = s_arg_txt[0] = 0;
     s_rows = 0;
     if (work) {
-        /* the hero is the current step: what the session says it is doing, else the newest step of the timeline */
-        const char *cur = s->summary[0] ? s->summary : s->tool[0] ? s->tool : t->count ? t->s[t->count - 1].text : "";
+        /* the hero is the current step: what the session says it is doing, else the newest step of
+         * the timeline */
+        const char *cur = s->summary[0] ? s->summary
+                          : s->tool[0]  ? s->tool
+                          : t->count    ? t->s[t->count - 1].text
+                                        : "";
         int prior = t->count > 0 ? t->count - 1 : 0;
         if (cur[0]) split_step(cur, s_tool_txt, sizeof s_tool_txt, s_arg_txt, sizeof s_arg_txt);
         else snprintf(s_tool_txt, sizeof s_tool_txt, "%s", theme_state_word(s));
@@ -577,7 +622,8 @@ static void render(void)
     show(s_lane, work);
     set_text(text);
 
-    /* not working: the state as one glyph (a tap on it answers, when it waits for you), and what the turn did */
+    /* not working: the state as one glyph (a tap on it answers, when it waits for you), and what
+     * the turn did */
     s_needs = !work && s->state == SESS_INPUT;
     show(s_hero, !work);
     s_word_txt[0] = 0;
@@ -631,13 +677,14 @@ bool ui_watch_refresh(uint32_t now)
     s_now = now;
     const session_t *s = model_find(s_sid);
     if (!s || s->state == SESS_ENDED) return false;
-    if (ui_home_sel_sid() != s_sid) ui_home_select_sid(s_sid, "watch"); /* the deck re-selected on its own */
+    /* the deck re-selected on its own */
+    if (ui_home_sel_sid() != s_sid) ui_home_select_sid(s_sid, "watch");
     render();
     return true;
 }
 
-/* A tap on a node of the lane selects that step (its argument is the text below); a tap on the one that is
- * selected falls through to what a tap does anyway. */
+/* A tap on a node of the lane selects that step (its argument is the text below); a tap on the one
+ * that is selected falls through to what a tap does anyway. */
 static bool tap_node(const gesture_evt_t *g)
 {
     if (!g || g->kind != G_TAP || !s_working) return false;
@@ -657,7 +704,8 @@ bool ui_watch_act(nav_action_t a, const gesture_evt_t *g)
     switch (a) {
     case NAV_FOCUS: /* the deck's default action: Done also acknowledges */
     case NAV_PICK_RIM:
-        if (tap_node(g)) return true; /* the furthest node lies beyond the centre zone: its tap comes as a rim tap */
+        /* the furthest node lies beyond the centre zone: its tap comes as a rim tap */
+        if (tap_node(g)) return true;
         /* fall through */
     case NAV_SCRUB:
     case NAV_NEXT:
@@ -678,7 +726,8 @@ void ui_watch_tick(uint32_t now)
     render_time(s);
     if (s_v.count <= 0 || s_v.node[s_v.count - 1].state != STEP_RUNNING) return;
     bool anim = ui_animations_allowed();
-    if (anim != s_comet_on) { /* animations were switched: the ring is whole when still, a comet when not */
+    if (anim != s_comet_on) {
+        /* animations were switched: the ring is whole when still, a comet when not */
         s_comet_on = anim;
         lane_inv(UI_CX - HERO_R - 2, -HERO_R - 2, UI_CX + HERO_R + 2, HERO_R + 2);
     }
@@ -696,7 +745,8 @@ void ui_watch_report(ui_report_t *r)
     r->sel_sid = s_sid;
     snprintf(r->screen, sizeof r->screen, "watch");
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
-    for (int i = 0; i < s_rows; i++) ui_report_add(r, "%s[%s] %s", s_v.sel == i ? "> " : "", s_mark_txt[i], s_row_txt[i]);
+    for (int i = 0; i < s_rows; i++)
+        ui_report_add(r, "%s[%s] %s", s_v.sel == i ? "> " : "", s_mark_txt[i], s_row_txt[i]);
     if (s_working && s_tool_txt[0]) ui_report_add(r, "%s", s_tool_txt);
     if (s_working && s_arg_txt[0]) ui_report_add(r, "%s", s_arg_txt);
     if (!s_working && s_word_txt[0]) ui_report_add(r, "%s", s_word_txt);
@@ -756,13 +806,16 @@ lv_obj_t *ui_watch_init(lv_obj_t *screen)
     s_hero = ui_glyph_create(s_root, FONT_ICON_HERO, UI_CX, STATE_Y);
     ui_done_watch_create(s_root, DONE_ROW_Y);
 
-    /* rule 6: A brings the session's terminal to the front (the desktop, as on the deck), B is the next session */
+    /* rule 6: A brings the session's terminal to the front (the desktop, as on the deck), B is the
+     * next session */
     static const char *const words[2] = {"Open", "Next"};
     for (int i = 0; i < 2; i++)
-        s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, 0, 0, &s_key[i], &s_word[i]);
+        s_badge[i] = theme_key_badge(s_root, i == 0 ? "A" : "B", words[i], i == 0, 0, 0, &s_key[i],
+                                     &s_word[i]);
     ui_key_hint_set(s_badge[0], ICON_COMPUTER);
     lv_obj_t *hide[] = {s_lane, s_tally, s_line1, s_line2, s_dots, s_hero};
-    for (size_t i = 0; i < sizeof hide / sizeof hide[0]; i++) lv_obj_add_flag(hide[i], LV_OBJ_FLAG_HIDDEN);
+    for (size_t i = 0; i < sizeof hide / sizeof hide[0]; i++)
+        lv_obj_add_flag(hide[i], LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     return s_root;
 }

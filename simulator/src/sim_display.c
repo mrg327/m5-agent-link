@@ -22,7 +22,10 @@ static SDL_Window *s_win;
 static SDL_Renderer *s_rend;
 static SDL_Texture *s_tex;
 
-static struct { bool down; int x, y; } s_ptr;
+static struct {
+    bool down;
+    int x, y;
+} s_ptr;
 
 void sim_display_set_headless(bool headless) { s_headless = headless; }
 bool sim_display_quit_requested(void) { return s_quit; }
@@ -55,8 +58,8 @@ int sim_fb_flipped_match_pct(void)
     return (int)(same * 100 / (W * H));
 }
 
-/* Like the watch's flush: a UI turned by 180 degrees is reversed pixel for pixel and its area mirrored, so the
- * framebuffer (and the PNG) hold what the glass would show. */
+/* Like the watch's flush: a UI turned by 180 degrees is reversed pixel for pixel and its area
+ * mirrored, so the framebuffer (and the PNG) hold what the glass would show. */
 static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px)
 {
     lv_area_t rot = *area;
@@ -90,9 +93,14 @@ lv_display_t *hal_display_create(void)
 {
     if (!s_headless) {
         SDL_Init(SDL_INIT_VIDEO);
-        s_win = SDL_CreateWindow("m5-agent-link simulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, W, H, 0);
-        s_rend = s_win ? SDL_CreateRenderer(s_win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC) : NULL;
-        s_tex = s_rend ? SDL_CreateTexture(s_rend, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, W, H) : NULL;
+        s_win = SDL_CreateWindow("m5-agent-link simulator", SDL_WINDOWPOS_CENTERED,
+                                 SDL_WINDOWPOS_CENTERED, W, H, 0);
+        s_rend = s_win ? SDL_CreateRenderer(s_win, -1,
+                                            SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC)
+                       : NULL;
+        s_tex = s_rend ? SDL_CreateTexture(s_rend, SDL_PIXELFORMAT_ARGB8888,
+                                           SDL_TEXTUREACCESS_STREAMING, W, H)
+                       : NULL;
         if (!s_tex) {
             sim_log("sdl_failed", "\"error\":\"%s\"", SDL_GetError());
             s_headless = true; /* keep running without a window rather than dying */
@@ -120,10 +128,15 @@ void hal_display_set_power(bool on)
     s_power = on;
     s_dirty = true;
 }
-void hal_display_set_brightness(uint8_t level) { s_brightness = level; s_dirty = true; }
+void hal_display_set_brightness(uint8_t level)
+{
+    s_brightness = level;
+    s_dirty = true;
+}
 void hal_display_set_rotation_180(bool flipped)
 {
-    if (s_disp) lv_display_set_rotation(s_disp, flipped ? LV_DISPLAY_ROTATION_180 : LV_DISPLAY_ROTATION_0);
+    if (s_disp)
+        lv_display_set_rotation(s_disp, flipped ? LV_DISPLAY_ROTATION_180 : LV_DISPLAY_ROTATION_0);
 }
 
 size_t hal_display_snapshot(uint32_t offset, uint8_t *dst, size_t max_len)
@@ -131,7 +144,8 @@ size_t hal_display_snapshot(uint32_t offset, uint8_t *dst, size_t max_len)
     size_t total = sizeof s_fb;
     if (offset >= total) return 0;
     size_t n = total - offset < max_len ? total - offset : max_len;
-    memcpy(dst, (const uint8_t *)s_fb + offset, n); /* host is little-endian, matching the wire format */
+    /* host is little-endian, matching the wire format */
+    memcpy(dst, (const uint8_t *)s_fb + offset, n);
     return n;
 }
 
@@ -149,7 +163,8 @@ static void present(void)
             if (in_circle(x, y)) {
                 c = s_power ? rgb565_to_rgb888(s_fb[y * W + x]) : 0;
                 if (s_power && s_brightness < 255) {
-                    uint32_t r = (c >> 16 & 0xff) * s_brightness / 255, g = (c >> 8 & 0xff) * s_brightness / 255,
+                    uint32_t r = (c >> 16 & 0xff) * s_brightness / 255,
+                             g = (c >> 8 & 0xff) * s_brightness / 255,
                              b = (c & 0xff) * s_brightness / 255;
                     c = r << 16 | g << 8 | b;
                 }
@@ -187,7 +202,8 @@ void sim_display_pump(void)
             if (e.button.button == SDL_BUTTON_LEFT) sim_input_pointer(true, e.button.x, e.button.y);
             break;
         case SDL_MOUSEBUTTONUP:
-            if (e.button.button == SDL_BUTTON_LEFT) sim_input_pointer(false, e.button.x, e.button.y);
+            if (e.button.button == SDL_BUTTON_LEFT)
+                sim_input_pointer(false, e.button.x, e.button.y);
             break;
         case SDL_MOUSEMOTION:
             if (s_ptr.down) sim_input_pointer(true, e.motion.x, e.motion.y);

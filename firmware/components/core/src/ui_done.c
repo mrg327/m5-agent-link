@@ -1,18 +1,22 @@
-/* The done summary in Sigil (docs/design/GLYPHS.md §5 DONE, docs/design/DONE-SUMMARY.md): what a finished turn
- * did, as one row of marks and not a word.
+/* The done summary in Sigil (docs/design/GLYPHS.md §5 DONE, docs/design/DONE-SUMMARY.md): what a
+ * finished turn did, as one row of marks and not a word.
  *
  *   files   the files glyph with their count in a badge at its corner (a count: rule 4)
- *   lines   a two-colour bar, green for added and vermillion for removed, split in their proportion; its length
- *           steps with the size of the change (a digit more of lines, a step longer)
- *   tests   the flask with a tick in a green dot, or the flask in the error colour with a cross in a red one
- *   time    the timer glyph and the turn's minutes as a tally (ui_kit.h); under a minute the glyph alone
+ *   lines   a two-colour bar, green for added and vermillion for removed, split in their
+ *           proportion; its length steps with the size of the change (a digit more of lines, a step
+ *           longer)
+ *   tests   the flask with a tick in a green dot, or the flask in the error colour with a cross in
+ *           a red one
+ *   time    the timer glyph and the turn's minutes as a tally (ui_kit.h); under a minute the glyph
+ *           alone
  *
- * Which parts show is still decided by done.c's line (the report prints that line, in words: rule 9); the row
- * drops the same parts in the same order when its marks do not fit: the lines, the time, the files, never the
- * tests. One row object draws itself; the tally is its child. Redraw discipline (UI-V2 §8a): the row is
- * invalidated only when what it shows changes.
+ * Which parts show is still decided by done.c's line (the report prints that line, in words: rule
+ * 9); the row drops the same parts in the same order when its marks do not fit: the lines, the
+ * time, the files, never the tests. One row object draws itself; the tally is its child. Redraw
+ * discipline (UI-V2 §8a): the row is invalidated only when what it shows changes.
  *
- * Two rows exist: the session card's (ui_home_card.c, which places it by moving the parent it gave) and WATCH's. */
+ * Two rows exist: the session card's (ui_home_card.c, which places it by moving the parent it gave)
+ * and WATCH's. */
 #include <stdio.h>
 #include <string.h>
 
@@ -21,27 +25,30 @@
 #include "ui_kit.h"
 #include "ui_theme.h"
 
-#define DONE_Y 250       /* the card's row, in its parent: the card puts the parent so this lands under the hero */
-#define ROW_H 56         /* the object's height: the glyphs and the badges that hang below them */
-#define ROW_MAX_W 340    /* the chord at the row's lower edge, less a margin */
+/* the card's row, in its parent: the card puts the parent so this lands under the hero */
+#define DONE_Y 250
+#define ROW_H 56      /* the object's height: the glyphs and the badges that hang below them */
+#define ROW_MAX_W 340 /* the chord at the row's lower edge, less a margin */
 #define GLYPH_PX 44
-#define GLYPH_W 40       /* the room a glyph takes */
-#define GLYPH_DY (-3)    /* the glyphs sit a little above the row's centre: their badges hang below */
-#define GAP 16           /* between two parts */
-#define BADGE_H 24       /* the count badge: a pill at the glyph's lower right corner */
+#define GLYPH_W 40 /* the room a glyph takes */
+/* the glyphs sit a little above the row's centre: their badges hang below */
+#define GLYPH_DY (-3)
+#define GAP 16     /* between two parts */
+#define BADGE_H 24 /* the count badge: a pill at the glyph's lower right corner */
 #define BADGE_PAD 7
-#define BADGE_DX 23      /* its left edge, from the glyph's */
-#define BADGE_DY 11      /* its centre, below the row's */
-#define MARK_R 11        /* the tests' tick or cross: a dot at the flask's lower right */
+#define BADGE_DX 23 /* its left edge, from the glyph's */
+#define BADGE_DY 11 /* its centre, below the row's */
+#define MARK_R 11   /* the tests' tick or cross: a dot at the flask's lower right */
 #define MARK_DX 34
 #define BAR_H 10
 #define TALLY_GAP 6
-#define RING 2           /* the black line that parts a badge from its glyph */
+#define RING 2 /* the black line that parts a badge from its glyph */
 
 typedef struct {
     bool on[DONE_SEGS], pass, grey;
     uint32_t files, minutes;
-    int16_t bar_w, bar_add; /* the bar's length and its green part, px; bar_add < 0: nothing changed */
+    /* the bar's length and its green part, px; bar_add < 0: nothing changed */
+    int16_t bar_w, bar_add;
     int16_t w[DONE_SEGS], total;
 } view_t;
 
@@ -74,8 +81,8 @@ static int badge_w(uint32_t n)
     return w < BADGE_H ? BADGE_H : w;
 }
 
-/* The bar: 24 px for a change of under ten lines, 12 px more for each digit, up to 72. Each side that has lines
- * keeps at least 6 px. */
+/* The bar: 24 px for a change of under ten lines, 12 px more for each digit, up to 72. Each side
+ * that has lines keeps at least 6 px. */
 static void bar_of(const done_sum_t *d, view_t *v)
 {
     uint32_t total = d->added + d->removed;
@@ -131,7 +138,8 @@ static void row_draw(lv_event_t *e)
     lv_area_t a;
     lv_obj_get_coords(d->row, &a);
     int cy = (a.y1 + a.y2) / 2, x = (a.x1 + a.x2 + 1) / 2 - v->total / 2;
-    lv_color_t ink = v->grey ? COL_TEXT3 : COL_TEXT2, good = v->grey ? COL_TEXT3 : lv_color_hex(RGB_DONE),
+    lv_color_t ink = v->grey ? COL_TEXT3 : COL_TEXT2,
+               good = v->grey ? COL_TEXT3 : lv_color_hex(RGB_DONE),
                bad = v->grey ? COL_TEXT3 : lv_color_hex(RGB_ERROR);
     for (int i = 0; i < DONE_SEGS; i++) {
         if (!v->on[i]) continue;
@@ -141,7 +149,8 @@ static void row_draw(lv_event_t *e)
             int bw = badge_w(v->files), bx = x + BADGE_DX, by = cy + BADGE_DY;
             snprintf(t, sizeof t, "%u", (unsigned)v->files);
             ui_glyph_draw(l, FONT_ICON_L, ICON_FILES, gx, gy, ink, LV_OPA_COVER);
-            fill(l, bx - RING, by - BADGE_H / 2 - RING, bx + bw - 1 + RING, by + BADGE_H / 2 - 1 + RING, COL_BG);
+            fill(l, bx - RING, by - BADGE_H / 2 - RING, bx + bw - 1 + RING,
+                 by + BADGE_H / 2 - 1 + RING, COL_BG);
             fill(l, bx, by - BADGE_H / 2, bx + bw - 1, by + BADGE_H / 2 - 1, COL_FILL2);
             lv_draw_label_dsc_t td;
             lv_draw_label_dsc_init(&td);
@@ -164,9 +173,11 @@ static void row_draw(lv_event_t *e)
         } else if (i == DONE_TESTS) {
             int mx = x + MARK_DX, my = cy + BADGE_DY;
             ui_glyph_draw(l, FONT_ICON_L, ICON_G_TEST, gx, gy, v->pass ? ink : bad, LV_OPA_COVER);
-            fill(l, mx - MARK_R - RING, my - MARK_R - RING, mx + MARK_R + RING, my + MARK_R + RING, COL_BG);
+            fill(l, mx - MARK_R - RING, my - MARK_R - RING, mx + MARK_R + RING, my + MARK_R + RING,
+                 COL_BG);
             fill(l, mx - MARK_R, my - MARK_R, mx + MARK_R, my + MARK_R, v->pass ? good : bad);
-            ui_glyph_draw(l, FONT_ICON_S, v->pass ? ICON_CHECK : ICON_X, mx, my, COL_ON_ACCENT, LV_OPA_COVER);
+            ui_glyph_draw(l, FONT_ICON_S, v->pass ? ICON_CHECK : ICON_X, mx, my, COL_ON_ACCENT,
+                          LV_OPA_COVER);
         } else {
             ui_glyph_draw(l, FONT_ICON_L, ICON_TIMER, gx, cy, ink, LV_OPA_COVER);
         }
@@ -192,7 +203,8 @@ static void place_tally(done_row_t *d)
     ui_tally_set(d->tally, v->minutes, v->grey ? COL_TEXT3 : COL_TEXT2);
 }
 
-static void row_create(done_row_t *d, lv_obj_t *parent, int cy, int text_w, const lv_font_t *text_font)
+static void row_create(done_row_t *d, lv_obj_t *parent, int cy, int text_w,
+                       const lv_font_t *text_font)
 {
     d->cy = cy;
     d->text_w = text_w;
@@ -210,7 +222,8 @@ static void row_create(done_row_t *d, lv_obj_t *parent, int cy, int text_w, cons
 
 static bool row_update(done_row_t *d, const session_t *s, bool allowed, bool grey)
 {
-    bool on = allowed && s && (s->state == SESS_DONE || s->state == SESS_ERROR) && s->agent != AGENT_SHELL && done_known(&s->sum);
+    bool on = allowed && s && (s->state == SESS_DONE || s->state == SESS_ERROR) &&
+              s->agent != AGENT_SHELL && done_known(&s->sum);
     if (!on) {
         if (d->shown) {
             d->shown = false;
@@ -227,8 +240,8 @@ static bool row_update(done_row_t *d, const session_t *s, bool allowed, bool gre
     v.files = sum->files;
     v.minutes = sum->secs / 60;
     bar_of(sum, &v);
-    /* done.c decides which parts the line of words keeps; the marks then ask it for less, a step at a time, until
-     * they fit: the parts go in the same order on glass and in the report */
+    /* done.c decides which parts the line of words keeps; the marks then ask it for less, a step at
+     * a time, until they fit: the parts go in the same order on glass and in the report */
     done_line_t line;
     s_measure_font = d->text_font;
     for (int max_w = d->text_w;; max_w -= 16) {
@@ -237,7 +250,8 @@ static bool row_update(done_row_t *d, const session_t *s, bool allowed, bool gre
         widths(&v);
         if (v.total <= ROW_MAX_W || max_w <= 0) break;
     }
-    for (int i = 0; i < DONE_SEGS; i++) snprintf(d->words[i], sizeof d->words[i], "%.52s", line.on[i] ? line.txt[i] : "");
+    for (int i = 0; i < DONE_SEGS; i++)
+        snprintf(d->words[i], sizeof d->words[i], "%.52s", line.on[i] ? line.txt[i] : "");
     if (!d->shown || memcmp(&v, &d->v, sizeof v)) {
         d->v = v;
         lv_obj_invalidate(d->row);
@@ -252,9 +266,11 @@ static bool row_update(done_row_t *d, const session_t *s, bool allowed, bool gre
 
 /* ───────── the session card's row ───────── */
 
-void ui_done_create(lv_obj_t *centre) { row_create(&s_card, centre, DONE_Y, DONE_MAX_W, FONT_BODY); }
+void ui_done_create(lv_obj_t *centre)
+{ row_create(&s_card, centre, DONE_Y, DONE_MAX_W, FONT_BODY); }
 
-bool ui_done_update(const session_t *s, bool allowed, bool offline) { return row_update(&s_card, s, allowed, offline); }
+bool ui_done_update(const session_t *s, bool allowed, bool offline)
+{ return row_update(&s_card, s, allowed, offline); }
 
 /* Two entries (the report keeps few and short ones): files and lines, then tests and time. */
 void ui_done_report(ui_report_t *r)
@@ -272,9 +288,11 @@ void ui_done_report(ui_report_t *r)
 
 /* ───────── WATCH's row ───────── */
 
-void ui_done_watch_create(lv_obj_t *root, int cy) { row_create(&s_watch, root, cy, UI_DONE_WATCH_W, FONT_CAPTION); }
+void ui_done_watch_create(lv_obj_t *root, int cy)
+{ row_create(&s_watch, root, cy, UI_DONE_WATCH_W, FONT_CAPTION); }
 
-bool ui_done_watch_update(const session_t *s, bool allowed) { return row_update(&s_watch, s, allowed, false); }
+bool ui_done_watch_update(const session_t *s, bool allowed)
+{ return row_update(&s_watch, s, allowed, false); }
 
 /* One entry: the whole line, as WATCH's footer said it. */
 void ui_done_watch_report(ui_report_t *r)

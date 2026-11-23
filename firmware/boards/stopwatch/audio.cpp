@@ -1,11 +1,11 @@
-// Audio: the ES8311 codec (I2C 0x18 on the system bus) and I2S0, shared by the microphone
-// (mic.cpp) and the speaker (the AW8737A amp, driven by the task below).
-// The ESP32-S3 is the I2S master in full duplex at 16 kHz mono and drives MCLK at 256 x fs
-// (4.096 MHz); the codec is a slave and clocks its ADC and DAC from MCLK. The audio rail (IOE1
-// PYG3, PYB_AU_EN) powers the codec and the mic; IOE1 PYG10 (PYB_SPK_EN, and G14 per the
-// schematic) enables the amp. Register values follow Espressif's es8311 driver (esp_codec_dev).
-// sw_audio_on()/sw_audio_off() are reference counted: the first user powers everything up, the
-// last powers it down and frees the DMA buffers.
+/* Audio: the ES8311 codec (I2C 0x18 on the system bus) and I2S0, shared by the microphone
+ * (mic.cpp) and the speaker (the AW8737A amp, driven by the task below).
+ * The ESP32-S3 is the I2S master in full duplex at 16 kHz mono and drives MCLK at 256 x fs
+ * (4.096 MHz); the codec is a slave and clocks its ADC and DAC from MCLK. The audio rail (IOE1
+ * PYG3, PYB_AU_EN) powers the codec and the mic; IOE1 PYG10 (PYB_SPK_EN, and G14 per the
+ * schematic) enables the amp. Register values follow Espressif's es8311 driver (esp_codec_dev).
+ * sw_audio_on()/sw_audio_off() are reference counted: the first user powers everything up, the
+ * last powers it down and frees the DMA buffers. */
 
 #include <math.h>
 #include <stdarg.h>
@@ -27,7 +27,7 @@ static const char *TAG = "audio";
 #define ES8311_ADDR 0x18
 #define PIN_MCLK GPIO_NUM_18
 #define PIN_BCLK GPIO_NUM_17
-#define PIN_DIN GPIO_NUM_16  /* codec ASDOUT -> ESP (mic) */
+#define PIN_DIN GPIO_NUM_16 /* codec ASDOUT -> ESP (mic) */
 #define PIN_WS GPIO_NUM_15
 #define PIN_DOUT GPIO_NUM_21 /* ESP -> codec DSDIN (speaker) */
 #define DAC_VOLUME 0xBF      /* 0xBF = 0 dB, 0.5 dB per step */
@@ -79,23 +79,21 @@ static bool codec_init(void)
         {0x16, 0x24}, /* ADC: mic gain / sync defaults */
         {0x04, 0x10}, /* DAC OSR 16 */
         {0x05, 0x00}, /* ADC and DAC clock dividers 1 */
-        {0x0B, 0x00}, {0x0C, 0x00},
-        {0x10, 0x1F}, {0x11, 0x7F},
-        {0x00, 0x80}, /* reset off, slave mode, power on the state machine */
-        {0x01, 0x3F}, /* all clocks on, MCLK from the pin */
-        {0x13, 0x10}, /* output drive for the amp input */
-        {0x1B, 0x0A}, {0x1C, 0x6A}, /* ADC HPF and EQ bypass */
-        {0x0A, 0x0C}, /* serial data out (ADC): I2S, 16-bit */
-        {0x09, 0x0C}, /* serial data in (DAC): I2S, 16-bit, left slot */
-        {0x17, 0xBF}, /* ADC volume 0 dB */
-        {0x0E, 0x02}, /* power up the PGA and ADC modulator */
-        {0x12, 0x00}, /* power up the DAC */
-        {0x14, 0x1A}, /* analog mic on MIC1P/N, PGA +30 dB */
-        {0x0D, 0x01}, /* power up the analog circuits */
-        {0x15, 0x40}, /* ADC ramp rate */
-        {0x37, 0x08}, /* DAC EQ bypass */
-        {0x32, s_dac_vol},
-        {0x31, 0x00}, /* DAC unmuted */
+        {0x0B, 0x00},      {0x0C, 0x00}, {0x10, 0x1F},
+        {0x11, 0x7F},      {0x00, 0x80}, /* reset off, slave mode, power on the state machine */
+        {0x01, 0x3F},                    /* all clocks on, MCLK from the pin */
+        {0x13, 0x10},                    /* output drive for the amp input */
+        {0x1B, 0x0A},      {0x1C, 0x6A}, /* ADC HPF and EQ bypass */
+        {0x0A, 0x0C},                    /* serial data out (ADC): I2S, 16-bit */
+        {0x09, 0x0C},                    /* serial data in (DAC): I2S, 16-bit, left slot */
+        {0x17, 0xBF},                    /* ADC volume 0 dB */
+        {0x0E, 0x02},                    /* power up the PGA and ADC modulator */
+        {0x12, 0x00},                    /* power up the DAC */
+        {0x14, 0x1A},                    /* analog mic on MIC1P/N, PGA +30 dB */
+        {0x0D, 0x01},                    /* power up the analog circuits */
+        {0x15, 0x40},                    /* ADC ramp rate */
+        {0x37, 0x08},                    /* DAC EQ bypass */
+        {0x32, s_dac_vol}, {0x31, 0x00}, /* DAC unmuted */
     };
     for (size_t i = 0; i < sizeof seq / sizeof *seq; i++)
         if (!wr(seq[i][0], seq[i][1])) return false;
@@ -114,20 +112,23 @@ static bool i2s_init(void)
     i2s_chan_config_t ch = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
     ch.dma_desc_num = 6;
     ch.dma_frame_num = 320; /* 20 ms */
-    ch.auto_clear = true;   /* the DAC gets silence, not a looping buffer, when nothing is written */
+    /* the DAC gets silence, not a looping buffer, when nothing is written */
+    ch.auto_clear = true;
     esp_err_t e = i2s_new_channel(&ch, &s_tx, &s_rx);
     if (e != ESP_OK) return FAIL("i2s channel: %s", esp_err_to_name(e));
     i2s_std_config_t std = {};
     std.clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(HAL_AUDIO_RATE);
     std.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_256;
-    std.slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO);
+    std.slot_cfg =
+        I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO);
     std.slot_cfg.slot_mask = I2S_STD_SLOT_LEFT;
     std.gpio_cfg.mclk = PIN_MCLK;
     std.gpio_cfg.bclk = PIN_BCLK;
     std.gpio_cfg.ws = PIN_WS;
     std.gpio_cfg.dout = PIN_DOUT;
     std.gpio_cfg.din = PIN_DIN;
-    if ((e = i2s_channel_init_std_mode(s_tx, &std)) != ESP_OK || (e = i2s_channel_init_std_mode(s_rx, &std)) != ESP_OK) {
+    if ((e = i2s_channel_init_std_mode(s_tx, &std)) != ESP_OK ||
+        (e = i2s_channel_init_std_mode(s_rx, &std)) != ESP_OK) {
         i2s_free();
         return FAIL("i2s std mode: %s", esp_err_to_name(e));
     }
@@ -234,7 +235,8 @@ static void speaker_task(void *)
             on = false;
             continue;
         }
-        if (!p.n || sw_mic_active()) continue; /* a stop request; or the speaker would be heard in the dictation */
+        /* a stop request; or the speaker would be heard in the dictation */
+        if (!p.n || sw_mic_active()) continue;
         if (!on) {
             if (!sw_audio_on()) continue;
             amp(true);
@@ -245,7 +247,9 @@ static void speaker_task(void *)
         /* Stop early when a newer sound is waiting: it replaces this one. */
         for (size_t i = 0; i < p.n && !uxQueueMessagesWaiting(s_q);) {
             size_t k = p.n - i < CHUNK_SAMPLES ? p.n - i : CHUNK_SAMPLES, w = 0;
-            if (i2s_channel_write(s_tx, p.pcm + i, k * sizeof *p.pcm, &w, pdMS_TO_TICKS(200)) != ESP_OK) break;
+            if (i2s_channel_write(s_tx, p.pcm + i, k * sizeof *p.pcm, &w, pdMS_TO_TICKS(200)) !=
+                ESP_OK)
+                break;
             i += w / sizeof *p.pcm;
         }
     }
@@ -253,7 +257,8 @@ static void speaker_task(void *)
 
 extern "C" void hal_audio_play(const int16_t *pcm, size_t n)
 {
-    if (!pcm || !n) { /* stop: an empty item replaces whatever waits, and a sound in progress yields to it */
+    if (!pcm || !n) {
+        /* stop: an empty item replaces whatever waits, and a sound in progress yields to it */
         if (s_q) {
             play_t none = {NULL, 0};
             xQueueOverwrite(s_q, &none);
@@ -263,7 +268,8 @@ extern "C" void hal_audio_play(const int16_t *pcm, size_t n)
     if (!s_q) {
         lock_create();
         s_q = xQueueCreate(1, sizeof(play_t));
-        if (!s_q || xTaskCreatePinnedToCore(speaker_task, "spk", 3072, NULL, 5, NULL, 1) != pdPASS) {
+        if (!s_q ||
+            xTaskCreatePinnedToCore(speaker_task, "spk", 3072, NULL, 5, NULL, 1) != pdPASS) {
             ESP_LOGW(TAG, "no memory for the speaker task");
             if (s_q) vQueueDelete(s_q);
             s_q = NULL;
@@ -274,7 +280,8 @@ extern "C" void hal_audio_play(const int16_t *pcm, size_t n)
     xQueueOverwrite(s_q, &p);
 }
 
-/* 100 % is the codec's 0 dB; each halving of the percentage is -6 dB (12 steps of 0.5 dB). 0 mutes. */
+/* 100 % is the codec's 0 dB; each halving of the percentage is -6 dB (12 steps of 0.5 dB). 0
+ * mutes. */
 extern "C" void hal_audio_set_volume(uint8_t percent)
 {
     if (percent > 100) percent = 100;
@@ -283,6 +290,4 @@ extern "C" void hal_audio_set_volume(uint8_t percent)
 }
 
 extern "C" void *hal_audio_alloc(size_t bytes)
-{
-    return heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-}
+{ return heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT); }

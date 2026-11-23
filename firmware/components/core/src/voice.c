@@ -10,12 +10,13 @@
 #include "model.h"
 
 static const int16_t kStep[89] = {
-    7,     8,     9,     10,    11,    12,    13,    14,    16,    17,    19,    21,    23,    25,    28,
-    31,    34,    37,    41,    45,    50,    55,    60,    66,    73,    80,    88,    97,    107,   118,
-    130,   143,   157,   173,   190,   209,   230,   253,   279,   307,   337,   371,   408,   449,   494,
-    544,   598,   658,   724,   796,   876,   963,   1060,  1166,  1282,  1411,  1552,  1707,  1878,  2066,
-    2272,  2499,  2749,  3024,  3327,  3660,  4026,  4428,  4871,  5358,  5894,  6484,  7132,  7845,  8630,
-    9493,  10442, 11487, 12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767};
+    7,     8,     9,     10,    11,    12,    13,    14,    16,    17,    19,   21,    23,
+    25,    28,    31,    34,    37,    41,    45,    50,    55,    60,    66,   73,    80,
+    88,    97,    107,   118,   130,   143,   157,   173,   190,   209,   230,  253,   279,
+    307,   337,   371,   408,   449,   494,   544,   598,   658,   724,   796,  876,   963,
+    1060,  1166,  1282,  1411,  1552,  1707,  1878,  2066,  2272,  2499,  2749, 3024,  3327,
+    3660,  4026,  4428,  4871,  5358,  5894,  6484,  7132,  7845,  8630,  9493, 10442, 11487,
+    12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767};
 static const int8_t kIndexAdj[16] = {-1, -1, -1, -1, 2, 4, 6, 8, -1, -1, -1, -1, 2, 4, 6, 8};
 
 static uint8_t nibble(int sample, int *pred, int *index)
@@ -27,11 +28,22 @@ static uint8_t nibble(int sample, int *pred, int *index)
         diff = -diff;
     }
     int delta = step >> 3;
-    if (diff >= step) { code |= 4; diff -= step; delta += step; }
+    if (diff >= step) {
+        code |= 4;
+        diff -= step;
+        delta += step;
+    }
     step >>= 1;
-    if (diff >= step) { code |= 2; diff -= step; delta += step; }
+    if (diff >= step) {
+        code |= 2;
+        diff -= step;
+        delta += step;
+    }
     step >>= 1;
-    if (diff >= step) { code |= 1; delta += step; }
+    if (diff >= step) {
+        code |= 1;
+        delta += step;
+    }
     *pred += (code & 8) ? -delta : delta;
     if (*pred > 32767) *pred = 32767;
     if (*pred < -32768) *pred = -32768;
@@ -60,18 +72,19 @@ int voice_adpcm_block(const int16_t *pcm, int n, uint8_t *out, int *index_io)
     return len;
 }
 
-/* The recording waits here, encoded, for the link. The microphone makes 8 kB/s and a BLE central on a long
- * interval takes less (48.75 ms to a Linux machine: under 2 kB/s). Sending straight from the microphone loop
- * then never returned: the watch froze and recorded past VOICE_MAX_MS. So the microphone only fills this
- * queue, a tick sends from it for VOICE_SEND_BUDGET_US, and a stop drains it before the end is sent.
- * In PSRAM: a minute of blocks, and the second the microphone's own buffer holds. */
+/* The recording waits here, encoded, for the link. The microphone makes 8 kB/s and a BLE central on
+ * a long interval takes less (48.75 ms to a Linux machine: under 2 kB/s). Sending straight from the
+ * microphone loop then never returned: the watch froze and recorded past VOICE_MAX_MS. So the
+ * microphone only fills this queue, a tick sends from it for VOICE_SEND_BUDGET_US, and a stop
+ * drains it before the end is sent. In PSRAM: a minute of blocks, and the second the microphone's
+ * own buffer holds. */
 #define VOICE_Q_BLOCKS ((VOICE_MAX_MS + 1500) * (HAL_MIC_RATE / 1000) / VOICE_BLOCK_SAMPLES + 2)
 #define VOICE_SEND_BUDGET_US 20000
 MODEL_EXT_BSS static uint8_t s_q[VOICE_Q_BLOCKS][VOICE_BLOCK_BYTES];
 MODEL_EXT_BSS static uint8_t s_q_len[VOICE_Q_BLOCKS];
-static uint32_t s_q_n;   /* blocks encoded; s_seq of them are sent */
-static bool s_draining;  /* stopped, with blocks still to send: the end follows the last one */
-static bool s_bulk;      /* the link was asked for its short interval */
+static uint32_t s_q_n;  /* blocks encoded; s_seq of them are sent */
+static bool s_draining; /* stopped, with blocks still to send: the end follows the last one */
+static bool s_bulk;     /* the link was asked for its short interval */
 static hal_link_kind_t s_port;
 
 static voice_state_t s_state;
@@ -90,9 +103,11 @@ uint32_t voice_sid(void) { return s_sid; }
 int voice_level(void) { return s_level; }
 const char *voice_text(void) { return s_text; }
 const char *voice_error(void) { return s_err; }
-uint32_t voice_elapsed_ms(uint32_t now_ms) { return (s_state == VOICE_REC ? now_ms : s_t_end) - s_t0; }
+uint32_t voice_elapsed_ms(uint32_t now_ms)
+{ return (s_state == VOICE_REC ? now_ms : s_t_end) - s_t0; }
 
-/* A recording is the one time the watch sends in bulk: ask the link for its shortest interval meanwhile. */
+/* A recording is the one time the watch sends in bulk: ask the link for its shortest interval
+ * meanwhile. */
 static void bulk(bool on)
 {
     if (on == s_bulk) return;
@@ -114,15 +129,16 @@ static void fail(const char *why)
 static void flush_block(void)
 {
     if (s_have < 1) return;
-    if (s_q_n < VOICE_Q_BLOCKS) { /* full only past VOICE_MAX_MS, if a tick came very late: the rest is dropped */
+    if (s_q_n < VOICE_Q_BLOCKS) {
+        /* full only past VOICE_MAX_MS, if a tick came very late: the rest is dropped */
         s_q_len[s_q_n] = (uint8_t)voice_adpcm_block(s_pcm, s_have, s_q[s_q_n], &s_index);
         s_q_n++;
     }
     s_have = 0;
 }
 
-/* Sends queued blocks for one tick's budget. A send waits for the link (back-pressure), so one block can
- * take longer than the budget on a slow link; the loop still returns after it. */
+/* Sends queued blocks for one tick's budget. A send waits for the link (back-pressure), so one
+ * block can take longer than the budget on a slow link; the loop still returns after it. */
 static void send_queued(void)
 {
     uint64_t t0 = hal_time_us();
@@ -136,7 +152,8 @@ static void send_queued(void)
     }
 }
 
-/* After a stop: the rest of the queue, then the end. The daemon's time to transcribe counts from the end. */
+/* After a stop: the rest of the queue, then the end. The daemon's time to transcribe counts from
+ * the end. */
 static void drain(uint32_t now_ms)
 {
     send_queued();
@@ -154,7 +171,8 @@ bool voice_start(uint32_t sid, uint32_t now_ms)
 {
     if (s_state == VOICE_REC) return true;
     s_err = "";
-    s_aid = s_aid + 1 + (now_ms & 0xff); /* differs across boots: the daemon keys recordings by aid */
+    /* differs across boots: the daemon keys recordings by aid */
+    s_aid = s_aid + 1 + (now_ms & 0xff);
     s_sid = sid;
     s_seq = 0;
     s_q_n = 0;
@@ -169,7 +187,8 @@ bool voice_start(uint32_t sid, uint32_t now_ms)
         s_err = "No microphone";
         s_state = VOICE_FAILED;
         char msg[96];
-        snprintf(msg, sizeof msg, "mic start failed: %s", hal_board_info()->has_mic ? hal_mic_error() : "no mic");
+        snprintf(msg, sizeof msg, "mic start failed: %s",
+                 hal_board_info()->has_mic ? hal_mic_error() : "no mic");
         link_send_log(0, msg);
         return false;
     }
@@ -196,7 +215,8 @@ static void pull(void)
             if (++s_energy_n == HAL_MIC_RATE / 10) { /* 100 ms window */
                 int64_t mean = s_energy / s_energy_n;
                 int rms = 0;
-                while ((int64_t)(rms + 1) * (rms + 1) <= mean) rms += (rms < 64 ? 1 : rms / 16); /* rough sqrt */
+                /* rough sqrt */
+                while ((int64_t)(rms + 1) * (rms + 1) <= mean) rms += (rms < 64 ? 1 : rms / 16);
                 /* ~ -50 dBFS .. -10 dBFS onto 0..100 */
                 int lvl = rms <= 100 ? 0 : rms >= 10000 ? 100 : (rms - 100) * 100 / 9900;
                 s_level = lvl;
@@ -230,7 +250,8 @@ void voice_cancel(void)
 {
     if (s_state == VOICE_REC) hal_mic_stop();
     if (s_state == VOICE_REC || (s_state == VOICE_WAIT && s_draining))
-        link_send_audio_end(s_aid); /* the daemon transcribes what it got, and nothing ever sends it */
+        /* the daemon transcribes what it got, and nothing ever sends it */
+        link_send_audio_end(s_aid);
     bulk(false);
     s_draining = false;
     if (s_state != VOICE_IDLE) dbg_event("voice", "cancel", "\"aid\":%u", (unsigned)s_aid);
@@ -260,5 +281,6 @@ void voice_on_transcript(uint32_t aid, const char *text)
     }
     snprintf(s_text, sizeof s_text, "%s", text);
     s_state = VOICE_TEXT;
-    dbg_event("voice", "transcript", "\"aid\":%u,\"chars\":%u", (unsigned)aid, (unsigned)strlen(s_text));
+    dbg_event("voice", "transcript", "\"aid\":%u,\"chars\":%u", (unsigned)aid,
+              (unsigned)strlen(s_text));
 }

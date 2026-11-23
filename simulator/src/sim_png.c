@@ -40,8 +40,19 @@ bool sim_png_write(const char *path, const uint8_t *rgb, int w, int h)
     if (!f) return false;
     static const uint8_t sig[8] = {0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a};
     fwrite(sig, 1, 8, f);
-    uint8_t ihdr[13] = {(uint8_t)(w >> 24), (uint8_t)(w >> 16), (uint8_t)(w >> 8), (uint8_t)w,
-                        (uint8_t)(h >> 24), (uint8_t)(h >> 16), (uint8_t)(h >> 8), (uint8_t)h, 8, 2, 0, 0, 0};
+    uint8_t ihdr[13] = {(uint8_t)(w >> 24),
+                        (uint8_t)(w >> 16),
+                        (uint8_t)(w >> 8),
+                        (uint8_t)w,
+                        (uint8_t)(h >> 24),
+                        (uint8_t)(h >> 16),
+                        (uint8_t)(h >> 8),
+                        (uint8_t)h,
+                        8,
+                        2,
+                        0,
+                        0,
+                        0};
     chunk(f, "IHDR", ihdr, 13);
 
     /* Raw data: each scanline is a filter byte (0) followed by the pixels. */
@@ -64,7 +75,8 @@ bool sim_png_write(const char *path, const uint8_t *rgb, int w, int h)
         b = (b + a) % 65521;
         if (fill == sizeof block || i + 1 == raw_len) {
             bool last = i + 1 == raw_len;
-            uint8_t bh[5] = {last, (uint8_t)fill, (uint8_t)(fill >> 8), (uint8_t)~fill, (uint8_t)(~fill >> 8)};
+            uint8_t bh[5] = {last, (uint8_t)fill, (uint8_t)(fill >> 8), (uint8_t)~fill,
+                             (uint8_t)(~fill >> 8)};
             fwrite(bh, 1, 5, f);
             fwrite(block, 1, fill, f);
             crc = crc32_update(crc, bh, 5);

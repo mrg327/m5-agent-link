@@ -1,5 +1,5 @@
-// M5Stack StopWatch (C152) board support: power rails, I2C bus, PM1/IOE1, battery,
-// power states and identity. Links + debug channel live in link*.cpp.
+/* M5Stack StopWatch (C152) board support: power rails, I2C bus, PM1/IOE1, battery,
+ * power states and identity. Links + debug channel live in link*.cpp. */
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -56,17 +56,20 @@ const char *hal_reset_reason(void)
 }
 void hal_retained_set(uint32_t v) { s_retained = v; }
 
-/* The power report's unsent figures (power_report.c) and the start of a deep sleep, in RTC slow memory too. */
+/* The power report's unsent figures (power_report.c) and the start of a deep sleep, in RTC slow
+ * memory too. */
 static RTC_DATA_ATTR uint32_t s_retained_words[HAL_RETAINED_WORDS];
 uint32_t *hal_retained_words(void) { return s_retained_words; }
 #define DEEP_MARK 0x44454550u /* "DEEP": the two times below belong to a sleep that was entered */
 static RTC_DATA_ATTR uint32_t s_deep_mark;
-static RTC_DATA_ATTR uint64_t s_deep_rtc_us; /* the RTC timer: counts through deep sleep, on the internal RC */
-static RTC_DATA_ATTR uint32_t s_deep_unix;   /* the RX8130 clock (crystal), 0 if it was not set */
+/* the RTC timer: counts through deep sleep, on the internal RC */
+static RTC_DATA_ATTR uint64_t s_deep_rtc_us;
+static RTC_DATA_ATTR uint32_t s_deep_unix; /* the RX8130 clock (crystal), 0 if it was not set */
 static uint32_t s_slept_ms;
 
-/* At boot: how long the DEEP that ended here lasted. The RX8130 keeps crystal time but counts whole seconds;
- * the chip's RTC timer runs on the internal RC oscillator (a few % off). The crystal wins when both are set. */
+/* At boot: how long the DEEP that ended here lasted. The RX8130 keeps crystal time but counts whole
+ * seconds; the chip's RTC timer runs on the internal RC oscillator (a few % off). The crystal wins
+ * when both are set. */
 static void deep_slept_init(void)
 {
     if (s_deep_mark != DEEP_MARK) return;
@@ -79,7 +82,8 @@ static void deep_slept_init(void)
     uint64_t ms = rtc_ms;
     if (s_deep_unix && unix_now >= s_deep_unix) ms = (uint64_t)(unix_now - s_deep_unix) * 1000u;
     s_slept_ms = ms > UINT32_MAX ? UINT32_MAX : (uint32_t)ms;
-    ESP_LOGI(TAG, "deep sleep lasted %u ms (rtc timer %u ms)", (unsigned)s_slept_ms, (unsigned)rtc_ms);
+    ESP_LOGI(TAG, "deep sleep lasted %u ms (rtc timer %u ms)", (unsigned)s_slept_ms,
+             (unsigned)rtc_ms);
 }
 uint32_t hal_deep_slept_ms(void) { return s_slept_ms; }
 
@@ -107,9 +111,7 @@ static bool deep_sleep(uint32_t wake_after_s)
     /* Tap to wake: the CST820 pulls INT (G13, an RTC IO) low while touched. If it is low now (a
      * finger, or a line that idles low), leave it out rather than wake straight back up. */
     uint64_t mask = (1ULL << SW_PIN_BTN_A) | (1ULL << SW_PIN_BTN_B);
-    if (gpio_get_level((gpio_num_t)SW_PIN_TOUCH_INT) == 1) {
-        mask |= 1ULL << SW_PIN_TOUCH_INT;
-    }
+    if (gpio_get_level((gpio_num_t)SW_PIN_TOUCH_INT) == 1) { mask |= 1ULL << SW_PIN_TOUCH_INT; }
     hal_haptic_play(NULL, 0);
     vTaskDelay(pdMS_TO_TICKS(20));
     sw_ioe_motor_duty(0); /* IOE1 stays powered: a motor left on would run all night */
@@ -119,12 +121,8 @@ static bool deep_sleep(uint32_t wake_after_s)
         rtc_gpio_pulldown_dis(p);
     }
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON); /* keeps the pull-ups */
-    if (esp_sleep_enable_ext1_wakeup_io(mask, ESP_EXT1_WAKEUP_ANY_LOW) != ESP_OK) {
-        return false;
-    }
-    if (wake_after_s) {
-        esp_sleep_enable_timer_wakeup((uint64_t)wake_after_s * 1000000ULL);
-    }
+    if (esp_sleep_enable_ext1_wakeup_io(mask, ESP_EXT1_WAKEUP_ANY_LOW) != ESP_OK) { return false; }
+    if (wake_after_s) { esp_sleep_enable_timer_wakeup((uint64_t)wake_after_s * 1000000ULL); }
     char line[80];
     snprintf(line, sizeof(line), "{\"cat\":\"power\",\"ev\":\"deep_sleep\",\"wake_after_s\":%u}",
              (unsigned)wake_after_s);
@@ -137,10 +135,7 @@ static bool deep_sleep(uint32_t wake_after_s)
     return true; /* not reached */
 }
 
-i2c_master_bus_handle_t sw_i2c_bus(void)
-{
-    return s_bus;
-}
+i2c_master_bus_handle_t sw_i2c_bus(void) { return s_bus; }
 
 /* ───────────── I2C ───────────── */
 
@@ -177,10 +172,10 @@ static void info_init(void)
     s_info.height = SW_PANEL_H;
     s_info.color = true;
     s_info.has_touch = true;
-    s_info.has_imu = false;     /* set once the BMI270 answers (sw_imu_init) */
+    s_info.has_imu = false; /* set once the BMI270 answers (sw_imu_init) */
     s_info.has_haptic = true;
     s_info.has_speaker = true; /* ES8311 + AW8737A, audio.cpp */
-    s_info.has_mic = true; /* ES8311 + MEMS mic, mic.cpp */
+    s_info.has_mic = true;     /* ES8311 + MEMS mic, mic.cpp */
     s_info.has_battery = true;
     s_info.num_buttons = 2;
 }
@@ -195,7 +190,8 @@ void hal_board_init(void)
     ESP_ERROR_CHECK(err);
 
     info_init();
-    /* Rail bring-up order follows M5StopWatch-UserDemo: I2C -> PM1 -> IOE1 -> (50 ms) -> display -> touch. */
+    /* Rail bring-up order follows M5StopWatch-UserDemo: I2C -> PM1 -> IOE1 -> (50 ms) -> display ->
+     * touch. */
     i2c_init();
     sw_power_init(s_bus);
     vTaskDelay(pdMS_TO_TICKS(50));
@@ -207,17 +203,11 @@ void hal_board_init(void)
     ESP_LOGI(TAG, "board init done (ioe=%d)", sw_ioe_ok());
 }
 
-const hal_board_info_t *hal_board_info(void)
-{
-    return &s_info;
-}
+const hal_board_info_t *hal_board_info(void) { return &s_info; }
 
 /* ───────────── time ───────────── */
 
-uint64_t hal_time_us(void)
-{
-    return (uint64_t)esp_timer_get_time();
-}
+uint64_t hal_time_us(void) { return (uint64_t)esp_timer_get_time(); }
 
 /* ───────────── power & battery ───────────── */
 
@@ -225,7 +215,8 @@ hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s
 {
     (void)wake_after_s;
     /* Guard: nothing below may take USB Serial/JTAG away while a host is attached. */
-    if (state == HAL_POWER_DEEP && (usb_serial_jtag_is_connected() || hal_battery_read().usb_present)) {
+    if (state == HAL_POWER_DEEP &&
+        (usb_serial_jtag_is_connected() || hal_battery_read().usb_present)) {
         state = HAL_POWER_STANDBY;
     }
     switch (state) {
@@ -243,7 +234,8 @@ hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s
          * Touch stays awake: its INT line (G13) is a deep-sleep wake source, so a tap wakes too. */
         hal_display_set_power(false);
         if (!deep_sleep(wake_after_s)) {
-            state = HAL_POWER_STANDBY; /* a button is held: its release is input and wakes the display */
+            /* a button is held: its release is input and wakes the display */
+            state = HAL_POWER_STANDBY;
         }
         break;
     }
@@ -256,12 +248,8 @@ hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s
 
 static uint8_t mv_to_percent(uint16_t mv)
 {
-    if (mv <= 3300) {
-        return 0;
-    }
-    if (mv >= 4200) {
-        return 100;
-    }
+    if (mv <= 3300) { return 0; }
+    if (mv >= 4200) { return 100; }
     return (uint8_t)(((uint32_t)(mv - 3300) * 100U) / (4200 - 3300));
 }
 

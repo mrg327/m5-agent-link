@@ -24,9 +24,10 @@ void gesture_init(gesture_t *g, gesture_cb_t cb, void *ctx)
 const char *gesture_name(gesture_kind_t k)
 {
     static const char *const names[] = {
-        "press", "release", "tap", "double_tap", "long_press", "swipe_up", "swipe_down",
-        "swipe_left", "swipe_right", "btn_a", "btn_b", "btn_a_long", "btn_b_long", "lift", "shake",
-        "scrub_start", "scrub", "scrub_end", "btn_a_double", "chord", "drag", "drag_end", "move"};
+        "press",        "release",    "tap",         "double_tap",  "long_press", "swipe_up",
+        "swipe_down",   "swipe_left", "swipe_right", "btn_a",       "btn_b",      "btn_a_long",
+        "btn_b_long",   "lift",       "shake",       "scrub_start", "scrub",      "scrub_end",
+        "btn_a_double", "chord",      "drag",        "drag_end",    "move"};
     return (unsigned)k < sizeof names / sizeof *names ? names[k] : "?";
 }
 
@@ -62,7 +63,8 @@ bool gesture_scrubbing(const gesture_t *g) { return g->scrubbing; }
 
 void gesture_set_moves(gesture_t *g, bool on) { g->moves = on; }
 
-/* Trackpad stream: every sample's travel once the finger has left the tap slop, so a tap never moves. */
+/* Trackpad stream: every sample's travel once the finger has left the tap slop, so a tap never
+ * moves. */
 static void move_track(gesture_t *g, int x, int y)
 {
     if (!g->move_armed) {
@@ -76,7 +78,8 @@ static void move_track(gesture_t *g, int x, int y)
     if (!dx && !dy) return;
     g->move_x = (int16_t)x;
     g->move_y = (int16_t)y;
-    gesture_evt_t e = {.kind = G_MOVE, .x = (int16_t)x, .y = (int16_t)y, .dx = (int16_t)dx, .dy = (int16_t)dy};
+    gesture_evt_t e = {
+        .kind = G_MOVE, .x = (int16_t)x, .y = (int16_t)y, .dx = (int16_t)dx, .dy = (int16_t)dy};
     g->cb(&e, g->ctx);
 }
 
@@ -87,7 +90,8 @@ static void update_sector(gesture_t *g, float deg)
 {
     if (g->sectors < 2) return;
     float width = 360.0f / (float)g->sectors;
-    float hyst = (float)GESTURE_SCRUB_HYST_DEG < width / 3.0f ? (float)GESTURE_SCRUB_HYST_DEG : width / 3.0f;
+    float hyst =
+        (float)GESTURE_SCRUB_HYST_DEG < width / 3.0f ? (float)GESTURE_SCRUB_HYST_DEG : width / 3.0f;
     float centre = ((float)g->sector + 0.5f) * width;
     if (fabsf(wrap180(deg - centre)) <= width * 0.5f + hyst) return;
     int next = sector_of(g, deg);
@@ -122,7 +126,8 @@ static void hist_push(gesture_t *g, int x, int y, uint32_t t)
     if (g->hist_n < GESTURE_HIST) g->hist_n++;
 }
 
-/* Velocity over the oldest sample still inside the flick window, in px/s; 0 if the finger rested. */
+/* Velocity over the oldest sample still inside the flick window, in px/s; 0 if the finger
+ * rested. */
 static void release_vel(const gesture_t *g, uint32_t t_ms, float *vx, float *vy)
 {
     int best = -1;
@@ -154,7 +159,12 @@ static void drag_track(gesture_t *g, int y, uint32_t t_ms)
     int step = d / GESTURE_DRAG_STEP_PX * GESTURE_DRAG_STEP_PX;
     g->drag_y = (int16_t)(g->drag_y + step);
     g->dragging = true;
-    gesture_evt_t e = {.kind = G_DRAG, .x = g->x0, .y = g->y0, .dur_ms = t_ms - g->t_down, .dx = 0, .dy = (int16_t)step};
+    gesture_evt_t e = {.kind = G_DRAG,
+                       .x = g->x0,
+                       .y = g->y0,
+                       .dur_ms = t_ms - g->t_down,
+                       .dx = 0,
+                       .dy = (int16_t)step};
     g->cb(&e, g->ctx);
 }
 
@@ -172,18 +182,30 @@ static void finish_touch(gesture_t *g, uint32_t t_ms)
     release_vel(g, t_ms, &vx, &vy);
     if (g->dragging) {
         float v = vy < -32000.0f ? -32000.0f : vy > 32000.0f ? 32000.0f : vy;
-        gesture_evt_t e = {.kind = G_DRAG_END, .x = g->x0, .y = g->y0, .dur_ms = dur, .dx = (int16_t)(g->x - g->x0),
-                           .dy = (int16_t)(g->y - g->y0), .vy = (int16_t)v};
+        gesture_evt_t e = {.kind = G_DRAG_END,
+                           .x = g->x0,
+                           .y = g->y0,
+                           .dur_ms = dur,
+                           .dx = (int16_t)(g->x - g->x0),
+                           .dy = (int16_t)(g->y - g->y0),
+                           .vy = (int16_t)v};
         g->cb(&e, g->ctx);
     }
     if (g->long_fired) return;
 
     if (g->moved) {
         int dx = g->x - g->x0, dy = g->y - g->y0;
-        if (dur > GESTURE_SWIPE_MAX_MS || (abs(dx) < GESTURE_SWIPE_MIN_PX && abs(dy) < GESTURE_SWIPE_MIN_PX)) return;
+        if (dur > GESTURE_SWIPE_MAX_MS ||
+            (abs(dx) < GESTURE_SWIPE_MIN_PX && abs(dy) < GESTURE_SWIPE_MIN_PX))
+            return;
         gesture_kind_t k = abs(dx) > abs(dy) ? (dx > 0 ? G_SWIPE_RIGHT : G_SWIPE_LEFT)
                                              : (dy > 0 ? G_SWIPE_DOWN : G_SWIPE_UP);
-        gesture_evt_t e = {.kind = k, .x = g->x0, .y = g->y0, .dur_ms = dur, .dx = (int16_t)dx, .dy = (int16_t)dy,
+        gesture_evt_t e = {.kind = k,
+                           .x = g->x0,
+                           .y = g->y0,
+                           .dur_ms = dur,
+                           .dx = (int16_t)dx,
+                           .dy = (int16_t)dy,
                            .flick = sqrtf(vx * vx + vy * vy) >= GESTURE_FLICK_PX_PER_S};
         g->cb(&e, g->ctx);
         return;
@@ -213,7 +235,8 @@ void gesture_touch(gesture_t *g, bool down, int x, int y, uint32_t t_ms)
         g->x = (int16_t)x;
         g->y = (int16_t)y;
         hist_push(g, x, y, t_ms);
-        if (abs(x - g->x0) > GESTURE_TAP_SLOP_PX || abs(y - g->y0) > GESTURE_TAP_SLOP_PX) g->moved = true;
+        if (abs(x - g->x0) > GESTURE_TAP_SLOP_PX || abs(y - g->y0) > GESTURE_TAP_SLOP_PX)
+            g->moved = true;
         if (g->rim_candidate) rim_track(g, x, y);
         else if (g->centre_start) {
             drag_track(g, y, t_ms);

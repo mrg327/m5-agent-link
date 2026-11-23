@@ -1,22 +1,22 @@
-/* The VOICE screen in Sigil (docs/design/GLYPHS.md §5; issue 0ea9 for what it does): dictate a reply to one
- * session. Opened by Dictate at the end of the Reply list, or on ASK for a request that takes free text
- * (rid != 0: the transcript answers it). voice.c does the recording.
+/* The VOICE screen in Sigil (docs/design/GLYPHS.md §5; issue 0ea9 for what it does): dictate a
+ * reply to one session. Opened by Dictate at the end of the Reply list, or on ASK for a request
+ * that takes free text (rid != 0: the transcript answers it). voice.c does the recording.
  *
  * What is on the glass, top to bottom:
- *   - who hears it: the reply glyph beside the project's sigil (the question glyph when the words answer a
- *     question of a request);
- *   - listening: the microphone as the hero glyph, inside a ring that drains with the time left (60 s), with
- *     the loudness as waves leaving it left and right. A tap or A stops it;
+ *   - who hears it: the reply glyph beside the project's sigil (the question glyph when the words
+ *     answer a question of a request);
+ *   - listening: the microphone as the hero glyph, inside a ring that drains with the time left (60
+ *     s), with the loudness as waves leaving it left and right. A tap or A stops it;
  *   - transcribing: the microphone goes grey and one wave walks inwards;
- *   - the transcript (text: rule 1), five rows at a time, page pips under it, and one disc below: grey with
- *     the caret while pages are unread (a tap or A turns the page), then the primary disc in yellow with the
- *     paper plane (the tick when the words are one answer of several) inside the ring a hold fills. Only the
- *     1.2 s hold sends, and only once every page has been on screen and the text has been readable for a
- *     moment, so a hold never sends words the user was not shown;
+ *   - the transcript (text: rule 1), five rows at a time, page pips under it, and one disc below:
+ *     grey with the caret while pages are unread (a tap or A turns the page), then the primary disc
+ *     in yellow with the paper plane (the tick when the words are one answer of several) inside the
+ *     ring a hold fills. Only the 1.2 s hold sends, and only once every page has been on screen and
+ *     the text has been readable for a moment, so a hold never sends words the user was not shown;
  *   - failed: the reason as a sign of one or two glyphs, and the retry disc (a tap or A).
- * A tap where a hold is needed, or a hold while pages are unread, is answered on the control itself: the hold
- * ring lights up, or the caret disc does. Long swipe down, swipe right or B held discards.
- * The report names all of it in the words the screen used to show (rule 9). */
+ * A tap where a hold is needed, or a hold while pages are unread, is answered on the control
+ * itself: the hold ring lights up, or the caret disc does. Long swipe down, swipe right or B held
+ * discards. The report names all of it in the words the screen used to show (rule 9). */
 #include <stdio.h>
 #include <string.h>
 
@@ -33,39 +33,46 @@
 #define HEAD_SIGIL_R 22
 #define HEAD_GLYPH_X (UI_CX - 28) /* a 28 px glyph, a 10 px gap, the sigil: centred as a pair */
 #define HEAD_SIGIL_X (UI_CX + 19)
-#define HERO_Y 228        /* the microphone, its time ring and its waves share this centre */
-#define TIME_R 84         /* the ring that drains while recording */
+#define HERO_Y 228 /* the microphone, its time ring and its waves share this centre */
+#define TIME_R 84  /* the ring that drains while recording */
 #define TIME_W 4
-#define WAVE_R0 104       /* the loudness: four pairs of arcs, the outermost at r 155 */
+#define WAVE_R0 104 /* the loudness: four pairs of arcs, the outermost at r 155 */
 #define WAVE_PITCH 17
 #define WAVE_N 4
-#define WAVE_STEP_MS 170  /* transcribing: the lit wave moves in one step per this */
+#define WAVE_STEP_MS 170 /* transcribing: the lit wave moves in one step per this */
 #define TEXT_CY 166
-#define TEXT_W_MAX 330    /* as wide as the chord allows, at most this */
+#define TEXT_W_MAX 330 /* as wide as the chord allows, at most this */
 #define TEXT_LINES 5
 #define PIPS_Y 236
-#define DISC_Y 338        /* the send disc: with its hold ring it ends at r 197 */
-#define HOLD_RING (UI_DISC_R_PRIMARY + 11) /* the centre line of the disc's hold ring (ui_kit.c: 8 px out, 6 wide) */
-#define SIGN_Y 172        /* failed: the reason */
+#define DISC_Y 338 /* the send disc: with its hold ring it ends at r 197 */
+/* the centre line of the disc's hold ring (ui_kit.c: 8 px out, 6 wide) */
+#define HOLD_RING (UI_DISC_R_PRIMARY + 11)
+#define SIGN_Y 172 /* failed: the reason */
 #define RETRY_Y 312
-#define NUDGE_MS 1800     /* how long a control stays lit after the wrong gesture on it */
+#define NUDGE_MS 1800 /* how long a control stays lit after the wrong gesture on it */
 
 typedef enum { NUDGE_NONE, NUDGE_HOLD, NUDGE_READ } nudge_t;
 
-static lv_obj_t *s_root, *s_head, *s_sigil, *s_time, *s_waves, *s_hero, *s_box, *s_text, *s_pips, *s_track, *s_disc;
+static lv_obj_t *s_root, *s_head, *s_sigil, *s_time, *s_waves, *s_hero, *s_box, *s_text, *s_pips,
+    *s_track, *s_disc;
 static lv_obj_t *s_sign, *s_sign_big, *s_key_a;
 static char s_header_txt[64], s_low_txt[32], s_reason_txt[96];
 MODEL_EXT_BSS static char s_text_txt[VOICE_TEXT_MAX];
 static uint32_t s_sid, s_rid, s_now, s_text_since, s_wait_since, s_nudge_until;
-static bool s_queue; /* the hold sends the dictation with q (a working session: typed mid-turn, PROTOCOL §6d) */
-static int s_qi = -1;  /* >= 0: a free answer to that question of request s_rid (proto 0.18); the hold hands it to ASK */
-static bool s_qlast;   /* ... and it is the request's last question: the hold sends every answer ("Send", else "Use") */
+/* the hold sends the dictation with q (a working session: typed mid-turn, PROTOCOL §6d) */
+static bool s_queue;
+/* >= 0: a free answer to that question of request s_rid (proto 0.18); the hold hands it to ASK */
+static int s_qi = -1;
+/* ... and it is the request's last question: the hold sends every answer ("Send", else "Use") */
+static bool s_qlast;
 static voice_state_t s_shown = (voice_state_t)-1;
 static bool s_holding, s_ramp_started;
-static bool s_lock_press; /* a press while pages are unread: says so once it has lasted NAV_HOLD_SHOW_MS */
+/* a press while pages are unread: says so once it has lasted NAV_HOLD_SHOW_MS */
+static bool s_lock_press;
 static uint32_t s_hold_t0;
 static int s_page_i, s_pages;
-static bool s_read_all; /* the last page has been on screen: everything a hold would send has been shown */
+/* the last page has been on screen: everything a hold would send has been shown */
+static bool s_read_all;
 static nudge_t s_nudge;
 
 static void show(lv_obj_t *o, bool on)
@@ -75,7 +82,8 @@ static void show(lv_obj_t *o, bool on)
     else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
 }
 
-/* The hold fills the ring round the disc and, because the finger covers the disc, the bezel ring too. */
+/* The hold fills the ring round the disc and, because the finger covers the disc, the bezel ring
+ * too. */
 static void hold_progress(int permille)
 {
     ui_disc_set_hold(s_disc, permille);
@@ -93,10 +101,12 @@ static void hold_cancel(void)
 
 /* "Use": the words are one answer of several, handed to ASK; "Send": the hold sends. */
 static bool is_use(void) { return !s_queue && s_qi >= 0 && !s_qlast; }
-static const char *nudge_words(void) { return s_nudge == NUDGE_HOLD ? "Hold to send" : "Tap to read the rest"; }
+static const char *nudge_words(void)
+{ return s_nudge == NUDGE_HOLD ? "Hold to send" : "Tap to read the rest"; }
 
-/* The loudness (0..100) as lit waves, counted from the microphone. A square-root curve: speech sits at 10..30
- * of 100 and should still light two or three of the four. A quiet room lights none, so nothing repaints. */
+/* The loudness (0..100) as lit waves, counted from the microphone. A square-root curve: speech sits
+ * at 10..30 of 100 and should still light two or three of the four. A quiet room lights none, so
+ * nothing repaints. */
 static void set_level(int level)
 {
     level = level < 0 ? 0 : level > 100 ? 100 : level;
@@ -107,7 +117,8 @@ static void set_level(int level)
     ui_waves_set(s_waves, (1u << lit) - 1, lv_color_hex(RGB_ASK), COL_FILL2);
 }
 
-/* Transcribing: what was heard travels into the microphone, one wave at a time, then a beat of nothing. */
+/* Transcribing: what was heard travels into the microphone, one wave at a time, then a beat of
+ * nothing. */
 static void set_pulse(void)
 {
     unsigned mask = 1; /* animations off: the innermost wave, still */
@@ -118,8 +129,8 @@ static void set_pulse(void)
     ui_waves_set(s_waves, mask, lv_color_hex(RGB_ASK), COL_FILL1);
 }
 
-/* The transcript, centred on TEXT_CY: FONT_BODY in a box as tall as the text, at most five lines. A longer
- * text is shown five lines at a time (the label slides up inside the clipping box). */
+/* The transcript, centred on TEXT_CY: FONT_BODY in a box as tall as the text, at most five lines. A
+ * longer text is shown five lines at a time (the label slides up inside the clipping box). */
 static void set_transcript(const char *t)
 {
     if (!strcmp(t, s_text_txt)) return;
@@ -141,20 +152,26 @@ static void set_transcript(const char *t)
     theme_set_text(s_text, s_text_txt, sizeof s_text_txt, t);
 }
 
-/* The one disc under the transcript, or under the reason. While pages are unread it is the small grey caret
- * ("More 1/3", which a tap answers); once every page has been shown it grows into the primary disc, in
- * yellow, inside the ring its hold fills ("Send" / "Use"). After a failure it is the retry ("Try again"). */
+/* The one disc under the transcript, or under the reason. While pages are unread it is the small
+ * grey caret ("More 1/3", which a tap answers); once every page has been shown it grows into the
+ * primary disc, in yellow, inside the ring its hold fills ("Send" / "Use"). After a failure it is
+ * the retry ("Try again"). */
 static void set_disc(voice_state_t st)
 {
     bool text = st == VOICE_TEXT, send = text && s_read_all;
     ui_disc_set_pos(s_disc, UI_CX, text ? DISC_Y : RETRY_Y);
     ui_disc_set_r(s_disc, send ? UI_DISC_R_PRIMARY : UI_DISC_R_SECONDARY);
-    ui_disc_set_glyph(s_disc, !text ? ICON_RETRY : !s_read_all ? ICON_CARET_DOWN : is_use() ? ICON_CHECK : ICON_SENT);
+    ui_disc_set_glyph(s_disc, !text         ? ICON_RETRY
+                              : !s_read_all ? ICON_CARET_DOWN
+                              : is_use()    ? ICON_CHECK
+                                            : ICON_SENT);
     /* a hold while pages are unread lights the caret: this is what to tap */
     ui_disc_set_rgb(s_disc, send || (text && s_nudge == NUDGE_READ) ? RGB_ASK : 0);
     /* the ring to fill: dim until a tap asks for the hold */
     show(s_track, send);
-    if (send) ui_arc_set(s_track, 0, COL_TEXT, s_nudge == NUDGE_HOLD ? lv_color_hex(RGB_ASK) : theme_dim(RGB_ASK, 30));
+    if (send)
+        ui_arc_set(s_track, 0, COL_TEXT,
+                   s_nudge == NUDGE_HOLD ? lv_color_hex(RGB_ASK) : theme_dim(RGB_ASK, 30));
     ui_pips_set(s_pips, text ? s_pages : 1, s_page_i);
 }
 
@@ -196,10 +213,13 @@ static void render(void)
     const session_t *s = model_find(s_sid);
     const char *base = s ? theme_basename(s->repo) : "";
     bool answer = !s_queue && s_qi >= 0;
-    snprintf(s_header_txt, sizeof s_header_txt, "%s %s", answer ? "Answer for" : "Reply to", base[0] ? base : "(no folder)");
+    snprintf(s_header_txt, sizeof s_header_txt, "%s %s", answer ? "Answer for" : "Reply to",
+             base[0] ? base : "(no folder)");
     ui_sigil_set_name(s_sigil, base);
-    ui_glyph_set(s_head, answer ? ICON_QUESTION : ICON_REPLY, answer ? lv_color_hex(RGB_ASK) : COL_TEXT2);
-    bool rec = st == VOICE_REC, wait = st == VOICE_WAIT, text = st == VOICE_TEXT, failed = !rec && !wait && !text;
+    ui_glyph_set(s_head, answer ? ICON_QUESTION : ICON_REPLY,
+                 answer ? lv_color_hex(RGB_ASK) : COL_TEXT2);
+    bool rec = st == VOICE_REC, wait = st == VOICE_WAIT, text = st == VOICE_TEXT,
+         failed = !rec && !wait && !text;
     if (st != s_shown) {
         if (text) s_text_since = s_now;
         if (wait) s_wait_since = s_now;
@@ -210,7 +230,7 @@ static void render(void)
         show(s_waves, rec || wait);
         show(s_time, rec);
         ui_glyph_set(s_hero, ICON_MIC, rec ? lv_color_hex(RGB_ASK) : COL_TEXT3);
-        if (text) { /* before the disc, which depends on the pages */
+        if (text) {            /* before the disc, which depends on the pages */
             s_text_txt[0] = 0; /* a retry that heard the same words starts on page one again */
             set_transcript(voice_text());
         }
@@ -223,11 +243,13 @@ static void render(void)
         else show(s_track, false);
         if (rec) set_level(0);
     }
-    const char *key = ""; /* what A does: stop, the next page, try again; nothing while waiting or once all is read */
+    /* what A does: stop, the next page, try again; nothing while waiting or once all is read */
+    const char *key = "";
     switch (st) {
     case VOICE_REC: {
         uint32_t ms = voice_elapsed_ms(s_now);
-        snprintf(s_low_txt, sizeof s_low_txt, "%u:%02u", (unsigned)(ms / 60000), (unsigned)(ms / 1000 % 60));
+        snprintf(s_low_txt, sizeof s_low_txt, "%u:%02u", (unsigned)(ms / 60000),
+                 (unsigned)(ms / 1000 % 60));
         int left = ms >= VOICE_MAX_MS ? 0 : (int)((VOICE_MAX_MS - ms) * 1000 / VOICE_MAX_MS);
         ui_arc_set(s_time, left, lv_color_hex(RGB_ASK), COL_FILL2);
         set_level(voice_level());
@@ -238,9 +260,7 @@ static void render(void)
         snprintf(s_low_txt, sizeof s_low_txt, "Transcribing\xe2\x80\xa6");
         set_pulse();
         break;
-    case VOICE_TEXT:
-        key = s_read_all ? "" : ICON_CARET_DOWN;
-        break;
+    case VOICE_TEXT: key = s_read_all ? "" : ICON_CARET_DOWN; break;
     case VOICE_FAILED:
     default:
         set_reason(voice_error()[0] ? voice_error() : "Not sent");
@@ -271,7 +291,8 @@ void ui_voice_open(uint32_t sid, uint32_t rid, bool queue, int qi, bool last, ui
     voice_start(sid, now); /* a refusal shows as the failed state with its reason */
     render();
     show(s_root, true);
-    dbg_event("ui", "voice", "\"sid\":%u,\"rid\":%u,\"state\":%d", (unsigned)sid, (unsigned)rid, (int)voice_state());
+    dbg_event("ui", "voice", "\"sid\":%u,\"rid\":%u,\"state\":%d", (unsigned)sid, (unsigned)rid,
+              (int)voice_state());
 }
 
 uint32_t ui_voice_rid(void) { return s_rid; }
@@ -290,7 +311,8 @@ bool ui_voice_refresh(uint32_t now)
     s_now = now;
     const session_t *s = model_find(s_sid);
     if (!s || s->state == SESS_ENDED) return false;
-    if (s_rid && !model_attention_find(s_rid)) return false; /* the request was answered elsewhere */
+    /* the request was answered elsewhere */
+    if (s_rid && !model_attention_find(s_rid)) return false;
     render();
     return true;
 }
@@ -317,8 +339,8 @@ bool ui_voice_act(nav_action_t a, const gesture_evt_t *g)
         render();
         return true;
     case NAV_HOLD_PRESS:
-        /* only the transcript arms a hold, only once all of it has been shown, and only once it has been
-         * readable for a moment */
+        /* only the transcript arms a hold, only once all of it has been shown, and only once it has
+         * been readable for a moment */
         if (st == VOICE_TEXT && !s_read_all) {
             s_lock_press = true;
             s_hold_t0 = s_now;
@@ -344,7 +366,8 @@ bool ui_voice_tick(uint32_t now)
         s_nudge = NUDGE_NONE;
         if (voice_state() == VOICE_TEXT) set_disc(VOICE_TEXT);
     }
-    if (s_lock_press && now - s_hold_t0 >= NAV_HOLD_SHOW_MS) { /* a hold, not a tap: say why it does nothing */
+    if (s_lock_press && now - s_hold_t0 >= NAV_HOLD_SHOW_MS) {
+        /* a hold, not a tap: say why it does nothing */
         s_lock_press = false;
         nudge(NUDGE_READ);
         dbg_event("ui", "voice_locked", "\"pages\":%d", s_pages);
@@ -365,10 +388,12 @@ bool ui_voice_tick(uint32_t now)
         if (el >= NAV_HOLD_MS) {
             s_holding = s_ramp_started = false;
             hold_progress(0);
-            if (s_qi >= 0) { /* "Other": the recording is this question's answer; ASK sends them all */
+            if (s_qi >= 0) {
+                /* "Other": the recording is this question's answer; ASK sends them all */
                 uint32_t aid = voice_aid();
                 ui_ask_other_done(s_rid, s_qi, aid, el);
-                voice_cancel(); /* done with it on the device; the daemon keeps the transcript for the answer */
+                /* done with it on the device; the daemon keeps the transcript for the answer */
+                voice_cancel();
                 return true;
             }
             g_ui_actions->dictate(s_sid, s_rid, voice_aid(), el, s_queue);
@@ -385,13 +410,16 @@ void ui_voice_report(ui_report_t *r)
     r->has_sel_sid = true;
     r->sel_sid = s_sid;
     voice_state_t st = voice_state();
-    if (s_nudge != NUDGE_NONE && st == VOICE_TEXT) ui_report_add(r, "%s", nudge_words()); /* the lit control */
+    /* the lit control */
+    if (s_nudge != NUDGE_NONE && st == VOICE_TEXT) ui_report_add(r, "%s", nudge_words());
     if (s_header_txt[0]) ui_report_add(r, "%s", s_header_txt);
     if (s_low_txt[0] && (st == VOICE_REC || st == VOICE_WAIT)) ui_report_add(r, "%s", s_low_txt);
     if (st == VOICE_TEXT) ui_report_add(r, "(transcript)");
     if (st == VOICE_FAILED) ui_report_add(r, "%s", s_reason_txt);
-    if (st == VOICE_TEXT && !s_read_all) ui_report_add(r, "More %d/%d", s_page_i + 1, s_pages); /* the disc */
-    else if (st == VOICE_TEXT || st == VOICE_FAILED) ui_report_add(r, "%s", st == VOICE_TEXT ? (is_use() ? "Use" : "Send") : "Try again");
+    /* the disc */
+    if (st == VOICE_TEXT && !s_read_all) ui_report_add(r, "More %d/%d", s_page_i + 1, s_pages);
+    else if (st == VOICE_TEXT || st == VOICE_FAILED)
+        ui_report_add(r, "%s", st == VOICE_TEXT ? (is_use() ? "Use" : "Send") : "Try again");
 }
 
 lv_obj_t *ui_voice_init(lv_obj_t *screen)
@@ -437,7 +465,9 @@ lv_obj_t *ui_voice_init(lv_obj_t *screen)
     /* rule 6: what A does. B has no hint here: a short press does nothing (held, it leaves) */
     s_key_a = ui_key_hint_create(s_root, UI_KEY_A);
 
-    lv_obj_t *hide[] = {s_time, s_waves, s_hero, s_box, s_pips, s_sign, s_sign_big, s_track, s_disc, s_key_a, s_root};
-    for (size_t i = 0; i < sizeof hide / sizeof hide[0]; i++) lv_obj_add_flag(hide[i], LV_OBJ_FLAG_HIDDEN);
+    lv_obj_t *hide[] = {s_time,     s_waves, s_hero, s_box,   s_pips, s_sign,
+                        s_sign_big, s_track, s_disc, s_key_a, s_root};
+    for (size_t i = 0; i < sizeof hide / sizeof hide[0]; i++)
+        lv_obj_add_flag(hide[i], LV_OBJ_FLAG_HIDDEN);
     return s_root;
 }

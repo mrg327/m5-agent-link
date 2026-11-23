@@ -22,12 +22,16 @@
 #define GESTURE_CX 233
 #define GESTURE_CY 233
 #define GESTURE_RIM_IN_PX 160
-#define GESTURE_RIM_OUT_PX 260      /* past the glass edge (r 233): a finger riding the bezel reads ~r 225-233 */
-#define GESTURE_RIM_TRACK_IN_PX 110 /* once started, the finger may drift this far in or out of the annulus */
+/* past the glass edge (r 233): a finger riding the bezel reads ~r 225-233 */
+#define GESTURE_RIM_OUT_PX 260
+/* once started, the finger may drift this far in or out of the annulus */
+#define GESTURE_RIM_TRACK_IN_PX 110
 #define GESTURE_RIM_TRACK_OUT_PX 340
-#define GESTURE_SCRUB_START_DEG 10  /* continuous arc before it counts as a scrub */
-#define GESTURE_SCRUB_HYST_DEG 5    /* how far past a sector boundary before switching (capped at a third of a sector) */
+#define GESTURE_SCRUB_START_DEG 10 /* continuous arc before it counts as a scrub */
+/* how far past a sector boundary before switching (capped at a third of a sector) */
+#define GESTURE_SCRUB_HYST_DEG 5
 
+/* clang-format off */
 typedef enum {
     G_PRESS, G_RELEASE,         /* raw finger down/up, for hold-to-confirm (dur_ms on release) */
     G_TAP,                      /* immediate on release; there is no double-tap any more */
@@ -41,22 +45,28 @@ typedef enum {
     G_SCRUB_END,                /* finger lifted after a scrub; x = last sector, y = angle */
     G_BTN_A_DOUBLE,             /* two A presses within GESTURE_BTN_DOUBLE_MS; a single A is delayed by that window */
     G_CHORD,                    /* A and B held together; the individual presses are swallowed */
-    G_DRAG,                     /* a finger that started inside the rim moved GESTURE_DRAG_STEP_PX more vertically:
-                                   x,y = press point, dy = the step (a multiple of the step size, up < 0) */
-    G_DRAG_END,                 /* finger lifted after at least one G_DRAG (before any swipe): x,y = press point,
-                                   dx,dy = whole travel, vy = vertical release speed in px/s (up < 0) */
-    G_MOVE                      /* only with gesture_set_moves(): a finger that started inside the rim and left the
-                                   tap slop moved; x,y = where it is, dx,dy = travel since the previous G_MOVE
-                                   (the first counts from where it left the slop). The trackpad (EXPERIMENTS.md) */
+    /* a finger that started inside the rim moved GESTURE_DRAG_STEP_PX more vertically:
+     *                                    x,y = press point, dy = the step (a multiple of the step size, up < 0) */
+    G_DRAG,
+    /* finger lifted after at least one G_DRAG (before any swipe): x,y = press point,
+     *                                    dx,dy = whole travel, vy = vertical release speed in px/s (up < 0) */
+    G_DRAG_END,
+    /* only with gesture_set_moves(): a finger that started inside the rim and left the
+     *                                    tap slop moved; x,y = where it is, dx,dy = travel since the previous G_MOVE
+     *                                    (the first counts from where it left the slop). The trackpad (EXPERIMENTS.md) */
+    G_MOVE
 } gesture_kind_t;
+/* clang-format on */
 
 typedef struct {
     gesture_kind_t kind;
-    int16_t x, y;               /* press point (touch), or see G_SCRUB* */
-    uint32_t dur_ms;            /* G_SCRUB*: arc swept so far, in degrees; drags and swipes: ms since the press */
-    int16_t dx, dy;             /* swipes: whole travel; G_DRAG: travel since the previous G_DRAG */
-    int16_t vy;                 /* G_DRAG_END: release velocity over GESTURE_FLICK_WINDOW_MS, px/s */
-    bool flick;                 /* swipes: released at flick speed */
+    int16_t x, y; /* press point (touch), or see G_SCRUB* */
+    /* G_SCRUB*: arc swept so far, in degrees; drags and swipes: ms since the press */
+    uint32_t dur_ms;
+    int16_t dx, dy; /* swipes: whole travel; G_DRAG: travel since the previous G_DRAG */
+    /* G_DRAG_END: release velocity over GESTURE_FLICK_WINDOW_MS, px/s */
+    int16_t vy;
+    bool flick; /* swipes: released at flick speed */
 } gesture_evt_t;
 
 typedef void (*gesture_cb_t)(const gesture_evt_t *evt, void *ctx);
@@ -66,7 +76,10 @@ typedef struct {
     uint32_t t_down;
 } gesture_btn_t;
 
-typedef struct { int16_t x, y; uint32_t t; } gesture_sample_t;
+typedef struct {
+    int16_t x, y;
+    uint32_t t;
+} gesture_sample_t;
 
 typedef struct {
     gesture_cb_t cb;
@@ -74,20 +87,23 @@ typedef struct {
     bool pressed, moved, long_fired;
     uint32_t t_down;
     int16_t x0, y0, x, y;
-    int sectors;                /* rim sectors, set by the UI; < 2 means scrub still starts but never changes sector */
+    /* rim sectors, set by the UI; < 2 means scrub still starts but never changes sector */
+    int sectors;
     bool rim_candidate, scrubbing;
     float last_deg, arc_deg;
     int sector;
-    bool centre_start, dragging; /* drag stream: press began inside the rim; at least one G_DRAG went out */
-    bool drag_armed;             /* the finger left the tap slop: drag steps count from drag_y */
-    int16_t drag_y;              /* y at the last G_DRAG */
-    bool moves;                  /* G_MOVE wanted (gesture_set_moves) */
-    bool move_armed;             /* the finger left the tap slop: G_MOVE counts from move_x/move_y */
-    int16_t move_x, move_y;      /* where the last G_MOVE left off */
+    /* drag stream: press began inside the rim; at least one G_DRAG went out */
+    bool centre_start, dragging;
+    bool drag_armed; /* the finger left the tap slop: drag steps count from drag_y */
+    int16_t drag_y;  /* y at the last G_DRAG */
+    bool moves;      /* G_MOVE wanted (gesture_set_moves) */
+    /* the finger left the tap slop: G_MOVE counts from move_x/move_y */
+    bool move_armed;
+    int16_t move_x, move_y;              /* where the last G_MOVE left off */
     gesture_sample_t hist[GESTURE_HIST]; /* recent samples, for the release speed */
     uint8_t hist_n, hist_i;
     gesture_btn_t btn[2];
-    bool a_pending;             /* A released once, waiting for a possible second press */
+    bool a_pending; /* A released once, waiting for a possible second press */
     uint32_t a_release_ms;
 } gesture_t;
 
@@ -101,7 +117,8 @@ void gesture_tick(gesture_t *g, uint32_t t_ms);
 /* Number of equal sectors around the rim (0 = 12 o'clock, clockwise). Safe to call mid-scrub. */
 void gesture_set_sectors(gesture_t *g, int n);
 bool gesture_scrubbing(const gesture_t *g);
-/* G_MOVE on every sample of a centre drag (the trackpad); off by default, the other screens need no stream. */
+/* G_MOVE on every sample of a centre drag (the trackpad); off by default, the other screens need no
+ * stream. */
 void gesture_set_moves(gesture_t *g, bool on);
 const char *gesture_name(gesture_kind_t k);
 /* Angle of a point around the centre, 0..360 degrees from 12 o'clock, clockwise; radius in px. */

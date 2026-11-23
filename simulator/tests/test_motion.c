@@ -4,7 +4,13 @@
 #include "motion.h"
 
 static int failures;
-#define EXPECT(cond, msg) do { if (!(cond)) { printf("FAIL: %s (line %d)\n", msg, __LINE__); failures++; } } while (0)
+#define EXPECT(cond, msg)                                  \
+    do {                                                   \
+        if (!(cond)) {                                     \
+            printf("FAIL: %s (line %d)\n", msg, __LINE__); \
+            failures++;                                    \
+        }                                                  \
+    } while (0)
 
 static uint32_t t;
 static int raises;
@@ -90,7 +96,8 @@ int main(void)
     motion_lift(t);
     EXPECT(!motion_take_raise(), "lift event ignored while face down");
 
-    /* orientation: 6 o'clock up for 1.5 s flips; mid-way stays; upright for 1.5 s flips back; flat never changes it */
+    /* orientation: 6 o'clock up for 1.5 s flips; mid-way stays; upright for 1.5 s flips back; flat
+     * never changes it */
     motion_reset();
     t = 0;
     pose(0, -1000, 0, 2000);

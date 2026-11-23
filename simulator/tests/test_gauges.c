@@ -1,17 +1,34 @@
-/* GAUGES.md on the device: when a usage figure may be shown (never a zero for "unknown"), the one buzz at
- * 80 %, and the words of the detail line and the AGENT readout. */
+/* GAUGES.md on the device: when a usage figure may be shown (never a zero for "unknown"), the one
+ * buzz at 80 %, and the words of the detail line and the AGENT readout. */
 #include <stdio.h>
 #include <string.h>
 
 #include "debug.h"
 #include "gauges.h"
 
-void dbg_event(const char *c, const char *e, const char *f, ...) { (void)c; (void)e; (void)f; }
-void dbg_event_at(dbg_level_t l, const char *c, const char *e, const char *f, ...) { (void)l; (void)c; (void)e; (void)f; }
+void dbg_event(const char *c, const char *e, const char *f, ...)
+{
+    (void)c;
+    (void)e;
+    (void)f;
+}
+void dbg_event_at(dbg_level_t l, const char *c, const char *e, const char *f, ...)
+{
+    (void)l;
+    (void)c;
+    (void)e;
+    (void)f;
+}
 const char *dbg_q(const char *s) { return s; }
 
 static int failures;
-#define EXPECT(cond, msg) do { if (!(cond)) { printf("FAIL: %s (line %d)\n", msg, __LINE__); failures++; } } while (0)
+#define EXPECT(cond, msg)                                  \
+    do {                                                   \
+        if (!(cond)) {                                     \
+            printf("FAIL: %s (line %d)\n", msg, __LINE__); \
+            failures++;                                    \
+        }                                                  \
+    } while (0)
 #define T0 1800000000u
 
 static usage_t reading(uint32_t at, int h5, uint32_t resets)
@@ -41,13 +58,15 @@ int main(void)
     EXPECT(!gauges_h5(T0 + GAUGES_STALE_S, &w), "an hour old: stale");
 
     /* the 80 % buzz: once, only on a crossing seen within one window */
-    usage_t a = reading(T0, 79, T0 + 3600), b = reading(T0 + 60, 80, T0 + 3600 + 30), c = reading(T0 + 120, 85, T0 + 3600);
+    usage_t a = reading(T0, 79, T0 + 3600), b = reading(T0 + 60, 80, T0 + 3600 + 30),
+            c = reading(T0 + 120, 85, T0 + 3600);
     EXPECT(gauges_should_warn(&a, &b), "79 -> 80 in the same window buzzes");
     EXPECT(!gauges_should_warn(&b, &c), "80 -> 85: already over");
     EXPECT(!gauges_should_warn(&a, &c), "and not twice in that window, whatever the order");
     usage_t none = {0}, hi = reading(T0, 90, T0 + 3600);
     EXPECT(!gauges_should_warn(&none, &hi), "connecting at 90 %: it never crossed in view");
-    usage_t next_lo = reading(T0 + 4000, 70, T0 + 4 * 3600), next_hi = reading(T0 + 5000, 81, T0 + 4 * 3600);
+    usage_t next_lo = reading(T0 + 4000, 70, T0 + 4 * 3600),
+            next_hi = reading(T0 + 5000, 81, T0 + 4 * 3600);
     EXPECT(!gauges_should_warn(&c, &next_lo), "a new window starts low");
     EXPECT(gauges_should_warn(&next_lo, &next_hi), "and buzzes again when it crosses");
     usage_t other = reading(T0, 79, T0 + 9000);
@@ -57,9 +76,12 @@ int main(void)
     usage_win_t tw = {true, 42, T0 + GAUGES_H5_S, 0};
     EXPECT(gauges_window_pm(&tw, T0, GAUGES_H5_S) == 0, "the window has just begun");
     EXPECT(gauges_window_pm(&tw, T0 + GAUGES_H5_S / 2, GAUGES_H5_S) == 500, "half way");
-    EXPECT(gauges_window_pm(&tw, T0 + GAUGES_H5_S - 1800, GAUGES_H5_S) == 900, "half an hour before the reset");
-    EXPECT(gauges_window_pm(&tw, T0 + GAUGES_H5_S + 5, GAUGES_H5_S) == 1000, "past the reset: the end");
-    EXPECT(gauges_window_pm(&tw, T0 - 600, GAUGES_H5_S) == 0, "a reset further away than the window is long: the start");
+    EXPECT(gauges_window_pm(&tw, T0 + GAUGES_H5_S - 1800, GAUGES_H5_S) == 900,
+           "half an hour before the reset");
+    EXPECT(gauges_window_pm(&tw, T0 + GAUGES_H5_S + 5, GAUGES_H5_S) == 1000,
+           "past the reset: the end");
+    EXPECT(gauges_window_pm(&tw, T0 - 600, GAUGES_H5_S) == 0,
+           "a reset further away than the window is long: the start");
 
     /* words */
     char buf[64];

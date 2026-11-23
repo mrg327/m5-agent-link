@@ -1,0 +1,29 @@
+# C and C++ style: docs/conventions/c.md, measured in docs/conventions/tooling.md §1.
+# Pinned formatter: uvx --from clang-format==23.1.5 clang-format (needs 20 or later).
+BasedOnStyle: LLVM
+IndentWidth: 4
+ContinuationIndentWidth: 4
+UseTab: Never
+ColumnLimit: 100
+PointerAlignment: Right
+DerivePointerAlignment: false
+BreakBeforeBraces: Linux
+IndentCaseLabels: false
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Always
+AllowShortFunctionsOnASingleLine: All
+AllowShortEnumsOnASingleLine: true
+AllowShortRecordOnASingleLine: Always
+AlignAfterOpenBracket: Align
+# Always, not the measured Leave: in 23.1.5 Leave drops a hand-aligned gap to one space once any
+# comment earlier in the file reaches the column limit, and is not stable across runs.
+AlignTrailingComments: {Kind: Always, OverEmptyLines: 0}
+AlignEscapedNewlines: Left
+SortIncludes: Never
+IncludeBlocks: Preserve
+SpaceBeforeParens: ControlStatements
+ReflowComments: true
+MaxEmptyLinesToKeep: 2
+InsertBraces: false

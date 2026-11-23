@@ -1,8 +1,8 @@
-/* The HOME deck (docs/design/UI-V2.md §4.1): one session card in the centre, a thin pinned index ring
- * at the rim. This file owns the slots (pinned order, merged Done groups), the selection, the actions
- * the interaction layer (nav.c) hands it, the nag and the ambient timer; the card itself is drawn by
- * ui_home_card.c. Nothing on the deck is destructive: a request shows its text here and is answered
- * on the ASK screen. */
+/* The HOME deck (docs/design/UI-V2.md §4.1): one session card in the centre, a thin pinned index
+ * ring at the rim. This file owns the slots (pinned order, merged Done groups), the selection, the
+ * actions the interaction layer (nav.c) hands it, the nag and the ambient timer; the card itself is
+ * drawn by ui_home_card.c. Nothing on the deck is destructive: a request shows its text here and is
+ * answered on the ASK screen. */
 #include <stdio.h>
 #include <string.h>
 
@@ -15,9 +15,10 @@
 #define MERGE_AT 9
 #define NAG_MS 15000
 #define NAG_MAX 3
-/* Reminders fit the answer window (ANSWER-WINDOW.md §5): NAG_MAX of them spread over it, at least NAG_MS
- * apart (a 60 s window: 15, 30, 45 s, as before; 300 s: 75, 150, 225 s), and none in its last NAG_TAIL_MS,
- * when the request is about to go back to the computer anyway. A request without a window: every NAG_MS. */
+/* Reminders fit the answer window (ANSWER-WINDOW.md §5): NAG_MAX of them spread over it, at least
+ * NAG_MS apart (a 60 s window: 15, 30, 45 s, as before; 300 s: 75, 150, 225 s), and none in its
+ * last NAG_TAIL_MS, when the request is about to go back to the computer anyway. A request without
+ * a window: every NAG_MS. */
 #define NAG_TAIL_MS 5000
 static uint32_t nag_gap(const attention_t *a)
 {
@@ -38,10 +39,7 @@ static bool s_ambient;
 static uint32_t s_nag_rid, s_nag_next;
 static int s_nag_n;
 
-static const session_t *sel_session(void)
-{
-    return s_has_sel ? model_find(s_sel_sid) : NULL;
-}
+static const session_t *sel_session(void) { return s_has_sel ? model_find(s_sel_sid) : NULL; }
 
 /* An unanswered permission or question for the session: what ASK would show. */
 static const attention_t *askable(const session_t *s)
@@ -51,7 +49,8 @@ static const attention_t *askable(const session_t *s)
     return a && (a->kind == ATT_APPROVAL || a->kind == ATT_QUESTION) && !a->answer_sent ? a : NULL;
 }
 
-/* The subset that can be approved, and so denied: the only state in which the deny swipe exists (on ASK). */
+/* The subset that can be approved, and so denied: the only state in which the deny swipe exists (on
+ * ASK). */
 static const attention_t *approvable(const session_t *s)
 {
     const attention_t *a = askable(s);
@@ -76,9 +75,7 @@ static void noted_input(void)
 }
 
 static bool before(const session_t *a, const session_t *b)
-{
-    return a->t0 != b->t0 ? a->t0 < b->t0 : a->sid < b->sid;
-}
+{ return a->t0 != b->t0 ? a->t0 < b->t0 : a->sid < b->sid; }
 
 /* ───────── slots ───────── */
 
@@ -96,7 +93,8 @@ static void rebuild(void)
         s_has_sel = n > 0;
         if (n) {
             s_sel_sid = l[0]->sid; /* the most urgent one */
-            dbg_event("ui", "select", "\"sid\":%u,\"idx\":-1,\"n\":%d,\"via\":\"auto\"", (unsigned)s_sel_sid, n);
+            dbg_event("ui", "select", "\"sid\":%u,\"idx\":-1,\"n\":%d,\"via\":\"auto\"",
+                      (unsigned)s_sel_sid, n);
         }
     }
     /* Pinned order: a session keeps its place however its state changes. */
@@ -112,7 +110,8 @@ static void rebuild(void)
     int ndone = 0;
     for (int i = 0; i < n; i++) ndone += l[i]->state == SESS_DONE;
     const session_t *sel = sel_session();
-    bool merge = n >= MERGE_AT && ndone >= 2 && !(sel && sel->state == SESS_DONE) && !s_freeze_expand;
+    bool merge =
+        n >= MERGE_AT && ndone >= 2 && !(sel && sel->state == SESS_DONE) && !s_freeze_expand;
 
     int old_n = s_n, m = 0;
     bool placed = false;
@@ -142,7 +141,8 @@ static void rebuild(void)
         segs[i].rgb = theme_session_rgb(s);
         segs[i].kind = (uint8_t)kind_of(s);
         segs[i].selected = i == s_sel && s_n > 0;
-        segs[i].dim = (s->state == SESS_DONE && (s->seen || s_slots[i].n_merged)) || model_session_snoozed(s, theme_now_unix());
+        segs[i].dim = (s->state == SESS_DONE && (s->seen || s_slots[i].n_merged)) ||
+                      model_session_snoozed(s, theme_now_unix());
     }
     ring_set(s_ring, segs, s_n, s_now);
 }
@@ -160,7 +160,8 @@ static bool select_idx(int i, const char *via, void (*haptic)(void))
     rebuild();
     ui_home_card_update();
     if (changed) {
-        dbg_event("ui", "select", "\"sid\":%u,\"idx\":%d,\"n\":%d,\"via\":\"%s\"", (unsigned)sid, s_sel, s_n, via);
+        dbg_event("ui", "select", "\"sid\":%u,\"idx\":%d,\"n\":%d,\"via\":\"%s\"", (unsigned)sid,
+                  s_sel, s_n, via);
         if (haptic) haptic();
     }
     return s_n != old_n;
@@ -180,7 +181,8 @@ void ui_home_select_sid(uint32_t sid, const char *via)
     s_has_sel = true;
     rebuild();
     ui_home_card_update();
-    dbg_event("ui", "select", "\"sid\":%u,\"idx\":%d,\"n\":%d,\"via\":\"%s\"", (unsigned)sid, s_sel, s_n, via);
+    dbg_event("ui", "select", "\"sid\":%u,\"idx\":%d,\"n\":%d,\"via\":\"%s\"", (unsigned)sid, s_sel,
+              s_n, via);
 }
 
 /* ───────── actions ───────── */
@@ -193,7 +195,8 @@ static void act_focus_selected(void)
         return;
     }
     g_ui_actions->focus(s->sid);
-    if (s->state == SESS_DONE) g_ui_actions->ack(s->sid); /* focusing a finished session also acknowledges it */
+    /* focusing a finished session also acknowledges it */
+    if (s->state == SESS_DONE) g_ui_actions->ack(s->sid);
 }
 
 static void next_attention(void)
@@ -204,7 +207,9 @@ static void next_attention(void)
             int i = (s_sel + k) % s_n;
             const session_t *s = model_find(s_slots[i].sid);
             if (!s || s_slots[i].n_merged) continue;
-            bool hit = cls == 0 ? s->state == SESS_INPUT : cls == 1 ? s->state == SESS_ERROR : (s->state == SESS_DONE && !s->seen);
+            bool hit = cls == 0   ? s->state == SESS_INPUT
+                       : cls == 1 ? s->state == SESS_ERROR
+                                  : (s->state == SESS_DONE && !s->seen);
             if (hit && s != sel) {
                 select_idx(i, "attention", g_ui_actions->tick);
                 return;
@@ -234,7 +239,8 @@ void ui_home_note_input(void) { noted_input(); }
 const session_t *ui_home_sel_session(void) { return sel_session(); }
 const home_slot_t *ui_home_sel_slot(void) { return s_n > 0 ? &s_slots[s_sel] : NULL; }
 int ui_home_slot_count(void) { return s_n; }
-/* What a rim drag means now: a dial through a list's items (AGENT, ASK, STATUS), or the session segments. */
+/* What a rim drag means now: a dial through a list's items (AGENT, ASK, STATUS), or the session
+ * segments. */
 void ui_home_rim_mode(bool dial)
 {
     s_rim_dial = dial;
@@ -252,15 +258,13 @@ void ui_home_set_card_shown(bool shown)
 }
 
 /* Acts on what the interaction layer decided (nav.c). No hold exists on the deck: approving means
- * opening ASK (NAV_OPEN_ASK, handled in ui.c) and holding there; deny lives there too (UI-V2 §3), so
- * the deck answers nothing. */
+ * opening ASK (NAV_OPEN_ASK, handled in ui.c) and holding there; deny lives there too (UI-V2 §3),
+ * so the deck answers nothing. */
 bool ui_home_act(nav_action_t a, const gesture_evt_t *g)
 {
     if (g->kind != G_LIFT && g->kind != G_SHAKE) noted_input();
     switch (a) {
-    case NAV_FOCUS:
-        act_focus_selected();
-        return true;
+    case NAV_FOCUS: act_focus_selected(); return true;
     case NAV_PICK_RIM: {
         int i = ring_hit(s_ring, g->x, g->y);
         if (i >= 0) select_idx(i, "tap", g_ui_actions->tick);
@@ -283,17 +287,10 @@ bool ui_home_act(nav_action_t a, const gesture_evt_t *g)
             select_idx(i < s_n ? i : s_n - 1, "scrub", NULL);
         }
         return true;
-    case NAV_NEXT_ATTENTION:
-        next_attention();
-        return true;
-    case NAV_NEXT:
-        step_selection(1, "btn");
-        return true;
-    case NAV_PREV:
-        step_selection(-1, "btn");
-        return true;
-    default:
-        return false; /* reserved or not for this screen */
+    case NAV_NEXT_ATTENTION: next_attention(); return true;
+    case NAV_NEXT: step_selection(1, "btn"); return true;
+    case NAV_PREV: step_selection(-1, "btn"); return true;
+    default: return false; /* reserved or not for this screen */
     }
 }
 

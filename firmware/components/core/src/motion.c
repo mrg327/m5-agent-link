@@ -5,8 +5,8 @@
 
 typedef struct {
     bool have;
-    int x, y, z;       /* last sample */
-    int fx, fy, fz;    /* mean of the last two samples: the pose */
+    int x, y, z;    /* last sample */
+    int fx, fy, fz; /* mean of the last two samples: the pose */
     uint32_t last_burst_ms;
     bool burst_seen;
     uint32_t last_big_ms; /* last sample-to-sample change over STILL_MG */
@@ -34,10 +34,13 @@ static motion_t s;
 
 void motion_reset(void) { memset(&s, 0, sizeof s); }
 
-static bool after(uint32_t now, uint32_t since, uint32_t ms) { return (int32_t)(now - since) >= (int32_t)ms; }
+static bool after(uint32_t now, uint32_t since, uint32_t ms)
+{ return (int32_t)(now - since) >= (int32_t)ms; }
 
-/* A change over STILL_MG after `since`: the watch moved while a pose was being timed, so the timing starts over. */
-static bool moved_since(uint32_t since) { return s.big_seen && (int32_t)(s.last_big_ms - since) > 0; }
+/* A change over STILL_MG after `since`: the watch moved while a pose was being timed, so the timing
+ * starts over. */
+static bool moved_since(uint32_t since)
+{ return s.big_seen && (int32_t)(s.last_big_ms - since) > 0; }
 
 static void update_face_down(uint32_t now)
 {

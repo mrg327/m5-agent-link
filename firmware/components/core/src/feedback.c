@@ -7,14 +7,15 @@
 
 #define DETENT_MIN_GAP_MS 45
 
-/* A watch lying face down is silent (MOTION.md): nothing buzzes or sounds until it is turned back. The
- * user's alert mode is not touched, so it applies again the moment the watch is lifted. */
+/* A watch lying face down is silent (MOTION.md): nothing buzzes or sounds until it is turned back.
+ * The user's alert mode is not touched, so it applies again the moment the watch is lifted. */
 static void haptic(const uint16_t *p, size_t n)
 {
     if (model_settings()->alert != ALERT_SILENT && !motion_face_down()) hal_haptic_play(p, n);
 }
 
-/* Speaker cues (roles in sound_bank.c); only in the full alert mode ("Sounds: on"), at the stored volume. */
+/* Speaker cues (roles in sound_bank.c); only in the full alert mode ("Sounds: on"), at the stored
+ * volume. */
 static void sound(const char *role)
 {
     if (model_settings()->alert != ALERT_FULL || motion_face_down() || !prefs_volume()) return;
@@ -22,7 +23,8 @@ static void sound(const char *role)
     sound_play(role);
 }
 
-/* Entry haptics follow docs/design/UI-RING.md §4. Normal pulses stay >= 35 ms: shorter ones do not spin the motor. */
+/* Entry haptics follow docs/design/UI-RING.md §4. Normal pulses stay >= 35 ms: shorter ones do not
+ * spin the motor. */
 void feedback_attention(att_kind_t kind)
 {
     static const uint16_t permission[] = {250, 120, 250};
@@ -30,10 +32,19 @@ void feedback_attention(att_kind_t kind)
     static const uint16_t error[] = {500};
     static const uint16_t done[] = {35};
     switch (kind) {
-    case ATT_APPROVAL: haptic(permission, 3); sound("input"); break;
-    case ATT_QUESTION: haptic(question, 3); sound("input"); break;
+    case ATT_APPROVAL:
+        haptic(permission, 3);
+        sound("input");
+        break;
+    case ATT_QUESTION:
+        haptic(question, 3);
+        sound("input");
+        break;
     case ATT_ERROR: haptic(error, 1); break;
-    case ATT_DONE: haptic(done, 1); sound("done"); break;
+    case ATT_DONE:
+        haptic(done, 1);
+        sound("done");
+        break;
     }
 }
 
@@ -43,7 +54,8 @@ void feedback_tick(void)
     haptic(tick, 1);
 }
 
-/* The board plays a pulse of at most 15 ms at the 100 % kick level only, which feels like a click. */
+/* The board plays a pulse of at most 15 ms at the 100 % kick level only, which feels like a
+ * click. */
 void feedback_detent(void)
 {
     static const uint16_t detent[] = {15};
@@ -61,7 +73,8 @@ void feedback_hold_ramp(void)
     haptic(ramp, sizeof ramp / sizeof ramp[0]);
 }
 
-/* Pulses shrink and the gaps grow: the opposite shape, so a deny hold feels different in the hand. */
+/* Pulses shrink and the gaps grow: the opposite shape, so a deny hold feels different in the
+ * hand. */
 void feedback_deny_ramp(void)
 {
     static const uint16_t deny_ramp[] = {100, 50, 80, 65, 65, 85, 55, 110, 45};
@@ -89,12 +102,9 @@ void feedback_denied(void)
     sound("denied");
 }
 
-/* The watch just booted a fresh OTA image and the daemon welcomed it: the "updated" flourish (no haptic).
- * Called once per update (ota.c), never on a power-on or a USB flash. */
-void feedback_updated(void)
-{
-    sound("updated");
-}
+/* The watch just booted a fresh OTA image and the daemon welcomed it: the "updated" flourish (no
+ * haptic). Called once per update (ota.c), never on a power-on or a USB flash. */
+void feedback_updated(void) { sound("updated"); }
 
 /* Three ticks: an answer went out that neither grants nor denies. */
 void feedback_reply_sent(void)
@@ -117,22 +127,25 @@ void feedback_scroll_stop(void)
     haptic(stop, 1);
 }
 
-/* Quiet mode toggled (UI-V2 §5): two spaced pulses, unlike the tick (one) and the reject (three). */
+/* Quiet mode toggled (UI-V2 §5): two spaced pulses, unlike the tick (one) and the reject
+ * (three). */
 void feedback_quiet_toggled(void)
 {
     static const uint16_t quiet[] = {35, 100, 35};
     haptic(quiet, 3);
 }
 
-/* Volume stepped on STATUS: the cue heard most (an agent asking) at the new level, so the user hears what
- * alerts will sound like; the tick confirms even where the speaker is held back (face down). */
+/* Volume stepped on STATUS: the cue heard most (an agent asking) at the new level, so the user
+ * hears what alerts will sound like; the tick confirms even where the speaker is held back (face
+ * down). */
 void feedback_volume_preview(void)
 {
     feedback_tick();
     sound("input");
 }
 
-/* A session finished (UI-V2 §5): done is two soft pulses with a long gap, error three firm pulses. */
+/* A session finished (UI-V2 §5): done is two soft pulses with a long gap, error three firm
+ * pulses. */
 void feedback_finished(bool error)
 {
     static const uint16_t done[] = {30, 200, 30};
@@ -155,10 +168,12 @@ void feedback_usage_warn(void)
 void feedback_hello(void)
 {
     static const uint16_t hello[] = {60};
-    hal_haptic_play(hello, 1); /* unconditional: proves the motor path regardless of the alert mode */
+    /* unconditional: proves the motor path regardless of the alert mode */
+    hal_haptic_play(hello, 1);
 }
 
-/* A palm cover: whatever buzz or sound is running stops. Nothing is stored; the next alert plays normally. */
+/* A palm cover: whatever buzz or sound is running stops. Nothing is stored; the next alert plays
+ * normally. */
 void feedback_silence_now(void)
 {
     hal_haptic_play(NULL, 0);

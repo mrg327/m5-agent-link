@@ -3,7 +3,8 @@
 
 #include "link_internal.h"
 
-MODEL_EXT_BSS static uint8_t s_txbuf[LINK_MAX_MSG]; /* encoded here, then copied by the transport: PSRAM */
+/* encoded here, then copied by the transport: PSRAM */
+MODEL_EXT_BSS static uint8_t s_txbuf[LINK_MAX_MSG];
 
 static uint32_t set_hdr(struct hdr_r *h, bool has_re, uint32_t re)
 {
@@ -24,15 +25,13 @@ static bool send_env(hal_link_kind_t to, const char *what)
     }
     bool ok = hal_link_send(to, s_txbuf, len);
     if (strcmp(what, "screenshot_chunk") != 0 && strcmp(what, "audio") != 0)
-        dbg_event("link", "tx", "\"msg\":\"%s\",\"id\":%u,\"len\":%u,\"sent\":%s", what, (unsigned)g_link.tx_id,
-                  (unsigned)len, ok ? "true" : "false");
+        dbg_event("link", "tx", "\"msg\":\"%s\",\"id\":%u,\"len\":%u,\"sent\":%s", what,
+                  (unsigned)g_link.tx_id, (unsigned)len, ok ? "true" : "false");
     return ok;
 }
 
 static struct zcbor_string zstr(const char *s)
-{
-    return (struct zcbor_string){.value = (const uint8_t *)s, .len = strlen(s)};
-}
+{ return (struct zcbor_string){.value = (const uint8_t *)s, .len = strlen(s)}; }
 
 static int device_class(const hal_board_info_t *bi)
 {
@@ -46,15 +45,19 @@ static void fill_caps(struct caps *c, const hal_board_info_t *bi)
     if (bi->has_display) {
         c->display_caps_m_present = true;
         struct display_caps *d = &c->display_caps_m.display_caps_m;
-        d->display_caps_disp_shape_m.disp_shape_choice = bi->shape == HAL_SHAPE_ROUND ? disp_shape_round_m_c : disp_shape_rect_m_c;
+        d->display_caps_disp_shape_m.disp_shape_choice =
+            bi->shape == HAL_SHAPE_ROUND ? disp_shape_round_m_c : disp_shape_rect_m_c;
         d->display_caps_uint1uint = bi->width;
         d->display_caps_uint2uint = bi->height;
         d->display_caps_uint3bool = bi->color;
     }
     size_t n = 0;
-    if (bi->has_touch) c->caps_input_kind_m_l_input_kind_m[n++].input_kind_choice = input_kind_touch_m_c;
-    if (bi->num_buttons) c->caps_input_kind_m_l_input_kind_m[n++].input_kind_choice = input_kind_btn_m_c;
-    if (bi->has_imu) c->caps_input_kind_m_l_input_kind_m[n++].input_kind_choice = input_kind_imu_m_c;
+    if (bi->has_touch)
+        c->caps_input_kind_m_l_input_kind_m[n++].input_kind_choice = input_kind_touch_m_c;
+    if (bi->num_buttons)
+        c->caps_input_kind_m_l_input_kind_m[n++].input_kind_choice = input_kind_btn_m_c;
+    if (bi->has_imu)
+        c->caps_input_kind_m_l_input_kind_m[n++].input_kind_choice = input_kind_imu_m_c;
     c->caps_input_kind_m_l_input_kind_m_count = n;
     if (bi->num_buttons) {
         c->caps_uint2uint_present = true;
@@ -65,13 +68,18 @@ static void fill_caps(struct caps *c, const hal_board_info_t *bi)
     c->caps_uint5bool = bi->has_mic;
     c->caps_uint6bool = bi->has_battery;
     c->caps_uint7uint = LINK_MAX_MSG;
-    /* Only features this firmware implements: voice when there is a mic, keys when there is a touch screen, no badge yet. */
-    static const int feats[] = {feature_focus_m_c, feature_ack_m_c, feature_approve_m_c, feature_reply_m_c,
-                                feature_debug_m_c, feature_scroll_m_c};
+    /* Only features this firmware implements: voice when there is a mic, keys when there is a touch
+     * screen, no badge yet. */
+    static const int feats[] = {feature_focus_m_c, feature_ack_m_c,   feature_approve_m_c,
+                                feature_reply_m_c, feature_debug_m_c, feature_scroll_m_c};
     n = 0;
-    for (size_t i = 0; i < sizeof feats / sizeof *feats; i++) c->caps_feature_m_l_feature_m[n++].feature_choice = feats[i];
-    if (bi->has_mic) c->caps_feature_m_l_feature_m[n++].feature_choice = feature_voice_m_c; /* dictation */
-    if (bi->has_touch && bi->has_display) c->caps_feature_m_l_feature_m[n++].feature_choice = feature_keys_m_c; /* KEYS swipe keyboard */
+    for (size_t i = 0; i < sizeof feats / sizeof *feats; i++)
+        c->caps_feature_m_l_feature_m[n++].feature_choice = feats[i];
+    /* dictation */
+    if (bi->has_mic) c->caps_feature_m_l_feature_m[n++].feature_choice = feature_voice_m_c;
+    if (bi->has_touch && bi->has_display)
+        c->caps_feature_m_l_feature_m[n++].feature_choice =
+            feature_keys_m_c; /* KEYS swipe keyboard */
     c->caps_feature_m_l_feature_m_count = n;
 }
 
@@ -84,29 +92,31 @@ bool link_tx_hello(hal_link_kind_t to)
     set_hdr(&m->msg_hello_hdr_m, false, 0);
     struct hello *h = &m->msg_hello_hello_m;
     h->hello_major_l_major = 0;
-    h->hello_major_l_minor = 24; /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice; 0.7: keys;
-                                  * 0.8: action_dictate on attention, dictate with rid answers that card;
-                                  * 0.9: jobs (agent_shell, session eta / exit, cmd_op_rerun);
-                                  * 0.10: gauges (usage message, session ctx / mdl / pm / pr / prs);
-                                  * 0.11: answer window (attention left / win / len, detail chunks, clear
-                                  *       handed_back, focus with a rid hands it back);
-                                  * 0.12: presence (attention hush, session hush);
-                                  * 0.13: standing rules (attention rule / scope / wide, approve with rh);
-                                  * 0.14: done summary (session fc / la / lr / tp / dur);
-                                  * 0.15: firmware update (fw_begin / fw_chunk / fw_ack);
-                                  * 0.16: transcripts up to 2047 bytes (VOICE_TEXT_MAX);
-                                  * 0.17: queued messages (session qd, type / dictate with q, cmd_op_unqueue);
-                                  * 0.18: last message (session lm / ll / lp, detail without a rid) and
-                                  *       questions (attention qs, cmd_op_answer);
-                                  * 0.19: power report (device to daemon only);
-                                  * 0.20: trackpad (welcome.pointer, cmd_op_pointer);
-                                  * 0.21: delta firmware update (fw_begin.patch);
-                                  * 0.22: agent graph (cmd graph, graph);
-                                  * 0.23: agent_pi; 0.24: bench (dbg_touch, dbg_bench, dbg_frames) */
+    /* 0.4: welcome.replies, cmd_op_type; 0.5: session q / rp; 0.6: voice; 0.7: keys;
+     * 0.8: action_dictate on attention, dictate with rid answers that card;
+     * 0.9: jobs (agent_shell, session eta / exit, cmd_op_rerun);
+     * 0.10: gauges (usage message, session ctx / mdl / pm / pr / prs);
+     * 0.11: answer window (attention left / win / len, detail chunks, clear
+     *       handed_back, focus with a rid hands it back);
+     * 0.12: presence (attention hush, session hush);
+     * 0.13: standing rules (attention rule / scope / wide, approve with rh);
+     * 0.14: done summary (session fc / la / lr / tp / dur);
+     * 0.15: firmware update (fw_begin / fw_chunk / fw_ack);
+     * 0.16: transcripts up to 2047 bytes (VOICE_TEXT_MAX);
+     * 0.17: queued messages (session qd, type / dictate with q, cmd_op_unqueue);
+     * 0.18: last message (session lm / ll / lp, detail without a rid) and
+     *       questions (attention qs, cmd_op_answer);
+     * 0.19: power report (device to daemon only);
+     * 0.20: trackpad (welcome.pointer, cmd_op_pointer);
+     * 0.21: delta firmware update (fw_begin.patch);
+     * 0.22: agent graph (cmd graph, graph);
+     * 0.23: agent_pi; 0.24: bench (dbg_touch, dbg_bench, dbg_frames) */
+    h->hello_major_l_minor = 24;
     h->hello_device_info_m.device_info_device_class_m.device_class_choice = device_class(bi);
     h->hello_device_info_m.device_info_uint1tstr = zstr(bi->board);
     h->hello_device_info_m.device_info_uint2tstr = zstr(bi->fw_version);
-    h->hello_device_info_m.device_info_uint3bstr = (struct zcbor_string){.value = bi->uid, .len = sizeof bi->uid};
+    h->hello_device_info_m.device_info_uint3bstr =
+        (struct zcbor_string){.value = bi->uid, .len = sizeof bi->uid};
     fill_caps(&h->hello_caps_m, bi);
     if (bi->has_battery) {
         h->hello_uint3uint_present = true;
@@ -123,7 +133,8 @@ bool link_send_audio_start(uint32_t aid, uint32_t sid)
     struct msg_audio_start *m = &g_tx_env.envelope_msg_audio_start_m;
     set_hdr(&m->msg_audio_start_hdr_m, false, 0);
     m->msg_audio_start_audio_start_m.audio_start_uint0uint = aid;
-    m->msg_audio_start_audio_start_m.audio_start_audio_codec_m.audio_codec_choice = audio_codec_adpcm16k_m_c;
+    m->msg_audio_start_audio_start_m.audio_start_audio_codec_m.audio_codec_choice =
+        audio_codec_adpcm16k_m_c;
     m->msg_audio_start_audio_start_m.audio_start_uint2uint_present = sid != 0;
     m->msg_audio_start_audio_start_m.audio_start_uint2uint.audio_start_uint2uint = sid;
     return send_env(g_link.kind, "audio_start");
@@ -150,7 +161,8 @@ bool link_send_log(int lvl, const char *msg)
     struct msg_log *m = &g_tx_env.envelope_msg_log_m;
     set_hdr(&m->msg_log_hdr_m, false, 0);
     m->msg_log_log_m.log_level_m.log_level_choice = lvl;
-    m->msg_log_log_m.log_uint1tstr = (struct zcbor_string){.value = (const uint8_t *)msg, .len = strlen(msg)};
+    m->msg_log_log_m.log_uint1tstr =
+        (struct zcbor_string){.value = (const uint8_t *)msg, .len = strlen(msg)};
     return send_env(g_link.kind, "log");
 }
 
@@ -174,7 +186,8 @@ bool link_send_kb_start(uint32_t kid, uint32_t sid, const uint8_t *keys, size_t 
     set_hdr(&m->msg_kb_start_hdr_m, false, 0);
     m->msg_kb_start_kb_start_m.kb_start_uint0uint = kid;
     m->msg_kb_start_kb_start_m.kb_start_uint1uint = sid;
-    m->msg_kb_start_kb_start_m.kb_start_uint2bstr = (struct zcbor_string){.value = keys, .len = len};
+    m->msg_kb_start_kb_start_m.kb_start_uint2bstr =
+        (struct zcbor_string){.value = keys, .len = len};
     return send_env(g_link.kind, "kb_start");
 }
 
@@ -187,7 +200,8 @@ bool link_send_kb_stroke(uint32_t kid, uint32_t seq, const uint8_t *pts, size_t 
     set_hdr(&m->msg_kb_stroke_hdr_m, false, 0);
     m->msg_kb_stroke_kb_stroke_m.kb_stroke_uint0uint = kid;
     m->msg_kb_stroke_kb_stroke_m.kb_stroke_uint1uint = seq;
-    m->msg_kb_stroke_kb_stroke_m.kb_stroke_uint2bstr = (struct zcbor_string){.value = pts, .len = len};
+    m->msg_kb_stroke_kb_stroke_m.kb_stroke_uint2bstr =
+        (struct zcbor_string){.value = pts, .len = len};
     return send_env(g_link.kind, "kb_stroke");
 }
 
@@ -224,7 +238,8 @@ bool link_send_ui_state(const ui_report_t *r, uint32_t re)
         s->dbg_ui_state_uint2uint_present = true;
         s->dbg_ui_state_uint2uint.dbg_ui_state_uint2uint = r->rid;
     }
-    for (size_t i = 0; i < r->n_visible && i < 8; i++) s->dbg_ui_state_tstr_l_tstr[i] = zstr(r->visible[i]);
+    for (size_t i = 0; i < r->n_visible && i < 8; i++)
+        s->dbg_ui_state_tstr_l_tstr[i] = zstr(r->visible[i]);
     s->dbg_ui_state_tstr_l_tstr_count = r->n_visible < 8 ? r->n_visible : 8;
     s->dbg_ui_state_uint4tstr = zstr(r->power);
     s->dbg_ui_state_uint5uint_present = true;
@@ -232,8 +247,8 @@ bool link_send_ui_state(const ui_report_t *r, uint32_t re)
     return send_env(g_link.kind, "dbg_ui_state");
 }
 
-bool link_send_screenshot_chunk(uint16_t w, uint16_t h, uint32_t offset, const uint8_t *data, size_t len,
-                                bool last, uint32_t re)
+bool link_send_screenshot_chunk(uint16_t w, uint16_t h, uint32_t offset, const uint8_t *data,
+                                size_t len, bool last, uint32_t re)
 {
     if (!g_link.welcomed) return false;
     memset(&g_tx_env, 0, sizeof g_tx_env);

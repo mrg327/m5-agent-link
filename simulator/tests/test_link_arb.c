@@ -1,6 +1,6 @@
-/* Link arbitration: hello on every up transport, first welcome wins, fallback when it drops, and USB is
- * preferred when plugged in: a USB welcome takes over another transport.
- * Builds link*.c and model.c against stubbed HAL/debug; no simulator needed. */
+/* Link arbitration: hello on every up transport, first welcome wins, fallback when it drops, and
+ * USB is preferred when plugged in: a USB welcome takes over another transport. Builds link*.c and
+ * model.c against stubbed HAL/debug; no simulator needed. */
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,15 +12,19 @@
 #include "ota.h"
 
 /* welcome (id 1) copied from scripts/link_indicator.txt */
-static const char *WELCOME_HEX =
-    "a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f";
+static const char *WELCOME_HEX = "a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6"
+                                 "163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f";
 
 static int sent[3], hellos[3], links_up, links_down;
 static bool usb_fails; /* an attached host that does not read: sends time out */
 static const hal_board_info_t s_bi = {.board = "sim", .fw_version = "t"};
 
 const hal_board_info_t *hal_board_info(void) { return &s_bi; }
-hal_battery_t hal_battery_read(void) { hal_battery_t b = {0}; return b; }
+hal_battery_t hal_battery_read(void)
+{
+    hal_battery_t b = {0};
+    return b;
+}
 void hal_rtc_set_unix(uint32_t s) { (void)s; }
 const char *hal_reset_reason(void) { return "poweron"; }
 void hal_display_set_brightness(uint8_t l) { (void)l; }
@@ -30,25 +34,75 @@ bool hal_link_send(hal_link_kind_t k, const uint8_t *f, size_t n)
     if (n > 3 && f[2] == 0x01) hellos[k]++; /* envelope type 1 = hello */
     return !(k == HAL_LINK_USB && usb_fails);
 }
-void dbg_event(const char *c, const char *e, const char *f, ...) { (void)c; (void)e; (void)f; }
-void dbg_event_at(dbg_level_t l, const char *c, const char *e, const char *f, ...) { (void)l; (void)c; (void)e; (void)f; }
+void dbg_event(const char *c, const char *e, const char *f, ...)
+{
+    (void)c;
+    (void)e;
+    (void)f;
+}
+void dbg_event_at(dbg_level_t l, const char *c, const char *e, const char *f, ...)
+{
+    (void)l;
+    (void)c;
+    (void)e;
+    (void)f;
+}
 const char *dbg_q(const char *s) { return s; }
 void dbg_set_level(dbg_level_t l) { (void)l; }
-void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sl, const char *v, size_t vl, const ota_patch_t *p,
-                  uint32_t now)
+void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sl, const char *v, size_t vl,
+                  const ota_patch_t *p, uint32_t now)
 {
-    (void)size; (void)sha; (void)sl; (void)v; (void)vl; (void)p; (void)now;
+    (void)size;
+    (void)sha;
+    (void)sl;
+    (void)v;
+    (void)vl;
+    (void)p;
+    (void)now;
 }
-void ota_on_chunk(uint32_t off, const uint8_t *d, size_t n, uint32_t now) { (void)off; (void)d; (void)n; (void)now; }
+void ota_on_chunk(uint32_t off, const uint8_t *d, size_t n, uint32_t now)
+{
+    (void)off;
+    (void)d;
+    (void)n;
+    (void)now;
+}
 void dbg_on_ui_state_req(uint32_t r) { (void)r; }
 void dbg_on_screenshot_req(uint32_t r) { (void)r; }
-void dbg_on_inject(int e, bool h, int x, int y) { (void)e; (void)h; (void)x; (void)y; }
-void bench_on_touch(uint32_t dt, const uint8_t *p, size_t n, uint32_t now) { (void)dt; (void)p; (void)n; (void)now; }
-void bench_on_ctl(int op, uint32_t arg, uint32_t now) { (void)op; (void)arg; (void)now; }
-void bench_note(int kind, uint32_t arg) { (void)kind; (void)arg; }
+void dbg_on_inject(int e, bool h, int x, int y)
+{
+    (void)e;
+    (void)h;
+    (void)x;
+    (void)y;
+}
+void bench_on_touch(uint32_t dt, const uint8_t *p, size_t n, uint32_t now)
+{
+    (void)dt;
+    (void)p;
+    (void)n;
+    (void)now;
+}
+void bench_on_ctl(int op, uint32_t arg, uint32_t now)
+{
+    (void)op;
+    (void)arg;
+    (void)now;
+}
+void bench_note(int kind, uint32_t arg)
+{
+    (void)kind;
+    (void)arg;
+}
 
 static int failures;
-#define EXPECT(cond, msg) do { if (!(cond)) { printf("FAIL: %s (line %d)\n", msg, __LINE__); failures++; } } while (0)
+#define EXPECT(cond, msg)                                  \
+    do {                                                   \
+        if (!(cond)) {                                     \
+            printf("FAIL: %s (line %d)\n", msg, __LINE__); \
+            failures++;                                    \
+        }                                                  \
+    } while (0)
 
 static void on_link(bool w) { w ? links_up++ : links_down++; }
 
@@ -85,32 +139,40 @@ int main(void)
 
     /* USB is silent (no daemon), BLE answers */
     rx_welcome(HAL_LINK_BLE);
-    EXPECT(link_welcomed() && link_active_kind() == HAL_LINK_BLE && links_up == 1, "BLE welcome wins");
+    EXPECT(link_welcomed() && link_active_kind() == HAL_LINK_BLE && links_up == 1,
+           "BLE welcome wins");
     int usb_before = sent[HAL_LINK_USB], ble_before = sent[HAL_LINK_BLE];
     link_tick(6000);
-    EXPECT(sent[HAL_LINK_BLE] == ble_before && sent[HAL_LINK_USB] == usb_before, "no more hellos once welcomed");
+    EXPECT(sent[HAL_LINK_BLE] == ble_before && sent[HAL_LINK_USB] == usb_before,
+           "no more hellos once welcomed");
     EXPECT(link_send_cmd(LINK_OP_FOCUS, 1, 0, 0) && sent[HAL_LINK_BLE] == ble_before + 1 &&
                sent[HAL_LINK_USB] == usb_before,
            "commands go to the active transport only");
 
     /* USB stays plugged in: it is offered a hello every 5 s while BLE is active */
     link_tick(8000);
-    EXPECT(hellos[HAL_LINK_USB] == 3 && sent[HAL_LINK_BLE] == ble_before + 1, "USB offered a hello while on BLE");
+    EXPECT(hellos[HAL_LINK_USB] == 3 && sent[HAL_LINK_BLE] == ble_before + 1,
+           "USB offered a hello while on BLE");
     rx_welcome(HAL_LINK_USB); /* USB is preferred: its welcome takes the link over */
-    EXPECT(link_welcomed() && link_active_kind() == HAL_LINK_USB && links_up == 2, "USB welcome takes over from BLE");
+    EXPECT(link_welcomed() && link_active_kind() == HAL_LINK_USB && links_up == 2,
+           "USB welcome takes over from BLE");
     rx_welcome(HAL_LINK_BLE);
-    EXPECT(link_active_kind() == HAL_LINK_USB && links_up == 2, "BLE frames ignored once USB is active");
+    EXPECT(link_active_kind() == HAL_LINK_USB && links_up == 2,
+           "BLE frames ignored once USB is active");
     int usb_now = sent[HAL_LINK_USB];
     link_tick(20000);
-    EXPECT(hellos[HAL_LINK_BLE] == 2 && sent[HAL_LINK_USB] == usb_now, "no offers to BLE while on USB");
+    EXPECT(hellos[HAL_LINK_BLE] == 2 && sent[HAL_LINK_USB] == usb_now,
+           "no offers to BLE while on USB");
 
     int h0 = hellos[HAL_LINK_BLE];
     link_on_state(HAL_LINK_USB, false);
-    EXPECT(!link_welcomed() && link_connected() && links_down == 1, "active down -> unwelcomed, still connected");
+    EXPECT(!link_welcomed() && link_connected() && links_down == 1,
+           "active down -> unwelcomed, still connected");
     EXPECT(hellos[HAL_LINK_BLE] == h0 + 1, "fallback restarts hello on remaining transport");
     EXPECT(!link_send_cmd(LINK_OP_FOCUS, 1, 0, 0), "no commands before welcome");
     rx_welcome(HAL_LINK_BLE);
-    EXPECT(link_welcomed() && link_active_kind() == HAL_LINK_BLE && links_up == 3, "BLE welcome after fallback");
+    EXPECT(link_welcomed() && link_active_kind() == HAL_LINK_BLE && links_up == 3,
+           "BLE welcome after fallback");
 
     link_on_state(HAL_LINK_BLE, false);
     EXPECT(!link_connected() && !link_welcomed() && links_down == 2, "all down");
@@ -122,7 +184,7 @@ int main(void)
     rx_welcome(HAL_LINK_BLE);
     link_on_state(HAL_LINK_USB, true); /* plugged in: one offer at once (it times out) */
     int u0 = hellos[HAL_LINK_USB];
-    link_tick(5000);  /* first periodic offer, fails: backs off */
+    link_tick(5000); /* first periodic offer, fails: backs off */
     link_tick(10000);
     link_tick(20000);
     EXPECT(hellos[HAL_LINK_USB] == u0 + 1, "a failing USB offer backs off");
@@ -135,15 +197,18 @@ int main(void)
     link_on_state(HAL_LINK_WS, true);
     EXPECT(hellos[HAL_LINK_WS] == 1, "late transport gets hello");
     link_on_state(HAL_LINK_USB, false);
-    EXPECT(link_connected() && !link_welcomed() && links_down == 0, "non-active down while unwelcomed is silent");
+    EXPECT(link_connected() && !link_welcomed() && links_down == 0,
+           "non-active down while unwelcomed is silent");
 
     reset();
     link_on_state(HAL_LINK_WS, true);
     rx_welcome(HAL_LINK_WS);
     link_on_state(HAL_LINK_BLE, true);
-    EXPECT(hellos[HAL_LINK_BLE] == 0 && link_active_kind() == HAL_LINK_WS, "no hello to extra transport while welcomed");
+    EXPECT(hellos[HAL_LINK_BLE] == 0 && link_active_kind() == HAL_LINK_WS,
+           "no hello to extra transport while welcomed");
     link_on_state(HAL_LINK_USB, true);
-    EXPECT(hellos[HAL_LINK_USB] == 1 && link_active_kind() == HAL_LINK_WS, "except USB, which is preferred");
+    EXPECT(hellos[HAL_LINK_USB] == 1 && link_active_kind() == HAL_LINK_WS,
+           "except USB, which is preferred");
 
     if (failures) return EXIT_FAILURE;
     puts("link arbitration OK");

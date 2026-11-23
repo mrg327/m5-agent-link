@@ -27,9 +27,16 @@ bool sim_mic_load(const char *path)
         uint32_t len = ch[4] | ch[5] << 8 | ch[6] << 16 | (uint32_t)ch[7] << 24;
         if (!memcmp(ch, "fmt ", 4)) {
             uint8_t fmt[16];
-            if (len < 16 || fread(fmt, 1, 16, f) != 16) { ok = false; break; }
-            unsigned chans = fmt[2] | fmt[3] << 8, rate = fmt[4] | fmt[5] << 8 | fmt[6] << 16, bits = fmt[14] | fmt[15] << 8;
-            if (fmt[0] != 1 || chans != 1 || rate != HAL_MIC_RATE || bits != 16) { ok = false; break; }
+            if (len < 16 || fread(fmt, 1, 16, f) != 16) {
+                ok = false;
+                break;
+            }
+            unsigned chans = fmt[2] | fmt[3] << 8, rate = fmt[4] | fmt[5] << 8 | fmt[6] << 16,
+                     bits = fmt[14] | fmt[15] << 8;
+            if (fmt[0] != 1 || chans != 1 || rate != HAL_MIC_RATE || bits != 16) {
+                ok = false;
+                break;
+            }
             fseek(f, len - 16, SEEK_CUR);
         } else if (!memcmp(ch, "data", 4)) {
             s_pcm = malloc(len);
