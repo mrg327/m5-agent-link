@@ -1,0 +1,314 @@
+#!/usr/bin/env bash
+# scripts/check: the one entry point for the repository's checks.
+#
+# Humans, git hooks, agents and CI all run this same script, so "it passed for me" means the same
+# thing everywhere. Each area runs exactly the commands its CI workflow runs today
+# (.github/workflows/*.yml, mirrored in the "Checks to run before closing" table in
+# issues/README.md). Phase 1 of the conventions work switches the workflows to call this script;
+# until then, keep the commands here and in the workflows in step.
+#
+# Usage: scripts/check [AREA...] [--changed] [--list] [--fail-fast]
+#   AREA         one or more of: sim daemon protocol atlas firmware docs (default: all)
+#   --changed    pick areas from files changed against main (commits, staged, unstaged, untracked)
+#   --list       print each area and the commands it runs, then exit
+#   --fail-fast  stop after the first failing area (default: run every area, then report)
+#   --keep-going accepted for clarity; it is the default
+#
+# A missing tool (cargo, uv, node, cmake, ninja, idf.py) makes its step SKIP, not FAIL. Skipped is
+# not passed: the summary says so, and CI must have every tool installed.
+# Exit status: 0 when nothing failed, 1 when any step failed, 2 on a usage error.
+#
+# Written for bash 3.2 too (the macOS system bash): no associative arrays, no mapfile.
+
+set -euo pipefail
+
+ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
+cd "$ROOT"
+
+ALL_AREAS="sim daemon protocol atlas firmware docs"
+# Fast areas first, so a quick failure shows up before the long builds.
+RUN_ORDER="docs protocol atlas daemon sim firmware"
+
+# area_steps AREA: one step per line, fields separated by '|':
+#   mode|dir|tools|command
+#   mode  "step" runs always; "then" runs only if the previous step in the area passed
+#   dir   working directory relative to the repo root
+#   tools space-separated requirements (see need_ok)
+#   command run with bash from dir
+area_steps() {
+    case "$1" in
+    sim)
+        echo "step|.|cmake ninja|cmake -S simulator -B build/sim -G Ninja"
+        echo "then|.|cmake ninja|cmake --build build/sim"
+        echo "then|.|ctest|ctest --test-dir build/sim -j 16 --output-on-failure"
+        ;;
+    daemon)
+        echo "step|daemon|cargo|cargo fmt --check"
+        echo "step|daemon|cargo|cargo clippy --workspace -- -D warnings"
+        echo "step|daemon|cargo|cargo test --workspace"
+        echo "step|.|node24|node --test daemon/integrations/pi/"
+        ;;
+    protocol)
+        echo "step|.|uv|uv run protocol/tools/validate_vectors.py"
+        echo "then|.|uv|uv run protocol/tools/gen_vectors.py"
+        echo "then|.|git|git diff --exit-code protocol/vectors"
+        ;;
+    atlas)
+        echo "step|.|python3|python3 atlas/tools/extract.py --check"
+        echo "step|.|node|node --test atlas/test/*.test.mjs"
+        ;;
+    firmware)
+        echo "step|.|idf.py python3|idf.py -C firmware build"
+        echo "then|.|python3|python3 firmware/tools/check_dram.py"
+        ;;
+    docs)
+        echo "step|.||echo 'docs: no checks yet (phase 1)'"
+        ;;
+    esac
+}
+
+# areas_for_path PATH: the areas a changed file can affect. Mirrors the workflows' path filters,
+# plus docs for Markdown.
+areas_for_path() {
+    case "$1" in
+    .github/workflows/simulator.yml) echo "sim" ;;
+    .github/workflows/daemon.yml) echo "daemon" ;;
+    .github/workflows/protocol.yml) echo "protocol" ;;
+    .github/workflows/atlas.yml) echo "atlas" ;;
+    .github/workflows/firmware.yml) echo "firmware" ;;
+    esac
+    case "$1" in
+    firmware/*) echo "sim firmware atlas" ;;
+    simulator/*) echo "sim" ;;
+    daemon/crates/agentlinkd/src/*) echo "daemon atlas" ;;
+    daemon/*) echo "daemon" ;;
+    protocol/*) echo "protocol daemon sim firmware atlas" ;;
+    atlas/* | index.html) echo "atlas" ;;
+    esac
+    case "$1" in
+    docs/* | *.md) echo "docs" ;;
+    esac
+}
+
+usage() {
+    sed -n '/^# Usage:/,/^# *--keep-going/s/^# \{0,1\}//p' "$0"
+}
+
+die_usage() {
+    echo "check: $1" >&2
+    usage >&2
+    exit 2
+}
+
+# need_ok TOOL: succeed if the requirement is met; otherwise print why to stdout and fail.
+need_ok() {
+    case "$1" in
+    node24)
+        # The directory form of `node --test` needs Node 24, as CI uses; Node 22 rejects it.
+        if ! command -v node >/dev/null 2>&1; then
+            echo "node not found; install Node.js 24 (CI uses 24)"
+            return 1
+        fi
+        local v
+        v="$(node -p 'process.versions.node' 2>/dev/null || echo 0.0.0)"
+        if [ "${v%%.*}" -lt 24 ]; then
+            echo "node $v is older than 24 (CI uses 24); install Node.js 24 to run this step"
+            return 1
+        fi
+        return 0
+        ;;
+    idf.py)
+        command -v idf.py >/dev/null 2>&1 && return 0
+        if [ -n "${IDF_PATH:-}" ]; then
+            echo "idf.py not on PATH; run '. \"\$IDF_PATH/export.sh\"' in this shell first"
+        else
+            echo "idf.py not on PATH; install ESP-IDF v5.5 and run its export.sh in this shell first"
+        fi
+        return 1
+        ;;
+    esac
+    command -v "$1" >/dev/null 2>&1 && return 0
+    case "$1" in
+    cargo) echo "cargo not found; install Rust with rustup (stable, with rustfmt and clippy)" ;;
+    uv) echo "uv not found; install it from https://docs.astral.sh/uv/" ;;
+    node) echo "node not found; install Node.js 22 or newer (CI uses 22 for atlas)" ;;
+    cmake | ctest) echo "$1 not found; install CMake (and SDL2 headers for the simulator)" ;;
+    ninja) echo "ninja not found; install ninja-build" ;;
+    *) echo "$1 not found" ;;
+    esac
+    return 1
+}
+
+list_areas() {
+    local area line mode dir tools cmd
+    for area in $ALL_AREAS; do
+        echo "$area:"
+        area_steps "$area" | while IFS='|' read -r mode dir tools cmd; do
+            if [ "$dir" = "." ]; then
+                echo "    $cmd"
+            else
+                echo "    (cd $dir && $cmd)"
+            fi
+        done
+    done
+    echo
+    echo "--changed maps paths to areas: firmware/ -> sim firmware atlas; simulator/ -> sim;"
+    echo "daemon/ -> daemon (agentlinkd/src also atlas); protocol/ -> protocol daemon sim firmware"
+    echo "atlas; atlas/ and index.html -> atlas; docs/ and *.md -> docs; a workflow -> its area."
+}
+
+changed_files() {
+    local base
+    base="$(git merge-base HEAD main 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null || true)"
+    {
+        if [ -n "$base" ]; then
+            git diff --name-only "$base" HEAD
+        else
+            echo "check: no main branch to compare with; using uncommitted changes only" >&2
+        fi
+        git diff --name-only HEAD
+        git ls-files --others --exclude-standard
+    } | sort -u
+}
+
+# ---- arguments ----------------------------------------------------------------------------------
+
+WANT=""
+CHANGED=0
+LIST=0
+FAIL_FAST=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+    --changed) CHANGED=1 ;;
+    --list) LIST=1 ;;
+    --keep-going) FAIL_FAST=0 ;;
+    --fail-fast) FAIL_FAST=1 ;;
+    -h | --help)
+        usage
+        exit 0
+        ;;
+    -*) die_usage "unknown option: $1" ;;
+    *)
+        case " $ALL_AREAS " in
+        *" $1 "*) WANT="$WANT $1" ;;
+        *) die_usage "unknown area: $1" ;;
+        esac
+        ;;
+    esac
+    shift
+done
+
+if [ "$LIST" -eq 1 ]; then
+    list_areas
+    exit 0
+fi
+
+if [ "$CHANGED" -eq 1 ]; then
+    files="$(changed_files)"
+    picked=""
+    if [ -n "$files" ]; then
+        while IFS= read -r f; do
+            picked="$picked $(areas_for_path "$f" | tr '\n' ' ')"
+        done <<EOF
+$files
+EOF
+    fi
+    echo "check: $(printf '%s\n' "$files" | grep -c . || true) changed file(s) against main"
+    # With explicit areas too, run only those the changes touch.
+    if [ -n "$WANT" ]; then
+        both=""
+        for a in $WANT; do
+            case " $picked " in *" $a "*) both="$both $a" ;; esac
+        done
+        picked="$both"
+    fi
+    WANT="$picked"
+    if [ -z "$(echo "$WANT" | tr -d ' ')" ]; then
+        echo "check: no area affected by the changes; nothing to run"
+        exit 0
+    fi
+    echo "check: areas:$(for a in $RUN_ORDER; do case " $WANT " in *" $a "*) printf ' %s' "$a" ;; esac; done)"
+elif [ -z "$WANT" ]; then
+    WANT="$ALL_AREAS"
+fi
+
+# ---- run ----------------------------------------------------------------------------------------
+
+SUMMARY=""
+N_PASS=0
+N_FAIL=0
+N_SKIP=0
+
+run_area() {
+    local area="$1" mode dir tools cmd t why prev="pass" ran=0 skipped=0 failed=0 start
+    start="$(date +%s)"
+    # Read the step list on fd 3 so the commands keep stdin.
+    while IFS='|' read -r mode dir tools cmd <&3; do
+        if [ "$mode" = "then" ] && [ "$prev" != "pass" ]; then
+            echo "--- $area: not run (earlier step did not pass): $cmd"
+            skipped=$((skipped + 1))
+            continue
+        fi
+        why=""
+        for t in $tools; do
+            if ! why="$(need_ok "$t")"; then
+                break
+            fi
+            why=""
+        done
+        if [ -n "$why" ]; then
+            echo "--- $area: SKIP $cmd"
+            echo "    $why"
+            skipped=$((skipped + 1))
+            prev="skip"
+            continue
+        fi
+        if [ "$dir" = "." ]; then echo "==> $area: $cmd"; else echo "==> $area: $cmd (in $dir/)"; fi
+        if (cd "$ROOT/$dir" && bash -c "$cmd"); then
+            ran=$((ran + 1))
+            prev="pass"
+        else
+            echo "--- $area: FAIL $cmd"
+            failed=$((failed + 1))
+            prev="fail"
+        fi
+    done 3<<EOF
+$(area_steps "$area")
+EOF
+    local secs=$(($(date +%s) - start)) result note=""
+    if [ "$failed" -gt 0 ]; then
+        result="FAIL"
+        N_FAIL=$((N_FAIL + 1))
+        note="$failed step(s) failed"
+    elif [ "$ran" -eq 0 ]; then
+        result="SKIP"
+        N_SKIP=$((N_SKIP + 1))
+        note="tools missing"
+    else
+        result="PASS"
+        N_PASS=$((N_PASS + 1))
+    fi
+    if [ "$skipped" -gt 0 ] && [ "$result" != "SKIP" ]; then
+        note="${note:+$note, }$skipped step(s) skipped"
+    fi
+    SUMMARY="$SUMMARY$(printf '%-9s %-6s %5ss%s' "$area" "$result" "$secs" "${note:+  $note}")
+"
+}
+
+for area in $RUN_ORDER; do
+    case " $WANT " in *" $area "*) ;; *) continue ;; esac
+    run_area "$area"
+    if [ "$FAIL_FAST" -eq 1 ] && [ "$N_FAIL" -gt 0 ]; then
+        echo "check: stopping after the first failure (--fail-fast)"
+        break
+    fi
+done
+
+echo
+echo "area      result   time  note"
+printf '%s' "$SUMMARY"
+echo "passed $N_PASS, failed $N_FAIL, skipped $N_SKIP"
+if [ "$N_SKIP" -gt 0 ] || echo "$SUMMARY" | grep -q 'skipped'; then
+    echo "note: skipped is not passed; install the missing tools to run those checks (CI runs them)"
+fi
+[ "$N_FAIL" -eq 0 ]

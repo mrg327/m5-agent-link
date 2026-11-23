@@ -25,6 +25,7 @@ scripts/atlas --open        # serves index.html at http://localhost:8700/
 |---|---|
 | `index.html`, `atlas/` | **The Atlas**, the living visual guide (facts generated from source; see `atlas/CONTRACT.md`) |
 | `docs/design/` | **Start here.** `DESIGN.md`, `PROTOCOL.md`, `FIRMWARE.md` |
+| `docs/conventions/` | How code, names, docs and commits are written, and how `scripts/check` verifies them |
 | `docs/research/` | Background research: similar products, use cases, host integration, UI |
 | `docs/` (rest) | Vendor documentation for the StopWatch (`uv run scripts/fetch_docs.py`) |
 | `protocol/` | Normative CDDL schema plus shared test vectors |
@@ -32,6 +33,10 @@ scripts/atlas --open        # serves index.html at http://localhost:8700/
 | `firmware/` | ESP-IDF project: portable `core` + `hal` contract + `boards/<name>` |
 | `simulator/` | The same firmware core on SDL2, linked to the daemon over WebSocket |
 | `bench/` | Task scripts the bench plays on the real watch as a finger (`agentlink bench`, `docs/design/BENCH.md`) |
+| `issues/` | The shared work log: one Markdown file per issue (`scripts/issue`, `issues/README.md`) |
+| `scripts/` | `check` (every check, `docs/conventions/`), `issue`, `atlas`, `fetch_docs.py` |
+| `tools/` | Host helpers: `board/` (the design board), `linux/` (a Bluetooth driver fix for one Linux laptop chipset) |
+| `design/` | Design board sources (`design/board/`) |
 
 ## Principles
 
