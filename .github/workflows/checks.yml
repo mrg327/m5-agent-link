@@ -20,7 +20,7 @@ jobs:
     name: format and docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the commit-message check walks history back to its cutoff
       - uses: astral-sh/setup-uv@v6
