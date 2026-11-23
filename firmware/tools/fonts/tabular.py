@@ -5,6 +5,7 @@ lv_font_conv cannot apply OpenType features, so gen.mjs runs this first and conv
 then all have the same advance and a ticking time never moves its neighbours (UI-V3 2.1). Usage:
     tabular.py in.woff out.ttf
 """
+
 import sys
 from fontTools.ttLib import TTFont
 

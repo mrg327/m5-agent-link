@@ -7,6 +7,7 @@ Output: one lowercase word per line, most frequent first (an estimated rank,
 see README.md). Only words from the american/english "words" lists up to size
 level 35 are used, plain a-z only.
 """
+
 import sys
 from pathlib import Path
 
@@ -20,8 +21,20 @@ here = Path(__file__).parent
 final = Path(sys.argv[1]) / "final"
 head = (here / "head.txt").read_text().split()
 
-SUFFIXES = [("ies", "y"), ("ied", "y"), ("ing", ""), ("ing", "e"), ("ers", ""), ("er", ""),
-            ("es", ""), ("ed", ""), ("ed", "e"), ("ly", ""), ("s", ""), ("d", "")]
+SUFFIXES = [
+    ("ies", "y"),
+    ("ied", "y"),
+    ("ing", ""),
+    ("ing", "e"),
+    ("ers", ""),
+    ("er", ""),
+    ("es", ""),
+    ("ed", ""),
+    ("ed", "e"),
+    ("ly", ""),
+    ("s", ""),
+    ("d", ""),
+]
 
 
 def demote_inflections(words):

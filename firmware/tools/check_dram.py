@@ -7,6 +7,7 @@ booted. The floor sits between the two. Big static tables belong in PSRAM (MODEL
 
     . $IDF_PATH/export.sh && idf.py -C firmware build && python3 firmware/tools/check_dram.py
 """
+
 import json
 import os
 import subprocess
@@ -19,12 +20,18 @@ if len(sys.argv) > 1:
     mapfile = sys.argv[1]
 if not os.path.exists(mapfile):
     sys.exit(f"check_dram: no map file at {mapfile}; build the firmware first")
-out = subprocess.run([sys.executable, "-m", "esp_idf_size", "--format", "json", mapfile],
-                     capture_output=True, text=True, check=True).stdout
+out = subprocess.run(
+    [sys.executable, "-m", "esp_idf_size", "--format", "json", mapfile],
+    capture_output=True,
+    text=True,
+    check=True,
+).stdout
 size = json.loads(out)
 free = size["diram_remain"]
 used = size["used_diram"]
 print(f"check_dram: DIRAM used {used} B, free {free} B (floor {FLOOR} B)")
 if free < FLOOR:
-    sys.exit(f"check_dram: FAIL: only {free} B of internal RAM left; BLE needs room at boot. "
-             "Move large static tables to PSRAM (MODEL_EXT_BSS) or shrink them.")
+    sys.exit(
+        f"check_dram: FAIL: only {free} B of internal RAM left; BLE needs room at boot. "
+        "Move large static tables to PSRAM (MODEL_EXT_BSS) or shrink them."
+    )
