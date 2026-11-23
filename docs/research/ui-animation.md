@@ -28,6 +28,7 @@ Legend: **[V]** = verified by reading source/docs in this research session (URL 
 ## 1. What the factory firmware does (verified)
 
 ### 1.1 Repo layout / stack
+
 * Repo: https://github.com/m5stack/M5StopWatch-UserDemo (main). Layout: `main/{apps,assets,hal}`, `patches/`,
   `platformio.ini`, `sdkconfig.defaults`, `sdkconfig.m5stack-stopwatch`.
 * `repos.json` pinned deps **[V]**: `mooncake v2.3.3`, `mooncake_log v1.5.0`, `smooth_ui_toolkit v2.12.1`,
@@ -42,8 +43,10 @@ Legend: **[V]** = verified by reading source/docs in this research session (URL 
   The `sdkconfig.defaults` also enables `LV_USE_DEMO_SMARTWATCH/BENCHMARK/STRESS`.
 
 ### 1.2 sdkconfig.defaults (verbatim highlights) **[V]**
+
 https://github.com/m5stack/M5StopWatch-UserDemo/blob/main/sdkconfig.defaults
-```
+
+```text
 CONFIG_SPIRAM=y  CONFIG_SPIRAM_MODE_OCT=y  CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_FREERTOS_HZ=1000
@@ -53,10 +56,13 @@ CONFIG_LV_IMAGE_HEADER_CACHE_DEF_CNT=2
 CONFIG_LV_FONT_MONTSERRAT_{10,16,18,22,28,36}=y
 CONFIG_LV_USE_FS_STDIO=y  CONFIG_LV_USE_LODEPNG=y  CONFIG_LV_USE_TJPGD=y
 ```
+
 Not set: `LV_ATTRIBUTE_FAST_MEM_USE_IRAM`, `COMPILER_OPTIMIZATION_PERF`, SPIRAM_FETCH_INSTRUCTIONS, 2 draw units.
 
 ### 1.3 Display bring-up (hal_display.cpp) **[V]**
+
 https://github.com/m5stack/M5StopWatch-UserDemo/blob/main/main/hal/hal_display.cpp
+
 * Pins: SCLK=G40, IO0=G41, IO1=G42, IO2=G46, IO3=G45, CS=G39, **TE=G38**, RST=NC (reset via M5IOE1 PYG5,
   panel power via PYG8 — see `docs/StopWatch.md`).
 * Local `Panel_CO5300 : lgfx::Panel_AMOLED`, `memory 480x480`, rgb565 write depth; config `panel_width=468,
@@ -79,6 +85,7 @@ https://github.com/m5stack/M5StopWatch-UserDemo/blob/main/main/hal/hal_display.c
   * Touch: `Cst820` custom driver → LVGL pointer indev; no gesture events from the chip are used.
 
 ### 1.4 M5GFX CO5300 support
+
 * `M5GFX/src/lgfx/v1/panel/Panel_AMOLED.{hpp,inl}` (QSPI, `LGFX_USE_QSPI`): `setBrightness` (0x51), `setSleep`
   (0x10/0x11), `setPowerSave`, `setPartialArea` (0x30/0x31), `waitDisplay/displayBusy`, `write_bytes(..use_dma)`,
   framebuffer sub-panel. https://github.com/m5stack/M5GFX/blob/master/src/lgfx/v1/panel/Panel_AMOLED.hpp
@@ -103,6 +110,7 @@ https://github.com/m5stack/M5StopWatch-UserDemo/blob/main/main/hal/hal_display.c
 | Others (SquareLine Studio, LVGL Lottie/ThorVG) | Design tooling | Heavy | See §4.4 |
 
 ### 2.1 Framework: Arduino vs ESP-IDF vs PlatformIO
+
 * **ESP-IDF (idf.py)** – what M5 ships; full control of sdkconfig (PSRAM XIP, cache sizes, IRAM placement,
   `LV_*` via Kconfig), `esp_lcd` drivers, proper FreeRTOS core pinning. **Best for perf-sensitive UI.**
 * **Arduino (M5Unified / M5GFX)** – fastest to start (vendor docs target it) but sdkconfig is fixed by the
@@ -118,6 +126,7 @@ https://github.com/m5stack/M5StopWatch-UserDemo/blob/main/main/hal/hal_display.c
 ## 3. Rendering performance
 
 ### 3.1 Numbers & arithmetic (derived)
+
 * Frame = 466×466×2 B = **434 312 B (424 KiB)** RGB565. Round display actually shows ~π/4 ≈ 78.5 % of those pixels
   (≈ 170 k of 217 k) — the panel still receives rectangles, so corners are transmitted/rendered unless clipped.
 * QSPI @ 80 MHz × 4 bits = 40 MB/s theoretical → **~10.9 ms/full frame** at line rate; practically ~60–75 %
@@ -132,6 +141,7 @@ https://github.com/m5stack/M5StopWatch-UserDemo/blob/main/main/hal/hal_display.c
   LVGL's own benchmark demo is enabled in the factory sdkconfig (`LV_USE_DEMO_BENCHMARK`) – run it first.
 
 ### 3.2 Buffers: PSRAM full-frame vs SRAM partial
+
 | Strategy | RAM | Pros | Cons |
 |---|---|---|---|
 | Partial, 2× in **internal SRAM** (e.g. 466×40 ×2 B ×2 = 74 KB) | ~75–100 KB DMA-capable internal | Fastest rendering (internal SRAM ≫ PSRAM), DMA reads straight from SRAM, render-while-flushing overlap | More chunks per frame; every 2-px-alignment rule applies; limited internal RAM (WiFi/BLE also need it) |
@@ -140,6 +150,7 @@ https://github.com/m5stack/M5StopWatch-UserDemo/blob/main/main/hal/hal_display.c
 | Full-frame ×2 in PSRAM (`FULL`/`DIRECT`) | 848 KB | Classic tear-free ping-pong; can swap pointers w/ TE | Eats PSRAM bandwidth; full flush each time in FULL mode (~15 ms) |
 
 Rules of thumb **[K]** (consistent with LVGL docs/forum guidance, https://docs.lvgl.io/master/):
+
 1. Prefer **PARTIAL + 2 internal-SRAM DMA buffers, ≥ 1/10 screen** (LVGL's recommended minimum), here 466×48 ≈ 1/10.
 2. Allocate with `heap_caps_malloc(sz, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL)` (esp_lvgl_port: `buff_dma=true`).
 3. Use **`LV_DRAW_SW_DRAW_UNIT_CNT=2`** to use both cores for render **[V in Waveshare cfg]**; but keep touch/IMU/Wi-Fi
@@ -149,6 +160,7 @@ Rules of thumb **[K]** (consistent with LVGL docs/forum guidance, https://docs.l
 5. Full-frame PSRAM only if you want effects touching the whole screen every frame (zoom/rotate/blur).
 
 ### 3.3 DMA & flush design
+
 * esp_lvgl_port exposes `trans_size`, `buff_dma`, `buff_spiram`, `double_buffer`, `flags.swap_bytes` **[V]**
   (`esp-bsp/components/esp_lvgl_port`; config struct shown in README, https://github.com/espressif/esp-bsp/tree/master/components/esp_lvgl_port).
 * Byte order: RGB565 needs byte-swap for 8-bit-wide SPI. Either set `LV_COLOR_16_SWAP`-equivalent
@@ -162,6 +174,7 @@ Rules of thumb **[K]** (consistent with LVGL docs/forum guidance, https://docs.l
 * Do **not** let any other task touch SPI2 / use the bus concurrently with the flush (M5GFX uses a bus lock).
 
 ### 3.4 TE (tearing effect) sync
+
 * TE is enabled in the init list (`0x35`), TE scanline set by `0x44 01 D2` (466), pin G38 **[V]**. TE pulses once
   per panel refresh (typ. 60 Hz AMOLED; AMOLED internal refresh may be 60 Hz in normal mode, lower in AOD/idle) **[K]**.
 * Methods: (a) ISR on G38 gives a binary semaphore; flush_cb of the **first** chunk of a frame waits for it
@@ -174,9 +187,11 @@ Rules of thumb **[K]** (consistent with LVGL docs/forum guidance, https://docs.l
   latency. Measure with a scrolling vertical bar test. **[?]**
 
 ### 3.5 Round-display / CO5300 alignment ("rounder")
+
 * QSPI AMOLED controllers (CO5300, SH8601, RM67162) require **start/end X and Y to be even** (x1 even, x2 odd; same Y) for
   `0x2A/0x2B` windows — otherwise pixel shifts/garbage **[K, widely reported; esp_lcd_co5300 docs and Waveshare/LilyGO
   examples use the rounder; verify against CO5300 datasheet in `docs/datasheets/` [?]]**. LVGL 9 callback:
+
 ```c
 static void rounder_cb(lv_event_t *e) {          // LV_EVENT_INVALIDATE_AREA
     lv_area_t *a = lv_event_get_invalidate_area(e);
@@ -185,21 +200,25 @@ static void rounder_cb(lv_event_t *e) {          // LV_EVENT_INVALIDATE_AREA
 }
 lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
 ```
+
   (LVGL 8 used `disp_drv.rounder_cb`; esp_lvgl_port exposes `.rounder_cb` in `lvgl_port_display_cfg_t` **[V]**.)
   Note: the factory firmware **does not** register a rounder (not in `hal_display.cpp`) but M5GFX handles windowing inside
   `setWindow`/`writeImage`; if you swap to your own flush, add it.
+
 * Panel offset: factory uses `panel_width=468`, `offset_x=6`(!). M5's 466 visible area is centered in 480 GRAM → odd
   offsets can break the alignment rule; keep it as M5 configured. **[V]** values; **[?]** why 468.
 * Round-aware optimisation: clip invalid areas to the circle bounding rows (skip rows' dead corners) — only
   worthwhile for large full-width redraws (use per-row start/length in your own flush) **[K]**.
 
 ### 3.6 Rotation
+
 * Don't use LVGL software rotation (`lv_display_set_rotation`) at 466² partial mode: it costs CPU + needs extra buffer.
   Use panel MADCTL `0x36` (M5GFX `setRotation`) for 0/90/180/270; round screen → usually **no rotation needed** **[K]**.
 * If you rotate widgets (arc needles, watch hands) use LVGL `lv_image` with `rotation` + `pivot`, only the small hand
   image area is transformed, bounded by the arm's bbox (see §4).
 
 ### 3.7 CPU tricks: IRAM, SIMD/PIE, esp-dsp
+
 * `CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM=y` (put LVGL hot functions in IRAM) **[V in Waveshare cfg]**,
   `CONFIG_COMPILER_OPTIMIZATION_PERF=y`, `CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB`, `CONFIG_ESP32S3_DATA_CACHE_64KB`,
   `CONFIG_ESP32S3_DATA_CACHE_LINE_64B`, `CONFIG_SPIRAM_FETCH_INSTRUCTIONS/RODATA` **[V]** (all in
@@ -221,6 +240,7 @@ lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
 ## 4. Animation best practices
 
 ### 4.1 Frame-rate targets **[K]**
+
 * **30 fps** for UI transitions on LVGL CPU rendering; **60 fps** only when dirty area ≤ ~1/6 screen or content is
   simple (fills, arcs, bitmaps). `LV_DEF_REFR_PERIOD` 33 ms (30 fps) default; 16 ms for 60.
 * Consistent pacing beats peak fps: keep a steady 30 than oscillate 20–45. Budget: **33 ms/frame** = ~15 ms render + ~15 ms
@@ -229,6 +249,7 @@ lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
   `task_max_sleep_ms`), CPU can light-sleep.
 
 ### 4.2 Easing
+
 * Ease-out (cubic/quint) for entering elements, ease-in for exits, ease-in-out for position changes; durations
   **150–250 ms** for micro-interactions, **250–400 ms** for screen transitions (Wear OS Material guidance
   ~300 ms; Apple HIG similar) **[K]**. Avoid linear except for spinners/progress.
@@ -238,19 +259,21 @@ lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
 * Drive animations by **time not frames** (LVGL does); never block the LVGL task.
 
 ### 4.3 Minimise dirty area
+
 * Every changed object invalidates its bbox → whole union is rendered. Strategies **[K]**:
-  - Animate **small**, opaque-background widgets (arc indicator, hand image, icon) – keep bbox tight.
-  - Use `lv_obj_set_style_transform_*` / `translate` on small objects rather than relayout (avoids invalidating siblings).
-  - Avoid `opa<255`, shadows, blur, big radius clipping masks (`lv_obj_set_style_clip_corner`, `radius=LV_RADIUS_CIRCLE` + clip) on large objects — they trigger
+  * Animate **small**, opaque-background widgets (arc indicator, hand image, icon) – keep bbox tight.
+  * Use `lv_obj_set_style_transform_*` / `translate` on small objects rather than relayout (avoids invalidating siblings).
+  * Avoid `opa<255`, shadows, blur, big radius clipping masks (`lv_obj_set_style_clip_corner`, `radius=LV_RADIUS_CIRCLE` + clip) on large objects — they trigger
     layer/mask rendering (slow). Pre-render those as images.
-  - Avoid `lv_label` text changes in animated parents that cause re-layout.
-  - Use `lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN)` + `lv_obj_remove_flag(LV_OBJ_FLAG_SCROLLABLE)` where applicable.
-  - Use `LV_OBJ_FLAG_SNAPPABLE` + `lv_obj_set_scroll_snap_*` for pages; `scroll_throw` tuned.
+  * Avoid `lv_label` text changes in animated parents that cause re-layout.
+  * Use `lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN)` + `lv_obj_remove_flag(LV_OBJ_FLAG_SCROLLABLE)` where applicable.
+  * Use `LV_OBJ_FLAG_SNAPPABLE` + `lv_obj_set_scroll_snap_*` for pages; `scroll_throw` tuned.
 * Debug with `LV_USE_REFR_DEBUG` (flash dirty areas) and `LV_USE_PERF_MONITOR` **[V enabled in Waveshare demo]**.
 * For purely custom canvases (watch hands, particles — as FluidBox/lucky-wheel in factory), M5GFX sprites + `pushSprite` of
   a bounding rect is ideal and bypasses LVGL cost; use a 16-bit sprite in PSRAM with `setPsram(true)` (factory has commented code for a full-screen canvas **[V]**).
 
 ### 4.4 Pre-rendered assets vs vector/Lottie
+
 * **Pre-rendered sprites/PNG-sequence/RGB565 raw (`LV_IMAGE_COMPRESS`, `.bin` in flash/LittleFS, mmap)**: cheapest; 466² frame
   = 424 KB, so keep animated assets ≤ ~120×120 (28 KB/frame, 20–30 frames) or use RLE/LZ4-compressed LVGL images
   (`LV_USE_LZ4`, `LV_BIN_COMPRESS`) **[K]**.
@@ -265,6 +288,7 @@ lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
 * Compared: factory `app_fluidbox`/`app_lucky_wheel` use custom M5GFX drawing for complex animations **[V dir listing]**.
 
 ### 4.5 Round-screen transition patterns (Wear OS / watchOS / Pixel Watch) **[K]**
+
 * **Edge/bezel swipe**: swipe from screen edge = back (Wear OS swipe-to-dismiss from left); watchOS: swipe up/down = Control Center / notifications. For
   a custom device with a "circle" use **swipe from the bezel inward** reserved for system, interior for content.
 * **Page carousel with vertical scroll + horizontal swipe** (watch faces left/right; apps list up; notifications down): LVGL `lv_tileview` with
@@ -282,6 +306,7 @@ lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
   fade (alpha blends full screen). Use `auto_del=false` for cached screens.
 
 ### 4.6 Haptics paired with animations **[K]**
+
 * The StopWatch has a vibration motor (`docs/arduino/api/vibration.md`, driven via M5PM1/M5IOE1 — see local docs for the API). Keep haptics
   **short (10–30 ms) and sparse**: tick on detent/snap in scroll lists, soft pulse on confirm, double pulse on error/alarm; never haptic every frame.
 * Fire haptic at the animation's **moment of impact** (end of ease-out / snap point), not at start; debounce ≥ 80 ms between ticks. ERM motors have
@@ -331,13 +356,13 @@ lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
 * **Typography** **[K]** (viewed at ~30–40 cm, 266 ppi): body ≥ **22–24 px (≈ 6 pt-ish)**, secondary ≥ 18 px, hero numerals 64–120 px, **never < 16 px**.
   Use medium/semibold weights on black (thin weights bloom and alias on AMOLED PenTile-style subpixels). Factory LVGL fonts: Montserrat 10/16/18/22/28/36 **[V]**;
   Waveshare demo uses 12–26 **[V]**.
-  - **LVGL fonts**: built-in Montserrat (4 bpp antialiased) — enable only sizes you use (each ~20–60 KB flash); custom via
+  * **LVGL fonts**: built-in Montserrat (4 bpp antialiased) — enable only sizes you use (each ~20–60 KB flash); custom via
     **lv_font_conv** (https://github.com/lvgl/lv_font_conv, `--bpp 4 --format lvgl --no-compress`, `--lcd`not for AMOLED) or the online tool
     https://lvgl.io/tools/fontconverter; limit glyph ranges (`0x20-0x7F`, plus icons); compressed fonts (`LV_USE_FONT_COMPRESSED` **[V enabled in Waveshare]**) save flash at CPU cost.
-  - **Runtime TTF**: LVGL `LV_USE_TINY_TTF` (stb_truetype; cache glyphs, RAM-heavy; first-draw latency — OK for static text, avoid in animated counters)
+  * **Runtime TTF**: LVGL `LV_USE_TINY_TTF` (stb_truetype; cache glyphs, RAM-heavy; first-draw latency — OK for static text, avoid in animated counters)
     or FreeType (heavier). For big numerals pre-render to bitmap font (e.g. 96 px digits only `0123456789:.`).
-  - **M5GFX/LovyanGFX**: `fonts::FreeSansBold18pt7b`, smooth fonts via VLW (`loadFont`) – antialiased. (Factory touch demo uses FreeMonoBold18pt7b **[V]**.)
-  - Prefer fixed-width (tabular) digits for timers to avoid jitter (Montserrat digits are tabular; check your custom font).
+  * **M5GFX/LovyanGFX**: `fonts::FreeSansBold18pt7b`, smooth fonts via VLW (`loadFont`) – antialiased. (Factory touch demo uses FreeMonoBold18pt7b **[V]**.)
+  * Prefer fixed-width (tabular) digits for timers to avoid jitter (Montserrat digits are tabular; check your custom font).
 * **Colour semantics** **[K]**: on black — white/near-white (#F2F2F2) primary text, 60 % grey (#9AA0A6) secondary; accents:
   green #34C759 OK/active/running, amber #FFB020 warning/waiting, red #FF453A error/stop, blue #0A84FF/cyan info/link, purple for agent "thinking".
   Don't convey state by colour alone (add icon/shape, text); contrast ≥ 4.5:1. Limit palette to 1 accent per screen + state colours.
@@ -364,12 +389,12 @@ lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
 * Hardware gesture IDs fire once at lift-off with fixed thresholds → feel laggy and can't drive interactive drags. **Prefer feeding raw X/Y to LVGL** (smooth
   tracking) and let LVGL derive gestures; use the chip's gestures only as low-power wake (e.g. double-tap to wake).
 * **LVGL 9 gesture/indev settings** (`lv_conf.h` / runtime) **[K]**:
-  - `LV_INDEV_DEF_READ_PERIOD` 10–16 ms (poll ≤ 60–100 Hz; I²C read ~0.3 ms at 400 kHz; or use IRQ-gated read).
-  - `LV_INDEV_DEF_SCROLL_LIMIT` 10 px (drag threshold; raise to 12–16 on the small round screen to avoid accidental scroll); `SCROLL_THROW` 10–15 %.
-  - `LV_INDEV_DEF_LONG_PRESS_TIME` 400 ms, `LONG_PRESS_REP_TIME` 100 ms; `LV_INDEV_DEF_GESTURE_LIMIT` 50 px, `GESTURE_MIN_VELOCITY` 3.
+  * `LV_INDEV_DEF_READ_PERIOD` 10–16 ms (poll ≤ 60–100 Hz; I²C read ~0.3 ms at 400 kHz; or use IRQ-gated read).
+  * `LV_INDEV_DEF_SCROLL_LIMIT` 10 px (drag threshold; raise to 12–16 on the small round screen to avoid accidental scroll); `SCROLL_THROW` 10–15 %.
+  * `LV_INDEV_DEF_LONG_PRESS_TIME` 400 ms, `LONG_PRESS_REP_TIME` 100 ms; `LV_INDEV_DEF_GESTURE_LIMIT` 50 px, `GESTURE_MIN_VELOCITY` 3.
     Events: `LV_EVENT_GESTURE` + `lv_indev_get_gesture_dir()`, `LV_EVENT_LONG_PRESSED`, `LV_EVENT_CLICKED`, `LV_EVENT_DOUBLE_CLICKED` (LVGL 9.x has `lv_indev_set_*`
     runtime setters for these and `LV_EVENT_GESTURE` for four directions; 9.4+ adds multi-touch gestures `LV_USE_GESTURE_RECOGNITION`) — verify names in v9.5.0.
-  - Gesture vs scroll conflict: on scrollable containers call `lv_obj_remove_flag(obj, LV_OBJ_FLAG_GESTURE_BUBBLE)` appropriately; for edge swipe-back put an invisible 24–32 px
+  * Gesture vs scroll conflict: on scrollable containers call `lv_obj_remove_flag(obj, LV_OBJ_FLAG_GESTURE_BUBBLE)` appropriately; for edge swipe-back put an invisible 24–32 px
     strip object at the rim that handles `LV_EVENT_GESTURE`.
 * **Double-tap** (software): two `PRESSED→RELEASED` within 250–300 ms and < 20 px apart; LVGL has `LV_EVENT_DOUBLE_CLICKED` (needs the 2nd click on the same object). Delay
   single-tap action by ~250 ms only where double-tap exists — otherwise avoid double-tap (latency) and use long-press.
@@ -405,6 +430,7 @@ lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
 ## 9. Recommended stack and rules of thumb for this project
 
 ### 9.1 Stack
+
 1. **ESP-IDF 5.5.x** (idf.py or PlatformIO `framework=espidf`, pioarduino 55.03.312 as in the factory `platformio.ini`), target esp32s3, 16 MB flash, OPI PSRAM @ 80 MHz.
 2. **LVGL 9.5.x** (same as factory) for UI; **M5GFX 0.2.19+ `Panel_AMOLED`** (copy factory `Panel_CO5300` subclass + `M5StopWatch` class from `hal_display.cpp`)
    for panel init/brightness/sleep. Optional later swap of flush to `esp_lcd_co5300` + `esp_lvgl_port` if M5GFX flush is the bottleneck (needs IOE reset/power first).
@@ -412,7 +438,8 @@ lv_display_add_event_cb(disp, rounder_cb, LV_EVENT_INVALIDATE_AREA, NULL);
 4. Wake/power: use factory PowerDemo + M5PM1/M5IOE1 libs (pinned: M5IOE1 1.0.8, M5PM1 1.0.6, BMI270_BMM150_Sensor 0.1.2).
 
 ### 9.2 sdkconfig (starting point; combine factory + Waveshare tuned values)
-```
+
+```text
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 CONFIG_SPIRAM=y  CONFIG_SPIRAM_MODE_OCT=y  CONFIG_SPIRAM_SPEED_80M=y
@@ -422,8 +449,10 @@ CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y  CONFIG_SPIRAM_RODATA=y      # only if intern
 CONFIG_FREERTOS_HZ=1000
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y   CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
 ```
+
 ### 9.3 LVGL config (`lv_conf` / Kconfig)
-```
+
+```text
 LV_COLOR_DEPTH 16                       # RGB565
 LV_DEF_REFR_PERIOD 33                   # 30 fps; use 16 only for small-region interactions
 LV_DRAW_SW_DRAW_UNIT_CNT 2              # one per core (set LVGL task affinity accordingly)
@@ -439,7 +468,9 @@ LV_CACHE_DEF_SIZE 1 MB (image cache, factory value)  LV_IMAGE_HEADER_CACHE_DEF_C
 LV_USE_LOTTIE 0 (unless a specific hero animation is justified)  LV_DRAW_SW_SHADOW off or limited
 LV_INDEV_DEF_READ_PERIOD 16; SCROLL_LIMIT 12; GESTURE_LIMIT 50; LONG_PRESS_TIME 400
 ```
+
 ### 9.4 Display buffers & flush
+
 * **Two partial buffers, 466 × 48 RGB565 = 44 736 B each (≈ 90 KB total), `MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL`**, `LV_DISPLAY_RENDER_MODE_PARTIAL`.
   Fall back to 466×24 if internal heap is tight with Wi-Fi/BLE; fall back to PSRAM 466×120 (factory) only if internal RAM is unavailable.
 * Fix/verify the factory's buffer-size arithmetic (`width*LV_BUFFER_LINE` passed in bytes) when porting **[?]**.
@@ -452,6 +483,7 @@ LV_INDEV_DEF_READ_PERIOD 16; SCROLL_LIMIT 12; GESTURE_LIMIT 50; LONG_PRESS_TIME 
   `lv_tick_set_cb(esp_timer-based)`; use `lv_timer_handler()` return value for sleep, clamp 1–33 ms while animating, ≤ 500 ms idle.
 
 ### 9.5 Targets & budgets
+
 | Item | Target |
 |---|---|
 | Interaction animation | 30 fps steady; ≤ 33 ms frame (render+flush overlapped) |
@@ -463,6 +495,7 @@ LV_INDEV_DEF_READ_PERIOD 16; SCROLL_LIMIT 12; GESTURE_LIMIT 50; LONG_PRESS_TIME 
 | PSRAM for UI | ≤ ~2 MB (image cache 1 MB + layers) |
 
 ### 9.6 Design rules of thumb
+
 1. Black background, one accent colour per screen, state colours green/amber/red; never white fills.
 2. Font sizes: body 22–28 px, secondary ≥ 18 px, hero 48–96 px; min weight Medium; no text < 16 px; digits tabular.
 3. Touch targets ≥ 80 px (target 96); keep interactive content inside r ≤ 190 px; rim 24–32 px strip = system gestures (back / page swipe).
@@ -475,6 +508,7 @@ LV_INDEV_DEF_READ_PERIOD 16; SCROLL_LIMIT 12; GESTURE_LIMIT 50; LONG_PRESS_TIME 
 ---------------------------------------------------------------------------------------------------
 
 ## 10. Gaps / things to verify on hardware
+
 * No TE-gated flush found in factory `hal_display.cpp` (only that file reviewed; `Panel_AMOLED.inl` was only keyword-scanned). Confirm whether M5GFX waits on TE internally.
 * Whether the CO5300 on StopWatch truly needs 2-pixel aligned windows (M5GFX hides this inside `setWindow`) — read `docs/datasheets/CO5300_display_driver.pdf`.
 * LVGL 9.5 names for ESP32-S3 asm blend and lottie (`LV_USE_LOTTIE`), gesture settings — check `lv_conf_template.h` of v9.5.0. I did not fetch LVGL docs (the docs URL tried returned 404).

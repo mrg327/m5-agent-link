@@ -26,7 +26,7 @@ The design board is where the watch UI's current state and the decisions about i
 
 The architecture is the proof of concept, grown. There is still one process, `tools/board/board.mjs`, started by the Claude Code session as a channel server. (Since B2 it is a small shim that forks `server.mjs` and restarts it on edit, so server changes don't need an MCP reconnect.)
 
-```
+```text
  phone / desktop browser ──HTTP+SSE──▶ board.mjs ──channel push──▶ Claude Code session
         ▲                               │  ▲                                │
         └──────── live updates ◀────────┘  └── fs.watch(design/board/) ◀────┘ edits files, calls tools

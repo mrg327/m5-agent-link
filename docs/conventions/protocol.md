@@ -49,11 +49,13 @@ changes the C code and needs a `regen.sh` run.
   (`pointer_left`, `pointer_right`) and `scroll_unit` (`scroll_lines`, `scroll_pages`,
   `scroll_to_end`). Do not copy them; renaming them is a C codec change, so it waits for the generator.
   `review`; `planned: phase 2`
+
   ```cddl
   ; good                               ; bad: prefix is not the enum's name
   fw_status = fw_status_go / …         pointer_btn = pointer_left / pointer_right
   fw_status_go = 0                     pointer_left = 0
   ```
+
 - **PROTO-3. Every map key line ends with `; <name>`, and that first word is the key's symbolic
   name.** Vectors, `agentlink decode`, the trace, the Rust field and the JS spec all use it. Write the
   comment's prose after the name. One key has no name today: `dbg_set_log_level` key 0 (Rust and the
@@ -155,10 +157,12 @@ So compatibility rests on the sender:
   maps new enum values to old ones and withholds messages by `peer_minor`; the device does the same
   with the daemon's minor (`model_peer_minor()`). Every new key, value or type comes with its gate in
   the same commit. `review`; `planned: phase 2` (an old-peer vector per gate)
+
   ```rust
   // device.rs: an older device cannot decode agent_pi, so it gets agent_other
   if self.peer_minor < PI_MINOR && s.ag == Some(Agent::Pi) { s.ag = Some(Agent::Other); }
   ```
+
 - **PROTO-21. New keys are optional (`? n =>`).** A required key in an existing map is a major
   change. `review`
 - **PROTO-22. When an unknown value must not cost the whole message, send it as a plain `uint`**, as

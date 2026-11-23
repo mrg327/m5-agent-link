@@ -1,0 +1,83 @@
+# typos (https://github.com/crate-ci/typos) config for `scripts/check docs`.
+# Run: uvx typos@1.52.0   (pinned in scripts/check.d/docs.sh; docs/conventions/docs.md §7)
+# A false positive goes in [default.extend-words] or [default.extend-identifiers] with a comment
+# saying what it is; a real typo gets fixed.
+
+[files]
+extend-exclude = [
+  # Vendored docs mirrored by scripts/fetch_docs.py (DOC-4)
+  "docs/StopWatch.md",
+  "docs/arduino/",
+  "docs/esp_idf/",
+  "docs/github/",
+  "docs/guide/",
+  "docs/tools/",
+  "docs/uiflow2/",
+  "*.pdf",
+  # Vendored code
+  "firmware/components/core/third_party/",
+  "firmware/components/agentlink_proto/include/zcbor_*",
+  "firmware/components/agentlink_proto/src/zcbor_*",
+  "firmware/boards/stopwatch/bmi270_config.c",
+  "atlas/vendor/",
+  # Generated
+  "firmware/components/agentlink_proto/include/agentlink_codec_*",
+  "firmware/components/agentlink_proto/src/agentlink_codec_*",
+  "firmware/components/core/src/fonts/",
+  "atlas/data/facts.json",
+  "atlas/css/tokens.generated.css",
+  "protocol/vectors/",
+  # Word lists for the keyboard decoder: real words, misspellings included on purpose
+  "daemon/crates/agentlink-keys/data/*.txt",
+  # Lock files and binaries
+  "*.lock",
+  "package-lock.json",
+  "*.bin",
+  "*.wav",
+  "*.wasm",
+  "*.png",
+  "*.patch",
+]
+
+[default]
+# Issue file names are slugs cut at a fixed length by scripts/issue ("...-the-runnin.md").
+check-filename = false
+extend-ignore-re = [
+  # Git commit hashes (f288ede, 95d85ba, cace2b8)
+  "\\b[0-9a-f]{7,40}\\b",
+  # Issue IDs (20261109-59ba)
+  "\\b\\d{8}-[0-9a-f]{4}\\b",
+  # Phosphor icon code points (e0ba)
+  "\\be[0-9][0-9a-f]{2}\\b",
+]
+
+[default.extend-words]
+# Accepted spelling; the UI palette's accent colour is named "vermillion" in code and docs
+vermillion = "vermillion"
+# Power report field: number of deep sleeps that ended (protocol/agentlink.cddl)
+nd = "nd"
+# Prefix of the "home" sound cues in sound_bank.c (hom_poke_lead, ...)
+hom = "hom"
+# Short local names: keep-awake inhibitor, badge area, I2S data-out pin
+inh = "inh"
+ba = "ba"
+dout = "dout"
+# "mis-tap": a tap that lands on the wrong target
+mis = "mis"
+# Active noise cancelling
+anc = "anc"
+# Test data: deliberate fragments and near-misses
+fo = "fo"
+thr = "thr"
+abd = "abd"
+caf = "caf"
+reques = "reques"
+als = "als"
+# SA-IS suffix-array library (sais-lite) in agentlink-delta's notices
+sais = "sais"
+
+[default.extend-identifiers]
+PNGs = "PNGs"
+OTAs = "OTAs"
+# NimBLE API name
+ble_gap_set_prefered_le_phy = "ble_gap_set_prefered_le_phy"

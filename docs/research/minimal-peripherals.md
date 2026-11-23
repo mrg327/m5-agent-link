@@ -40,22 +40,27 @@ Per-state default actions used below ("press" = main action; "hold" = secondary)
 | Error | Focus terminal | Dismiss | |
 
 ### Model A – "Ring carousel + context press" (recommended)
+
 Swipe/rotate-drag around the bezel (or button 1/2 = prev/next) to select; the focused session fills the centre, with a coloured arc. Tap centre or button A = context-default; hold = secondary. Haptic tick per session.
 Pros: zero submenus; list and detail merge; Flic/AirPods precedent. Cons: a long list needs scrolling; tap-vs-hold needs clear affordance.
 
 ### Model B – "Two buttons = two verbs"
+
 Touch selects (tap a ring segment, one segment per session). Button A = primary action, Button B = secondary; hold either = confirm-protected action (Pebble fixed roles + hint labels). Labels drawn at the screen edge next to each button, recoloured per state.
 Pros: eyes-free, reliable with gloves/wet hands, matches Pebble. Cons: only two verbs; state-dependent meaning must be taught by labels.
 
 ### Model C – "Radial action flower" (Surface Dial / Actions Ring)
+
 Tap a session → 3–4 coloured action petals appear around it; swipe toward a petal and release to fire (flick gesture), hold on petal to confirm destructive ones.
 Pros: rich, discoverable, uses round screen. Cons: this is still a (small) submenu – two steps, slower than A/B; use only for rarely needed actions.
 
 ### Model D – "IMU confirm layer"
+
 On top of A/B: wrist-flick/tilt toggles snooze; nod-style double-tilt or shake = deny; press-and-hold + steady = approve. Head-gesture precedent exists in AirPods ([9to5Mac](https://9to5mac.com/2026/03/19/airpods-pro-now-have-10-hidden-controls-in-ios-26-heres-the-full-list/)); wrist equivalents for a wearable are untested **[unverified]**.
 Pros: hands-busy approval, fun. Cons: false triggers on a wearable; never sole confirm for approvals.
 
 ### Model E – "Aggregate-first glance with per-session peek" (Hue-light style)
+
 Home shows worst-state colour (priority like [esp32-claude-status-light](https://github.com/lianshuang-photo/esp32-claude-status-light/blob/main/README.md)); button A jumps directly to the highest-priority session and acts with its default. Pros: fewest inputs for the common "something needs me" case. Cons: hides other sessions; combine with A.
 
 **Recommendation:** A as the base, B's edge labels for the buttons, E's priority jump as the button-A shortcut, D only as an optional deny/snooze accelerator.

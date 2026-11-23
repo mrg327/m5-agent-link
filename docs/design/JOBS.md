@@ -73,7 +73,7 @@ Commands on a shell session:
 `agentlink shell-init zsh|bash` prints a snippet that calls the hook shim in the background, so a
 command is never delayed:
 
-```
+```sh
 agentlink-hook shell start --pid $$ --seq N -- "<command line>"     # preexec
 agentlink-hook shell end   --pid $$ --seq N --exit <status>          # precmd
 agentlink-hook shell exit  --pid $$                                  # the shell exits

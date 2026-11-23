@@ -159,7 +159,7 @@ need one written, and `sw_power.h` has two `//` comments. A run with `WARN_AS_ER
 that is done, so the coverage counts are the baseline: `/**` comments may only go up, and undocumented
 functions only down. Candidate Doxyfile (paths from the repository root):
 
-```
+```text
 INPUT = firmware/components/core/include firmware/components/agentlink_hal/include \
         firmware/boards/stopwatch/sw_power/include
 FILE_PATTERNS = *.h

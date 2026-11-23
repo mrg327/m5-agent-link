@@ -67,6 +67,7 @@ All figures are for signed `agentlink.bin` images built from commits on `main`, 
 
 With a 22-135 KB patch, the radio carries data for under 1 s from macOS and a few seconds from Linux. The rest of an
 update is fixed cost:
+
 - reading and hashing the 1.3 MB base on the watch;
 - erasing and writing the 1.3 MB spare slot as the image is rebuilt (the USB whole-image update, 13 s, is the upper
   bound for this);

@@ -10,7 +10,7 @@
 A finished agent card said little more than that it finished. It now says what the turn did: how many files it
 changed, how many lines it added and removed, whether the tests passed, and how long it took:
 
-```
+```text
         ✓ Done  1m 34s
         ━━━━━━━───────            (context capsule, GAUGES.md)
    3 files · +120 –14 · ✓ passed · 4m 12s

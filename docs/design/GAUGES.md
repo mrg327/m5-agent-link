@@ -89,7 +89,7 @@ device connects (unless the last reading is stale), whenever the figures change,
 
 ## 4. The status-line entry point
 
-```
+```sh
 agentlink-hook statusline [-- <your own status-line command>]
 ```
 

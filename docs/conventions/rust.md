@@ -63,7 +63,7 @@ and metadata live in the root `daemon/Cargo.toml` (`[workspace.package]`,
 
 The allowed direction is **binaries → libraries, never the reverse, and never library → library**:
 
-```
+```text
 agentlinkd ──► agentlink-proto ◄── agentlink
      ├───────► agentlink-keys
      └───────► agentlink-delta
@@ -295,6 +295,7 @@ literal_string_with_formatting_args = "allow"
 ```
 
 Notes:
+
 - `nursery` stays off, because its lints are still being developed.
 - `restriction` is never enabled as a group (the clippy README says so). Lints from it are picked
   one at a time, as above.
@@ -335,12 +336,14 @@ without a `// SAFETY:` comment is the second `libc::kill` at `agentlinkd/src/kee
 hits are why RS-24 keeps `indexing_slicing` out of the workspace table.
 
 What this means for phase 3:
+
 - The panic baseline is 121 sites, and 69 of them are `Mutex::lock().unwrap()` in `agentlinkd`
   (RS-22), so it can shrink quickly.
 - Library crates can ban unwrap and expect almost at once (4 sites).
 - `missing_docs` on the three library crates is 59 items.
 
 Other baseline items:
+
 - No crate depends on `thiserror`. There are two hand-written library errors (`delta`, `keys`) and 27
   `Result<_, String>` functions in `agentlinkd` (RS-15, RS-17).
 - `agentlinkd` refers to `agentlink-keys` and `agentlink-delta` by path, not through

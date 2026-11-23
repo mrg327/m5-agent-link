@@ -194,7 +194,7 @@ anywhere else in the centre behaves as in v2. A tap still never commits a hold i
 
 ### 4.1 HOME
 
-```
+```text
             y 72    Claude Code · feat/login          caption, COL_TEXT2
             y 146   webapp                            FONT_TITLE white; FONT_HEAD ×2 lines if too wide
             y 196   ⟳ Working  1m 40s                 icon 28 + FONT_HEAD in state colour; time FONT_BODY COL_TEXT2
@@ -227,7 +227,7 @@ anywhere else in the centre behaves as in v2. A tap still never commits a hold i
 
 A terminal command that runs longer than ten seconds is a session like an agent's: same ring, same card.
 
-```
+```text
             y 72    Terminal · main                   caption
             y 146   webapp                            subject
             y 196   ⟳ Running  about 2m left          state row; the time is the job's own (below)
@@ -282,7 +282,7 @@ centred on y 246. Legends: A `Select`, B `Next`.
 
 ### 4.3 ASK
 
-```
+```text
             y 58    Claude Code · webapp              caption
             y 80    Run shell command                 FONT_HEAD white, one line
             y 112…  ┌──────────────────────────┐      platter COL_FILL1, r 18, 320 wide, pad 10/14
@@ -351,7 +351,7 @@ A permission can only be approved when all of its text has been on screen.
 A permission whose request carries a standing rule (proto 0.13) has a third option after Deny:
 `Approve` · `Deny` · `Always allow` · `Open on PC`. The default view is unchanged (`Open on PC` / Approve / `Deny`).
 
-```
+```text
             y 58    Claude Code · webapp              caption (unchanged)
             y 80    Saved for this project            FONT_HEAD white: where (or "Until this session ends")
             y 112…  ┌──────────────────────────┐      platter COL_FILL1, r 18, 320 wide, pad 10/14
@@ -377,7 +377,7 @@ A permission whose request carries a standing rule (proto 0.13) has a third opti
 
 An `AskUserQuestion` request (proto 0.18, `qs`) is shown one question at a time:
 
-```
+```text
             y 58    Claude Code · webapp · 1 of 2     caption; "1 of 2" only with several questions
             y 80    Framework                         FONT_HEAD white: the question's header
             y 112…  Which UI framework should the     FONT_BODY COL_TEXT2, up to 3 lines (question style, no
@@ -419,7 +419,7 @@ one line. No chevrons, no hint. Legends: A `Bottom`, B `Page`, both hidden while
 
 ### 4.6 STATUS: the control centre (M2)
 
-```
+```text
             y 116   12:30                             FONT_NUM white (clock unset: host name, FONT_TITLE)
             y 168   🖥 dev-mac   ▮ 80%                 chip row, COL_TEXT2 (amber `Offline · 4m`)
             y 246   ( 🔔 ) ( 🔊 ) ( ⑤ ) ( i )      four round toggles, Ø 64, centres x 107 / 191 / 275 / 359
@@ -451,7 +451,7 @@ one line. No chevrons, no hint. Legends: A `Bottom`, B `Page`, both hidden while
 
 ### 4.6b STATUS with usage (2026-11-12, [GAUGES.md](GAUGES.md))
 
-```
+```text
             r 192 / 182   two 240° arcs through 12 o'clock, 4 px: outer 5 hours, inner the week
             y 84    12:30                             FONT_TITLE (FONT_NUM without usage)
             y 120   🖥 dev-mac   ▮ 80%                 chip row
@@ -499,7 +499,7 @@ open except the B hold. The ring is drawn with `lv_draw_arc`; `LV_USE_ARC` and `
 
 ### 4.10 READ: the last message (2026-11-12, [LAST-MESSAGE.md](LAST-MESSAGE.md))
 
-```
+```text
             y 58    Claude Code · webapp              caption
             y 80    Last message                      FONT_HEAD white
             y 112…  Built and flashed the new         FONT_BODY white, left-aligned, 320 wide, seven lines a page

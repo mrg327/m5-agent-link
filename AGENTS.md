@@ -12,7 +12,15 @@ scripts/issue log ID "…"      # as you go
 scripts/issue close ID fixed "commit …; checks …"
 ```
 
-The design docs are under `docs/design/` and the repository map is in `README.md`.
+The design docs are under `docs/design/` ([index](docs/design/README.md)) and the repository map is
+in `README.md`.
+
+## Per-component guides
+
+Read the `AGENTS.md` for the directory you work in. Each names the check to run, where new code goes
+and the gotchas found there (each directory's `CLAUDE.md` loads it):
+[firmware](firmware/AGENTS.md), [simulator](simulator/AGENTS.md), [daemon](daemon/AGENTS.md),
+[protocol](protocol/AGENTS.md), [atlas](atlas/AGENTS.md), [bench](bench/AGENTS.md).
 
 ## Conventions and checks
 

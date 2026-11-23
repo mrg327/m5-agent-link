@@ -19,8 +19,8 @@ This is a local mirror of the vendor documentation for the M5Stack StopWatch. To
 | --- | --- |
 | [StopWatch.md](StopWatch.md) | Product page: specs, **pin map**, M5PM1/M5IOE1 pins, PlatformIO config |
 | [StopWatch_product_page.pdf](StopWatch_product_page.pdf) | PDF export of the product page |
-| [hardware/](hardware/) | Schematic and model/size drawing |
-| [datasheets/](datasheets/) | ESP32-S3, M5PM1, M5IOE1, ES8311, RX8130CE, CO5300, CST820B |
+| `hardware/` (fetched, not committed) | Schematic and model/size drawing |
+| `datasheets/` (fetched, not committed) | ESP32-S3, M5PM1, M5IOE1, ES8311, RX8130CE, CO5300, CST820B |
 | [guide/](guide/) | Factory firmware usage, factory firmware restore, Xiaozhi voice assistant |
 | [arduino/setup/](arduino/setup/) | Arduino IDE, board manager, and library manager setup |
 | [arduino/program.md](arduino/program.md) | Compile and upload walkthrough |

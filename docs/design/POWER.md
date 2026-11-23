@@ -67,7 +67,7 @@ user's own logger. It also keeps the last report of each device for `agentlink s
 
 ## `agentlink power`
 
-```
+```text
 agentlink power [--csv PATH] [--device HEXPREFIX] [--hours H | --all] [--capacity-mah 450] [--json]
 ```
 

@@ -144,22 +144,65 @@ silent.
 ## 5. Markdown
 
 - **DOC-23. One H1 (`# Title`) per file, on the first line** (after front matter, if any). Issue
-  files are exempt: their title is the `title:` front-matter field. `planned: phase 1`
+  files are exempt: their title is the `title:` front-matter field. `checked: scripts/check docs`
   (markdownlint MD025, MD041)
-- **DOC-24. Headings go down one level at a time** and are sentence case. `planned: phase 1`
-  (markdownlint MD001)
+- **DOC-24. Headings go down one level at a time** and are sentence case. `checked: scripts/check
+  docs` (markdownlint MD001; sentence case: `review`)
 - **DOC-25. Links inside the repo are relative** (`[PROTOCOL.md](PROTOCOL.md)`,
   `[issues](../../issues/README.md)`), never `/home/...`, a `github.com/.../blob/main/...` URL or an
-  absolute path, so they work in a clone, on GitHub and offline. `planned: phase 1` (lychee
-  `--offline`)
-- **DOC-26. Every relative link resolves,** including `#anchors`. `planned: phase 1` (lychee
-  `--offline`; external links are checked weekly, not per change, `planned: phase 4`)
-- **DOC-27. Fenced code blocks name their language** (`sh`, `c`, `rust`, `text`). `planned: phase 1`
-  (markdownlint MD040)
+  absolute path, so they work in a clone, on GitHub and offline. `checked: scripts/check docs`
+  (`scripts/check.d/links.py` fails on an absolute path; a `github.com/.../blob/` URL to this repo:
+  `review`)
+- **DOC-26. Every relative link resolves,** including `#anchors` (GitHub's heading slugs).
+  `checked: scripts/check docs` (`scripts/check.d/links.py`; a link to a gitignored file, such as a
+  PDF `scripts/fetch_docs.py` downloads, is skipped; external links are checked weekly, not per
+  change, `planned: phase 4`)
+- **DOC-27. Fenced code blocks name their language** (`sh`, `c`, `rust`, `text`; a diagram or a
+  screen sketch is `text`). `checked: scripts/check docs` (markdownlint MD040)
 - **DOC-28. Line length is not enforced** (markdownlint MD013 off). Wrap prose at about 100 columns
   in new text so diffs stay readable; never re-wrap a paragraph you are not changing. `review`
+  (MD013 is off in `.markdownlint-cli2.jsonc`)
 - **DOC-29. Tables for comparisons and lookups, lists for steps.** Keep cells short; a cell that
-  needs a paragraph belongs in the text. `review`
+  needs a paragraph belongs in the text. A `|` inside a code span in a table is written `\|`, or
+  GitHub splits the cell. `review` (the cell count: `checked: scripts/check docs`, markdownlint
+  MD056)
+- **DOC-30. Spelling is checked** in docs and code alike. A real word the checker does not know (a
+  field name like `nd`, a colour name like "vermillion") goes in `[default.extend-words]` of
+  `_typos.toml` with a comment saying what it is; anything else is fixed. `checked: scripts/check
+  docs` (typos)
+- **DOC-31. Everything else markdownlint checks by default holds** (blank lines around headings,
+  lists, fences and tables; one list marker style per file; no trailing spaces; no stray HTML, so
+  write `\<fw>` or `` `<fw>` `` for a placeholder). `checked: scripts/check docs` (markdownlint)
+
+### What `scripts/check docs` runs (phase 1)
+
+`scripts/check.d/docs.sh` runs three tools and fails if any of them reports a line, or if `uvx` or
+`npx` is missing (CI installs both; a skip would not be deterministic). 3.3 s on the Linux dev
+laptop.
+
+| Tool | Version (pinned in `docs.sh`) | Config | Scope |
+|---|---|---|---|
+| `scripts/check.d/links.py` | Python 3.11 standard library | in the script | first-party `.md` |
+| [typos](https://github.com/crate-ci/typos) via `uvx typos@1.52.0` | 1.52.0 | `_typos.toml` | every file except vendored, generated, binary and word lists |
+| [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) via `npx --yes markdownlint-cli2@0.24.0` | 0.24.0 (markdownlint 0.42.0) | `.markdownlint-cli2.jsonc` | first-party `.md`, except issue files and `CLAUDE.md` imports |
+
+Vendored docs (DOC-4) are excluded from all three: `docs/StopWatch.md`, `docs/arduino/`,
+`docs/esp_idf/`, `docs/github/`, `docs/guide/`, `docs/tools/`, `docs/uiflow2/`, the list
+`scripts/fetch_docs.py` writes. Issue files (`issues/2*.md`) get the link and spelling checks but
+not markdownlint: their front matter and log are written by `scripts/issue` (the log nests its
+environment list four spaces deep) and their bodies are notes from many agents.
+
+markdownlint runs its default rule set with these off, each for a reason:
+
+| Rule | Off because |
+|---|---|
+| MD013 line length | DOC-28 |
+| MD060 table column style | Tables are written compact (`\|---\|`, cells unpadded); padding them churns every edit (1018 hits) |
+| MD034 bare URLs | GitHub autolinks them; the research docs cite their sources that way (183 hits) |
+| MD038 spaces in code spans | The spaces are the point in `` `# ` ``, `` `^Merge ` ``, `` `> ` `` (16 hits) |
+| MD036 emphasis as heading | A bold label line ("**macOS permissions**") is house style (6 hits) |
+| MD024 duplicate headings | On, `siblings_only`: each section can have its own "Build" |
+| MD029 ordered list numbers | Off in `UI-V2.md` only (an inline comment): its decisions are numbered across lists so later text can cite "decision 27" |
 
 ## 6. Where we are (baseline, 2026-11-22)
 
@@ -196,17 +239,39 @@ first of the vendored ones:
 14. `docs/github/hermes-gadget-sdk_STOPWATCH.md` → `server/README.md`
 15. `docs/github/hermes-gadget-sdk_STOPWATCH.md` → `docs/hardware-validation.md`
 
-Items 2–4 need a decision when the link check lands: either the check skips gitignored targets, or
-`docs/README.md` marks them as "fetched" without a link. Phase 1 fixes `docs/github/M5PM1.md`'s
-byte-order mark only if `fetch_docs.py` is changed to strip it.
+Items 2–4, decided in phase 1: the link check skips a target that is gitignored (`git check-ignore`),
+which covers item 2; `hardware/` and `datasheets/` hold only gitignored PDFs, so the directories do
+not exist in a clone and `docs/README.md` now names them as "fetched, not committed" without a link.
+`docs/github/M5PM1.md`'s byte-order mark stays (vendored); the link check reads files as
+`utf-8-sig`.
+
+### Phase 1 (2026-11-22, issue 20261123-2436)
+
+Measured over first-party docs (vendored mirrors excluded), before and after this change:
+
+| Check | Before | After |
+|---|---|---|
+| Broken relative links and anchors (`links.py`) | 2 (`docs/README.md` → `hardware/`, `datasheets/`) | 0 |
+| typos, whole tree, no config | 297 hits, none a real typo in first-party `.md` (hashes, field names, test strings, vendored files) | 0 with `_typos.toml` |
+| markdownlint, default rules minus MD013, non-issue files | 1712 | 0 |
+
+markdownlint before, by rule: MD060 1018, MD034 183, MD032 152, MD022 150, MD040 61, MD031 61,
+MD029 26, MD038 16, MD004 14, MD058 13, MD036 6, MD056 4, MD033 3, MD041 2, MD009 2, MD012 1.
+Fixed in the `.md` files (39 files, +332 −89 lines, nearly all inserted blank lines): MD022, MD031,
+MD032, MD058 (blank lines), MD040 (59 fences marked `text`, 2 `sh`), MD004 (`ui-animation.md`),
+MD009, MD012, MD041 (`UI-V2.md`'s superseded note moved below its H1), MD056 (`|` escaped in
+table code spans in `atlas/CONTRACT.md` and `daemon/README.md`, which GitHub rendered as extra
+columns) and MD033 (`<fw>` and `Promise<number>`, which GitHub dropped as HTML). The rest are off
+or scoped, as listed in §5.
 
 ## 7. Checks
 
 | Check | Rules | When |
 |---|---|---|
-| `scripts/check docs` runs markdownlint-cli2 (MD013 off) and `lychee --offline` on own docs | DOC-23 – DOC-27 | `planned: phase 1` |
+| `scripts/check docs` (`scripts/check.d/docs.sh`): `links.py`, typos, markdownlint-cli2 on own docs (§5) | DOC-23 – DOC-27, DOC-30, DOC-31 | `checked` (phase 1) |
 | Front matter, `superseded_by` targets, `docs/INDEX.md` regenerate-and-diff, README per component | DOC-3, DOC-8, DOC-9, DOC-11 | `planned: phase 2` |
 | Weekly: external links, docs past `last_reviewed`, docs naming paths that no longer exist; files one tracker issue | DOC-10, DOC-26 | `planned: phase 4` |
 | Vale (Google style) on `docs/design/` at suggestion level | DOC-16 | `planned: phase 4` |
 
-Every check prints `path:line: DOC-n message — how to fix`.
+`links.py` prints `path:line: DOC-n message — how to fix`; typos and markdownlint print
+`path:line:col` with their own rule names (the rule table in §5 maps them to DOC rules).

@@ -69,6 +69,7 @@ A screen is assembled from these. A screen that needs something new adds it here
 `firmware/components/core/src/ui_kit.h` is the reference; this section is its summary.
 
 Common to all of them:
+
 - Each is one LVGL object that draws itself. Positions are **centres**, in the parent's coordinates. Angles
   are degrees clockwise from 12 o'clock.
 - Every setter is change-only. Calling it with the value it already has costs nothing; a change invalidates
@@ -301,6 +302,7 @@ owner's, inside the rules.
    before / after sheets.
 
 Checks for every screen:
+
 - `ctest` green. A script's taps may move with the layout, and its `expect_label` words stay
   (rule 9). A script changes only where a tap target moved.
 - No full-screen redraw on a tick: `expect_px_max` tests keep passing.

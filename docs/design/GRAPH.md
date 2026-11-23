@@ -5,7 +5,7 @@ is the session's own agent. Each sub-agent gets its own lane, which forks off la
 started it and merges back when the sub-agent stops. This is the reference screen for the project tenet
 **glyphs over words** (README Principles 4, UI-V3 §1.7): the graph has no text at all.
 
-```
+```text
   ●          newest at the top
   │ ◉        a sub-agent still working (running node: hollow ring, pulses)
   │ ●

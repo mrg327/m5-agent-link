@@ -6,7 +6,7 @@ ISC). Their licences follow.
 
 ## detools
 
-```
+```text
 bsdiff/sais.c based on sais-lite 2.4.1 <https://sites.google.com/site/yuta256/sais>:
     Copyright (c) 2008-2010 Yuta Mori. (MIT License)
 
@@ -42,7 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## heatshrink
 
-```
+```text
 Copyright (c) 2013-2015, Scott Vokes <vokes.s@gmail.com>
 All rights reserved.
  

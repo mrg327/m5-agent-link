@@ -20,7 +20,7 @@ while an agent or job runs is the silent failure of stepping away.
 The cards are always on the watch and can be answered as ever. `agentlink status` shows what the daemon
 believes:
 
-```
+```text
 presence: present (via freedesktop-screensaver, idle 3s of 120s)
   #2 terminal focused: yes (via x11)
 keep awake: held (setting ac, work running, on AC power, via systemd-inhibit)

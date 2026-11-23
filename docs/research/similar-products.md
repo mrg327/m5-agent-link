@@ -14,6 +14,7 @@ Items marked **(unverified)** come from search snippets or general knowledge and
 ## 1. Hardware companions for AI coding agents
 
 ### 1.1 AgentDeck (puritysb) — closest overall competitor
+
 - URL: https://github.com/puritysb/AgentDeck (README: https://raw.githubusercontent.com/puritysb/AgentDeck/master/README.md; device catalog: https://raw.githubusercontent.com/puritysb/AgentDeck/master/docs/devices.md)
 - Offers: local daemon + dashboards for Claude Code, Codex CLI, OpenCode (Hermes preview). Surfaces: Stream Deck/Stream Deck+, Ulanzi D200H/X, iPad/iPhone/Mac/Android apps, e-ink (TRMNL, XTeink), ESP32 panels (TTGO T-Display, LilyGO T-Embed CC1101 knob, T-Display-S3-Pro), Pixoo64/Timebox LED matrices, TUI (`agentdeck dashboard`), Apple Watch notification mirror (CloudKit PoC, observation only).
 - Form factors: wide range; the **T-Embed** is a dual-mode knob/pager (USB on desk, 1300 mAh battery as "carry-around pager that chimes when a session starts waiting"; 8-LED ring = one LED per session).
@@ -24,6 +25,7 @@ Items marked **(unverified)** come from search snippets or general knowledge and
 - Relevance: validates architecture; multi-machine remote attach is its weakest/experimental part ("`agentdeck relay`, experimental"). No Copilot CLI listed in the observed table (verified only for Claude Code, Codex, OpenCode, Hermes).
 
 ### 1.2 nimbus-notify (ristllin)
+
 - URL: https://github.com/ristllin/nimbus-notify ; protocol: https://raw.githubusercontent.com/ristllin/nimbus-notify/main/docs/protocol.md ; PyPI https://pypi.org/project/nimbus-notify/
 - Offers: Python host broker watching Claude Code, Codex, Mistral Vibe via hooks (Vibe via log watcher); pushes per-session state to an LED ring / e-ink device. MIT.
 - Comms: serial (USB-CDC) or BLE using a documented binary protocol **nsn**: `[0xAA][LEN][payload][CRC8]`, payload = magic, seq, segment count, brightness, then 4-byte segment records (state, hue, anim, span). Each frame is a full snapshot ("latest wins"), up to 16 segments.
@@ -32,6 +34,7 @@ Items marked **(unverified)** come from search snippets or general knowledge and
 - Hook-facing CLI `led-report <harness> <verb>`; events to broker over a Unix socket as JSON lines.
 
 ### 1.3 edrethardo/agent-deck — "physical traffic light" macropad
+
 - URL: https://github.com/edrethardo/agent-deck
 - Offers: each Claude Code session on a key of a DeepDeck 16-key WiFi macropad (ESPHome firmware). Green idle, yellow working, red blocked, blue "detected before hooks installed". OLED shows project; knob dims LEDs.
 - Gestures: press = see which project; **double-press = jump to that session's window on the desktop**; hold = rearrange.
@@ -39,6 +42,7 @@ Items marked **(unverified)** come from search snippets or general knowledge and
 - Open source; hardware ~hobbyist macropad.
 
 ### 1.4 Anthropic claude-desktop-buddy (M5StickC Plus desk pet)
+
 - URL: https://github.com/anthropics/claude-desktop-buddy (README raw: https://raw.githubusercontent.com/anthropics/claude-desktop-buddy/main/README.md); summary: https://hysenlabs.com/projects/anthropics-claude-desktop-buddy
 - Offers: official maker reference. Claude desktop app (macOS/Windows) in Developer Mode exposes a **BLE Nordic UART Service JSON API** for permission prompts and recent messages; device approves/denies with buttons. ~2.6k stars at time of summary.
 - Pairing: Help → Troubleshooting → Enable Developer Mode → Developer → Open Hardware Buddy → Connect; auto-reconnect.
@@ -46,19 +50,23 @@ Items marked **(unverified)** come from search snippets or general knowledge and
 - Caveat: only for the desktop app; not a supported product; protocol spec in `REFERENCE.md` (https://github.com/anthropics/claude-desktop-buddy/blob/main/REFERENCE.md, not read).
 
 ### 1.5 Permitter (ericfriedman) — M5Stack Core2 permission panel
+
 - URL: https://github.com/ericfriedman/permitter/blob/main/PERMITTER.md
 - Offers: Claude Code PreToolUse hook → bridge server → M5Stack Core2 over WiFi (HTTP); three touch zones: **Trust Always / This Time / Deny**; "solo mode" where the device is the sole gatekeeper (pre-allows tools in settings so only the hook decides); trusted set resets with bridge restart; runtime-switchable themes. Open source (Arduino/C++, ArduinoJson).
 
 ### 1.6 CVSRohit/claude-code-remote — ESP32 remote with cloud relay
+
 - URL: https://github.com/CVSRohit/claude-code-remote
 - Offers: ESP32 + 1.3" ST7789 240×240 + 4 buttons (▲ ▼ ✓ ✗); launch prompts, approve/deny every tool call, scroll output, interrupt.
 - Comms: device → wss/TLS → Fly.io relay ← outbound wss from a PC runner (Claude **Agent SDK** with `canUseTool` callback). Token-paired; single device + single runner per token. Printable 3D case. Warns that runner uses `bypassPermissions`, so token = shell key.
 
 ### 1.7 Apple Watch controllers
+
 - `shobhit99/claude-watch` — Swift, Node bridge on Mac, live tool output on watch, approve prompts from wrist; ~626 stars (per https://hysenlabs.com/projects/shobhit99-claude-watch). Bridge blocks on the hook until answered. License unclear.
 - `CryptoPilot16/watch-control` — https://github.com/CryptoPilot16/watch-control: approve **Codex and Claude Code** from Apple Watch; agent runs in tmux on a remote Linux server; Codex flow polls tmux every 2 s to detect the prompt and injects `y`; Claude flow uses the PermissionRequest hook; iPhone + watchOS app; optional Pushover fallback.
 
 ### 1.8 Hermes Gadget SDK (explicit StopWatch support)
+
 - URL: https://github.com/allinnb/hermes-gadget-sdk (fork of https://github.com/Adolanium/hermes-gadget-sdk); docs: https://raw.githubusercontent.com/allinnb/hermes-gadget-sdk/main/docs/supported-hardware.md, `docs/protocol.md`.
 - Offers: ESP32-S3 / Raspberry Pi "voice terminal" for **Hermes Agent** (Nous Research): hold to talk, hear reply, see cards, answer confirmation questions, expose LEDs/sensors as agent tools. Not a coding-agent status board, but a reusable device framework. MIT.
 - StopWatch mapping (supported-hardware.md): **blue button hold-to-talk; yellow cancel/navigation; red screen sleep/wake, hold for Settings**; analog mic + speaker; "experimental battery/power reporting". Ports are "experimental until a physical verification report exists".
@@ -66,10 +74,12 @@ Items marked **(unverified)** come from search snippets or general knowledge and
 - Relevance: strongest source of reusable ideas for pairing, capability negotiation, simulator, OTA, and StopWatch pin/button mapping.
 
 ### 1.7b M5Stack StackChan / Xiaozhi
+
 - StackChan: https://github.com/m5stack/StackChan — MIT, firmware + iOS/Android app + Go server (WebSocket forwarding between devices and app clients, XiaoZhi integration, device activation, MySQL, Docker/Kustomize). CoreS3-based desktop robot with servos, 2" touch display, 550 mAh battery. Hardware page: https://docs.m5stack.com/en/core/StackChan_Core.
 - Xiaozhi: https://github.com/78/xiaozhi-esp32 — MIT, MCP-based voice chatbot firmware, 70+ boards incl. M5Stack CoreS3/AtomS3R; protocols documented: WebSocket (`docs/websocket.md`), MQTT+UDP hybrid (`docs/mqtt-udp.md`), MCP device-side (`docs/mcp-protocol.md`); cloud-side MCP can do "PC desktop operation"; community servers in Python/Java/Go; web asset generator for wake words/fonts/emojis. Relevance: voice stack and MCP tool exposure, not coding-agent status.
 
 ### 1.9 Stream Deck plugins for agents
+
 - **Copilot Deck** (Bouncing Ball) — https://marketplace.elgato.com/product/copilot-deck-fe397e6a-5052-4497-875e-741cabca39f2 (v1, Oct 7 2026). **Directly targets GitHub Copilot CLI** on macOS: session tiles, approve permission requests from a key, send prompts, change model/effort/mode, quota/forecast on dials and Neo infobar; keys **blink while Copilot is waiting**, optional sounds + macOS notification; "jumping to a session brings its terminal to the front" (Accessibility permission; Terminal/iTerm tabs precise, others only app-level). Works through a **small Copilot CLI extension** (user-approved) that reports tool/model/context/quota and answers permission requests. No cloud, no tokens.
 - **copilot-stream-deck** (haflidif) — https://github.com/haflidif/copilot-stream-deck, design notes https://github.com/haflidif/copilot-stream-deck/blob/main/docs/integration.md : for the *GitHub Copilot app*. Uses an experimental extension (`joinSession()`), a loopback WebSocket companion API with bearer tokens in `~/.copilot/run/*.json` (voice toggle, `question.answer`, `session.open`), 5 s poll fallback. Findings worth reading: idle runtimes are reaped ~10 min after idle (`idle_cli_reap_check`), so sessions may have no live bridge; reads `events.jsonl` as a degraded fallback; **never auto-approves host permissions**; clears stale data on disconnect so tiles cannot act on stale state; per-session bridge on ephemeral port with random token.
 - **agentsd** (paultyng) — https://github.com/paultyng/agentsd: Claude Code HTTP hooks → local server :9200 → Stream Deck keys/dials; PermissionRequest hook holds response up to 120 s; macOS only; MIT.
@@ -77,6 +87,7 @@ Items marked **(unverified)** come from search snippets or general knowledge and
 - Blog on the pattern: https://nick-liu.com/posts/permission-round-trip/ — holds HTTP open ~590 s (Claude hook timeout 600 s) so a Stream Deck key can approve; gotchas below.
 
 ### 1.10 Host-side notifiers (software, closest to "approve from phone")
+
 - claude-ntfy-hook — https://github.com/nickknissen/claude-ntfy-hook: ntfy push with Allow/Deny action buttons, Tailscale for callback, reads Claude ask/allow/deny rules to avoid noise, parses transcript for context, retries with backoff.
 - claude-notify-everywhere — https://github.com/hwwn/claude-notify-everywhere: Stop/PermissionRequest/Notification hooks → macOS banner (click to focus Ghostty/iTerm2/Warp/VS Code/Cursor...) + ntfy/Bark/Pushover/Telegram.
 - steryereo/claude-hooks — https://github.com/steryereo/claude-hooks: click-to-focus via `$TERM_PROGRAM` / `$ITERM_SESSION_ID`, auto-suppress when that window is already focused.
@@ -102,6 +113,7 @@ Items marked **(unverified)** come from search snippets or general knowledge and
 | M5Stack StopWatch (target hardware) — https://shop.m5stack.com/products/m5stack-stopwatch-dev-kit-esp32-s3 | 1.75" 466×466 AMOLED round touch, 2 prog buttons + power, vibration motor, BMI270 IMU, ES8311 codec + MEMS mic, RX8130 RTC, 450 mAh, lanyard hole, rear magnet; ESP32-S3R8, 16 MB flash, 8 MB PSRAM, 2.4 GHz Wi-Fi | — | Arduino/ESP-IDF/UiFlow | $45 (C152) | Round glanceable face; haptics; wearable |
 
 ### Developer notification apps on watches (CI/GitHub)
+
 - No dedicated, popular "GitHub Actions on Apple Watch / Wear OS" app was found in this research (searched; only generic push actions such as https://github.com/marketplace/actions/api-alerts-github-action-notify and https://github.com/marketplace/actions/cloud-notify-send-push-notifications-to-your-devices turned up). Developers typically rely on phone push (ntfy/Pushover/Slack) mirrored to the watch. The Apple Watch agent approvers in 1.7 are the real analogues.
 
 ---
@@ -109,12 +121,14 @@ Items marked **(unverified)** come from search snippets or general knowledge and
 ## 3. Software patterns
 
 ### 3.1 Agent lifecycle hooks (the data source)
+
 - **GitHub Copilot CLI** hooks: https://docs.github.com/en/copilot/reference/hooks-reference and https://docs.github.com/en/copilot/concepts/customizations/hooks. Sources (loaded in order, combined): policy (`/etc/github-copilot/policy.d/*.json`, Windows ProgramData/Registry), repo `.github/hooks/*.json`, user `~/.copilot/hooks/*.json` (or `$COPILOT_HOME/hooks`), inline `settings.json`, plugin hooks; also reads `.claude/settings.json`. Event names found in the reference (camelCase runtime names with PascalCase aliases): sessionStart, sessionEnd, userPromptSubmitted, preToolUse, postToolUse, agentStop, subagentStop, permissionRequest, notification, errorOccurred, preCompact. Hooks can be `command` (per-OS overrides) or HTTP; hooks can programmatically approve/deny tool execution. Copilot CLI also has an SDK with hooks (https://docs.github.com/en/enterprise-cloud@latest/copilot/how-tos/copilot-sdk/features/hooks) and an experimental extension API used by Copilot Deck.
 - **Claude Code**: https://code.claude.com/docs/en/hooks-guide ; events incl. SessionStart/End, UserPromptSubmit, PreToolUse, PermissionRequest (`hookSpecificOutput.decision.behavior: allow`), Notification (matchers `permission_prompt`, `idle_prompt`), Stop, SubagentStart/Stop, Elicitation; command and **HTTP hooks** supported.
 - **Codex CLI**: three layers (https://codex.danielvaughan.com/2026/04/13/codex-cli-notification-pipeline-osc9-hooks-alerts/): TUI notifications (`[tui] notifications = ["agent-turn-complete","approval-requested"]`, `notification_method = osc9|bel|auto`), external `notify = [...]` program (as of April 2026 fires only for `agent-turn-complete`, tracked in openai/codex #11808, #14813), and newer `~/.codex/hooks.json` hooks (used by nimbus-notify).
 - **Aider/Cursor/others**: no first-class hooks found; fall back to process/log watching (nimbus-notify does this for Vibe; watch-control polls tmux; edrethardo scans /proc).
 
 ### 3.2 Multi-session / terminal integrations
+
 - agent-status (Rust, tmux status-right) — https://lib.rs/crates/agent-status : one JSON file per session, states notify/done/working/idle; agent-switcher popup.
 - tmux-claude-status — https://github.com/farnots/tmux-claude-status : badges per window (working animated, "need input? 3m", waiting, error), jump key to next window needing input.
 - ccmux — https://github.com/skzv/ccmux : TUI + `ccmuxd` daemon + HTTP API, one dashboard for Claude Code/Codex/Cursor across devices, mobile via Moshi.
@@ -122,6 +136,7 @@ Items marked **(unverified)** come from search snippets or general knowledge and
 - Terminal bell / OSC 9: Codex `osc9`; many terminals (Ghostty, iTerm2, Warp, WezTerm) convert to desktop notifications; coverage varies.
 
 ### 3.3 Mobile/remote approval relays
+
 - ntfy / Pushover / Bark / Telegram (1.10); Tailscale for callbacks; Fly.io relay with outbound-only connections (1.6); Claude Remote Control (outbound-only, no open ports); CloudKit relay for Apple Watch (AgentDeck PoC, observation only).
 
 ---

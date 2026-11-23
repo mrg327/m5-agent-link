@@ -47,7 +47,7 @@ The stretch goals are approve/deny, canned replies, and push-to-talk STT. There 
 
 ## 3. System architecture
 
-```
+```text
  ┌──────────── PC ─────────────────────────────────────────────────┐
  │  copilot CLI ──hooks──┐                                           │
  │  claude code ─hooks───┼─► agentlink-hook (tiny exe) ──IPC──┐      │
@@ -64,6 +64,7 @@ The stretch goals are approve/deny, canned replies, and push-to-talk STT. There 
 ```
 
 ### 3.1 Multi-device principles (R10) [P]
+
 1. **The daemon sends semantic data, never pixels.** It sends sessions, states, and attention events. Each device decides how to render them. This keeps the protocol small and lets very different devices work, for example a round AMOLED, a 128×64 OLED, or a single RGB LED plus a button.
 2. **Capability negotiation.** On connect, the device sends `Hello{device_class, board, fw, caps}`. The `caps` field covers:
    - display: none, mono, or color; shape round or rect; width and height
@@ -75,13 +76,15 @@ The stretch goals are approve/deny, canned replies, and push-to-talk STT. There 
    The daemon tailors traffic to these capabilities. For example, a device without a display gets no preview text. A device without a mic doesn't see the STT action.
 3. **Commands are a closed, device-neutral set.** The set is `focus`, `ack`, `approve`, and so on. How a gesture or button maps to a command is decided by the device and is not part of the protocol.
 4. **Firmware = portable core + board support package (BSP).**
-   ```
+
+   ```text
    firmware/
      core/        protocol, session model, state, power policy hooks, UI logic (LVGL), haptic patterns
      boards/
        stopwatch/ CO5300+CST820B+M5PM1/M5IOE1+BMI270+ES8311 init, pin map, power mgmt
        <next>/    e.g. M5Dial (round 240×240 + encoder), CoreS3, AtomS3, Waveshare AMOLED
    ```
+
    The BSP exposes a small HAL: `display_*`, `input_*`, `haptic_*`, `audio_*`, `power_*`, `imu_*`, `link_*`. The UI layer picks a **layout profile** by shape and size (round-large, round-small, rect, or text-only) and is not tied to a board.
 5. **A simulator is a first-class device.** LVGL compiled for the desktop (SDL) connects to the daemon over localhost WebSocket. It is used for UI development, CI screenshots, and as a "virtual device" for users without hardware.
 6. **Protocol schema in one place.** `protocol/` holds the message definitions (CBOR with a CDDL schema, or protobuf/nanopb). Rust and C bindings are generated from it, so non-ESP clients can be written later.
@@ -103,6 +106,7 @@ The **transport is a framing layer.** The same protocol (§5) runs over BLE GATT
 **[D] Q1.** BLE pairing works on the work machine → **BLE is the primary transport.** The dongle is deferred and kept only as a contingency.
 
 ### 3.3 Behaviour when the user steps away
+
 - The link drops, so the device shows the "away" state and keeps the last snapshot with a "stale since hh:mm" label.
 - A reconnect triggers a full snapshot resync. This is idempotent because session IDs come from the daemon.
 - **[P]** The daemon buffers "attention" events while disconnected. On reconnect the device gets a single haptic summary ("2 waiting, 3 done"), not a burst.
@@ -120,10 +124,12 @@ Agent sources are **plugins inside the daemon** (a trait `AgentSource`), so addi
 The hook shim captures **terminal identity** at hook time: `TERM_PROGRAM`, `WT_SESSION`, `KITTY_WINDOW_ID`, `KITTY_LISTEN_ON`, `TMUX_PANE`, `WINDOWID`, the TTY, the PID chain, and the cwd. With these the daemon can focus the exact tab later.
 
 ### Agent state model (device-visible)
+
 `starting → working(tool) → needs_input{approval|question} → working → idle/done | error | ended`.
 Priority for sorting: `needs_input > error > done(unseen) > working > idle > done(seen)`.
 
 ## 5. Device↔daemon protocol [P]
+
 - **Framing:** CBOR messages. Over CDC they are COBS-framed with a CRC16. Over BLE a Nordic-UART-style custom service is used (one RX and one TX characteristic) with length-prefixed fragments, MTU 247 and 2M PHY when available. Over WS, one message per binary frame.
 - **Messages:**
   - `Hello{proto, device_class, board, fw, caps}` and `Welcome{host_id, host_name, proto}`
@@ -144,12 +150,14 @@ Priority for sorting: `needs_input > error > done(unseen) > working > idle > don
 > **Update:** the glance/list/detail navigation below is superseded by the single Ring screen, implemented per [UI-RING.md](UI-RING.md). The gesture table at the end of this section is updated; items 1–3 are kept for history.
 
 **Screen map [D] (superseded):**
-```
+
+```text
  (display off) ──lift / button / attention-glow tap──► GLANCE
    GLANCE ──swipe up──► SESSION LIST ──tap──► DETAIL
    any screen ◄── needs_input arrives & device lifted ── ATTENTION CARD
    Button B long-press ──► BADGE (visualizer)      swipe left / Button B = back
 ```
+
 1. **Glance [D]:** a status ring around the bezel with one arc segment per session, colored by state (amber = needs you, red = error, green = done/unseen, blue pulse = working, grey = idle). The center shows **counts** (waiting · running · done) and a small clock. Tapping a ring segment jumps to that session.
 2. **Session list:** a curved/scaling list (Wear OS style), sorted by priority (§4). Each row is **`repo · branch`** **[D]** plus an agent icon (Copilot / Claude / cloud), a state chip and the elapsed time. Rows ≥ 80 px tall.
 3. **Session detail:** shows repo · branch, agent, host, current tool, elapsed time and the last summary as a short preview with full text on tap (Q2). The actions are: **double-tap = focus on PC** **[D]**, swipe right = ack, and a menu (snooze, notify-when-done, cancel).
@@ -157,6 +165,7 @@ Priority for sorting: `needs_input > error > done(unseen) > working > idle > don
 5. **Badge:** the animated agent visualizer (§8).
 
 **Gestures/buttons [D/P]:**
+
 | Input | Action |
 |---|---|
 | Tap centre | Default action for the selected session (Focus; Done also acks), immediate |
@@ -172,6 +181,7 @@ Priority for sorting: `needs_input > error > done(unseen) > working > idle > don
 **Alerting while at rest [D]:** The screen faces outward on the lanyard, so text is never lit at rest. For `needs_input` and `error`, the device vibrates and shows a **brief dim colored ring glow** (about 2 s, no text, then off). Lifting it shows the attention card.
 
 **Haptics + sound [D]:** both are on by default, with a **quiet mode** (haptics only) and **silent mode** (glow only). The mode is toggled from a quick-settings swipe-down on Glance and can also be scheduled from the daemon (e.g. during meetings, synced later from calendar/OS focus mode **[P]**).
+
 | Event | Haptic | Sound (when not quiet) |
 |---|---|---|
 | needs_input | 2 long | soft two-tone chime |
@@ -188,16 +198,19 @@ Priority for sorting: `needs_input > error > done(unseen) > working > idle > don
 **Hook installation:** the daemon detects Copilot CLI and Claude Code and **asks once** per agent before writing hooks (`~/.copilot/hooks/agentlink.json`, the `hooks` block in Claude `settings.json`). It keeps a backup and offers `hooks remove`. Done so far (issue 20261116-7847): `agentlink hooks list [agent]` and `hooks install copilot|claude|pi`, which write only what is missing or stale, keep the replaced file as `<file>.agentlink-bak`, and merge into Claude `settings.json` without touching other hooks; detection, asking and `remove` are still to come. Sessions that were already running pick the hooks up on restart, and the UI says so.
 
 **Pairing:** both methods are supported:
+
 - (a) the **BLE passkey** shown on the device and typed on the PC;
 - (b) **USB-first**: plug in, then the daemon and device exchange keys over CDC, so no passkey is needed.
 
 **Approval race, "first answer wins":**
-```
+
+```text
 agent raises permission ─► hook ─► daemon ─► device shows Attention card
                                    │
                     terminal prompt also visible to user
 first of {device answer, terminal answer} wins; the other side is dismissed
 ```
+
 - Ideal: the agent shows its terminal prompt **and** the hook/daemon path at the same time. When the device answers first, the daemon returns the decision to the agent. When the terminal answers first, the daemon sees it (the event stream shows `permission.completed`) and clears the card on the device.
 - **Risk / spike S1:** a blocking `permissionRequest`/`PreToolUse` hook may hold the prompt back until it returns, which means the two can't run in parallel. There are two fallbacks:
   - (1) Use a **non-blocking** notification hook to show the card, and deliver the device's answer through an agent-native channel (Copilot CLI SDK/server/ACP mode, or Claude Code's equivalent) if one exists.
@@ -218,16 +231,18 @@ first of {device answer, terminal answer} wins; the other side is dismissed
 **Out of range:** events are buffered while the device is out of range. On reconnect the device gets a single summary vibration and a "while you were away" list at the top of Glance.
 
 ## 7. Power budget (R7) [P]
+
 **[D] Q4:** multi-day standby. **The display stays off until the device is lifted**, a button is pressed, or an attention event arrives. Target: **≥ 3 working days on 450 mAh** with BLE connected. Ambient mode is opt-in only.
+
 - The display is off by default. It wakes on lift (BMI270 interrupt), on button press, or on an attention event. It auto-sleeps after 8–10 s.
 - An optional **ambient mode** is a black screen with only the status ring at low brightness and pixel shift. Its cost is measured before it can become the default.
 - The CPU idles in auto light-sleep. The BLE connection interval is about 1 s idle and 30 ms during interaction or audio. No Wi-Fi in normal operation.
 - Power policy lives in core; the mechanisms (PMIC, wake sources) live in the BSP.
 
-
 ## 8. Visual language & badge mode [D]
 
 **Palette:** inspired by GitHub dark (Primer): a true-black `#000` background (AMOLED), surfaces `#0d1117`/`#161b22`, and text `#e6edf3`/`#8b949e`. State colors follow Primer semantics:
+
 - needs-you = attention amber `#d29922`
 - error = danger `#f85149`
 - done = success `#3fb950`
@@ -238,6 +253,7 @@ first of {device answer, terminal answer} wins; the other side is dismissed
 We use **original** artwork only and no GitHub/Copilot logos or mascots (trademarks). The agent icons are generic glyphs.
 
 **Badge = creature visualizer:** each live session is a small **original creature** whose species is tied to the agent type (Copilot CLI, Claude Code, or cloud agent). Its behaviour shows the state:
+
 - working: busy, typing or bouncing
 - needs you: waving, with an amber "!" bubble
 - error: dizzy, red tint
@@ -245,10 +261,12 @@ We use **original** artwork only and no GitHub/Copilot logos or mascots (tradema
 - idle: sleeping "z z"
 
 The frame shows the **handle**, the **session count**, **agent icons** and a **clock**.
+
 - Creatures are sprite sheets: a few frames per state, about 64–96 px, in PSRAM. They are drawn as LVGL images moved by tweened paths, so the screen redraws only the dirty rectangles.
 - Badge mode keeps the display on, so it is a high-power mode and shows a battery indicator.
 
 **Easter eggs (IMU) [P]:**
+
 - **Shake:** the creatures tumble and get dizzy, then recover.
 - **Tilt:** the creatures slide or roll toward the low side, like marbles in a bowl, using a simple physics step.
 - **Double-shake:** a party mode with confetti.
@@ -257,6 +275,7 @@ The frame shows the **handle**, the **session count**, **agent icons** and a **c
 All easter eggs are rate-limited and are off in quiet mode.
 
 ## 9. Voice / STT (stretch) [P]
+
 - The device captures 16 kHz mono while Button A is held. It encodes with IMA-ADPCM (64 kbps) or Opus (16–24 kbps) and streams over BLE.
 - The daemon runs **local** STT (`whisper-rs`, base.en/small.en). The transcript is shown on the device for confirmation before it is sent.
 - **Injecting text into an agent:**
@@ -283,11 +302,13 @@ Focus drivers are also a daemon trait (`FocusDriver`) with per-OS/per-terminal i
 - **Input policy:** that identity is untrusted (it travels hook → daemon → device → `cmd focus`). The daemon validates every value before use (tty path, kitty id, `listen_on`, tmux pane). External tools run as `Command` args with a 3 s timeout, never through a shell, and AppleScript gets values as `argv`, never interpolated.
 
 ## 11. Firmware stack [P]
+
 ESP-IDF 5.5 + LVGL 9.5 for the core UI. This is portable to any LVGL-capable board, and the simulator uses LVGL on SDL. For StopWatch, the BSP drives the panel through M5GFX's CO5300 QSPI driver, the same approach as the factory UserDemo. The display uses two 466×48 RGB565 partial buffers in internal DMA RAM, a rounder callback for even alignment, and 30 fps with 60 fps only for small regions. NimBLE handles BLE.
 Reasoning: Arduino locks the sdkconfig, and we need control of sleep, BLE, PSRAM, and cache. The factory firmware proves this stack works on this board.
 
 ## 12. Repository layout [P]
-```
+
+```text
 protocol/     schema (CDDL or .proto) + generated Rust/C bindings + test vectors
 daemon/       Rust workspace: agentlinkd, agentlink-hook, agentlink-cli (pair/status), crates for sources/focus/transport
 firmware/     ESP-IDF project: core/ + boards/stopwatch/ (+ future boards)
@@ -305,6 +326,7 @@ docs/
 | **v3** | Push-to-talk STT → agent input; multi-PC; OTA |
 
 ## 14. Open questions
+
 Resolved: Q1 BLE OK · Q2 preview+tap · Q3 lanyard · Q4 multi-day, display off · Q5 animated agent visualizer · **Q6 approvals reuse the agent's own permission rules** (the device only answers prompts the agent itself raised; no separate allow-list) · Q7 second device undecided, so design generically via layout profiles.
 
 Remote sessions: agents on remote Windows machines reach the local daemon through an SSH tunnel with a token ([REMOTE.md](REMOTE.md)). Built; not yet tested against a real Windows machine.
