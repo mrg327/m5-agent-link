@@ -1,0 +1,39 @@
+# Line endings: every text file is stored and checked out with LF (all tracked files already are);
+# git's content detection decides what is text.
+* text=auto eol=lf
+
+# Binary fixtures and build outputs: never diffed or converted.
+*.bin binary
+*.wasm binary
+*.wav binary
+*.png binary
+*.pdf binary
+protocol/fixtures/ota/*.patch binary
+
+# Generated files (docs/conventions/structure.md S-GEN-01, S-GEN-02): edit the generator or its input,
+# rerun it, commit both. GitHub collapses their diffs. Checked by scripts/check.d/structure.py.
+firmware/components/agentlink_proto/src/agentlink_codec_*.c linguist-generated=true
+firmware/components/agentlink_proto/include/agentlink_codec_*.h linguist-generated=true
+protocol/vectors/*.json linguist-generated=true
+protocol/fixtures/ota/base.bin linguist-generated=true
+protocol/fixtures/ota/new.bin linguist-generated=true
+protocol/fixtures/ota/*.patch linguist-generated=true
+atlas/data/facts.json linguist-generated=true
+atlas/css/tokens.generated.css linguist-generated=true
+atlas/vendor/watch.* linguist-generated=true
+firmware/components/core/src/fonts/font_*.c linguist-generated=true
+daemon/crates/agentlink-keys/data/english.txt linguist-generated=true
+daemon/Cargo.lock linguist-generated=true
+firmware/tools/fonts/package-lock.json linguist-generated=true
+
+# Vendored code and documentation mirrors: kept out of language stats and collapsed in diffs.
+firmware/components/agentlink_proto/src/zcbor_* linguist-vendored=true
+firmware/components/agentlink_proto/include/zcbor_* linguist-vendored=true
+firmware/components/core/third_party/** linguist-vendored=true
+docs/StopWatch.md linguist-vendored=true
+docs/arduino/** linguist-vendored=true
+docs/esp_idf/** linguist-vendored=true
+docs/github/** linguist-vendored=true
+docs/guide/** linguist-vendored=true
+docs/tools/** linguist-vendored=true
+docs/uiflow2/** linguist-vendored=true

@@ -1,7 +1,8 @@
 name: checks
 
 # Repository-wide checks that are not tied to one component: formatting for every language
-# (scripts/check.d/format.sh) and the Markdown checks (scripts/check.d/docs.sh).
+# (scripts/check.d/format.sh), the structure rules, commit messages since the cutoff, and the
+# Markdown and doc-coverage checks.
 on:
   push:
   pull_request:
@@ -20,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the commit-message check walks history back to its cutoff
       - uses: astral-sh/setup-uv@v6
       - uses: actions/setup-node@v4
         with:
@@ -27,5 +30,5 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
-      - name: Formatting (C/C++, Python, JS/TS, Rust) and docs
-        run: scripts/check format docs
+      - name: Formatting, structure, commit messages and docs
+        run: scripts/check format structure commits docs

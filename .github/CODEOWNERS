@@ -1,0 +1,57 @@
+# Code owners: who answers for what (docs/conventions/structure.md S-OWN-01).
+#
+# Advisory only: branch protection does not require code-owner review, and merges are local. The
+# map is written in roles (the comments); every role is the repository owner until there are more
+# people. The last matching pattern wins, so broad paths come first and narrower ones override
+# them below. Every top-level directory has an entry (checked by scripts/check.d/structure.py).
+
+# maintainer: everything not named below; design docs, research, the work log
+*                                               @mrg327
+/docs/                                          @mrg327
+/docs/design/                                   @mrg327
+/docs/research/                                 @mrg327
+/issues/                                        @mrg327
+
+# daemon: the Rust workspace
+/daemon/                                        @mrg327
+
+# firmware-core: the portable watch logic
+/firmware/                                      @mrg327
+/firmware/components/core/                      @mrg327
+
+# firmware-board: the HAL contract, boards and the ESP-IDF entry point
+/firmware/components/agentlink_hal/             @mrg327
+/firmware/boards/                               @mrg327
+/firmware/main/                                 @mrg327
+
+# protocol: the schema, vectors and every codec
+/protocol/                                      @mrg327
+/firmware/components/agentlink_proto/           @mrg327
+/daemon/crates/agentlink-proto/                 @mrg327
+/docs/design/PROTOCOL.md                        @mrg327
+
+# ui-design: screens, fonts and glyphs, the design board
+/firmware/components/core/src/ui_*              @mrg327
+/firmware/components/core/src/fonts/            @mrg327
+/firmware/tools/fonts/                          @mrg327
+/docs/design/UI-*.md                            @mrg327
+/docs/design/GLYPHS.md                          @mrg327
+/design/                                        @mrg327
+
+# test-harness: simulator and bench
+/simulator/                                     @mrg327
+/bench/                                         @mrg327
+
+# host-integration: agent hooks and extensions
+/daemon/integrations/                           @mrg327
+/daemon/crates/agentlink-hook/                  @mrg327
+
+# atlas: the visual guide and the core built for the browser
+/atlas/                                         @mrg327
+/index.html                                     @mrg327
+
+# tooling: scripts, tools, CI, conventions
+/scripts/                                       @mrg327
+/tools/                                         @mrg327
+/.github/                                       @mrg327
+/docs/conventions/                              @mrg327

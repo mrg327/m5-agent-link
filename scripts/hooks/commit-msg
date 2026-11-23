@@ -1,0 +1,5 @@
+#!/bin/sh
+# commit-msg hook: check the message against docs/conventions/changes.md §5.
+# Install once per clone: git config core.hooksPath scripts/hooks
+# Skip once (rare, say why in the body): git commit --no-verify
+exec python3 "$(git rev-parse --show-toplevel)/scripts/check.d/commit_msg.py" --file "$1"

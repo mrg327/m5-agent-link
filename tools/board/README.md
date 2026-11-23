@@ -34,9 +34,9 @@ claude --mcp-config tools/board/mcp.json --dangerously-load-development-channels
 
 Accept the development-channels prompt, then open http://127.0.0.1:7880.
 
-**Per-machine path.** `mcp.json` holds an absolute path to `board.mjs` (it is the Linux dev host's checkout). On another machine, use a copy of it or edit the path to your own checkout before passing it to `--mcp-config`.
+**Path.** `mcp.json` names `board.mjs` relative to the repository root, so start `claude` from the root of your checkout.
 
-**Phone.** `mcp.json` sets `BOARD_TAILSCALE=1`, so the board also listens on this machine's Tailscale address: `http://<tailscale ip -4>:7880`, e.g. `http://100.74.203.10:7880`. Only devices on your tailnet can reach it, and it never binds 0.0.0.0. Anyone who can reach the page can send text into the session, so keep it tailnet-only.
+**Phone.** `mcp.json` sets `BOARD_TAILSCALE=1`, so the board also listens on this machine's Tailscale address: `http://<tailscale ip -4>:7880`, e.g. `http://100.64.0.1:7880`. Only devices on your tailnet can reach it, and it never binds 0.0.0.0. Anyone who can reach the page can send text into the session, so keep it tailnet-only.
 
 **Relaunch this session with the board.** The development-channels flag takes several values, so put `--` before a prompt:
 

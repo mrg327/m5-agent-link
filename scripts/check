@@ -7,7 +7,8 @@
 # "Checks to run before closing" table in issues/README.md names the same areas.
 #
 # Usage: scripts/check [AREA...] [--changed] [--list] [--fail-fast]
-#   AREA         one or more of: format sim daemon protocol atlas firmware docs (default: all)
+#   AREA         one or more of: format structure commits docs protocol atlas daemon sim
+#                firmware (default: all)
 #   --changed    pick areas from files changed against main (commits, staged, unstaged, untracked)
 #   --list       print each area and the commands it runs, then exit
 #   --fail-fast  stop after the first failing area (default: run every area, then report)
@@ -26,9 +27,9 @@ set -euo pipefail
 ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 cd "$ROOT"
 
-ALL_AREAS="format sim daemon protocol atlas firmware docs"
+ALL_AREAS="format structure commits sim daemon protocol atlas firmware docs"
 # Fast areas first, so a quick failure shows up before the long builds.
-RUN_ORDER="format docs protocol atlas daemon sim firmware"
+RUN_ORDER="format structure commits docs protocol atlas daemon sim firmware"
 
 # area_steps AREA: one step per line, fields separated by '|':
 #   mode|dir|tools|command
@@ -65,8 +66,15 @@ area_steps() {
         echo "step|.|idf.py python3|idf.py -C firmware build"
         echo "then|.|python3|python3 firmware/tools/check_dram.py"
         ;;
+    structure)
+        echo "step|.|python3|python3 scripts/check.d/structure.py"
+        ;;
+    commits)
+        echo "step|.|python3 git|python3 scripts/check.d/commit_msg.py"
+        ;;
     docs)
         echo "step|.|./scripts/check.d/docs.sh|scripts/check.d/docs.sh"
+        echo "step|.|python3|python3 scripts/check.d/doc_coverage.py"
         ;;
     esac
 }
@@ -75,7 +83,7 @@ area_steps() {
 # plus format for source files and formatter configs, and docs for Markdown.
 areas_for_path() {
     case "$1" in
-    .github/workflows/checks.yml | scripts/check) echo "format docs" ;;
+    .github/workflows/checks.yml | scripts/check) echo "format structure commits docs" ;;
     .github/workflows/simulator.yml) echo "sim" ;;
     .github/workflows/daemon.yml) echo "daemon" ;;
     .github/workflows/protocol.yml) echo "protocol" ;;
@@ -92,7 +100,11 @@ areas_for_path() {
     esac
     case "$1" in
     docs/* | *.md | _typos.toml | .markdownlint-cli2.jsonc) echo "docs" ;;
-    scripts/check.d/docs.sh | scripts/check.d/links.py) echo "docs" ;;
+    scripts/check.d/docs.sh | scripts/check.d/links.py | scripts/check.d/doc_coverage.py) echo "docs" ;;
+    esac
+    # Structure and commit messages are fast (under a second), so any change runs them.
+    case "$1" in
+    *) echo "structure commits" ;;
     esac
     case "$1" in
     *.c | *.h | *.cpp | *.hpp | *.py | *.js | *.mjs | *.ts | *.rs) echo "format" ;;
