@@ -36,7 +36,12 @@ run() {
 
 run python3 scripts/check.d/links.py
 run uvx "typos@${TYPOS_VERSION}" --format brief
-run npx --yes "markdownlint-cli2@${MARKDOWNLINT_CLI2_VERSION}" '**/*.md'
+# Hand markdownlint the files git knows (tracked, or untracked and not ignored), so .gitignore and
+# .git/info/exclude apply; its own '**/*.md' glob would read every local file. The config's
+# "ignores" still drop vendor docs and issue logs.
+md_files=()
+while IFS= read -r f; do md_files+=("$f"); done < <(git ls-files -co --exclude-standard -- '*.md')
+run npx --yes "markdownlint-cli2@${MARKDOWNLINT_CLI2_VERSION}" "${md_files[@]}"
 
 if [ "$failed" -ne 0 ]; then
     echo "docs: FAILED. Fix the lines above; docs/conventions/docs.md says how." >&2
