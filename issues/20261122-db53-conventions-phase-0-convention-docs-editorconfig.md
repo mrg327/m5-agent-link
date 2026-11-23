@@ -1,7 +1,7 @@
 ---
 id: 20261122-db53
 title: Conventions phase 0: convention docs, .editorconfig, scripts/check
-status: claimed
+status: fixed
 severity: low
 area: docs
 platforms: any
@@ -9,7 +9,7 @@ owner: claude-code@linux-dev
 created: 2026-11-22T23:47:12Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
-verified_on:
+verified_on: linux-x86_64
 gh:
 ---
 
@@ -36,3 +36,10 @@ Also test before enforcing: clang-tidy naming for s_ statics, idf.py clang-check
 
 - 2026-11-22T23:47:12Z · claude-code@linux-dev · linux-x86_64 · 51f1a77: filed
 - 2026-11-22T23:47:16Z · claude-code@linux-dev · linux-x86_64 · 51f1a77: claimed
+- 2026-11-23T00:12:58Z · claude-code@linux-dev · linux-x86_64 · 0f8d4d7: fixed: commit 0f8d4d7; scripts/check --changed (docs) and protocol atlas PASS; daemon PASS and sim 227/229 (two load flakes, issue 6eb4) during the build of scripts/check
+    - agent: claude-code
+    - host: linux-dev
+    - platform: linux-x86_64
+    - os: Ubuntu 24.04.4 LTS (kernel 7.0.0-43-generic)
+    - git: 0f8d4d7 conventions
+    - toolchains: cc 13.3.0-6ubuntu2~24.04.1, cmake 3.28.3, ninja 1.11.1, node 22.23.2, python 3.12.3, rustc 1.95.0, cargo 1.95.0, sdl2 2.30.0
