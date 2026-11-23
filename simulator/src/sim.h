@@ -88,3 +88,7 @@ const uint8_t *sim_ota_slot(uint32_t *size);
  * MS`). */
 void sim_set_battery_pct(unsigned pct, bool charging);
 void sim_skip_time(uint32_t ms);
+/* sim_board.c: the clock. sim_clock_virtual() makes hal_time_us() advance only through
+ * sim_sleep_us(), which otherwise sleeps for real. */
+void sim_clock_virtual(void);
+void sim_sleep_us(uint64_t us);

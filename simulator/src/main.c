@@ -76,6 +76,9 @@ int main(int argc, char **argv)
     core_set_idle_timeout_ms(idle_s * 1000);
     if (deep_s) core_set_deep_after_ms(deep_s * 1000);
     if (script && !sim_script_load(script)) return 2;
+    /* Nobody watches a headless scripted run and nothing outside it keeps time, so its clock is
+     * virtual: the script's timeline holds however slow the machine is (issue 6eb4). */
+    if (script && headless && no_ws && !getenv("AGENTLINK_SIM_REAL_CLOCK")) sim_clock_virtual();
 
     bool script_running = script != NULL;
     while (!sim_display_quit_requested()) {
@@ -88,7 +91,8 @@ int main(int argc, char **argv)
             if (headless || no_ws) break;
             script_running = false;
         }
-        usleep(timed_core_step() * 1000);
+        uint32_t wait = timed_core_step();
+        sim_sleep_us((uint64_t)(wait ? wait : 1) * 1000u);
     }
     return 0;
 }

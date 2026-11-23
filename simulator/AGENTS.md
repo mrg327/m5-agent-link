@@ -35,5 +35,7 @@ build/sim/agentlink_sim --no-ws --headless --script simulator/scripts/selftest.t
   ([BENCH.md](../docs/design/BENCH.md)), not from `cpu_us` here.
 - It cannot catch internal-RAM limits either: the device build and its boot log do
   ([firmware/AGENTS.md](../firmware/AGENTS.md)).
-- Scripts replay in real time, so run ctest with `-j 16`.
+- Headless `--no-ws` scripts run on a virtual clock (`sim_clock_virtual`), so timing in them is
+  exact and independent of load. Anything that reads time must go through `hal_time_us()` and wait
+  through `sim_sleep_us()`, never `usleep` or `clock_gettime` directly.
 - `atlas/wasm/lv_conf.h` is a copy of `lv_conf.h`; change both.

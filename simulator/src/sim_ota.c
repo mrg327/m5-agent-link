@@ -86,7 +86,7 @@ hal_ota_result_t hal_ota_write(const uint8_t *data, size_t len)
         const char *e = getenv("AGENTLINK_SIM_OTA_WRITE_US");
         write_us = e ? atoi(e) : 0;
     }
-    if (write_us > 0) usleep((useconds_t)write_us);
+    if (write_us > 0) sim_sleep_us((uint64_t)write_us);
     memcpy(s_buf + s_got, data, len);
     s_got += (uint32_t)len;
     return HAL_OTA_OK;
