@@ -30,7 +30,7 @@ jobs:
       run:
         working-directory: daemon
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Linux BLE dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
@@ -54,7 +54,7 @@ jobs:
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/daemon/target
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Linux BLE dependencies
         run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
       - uses: dtolnay/rust-toolchain@1.95.0
@@ -70,7 +70,7 @@ jobs:
     name: pi extension (node)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 24 # runs .ts without flags (so does 22.18 and newer)
