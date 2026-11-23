@@ -1,11 +1,11 @@
 ---
 id: 20261122-6b60
 title: Text outside Latin-1 draws as empty boxes (CJK, Cyrillic, Greek, Polish, emoji): approval text the user cannot read
-status: open
+status: claimed
 severity: med
 area: daemon
 platforms: any
-owner:
+owner: claude-code/strings@linux-dev
 created: 2026-11-22T19:20:13Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -31,3 +31,4 @@ Should: the same stand-in/drop pass for every string sent to the watch, and a vi
 ## Log
 
 - 2026-11-22T19:20:13Z · claude-code@linux-dev · linux-x86_64 · 3724645: filed
+- 2026-11-23T06:49:17Z · claude-code/strings@linux-dev · linux-x86_64 · ab35617: claimed

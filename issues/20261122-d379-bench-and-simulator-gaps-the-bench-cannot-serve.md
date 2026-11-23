@@ -1,11 +1,11 @@
 ---
 id: 20261122-d379
 title: Bench and simulator gaps: the bench cannot serve READ/GRAPH/SCROLL content or errors; sim rx cut at ~255 bytes
-status: open
+status: claimed
 severity: low
 area: daemon
 platforms: any
-owner:
+owner: claude-code/strings@linux-dev
 created: 2026-11-22T19:20:13Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -29,3 +29,4 @@ UX profile (docs/design/UX-PROFILE.md §6). The bench player has no drop, clear,
 ## Log
 
 - 2026-11-22T19:20:14Z · claude-code@linux-dev · linux-x86_64 · 3724645: filed
+- 2026-11-23T06:49:17Z · claude-code/strings@linux-dev · linux-x86_64 · ab35617: claimed

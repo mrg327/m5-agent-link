@@ -1,11 +1,11 @@
 ---
 id: 20261122-9689
 title: Clipped strings lose their ellipsis and can end in half a UTF-8 character; AGENT header clips numbers
-status: open
+status: claimed
 severity: med
 area: protocol
 platforms: any
-owner:
+owner: claude-code/strings@linux-dev
 created: 2026-11-22T19:20:13Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -32,3 +32,4 @@ Should: clip to the byte budget on the daemon, utf8_drop_partial on the device f
 ## Log
 
 - 2026-11-22T19:20:13Z · claude-code@linux-dev · linux-x86_64 · 3724645: filed
+- 2026-11-23T06:49:17Z · claude-code/strings@linux-dev · linux-x86_64 · ab35617: claimed
