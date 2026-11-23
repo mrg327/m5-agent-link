@@ -12,6 +12,7 @@ pub mod battery;
 mod body;
 mod enums;
 mod envelope;
+pub mod limits;
 
 pub use body::*;
 pub use enums::*;

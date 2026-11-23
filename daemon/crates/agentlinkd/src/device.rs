@@ -332,7 +332,8 @@ impl Conn {
         Ok(())
     }
 
-    async fn send_now(&mut self, re: Option<u64>, msg: Message) -> Result<()> {
+    async fn send_now(&mut self, re: Option<u64>, mut msg: Message) -> Result<()> {
+        crate::watchtext::for_watch(&mut msg);
         let env = Envelope {
             id: self.next_id,
             re,

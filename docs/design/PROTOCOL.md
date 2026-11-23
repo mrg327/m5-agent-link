@@ -59,6 +59,24 @@ Every message is a CBOR map:
 
 Unknown `t` → ignore. Unknown keys in `b` → ignore. A breaking change means a bump of `proto` major.
 
+### 2a. Text
+
+Every text limit in the CDDL is in UTF-8 bytes, and the daemon keeps them in one table
+(`agentlink-proto` `limits`; a daemon test checks that the watch's buffers hold each). The daemon
+fits every string it shows on the watch on the way out (`agentlinkd` `watchtext`, issues 9689 and
+6b60):
+
+- Common symbols get a stand-in ("→" is "->"), Latin letters outside Latin-1 lose their marks
+  ("ł" is "l"), and emoji and other symbols are dropped.
+- A run of letters the watch's fonts cannot draw (Cyrillic, Greek, CJK …) is sent as one U+FFFD. The
+  watch draws it as the eye-slash glyph: text was here that is not shown. A string with nothing
+  drawable left is one U+FFFD, never blank.
+- A longer string is cut on a character boundary and ends in "…".
+
+Not touched: the standing rule (granted by its hash), a transcript (typed as sent) and `detail`
+chunks (offsets into the reader's text, which `broker::detail_text` already escapes). The watch
+copies each string the same way: never half a character, a cut one ends in "…", U+FFFD as the glyph.
+
 ## 3. Handshake & lifecycle
 
 ```text

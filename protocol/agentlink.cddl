@@ -2,6 +2,9 @@
 ; See docs/design/PROTOCOL.md for semantics. Integer keys; symbolic names in comments.
 ; Rule: decoders MUST ignore unknown map keys and unknown message types.
 ; Keys are scoped per map (key 0 in `session` is unrelated to key 0 in `hello`).
+; Text limits are UTF-8 bytes (the daemon's table: agentlink-proto `limits`). A sender cuts a longer
+; string on a character boundary and ends it in "…"; U+FFFD stands for a run of text the device
+; cannot draw (PROTOCOL.md §2a).
 
 ; ───────────────────────── envelope ─────────────────────────
 ; Every message is a CBOR map. Key 0 (t) is the message type and determines the body
@@ -161,7 +164,7 @@ welcome = {
   1 => host_info,                    ; host
   2 => time_sync,                    ; time
   3 => device_cfg,                   ; cfg
-  ? 4 => [0*6 tstr],                 ; replies  quick replies, each <= 24 chars (proto 0.4); present = the
+  ? 4 => [0*6 tstr],                 ; replies  quick replies, each <= 24 bytes (proto 0.4); present = the
                                      ;          daemon types into terminals (cmd_op_type, cmd_op_cancel)
   ? 5 => bool,                       ; voice    the daemon transcribes audio_* and answers with transcript
                                      ;          (proto 0.6); cmd_op_dictate then types it
@@ -172,7 +175,7 @@ welcome = {
 }
 host_info = {
   0 => bstr .size 8,                  ; id
-  1 => tstr,                          ; name
+  1 => tstr,                          ; name  <= 32 bytes
   2 => host_os      ; os
 }
 time_sync = {
@@ -184,7 +187,7 @@ device_cfg = {
   ? 1 => alert_mode,   ; alert
   ? 2 => uint,         ; quiet_until (unix, 0 = none)
   ? 3 => uint,         ; brightness 0..255
-  ? 4 => tstr         ; badge_handle
+  ? 4 => tstr         ; badge_handle  <= 24 bytes
 }
 privacy = privacy_meta / privacy_preview / privacy_full
 privacy_meta = 0
@@ -214,27 +217,27 @@ session = {
   ? 1 => agent,              ; ag
   ? 2 => sess_state,         ; st
   ? 3 => input_sub,          ; sub   when st = input
-  ? 4 => tstr,               ; repo  ≤ 32 chars
-  ? 5 => tstr,               ; br    ≤ 32 chars
-  ? 6 => tstr,               ; tool  current tool
+  ? 4 => tstr,               ; repo  <= 32 bytes
+  ? 5 => tstr,               ; br    <= 32 bytes
+  ? 6 => tstr,               ; tool  current tool, <= 24 bytes
   ? 7 => uint,               ; t0    start (unix)
   ? 8 => uint,               ; tst   last state change (unix)
-  ? 9 => tstr,               ; sum   preview ≤ 80 chars (privacy-dependent)
+  ? 9 => tstr,               ; sum   preview <= 80 bytes (privacy-dependent)
   ? 10 => bool,              ; seen
   ? 11 => uint,              ; host  host index: 0 = the daemon's own PC, 1.. = remote hosts (REMOTE.md)
-  ? 12 => tstr,             ; hn    remote host name ≤ 16 chars; only with host != 0, only to devices with proto ≥ 0.2
+  ? 12 => tstr,             ; hn    remote host name <= 16 bytes; only with host != 0, only to devices with proto ≥ 0.2
   ? 13 => uint,             ; snz   snoozed until (unix); 0 = not snoozed. Keys 13-16 only to devices with proto ≥ 0.3
   ? 14 => bool,             ; ntf   "notify when done" armed; the daemon clears it in the delta that enters done/error
   ? 15 => uint,             ; n     tool steps in the current turn (resets on a new prompt)
   ? 16 => bool,             ; ok    result of step n; absent while it runs
-  ? 17 => tstr,             ; q     the agent's closing question when its turn ended, <= 120 chars; "" = none (proto 0.5)
-  ? 18 => [0*3 tstr],       ; rp    answers to q for the Reply list, <= 24 chars each; [] = none (proto 0.5)
+  ? 17 => tstr,             ; q     the agent's closing question when its turn ended, <= 120 bytes; "" = none (proto 0.5)
+  ? 18 => [0*3 tstr],       ; rp    answers to q for the Reply list, <= 24 bytes each; [] = none (proto 0.5)
   ? 19 => uint,             ; eta   a job's expected total run time in seconds (median of its earlier runs);
                             ;       0 = unknown. Keys 19-20 and agent_shell only to devices with proto ≥ 0.9
   ? 20 => uint,             ; exit  a job's exit status (0-255), sent with the delta that enters done / error
   ? 21 => uint,             ; ctx   context window used, percent 0-100; 255 = unknown (GAUGES.md). Keys 21-25
                             ;       only to devices with proto ≥ 0.10
-  ? 22 => tstr,             ; mdl   the model's short name, <= 16 chars ("Opus 4.7"); "" = unknown
+  ? 22 => tstr,             ; mdl   the model's short name, <= 16 bytes ("Opus 4.7"); "" = unknown
   ? 23 => perm_mode,        ; pm    the agent's permission mode
   ? 24 => uint,             ; pr    the open pull request of the session's branch; 0 = none (withheld under privacy meta)
   ? 25 => pr_state,         ; prs   its review state; sent with pr
@@ -249,7 +252,7 @@ session = {
   ? 33 => bool,             ; tp    the turn's last recognised test run: true passed, false failed; absent = unknown
   ? 34 => uint,             ; dur   the turn's length in seconds, prompt to stop
   ? 35 => tstr,            ; qd    the message queued for this session (proto 0.17, PROTOCOL.md §4b): the
-                            ;       start of its text, <= 48 chars, cut with "…"; "" = none. Only to devices with
+                            ;       start of its text, <= 48 bytes, cut with "…"; "" = none. Only to devices with
                             ;       proto >= 0.17. The daemon types the message the next time the session can take
                             ;       input and then sends qd: "". The user's own words: the trace shows <private>
   ? 36 => uint,             ; lm    the agent's last message (proto 0.18, LAST-MESSAGE.md): its id, new for each
@@ -302,9 +305,9 @@ attention = {
   0 => uint,              ; rid   request id (required for approve/deny/reply)
   1 => uint,              ; sid
   2 => att_kind,          ; kind
-  ? 3 => tstr,            ; title  e.g. "Run shell command"
-  ? 4 => tstr,            ; text   preview ≤ 160 chars
-  ? 5 => [0*4 tstr],        ; opts   ≤ 4 choices, each ≤ 24 chars
+  ? 3 => tstr,            ; title  e.g. "Run shell command", <= 40 bytes
+  ? 4 => tstr,            ; text   preview <= 160 bytes
+  ? 5 => [0*4 tstr],        ; opts   ≤ 4 choices, each <= 24 bytes
   6 => [0*6 action],        ; acts   actions the device may offer
   ? 7 => uint,            ; exp    unix time after which to drop
   ? 8 => uint,           ; grant_mask  bit i set = opts[i] grants permission (approve-class: hold to commit)
@@ -443,7 +446,7 @@ scroll_to_end = 2
 result = {
   0 => bool,         ; ok
   ? 1 => result_err,   ; err
-  ? 2 => tstr,       ; msg
+  ? 2 => tstr,       ; msg   <= 47 bytes
   ? 3 => scroll_pos   ; pos   only in answers to cmd_op_scroll
 }
 ; Where the terminal's view is after a scroll (UI-V2 §6.1). `preview` is terminal content: sent only when
@@ -452,7 +455,7 @@ scroll_pos = {
   0 => uint,     ; lines_above   lines between the view and the live bottom; 0 = live
   1 => bool,     ; at_bottom
   ? 2 => uint,   ; total         scrollback size when known (for the position track)
-  ? 3 => tstr   ; preview       top visible line, ≤ 48 chars
+  ? 3 => tstr   ; preview       top visible line, <= 48 bytes
 }
 
 ; The full text of request `rid` (proto 0.11, ANSWER-WINDOW.md), the answer to cmd_op_detail {rid, arg: off}.

@@ -37,6 +37,7 @@ mod typing;
 mod usage;
 mod usb;
 mod voice;
+mod watchtext;
 mod window;
 mod ws;
 
