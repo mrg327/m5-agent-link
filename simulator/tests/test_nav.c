@@ -55,6 +55,51 @@ int main(void)
     EXPECT(n == 6 && it[4].id == ASK_DICTATE && it[5].id == ASK_OPEN_PC,
            "Dictate... before Open on PC");
 
+    /* a permission's options: the mask bit and the label read together (UX-PROFILE C4) */
+    EXPECT(nav_opt_reads("Yes") == NAV_OPT_GRANT, "Yes grants");
+    EXPECT(nav_opt_reads("allow") == NAV_OPT_GRANT, "any case");
+    EXPECT(nav_opt_reads("No, tell Claude what to\xE2\x80\xA6") == NAV_OPT_DENY, "No denies");
+    EXPECT(nav_opt_reads("Yes, don't ask again fo\xE2\x80\xA6") == (NAV_OPT_GRANT | NAV_OPT_ALWAYS),
+           "don't ask again: always");
+    EXPECT(nav_opt_reads("Yes, don\xE2\x80\x99t ask again") == (NAV_OPT_GRANT | NAV_OPT_ALWAYS),
+           "a curly apostrophe too");
+    EXPECT(nav_opt_reads("Keep going without askin") == (NAV_OPT_GRANT | NAV_OPT_ALWAYS),
+           "without asking: always");
+    EXPECT(nav_opt_reads("Nope") == 0 && nav_opt_reads("Yesterday") == 0, "whole words only");
+    {
+        attention_t p = question(2, (1u << ACT_APPROVE) | (1u << ACT_DENY));
+        p.kind = ATT_APPROVAL;
+        snprintf(p.opts[0], sizeof p.opts[0], "Yes");
+        snprintf(p.opts[1], sizeof p.opts[1], "No");
+        p.grant_mask = 0xFF; /* every bit, and bits past n_opts */
+        n = nav_ask_items(&p, false, it, ASK_MAX_ITEMS);
+        EXPECT(n == 4 && it[0].grants && !it[0].unclear, "mask 0xFF: Yes grants");
+        EXPECT(it[1].grants && it[1].unclear, "mask 0xFF: No is unclear, never a plain grant");
+        EXPECT(it[2].id == ASK_DENY && it[3].id == ASK_OPEN_PC, "no plain deny: Deny follows");
+        p.grant_mask = 0;
+        snprintf(p.opts[0], sizeof p.opts[0], "Allow");
+        snprintf(p.opts[1], sizeof p.opts[1], "Deny");
+        n = nav_ask_items(&p, false, it, ASK_MAX_ITEMS);
+        EXPECT(n == 3 && it[0].grants && it[0].hold_ms == NAV_HOLD_MS,
+               "mask 0: Allow still grants");
+        EXPECT(!it[1].grants && it[1].hold_ms == NAV_DENY_HOLD_MS, "Deny denies");
+        EXPECT(it[2].id == ASK_OPEN_PC, "a plain deny option: no extra Deny");
+        p.n_opts = 1;
+        snprintf(p.opts[0], sizeof p.opts[0], "Yes");
+        p.grant_mask = 1;
+        n = nav_ask_items(&p, false, it, ASK_MAX_ITEMS);
+        EXPECT(n == 3 && it[1].id == ASK_DENY, "one grant option: Deny is still on the watch");
+        p.n_opts = 2;
+        snprintf(p.opts[1], sizeof p.opts[1], "Always allow");
+        p.grant_mask = 0;
+        n = nav_ask_items(&p, false, it, ASK_MAX_ITEMS);
+        EXPECT(it[1].grants && it[1].always && !it[0].always, "Always allow: the double tick");
+        /* a question's options are never read as grants */
+        p.kind = ATT_QUESTION;
+        n = nav_ask_items(&p, false, it, ASK_MAX_ITEMS);
+        EXPECT(n == 3 && !it[0].grants && !it[1].grants, "a question's Yes answers, never grants");
+    }
+
     /* the escape always fits, even when the list is cut short */
     n = nav_ask_items(&a, true, it, 3);
     EXPECT(n == 3 && it[2].id == ASK_OPEN_PC, "short list keeps Open on PC last");

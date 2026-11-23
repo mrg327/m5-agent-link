@@ -179,7 +179,8 @@ static void build_items(const session_t *s)
                         (model_reply_count() > 0 || model_voice());
         n = nav_agent_items(s->state, model_can_type(),
                             model_reply_count() > 0 || s->n_rp > 0 || model_voice() || model_keys(),
-                            queue_ok, s->queued[0] != 0, detail_msg_fetchable(s),
+                            queue_ok, s->queued[0] != 0,
+                            detail_msg_fetchable(s) && !detail_msg_whole(s),
                             model_peer_minor() >= GRAPH_MINOR, items, MAX_ITEMS);
     }
     for (int i = 0; i < n; i++) {
@@ -231,7 +232,7 @@ static void draw_menu(const session_t *s)
 
     const char *base = theme_basename(s->repo);
     char name[sizeof s_name_txt];
-    ui_sigil_set_name(s_sigil, base);
+    ui_sigil_set_session(s_sigil, base, s->sid);
     /* the name, with the globe of a remote session before it; no folder is the dashed folder
      * alone */
     snprintf(name, sizeof name, "%s%s", s->host && base[0] ? ICON_G_WEB " " : "", base);
@@ -309,7 +310,7 @@ static void draw_replies(const session_t *s)
     int hy = q[0] ? HEAD_Y_Q : HEAD_Y;
     ui_glyph_set_pos(s_head_glyph, UI_CX - HEAD_DX, hy);
     ui_sigil_set_pos(s_head_sigil, UI_CX + HEAD_DX, hy);
-    ui_sigil_set_name(s_head_sigil, theme_basename(s->repo));
+    ui_sigil_set_session(s_head_sigil, theme_basename(s->repo), s->sid);
 }
 
 /* The item under a screen point, or -1. */

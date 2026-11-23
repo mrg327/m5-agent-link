@@ -240,6 +240,19 @@ sim_script_test(sim_ask_deny_hold ask_deny_hold.txt
 sim_script_test(sim_ask_tap_never_approves ask_tap_never_approves.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"op\":5"
                 PASS_REGULAR_EXPRESSION "\"op\":0,\"sid\":2")
+# UX-PROFILE C3-C5 (issue 67d1): an option's glyph from its mask bit and its label, an unclear
+# option or a blank request never answered from the watch, a long command fills its lines, and a
+# 33rd session's request still shows.
+sim_script_test(sim_ask_option_glyphs ask_option_glyphs.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3,|\"op\":4,|\"op\":5,")
+sim_script_test(sim_ask_blank_request ask_blank_request.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3,|\"op\":4,|\"op\":5,")
+sim_script_test(sim_ask_long_command ask_long_command.txt)
+sim_script_test(sim_content_session_pool_full content_session_pool_full.txt)
+# UX-PROFILE C7-C8 (issue 4094): an overdue job, a one-word message, reader pages and code blocks.
+sim_script_test(sim_content_job_overdue content_job_overdue.txt)
+sim_script_test(sim_content_message_word content_message_word.txt)
+sim_script_test(sim_content_reader_blocks content_reader_blocks.txt)
 # UI-V3 §3.3: tapping any ASK row (selected or neighbour) never approves, denies or answers a hold item;
 # tapping a neighbour question option sends that option's reply.
 sim_script_test(sim_ask_tap_rows ask_tap_rows.txt

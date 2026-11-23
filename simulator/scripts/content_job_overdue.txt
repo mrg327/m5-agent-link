@@ -1,0 +1,12 @@
+# A job past its estimate is not a full progress arc like one about to finish (UX-PROFILE C7,
+# issue 4094): the arc turns amber, and the report says so.
+connect
+rtc 1800000000
+job 5 run webapp 30 86400 0 make all
+wait 600
+expect_label progress 0%
+job 5 run webapp 9000 60 0 make all
+wait 600
+expect_label past its estimate
+expect_no_label progress
+quit

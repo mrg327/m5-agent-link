@@ -73,6 +73,11 @@ int main(void)
     line(&one, 1000, txt, sizeof txt, &l);
     EXPECT(!strcmp(txt, "1 file \xC2\xB7 <1s"), "one file; a zero duration reads <1s, never 0s");
 
+    /* a change of no lines draws no bar (UX-PROFILE C8: an empty pill) */
+    done_sum_t no_lines = {.files_known = true, .files = 1, .lines_known = true};
+    line(&no_lines, 1000, txt, sizeof txt, &l);
+    EXPECT(!strcmp(txt, "1 file") && !l.on[DONE_LINES], "+0 -0: no lines segment");
+
     /* unknown stays absent: no files figure, no lines, no tests */
     done_sum_t only_time = {.secs_known = true, .secs = 3725};
     line(&only_time, 1000, txt, sizeof txt, &l);

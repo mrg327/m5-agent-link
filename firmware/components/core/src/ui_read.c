@@ -124,10 +124,70 @@ static void page(void)
     s_page_ms = s_now;
 }
 
+/* The text as paged: a block (lines between blank lines: a code block, a table, a list) that
+ * would straddle a page break, and fits on one page, starts on the next page instead
+ * (UX-PROFILE C8). Blank lines fill the rest of the page before it. */
+MODEL_EXT_BSS static char s_paged[DETAIL_CAP + 512];
+MODEL_EXT_BSS static char s_block[DETAIL_CAP + 1];
+
+static int lines_of(const char *t, size_t n)
+{
+    if (!n) return 1; /* a blank line */
+    memcpy(s_block, t, n);
+    s_block[n] = 0;
+    lv_point_t sz;
+    lv_text_get_size(&sz, s_block, FONT_BODY, 0, 0, READ_W, LV_TEXT_FLAG_NONE);
+    int lh = lv_font_get_line_height(FONT_BODY), l = sz.y / lh;
+    return l < 1 ? 1 : l;
+}
+
+static const char *paginate(const char *t)
+{
+    size_t o = 0, cap = sizeof s_paged;
+    int at = 0; /* lines laid out so far */
+    while (*t) {
+        if (*t == '\n') { /* a blank line between blocks; none at the top of a page */
+            if (at % READ_LINES || !at) {
+                if (o + 1 < cap) s_paged[o++] = '\n';
+                at++;
+            }
+            t++;
+            continue;
+        }
+        /* a block: up to the next blank line (or the end) */
+        const char *e = t;
+        while (*e && !(e[0] == '\n' && (e[1] == '\n' || !e[1]))) e++;
+        size_t n = (size_t)(e - t);
+        int h = 0;
+        for (const char *l = t; l < e;) { /* each of its lines wraps on its own */
+            const char *nl = memchr(l, '\n', (size_t)(e - l));
+            size_t ln = nl ? (size_t)(nl - l) : (size_t)(e - l);
+            h += lines_of(l, ln);
+            l += ln + (nl ? 1 : 0);
+        }
+        int used = at % READ_LINES;
+        if (used && used + h > READ_LINES && h <= READ_LINES) {
+            for (int k = used; k < READ_LINES && o + 1 < cap; k++) s_paged[o++] = '\n';
+            at += READ_LINES - used;
+        }
+        if (o + n + 1 >= cap) n = cap - o - 1; /* never past the buffer */
+        memcpy(s_paged + o, t, n);
+        o += n;
+        at += h;
+        t = e;
+        if (*t == '\n') { /* the line break that ends the block's last line */
+            if (o + 1 < cap) s_paged[o++] = '\n';
+            t++;
+        }
+    }
+    s_paged[o] = 0;
+    return s_paged;
+}
+
 /* Measures the text again (it grows as the message arrives); the page on screen stays. */
 static void load(void)
 {
-    const char *t = text();
+    const char *t = paginate(text());
     int lh = lv_font_get_line_height(FONT_BODY);
     lv_point_t sz;
     lv_text_get_size(&sz, t, FONT_BODY, 0, 0, READ_W, LV_TEXT_FLAG_NONE);
@@ -210,8 +270,8 @@ bool ui_read_refresh(uint32_t now)
      * mark */
     snprintf(s_header_txt, sizeof s_header_txt, "%s%s%s%s", host, theme_agent_name(s->agent),
              theme_sep(), base[0] ? base : "(no folder)");
-    ui_sigil_set_name(s_sigil, base);
-    ui_sigil_set_name(s_end_sigil, base);
+    ui_sigil_set_session(s_sigil, base, s->sid);
+    ui_sigil_set_session(s_end_sigil, base, s->sid);
     snprintf(marks, sizeof marks, "%s%s", s->host ? ICON_G_WEB " " : "",
              theme_agent_glyph(s->agent));
     theme_set_text(s_marks, s_marks_txt, sizeof s_marks_txt, marks);
@@ -404,7 +464,7 @@ void ui_read_report(ui_report_t *r)
     ui_report_add(r, "Reading %d of %d", s_page_i + 1, s_pages);
     if (!complete()) ui_report_add(r, failed() ? "Not loaded" : "Loading");
     /* the first visible line of the page, so a script can tell what is on screen */
-    const char *t = text();
+    const char *t = s_paged;
     for (int skip = s_page_i * READ_LINES; skip > 0 && *t; skip--) {
         /* by line breaks: close enough for a check */
         const char *nl = strchr(t, '\n');

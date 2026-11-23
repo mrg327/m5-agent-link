@@ -197,7 +197,15 @@ int nav_job_items(sess_state_t state, agent_item_t *out, int cap);
  * commits only by the NAV_HOLD_MS hold; a deny-class option by the NAV_DENY_HOLD_MS hold (or the
  * strict swipe); a question option by a tap. A bare permission whose attention carries a standing
  * rule (has_rule, proto 0.13) also offers "Always allow" after Deny: a grant item held for
- * NAV_GRANT_HOLD_MS (STANDING-RULES.md). */
+ * NAV_GRANT_HOLD_MS (STANDING-RULES.md).
+ *
+ * A permission's option is read from its grant_mask bit and its label together (UX-PROFILE C4):
+ * mask bits past n_opts mean nothing; an option grants when its bit says so or its label reads as
+ * a grant ("Yes", "Allow", "Always ..."), so a mask can only ever add a hold, never take a grant's
+ * away. An option whose label reads as "don't ask again" (or "without asking") is `always`. An
+ * option whose bit grants but whose label reads as a refusal ("No", "Deny") is `unclear`: the watch
+ * cannot tell what it does, so it is shown as such and only the computer can answer with it. When
+ * no option plainly denies and the request takes a deny, a Deny item follows the options. */
 typedef enum {
     ASK_OPT,
     ASK_APPROVE,
@@ -215,10 +223,17 @@ typedef struct {
     int opt;          /* ASK_OPT: index into attention.opts (the cmd_op_reply argument) */
     uint32_t hold_ms; /* 0: commits by tap or button A; else only by a hold of this length */
     bool grants;      /* approve-class: hold arc and haptic ramp use the approve pattern */
+    bool always;      /* ASK_OPT: the label says it stops asking ("don't ask again") */
+    bool unclear;     /* ASK_OPT: mask and label disagree; never committed from the watch */
 } ask_item_t;
 
-/* 4 options + Approve + Deny + Dictate + Open on PC never all coexist, but keep room */
+/* 4 options + Deny + Dictate + Open on PC */
 #define ASK_MAX_ITEMS 7
+/* How a permission option's label reads (NAV_OPT_*), from its first words; ASCII, any case. */
+#define NAV_OPT_GRANT 1u
+#define NAV_OPT_DENY 2u
+#define NAV_OPT_ALWAYS 4u
+unsigned nav_opt_reads(const char *label);
 int nav_ask_items(const attention_t *a, bool voice, ask_item_t *out, int cap);
 /* One question of a multiple-choice request (proto 0.18, LAST-MESSAGE.md §3.3), in wheel order: its
  * options (ASK_QOPT, opt = index), then "Other" (ASK_OTHER, a dictated answer) when the daemon

@@ -67,14 +67,14 @@ readability-braces-around-statements	firmware/components/core/src/sound_bank.c	2
 readability-braces-around-statements	firmware/components/core/src/steps.c	1
 readability-braces-around-statements	firmware/components/core/src/ui.c	34
 readability-braces-around-statements	firmware/components/core/src/ui_agent.c	12
-readability-braces-around-statements	firmware/components/core/src/ui_ask.c	29
+readability-braces-around-statements	firmware/components/core/src/ui_ask.c	28
 readability-braces-around-statements	firmware/components/core/src/ui_done.c	6
 readability-braces-around-statements	firmware/components/core/src/ui_gauges.c	13
 readability-braces-around-statements	firmware/components/core/src/ui_graph.c	21
 readability-braces-around-statements	firmware/components/core/src/ui_home.c	2
-readability-braces-around-statements	firmware/components/core/src/ui_home_card.c	11
+readability-braces-around-statements	firmware/components/core/src/ui_home_card.c	10
 readability-braces-around-statements	firmware/components/core/src/ui_keys.c	12
-readability-braces-around-statements	firmware/components/core/src/ui_kit.c	23
+readability-braces-around-statements	firmware/components/core/src/ui_kit.c	22
 readability-braces-around-statements	firmware/components/core/src/ui_labs.c	6
 readability-braces-around-statements	firmware/components/core/src/ui_ota.c	4
 readability-braces-around-statements	firmware/components/core/src/ui_read.c	8

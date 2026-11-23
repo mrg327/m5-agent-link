@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "detail.h"
 #include "hal.h"
 #include "ui_done.h"
 #include "ui_gauges.h"
@@ -80,6 +81,7 @@ static bool s_ambient, s_quiet_shown, s_clock_set, s_back_shown, s_time_shown, s
 static uint32_t s_minute, s_batt_next;
 static look_t s_look = LOOK_CARD;
 static sign_t s_sign_kind;
+static bool s_prog_over; /* a job past its estimate */
 static int s_prog_pm = -1, s_gauge_y, s_clock_y, s_sign_x = -1;
 
 /* What the card says in words, for the report (rule 9): the screen draws the glyphs. */
@@ -270,9 +272,12 @@ static void update_time(const session_t *s, bool merged, lv_color_t col)
     bool job = !merged && theme_is_job(s), ago = false, timed = false;
     /* a job's estimate: an arc that fills, in the state colour; change-only, a degree at a time */
     int pm = job ? theme_job_progress(s, now) : -1;
+    /* past its estimate (UX-PROFILE C7): the full arc turns amber, so it never reads as about to
+     * finish */
+    s_prog_over = pm >= 0 && now - s->t0 > s->eta;
     s_prog_pm = pm;
     show(s_prog, pm >= 0);
-    if (pm >= 0) ui_arc_set(s_prog, pm, col, COL_FILL2);
+    if (pm >= 0) ui_arc_set(s_prog, pm, s_prog_over ? lv_color_hex(RGB_AMBER) : col, COL_FILL2);
     if (job) {
         theme_job_time(buf, sizeof buf, s, now);
         /* then the dots are how long it ran */
@@ -437,8 +442,9 @@ void ui_home_card_update(void)
         int len = snprintf(marks, sizeof marks, "%s%s%s", s->host ? ICON_G_WEB " " : "",
                            theme_agent_glyph(s->agent),
                            model_session_snoozed(s, theme_now_unix()) ? " " ICON_IDLE : "");
-        if (theme_is_job(s) && s->state == SESS_ERROR)
+        if (theme_is_job(s) && s->state == SESS_ERROR && s->exit_code) { /* 0 says nothing */
             snprintf(marks + len, sizeof marks - (size_t)len, " %u", (unsigned)s->exit_code);
+        }
     }
     const char *base = sl->n_merged ? "" : theme_basename(s->repo);
     snprintf(s_name_words, sizeof s_name_words, "%s",
@@ -453,7 +459,7 @@ void ui_home_card_update(void)
         theme_set_text_color(s_clock, amb);
         show(s_amb_sigil, !sl->n_merged);
         show(s_amb_glyph, true);
-        ui_sigil_set_name(s_amb_sigil, base);
+        ui_sigil_set_session(s_amb_sigil, base, s->sid);
         ui_sigil_set_color(s_amb_sigil, amb);
         ui_glyph_set_pos(s_amb_glyph, sl->n_merged ? UI_CX : UI_CX + AMBIENT_DX, AMBIENT_Y);
         ui_glyph_set(s_amb_glyph, hero, amb);
@@ -473,10 +479,12 @@ void ui_home_card_update(void)
 
     show(s_sigil, !sl->n_merged);
     show(s_stack, sl->n_merged != 0);
-    ui_sigil_set_name(s_sigil, base);
+    ui_sigil_set_session(s_sigil, base, s->sid);
     ui_sigil_set_color(s_sigil, off ? COL_TEXT3 : COL_TEXT);
     ui_glyph_set(s_stack, ICON_SESSIONS, off ? COL_TEXT3 : COL_TEXT);
-    ui_glyph_set(s_hero, hero, sc);
+    /* starting (UX-PROFILE C8): the arrows not yet lit, so it does not read as working */
+    bool starting = !sl->n_merged && !req && !back && s->state == SESS_START;
+    ui_glyph_set(s_hero, hero, starting && !off ? COL_TEXT2 : sc);
     s_back_shown = back;
     update_time(s, sl->n_merged != 0, off ? COL_TEXT3 : theme_dim(rgb, 85));
     update_marks(marks);
@@ -530,7 +538,7 @@ void ui_home_card_update(void)
     }
     /* what a tap does, in the words the buttons had: the hero glyph is Review / Answer, the book
      * disc is Read (not while offline: the message is fetched when it is opened) */
-    s_read_shown = msg && !off;
+    s_read_shown = msg && !off && !detail_msg_whole(s); /* a few words: all on the card */
     s_btn_word = req            ? (req->kind == ATT_APPROVAL ? "Review" : "Answer")
                  : s_read_shown ? "Read"
                                 : "";
@@ -586,7 +594,8 @@ void ui_home_card_report(ui_report_t *r)
         ui_report_add(r, "%s", s_state_words);
         if (s_time_shown) ui_report_add(r, "%s", s_time_words);
         if (s_back_shown) ui_report_add(r, "Answer it there");
-        if (s_prog_pm >= 0) ui_report_add(r, "progress %d%%", s_prog_pm / 10);
+        if (s_prog_pm >= 0 && s_prog_over) ui_report_add(r, "past its estimate");
+        if (s_prog_pm >= 0 && !s_prog_over) ui_report_add(r, "progress %d%%", s_prog_pm / 10);
         ui_gauges_card_report(r);
         ui_done_report(r);
         if (shown(s_line1)) ui_report_add(r, "%s", s_sum_txt);

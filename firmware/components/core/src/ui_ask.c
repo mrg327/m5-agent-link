@@ -101,6 +101,8 @@ static char s_header_txt[80], s_title_txt[48], s_text_txt[168], s_word_txt[24],
 static char s_req_title[48];  /* the request's own title; the rule view's is its scope, in words */
 static char s_title_draw[48]; /* the title as drawn: what the agent sent, never a stand-in */
 static char s_title_lbl[48], s_res_txt[MODEL_RULE_CAP + 12], s_row_txt[3][64];
+/* the text as drawn: a permission's with its lines filled (fill_lines) */
+static char s_fill_txt[200], s_text_drawn[200];
 static const char *s_after_words = "";
 static int s_blk_key, s_title_y, s_title_y_shown, s_text_w, s_row_key, s_resmark_y;
 /* the rows' discs: the list is centred on what it holds */
@@ -128,6 +130,9 @@ static bool s_more_on;
 #define NUDGE_PM 110
 static lv_obj_t *s_read, *s_read_lbl, *s_load;
 static bool s_long, s_cut, s_fetch, s_reading, s_read_ok, s_gate_press;
+/* a permission with no title, text or tool: nothing says what would be granted (UX-PROFILE C4) */
+static bool s_blank;
+static lv_obj_t *s_blank_g; /* its glyph where the request would be: an eye, struck through */
 static int s_page_i, s_pages, s_read_pad;
 static uint32_t s_read_ms, s_gate_t0;
 /* bytes of text in the reader now; s_read_len: when its last page was shown */
@@ -225,7 +230,12 @@ static const char *glyph_of(const ask_item_t *it, const attention_t *a)
     const ask_q_t *q = cur_q(a);
     switch (it->id) {
     case ASK_QOPT: return q && q->multi && !ticked(it) ? "" : ICON_CHECK;
-    case ASK_OPT: return it->hold_ms && !it->grants ? ICON_X : ICON_CHECK;
+    case ASK_OPT: /* what holding it does: the label and the grant mask read together (nav.h) */
+        return it->unclear   ? ICON_ERROR
+               : it->always  ? ICON_ALWAYS
+               : it->grants  ? ICON_CHECK
+               : it->hold_ms ? ICON_X
+                             : ICON_CHECK;
     case ASK_OTHER:
     case ASK_DICTATE: return ICON_MIC;
     case ASK_SEND: return last_q(a) ? ICON_SENT : ICON_NEXT;
@@ -305,6 +315,7 @@ static bool text_unreachable(void)
 static bool text_locked(const ask_item_t *it)
 {
     if (!it->grants) return false;
+    if (s_blank || it->unclear) return true; /* nothing to read, or no telling what it grants */
     if (s_cut) {
         if (text_unreachable()) return ASK_BLOCK_CUT_TEXT || !s_read_ok;
         return !(text_complete() && s_read_ok && s_read_len == detail_total(s_rid));
@@ -316,6 +327,7 @@ static bool text_locked(const ask_item_t *it)
 static bool grant_locked(const ask_item_t *it)
 {
     if (!it->grants) return false;
+    if (it->unclear) return true; /* mask and label disagree: only the computer can say */
     /* the rule is not on screen in full */
     if (it->id == ASK_GRANT && (!s_gview || !s_rule_fits)) return true;
     return text_locked(it);
@@ -440,6 +452,79 @@ static void rule_view(const attention_t *a)
              on ? scope_title(s_rule_scope_shown) : s_req_title);
 }
 
+/* One character of UTF-8 at `s`: its code point, and how many bytes it takes in *len. */
+static uint32_t utf8_at(const char *s, int *len)
+{
+    const unsigned char *u = (const unsigned char *)s;
+    if (u[0] < 0x80) return *len = 1, u[0];
+    int n = u[0] >= 0xF0 ? 4 : u[0] >= 0xE0 ? 3 : u[0] >= 0xC0 ? 2 : 1;
+    uint32_t c = u[0] & (0x3Fu >> (n - 1));
+    for (int i = 1; i < n; i++) {
+        if ((u[i] & 0xC0) != 0x80) return *len = i, 0xFFFD; /* cut short */
+        c = c << 6 | (u[i] & 0x3Fu);
+    }
+    return *len = n, c;
+}
+
+/* A command is not prose (UX-PROFILE C5): word wrapping puts "cd" alone on the first line and a
+ * long path on the next, and what the command does (`rm -rf`) falls off the end. Fills every line
+ * instead: a line breaks after the last space or '/' in its second half, else mid-word. `dst` gets
+ * the text with its line breaks; the label then wraps nothing. */
+static void fill_lines(const char *src, char *dst, size_t cap, const lv_font_t *f, int w)
+{
+    size_t o = 0;
+    const char *line = src, *brk = NULL;
+    int lw = 0, bw = 0;
+    w -= 2; /* no kerning counted: leave a little room */
+    for (const char *p = src; *p && o + 6 < cap;) {
+        int n;
+        uint32_t c = utf8_at(p, &n);
+        if (c == '\n') {
+            dst[o++] = '\n';
+            p += n;
+            line = p, brk = NULL, lw = bw = 0;
+            continue;
+        }
+        int cw = lv_font_get_glyph_width(f, c, 0);
+        if (lw + cw > w && p > line) { /* this character starts the next line */
+            const char *cut = brk && bw >= w / 2 ? brk : p;
+            /* what was copied past the cut goes to the next line */
+            o -= (size_t)(p - cut);
+            while (o > 0 && dst[o - 1] == ' ') o--; /* no trailing space */
+            dst[o++] = '\n';
+            while (*cut == ' ') cut++;
+            line = p = cut;
+            brk = NULL, lw = bw = 0;
+            continue;
+        }
+        memcpy(dst + o, p, (size_t)n);
+        o += (size_t)n;
+        p += n;
+        lw += cw;
+        if (c == ' ' || c == '/') brk = p, bw = lw;
+    }
+    dst[o] = 0;
+}
+
+/* The text as drawn in font `f` at width `w`: a permission's (a command, a path) with every line
+ * filled, a question's (prose) as it is. */
+static const char *drawn(bool perm, const char *text, const lv_font_t *f, int w, char *buf,
+                         size_t cap)
+{
+    if (!perm) return text;
+    fill_lines(text, buf, cap, f, w);
+    return buf;
+}
+
+/* The lines `t` takes set large at width `w`, or 0 when that is more than two. */
+static int big_lines(const char *t, int w)
+{
+    lv_point_t sz;
+    lv_text_get_size(&sz, t, FONT_HEAD, 0, 0, w, LV_TEXT_FLAG_NONE);
+    int big = sz.y / lv_font_get_line_height(FONT_HEAD);
+    return big >= 1 && big <= 2 ? big : 0;
+}
+
 /* What is asked: the title over the text, centred as a block. A text of one or two short lines is
  * set large. */
 static void layout_text(bool perm, const char *text)
@@ -447,7 +532,8 @@ static void layout_text(bool perm, const char *text)
     const attention_t *a = req();
     int lh = lv_font_get_line_height(FONT_BODY), w = perm ? TEXT_W : TEXT_W_Q;
     lv_point_t sz;
-    lv_text_get_size(&sz, text, FONT_BODY, 0, 0, w, LV_TEXT_FLAG_NONE);
+    const char *body = drawn(perm, text, FONT_BODY, w, s_fill_txt, sizeof s_fill_txt);
+    lv_text_get_size(&sz, body, FONT_BODY, 0, 0, w, LV_TEXT_FLAG_NONE);
     int lines = sz.y / lh;
     size_t tl = strlen(text);
     /* the daemon clips with an ellipsis; a text that fills the model's buffer was clipped on
@@ -468,16 +554,19 @@ static void layout_text(bool perm, const char *text)
     lines = lines < 1 ? 1 : more && lines > MORE_LINES ? MORE_LINES : lines;
     const lv_font_t *f = FONT_BODY;
     if (!more) { /* short enough to be set large */
-        lv_text_get_size(&sz, text, FONT_HEAD, 0, 0, w, LV_TEXT_FLAG_NONE);
-        int big = sz.y / lv_font_get_line_height(FONT_HEAD);
-        if (big >= 1 && big <= 2)
-            f = FONT_HEAD, lines = big, lh = lv_font_get_line_height(FONT_HEAD);
+        static char big_txt[sizeof s_fill_txt];
+        const char *bt = drawn(perm, text, FONT_HEAD, w, big_txt, sizeof big_txt);
+        int big = big_lines(bt, w);
+        if (big) f = FONT_HEAD, lines = big, lh = lv_font_get_line_height(FONT_HEAD), body = bt;
     }
     if (strcmp(s_text_txt, text)) { /* a different text has not been read */
         s_read_ok = false;
         s_reading = false;
         snprintf(s_text_txt, sizeof s_text_txt, "%s", text);
-        lv_label_set_text(s_text, text);
+    }
+    if (strcmp(s_text_drawn, body) != 0) { /* change-only: a set invalidates */
+        snprintf(s_text_drawn, sizeof s_text_drawn, "%s", body);
+        lv_label_set_text(s_text, body);
     }
     int th = s_title_draw[0] ? lv_font_get_line_height(FONT_BODY_STRONG) + 2 : 0;
     int total = th + lines * lh + (more ? MORE_H : 0), y0 = BLOCK_Y0 + (BLOCK_H - total) / 2;
@@ -787,6 +876,7 @@ static void paint(void)
         lv_obj_set_y(s_title, ty);
     }
     show(s_text, pick && !rule);
+    show(s_blank_g, pick && !rule && s_blank);
     show(s_more, pick && !rule && s_more_on);
     show(s_scope, rule && s_rule_fits);
     show(s_breadth, rule && s_rule_fits);
@@ -849,6 +939,7 @@ bool ui_ask_refresh(uint32_t now)
         s_read_ok = false;
         s_text_txt[0] = 0;
         lv_label_set_text(s_text, "");
+        s_text_drawn[0] = 0;
         s_rid = a->rid;
         s_shown_ms = now;
         s_read_len = 0;
@@ -875,7 +966,7 @@ bool ui_ask_refresh(uint32_t now)
         snprintf(buf + n, sizeof buf - n, "%s%d of %d", theme_sep(), s_q.qi + 1, a->n_qs);
     }
     snprintf(s_header_txt, sizeof s_header_txt, "%s", buf);
-    ui_sigil_set_name(s_sigil, base);
+    ui_sigil_set_session(s_sigil, base, s->sid);
     ui_glyph_set(s_mark[0], s->host ? ICON_G_WEB : "", COL_TEXT3);
     ui_glyph_set(s_mark[1], theme_agent_glyph(s->agent), COL_TEXT3);
     bool perm = a->kind == ATT_APPROVAL;
@@ -883,6 +974,7 @@ bool ui_ask_refresh(uint32_t now)
      * report names the kind; the glass leaves the row out (the request's colour already says
      * which) */
     const char *own = q ? q->h : a->title[0] ? a->title : s->tool;
+    s_blank = perm && !q && !own[0] && !a->text[0];
     snprintf(s_title_draw, sizeof s_title_draw, "%s", own);
     snprintf(s_req_title, sizeof s_req_title, "%s",
              own[0]       ? own
@@ -930,6 +1022,7 @@ void ui_ask_open(uint32_t sid, uint32_t now)
     s_read_len = 0;
     s_text_txt[0] = 0;
     lv_label_set_text(s_text, "");
+    s_text_drawn[0] = 0;
     s_reading = false;
     s_listed = 0;
     s_sel = 0;
@@ -1071,7 +1164,13 @@ static void commit(const attention_t *a, int idx, uint32_t hold_ms)
         question_answered(a, hold_ms);
         break;
     case ASK_OTHER: ui_go_voice_answer(a->rid, s_q.qi, last_q(a)); break;
-    case ASK_OPT: g_ui_actions->reply(s_sid, a->rid, (uint8_t)it->opt, hold_ms); break;
+    case ASK_OPT:
+        if (it->unclear) { /* never from the watch */
+            g_ui_actions->reject();
+        } else {
+            g_ui_actions->reply(s_sid, a->rid, (uint8_t)it->opt, hold_ms);
+        }
+        break;
     case ASK_APPROVE: g_ui_actions->approve(s_sid, a->rid, hold_ms); break;
     case ASK_GRANT: /* the rule on screen, and only if it is still the request's own */
         if (s_gview && s_rule_fits && a->has_rule && s_rule_hash_shown == a->rule_hash)
@@ -1123,6 +1222,13 @@ static void nudge(void)
  * the watch can never show all of it. */
 static void grant_tell(const ask_item_t *it)
 {
+    if (s_blank || it->unclear) {
+        ui_toast(s_blank ? "Nothing to read: answer on your computer"
+                         : "Unclear option: answer on your computer",
+                 rgb_of(it));
+        g_ui_actions->reject();
+        return;
+    }
     if (it->id == ASK_GRANT && s_gview && !s_rule_fits) {
         ui_toast("Rule too long for the watch", rgb_of(it));
         g_ui_actions->reject();
@@ -1140,6 +1246,8 @@ static void grant_tell(const ask_item_t *it)
 /* What a hold on a locked grant is told. */
 static const char *lock_word(const ask_item_t *it)
 {
+    if (s_blank) return "Nothing to read: answer on your computer";
+    if (it->unclear) return "Unclear option: answer on your computer";
     if (it->id == ASK_GRANT && !s_rule_fits) return "Rule too long for the watch";
     return text_unreachable() && ASK_BLOCK_CUT_TEXT ? "Too long to approve here" : "Read it first";
 }
@@ -1424,6 +1532,12 @@ void ui_ask_report(ui_report_t *r)
                       s_rule_fits ? breadth_note(s_rule_wide_shown) : "Answer it on your computer");
     } else if (s_text_txt[0]) {
         ui_report_add(r, "%s", s_text_txt);
+        if (s_more_on && strchr(s_text_drawn, '\n')) { /* what the glass holds of a long one */
+            const char *nl = strchr(s_text_drawn, '\n'), *nl2 = strchr(nl + 1, '\n');
+            ui_report_add(r, "glass: %.*s", (int)(nl - s_text_drawn), s_text_drawn);
+            ui_report_add(r, "glass: %.*s", (int)(nl2 ? nl2 - nl - 1 : (long)strlen(nl + 1)),
+                          nl + 1);
+        }
     }
     if (s_back_ms) {
         ui_report_add(r, "On your computer");
@@ -1441,10 +1555,18 @@ void ui_ask_report(ui_report_t *r)
         return;
     }
     if (s_long || s_cut) ui_report_add(r, "Read all");
+    if (s_blank) ui_report_add(r, "Nothing to read");
     if (!a) return;
     for (int k = 0; k < s_n && k < (s_gview ? 3 : 4); k++) {
         const ask_item_t *it = &s_items[(s_sel + k) % s_n];
-        ui_report_add(r, "%s%s%s", k == 0 ? "> " : "", label_of(it, a), it->hold_ms ? " HOLD" : "");
+        ui_report_add(r, "%s%s%s%s", k == 0 ? "> " : "", label_of(it, a),
+                      it->hold_ms ? " HOLD" : "",
+                      it->id != ASK_OPT ? ""
+                      : it->unclear     ? " (unclear)"
+                      : it->always      ? " (always)"
+                      : it->grants      ? " (grants)"
+                      : it->hold_ms     ? " (denies)"
+                                        : "");
     }
     ui_report_add(r, "%d options", s_n);
 }
@@ -1493,6 +1615,8 @@ lv_obj_t *ui_ask_init(lv_obj_t *screen)
     /* a rule that does not fit locks instead */
     lv_label_set_long_mode(s_grule, LV_LABEL_LONG_MODE_CLIP);
     s_gsign = ui_glyph_create(s_root, FONT_ICON_L, UI_CX, BLOCK_Y0 + BLOCK_H / 2);
+    s_blank_g = ui_glyph_create(s_root, FONT_ICON_L, UI_CX, BLOCK_Y0 + BLOCK_H / 2);
+    ui_glyph_set(s_blank_g, ICON_EYE_OFF, COL_TEXT2);
     /* not here: on the computer */
     ui_glyph_set(s_gsign, ICON_ALWAYS ICON_REFUSED ICON_COMPUTER, lv_color_hex(RGB_PERMISSION));
 
@@ -1539,9 +1663,9 @@ lv_obj_t *ui_ask_init(lv_obj_t *screen)
     ui_key_hint_set(s_key[0], ICON_COMPUTER);
     ui_key_hint_set(s_key[1], ICON_NEXT);
 
-    lv_obj_t *hide[] = {s_title,  s_text,   s_more,   s_scope,   s_breadth, s_grule,
-                        s_gsign,  s_read,   s_load,   s_seldisc, s_nb[0],   s_nb[1],
-                        s_row[0], s_row[1], s_row[2], s_hero,    s_res,     s_resmarks};
+    lv_obj_t *hide[] = {s_title,   s_text,   s_more, s_scope,   s_breadth, s_grule, s_gsign,
+                        s_blank_g, s_read,   s_load, s_seldisc, s_nb[0],   s_nb[1], s_row[0],
+                        s_row[1],  s_row[2], s_hero, s_res,     s_resmarks};
     for (size_t i = 0; i < sizeof hide / sizeof hide[0]; i++)
         lv_obj_add_flag(hide[i], LV_OBJ_FLAG_HIDDEN);
     for (int i = 0; i < ASK_MAX_ITEMS; i++) lv_obj_add_flag(s_disc[i], LV_OBJ_FLAG_HIDDEN);

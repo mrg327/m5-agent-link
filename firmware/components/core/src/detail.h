@@ -51,6 +51,11 @@ void detail_reset(void);
  * only for the session and message asked for, in order, with the announced length (session.ll). A
  * replaced or cleared message is forgotten. */
 bool detail_msg_fetchable(const session_t *s);
+/* The session's last message is all on its card already (UX-PROFILE C8): its preview is the whole
+ * of it, one word of at most DETAIL_MSG_WHOLE bytes ("Done."). Then nothing offers Read: the
+ * reader would show that word alone. A sentence still opens the reader, whose end has Reply. */
+#define DETAIL_MSG_WHOLE 32
+bool detail_msg_whole(const session_t *s);
 void detail_want_msg(const session_t *s, uint32_t now_ms);
 void detail_on_msg_chunk(uint32_t sid, uint32_t lm, uint32_t off, uint32_t total,
                          const uint8_t *text, uint32_t len, uint32_t now_ms);

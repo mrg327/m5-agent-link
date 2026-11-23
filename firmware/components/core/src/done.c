@@ -24,7 +24,7 @@ static void compose(const done_sum_t *d, const char *sep, bool short_tests, done
     if (d->files_known && d->files)
         snprintf(body[DONE_FILES], sizeof body[0], "%u file%s", (unsigned)d->files,
                  d->files == 1 ? "" : "s");
-    if (d->lines_known)
+    if (d->lines_known && (d->added || d->removed)) /* +0 -0 says nothing (UX-PROFILE C8) */
         snprintf(body[DONE_LINES], sizeof body[0], "+%u \xE2\x80\x93%u", (unsigned)d->added,
                  (unsigned)d->removed);
     if (d->tests_known)

@@ -1,0 +1,12 @@
+# A long command fills its lines instead of wrapping at the first space (UX-PROFILE C5, issue
+# 67d1): "cd" is not alone on the first line, and the rm -rf is on the glass.
+connect
+rtc 1800000000
+rx a400020101020103a5008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+session 2 input webapp feat/login
+attention 7 2 approval approve,deny,focus 0 Run shell command in the repository roo…|cd /home/user/projects/customer-portal && rm -rf node_modules dist .cache && npm ci --prefer-offline --no-audit && npm run build -- --mode=production && npm tes…
+wait 700
+expect_screen ask
+expect_label glass: cd /home/user/projects/
+expect_label glass: customer-portal && rm -rf
+quit
