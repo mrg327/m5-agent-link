@@ -2,7 +2,9 @@
 // It is honest: a quiet placeholder, no firmware behaviour is faked.
 export function createStubWatch(canvas, { bus } = {}) {
   const ctx = canvas.getContext('2d');
-  let t = 0, raf = 0, press = null;
+  let t = 0,
+    raf = 0,
+    press = null;
   const rings = [];
 
   function frame(now) {
@@ -14,13 +16,21 @@ export function createStubWatch(canvas, { bus } = {}) {
       const p = (t / 6 + i / 4) % 1;
       ctx.strokeStyle = `rgba(120,150,210,${(0.16 * (1 - p)).toFixed(3)})`;
       ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(233, 233, 30 + p * 190, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(233, 233, 30 + p * 190, 0, Math.PI * 2);
+      ctx.stroke();
     }
     for (let i = rings.length - 1; i >= 0; i--) {
-      const r = rings[i], a = 1 - (now - r.t0) / 700;
-      if (a <= 0) { rings.splice(i, 1); continue; }
-      ctx.strokeStyle = `rgba(190,210,255,${(a * .6).toFixed(3)})`;
-      ctx.beginPath(); ctx.arc(r.x, r.y, 8 + (1 - a) * 50, 0, Math.PI * 2); ctx.stroke();
+      const r = rings[i],
+        a = 1 - (now - r.t0) / 700;
+      if (a <= 0) {
+        rings.splice(i, 1);
+        continue;
+      }
+      ctx.strokeStyle = `rgba(190,210,255,${(a * 0.6).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, 8 + (1 - a) * 50, 0, Math.PI * 2);
+      ctx.stroke();
     }
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(230,237,243,.82)';
@@ -38,14 +48,26 @@ export function createStubWatch(canvas, { bus } = {}) {
   return {
     kind: 'stub',
     pointer(type, x, y) {
-      if (type === 'down') { press = { x, y, t: performance.now() }; rings.push({ x, y, t0: performance.now() }); }
-      if (type === 'up' && press) { bus?.emit('watch:gesture', { kind: 'tap', x, y }); press = null; }
+      if (type === 'down') {
+        press = { x, y, t: performance.now() };
+        rings.push({ x, y, t0: performance.now() });
+      }
+      if (type === 'up' && press) {
+        bus?.emit('watch:gesture', { kind: 'tap', x, y });
+        press = null;
+      }
     },
-    button(id, down) { if (down) bus?.emit('watch:gesture', { kind: `btn_${id}`, x: 0, y: 0 }); },
+    button(id, down) {
+      if (down) bus?.emit('watch:gesture', { kind: `btn_${id}`, x: 0, y: 0 });
+    },
     deliver() {},
-    onTx(fn) { txHandlers.add(fn); },
+    onTx(fn) {
+      txHandlers.add(fn);
+    },
     setLinkUp() {},
     reset() {},
-    destroy() { cancelAnimationFrame(raf); },
+    destroy() {
+      cancelAnimationFrame(raf);
+    },
   };
 }

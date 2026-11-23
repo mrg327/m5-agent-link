@@ -11,7 +11,8 @@ function head(major, n, out) {
   if (n < 24) out.push(m | n);
   else if (n < 0x100) out.push(m | 24, n);
   else if (n < 0x10000) out.push(m | 25, n >> 8, n & 0xff);
-  else if (n < 0x100000000) out.push(m | 26, (n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff);
+  else if (n < 0x100000000)
+    out.push(m | 26, (n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff);
   else {
     let b = BigInt(n);
     out.push(m | 27);
@@ -53,12 +54,17 @@ function encodeInto(v, out) {
     for (const x of v) encodeInto(x, out);
   } else if (v instanceof Map || typeof v === 'object') {
     // Plain-object keys that look like integers are integer keys.
-    const entries = v instanceof Map ? [...v] : Object.entries(v).map(([k, x]) => [/^\d+$/.test(k) ? Number(k) : k, x]);
-    const items = entries.filter(([, x]) => x !== undefined).map(([k, x]) => {
-      const kb = [];
-      encodeInto(k, kb);
-      return { kb, x };
-    });
+    const entries =
+      v instanceof Map
+        ? [...v]
+        : Object.entries(v).map(([k, x]) => [/^\d+$/.test(k) ? Number(k) : k, x]);
+    const items = entries
+      .filter(([, x]) => x !== undefined)
+      .map(([k, x]) => {
+        const kb = [];
+        encodeInto(k, kb);
+        return { kb, x };
+      });
     items.sort((a, b) => cmpBytes(a.kb, b.kb));
     head(5, items.length, out);
     for (const { kb, x } of items) {
@@ -98,9 +104,22 @@ export function decodeAt(b, pos) {
   };
   function arg(ai) {
     if (ai < 24) return ai;
-    if (ai === 24) { need(1); return b[p++]; }
-    if (ai === 25) { need(2); const v = dv.getUint16(p); p += 2; return v; }
-    if (ai === 26) { need(4); const v = dv.getUint32(p); p += 4; return v; }
+    if (ai === 24) {
+      need(1);
+      return b[p++];
+    }
+    if (ai === 25) {
+      need(2);
+      const v = dv.getUint16(p);
+      p += 2;
+      return v;
+    }
+    if (ai === 26) {
+      need(4);
+      const v = dv.getUint32(p);
+      p += 4;
+      return v;
+    }
     if (ai === 27) {
       need(8);
       const v = dv.getBigUint64(p);
@@ -115,21 +134,66 @@ export function decodeAt(b, pos) {
     const major = ib >> 5;
     const ai = ib & 31;
     switch (major) {
-      case 0: return arg(ai);
-      case 1: { const n = arg(ai); return typeof n === 'bigint' ? -1n - n : -1 - n; }
-      case 2: { const n = arg(ai); need(n); const v = b.slice(p, p + n); p += n; return v; }
-      case 3: { const n = arg(ai); need(n); const v = dec.decode(b.subarray(p, p + n)); p += n; return v; }
-      case 4: { const n = arg(ai); const a = []; for (let i = 0; i < n; i++) a.push(item()); return a; }
-      case 5: { const n = arg(ai); const m = new Map(); for (let i = 0; i < n; i++) { const k = item(); m.set(k, item()); } return m; }
+      case 0:
+        return arg(ai);
+      case 1: {
+        const n = arg(ai);
+        return typeof n === 'bigint' ? -1n - n : -1 - n;
+      }
+      case 2: {
+        const n = arg(ai);
+        need(n);
+        const v = b.slice(p, p + n);
+        p += n;
+        return v;
+      }
+      case 3: {
+        const n = arg(ai);
+        need(n);
+        const v = dec.decode(b.subarray(p, p + n));
+        p += n;
+        return v;
+      }
+      case 4: {
+        const n = arg(ai);
+        const a = [];
+        for (let i = 0; i < n; i++) a.push(item());
+        return a;
+      }
+      case 5: {
+        const n = arg(ai);
+        const m = new Map();
+        for (let i = 0; i < n; i++) {
+          const k = item();
+          m.set(k, item());
+        }
+        return m;
+      }
       case 7:
         if (ai === 20) return false;
         if (ai === 21) return true;
         if (ai === 22 || ai === 23) return null;
-        if (ai === 25) { need(2); const v = half(dv.getUint16(p)); p += 2; return v; }
-        if (ai === 26) { need(4); const v = dv.getFloat32(p); p += 4; return v; }
-        if (ai === 27) { need(8); const v = dv.getFloat64(p); p += 8; return v; }
+        if (ai === 25) {
+          need(2);
+          const v = half(dv.getUint16(p));
+          p += 2;
+          return v;
+        }
+        if (ai === 26) {
+          need(4);
+          const v = dv.getFloat32(p);
+          p += 4;
+          return v;
+        }
+        if (ai === 27) {
+          need(8);
+          const v = dv.getFloat64(p);
+          p += 8;
+          return v;
+        }
         throw new Error('cbor: unsupported simple value');
-      default: throw new Error('cbor: unsupported major type ' + major);
+      default:
+        throw new Error('cbor: unsupported major type ' + major);
     }
   }
   const value = item();
@@ -151,9 +215,16 @@ export function spans(bytes) {
     const ai = ib & 31;
     let n = ai;
     if (ai === 24) n = bytes[p++];
-    else if (ai === 25) { n = (bytes[p] << 8) | bytes[p + 1]; p += 2; }
-    else if (ai === 26) { n = ((bytes[p] << 24) | (bytes[p + 1] << 16) | (bytes[p + 2] << 8) | bytes[p + 3]) >>> 0; p += 4; }
-    else if (ai === 27) { p += 8; n = 0; }
+    else if (ai === 25) {
+      n = (bytes[p] << 8) | bytes[p + 1];
+      p += 2;
+    } else if (ai === 26) {
+      n = ((bytes[p] << 24) | (bytes[p + 1] << 16) | (bytes[p + 2] << 8) | bytes[p + 3]) >>> 0;
+      p += 4;
+    } else if (ai === 27) {
+      p += 8;
+      n = 0;
+    }
     const headEnd = p;
     const push = (s, e, kind) => out.push({ start: s, end: e, kind, depth, label });
     if (major === 0 || major === 1 || major === 7) {

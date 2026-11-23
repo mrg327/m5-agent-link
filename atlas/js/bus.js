@@ -12,7 +12,11 @@ export function createBus() {
       const set = map.get(type);
       if (!set) return;
       for (const fn of [...set]) {
-        try { fn(detail, type); } catch (e) { console.error(`[bus] ${type} listener failed`, e); }
+        try {
+          fn(detail, type);
+        } catch (e) {
+          console.error(`[bus] ${type} listener failed`, e);
+        }
       }
     },
   };

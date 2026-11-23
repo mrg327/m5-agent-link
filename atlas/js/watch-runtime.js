@@ -3,15 +3,31 @@
 const SIZE = 466;
 const LINK_KINDS = { usb: 0, ble: 1, ws: 2 };
 const GESTURE_KINDS = {
-  tap: 'tap', long_press: 'long_press', scrub: 'scrub', select: 'select', chord: 'chord',
-  swipe_up: 'swipe_u', swipe_down: 'swipe_d', swipe_left: 'swipe_l', swipe_right: 'swipe_r',
-  btn_a: 'btn_a', btn_b: 'btn_b', btn_a_long: 'btn_a', btn_b_long: 'btn_b',
+  tap: 'tap',
+  long_press: 'long_press',
+  scrub: 'scrub',
+  select: 'select',
+  chord: 'chord',
+  swipe_up: 'swipe_u',
+  swipe_down: 'swipe_d',
+  swipe_left: 'swipe_l',
+  swipe_right: 'swipe_r',
+  btn_a: 'btn_a',
+  btn_b: 'btn_b',
+  btn_a_long: 'btn_a',
+  btn_b_long: 'btn_b',
 };
 
 const noop = () => {};
 
 function makeEmitter(bus) {
-  return (type, detail) => { try { bus?.emit(type, detail); } catch (e) { console.error(e); } };
+  return (type, detail) => {
+    try {
+      bus?.emit(type, detail);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 }
 
 // The firmware's debug channel is one JSON object per line (see hal_debug_line); lift gestures and screens out of it.
@@ -19,9 +35,18 @@ function handleDebugLine(line, emit, log) {
   log?.(line);
   if (line[0] !== '{') return;
   let ev;
-  try { ev = JSON.parse(line); } catch { return; }
+  try {
+    ev = JSON.parse(line);
+  } catch {
+    return;
+  }
   if (ev.cat === 'input' && GESTURE_KINDS[ev.ev]) {
-    emit('watch:gesture', { kind: GESTURE_KINDS[ev.ev], x: ev.x ?? 0, y: ev.y ?? 0, long: ev.ev.endsWith('_long') || undefined });
+    emit('watch:gesture', {
+      kind: GESTURE_KINDS[ev.ev],
+      x: ev.x ?? 0,
+      y: ev.y ?? 0,
+      long: ev.ev.endsWith('_long') || undefined,
+    });
   } else if (ev.cat === 'ui' && ev.ev === 'screen') {
     emit('watch:screen', { screen: ev.screen, sel: ev.sel_sid ?? 0 });
   }
@@ -57,20 +82,23 @@ async function createWasmWatch(factory, canvas, emit, autoStart, onDebug) {
     tx: (_kind, bytes) => txFns.forEach((f) => f(bytes)),
     haptic: (ms) => {
       const steps = [];
-      for (let i = 0; i < ms.length; i += 2) steps.push({ on_ms: ms[i], off_ms: ms[i + 1] ?? 0, duty: 100 });
+      for (let i = 0; i < ms.length; i += 2)
+        steps.push({ on_ms: ms[i], off_ms: ms[i + 1] ?? 0, duty: 100 });
       emit('watch:haptic', { steps });
     },
     debug: (line) => handleDebugLine(line, emit, onDebug),
   };
 
   function boot() {
-    return factory({ hooks, print: noop, printErr: (s) => console.warn('[watch]', s) }).then((m) => {
-      M = m;
-      M._wasm_set_wallclock(Math.floor(Date.now() / 1000));
-      M._wasm_init();
-      imageData = null;
-      for (const [k, up] of Object.entries(linkState)) if (up) M._wasm_link_up(LINK_KINDS[k], 1);
-    });
+    return factory({ hooks, print: noop, printErr: (s) => console.warn('[watch]', s) }).then(
+      (m) => {
+        M = m;
+        M._wasm_set_wallclock(Math.floor(Date.now() / 1000));
+        M._wasm_init();
+        imageData = null;
+        for (const [k, up] of Object.entries(linkState)) if (up) M._wasm_link_up(LINK_KINDS[k], 1);
+      },
+    );
   }
 
   function blit() {
@@ -78,10 +106,15 @@ async function createWasmWatch(factory, canvas, emit, autoStart, onDebug) {
     const buf = M.HEAPU8.buffer;
     if (!imageData || imageBuf !== buf) {
       imageBuf = buf;
-      imageData = new ImageData(new Uint8ClampedArray(buf, M._wasm_fb_ptr(), SIZE * SIZE * 4), SIZE, SIZE);
+      imageData = new ImageData(
+        new Uint8ClampedArray(buf, M._wasm_fb_ptr(), SIZE * SIZE * 4),
+        SIZE,
+        SIZE,
+      );
     }
     const d = new Int32Array(buf, M._wasm_dirty_ptr(), 4);
-    const x = d[0], y = d[1];
+    const x = d[0],
+      y = d[1];
     ctx2d.putImageData(imageData, 0, 0, x, y, d[2] - x + 1, d[3] - y + 1);
   }
 
@@ -122,10 +155,14 @@ async function createWasmWatch(factory, canvas, emit, autoStart, onDebug) {
       queue.push({ t: type, x: Math.round(x), y: Math.round(y) });
       if (queue.length > 64) queue.splice(0, queue.length - 64);
     },
-    button(id, down) { queue.push({ t: 'btn', id: id === 'b' ? 1 : 0, down: !!down }); },
+    button(id, down) {
+      queue.push({ t: 'btn', id: id === 'b' ? 1 : 0, down: !!down });
+    },
     onTx(fn) {
       txFns.push(fn);
-      return () => { txFns = txFns.filter((f) => f !== fn); };
+      return () => {
+        txFns = txFns.filter((f) => f !== fn);
+      };
     },
     setLinkUp(kind, up) {
       if (!(kind in LINK_KINDS)) return;
@@ -154,11 +191,22 @@ async function createWasmWatch(factory, canvas, emit, autoStart, onDebug) {
       running = true;
       raf = requestAnimationFrame(loop);
     },
-    stop() { running = false; cancelAnimationFrame(raf); },
-    step(n = 1) { for (let i = 0; i < n; i++) step(); },
-    screen() { return M.UTF8ToString(M._wasm_screen_name()); },
-    stats() { return { ...stats, avgMs: stats.ticks ? stats.totalMs / stats.ticks : 0, fps: M._wasm_fps() }; },
-    get module() { return M; },
+    stop() {
+      running = false;
+      cancelAnimationFrame(raf);
+    },
+    step(n = 1) {
+      for (let i = 0; i < n; i++) step();
+    },
+    screen() {
+      return M.UTF8ToString(M._wasm_screen_name());
+    },
+    stats() {
+      return { ...stats, avgMs: stats.ticks ? stats.totalMs / stats.ticks : 0, fps: M._wasm_fps() };
+    },
+    get module() {
+      return M;
+    },
   };
   watch.deliver = (bytes, kind = 'ws') => watch.deliverOn(kind, bytes);
   if (autoStart) watch.start();
@@ -194,17 +242,34 @@ function createStubWatch(canvas, emit) {
     pointer(type, x, y) {
       if (type === 'down') down = { x, y, t: performance.now() };
       else if (type === 'up' && down) {
-        const dx = x - down.x, dy = y - down.y;
+        const dx = x - down.x,
+          dy = y - down.y;
         let kind = 'tap';
-        if (Math.hypot(dx, dy) > 60) kind = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'swipe_r' : 'swipe_l') : dy > 0 ? 'swipe_d' : 'swipe_u';
+        if (Math.hypot(dx, dy) > 60)
+          kind =
+            Math.abs(dx) > Math.abs(dy)
+              ? dx > 0
+                ? 'swipe_r'
+                : 'swipe_l'
+              : dy > 0
+                ? 'swipe_d'
+                : 'swipe_u';
         emit('watch:gesture', { kind, x: down.x, y: down.y, stub: true });
         down = null;
       }
     },
-    button(id, isDown) { if (isDown) emit('watch:gesture', { kind: id === 'b' ? 'btn_b' : 'btn_a', x: 0, y: 0, stub: true }); },
+    button(id, isDown) {
+      if (isDown)
+        emit('watch:gesture', { kind: id === 'b' ? 'btn_b' : 'btn_a', x: 0, y: 0, stub: true });
+    },
     deliver: noop,
     deliverOn: noop,
-    onTx(fn) { txFns.push(fn); return () => { txFns = txFns.filter((f) => f !== fn); }; },
+    onTx(fn) {
+      txFns.push(fn);
+      return () => {
+        txFns = txFns.filter((f) => f !== fn);
+      };
+    },
     setLinkUp: noop,
     reset: async () => draw(),
     start: noop,

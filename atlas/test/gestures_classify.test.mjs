@@ -85,12 +85,16 @@ test('moving cancels a pending long press', () => {
 
 test('buttons: B fires on release, B long once from tick, A waits out the double-press window', () => {
   const { c, kinds } = rig();
-  c.button(1, true, 0); c.button(1, false, 50);
+  c.button(1, true, 0);
+  c.button(1, false, 50);
   assert.deepEqual(kinds(), ['btn_b']);
-  c.button(1, true, 200); c.tick(200 + th.long_press_ms); c.tick(200 + th.long_press_ms + 10);
+  c.button(1, true, 200);
+  c.tick(200 + th.long_press_ms);
+  c.tick(200 + th.long_press_ms + 10);
   c.button(1, false, 1500);
   assert.deepEqual(kinds(), ['btn_b', 'btn_b_long']);
-  c.button(0, true, 2000); c.button(0, false, 2080);
+  c.button(0, true, 2000);
+  c.button(0, false, 2080);
   c.tick(2080 + th.btn_double_ms - 1);
   assert.equal(kinds().length, 2);
   c.tick(2080 + th.btn_double_ms);
@@ -99,38 +103,47 @@ test('buttons: B fires on release, B long once from tick, A waits out the double
 
 test('A double-press inside the window gives btn_a_double and no btn_a', () => {
   const { c, kinds } = rig();
-  c.button(0, true, 0); c.button(0, false, 60);
-  c.button(0, true, 60 + th.btn_double_ms); c.button(0, false, 60 + th.btn_double_ms + 40);
+  c.button(0, true, 0);
+  c.button(0, false, 60);
+  c.button(0, true, 60 + th.btn_double_ms);
+  c.button(0, false, 60 + th.btn_double_ms + 40);
   c.tick(2000);
   assert.deepEqual(kinds(), ['btn_a_double']);
   const r = rig(); // too late: two separate single presses
-  r.c.button(0, true, 0); r.c.button(0, false, 60);
+  r.c.button(0, true, 0);
+  r.c.button(0, false, 60);
   r.c.tick(60 + th.btn_double_ms);
-  r.c.button(0, true, 700); r.c.button(0, false, 760); r.c.tick(2000);
+  r.c.button(0, true, 700);
+  r.c.button(0, false, 760);
+  r.c.tick(2000);
   assert.deepEqual(r.kinds(), ['btn_a', 'btn_a']);
 });
 
 test('A+B chord swallows both presses', () => {
   const { c, kinds } = rig();
-  c.button(0, true, 0); c.button(1, true, 30);
-  c.button(1, false, 200); c.button(0, false, 210);
+  c.button(0, true, 0);
+  c.button(1, true, 30);
+  c.button(1, false, 200);
+  c.button(0, false, 210);
   c.tick(3000);
   assert.deepEqual(kinds(), ['chord']);
 });
 
 // Finger positions on the rim at a clock angle (0 = 12 o'clock, clockwise).
 const rim = (deg, r = 195) => {
-  const a = (deg - 90) * Math.PI / 180;
+  const a = ((deg - 90) * Math.PI) / 180;
   return [th.cx_px + r * Math.cos(a), th.cy_px + r * Math.sin(a)];
 };
 function dragRim(c, from, to, step, r = 195, t0 = 0) {
-  let t = t0, dir = to >= from ? 1 : -1;
+  let t = t0,
+    dir = to >= from ? 1 : -1;
   c.touch(true, ...rim(from, r), t);
-  for (let d = from + dir * step; dir * (to - d) >= 0; d += dir * step) c.touch(true, ...rim(d, r), t += 10);
-  c.touch(false, ...rim(to, r), t += 10);
+  for (let d = from + dir * step; dir * (to - d) >= 0; d += dir * step)
+    c.touch(true, ...rim(d, r), (t += 10));
+  c.touch(false, ...rim(to, r), (t += 10));
 }
 
-test('angleDeg: 12 o\'clock is 0, 3 o\'clock is 90, and it wraps', () => {
+test("angleDeg: 12 o'clock is 0, 3 o'clock is 90, and it wraps", () => {
   assert.ok(Math.abs(angleDeg(th, th.cx_px, 0).deg) < 1e-6);
   assert.ok(Math.abs(angleDeg(th, 466, th.cy_px).deg - 90) < 1e-6);
   assert.ok(Math.abs(angleDeg(th, 0, th.cy_px).deg - 270) < 1e-6);
@@ -146,7 +159,10 @@ test('a drag along the rim past scrub_start_deg scrubs; sectors change only past
   assert.equal(ev[1].x, 0);
   assert.ok(ev[1].dur_ms >= th.scrub_start_deg);
   const scrubs = ev.filter((e) => e.kind === 'scrub');
-  assert.deepEqual(scrubs.map((e) => e.x), [1, 2]);
+  assert.deepEqual(
+    scrubs.map((e) => e.x),
+    [1, 2],
+  );
   // 0 -> 1 only once the finger is scrub_hyst_deg (at most a third of a sector) beyond the boundary at 90 deg
   const edge = 90 + Math.min(th.scrub_hyst_deg, 90 / 3);
   assert.ok(scrubs[0].y > edge && scrubs[0].y <= edge + 3);
@@ -159,7 +175,10 @@ test('hysteresis: wobbling on a sector boundary does not flutter', () => {
   c.setSectors(4);
   c.touch(true, ...rim(60), 0);
   for (let d = 60; d <= 92; d += 4) c.touch(true, ...rim(d), d * 5);
-  for (let i = 0; i < 6; i++) { c.touch(true, ...rim(89), 300 + i * 10); c.touch(true, ...rim(94), 305 + i * 10); }
+  for (let i = 0; i < 6; i++) {
+    c.touch(true, ...rim(89), 300 + i * 10);
+    c.touch(true, ...rim(94), 305 + i * 10);
+  }
   assert.equal(kinds().filter((x) => x === 'scrub').length, 0);
 });
 
@@ -222,14 +241,17 @@ test('with fewer than two sectors a scrub starts but never changes sector', () =
 test('swipe down across the centre is still a swipe (not a rim candidate)', () => {
   const { c, kinds } = rig();
   c.setSectors(4);
-  c.touch(true, 233, 160, 0); c.touch(true, 233, 200, 40); c.touch(true, 233, 260, 80);
+  c.touch(true, 233, 160, 0);
+  c.touch(true, 233, 200, 40);
+  c.touch(true, 233, 260, 80);
   c.touch(false, 233, 260, 90);
   assert.equal(kinds().at(-1), 'swipe_d');
 });
 
 test('a hold in the centre fires long_press from tick; a centre tap is immediate', () => {
   const { c, kinds } = rig();
-  c.touch(true, 233, 233, 0); c.touch(false, 233, 233, 80);
+  c.touch(true, 233, 233, 0);
+  c.touch(false, 233, 233, 80);
   assert.equal(kinds().at(-1), 'tap');
 });
 
@@ -237,7 +259,10 @@ test('a hold in the centre fires long_press from tick; a centre tap is immediate
 
 test('a tap with jitter inside the slop is a tap and no drag step', () => {
   const { c, kinds } = rig();
-  c.touch(true, 233, 233, 0); c.touch(true, 233, 243, 30); c.touch(true, 240, 225, 60); c.touch(true, 233, 250, 90);
+  c.touch(true, 233, 233, 0);
+  c.touch(true, 233, 243, 30);
+  c.touch(true, 240, 225, 60);
+  c.touch(true, 233, 250, 90);
   c.touch(false, 233, 250, 120);
   assert.ok(!kinds().includes('drag') && !kinds().includes('drag_end'));
   assert.equal(kinds().at(-1), 'tap');
@@ -249,10 +274,16 @@ test('a slow drag emits one drag per drag_step_px, counted from where it left th
   for (let i = 1; i <= 12; i++) c.touch(true, 233, 260 - i * 8, i * 50); // 96 px up over 600 ms
   const drags = ev.filter((e) => e.kind === 'drag');
   assert.equal(drags.length, 7); // armed at 24 px, then 72 px of 10 px steps
-  assert.deepEqual([drags[0].dy, drags[0].x, drags[0].y, drags[0].dx], [-th.drag_step_px, 233, 260, 0]);
+  assert.deepEqual(
+    [drags[0].dy, drags[0].x, drags[0].y, drags[0].dx],
+    [-th.drag_step_px, 233, 260, 0],
+  );
   assert.ok(c.dragging);
   c.touch(false, 233, 164, 650);
-  assert.ok(!kinds().includes('tap') && !kinds().some((k) => k.startsWith('swipe')), 'a slow drag ends without a tap or a swipe');
+  assert.ok(
+    !kinds().includes('tap') && !kinds().some((k) => k.startsWith('swipe')),
+    'a slow drag ends without a tap or a swipe',
+  );
   const end = ev.at(-1);
   assert.deepEqual([end.kind, end.vy, end.dy], ['drag_end', 0, -96]);
 });
@@ -264,9 +295,16 @@ test('a jump of more than one step is one drag of several steps, and the remaind
   c.touch(true, 233, 220, 30); // leaves the slop: the stream starts here
   assert.equal(ev.filter((e) => e.kind === 'drag').length, 0);
   c.touch(true, 233, 245, 60); // 25 px at once: two whole steps, 5 px carry
-  assert.deepEqual(ev.filter((e) => e.kind === 'drag').map((d) => d.dy), [2 * step]);
+  assert.deepEqual(
+    ev.filter((e) => e.kind === 'drag').map((d) => d.dy),
+    [2 * step],
+  );
   c.touch(true, 233, 250, 90);
-  assert.deepEqual(ev.filter((e) => e.kind === 'drag').map((d) => d.dy), [2 * step, step], 'the remainder adds up to one more step');
+  assert.deepEqual(
+    ev.filter((e) => e.kind === 'drag').map((d) => d.dy),
+    [2 * step, step],
+    'the remainder adds up to one more step',
+  );
 });
 
 test('a fast swipe streams drags, then drag_end with the release speed, then a flick swipe', () => {

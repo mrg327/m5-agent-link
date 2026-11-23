@@ -5,12 +5,21 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { encode, decode, spans } from '../js/proto/cbor.js';
 import { crc16 } from '../js/proto/crc16.js';
-import { cobsEncode, cobsDecode, cobsLayout, encodeFrame, FrameDecoder, MAX_PAYLOAD } from '../js/proto/cobs.js';
+import {
+  cobsEncode,
+  cobsDecode,
+  cobsLayout,
+  encodeFrame,
+  FrameDecoder,
+  MAX_PAYLOAD,
+} from '../js/proto/cobs.js';
 import { fragment, Reassembler, FIRST, LAST } from '../js/proto/blefrag.js';
 import { encodeMsg, decodeMsg, describe } from '../js/proto/messages.js';
 
 const vecDir = join(dirname(fileURLToPath(import.meta.url)), '../../protocol/vectors');
-const vectors = readdirSync(vecDir).filter((f) => f.endsWith('.json')).map((f) => [f, JSON.parse(readFileSync(join(vecDir, f), 'utf8'))]);
+const vectors = readdirSync(vecDir)
+  .filter((f) => f.endsWith('.json'))
+  .map((f) => [f, JSON.parse(readFileSync(join(vecDir, f), 'utf8'))]);
 const hex = (u) => Buffer.from(u).toString('hex');
 const unhex = (s) => Uint8Array.from(Buffer.from(s, 'hex'));
 const pattern = (n) => Uint8Array.from({ length: n }, (_, i) => (i * 7 + 3) & 0xff);
@@ -32,23 +41,41 @@ for (const [name, v] of vectors) {
 }
 
 test('describe wording', () => {
-  assert.equal(describe({ t: 'session_upd', id: 1, b: { sid: 2, st: 'done' } }, 'rx'), 'Daemon → watch: session 2 is now Done');
+  assert.equal(
+    describe({ t: 'session_upd', id: 1, b: { sid: 2, st: 'done' } }, 'rx'),
+    'Daemon → watch: session 2 is now Done',
+  );
 });
 
 test('cbor ints, floats, nesting', () => {
-  for (const n of [0, 23, 24, 255, 256, 65535, 65536, 4294967295, 4294967296, -1, -24, -25, -1000]) {
+  for (const n of [
+    0, 23, 24, 255, 256, 65535, 65536, 4294967295, 4294967296, -1, -24, -25, -1000,
+  ]) {
     assert.equal(decode(encode(n)), n);
   }
   assert.equal(decode(encode(1.5)), 1.5);
-  assert.deepEqual(decode(encode([true, false, null, 'é', Uint8Array.of(1, 2)])), [true, false, null, 'é', Uint8Array.of(1, 2)]);
+  assert.deepEqual(decode(encode([true, false, null, 'é', Uint8Array.of(1, 2)])), [
+    true,
+    false,
+    null,
+    'é',
+    Uint8Array.of(1, 2),
+  ]);
   assert.equal(hex(encode(1793995200)), '1a6aee31c0');
   assert.throws(() => decode(Uint8Array.of(0x82, 1)));
 });
 
-test('crc16 known vector', () => assert.equal(crc16(new TextEncoder().encode('123456789')), 0x29b1));
+test('crc16 known vector', () =>
+  assert.equal(crc16(new TextEncoder().encode('123456789')), 0x29b1));
 
 test('cobs edge cases round-trip', () => {
-  const cases = [[], [0], [0, 0], [1, 0, 2], ...[253, 254, 255, 508, 600].map((n) => new Array(n).fill(7))];
+  const cases = [
+    [],
+    [0],
+    [0, 0],
+    [1, 0, 2],
+    ...[253, 254, 255, 508, 600].map((n) => new Array(n).fill(7)),
+  ];
   cases.push([...new Array(254).fill(9), 0, ...new Array(254).fill(3)]);
   cases.push(Array.from({ length: 2000 }, (_, i) => i % 256));
   for (const c of cases) {
@@ -105,7 +132,12 @@ test('ble single fragment, seq wrap, loss recovery', () => {
   const r = new Reassembler();
   assert.ok(lossy.every((f) => r.push(f) === null));
   const next = pattern(50);
-  assert.deepEqual(fragment(next, 20).map((f) => r.push(f)).filter(Boolean), [next]);
+  assert.deepEqual(
+    fragment(next, 20)
+      .map((f) => r.push(f))
+      .filter(Boolean),
+    [next],
+  );
   assert.equal(fragment(pattern(4097), 244), null);
   assert.equal(fragment(new Uint8Array(0), 20), null);
 });
@@ -113,8 +145,17 @@ test('ble single fragment, seq wrap, loss recovery', () => {
 test('cobsLayout matches cobsEncode and tracks sources', () => {
   const d = Uint8Array.of(1, 0, 2, 3, 0, 0, 4);
   const lay = cobsLayout(d);
-  assert.deepEqual(Uint8Array.from(lay, (x) => x.v), cobsEncode(d));
-  assert.deepEqual(lay.map((x) => x.src), [-1, 0, -1, 2, 3, -1, -1, 6]);
+  assert.deepEqual(
+    Uint8Array.from(lay, (x) => x.v),
+    cobsEncode(d),
+  );
+  assert.deepEqual(
+    lay.map((x) => x.src),
+    [-1, 0, -1, 2, 3, -1, -1, 6],
+  );
   const big = Uint8Array.from({ length: 600 }, (_, i) => (i % 251) + 1);
-  assert.deepEqual(Uint8Array.from(cobsLayout(big), (x) => x.v), cobsEncode(big));
+  assert.deepEqual(
+    Uint8Array.from(cobsLayout(big), (x) => x.v),
+    cobsEncode(big),
+  );
 });

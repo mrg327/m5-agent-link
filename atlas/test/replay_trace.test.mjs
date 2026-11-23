@@ -17,7 +17,10 @@ test('sample trace parses into four sessions with ordered state steps', () => {
   for (const s of t.sessions) {
     assert.ok(s.repo && !s.repo.includes('/'));
     const ts = s.steps.map((x) => x.t);
-    assert.deepEqual(ts, [...ts].sort((a, b) => a - b));
+    assert.deepEqual(
+      ts,
+      [...ts].sort((a, b) => a - b),
+    );
   }
   assert.equal(t.focus.length, 4);
   assert.ok(t.duration > 600_000);
@@ -40,13 +43,24 @@ test('timeline is sorted and tolerant of junk lines', () => {
   assert.equal(t.bad, 2);
   const ev = buildTimeline(t);
   assert.ok(ev.length > 30);
-  assert.deepEqual(ev.map((e) => e.t), ev.map((e) => e.t).sort((a, b) => a - b));
+  assert.deepEqual(
+    ev.map((e) => e.t),
+    ev.map((e) => e.t).sort((a, b) => a - b),
+  );
   assert.ok(ev.some((e) => e.type === 'focus') && ev.some((e) => e.type === 'gone'));
 });
 
 test('falls back to usb session_upd when there are no registry lines, and never keeps cwd paths', () => {
-  const line = JSON.stringify({ dir: 'out', kind: 'session_upd', src: 'usb', ts_us: 1000,
-    msg: { b: { sid: 7, st: 'work', ag: 'claude', repo: '/Users/x/secret/proj' }, t: 'session_upd' } });
+  const line = JSON.stringify({
+    dir: 'out',
+    kind: 'session_upd',
+    src: 'usb',
+    ts_us: 1000,
+    msg: {
+      b: { sid: 7, st: 'work', ag: 'claude', repo: '/Users/x/secret/proj' },
+      t: 'session_upd',
+    },
+  });
   const t = parseTrace(line);
   assert.equal(t.sessions[0].repo, 'proj');
   assert.equal(t.sessions[0].steps[0].patch.repo, 'proj');

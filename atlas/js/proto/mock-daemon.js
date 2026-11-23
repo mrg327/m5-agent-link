@@ -8,7 +8,16 @@ import { encodeMsg, decodeMsg } from './messages.js';
 const MIN_APPROVE_HOLD_MS = 1000; // device.rs MIN_APPROVE_HOLD_MS
 const clip = (s, n) => (s.length <= n ? s : s.slice(0, n - 1) + '…');
 
-const S = (sid, ag, repo, br, st, extra = {}) => ({ sid, ag, repo, br, st, seen: false, host: 0, ...extra });
+const S = (sid, ag, repo, br, st, extra = {}) => ({
+  sid,
+  ag,
+  repo,
+  br,
+  st,
+  seen: false,
+  host: 0,
+  ...extra,
+});
 
 // Each step: [atMs, text, (d) => void]. A scenario loops after `length` ms.
 const SCENARIOS = {
@@ -16,25 +25,100 @@ const SCENARIOS = {
     title: 'Three agents, one watch',
     length: 34000,
     steps: [
-      [0, 'Copilot CLI starts working on m5-agent-link', (d) => d.addSession(S(1, 'copilot', 'm5-agent-link', 'main', 'work', { tool: 'bash', sum: 'Running tests' }))],
-      [2500, 'Claude Code joins in webapp', (d) => d.addSession(S(2, 'claude', 'webapp', 'feat/login', 'work', { tool: 'Edit', sum: 'Editing login form' }))],
-      [5000, 'A second Copilot session boots up', (d) => d.addSession(S(3, 'copilot', 'docs-site', 'main', 'start'))],
-      [6500, 'docs-site starts working', (d) => d.update(3, { st: 'work', tool: 'grep', sum: 'Searching docs' })],
-      [9000, 'Claude Code needs permission to run a command', (d) => d.requestApproval(2, { rid: 7, title: 'Run shell command', text: 'npm test -- --watch=false' })],
-      [12500, 'Copilot finishes its tests', (d) => d.update(1, { st: 'done', tool: undefined, sum: 'Tests passed' })],
+      [
+        0,
+        'Copilot CLI starts working on m5-agent-link',
+        (d) =>
+          d.addSession(
+            S(1, 'copilot', 'm5-agent-link', 'main', 'work', {
+              tool: 'bash',
+              sum: 'Running tests',
+            }),
+          ),
+      ],
+      [
+        2500,
+        'Claude Code joins in webapp',
+        (d) =>
+          d.addSession(
+            S(2, 'claude', 'webapp', 'feat/login', 'work', {
+              tool: 'Edit',
+              sum: 'Editing login form',
+            }),
+          ),
+      ],
+      [
+        5000,
+        'A second Copilot session boots up',
+        (d) => d.addSession(S(3, 'copilot', 'docs-site', 'main', 'start')),
+      ],
+      [
+        6500,
+        'docs-site starts working',
+        (d) => d.update(3, { st: 'work', tool: 'grep', sum: 'Searching docs' }),
+      ],
+      [
+        9000,
+        'Claude Code needs permission to run a command',
+        (d) =>
+          d.requestApproval(2, {
+            rid: 7,
+            title: 'Run shell command',
+            text: 'npm test -- --watch=false',
+          }),
+      ],
+      [
+        12500,
+        'Copilot finishes its tests',
+        (d) => d.update(1, { st: 'done', tool: undefined, sum: 'Tests passed' }),
+      ],
       [15500, 'The request is answered in the terminal', (d) => d.clearAttention(7, 'answered_pc')],
-      [18000, 'docs-site has a question for you', (d) => d.update(3, { st: 'input', sub: 'question', sum: 'Which version to document?' })],
-      [21500, 'You answer; docs-site carries on', (d) => d.update(3, { st: 'work', tool: 'Edit', sum: 'Writing docs' })],
-      [24000, 'Claude Code is done', (d) => d.update(2, { st: 'done', tool: undefined, sum: 'Login form refactored' })],
-      [27000, 'docs-site is done', (d) => d.update(3, { st: 'done', tool: undefined, sum: 'Docs updated' })],
-      [31000, 'Sessions wind down', (d) => { d.removeSession(1); d.removeSession(2); d.removeSession(3); }],
+      [
+        18000,
+        'docs-site has a question for you',
+        (d) => d.update(3, { st: 'input', sub: 'question', sum: 'Which version to document?' }),
+      ],
+      [
+        21500,
+        'You answer; docs-site carries on',
+        (d) => d.update(3, { st: 'work', tool: 'Edit', sum: 'Writing docs' }),
+      ],
+      [
+        24000,
+        'Claude Code is done',
+        (d) => d.update(2, { st: 'done', tool: undefined, sum: 'Login form refactored' }),
+      ],
+      [
+        27000,
+        'docs-site is done',
+        (d) => d.update(3, { st: 'done', tool: undefined, sum: 'Docs updated' }),
+      ],
+      [
+        31000,
+        'Sessions wind down',
+        (d) => {
+          d.removeSession(1);
+          d.removeSession(2);
+          d.removeSession(3);
+        },
+      ],
     ],
   },
   single: {
     title: 'One agent, quietly working',
     length: 24000,
     steps: [
-      [0, 'Copilot CLI starts', (d) => d.addSession(S(1, 'copilot', 'm5-agent-link', 'main', 'work', { tool: 'view', sum: 'Reading the code' }))],
+      [
+        0,
+        'Copilot CLI starts',
+        (d) =>
+          d.addSession(
+            S(1, 'copilot', 'm5-agent-link', 'main', 'work', {
+              tool: 'view',
+              sum: 'Reading the code',
+            }),
+          ),
+      ],
       [4000, 'Running a command', (d) => d.update(1, { tool: 'bash', sum: 'Running tests' })],
       [9000, 'Editing a file', (d) => d.update(1, { tool: 'edit', sum: 'Fixing a bug' })],
       [15000, 'Done', (d) => d.update(1, { st: 'done', tool: undefined, sum: 'All green' })],
@@ -45,11 +129,49 @@ const SCENARIOS = {
     title: 'A permission request',
     length: 26000,
     steps: [
-      [0, 'Claude Code starts', (d) => d.addSession(S(1, 'claude', 'webapp', 'feat/login', 'work', { tool: 'Edit', sum: 'Editing login form' }))],
-      [600, 'Copilot CLI is busy in api', (d) => d.addSession(S(2, 'copilot', 'api', 'main', 'work', { tool: 'bash', sum: 'Running migrations' }))],
-      [1200, 'docs-site finished earlier', (d) => d.addSession(S(3, 'copilot', 'docs-site', 'main', 'done', { sum: 'Docs updated' }))],
-      [1800, 'infra has a question', (d) => d.addSession(S(4, 'claude', 'infra', 'main', 'input', { sub: 'question', sum: 'Which region?' }))],
-      [3000, 'Claude Code asks to run a shell command', (d) => d.requestApproval(1, { rid: 7, title: 'Run shell command', text: 'npm test -- --watch=false', exp: 20 })],
+      [
+        0,
+        'Claude Code starts',
+        (d) =>
+          d.addSession(
+            S(1, 'claude', 'webapp', 'feat/login', 'work', {
+              tool: 'Edit',
+              sum: 'Editing login form',
+            }),
+          ),
+      ],
+      [
+        600,
+        'Copilot CLI is busy in api',
+        (d) =>
+          d.addSession(
+            S(2, 'copilot', 'api', 'main', 'work', { tool: 'bash', sum: 'Running migrations' }),
+          ),
+      ],
+      [
+        1200,
+        'docs-site finished earlier',
+        (d) => d.addSession(S(3, 'copilot', 'docs-site', 'main', 'done', { sum: 'Docs updated' })),
+      ],
+      [
+        1800,
+        'infra has a question',
+        (d) =>
+          d.addSession(
+            S(4, 'claude', 'infra', 'main', 'input', { sub: 'question', sum: 'Which region?' }),
+          ),
+      ],
+      [
+        3000,
+        'Claude Code asks to run a shell command',
+        (d) =>
+          d.requestApproval(1, {
+            rid: 7,
+            title: 'Run shell command',
+            text: 'npm test -- --watch=false',
+            exp: 20,
+          }),
+      ],
       [20000, 'Nobody answered, so the request expires', (d) => d.expireAttention(7)],
       [22000, 'Claude Code carries on', (d) => d.update(1, { st: 'done', sum: 'Stopped waiting' })],
     ],
@@ -58,31 +180,130 @@ const SCENARIOS = {
     title: 'One session in every state',
     length: 3600000,
     steps: [
-      [0, 'Working', (d) => d.addSession(S(1, 'copilot', 'm5-agent-link', 'main', 'work', { tool: 'bash', sum: 'Running tests' }))],
-      [0, 'Has a question', (d) => d.addSession(S(2, 'claude', 'webapp', 'feat/login', 'input', { sub: 'question', sum: 'Which version to document?' }))],
-      [0, 'Needs permission', (d) => d.addSession(S(3, 'claude', 'api', 'main', 'work', { tool: 'bash' }))],
-      [0, 'Done', (d) => d.addSession(S(4, 'copilot', 'docs-site', 'main', 'done', { sum: 'Docs updated' }))],
-      [0, 'Error', (d) => d.addSession(S(5, 'copilot', 'infra', 'main', 'error', { sum: 'Build failed' }))],
-      [0, 'Idle', (d) => d.addSession(S(6, 'claude', 'blog', 'main', 'idle', { sum: 'Waiting for a prompt' }))],
-      [100, 'Permission request', (d) => d.requestApproval(3, { rid: 7, title: 'Run shell command', text: 'npm test -- --watch=false', exp: 3000 })],
+      [
+        0,
+        'Working',
+        (d) =>
+          d.addSession(
+            S(1, 'copilot', 'm5-agent-link', 'main', 'work', {
+              tool: 'bash',
+              sum: 'Running tests',
+            }),
+          ),
+      ],
+      [
+        0,
+        'Has a question',
+        (d) =>
+          d.addSession(
+            S(2, 'claude', 'webapp', 'feat/login', 'input', {
+              sub: 'question',
+              sum: 'Which version to document?',
+            }),
+          ),
+      ],
+      [
+        0,
+        'Needs permission',
+        (d) => d.addSession(S(3, 'claude', 'api', 'main', 'work', { tool: 'bash' })),
+      ],
+      [
+        0,
+        'Done',
+        (d) => d.addSession(S(4, 'copilot', 'docs-site', 'main', 'done', { sum: 'Docs updated' })),
+      ],
+      [
+        0,
+        'Error',
+        (d) => d.addSession(S(5, 'copilot', 'infra', 'main', 'error', { sum: 'Build failed' })),
+      ],
+      [
+        0,
+        'Idle',
+        (d) =>
+          d.addSession(S(6, 'claude', 'blog', 'main', 'idle', { sum: 'Waiting for a prompt' })),
+      ],
+      [
+        100,
+        'Permission request',
+        (d) =>
+          d.requestApproval(3, {
+            rid: 7,
+            title: 'Run shell command',
+            text: 'npm test -- --watch=false',
+            exp: 3000,
+          }),
+      ],
     ],
   },
   busy: {
     title: 'Eight sessions at once',
     length: 24000,
     steps: [
-      ...Array.from({ length: 8 }, (_, i) => [i * 350, `Session ${i + 1} starts`, (d) => d.addSession(S(i + 1, i % 2 ? 'claude' : 'copilot', ['api', 'webapp', 'docs', 'infra', 'mobile', 'cli', 'ml-train', 'blog'][i], i % 3 ? 'main' : 'feat/x', 'work', { tool: ['bash', 'Edit', 'grep', 'view'][i % 4], sum: 'Working' }))]),
-      [4000, 'Two agents need you', (d) => { d.update(2, { st: 'input', sub: 'approval' }); d.update(5, { st: 'input', sub: 'question', sum: 'Pick a name?' }); }],
-      [8000, 'Three finish', (d) => { for (const s of [1, 3, 6]) d.update(s, { st: 'done', tool: undefined, sum: 'Finished' }); }],
+      ...Array.from({ length: 8 }, (_, i) => [
+        i * 350,
+        `Session ${i + 1} starts`,
+        (d) =>
+          d.addSession(
+            S(
+              i + 1,
+              i % 2 ? 'claude' : 'copilot',
+              ['api', 'webapp', 'docs', 'infra', 'mobile', 'cli', 'ml-train', 'blog'][i],
+              i % 3 ? 'main' : 'feat/x',
+              'work',
+              { tool: ['bash', 'Edit', 'grep', 'view'][i % 4], sum: 'Working' },
+            ),
+          ),
+      ]),
+      [
+        4000,
+        'Two agents need you',
+        (d) => {
+          d.update(2, { st: 'input', sub: 'approval' });
+          d.update(5, { st: 'input', sub: 'question', sum: 'Pick a name?' });
+        },
+      ],
+      [
+        8000,
+        'Three finish',
+        (d) => {
+          for (const s of [1, 3, 6]) d.update(s, { st: 'done', tool: undefined, sum: 'Finished' });
+        },
+      ],
       [12000, 'An error appears', (d) => d.update(4, { st: 'error', sum: 'Build failed' })],
-      [16000, 'Back to work', (d) => { d.update(2, { st: 'work' }); d.update(5, { st: 'work' }); d.update(4, { st: 'work', sum: 'Retrying' }); }],
-      [20000, 'Everything settles', (d) => { for (let s = 1; s <= 8; s++) d.update(s, { st: 'done', tool: undefined }); }],
+      [
+        16000,
+        'Back to work',
+        (d) => {
+          d.update(2, { st: 'work' });
+          d.update(5, { st: 'work' });
+          d.update(4, { st: 'work', sum: 'Retrying' });
+        },
+      ],
+      [
+        20000,
+        'Everything settles',
+        (d) => {
+          for (let s = 1; s <= 8; s++) d.update(s, { st: 'done', tool: undefined });
+        },
+      ],
     ],
   },
 };
 
-export function createMockDaemon({ bus, facts, timers, now, hostName = 'your-laptop', latencyMs = 25, staleApprovals = false } = {}) {
-  const T = timers ?? { setTimeout: (f, ms) => globalThis.setTimeout(f, ms), clearTimeout: (h) => globalThis.clearTimeout(h) };
+export function createMockDaemon({
+  bus,
+  facts,
+  timers,
+  now,
+  hostName = 'your-laptop',
+  latencyMs = 25,
+  staleApprovals = false,
+} = {}) {
+  const T = timers ?? {
+    setTimeout: (f, ms) => globalThis.setTimeout(f, ms),
+    clearTimeout: (h) => globalThis.clearTimeout(h),
+  };
   const clock = now ?? (() => Date.now());
   const unix = () => Math.floor(clock() / 1000);
   const emit = (type, detail) => bus?.emit(type, detail);
@@ -102,12 +323,24 @@ export function createMockDaemon({ bus, facts, timers, now, hostName = 'your-lap
 
   const self = {
     host: { id: 'a1a2a3a4a5a6a7a8', name: hostName, os: 'mac' },
-    get scenarios() { return Object.entries(SCENARIOS).map(([name, s]) => ({ name, title: s.title })); },
-    get sessions() { return [...sessions.values()]; },
-    get playing() { return playing; },
-    get scenario() { return scenario; },
-    get handshaken() { return handshaken; },
-    get loops() { return loops; },
+    get scenarios() {
+      return Object.entries(SCENARIOS).map(([name, s]) => ({ name, title: s.title }));
+    },
+    get sessions() {
+      return [...sessions.values()];
+    },
+    get playing() {
+      return playing;
+    },
+    get scenario() {
+      return scenario;
+    },
+    get handshaken() {
+      return handshaken;
+    },
+    get loops() {
+      return loops;
+    },
 
     attach(w) {
       watch = w;
@@ -118,7 +351,11 @@ export function createMockDaemon({ bus, facts, timers, now, hostName = 'your-lap
     /** Raw frame from the watch. */
     receive(bytes) {
       let msg;
-      try { msg = decodeMsg(bytes); } catch { return; }
+      try {
+        msg = decodeMsg(bytes);
+      } catch {
+        return;
+      }
       emit('watch:tx', { bytes, msg });
       T.setTimeout(() => handle_(msg), latencyMs);
     },
@@ -144,8 +381,16 @@ export function createMockDaemon({ bus, facts, timers, now, hostName = 'your-lap
       const delta = { sid };
       for (const [k, v] of Object.entries(patch)) {
         const val = typeof v === 'string' ? clip(v, k === 'sum' ? 80 : 32) : v;
-        if (val === undefined) { if (s[k] !== undefined) { delete s[k]; } continue; }
-        if (s[k] !== val) { s[k] = val; delta[k] = val; }
+        if (val === undefined) {
+          if (s[k] !== undefined) {
+            delete s[k];
+          }
+          continue;
+        }
+        if (s[k] !== val) {
+          s[k] = val;
+          delta[k] = val;
+        }
       }
       if (patch.st !== undefined && delta.st !== undefined) {
         s.tst = delta.tst = unix();
@@ -163,7 +408,15 @@ export function createMockDaemon({ bus, facts, timers, now, hostName = 'your-lap
       const s = sessions.get(sid);
       if (!s) return;
       self.update(sid, { st: 'input', sub: 'approval' });
-      const b = { rid, sid, kind: 'approval', title, text, acts: ['approve', 'deny', 'focus'], exp: unix() + exp };
+      const b = {
+        rid,
+        sid,
+        kind: 'approval',
+        title,
+        text,
+        acts: ['approve', 'deny', 'focus'],
+        exp: unix() + exp,
+      };
       live.set(rid, { sid, msg: b });
       if (handshaken) self.send({ t: 'attention', b });
     },
@@ -176,7 +429,9 @@ export function createMockDaemon({ bus, facts, timers, now, hostName = 'your-lap
       self.update(a.sid, { st: 'work' });
     },
 
-    expireAttention(rid) { self.clearAttention(rid, 'expired'); },
+    expireAttention(rid) {
+      self.clearAttention(rid, 'expired');
+    },
 
     /** For replay: a symbolic session delta, or {gone: sid}, {attention: {...}}, {clear: {rid, why}}. */
     inject(patch) {
@@ -193,7 +448,10 @@ export function createMockDaemon({ bus, facts, timers, now, hostName = 'your-lap
         return;
       }
       if (!sessions.has(patch.sid)) self.addSession({ host: 0, seen: false, ...patch });
-      else { const { sid, ...rest } = patch; self.update(sid, rest); }
+      else {
+        const { sid, ...rest } = patch;
+        self.update(sid, rest);
+      }
     },
 
     /** Clears sessions without notifying (a fresh snapshot is sent when attached and handshaken). */
@@ -268,8 +526,14 @@ export function createMockDaemon({ bus, facts, timers, now, hostName = 'your-lap
         handshaken = true;
         nextId = 1;
         self.send({
-          t: 'welcome', re: msg.id,
-          b: { proto: [0, 1], host: self.host, time: { unix: unix(), tz_off: -new Date(clock()).getTimezoneOffset() }, cfg: { privacy: 'preview', alert: 'full' } },
+          t: 'welcome',
+          re: msg.id,
+          b: {
+            proto: [0, 1],
+            host: self.host,
+            time: { unix: unix(), tz_off: -new Date(clock()).getTimezoneOffset() },
+            cfg: { privacy: 'preview', alert: 'full' },
+          },
         });
         self.send({ t: 'snapshot', b: { sessions: [...sessions.values()] } });
         for (const a of live.values()) {
@@ -277,9 +541,14 @@ export function createMockDaemon({ bus, facts, timers, now, hostName = 'your-lap
         }
         break;
       }
-      case 'ping': self.send({ t: 'pong', re: msg.id, b: {} }); break;
-      case 'cmd': self.send({ t: 'result', re: msg.id, b: cmdResult(b) }); break;
-      default: break;
+      case 'ping':
+        self.send({ t: 'pong', re: msg.id, b: {} });
+        break;
+      case 'cmd':
+        self.send({ t: 'result', re: msg.id, b: cmdResult(b) });
+        break;
+      default:
+        break;
     }
   }
 
@@ -292,14 +561,17 @@ export function createMockDaemon({ bus, facts, timers, now, hostName = 'your-lap
         return { ok: true };
       case 'approve':
       case 'deny': {
-        if (c.op === 'approve' && (c.hold_ms ?? 0) < MIN_APPROVE_HOLD_MS) return fail('denied', 'hold-to-confirm too short');
+        if (c.op === 'approve' && (c.hold_ms ?? 0) < MIN_APPROVE_HOLD_MS)
+          return fail('denied', 'hold-to-confirm too short');
         const a = live.get(c.rid);
         if (staleApprovals || !a) return fail('stale', 'no pending request for rid');
         T.setTimeout(() => self.clearAttention(c.rid, 'answered_dev'), latencyMs);
         return { ok: true };
       }
-      case 'ack': return { ok: true };
-      default: return fail('unsupported', 'command not implemented');
+      case 'ack':
+        return { ok: true };
+      default:
+        return fail('unsupported', 'command not implemented');
     }
   }
 

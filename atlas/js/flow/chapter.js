@@ -19,14 +19,32 @@ function tagsFor(kind, f) {
   ];
   if (kind === 'usb') {
     const u = f.usb ?? {};
-    return [['VID', u.vid], ['PID', u.pid], ['baud', u.baud], ['crc', u.crc], ['max payload', `${u.max_payload} B`], ...common];
+    return [
+      ['VID', u.vid],
+      ['PID', u.pid],
+      ['baud', u.baud],
+      ['crc', u.crc],
+      ['max payload', `${u.max_payload} B`],
+      ...common,
+    ];
   }
   if (kind === 'ble') {
     const b = f.ble ?? {};
-    return [['name', `${b.name_prefix}*`], ['service', short(b.service)], ['rx', short(b.rx)], ['tx', short(b.tx)],
-      ['write', `${b.default_write_len} B (up to ${b.max_write_len})`], ...common];
+    return [
+      ['name', `${b.name_prefix}*`],
+      ['service', short(b.service)],
+      ['rx', short(b.rx)],
+      ['tx', short(b.tx)],
+      ['write', `${b.default_write_len} B (up to ${b.max_write_len})`],
+      ...common,
+    ];
   }
-  return [['endpoint', `ws://${WS_ADDR}`], ['message', 'binary'], ['framing', 'none extra'], ...common];
+  return [
+    ['endpoint', `ws://${WS_ADDR}`],
+    ['message', 'binary'],
+    ['framing', 'none extra'],
+    ...common,
+  ];
 }
 
 const BLURB = {
@@ -38,7 +56,10 @@ const BLURB = {
 export function mount(section, ctx) {
   const { facts, bus } = ctx;
   const reduced = !!ctx.reducedMotion;
-  const slot = section.querySelector('[data-slot="body"]') ?? section.querySelector('.chapter__inner') ?? section;
+  const slot =
+    section.querySelector('[data-slot="body"]') ??
+    section.querySelector('.chapter__inner') ??
+    section;
   const root = document.createElement('div');
   root.className = 'flow';
   slot.append(root);
@@ -99,7 +120,12 @@ export function mount(section, ctx) {
     b.innerHTML = `<b>${LANE_META[k].label}</b><span>${LANE_META[k].sub}</span>`;
     b.addEventListener('click', () => setTransport(k, true));
     b.addEventListener('keydown', (e) => {
-      const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+      const d =
+        e.key === 'ArrowRight' || e.key === 'ArrowDown'
+          ? 1
+          : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+            ? -1
+            : 0;
       if (!d) return;
       e.preventDefault();
       const n = TRANSPORTS[(TRANSPORTS.indexOf(transport) + d + 3) % 3];
@@ -118,12 +144,14 @@ export function mount(section, ctx) {
       b.tabIndex = b.dataset.k === k ? 0 : -1;
     }
     r.blurb.textContent = BLURB[k];
-    r.tags.replaceChildren(...tagsFor(k, facts ?? {}).map(([a, v]) => {
-      const li = document.createElement('li');
-      li.innerHTML = `<span>${a}</span><code></code>`;
-      li.querySelector('code').textContent = v ?? '—';
-      return li;
-    }));
+    r.tags.replaceChildren(
+      ...tagsFor(k, facts ?? {}).map(([a, v]) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${a}</span><code></code>`;
+        li.querySelector('code').textContent = v ?? '—';
+        return li;
+      }),
+    );
     diagram.setTransport(k);
     inspector.setTransport(k);
     stageFocus();
@@ -156,16 +184,21 @@ export function mount(section, ctx) {
   });
   r.play.addEventListener('click', () => {
     playing = !playing;
-    if (playing) ctx.daemon?.play(); else ctx.daemon?.pause();
+    if (playing) ctx.daemon?.play();
+    else ctx.daemon?.pause();
     syncControls();
   });
   function syncControls() {
     r.play.setAttribute('aria-pressed', String(playing));
     r.play.dataset.playing = String(playing);
     r.playTxt.textContent = playing ? 'Pause' : 'Play';
-    for (const b of r.scen.children) b.setAttribute('aria-checked', String(b.dataset.name === current));
+    for (const b of r.scen.children)
+      b.setAttribute('aria-checked', String(b.dataset.name === current));
   }
-  if (!scenarios.length) { r.scen.hidden = true; r.play.hidden = true; }
+  if (!scenarios.length) {
+    r.scen.hidden = true;
+    r.play.hidden = true;
+  }
 
   // ───────── frames ─────────
   function addFrame(dir, bytes, msg, isSample = false) {
@@ -177,19 +210,21 @@ export function mount(section, ctx) {
   }
 
   function renderChips() {
-    r.chips.replaceChildren(...frames.map((f) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = `fx-chip-btn dir-${f.dir}${(pinned ?? frames[0]?.id) === f.id ? ' is-on' : ''}`;
-      b.setAttribute('role', 'option');
-      b.setAttribute('aria-selected', String((pinned ?? frames[0]?.id) === f.id));
-      b.title = describe(f.msg, f.dir);
-      b.innerHTML = `<i aria-hidden="true">${f.dir === 'rx' ? '↓' : '↑'}</i><b></b><span></span>`;
-      b.querySelector('b').textContent = f.msg.t.replace('session_upd', 'session');
-      b.querySelector('span').textContent = `${f.bytes.length} B`;
-      b.addEventListener('click', () => select(f.id, true));
-      return b;
-    }));
+    r.chips.replaceChildren(
+      ...frames.map((f) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `fx-chip-btn dir-${f.dir}${(pinned ?? frames[0]?.id) === f.id ? ' is-on' : ''}`;
+        b.setAttribute('role', 'option');
+        b.setAttribute('aria-selected', String((pinned ?? frames[0]?.id) === f.id));
+        b.title = describe(f.msg, f.dir);
+        b.innerHTML = `<i aria-hidden="true">${f.dir === 'rx' ? '↓' : '↑'}</i><b></b><span></span>`;
+        b.querySelector('b').textContent = f.msg.t.replace('session_upd', 'session');
+        b.querySelector('span').textContent = `${f.bytes.length} B`;
+        b.addEventListener('click', () => select(f.id, true));
+        return b;
+      }),
+    );
     r.live.hidden = pinned !== null;
   }
 
@@ -200,11 +235,16 @@ export function mount(section, ctx) {
     const shown = pinned !== null ? frameById.get(pinned) : frames[0];
     if (shown) inspector.show(shown);
     renderChips();
-    if (pin && visible) r.pk.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' });
+    if (pin && visible)
+      r.pk.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' });
   }
 
   function onFrame(dir, { bytes, msg }) {
-    if (samples) { frames = []; frameById.clear(); samples = false; }
+    if (samples) {
+      frames = [];
+      frameById.clear();
+      samples = false;
+    }
     const f = addFrame(dir, bytes, msg);
     trackSessions(dir, msg);
     if (pinned === null) inspector.show(f);
@@ -217,9 +257,17 @@ export function mount(section, ctx) {
   function trackSessions(dir, msg) {
     if (dir !== 'rx') return;
     let dirty = false;
-    if (msg.t === 'snapshot') { sessions.clear(); (msg.b.sessions ?? []).forEach((s) => sessions.set(s.sid, { ...s })); dirty = true; }
-    else if (msg.t === 'session_upd') { sessions.set(msg.b.sid, { ...(sessions.get(msg.b.sid) ?? {}), ...msg.b }); dirty = true; }
-    else if (msg.t === 'gone') { sessions.delete(msg.b.sid); dirty = true; }
+    if (msg.t === 'snapshot') {
+      sessions.clear();
+      (msg.b.sessions ?? []).forEach((s) => sessions.set(s.sid, { ...s }));
+      dirty = true;
+    } else if (msg.t === 'session_upd') {
+      sessions.set(msg.b.sid, { ...(sessions.get(msg.b.sid) ?? {}), ...msg.b });
+      dirty = true;
+    } else if (msg.t === 'gone') {
+      sessions.delete(msg.b.sid);
+      dirty = true;
+    }
     if (dirty) diagram.setSessions(sessions);
   }
 
@@ -227,7 +275,24 @@ export function mount(section, ctx) {
   function seed() {
     const demo = [
       ['rx', welcome(1, 1, { host: { name: 'your-laptop' } })],
-      ['rx', snapshot(2, [{ sid: 1, ag: 'copilot', st: 'work', repo: 'm5-agent-link', br: 'main', tool: 'bash', t0: 1793994000, tst: 1793995100, sum: 'Running tests', seen: false, host: 0 }])],
+      [
+        'rx',
+        snapshot(2, [
+          {
+            sid: 1,
+            ag: 'copilot',
+            st: 'work',
+            repo: 'm5-agent-link',
+            br: 'main',
+            tool: 'bash',
+            t0: 1793994000,
+            tst: 1793995100,
+            sum: 'Running tests',
+            seen: false,
+            host: 0,
+          },
+        ]),
+      ],
       ['tx', cmd(5, 'focus', { sid: 1 })],
       ['tx', hello(1)],
     ];
@@ -243,14 +308,21 @@ export function mount(section, ctx) {
     bus?.on('watch:tx', (d) => onFrame('tx', d)),
     bus?.on('scenario:step', (d) => {
       r.now.textContent = d.text;
-      if (ctx.daemon && playing !== ctx.daemon.playing) { playing = ctx.daemon.playing; }
+      if (ctx.daemon && playing !== ctx.daemon.playing) {
+        playing = ctx.daemon.playing;
+      }
       syncControls();
       if (visible) diagram.hookEvent(hookColor());
-      if (d.name && d.name !== current) { current = d.name; syncControls(); }
+      if (d.name && d.name !== current) {
+        current = d.name;
+        syncControls();
+      }
     }),
     bus?.on('pc:focus', ({ sid, ok }) => {
       const s = sessions.get(sid);
-      r.ret.textContent = ok ? `cmd focus → session ${sid}${s?.repo ? ` (${s.repo})` : ''}: the daemon's focus driver raised that terminal.` : `cmd focus → session ${sid}: no window found.`;
+      r.ret.textContent = ok
+        ? `cmd focus → session ${sid}${s?.repo ? ` (${s.repo})` : ''}: the daemon's focus driver raised that terminal.`
+        : `cmd focus → session ${sid}: no window found.`;
       r.ret.classList.add('is-hot');
       setTimeout(() => r.ret.classList.remove('is-hot'), 2400);
       if (visible) diagram.focusReturn({ agent: s?.ag, color: retColor() });
@@ -263,23 +335,36 @@ export function mount(section, ctx) {
 
   // narrow screens get the vertical pipeline
   const mq = window.matchMedia('(max-width: 760px)');
-  const applyLayout = () => { diagram.resize(mq.matches); diagram.setTransport(transport); diagram.setSessions(sessions); };
+  const applyLayout = () => {
+    diagram.resize(mq.matches);
+    diagram.setTransport(transport);
+    diagram.setSessions(sessions);
+  };
   mq.addEventListener?.('change', applyLayout);
   applyLayout();
 
-  const io = new IntersectionObserver((es) => {
-    const v = es.some((e) => e.isIntersecting);
-    if (v === visible) return;
-    visible = v;
-    if (v) stageFocus(); else ctx.stage?.focus?.(null);
-  }, { rootMargin: '-10% 0px -10% 0px' });
+  const io = new IntersectionObserver(
+    (es) => {
+      const v = es.some((e) => e.isIntersecting);
+      if (v === visible) return;
+      visible = v;
+      if (v) stageFocus();
+      else ctx.stage?.focus?.(null);
+    },
+    { rootMargin: '-10% 0px -10% 0px' },
+  );
   io.observe(r.diagram);
 
   seed();
   setTransport('usb', false, true);
   syncControls();
 
-  return { destroy() { offs.forEach((o) => o()); io.disconnect(); } };
+  return {
+    destroy() {
+      offs.forEach((o) => o());
+      io.disconnect();
+    },
+  };
 }
 
 export function onEnter() {}

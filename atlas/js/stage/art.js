@@ -3,15 +3,36 @@
 // Orange key = A, coral key = B, both on the lower rim; USB-C on the right edge.
 
 export const SLABS = 26;
-export const SLAB_STEP = 5;                 // px between slabs → ≈130 px thickness
+export const SLAB_STEP = 5; // px between slabs → ≈130 px thickness
 export const DEPTH = SLABS * SLAB_STEP;
 
 export const REGIONS = {
-  screen:  { label: 'AMOLED · 466×466',  holes: [{ x: 300, y: 300, r: 262 }], tag: { x: 300, y: 300 } },
-  buttons: { label: 'Keys A · B',        holes: [{ x: 98, y: 508, r: 58 }, { x: 502, y: 508, r: 58 }], tag: { x: 300, y: 590 } },
-  motor:   { label: 'Vibration motor',   holes: [{ x: 300, y: 505, r: 70 }], tag: { x: 300, y: 505 }, inside: true },
-  usb:     { label: 'USB-C',             holes: [{ x: 598, y: 300, r: 62 }], tag: { x: 598, y: 300 } },
-  antenna: { label: '2.4 GHz antenna',   holes: [{ x: 300, y: 62, r: 78 }],  tag: { x: 300, y: 62 }, inside: true },
+  screen: {
+    label: 'AMOLED · 466×466',
+    holes: [{ x: 300, y: 300, r: 262 }],
+    tag: { x: 300, y: 300 },
+  },
+  buttons: {
+    label: 'Keys A · B',
+    holes: [
+      { x: 98, y: 508, r: 58 },
+      { x: 502, y: 508, r: 58 },
+    ],
+    tag: { x: 300, y: 590 },
+  },
+  motor: {
+    label: 'Vibration motor',
+    holes: [{ x: 300, y: 505, r: 70 }],
+    tag: { x: 300, y: 505 },
+    inside: true,
+  },
+  usb: { label: 'USB-C', holes: [{ x: 598, y: 300, r: 62 }], tag: { x: 598, y: 300 } },
+  antenna: {
+    label: '2.4 GHz antenna',
+    holes: [{ x: 300, y: 62, r: 78 }],
+    tag: { x: 300, y: 62 },
+    inside: true,
+  },
 };
 
 export function slabsHTML() {

@@ -22,33 +22,54 @@ export const LANE_META = {
 function layout(vertical) {
   if (!vertical) {
     const Y = 200;
-    const lane = (dy) => `M646,${Y} C720,${Y} 724,${Y + dy} 790,${Y + dy} L862,${Y + dy} C940,${Y + dy} 940,${Y} 1004,${Y}`;
+    const lane = (dy) =>
+      `M646,${Y} C720,${Y} 724,${Y + dy} 790,${Y + dy} L862,${Y + dy} C940,${Y + dy} 940,${Y} 1004,${Y}`;
     return {
-      w: 1200, h: 320, y0: 56,
+      w: 1200,
+      h: 320,
+      y0: 56,
       term: { front: { x: 30, y: 148 }, back: { x: 70, y: 92 }, w: 180, h: 112 },
-      agentPort: [210, Y], hook: { x: 340, y: Y }, daemon: { x: 548, y: Y, w: 196, h: 128 },
+      agentPort: [210, Y],
+      hook: { x: 340, y: Y },
+      daemon: { x: 548, y: Y, w: 196, h: 128 },
       watch: { x: 1092, y: Y, r: 76 },
       paths: {
-        agentHook: `M212,${Y} L322,${Y}`, hookDaemon: `M358,${Y} L450,${Y}`,
+        agentHook: `M212,${Y} L322,${Y}`,
+        hookDaemon: `M358,${Y} L450,${Y}`,
         lanes: { usb: lane(-98), ble: lane(0), ws: lane(98) },
       },
-      laneLabel: (k) => ({ x: 820, y: Y + ({ usb: -98, ble: 0, ws: 98 }[k]) - 14, anchor: 'middle' }),
+      laneLabel: (k) => ({ x: 820, y: Y + { usb: -98, ble: 0, ws: 98 }[k] - 14, anchor: 'middle' }),
       segLabel: { agentHook: [268, Y - 12], hookDaemon: [404, Y - 12] },
-      nodeLabel: { hook: [340, Y + 58], daemon: [548, Y + 98], watch: [1092, Y + 112], agent: [120, 316] },
+      nodeLabel: {
+        hook: [340, Y + 58],
+        daemon: [548, Y + 98],
+        watch: [1092, Y + 112],
+        agent: [120, 316],
+      },
     };
   }
   const X = 180;
-  const lane = (dx) => `M${X},362 C${X},410 ${X + dx},420 ${X + dx},458 L${X + dx},500 C${X + dx},560 ${X},560 ${X},600`;
+  const lane = (dx) =>
+    `M${X},362 C${X},410 ${X + dx},420 ${X + dx},458 L${X + dx},500 C${X + dx},560 ${X},560 ${X},600`;
   return {
-    w: 360, h: 760, y0: 0,
+    w: 360,
+    h: 760,
+    y0: 0,
     term: { front: { x: 104, y: 70 }, back: { x: 142, y: 30 }, w: 150, h: 96 },
-    agentPort: [X, 168], hook: { x: X, y: 226 }, daemon: { x: X, y: 314, w: 200, h: 96 },
+    agentPort: [X, 168],
+    hook: { x: X, y: 226 },
+    daemon: { x: X, y: 314, w: 200, h: 96 },
     watch: { x: X, y: 666, r: 66 },
     paths: {
-      agentHook: `M${X},170 L${X},208`, hookDaemon: `M${X},244 L${X},266`,
+      agentHook: `M${X},170 L${X},208`,
+      hookDaemon: `M${X},244 L${X},266`,
       lanes: { usb: lane(-112), ble: lane(0), ws: lane(112) },
     },
-    laneLabel: (k) => ({ x: X + ({ usb: -112, ble: 0, ws: 112 }[k]) + (k === 'ble' ? 12 : 0), y: 480, anchor: k === 'ble' ? 'start' : 'middle' }),
+    laneLabel: (k) => ({
+      x: X + { usb: -112, ble: 0, ws: 112 }[k] + (k === 'ble' ? 12 : 0),
+      y: 480,
+      anchor: k === 'ble' ? 'start' : 'middle',
+    }),
     segLabel: { agentHook: [X + 12, 192], hookDaemon: [X + 12, 260] },
     nodeLabel: { hook: [X + 34, 230], daemon: [X, 380], watch: [X, 754], agent: [X, 14] },
   };
@@ -78,11 +99,29 @@ export function createDiagram(host, { facts, reducedMotion }) {
   function build() {
     L = layout(vertical);
     host.replaceChildren();
-    svg = el('svg', { viewBox: `0 ${L.y0} ${L.w} ${L.h}`, class: 'fx-svg', role: 'img', 'aria-label': 'Pipeline: agent terminal to hook to daemon to USB, Bluetooth or WebSocket to the watch' }, host);
+    svg = el(
+      'svg',
+      {
+        viewBox: `0 ${L.y0} ${L.w} ${L.h}`,
+        class: 'fx-svg',
+        role: 'img',
+        'aria-label':
+          'Pipeline: agent terminal to hook to daemon to USB, Bluetooth or WebSocket to the watch',
+      },
+      host,
+    );
     const defs = el('defs', {}, svg);
-    const blur = el('filter', { id: 'fx-blur', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
+    const blur = el(
+      'filter',
+      { id: 'fx-blur', x: '-50%', y: '-50%', width: '200%', height: '200%' },
+      defs,
+    );
     el('feGaussianBlur', { stdDeviation: 3.2 }, blur);
-    const blur2 = el('filter', { id: 'fx-blur-lg', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
+    const blur2 = el(
+      'filter',
+      { id: 'fx-blur-lg', x: '-50%', y: '-50%', width: '200%', height: '200%' },
+      defs,
+    );
     el('feGaussianBlur', { stdDeviation: 9 }, blur2);
     const puck = el('radialGradient', { id: 'fx-puck', cx: '38%', cy: '30%', r: '85%' }, defs);
     el('stop', { offset: 0, 'stop-color': '#2a2e38' }, puck);
@@ -98,7 +137,16 @@ export function createDiagram(host, { facts, reducedMotion }) {
       const g = el('g', { class: `fx-thread ${cls}`, 'data-thread': key }, threads);
       el('path', { d, class: 'fx-thread__glow' }, g);
       if (cls.includes('is-lane')) {
-        for (const o of [-2.6, 2.6]) el('path', { d, class: 'fx-thread__strand', transform: vertical ? `translate(${o} 0)` : `translate(0 ${o})` }, g);
+        for (const o of [-2.6, 2.6])
+          el(
+            'path',
+            {
+              d,
+              class: 'fx-thread__strand',
+              transform: vertical ? `translate(${o} 0)` : `translate(0 ${o})`,
+            },
+            g,
+          );
       }
       const core = el('path', { d, class: 'fx-thread__core' }, g);
       return { g, core };
@@ -109,14 +157,24 @@ export function createDiagram(host, { facts, reducedMotion }) {
     for (const k of ['usb', 'ble', 'ws']) {
       laneEls[k] = thread(k, L.paths.lanes[k], `is-lane lane-${k}`);
       const p = L.laneLabel(k);
-      const t = txt(threads, p.x, p.y, LANE_META[k].label, `fx-lane-label lane-${k}`, { 'text-anchor': p.anchor, 'data-lane': k });
+      const t = txt(threads, p.x, p.y, LANE_META[k].label, `fx-lane-label lane-${k}`, {
+        'text-anchor': p.anchor,
+        'data-lane': k,
+      });
       laneEls[k].label = t;
     }
-    txt(threads, ...L.segLabel.agentHook, 'hook event', 'fx-seg', { 'text-anchor': vertical ? 'start' : 'middle' });
-    txt(threads, ...L.segLabel.hookDaemon, 'unix socket', 'fx-seg', { 'text-anchor': vertical ? 'start' : 'middle' });
+    txt(threads, ...L.segLabel.agentHook, 'hook event', 'fx-seg', {
+      'text-anchor': vertical ? 'start' : 'middle',
+    });
+    txt(threads, ...L.segLabel.hookDaemon, 'unix socket', 'fx-seg', {
+      'text-anchor': vertical ? 'start' : 'middle',
+    });
     routes = {
-      agentHook: ah.core, hookDaemon: hd.core,
-      usb: laneEls.usb.core, ble: laneEls.ble.core, ws: laneEls.ws.core,
+      agentHook: ah.core,
+      hookDaemon: hd.core,
+      usb: laneEls.usb.core,
+      ble: laneEls.ble.core,
+      ws: laneEls.ws.core,
     };
 
     nodes = {};
@@ -138,7 +196,9 @@ export function createDiagram(host, { facts, reducedMotion }) {
       const { w, h } = L.term;
       el('rect', { x: 0, y: 0, width: w, height: h, rx: 10, class: 'fx-term__body' }, t);
       el('path', { d: `M0,22 H${w}`, class: 'fx-term__rule' }, t);
-      [0, 1, 2].forEach((i) => el('circle', { cx: 14 + i * 13, cy: 11, r: 3.2, class: 'fx-term__dot' }, t));
+      [0, 1, 2].forEach((i) =>
+        el('circle', { cx: 14 + i * 13, cy: 11, r: 3.2, class: 'fx-term__dot' }, t),
+      );
       txt(t, w - 12, 15, TERMS[key].name, 'fx-term__title', { 'text-anchor': 'end' });
       TERMS[key].lines.forEach((l, i) => txt(t, 14, 48 + i * 20, l, 'fx-term__line'));
       el('rect', { x: 14, y: 76, width: 8, height: 13, class: 'fx-term__cursor' }, t);
@@ -147,29 +207,58 @@ export function createDiagram(host, { facts, reducedMotion }) {
       nodes.term[key] = t;
     }
     const [lx, ly] = L.nodeLabel.agent;
-    txt(g, lx, ly, 'Your terminal', 'fx-node__name', { 'text-anchor': vertical ? 'middle' : 'middle' });
-    if (!vertical) txt(g, lx, ly + 18, 'Copilot CLI · Claude Code', 'fx-node__sub', { 'text-anchor': 'middle' });
+    txt(g, lx, ly, 'Your terminal', 'fx-node__name', {
+      'text-anchor': vertical ? 'middle' : 'middle',
+    });
+    if (!vertical)
+      txt(g, lx, ly + 18, 'Copilot CLI · Claude Code', 'fx-node__sub', { 'text-anchor': 'middle' });
   }
 
   function buildHook() {
     const { x, y } = L.hook;
-    const g = el('g', { class: 'fx-node fx-hook', 'data-node': 'hook', transform: `translate(${x} ${y})` }, svg);
+    const g = el(
+      'g',
+      { class: 'fx-node fx-hook', 'data-node': 'hook', transform: `translate(${x} ${y})` },
+      svg,
+    );
     nodes.hook = g;
     el('circle', { r: 20, class: 'fx-hook__halo', filter: 'url(#fx-blur)' }, g);
     // a four-point spark
-    el('path', { d: 'M0,-17 C2,-5 5,-2 17,0 C5,2 2,5 0,17 C-2,5 -5,2 -17,0 C-5,-2 -2,-5 0,-17Z', class: 'fx-hook__spark' }, g);
+    el(
+      'path',
+      {
+        d: 'M0,-17 C2,-5 5,-2 17,0 C5,2 2,5 0,17 C-2,5 -5,2 -17,0 C-5,-2 -2,-5 0,-17Z',
+        class: 'fx-hook__spark',
+      },
+      g,
+    );
     const [lx, ly] = L.nodeLabel.hook;
-    txt(g, lx - x, ly - y, 'agentlink-hook', 'fx-node__name', { 'text-anchor': vertical ? 'start' : 'middle' });
-    txt(g, lx - x, ly - y + 17, 'tiny, one per event', 'fx-node__sub', { 'text-anchor': vertical ? 'start' : 'middle' });
+    txt(g, lx - x, ly - y, 'agentlink-hook', 'fx-node__name', {
+      'text-anchor': vertical ? 'start' : 'middle',
+    });
+    txt(g, lx - x, ly - y + 17, 'tiny, one per event', 'fx-node__sub', {
+      'text-anchor': vertical ? 'start' : 'middle',
+    });
   }
 
   function buildDaemon() {
     const { x, y, w, h } = L.daemon;
-    const g = el('g', { class: 'fx-node fx-daemon', 'data-node': 'daemon', transform: `translate(${x - w / 2} ${y - h / 2})` }, svg);
+    const g = el(
+      'g',
+      {
+        class: 'fx-node fx-daemon',
+        'data-node': 'daemon',
+        transform: `translate(${x - w / 2} ${y - h / 2})`,
+      },
+      svg,
+    );
     nodes.daemon = g;
     el('rect', { width: w, height: h, rx: 14, class: 'fx-daemon__body' }, g);
     txt(g, w / 2, 30, 'agentlinkd', 'fx-daemon__name', { 'text-anchor': 'middle' });
-    [['registry', 0], ['focus drivers', 1]].forEach(([s, i]) => {
+    [
+      ['registry', 0],
+      ['focus drivers', 1],
+    ].forEach(([s, i]) => {
       const cw = i ? 96 : 70;
       const cx = i ? w - 12 - cw : 12;
       el('rect', { x: cx, y: h - 56, width: cw, height: 26, rx: 13, class: 'fx-chip' }, g);
@@ -177,24 +266,55 @@ export function createDiagram(host, { facts, reducedMotion }) {
     });
     el('path', { d: `M14,44 H${w - 14}`, class: 'fx-daemon__rule' }, g);
     const [lx, ly] = L.nodeLabel.daemon;
-    txt(g, lx - (x - w / 2), ly - (y - h / 2), 'the host-side hub', 'fx-node__sub', { 'text-anchor': 'middle' });
+    txt(g, lx - (x - w / 2), ly - (y - h / 2), 'the host-side hub', 'fx-node__sub', {
+      'text-anchor': 'middle',
+    });
   }
 
   function buildWatch() {
     const { x, y, r } = L.watch;
-    const g = el('g', { class: 'fx-node fx-watch', 'data-node': 'watch', transform: `translate(${x} ${y})` }, svg);
+    const g = el(
+      'g',
+      { class: 'fx-node fx-watch', 'data-node': 'watch', transform: `translate(${x} ${y})` },
+      svg,
+    );
     nodes.watch = g;
     el('circle', { r: r + 14, class: 'fx-watch__halo', filter: 'url(#fx-blur-lg)' }, g);
     // buttons
-    el('rect', { x: -r - 5, y: 6, width: 10, height: 24, rx: 5, class: 'fx-watch__btn fx-watch__btn--a', transform: 'rotate(-32 ' + (-r) + ' 18)' }, g);
-    el('rect', { x: r - 5, y: 6, width: 10, height: 24, rx: 5, class: 'fx-watch__btn fx-watch__btn--b', transform: 'rotate(32 ' + r + ' 18)' }, g);
+    el(
+      'rect',
+      {
+        x: -r - 5,
+        y: 6,
+        width: 10,
+        height: 24,
+        rx: 5,
+        class: 'fx-watch__btn fx-watch__btn--a',
+        transform: 'rotate(-32 ' + -r + ' 18)',
+      },
+      g,
+    );
+    el(
+      'rect',
+      {
+        x: r - 5,
+        y: 6,
+        width: 10,
+        height: 24,
+        rx: 5,
+        class: 'fx-watch__btn fx-watch__btn--b',
+        transform: 'rotate(32 ' + r + ' 18)',
+      },
+      g,
+    );
     el('circle', { r, class: 'fx-watch__puck' }, g);
     el('circle', { r: r - 7, class: 'fx-watch__screen' }, g);
     nodes.watchRing = el('g', { class: 'fx-watch__ring' }, g);
     nodes.watchGlyph = txt(g, 0, 6, '', 'fx-watch__glyph', { 'text-anchor': 'middle' });
     const [lx, ly] = L.nodeLabel.watch;
     txt(g, lx - x, ly - y, 'the watch', 'fx-node__name', { 'text-anchor': 'middle' });
-    if (!vertical) txt(g, lx - x, ly - y + 17, 'M5Stack StopWatch', 'fx-node__sub', { 'text-anchor': 'middle' });
+    if (!vertical)
+      txt(g, lx - x, ly - y + 17, 'M5Stack StopWatch', 'fx-node__sub', { 'text-anchor': 'middle' });
     drawRing();
   }
 
@@ -206,7 +326,16 @@ export function createDiagram(host, { facts, reducedMotion }) {
     nodes.watchGlyph.textContent = list.length ? '' : '·';
     list.forEach((s, i) => {
       const a = -Math.PI / 2 + (i / Math.max(list.length, 1)) * Math.PI * 2;
-      const dot = el('circle', { cx: Math.cos(a) * R * (list.length === 1 ? 0 : 1), cy: Math.sin(a) * R * (list.length === 1 ? 0 : 1), r: list.length > 5 ? 5 : 7, class: 'fx-watch__s' }, nodes.watchRing);
+      const dot = el(
+        'circle',
+        {
+          cx: Math.cos(a) * R * (list.length === 1 ? 0 : 1),
+          cy: Math.sin(a) * R * (list.length === 1 ? 0 : 1),
+          r: list.length > 5 ? 5 : 7,
+          class: 'fx-watch__s',
+        },
+        nodes.watchRing,
+      );
       dot.style.fill = stateColor(s.st);
       dot.style.filter = `drop-shadow(0 0 5px ${stateColor(s.st)})`;
     });
@@ -232,13 +361,18 @@ export function createDiagram(host, { facts, reducedMotion }) {
     nodes.agent.append(nodes.term[front]);
     place(other, b, 0.9, false);
     place(front, f, 1, true);
-    for (const k of Object.keys(TERMS)) nodes.term[k].querySelector('.fx-term__state').style.fill = stateColor(agentState[k]);
+    for (const k of Object.keys(TERMS))
+      nodes.term[k].querySelector('.fx-term__state').style.fill = stateColor(agentState[k]);
     void w;
   }
 
   // ───────── beads ─────────
   function routeOf(segs) {
-    const parts = segs.map(({ key, rev }) => ({ p: routes[key], len: routes[key].getTotalLength(), rev }));
+    const parts = segs.map(({ key, rev }) => ({
+      p: routes[key],
+      len: routes[key].getTotalLength(),
+      rev,
+    }));
     return { parts, total: parts.reduce((a, s) => a + s.len, 0) };
   }
   function pointAt(route, s) {
@@ -252,12 +386,16 @@ export function createDiagram(host, { facts, reducedMotion }) {
     }
     return { x: 0, y: 0 };
   }
-  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2);
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
   /** Sends a bead along a route. opts: {segs, color, ms, size, frameId, title, delay, onDone} */
   function bead(opts) {
     const route = routeOf(opts.segs);
-    const g = el('g', { class: 'fx-bead' + (opts.faint ? ' is-faint' : ''), tabindex: opts.frameId ? 0 : -1 }, nodes.beads);
+    const g = el(
+      'g',
+      { class: 'fx-bead' + (opts.faint ? ' is-faint' : ''), tabindex: opts.frameId ? 0 : -1 },
+      nodes.beads,
+    );
     if (opts.title) el('title', {}, g).textContent = opts.title;
     const hit = el('circle', { r: 16, class: 'fx-bead__hit' }, g);
     const ghosts = [];
@@ -273,9 +411,23 @@ export function createDiagram(host, { facts, reducedMotion }) {
     if (opts.frameId) {
       const go = () => clicks.forEach((f) => f(opts.frameId));
       g.addEventListener('click', go);
-      g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+      g.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          go();
+        }
+      });
     }
-    const b = { route, g, ghosts, halo, hit, born: performance.now() + (opts.delay ?? 0), ms: opts.ms ?? 900, onDone: opts.onDone };
+    const b = {
+      route,
+      g,
+      ghosts,
+      halo,
+      hit,
+      born: performance.now() + (opts.delay ?? 0),
+      ms: opts.ms ?? 900,
+      onDone: opts.onDone,
+    };
     g.style.opacity = 0;
     beads.add(b);
     if (!raf) raf = requestAnimationFrame(tick);
@@ -321,9 +473,20 @@ export function createDiagram(host, { facts, reducedMotion }) {
   // ───────── public ─────────
   const api = {
     el: host,
-    onBeadClick: (f) => { clicks.add(f); return () => clicks.delete(f); },
-    setTransport(k) { transport = k; applyTransport(); },
-    setSessions(map) { sessions = map; for (const s of map.values()) if (s.ag in agentState && s.st) agentState[s.ag] = s.st; drawRing(); applyFront(true); },
+    onBeadClick: (f) => {
+      clicks.add(f);
+      return () => clicks.delete(f);
+    },
+    setTransport(k) {
+      transport = k;
+      applyTransport();
+    },
+    setSessions(map) {
+      sessions = map;
+      for (const s of map.values()) if (s.ag in agentState && s.st) agentState[s.ag] = s.st;
+      drawRing();
+      applyFront(true);
+    },
 
     /** A decoded frame crossed the link. dir 'rx' = PC→watch, 'tx' = watch→PC. */
     frame({ dir, msg, id, color, retColor, viaAgent }) {
@@ -337,9 +500,27 @@ export function createDiagram(host, { facts, reducedMotion }) {
       }
       const title = `${dir === 'rx' ? '↓' : '↑'} ${msg.t}`;
       if (dir === 'rx') {
-        bead({ segs: [lane], color, ms: 1000, size: small ? 3.6 : 6, frameId: id, title, faint: small, onDone: () => hit('watch') });
+        bead({
+          segs: [lane],
+          color,
+          ms: 1000,
+          size: small ? 3.6 : 6,
+          frameId: id,
+          title,
+          faint: small,
+          onDone: () => hit('watch'),
+        });
       } else {
-        bead({ segs: [lane], color: retColor, ms: 1000, size: small ? 3.6 : 6, frameId: id, title, faint: small, onDone: () => hit('daemon') });
+        bead({
+          segs: [lane],
+          color: retColor,
+          ms: 1000,
+          size: small ? 3.6 : 6,
+          frameId: id,
+          title,
+          faint: small,
+          onDone: () => hit('daemon'),
+        });
       }
       void viaAgent;
     },
@@ -348,7 +529,14 @@ export function createDiagram(host, { facts, reducedMotion }) {
     hookEvent(color) {
       if (reducedMotion) return hit('hook');
       hit('agent');
-      bead({ segs: [{ key: 'agentHook' }, { key: 'hookDaemon' }], color, ms: 700, size: 3.6, title: 'hook event', onDone: () => hit('daemon') });
+      bead({
+        segs: [{ key: 'agentHook' }, { key: 'hookDaemon' }],
+        color,
+        ms: 700,
+        size: 3.6,
+        title: 'hook event',
+        onDone: () => hit('daemon'),
+      });
       setTimeout(() => hit('hook'), 280);
     },
 
@@ -365,7 +553,17 @@ export function createDiagram(host, { facts, reducedMotion }) {
       };
       if (reducedMotion) return arrive();
       hit('daemon');
-      bead({ segs: [{ key: 'hookDaemon', rev: true }, { key: 'agentHook', rev: true }], color, ms: 800, size: 6, title: 'pc:focus', onDone: arrive });
+      bead({
+        segs: [
+          { key: 'hookDaemon', rev: true },
+          { key: 'agentHook', rev: true },
+        ],
+        color,
+        ms: 800,
+        size: 6,
+        title: 'pc:focus',
+        onDone: arrive,
+      });
     },
 
     resize(isVertical) {
