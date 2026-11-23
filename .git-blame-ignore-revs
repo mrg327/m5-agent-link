@@ -1,0 +1,7 @@
+# Commits that only reformat code (no behaviour change), hidden from `git blame`.
+#
+# GitHub's blame view reads this file automatically. For local `git blame`, run once per clone:
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# One full 40-character commit hash per line, with a comment line above it saying what it did.
+# Add a commit here only when it is purely mechanical (a formatter run, a comment-style change).

@@ -1,0 +1,31 @@
+name: checks
+
+# Repository-wide checks that are not tied to one component: formatting for every language
+# (scripts/check.d/format.sh) and the Markdown checks (scripts/check.d/docs.sh).
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  format-docs:
+    name: format and docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Formatting (C/C++, Python, JS/TS, Rust) and docs
+        run: scripts/check format docs

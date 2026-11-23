@@ -40,7 +40,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: daemon
-      - run: cargo fmt --check
+      # The commands of `scripts/check daemon`, run directly: that area also runs the pi step,
+      # which has its own job below, and this matrix includes Windows. Formatting (cargo fmt
+      # --check) runs in checks.yml as part of `scripts/check format`.
       - run: cargo clippy --workspace -- -D warnings
       - run: cargo test --workspace
 
@@ -51,5 +53,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24 # runs .ts without flags
-      - run: node --test daemon/integrations/pi/
+          node-version: 24 # runs .ts without flags (so does 22.18 and newer)
+      - run: node --test daemon/integrations/pi/*.test.ts

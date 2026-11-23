@@ -39,9 +39,5 @@ jobs:
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: brew install sdl2 ninja
-      - name: Configure
-        run: cmake -S simulator -B build/sim -G Ninja
-      - name: Build
-        run: cmake --build build/sim
-      - name: Test
-        run: ctest --test-dir build/sim -j 16 --output-on-failure
+      - name: Configure, build, test
+        run: scripts/check sim

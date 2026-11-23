@@ -20,6 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # `scripts/check firmware` is the local equivalent of this step (idf.py build, then
+      # tools/check_dram.py); the ESP-IDF action runs in its own container, so it runs the
+      # commands directly.
       - name: Build (ESP-IDF v5.5, esp32s3)
         uses: espressif/esp-idf-ci-action@v1
         with:
