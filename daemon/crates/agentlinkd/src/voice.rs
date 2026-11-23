@@ -106,17 +106,7 @@ pub fn clean(text: &str) -> String {
 /// `text` cut to what the device holds (`max` UTF-8 bytes), ending in `…` when cut. The daemon keeps exactly
 /// this for the hold, so what is typed is what the user read.
 pub fn fit(text: &str, max: usize) -> String {
-    if text.len() <= max {
-        return text.to_owned();
-    }
-    let room = max - '…'.len_utf8();
-    let mut out: String = text
-        .char_indices()
-        .take_while(|(i, c)| i + c.len_utf8() <= room)
-        .map(|(_, c)| c)
-        .collect();
-    out.push('…');
-    out
+    crate::watchtext::cut(text, max)
 }
 
 /// One recording being received.

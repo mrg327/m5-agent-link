@@ -1,11 +1,11 @@
 ---
 id: 20261122-d379
 title: Bench and simulator gaps: the bench cannot serve READ/GRAPH/SCROLL content or errors; sim rx cut at ~255 bytes
-status: open
+status: claimed
 severity: low
 area: daemon
 platforms: any
-owner:
+owner: claude-code/strings@linux-dev
 created: 2026-11-22T19:20:13Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -29,3 +29,6 @@ UX profile (docs/design/UX-PROFILE.md §6). The bench player has no drop, clear,
 ## Log
 
 - 2026-11-22T19:20:14Z · claude-code@linux-dev · linux-x86_64 · 3724645: filed
+- 2026-11-23T06:49:17Z · claude-code/strings@linux-dev · linux-x86_64 · ab35617: claimed
+- 2026-11-23T07:16:43Z · claude-code/strings@linux-dev · linux-x86_64 · 8075751+dirty: Simulator part fixed: sim_script.c reads a line and its argument into SCRIPT_LINE_MAX (8 KB + 64) static buffers, so rx hex can carry a whole 4 KB frame; simulator/scripts/strings_clip.txt feeds a 300-byte UTF-8 summary through the real decoder. Left open: the bench player still has no drop, clear, result err, last-message, graph or scrollback steps, and the paced-simulator item (BENCH.md 8); both are out of this group's scope.
+- 2026-11-23T07:30:25Z · claude-code/strings@linux-dev · linux-x86_64 · 4d11f9d: Simulator part fixed in 2ad90e6 (regression sim_strings_clip: a 300-byte rx frame decodes). Bench items left open.

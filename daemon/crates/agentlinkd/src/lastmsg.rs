@@ -88,7 +88,7 @@ pub fn clean(text: &str) -> String {
     if let Some((_, body)) = &mut fence {
         flush_code(&mut out, body); // an unclosed fence runs to the end
     }
-    cap(&blank_runs(&drawable(&out.join("\n"))))
+    cap(&blank_runs(&crate::watchtext::drawable(&out.join("\n"))))
 }
 
 /// The start of a cleaned message for the card: its first paragraph (after a heading-like line, the
@@ -401,55 +401,6 @@ fn emphasis(v: &[(char, bool)]) -> String {
         .filter(|(_, g)| !g)
         .map(|(x, _)| x.0)
         .collect()
-}
-
-/// Only what the watch can draw: a few common symbols get a stand-in, other characters outside its
-/// glyph set (emoji, variation selectors, joiners) are dropped, with the space they leave behind.
-fn drawable(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut dropped = false;
-    for c in s.chars() {
-        let stand_in = match c {
-            '\n' => Some("\n"),
-            '\t' => Some("    "),
-            '\u{a0}' | '\u{2002}'..='\u{200a}' | '\u{202f}' => Some(" "),
-            '\u{2192}' | '\u{27f6}' | '\u{279c}' | '\u{2794}' => Some("->"),
-            '\u{2190}' | '\u{27f5}' => Some("<-"),
-            '\u{2194}' => Some("<->"),
-            '\u{21d2}' | '\u{27f9}' => Some("=>"),
-            '\u{2265}' => Some(">="),
-            '\u{2264}' => Some("<="),
-            '\u{2260}' => Some("!="),
-            '\u{2248}' => Some("~"),
-            '\u{2212}' | '\u{2010}' | '\u{2011}' => Some("-"),
-            '\u{2032}' => Some("'"),
-            '\u{2033}' => Some("\""),
-            '\u{2713}' | '\u{2714}' | '\u{2705}' | '\u{2611}' => Some("[x]"),
-            '\u{274c}' | '\u{2717}' | '\u{2718}' | '\u{274e}' => Some("[ ]"),
-            '\u{25e6}' | '\u{2023}' | '\u{25aa}' | '\u{25b8}' | '\u{2219}' => Some("•"),
-            _ => None,
-        };
-        if let Some(t) = stand_in {
-            out.push_str(t);
-            dropped = false;
-            continue;
-        }
-        // the watch's glyph set, as `broker::detail_text` reads it
-        let keep = matches!(c,
-            '\u{20}'..='\u{7e}' | '\u{a1}'..='\u{ac}' | '\u{ae}'..='\u{ff}'
-            | '\u{2013}' | '\u{2014}' | '\u{2018}' | '\u{2019}' | '\u{201c}' | '\u{201d}'
-            | '\u{2022}' | '\u{2026}');
-        if keep {
-            // "✨ Done" reads "Done", not " Done"
-            if !(dropped && c == ' ' && (out.is_empty() || out.ends_with([' ', '\n']))) {
-                out.push(c);
-            }
-            dropped = false;
-        } else {
-            dropped = true;
-        }
-    }
-    out
 }
 
 /// Trailing spaces gone, runs of blank lines down to one, no blank lines at either end.

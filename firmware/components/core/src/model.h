@@ -342,4 +342,11 @@ bool model_pointer(void);
 
 const char *sess_state_name(sess_state_t s);
 const char *agent_name(agent_t a);
+/* A wire string into a buffer of `cap` bytes: never cut inside a character, a cut one ends in
+ * "\xE2\x80\xA6", and U+FFFD (text the daemon withheld, as the watch cannot draw it) becomes the
+ * eye-slash glyph. */
 void model_copy_str(char *dst, size_t cap, const uint8_t *src, size_t len);
+/* A string cut at a buffer's end may stop inside a multi-byte character: drop the stub. */
+void model_utf8_drop_partial(char *s);
+/* U+FFFD in `s` (`len` bytes) as the eye-slash glyph, in place: text that is not shown. */
+void model_show_hidden(char *s, size_t len);

@@ -107,6 +107,8 @@
 #include "sim.h"
 
 static char s_script_dir[512] = ".";
+/* One script line: `rx` hex for a whole 4 KB frame and its command word. */
+#define SCRIPT_LINE_MAX (2 * 4096 + 64)
 
 typedef enum {
     E_PTR,
@@ -298,7 +300,9 @@ static int s_last_x, s_last_y; /* where `press` put the finger, for `release` */
 
 static bool parse_line(char *line, uint32_t *t)
 {
-    char cmd[24] = "", arg[512] = "";
+    /* the line's argument: `rx` hex up to one frame, long UTF-8 text (issue d379) */
+    static char arg[SCRIPT_LINE_MAX];
+    char cmd[24] = "";
     int a = 0, b = 0, c = 0, d = 0, e = 0;
     if (sscanf(line, "%23s", cmd) != 1 || cmd[0] == '#') return true;
     char *rest = line + strlen(cmd);
@@ -601,8 +605,8 @@ bool sim_script_load(const char *path)
         fprintf(stderr, "cannot open script %s\n", path);
         return false;
     }
-    char line[4096];  /* a transcript line holds up to 2 KB (issue f97a) */
-    uint32_t t = 300; /* let the first frame render */
+    static char line[SCRIPT_LINE_MAX]; /* a transcript line holds up to 2 KB (issue f97a) */
+    uint32_t t = 300;                  /* let the first frame render */
     for (int no = 1; fgets(line, sizeof line, f); no++) {
         if (!parse_line(line, &t)) {
             fprintf(stderr, "%s:%d: bad command: %s", path, no, line);

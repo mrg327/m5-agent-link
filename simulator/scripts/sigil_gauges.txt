@@ -64,7 +64,8 @@ expect_label Opus 4.7 · Bypass · PR 7 changes
 shot sigil_agent_bypass.png
 gauge 1 55 Sonnet_4.5 auto 1024 pending
 wait 300
-expect_label Sonnet 4.5 · Auto · PR 1024 in review
+# the name gives way to the mode and the whole number (issue 20261122-9689)
+expect_label Sonne… · Auto · PR 1024 in review
 shot sigil_agent_auto.png
 gauge 1 55 - dont_ask 12 draft
 wait 300

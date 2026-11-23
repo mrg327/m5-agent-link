@@ -8,11 +8,12 @@
 //! gets `stale`, and a hook whose channel closes without a decision reports *no* decision,
 //! never an approval.
 
-use crate::registry::{clip, now_unix, Registry, Update};
+use crate::registry::{now_unix, Registry, Update};
 use crate::standing::Standing;
+use crate::watchtext::fit;
 use agentlink_proto::{
-    Action, AskOpt, AskQ, AttKind, Attention, Clear, ClearWhy, Envelope, Message, ResultErr,
-    RuleScope,
+    limits, Action, AskOpt, AskQ, AttKind, Attention, Clear, ClearWhy, Envelope, Message,
+    ResultErr, RuleScope,
 };
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -31,10 +32,10 @@ pub const DETAIL_CHUNK: usize = 1024;
 /// shortened, then dropped, to stay well inside the watch's 4096-byte message limit.
 const QS_BUDGET: usize = 3000;
 /// Byte limits of a question's parts as the watch shows them (`attention.qs`).
-const QS_HEADER: usize = 16;
-const QS_QUESTION: usize = 160;
-const QS_LABEL: usize = 48;
-const QS_DESC: usize = 120;
+const QS_HEADER: usize = limits::ASK_HEADER;
+const QS_QUESTION: usize = limits::ASK_QUESTION;
+const QS_LABEL: usize = limits::ASK_LABEL;
+const QS_DESC: usize = limits::ASK_DESC;
 const QS_DESC_SHORT: usize = 60;
 
 /// What the device answered.
@@ -322,7 +323,7 @@ impl Broker {
         } else {
             rid + 1
         };
-        let text = req.text.as_deref().map(|t| clip(&tidy(t), 160));
+        let text = req.text.as_deref().map(|t| fit(&tidy(t), limits::TEXT));
         let full = req.text.as_deref().map(detail_text);
         // `len` says the preview is not the whole text (cut, or tidied): the device fetches it
         let len = full
@@ -338,10 +339,14 @@ impl Broker {
             rid,
             sid: req.sid,
             kind: req.kind,
-            title: req.title.map(|t| clip(&tidy(&t), 40)),
+            title: req.title.map(|t| fit(&tidy(&t), limits::TITLE)),
             text,
-            opts: (!req.opts.is_empty() && !req.focus_only)
-                .then(|| req.opts.iter().map(|(o, _)| clip(&tidy(o), 24)).collect()),
+            opts: (!req.opts.is_empty() && !req.focus_only).then(|| {
+                req.opts
+                    .iter()
+                    .map(|(o, _)| fit(&tidy(o), limits::OPTION))
+                    .collect()
+            }),
             acts,
             exp: Some(now_unix() + req.ttl.as_secs().max(1)),
             grant_mask: (!req.opts.is_empty() && !req.focus_only).then_some(grant_mask),
@@ -798,7 +803,7 @@ fn answer_of(q: &Question, answer: String) -> Map<String, Value> {
 /// `qs` as the watch shows it: each part tidied and clipped to its byte limit, descriptions at most
 /// `desc` bytes (0 = none).
 fn ask_qs(questions: &[Question], desc: usize) -> Vec<AskQ> {
-    let fit = |s: &str, max: usize| crate::voice::fit(&tidy(s), max);
+    let fit = |s: &str, max: usize| fit(&tidy(s), max);
     questions
         .iter()
         .map(|q| AskQ {
@@ -1647,7 +1652,17 @@ mod tests {
         r.text = Some(long);
         let (_, _w) = b.open(r);
         let att = b.pending().pop().unwrap();
-        assert_eq!(att.text.unwrap().chars().count(), 160);
+        let text = att.text.unwrap();
+        assert!(text.len() <= limits::TEXT && text.ends_with('…'), "{text}");
+        // the watch's byte limit, not characters: a cut option keeps its mark
+        let mut r = perm(false);
+        r.opts = vec![(
+            "Yes, don't ask again for this command".into(),
+            Meaning::Allow,
+        )];
+        let (_, _w) = b.open(r);
+        let att = b.pending().pop().unwrap();
+        assert_eq!(att.opts.unwrap()[0], "Yes, don't ask again…");
     }
 
     #[tokio::test]
