@@ -360,9 +360,14 @@ bool ui_agent_refresh(uint32_t now)
     /* in words: the project (host first when remote); Reply says what the list is for */
     snprintf(s_header_txt, sizeof s_header_txt, "%s%s", s_queue || s_replies ? "Reply to " : host,
              base[0] ? base : "(no folder)");
-    int was = s_n;
+    bool had = s_sel < s_n;
+    int sel_id = had ? s_items[s_sel].id : 0;
     build_items(s);
-    if (s_n != was || s_sel >= s_n) s_sel = 0; /* a list that changed starts at its first item */
+    /* The selection stays on its item when the list around it changes (issue 20261122-9df4,
+     * UX-PROFILE E9); a list without it starts at its first item, and a hold on it ends. */
+    int at = had ? find_item(sel_id) : -1;
+    if (at < 0 && had) hold_cancel();
+    s_sel = at < 0 ? 0 : at;
     draw(s);
     return true;
 }

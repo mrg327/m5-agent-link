@@ -315,10 +315,31 @@ sim_script_test(sim_keys_back keys_back.txt
 sim_script_test(sim_keys_pick keys_pick.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"seq\":1,"
   PASS_REGULAR_EXPRESSION "\"op\":13,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":1.*\"arg\":2.*\"arg\":0.*\"op\":16,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":1")
-# KEYS refusals show as short reasons; an arriving request closes the keyboard (kb_end arg 1) into ASK.
+# KEYS refusals show as short reasons; an arriving request waits until the user leaves (kb_end arg 1),
+# then opens ASK.
 sim_script_test(sim_keys_refusal keys_refusal.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
   PASS_REGULAR_EXPRESSION "\"op\":16,\"sid\":1,\"rid\":0,\"hold_ms\":0,\"arg\":1.*\"mode\":\"home\".*\"mode\":\"ask\"")
+# How a request takes over the watch (issues 883f, 4b25, 09b8, 5f79): a request never closes KEYS
+# or STATUS, it waits (a dot) and opens on the way back; a late refusal brings its request back; a
+# finger already down when ASK opens is swallowed; a wake after an unseen glow opens the request.
+sim_script_test(sim_takeover_keys_waits takeover_keys_waits.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_takeover_status_waits takeover_status_waits.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# The session READ is open on ends: the deck says "Session ended" (9df4, UX-PROFILE E7).
+sim_script_test(sim_takeover_session_ended takeover_session_ended.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# A second request that arrives in ASK opens once the first is answered (9df4, UX-PROFILE E5).
+sim_script_test(sim_takeover_second_request takeover_second_request.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# AGENT keeps its selected item across a state change of the session (9df4, UX-PROFILE E9).
+sim_script_test(sim_takeover_agent_keeps_item takeover_agent_keeps_item.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_takeover_late_err takeover_late_err.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+  PASS_REGULAR_EXPRESSION "\"result\",\"ok\":false,\"err\":0,\"op\":3.*\"mode\":\"ask\".*\"text\":\"Out of date\"")
+sim_script_test(sim_takeover_finger_carry takeover_finger_carry.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"action\":\"back\"")
+add_test(NAME sim_takeover_glow_missed
+         COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/takeover_glow_missed.txt)
+set_tests_properties(sim_takeover_glow_missed PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3"
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"glow\".*\"wake_input\",\"touch\":true")
 # Quick replies and interrupt (issue b150): reply 1 goes out as op 11 with arg 1; a tap on Interrupt
 # sends nothing; the hold sends op 6 with hold_ms >= 1000.
 sim_script_test(sim_quick_replies quick_replies.txt

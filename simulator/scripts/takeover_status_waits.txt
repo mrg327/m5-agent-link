@@ -1,0 +1,20 @@
+# Issue 20261122-883f: STATUS is not closed by a request on a session; the request waits (a dot on
+# the rim) and opens when the user goes back to the deck.
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 1 done webapp feat/login Finished the work
+session 2 work api main Working
+wait 300
+swipe 233 150 233 330 200
+wait 300
+expect_screen status
+session 2 input api main
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 600
+expect_screen status
+expect_label waiting 2
+swipe 140 233 330 233 160
+wait 400
+expect_screen ask
+expect_label Run shell command
+quit

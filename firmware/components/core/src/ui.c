@@ -13,11 +13,15 @@
 #include "ui_theme.h"
 
 #define TOAST_MS 1800
+#define WAIT_PIP_D 16 /* the waiting-request dot */
+#define WAIT_PIP_Y 6
 
 const ui_actions_t *g_ui_actions;
 static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch, *s_voice, *s_keys,
     *s_read, *s_labs, *s_trackpad, *s_graph;
 static nav_mode_t s_mode = MODE_HOME;
+static uint32_t s_mode_seq; /* counts mode changes (ui_mode_seq) */
+static uint32_t s_mode_sid; /* the session selected when the mode opened */
 static int s_rel_y;
 static bool s_link_up, s_animate = true;
 static uint32_t s_seen_rev;
@@ -39,6 +43,7 @@ static uint32_t s_toast_until_ms;
 /* the toast in words: the report and the log; the screen shows its glyphs */
 static char s_toast_txt[64];
 static lv_obj_t *s_glow, *s_glow_ring;
+static lv_obj_t *s_wait_pip; /* a request waits behind the open screen (ui_offer_attention) */
 
 lv_obj_t *ui_new_screen(void)
 {
@@ -76,6 +81,19 @@ static void create_overlays(void)
     s_toast = ui_sign_create(top, UI_CX, UI_Y_TOAST);
     lv_obj_add_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
     ui_burst_init(top); /* over the toast, under the glow */
+
+    /* A dot of the request's colour at 12 o'clock, on the rim: something waits behind this screen
+     * (glyphs over words). */
+    s_wait_pip = lv_obj_create(top);
+    lv_obj_remove_style_all(s_wait_pip);
+    lv_obj_set_size(s_wait_pip, WAIT_PIP_D, WAIT_PIP_D);
+    lv_obj_set_pos(s_wait_pip, UI_CX - WAIT_PIP_D / 2, WAIT_PIP_Y);
+    lv_obj_set_style_radius(s_wait_pip, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(s_wait_pip, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(s_wait_pip, COL_BG, 0);
+    lv_obj_set_style_border_width(s_wait_pip, 2, 0);
+    lv_obj_remove_flag(s_wait_pip, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
 
     s_glow = lv_obj_create(top);
     lv_obj_remove_style_all(s_glow);
@@ -167,6 +185,8 @@ static void enter_mode(nav_mode_t m)
     if (s_mode == MODE_TRACKPAD) ui_trackpad_close();
     if (s_mode == MODE_GRAPH) ui_graph_close();
     s_mode = m;
+    s_mode_seq++;
+    s_mode_sid = ui_home_sel_sid();
     ui_home_set_card_shown(m == MODE_HOME);
     if (m == MODE_AGENT) ui_agent_open(ui_home_sel_sid(), s_now_ms);
     else if (m == MODE_ASK) ui_ask_open(ui_home_sel_sid(), s_now_ms);
@@ -298,6 +318,102 @@ uint32_t ui_pending_attention_sid(void)
                                                                                         : 0;
 }
 
+/* ───────── a request that waits (issue 20261122-883f) ───────── */
+
+/* A request or an error that did not take over: the screen the user works in owns it, ASK shows
+ * another request, or the display was dark. It is offered again when the user comes back to the
+ * deck or WATCH, or wakes the display (ui_reveal_attention); meanwhile a dot of its colour waits on
+ * the rim. */
+static uint32_t s_wait_sid;
+static bool s_wait_error;
+static uint32_t s_wait_seq; /* the mode it found: offered again once the mode has changed */
+
+uint32_t ui_mode_seq(void) { return s_mode_seq; }
+bool ui_asking(uint32_t sid) { return s_mode == MODE_ASK && ui_home_sel_sid() == sid; }
+
+/* Screens where the user composes, reads or works: an automatic takeover would lose the typed
+ * text, the recording, the page or the place (UI-V3 §1.6 "Nothing is lost"). */
+static bool mode_keeps_work(nav_mode_t m)
+{
+    return m == MODE_KEYS || m == MODE_VOICE || m == MODE_READ || m == MODE_GRAPH ||
+           m == MODE_STATUS || m == MODE_LABS || m == MODE_TRACKPAD;
+}
+
+static const attention_t *askable_for(uint32_t sid)
+{
+    const attention_t *a = model_attention_for_sid(sid);
+    return a && (a->kind == ATT_APPROVAL || a->kind == ATT_QUESTION) && !a->answer_sent ? a : NULL;
+}
+
+/* Taking over now would lose work, or hide a request the user is answering. */
+static bool takeover_blocked(uint32_t sid)
+{ return mode_keeps_work(s_mode) || (s_mode == MODE_ASK && !ui_asking(sid)); }
+
+static void wait_clear(void)
+{
+    s_wait_sid = 0;
+    lv_obj_add_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void take_over(uint32_t sid, bool error)
+{
+    wait_clear();
+    if (error && !askable_for(sid)) {
+        ui_show_session(sid);
+    } else {
+        ui_show_attention(sid);
+    }
+}
+
+void ui_wait_attention(uint32_t sid, bool error, uint32_t rgb)
+{
+    s_wait_sid = sid;
+    s_wait_error = error;
+    s_wait_seq = s_mode_seq;
+    lv_obj_set_style_bg_color(s_wait_pip, lv_color_hex(rgb), 0);
+    dbg_event("ui", "wait", "\"sid\":%u,\"mode\":\"%s\"", (unsigned)sid, nav_mode_name(s_mode));
+}
+
+void ui_offer_attention(uint32_t sid, bool error, uint32_t rgb)
+{
+    if (takeover_blocked(sid)) {
+        ui_wait_attention(sid, error, rgb);
+    } else {
+        take_over(sid, error);
+    }
+}
+
+void ui_reveal_attention(void)
+{
+    if (s_wait_sid && !takeover_blocked(s_wait_sid)) { take_over(s_wait_sid, s_wait_error); }
+}
+
+/* Per step: drop what no longer waits, offer it on the way back to the deck or WATCH, show the
+ * dot elsewhere. */
+static void wait_step(void)
+{
+    if (!s_wait_sid) { return; }
+    bool still = s_wait_error ? model_find(s_wait_sid) != NULL : askable_for(s_wait_sid) != NULL;
+    /* gone, answered on the PC, or the user opened it */
+    if (!still || ui_asking(s_wait_sid)) {
+        wait_clear();
+        return;
+    }
+    if (s_mode_seq != s_wait_seq && (s_mode == MODE_HOME || s_mode == MODE_WATCH)) {
+        take_over(s_wait_sid, s_wait_error);
+        return;
+    }
+    bool pip = s_mode != MODE_HOME;
+    if (pip != lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN)) {
+        return; /* already so: no redraw */
+    }
+    if (pip) {
+        lv_obj_remove_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
 void ui_report_add(ui_report_t *r, const char *fmt, ...)
 {
     if (r->n_visible >= 8) return;
@@ -317,6 +433,9 @@ void ui_report(ui_report_t *r)
     }
     ui_burst_report(r);
     if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_toast_txt);
+    if (!lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN)) {
+        ui_report_add(r, "waiting %u", (unsigned)s_wait_sid);
+    }
     if (s_mode == MODE_AGENT) ui_agent_report(r);
     else if (s_mode == MODE_ASK) ui_ask_report(r);
     else if (s_mode == MODE_SCROLL) ui_scroll_report(r);
@@ -417,6 +536,18 @@ bool ui_glow_active(void) { return !lv_obj_has_flag(s_glow, LV_OBJ_FLAG_HIDDEN);
 
 /* ───────── per-step ───────── */
 
+/* The session a screen was opened on ended under it and the screen closed to the deck: say so, as
+ * WATCH does, instead of dropping there silently (issue 20261122-9df4, UX-PROFILE E7). */
+static void say_session_ended(nav_mode_t was, uint32_t sid)
+{
+    bool on_session = was == MODE_AGENT || was == MODE_ASK || was == MODE_SCROLL ||
+                      was == MODE_VOICE || was == MODE_KEYS || was == MODE_READ ||
+                      was == MODE_GRAPH;
+    if (!on_session || s_mode != MODE_HOME || !sid) { return; }
+    const session_t *s = model_find(sid);
+    if (!s || s->state == SESS_ENDED) { ui_toast("Session ended", RGB_IDLE); }
+}
+
 void ui_tick(uint32_t now_ms)
 {
     s_now_ms = now_ms;
@@ -428,6 +559,8 @@ void ui_tick(uint32_t now_ms)
     ui_burst_tick(now_ms);
     if (model_rev() != s_seen_rev) {
         s_seen_rev = model_rev();
+        nav_mode_t was = s_mode;
+        uint32_t was_sid = s_mode_sid; /* the deck may move off a session that left */
         ui_home_refresh(now_ms);
         if (s_mode == MODE_AGENT && !ui_agent_refresh(now_ms)) enter_mode(MODE_HOME);
         if (s_mode == MODE_ASK && !ui_ask_refresh(now_ms)) leave_mode();
@@ -444,6 +577,7 @@ void ui_tick(uint32_t now_ms)
             enter_mode(MODE_HOME);
             ui_toast("Session ended", RGB_IDLE);
         }
+        say_session_ended(was, was_sid);
     }
     ui_home_tick(now_ms);
     if (s_mode == MODE_AGENT && ui_agent_tick(now_ms)) enter_mode(MODE_HOME);
@@ -467,6 +601,7 @@ void ui_tick(uint32_t now_ms)
     if (s_mode == MODE_GRAPH) ui_graph_tick(now_ms);
     if (s_mode == MODE_LABS && ui_labs_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_TRACKPAD) ui_trackpad_tick(now_ms);
+    wait_step(); /* after the screens that closed themselves this step */
     /* the answer window runs on the request it belongs to: on ASK, and on its card on the deck */
     ui_countdown_show(s_mode == MODE_ASK    ? ui_ask_request()
                       : s_mode == MODE_HOME ? ui_home_sel_request()

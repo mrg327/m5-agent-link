@@ -1,0 +1,27 @@
+# Issue 20261122-4b25: approve, back out and move to another session; a refusal that arrives then
+# brings the request back on its own session (ASK on sid 2, options restored) with the refusal
+# over it, instead of a glyph over the other session's card.
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 1 done webapp feat/login Finished the work
+session 2 work api main Working
+session 3 work cli main Working
+wait 300
+session 2 input api main
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 600
+hold 233 282 1500
+wait 200
+expect_label Approved
+swipe 140 233 330 233 160
+wait 300
+btn B
+wait 300
+expect_screen ring
+# the daemon refuses the approve (cmd id 5) as stale: a raw result, as `result` answers only the last command
+rx a40009011830020503a200f40100
+wait 300
+expect_screen ask
+expect_label Run shell command
+expect_label HOLD
+quit

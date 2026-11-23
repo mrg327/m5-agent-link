@@ -91,6 +91,19 @@ void ui_set_link_transport(int kind);
 void ui_show_session(uint32_t sid);
 /* A request arrived (or a glow was touched): select its session and open ASK on it. */
 void ui_show_attention(uint32_t sid);
+/* A request (with error: an error) on session sid, in colour rgb, as it arrives: open it (ASK, or
+ * the card for an error) unless that would lose work (KEYS, VOICE, READ, GRAPH, STATUS, LABS,
+ * TRACKPAD) or hide another request open in ASK. Then it waits, a dot on the rim, and opens when
+ * the user is back on the deck or WATCH (issue 20261122-883f). */
+void ui_offer_attention(uint32_t sid, bool error, uint32_t rgb);
+/* The same, but it only waits (the display is dark or glowing): see ui_reveal_attention. */
+void ui_wait_attention(uint32_t sid, bool error, uint32_t rgb);
+/* The display woke: what waits opens now, unless the open screen keeps it waiting. */
+void ui_reveal_attention(void);
+/* Counts mode changes: a change the user did not make swallows a finger already down. */
+uint32_t ui_mode_seq(void);
+/* ASK is open on session sid. */
+bool ui_asking(uint32_t sid);
 /* The session the WATCH screen is showing, 0 when it is not open. */
 uint32_t ui_watched_sid(void);
 /* The first unanswered request, if any, else 0. */

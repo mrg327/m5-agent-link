@@ -46,7 +46,7 @@ misc-predictable-rand	simulator/src/sim_ws.c	1
 misc-use-internal-linkage	simulator/tests/test_link_arb.c	3
 misc-use-internal-linkage	simulator/tests/test_power.c	7
 misc-use-internal-linkage	simulator/tests/test_power_report.c	2
-readability-braces-around-statements	firmware/components/core/src/app.c	25
+readability-braces-around-statements	firmware/components/core/src/app.c	24
 readability-braces-around-statements	firmware/components/core/src/debug.c	3
 readability-braces-around-statements	firmware/components/core/src/detail.c	3
 readability-braces-around-statements	firmware/components/core/src/done.c	11
