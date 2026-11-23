@@ -99,6 +99,10 @@ nightly. Dropped as noise:
 | `cert-err33-c` | 263 | ignored `snprintf` results |
 | `bugprone-easily-swappable-parameters` | 120 | `int x, int y` |
 
+Braces: by default `readability-braces-around-statements` flags 1,667 bodies, against 1,142
+house-style one-line `if`s. With `ShortStatementLines: 1`, the setting C-STY-04 chose, it flags
+390, mostly two-line `if (a) x;` / `else y;` pairs.
+
 The 74 naming warnings the candidate reports are all real (61 sound tables without `s_`, 13
 `k`-prefixed constants). The analyzer's two warnings that looked worth a look (`bench.c` with an
 empty stroke, the UTF-8 decoder in `ui_kit.c`) are false positives on inspection: the stroke length

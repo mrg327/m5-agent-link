@@ -24,29 +24,21 @@ Our deltas:
   `char* p` or LVGL's `char * p`. `planned: phase 1` (clang-format `PointerAlignment: Right`).
 - **C-STY-03** Comments use `/* */` only, never `//`. One comment style is easier to grep and matches
   LVGL and Zephyr. `planned: phase 1` (a `scripts/check` grep on changed lines).
-- **C-STY-04** Every `if`/`else`/`for`/`while`/`do` body has braces, even a one-statement body
-  (MISRA C:2012 Rule 15.6). A missing brace is how a second statement ends up outside the branch.
-  `planned: phase 1` (clang-format `InsertBraces: true`).
-- **C-STY-05** A function definition puts its opening brace on its own line, as ESP-IDF does. Today's
-  one-line definitions (`uint32_t hal_retained_get(void) { return s_retained; }`) go in the reformat.
-  `planned: phase 1` (clang-format `AllowShortFunctionsOnASingleLine: None`).
+- **C-STY-04** A body without braces is allowed only when the whole statement fits on one line:
+  `if (!p) return;`. Any body on its own line has braces, and so does every `else` of a braced `if`.
+  A body on the next line without braces is how a second statement ends up outside the branch
+  (MISRA C:2012 Rule 15.6 asks for braces always; this is our relaxation for guard clauses).
+  `planned: phase 3` (clang-tidy `readability-braces-around-statements` with
+  `ShortStatementLines: 1`).
+- **C-STY-05** A function definition puts its opening brace on its own line, as ESP-IDF does, except
+  that a function whose whole body fits on one line may stay on one line:
+  `bool bench_playing(void) { return s_play.playing; }`. `planned: phase 1` (clang-format
+  `AllowShortFunctionsOnASingleLine: All`).
 
 None of ESP-IDF, FreeRTOS or LVGL use clang-format (they use Astyle or Uncrustify), so phase 1 writes
-a `.clang-format` that reproduces the ESP-IDF look instead of copying an upstream file. The planned
-starting point:
-
-```yaml
-BasedOnStyle: LLVM
-IndentWidth: 4
-ColumnLimit: 100
-BreakBeforeBraces: Linux        # function braces on their own line, others attached
-PointerAlignment: Right
-InsertBraces: true
-AllowShortFunctionsOnASingleLine: None
-AllowShortIfStatementsOnASingleLine: Never
-IncludeBlocks: Regroup          # with IncludeCategories in the C-MOD-05 order
-SortIncludes: CaseSensitive
-```
+a `.clang-format` that reproduces the ESP-IDF look instead of copying an upstream file. The candidate,
+tuned against today's code to keep the churn down, is in [tooling.md](tooling.md) §1. Include
+regrouping (C-MOD-05) waits for its own commit, because reordering includes can change behaviour.
 
 The reformat lands as one commit listed in `.git-blame-ignore-revs`.
 
@@ -70,9 +62,9 @@ exceptions are in the table at the end.
   *global* to clang-tidy, and `StaticVariable` covers only function-local statics; see
   [tooling.md](tooling.md)).
 - **C-NAME-03** Types are snake_case with `_t`: `hal_board_info_t`, `ring_t`. Function-pointer
-  typedefs end in `_cb_t` when they are callbacks (`hal_button_cb_t`, `gesture_cb_t`) and in `_fn_t`
-  otherwise. Type names carry the module prefix too (`hal_ota_result_t`, not `ota_result_t`).
-  `planned: phase 3` (`TypedefSuffix: _t`).
+  typedefs end in `_cb_t` when they are callbacks (`hal_button_cb_t`, `gesture_cb_t`); other
+  function-pointer typedefs end in `_fn_t` or `_fn` (both are allowed: `detail_send_fn`). Type names carry the module prefix too (`hal_ota_result_t`, not `ota_result_t`).
+  `planned: phase 3` (`TypedefSuffix: _t`, `TypedefIgnoredRegexp: '^[a-z0-9_]+_fn$'`).
 - **C-NAME-04** Enums are typedef'd. Enum constants are UPPER_CASE and start with the type's name
   without `_t`, or with the module prefix: `HAL_BTN_A` for `hal_button_t`, `DETAIL_NONE` for
   `detail_state_t`. `planned: phase 3` (`EnumConstantCase: UPPER_CASE`; the prefix by review).
@@ -284,8 +276,8 @@ Measured on 2026-11-22 over first-party code only: 121 C files (`.c`/`.h`) and 1
 | Functions over 60 lines (C-SIZE-01) | 28 of 1,563; 10 over 100 | [lizard](https://github.com/terryyin/lizard) 1.26.1, signature to closing brace |
 | ...by place | 15 core, 4 `simulator/src`, 8 test `main()`s, 1 board | Longest: `parse_line` in `sim_script.c` (281), `link_rx_dispatch` (151), `ui_on_gesture` (145) |
 | Pointer declarations `T *p` / `T * p` / `T* p` (C-STY-02) | 2,333 / 0 / 0 | Regex on code with strings and comments blanked, after known type names |
-| One-line function definitions (C-STY-05) | 312 C | lizard, length 1 |
-| Brace-less one-statement bodies (C-STY-04) | about 1,356 lines | Rough grep for `if/for/while (...) stmt;` |
+| One-line function definitions (C-STY-05) | 312 C, allowed | lizard, length 1 |
+| Brace-less bodies not on one line (C-STY-04) | 390 (of about 1,356 brace-less bodies) | clang-tidy `readability-braces-around-statements`, `ShortStatementLines: 1` |
 | Headers with `#pragma once` / `#ifndef` guards | 44 / 0 | grep |
 | Doxygen `/**` blocks in headers (C-DOC-02) | 0 | grep |
 | `esp_err_t` in core, simulator, tests (C-ERR-01) | 0 | grep; boards use it for ESP-IDF calls |
@@ -299,7 +291,7 @@ Existing naming and structure exceptions, fixed when touched:
 |---|---|
 | C-NAME-01 prefix = file root | 87 public functions: `theme_*` in `ui_theme.c` (31), `ring_*` in `ui_ring.c` and `ui_ring_draw.c` (15, which also clashes with the FIFO `ring_*` in `ring.c`), `preport_*` in `power_report.c` (11), `dbg_*` in `debug.c` (9), `wheel_*` in `ui_wheel.c` (9), `snd_*` in `sound.c` and `sound_bank.c` (5), `ws_*` in `sim_ws.c` (5), `sess_state_name` and `agent_name` in `model.c` (2). `core_*` is defined in `app.c` (9); the file should become `core.c` |
 | C-NAME-02 `s_` statics | Of 627 file-scope statics, 482 use `s_` and 12 are `TAG`. The rest: 76 lowercase `static const` tables (72 in `sound_bank.c`), 26 `kCamel` constants (9 C, 17 `.cpp`), 26 in tests (`failures`, `g_*`), 3 mutable lowercase (`debug.c` `active`, `motion.c` `s`, `sim_display.c` `down`), and 2 others |
-| C-NAME-03 `_t` types | 3 function-pointer typedefs end in `_fn` (`detail_send_fn`, `done_measure_fn`, `ring_used_fn`). 42 of 103 header typedefs lack the module prefix, mostly the domain types in `model.h` (`session_t`, `attention_t`, `agent_t`) and `nav.h` |
+| C-NAME-03 `_t` types | 42 of 103 header typedefs lack the module prefix, mostly the domain types in `model.h` (`session_t`, `attention_t`, `agent_t`) and `nav.h` |
 | C-NAME-04 enum prefixes | All 334 constants of the 47 enums are UPPER_CASE. 14 enums use a short prefix instead of the module's: `G_PRESS`, `GK_`/`GS_`/`GL_` (graph), `MODE_`/`ZONE_`/`WHEN_`/`SCROLL_` (nav), `ACT_`, `PM_`, `PRS_`, `AG_`, `ST_`, `E_` |
 | C-NAME-05 macros | None: all 935 `#define`s are UPPER_CASE. 36 are function-like (C-SAFE-10) |
 | C-MOD-01 own header first | Of 62 non-test `.c` files, 34 have a same-name header and 25 of those include it first. 28 have none by design: the screens share `ui_internal.h`, `sim_*.c` implement `hal.h`, `link_rx.c`/`link_tx.c` share `link_internal.h` |

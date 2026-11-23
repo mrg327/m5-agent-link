@@ -32,7 +32,8 @@ scripts/check --list       # what each area runs
 
 ## Decisions (2026-11-22)
 
-- C: 100 columns, `char *p`, `/* */` comments only, functions capped at 60 lines.
+- C: 100 columns, `char *p`, `/* */` comments only, functions capped at 60 lines. One-line functions
+  stay; a body without braces only on one line (`if (!p) return;`); `_fn` and `_fn_t` both allowed.
 - C errors: `esp_err_t`-style codes in every module, including those that also build in the simulator.
 - Rust: no `unwrap()` or `expect()` outside tests; an exception carries `#[expect(..., reason = "…")]`.
 - Commits: Linux-style `area: summary (issue ID)` subjects, not Conventional Commits.
