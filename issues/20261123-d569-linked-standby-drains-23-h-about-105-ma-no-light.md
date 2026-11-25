@@ -1,11 +1,11 @@
 ---
 id: 20261123-d569
 title: Linked standby drains 23 %/h (about 105 mA): no light sleep, BLE stays at 30 ms
-status: claimed
+status: open
 severity: high
 area: firmware
 platforms: esp32
-owner: claude-code/cloud@cloud
+owner:
 created: 2026-11-23T05:58:16Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -61,3 +61,5 @@ Related: 20261117-0d15 (DEEP drain) is separate; this run had no deep time so it
 
 - 2026-11-23T05:58:16Z · claude-code@linux-dev · linux-x86_64 · 5d21b95: filed
 - 2026-11-25T16:19:37Z · claude-code/cloud@cloud · linux-x86_64 · b461e37: claimed
+- 2026-11-25T16:30:16Z · claude-code/cloud@cloud · linux-x86_64 · 34d250c: Commit 34d250c (plan steps 1-2, code only): PM + tickless light sleep at rest (no-light-sleep lock while the display is on; dark display flushes synchronously; no light sleep with USB Serial/JTAG attached), BT modem sleep on the main crystal kept powered (G15/G16, the 32 kHz crystal pins, carry I2S), buttons polled every 50 ms and touch ungated at rest, BLE rest interval 60-75 ms latency 12 timeout 5 s (Apple rules), back to the central's base on wake; Kconfig AGENTLINK_LIGHT_SLEEP / AGENTLINK_BLE_REST_INTERVAL. Checks: format structure docs lint atlas sim (246/246) firmware PASS, check_dram 182957 B free (-1.8 KB). NOT run on the watch. To verify: delete firmware/sdkconfig, build, flash; on battery, linked over BLE, display off for 2-3 h; agentlink power should show r_off in the low mA (vendor: 3.5 mA Wi-Fi light sleep) and itvl_us 60000-75000. Also check: an attention buzzes within ~1-2 s at rest; button A/B and a tap wake the display; the USB link and OTA still work; no BLE drops (supervision 5 s). If light sleep breaks something, turn AGENTLINK_LIGHT_SLEEP off and measure the BLE interval alone.
+- 2026-11-25T16:30:16Z · claude-code/cloud@cloud · linux-x86_64 · 34d250c: reopened: Released: needs a run on the watch (steps above)
