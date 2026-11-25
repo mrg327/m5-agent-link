@@ -54,6 +54,15 @@ scripts/atlas --open        # serves index.html at http://localhost:8700/
 
 Run the daemon (`cargo run -p agentlinkd` in `daemon/`; see `daemon/README.md`). It serves USB, BLE and a WebSocket simulator link at once. On macOS, `daemon/tools/launchd.sh install` runs it as a launchd agent that starts at login (see `daemon/README.md`).
 
+**Desk or wrist.** The StopWatch ships without a strap (52 × 52 × 15.5 mm, 39 g). Two ways to use it:
+
+- **Desk:** plug it into the PC with a USB-C data cable and stand it on its magnetic back (a steel plate
+  or a monitor bezel). USB is the preferred link, so it needs no Bluetooth and the battery stays full.
+  On USB the display stays on for 10 minutes without input (60 s on battery), then goes off so the
+  AMOLED does not burn in; a button, a tap or any request wakes it.
+- **Wrist or lanyard:** on battery over Bluetooth, with your own band through the strap
+  holes. Battery life depends on the power work in issues 20261123-d569 and 20261117-0d15.
+
 **macOS permissions**
 
 - **Bluetooth:** allow the terminal (or the `agentlinkd` binary) under System Settings › Privacy & Security › Bluetooth, or BLE scanning finds nothing. Under launchd, the `agentlinkd` binary needs its own grant.

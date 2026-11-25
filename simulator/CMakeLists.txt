@@ -206,6 +206,12 @@ sim_power_test(sim_deep_battery deep_sleep.txt ARGS --battery --idle-off 1 --dee
                      PASS_REGULAR_EXPRESSION "\"ev\":\"display_on\".*\"ev\":\"deep\",\"wake_after_s\":0,\"tries\":0")
 sim_power_test(sim_deep_not_on_usb deep_wait.txt ARGS --idle-off 1 --deep-after 1
                PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"deep\"")
+# Desk mode: the default 60 s timeout (--idle-off 60) becomes 10 minutes on USB, stays 60 s on battery.
+sim_power_test(sim_desk_usb_stays_on desk_idle.txt ARGS --idle-off 60
+               PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"display_off\"")
+sim_power_test(sim_desk_battery_off desk_idle.txt ARGS --battery --idle-off 60
+               PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"display_off\"")
 sim_power_test(sim_deep_not_linked deep_linked.txt ARGS --battery --idle-off 1 --deep-after 1
                PROPS FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"deep\"")
 sim_power_test(sim_deep_timer_wake deep_wait.txt ARGS --battery --deep-after 2 --wake timer --tries 2

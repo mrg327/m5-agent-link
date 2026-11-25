@@ -98,6 +98,12 @@ Measured rails (from vendor docs): **L0** = M5PM1 only. **L1** = + IMU + RTC. **
   - Both are board Kconfig options (`AGENTLINK_LIGHT_SLEEP`, `AGENTLINK_BLE_REST_INTERVAL`), on by
     default. An existing `firmware/sdkconfig` keeps PM off: delete it (the build warns).
   - The core loop still polls every 50 ms with the display off.
+- **DEEP as built (issue 20261117-0d15, 2026-11-25; not yet measured):** the AMOLED / touch rail (L3B,
+  IOE1 PYG8) is cut and the PM1 and IOE1 I2C interfaces sleep after 1 s, just before
+  `esp_deep_sleep_start`. Only the buttons and the retry timer wake it (decision 2026-11-25: no tap to
+  wake from DEEP). The wake is a reboot, which raises the rail and wakes both chips again.
+- **Display timeout:** 60 s without input on battery; 10 minutes on USB power (a desk). An explicit
+  setting (the simulator's `--idle-off`) stays as set.
   - The vendor measured 3.5 mA for Wi-Fi connected in light sleep with the display off
     (`docs/github/M5StopWatch-PowerDemo.md`); the 2026-11-22 run measured 105 mA linked before this.
 
