@@ -37,6 +37,8 @@ bool sw_ioe_motor_readback(uint8_t *duty, bool *enabled);
 
 /* PM1 green power LED (kept off while the AMOLED is lit). */
 void sw_pm1_led(bool on);
+/* Before deep sleep only: the PM1 and IOE1 I2C interfaces sleep after 1 s idle (issue 0d15). */
+void sw_power_i2c_idle_sleep(void);
 /* Battery and USB input voltages, and charger state. False if the PM1 is unavailable. */
 bool sw_pm1_read(uint16_t *vbat_mv, uint16_t *vin_mv, bool *charging);
 

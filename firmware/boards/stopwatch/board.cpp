@@ -162,6 +162,7 @@ static bool deep_sleep(uint32_t wake_after_s)
     vTaskDelay(pdMS_TO_TICKS(20));
     sw_ioe_motor_duty(0); /* IOE1 stays powered: a motor left on would run all night */
     sw_pm1_led(false);
+    sw_power_i2c_idle_sleep(); /* the last I2C writes before the sleep */
     for (gpio_num_t p : pins) {
         rtc_gpio_pullup_en(p);
         rtc_gpio_pulldown_dis(p);

@@ -66,6 +66,24 @@ static void pm1_init(i2c_master_bus_handle_t s_bus)
     /* TODO(power): PMG1 -> G12 IRQ (IMU lift / RTC wake) once lift detection exists. */
 }
 
+/* Before deep sleep: let the PM1 and IOE1 put their I2C interfaces to sleep after 1 s idle. The
+ * vendor measured deep sleep at 43-57 uA with the PM1's I2C idle sleep on and 631 uA with it off
+ * (M5StopWatch-PowerDemo, issue 20261117-0d15). Both chips keep their outputs; a wake is a reboot,
+ * and begin() wakes each chip and turns this off again. */
+void sw_power_i2c_idle_sleep(void)
+{
+    if (s_pm1) {
+        xSemaphoreTake(s_pm1_mtx, portMAX_DELAY);
+        s_pm1->setI2cSleepTime(1);
+        xSemaphoreGive(s_pm1_mtx);
+    }
+    if (s_ioe) {
+        xSemaphoreTake(s_ioe_mtx, portMAX_DELAY);
+        s_ioe->setI2cSleepTime(1);
+        xSemaphoreGive(s_ioe_mtx);
+    }
+}
+
 void sw_pm1_led(bool on)
 {
     if (!s_pm1) { return; }
