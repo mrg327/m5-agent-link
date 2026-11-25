@@ -1,6 +1,9 @@
 // Markup for the StopWatch render. Geometry is in a 600×600 box (≈11.5 px/mm:
 // body Ø52 mm, 1.75" AMOLED, 15.5 mm thick; see docs/hardware/StopWatch_model_size.pdf).
-// Orange key = A, coral key = B, both on the lower rim; USB-C on the right edge.
+// Laid out from M5Stack's product photos (docs.m5stack.com C152), screen upright with USB at the bottom
+// as the firmware draws it: key A yellow at about 10:30 and key B blue at about 1:30, both on the upper
+// rim; the red power button at about 7:30 (the PM1's, not the app's); USB-C at the bottom, a little
+// right of 6, with the HY2.0 (Grove) port at about 4. Rim angles are approximate (issue 20261125-d549).
 
 export const SLABS = 26;
 export const SLAB_STEP = 5; // px between slabs → ≈130 px thickness
@@ -15,10 +18,10 @@ export const REGIONS = {
   buttons: {
     label: 'Keys A · B',
     holes: [
-      { x: 98, y: 508, r: 58 },
-      { x: 502, y: 508, r: 58 },
+      { x: 98, y: 92, r: 58 },
+      { x: 502, y: 92, r: 58 },
     ],
-    tag: { x: 300, y: 590 },
+    tag: { x: 300, y: 10 },
   },
   motor: {
     label: 'Vibration motor',
@@ -26,7 +29,7 @@ export const REGIONS = {
     tag: { x: 300, y: 505 },
     inside: true,
   },
-  usb: { label: 'USB-C', holes: [{ x: 598, y: 300, r: 62 }], tag: { x: 598, y: 300 } },
+  usb: { label: 'USB-C', holes: [{ x: 378, y: 590, r: 62 }], tag: { x: 378, y: 590 } },
   antenna: {
     label: '2.4 GHz antenna',
     holes: [{ x: 300, y: 62, r: 78 }],
@@ -118,7 +121,15 @@ function keyLayers() {
 }
 
 export function usbHTML() {
-  return `<div class="usb" aria-hidden="true"><div class="usb__shell"><div class="usb__slot"><i class="usb__tongue"></i></div></div></div>`;
+  return `<div class="rim usb" aria-hidden="true"><div class="usb__shell"><div class="usb__slot"><i class="usb__tongue"></i></div></div></div>`;
+}
+
+/**
+ * The HY2.0-4P (Grove) port: a white 4-pin housing on the rim.
+ * @returns {string} its markup
+ */
+export function groveHTML() {
+  return `<div class="rim grove" aria-hidden="true"><div class="grove__shell"><div class="grove__slot"><i></i><i></i><i></i><i></i></div></div></div>`;
 }
 
 export function deviceHTML() {
@@ -128,6 +139,8 @@ export function deviceHTML() {
   <div class="device" data-device>
     ${slabsHTML()}
     ${usbHTML()}
+    ${groveHTML()}
+    <div class="key key--pwr" aria-hidden="true" title="Power (M5PM1): click on, double click off">${keyLayers()}</div>
     <button class="key key--a" type="button" data-key="a" aria-label="Button A (keyboard: A)" title="Button A · key A">${keyLayers()}</button>
     <button class="key key--b" type="button" data-key="b" aria-label="Button B (keyboard: B)" title="Button B · key B">${keyLayers()}</button>
     <div class="face">

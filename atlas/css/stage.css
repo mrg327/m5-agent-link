@@ -53,7 +53,7 @@ body[data-stage="mini"] { --sx: calc(100vw - var(--gutter) - 64px); --sy: calc(1
 /* --- the puck ---------------------------------------------------------- */
 .device {
   position: absolute; inset: 0; transform-style: preserve-3d; transform-origin: 50% 50% -65px;
-  transform: rotateX(14deg) rotateY(-15deg); will-change: transform;
+  transform: rotateX(-14deg) rotateY(-10deg); will-change: transform;
 }
 .device > * { position: absolute; }
 .slab {
@@ -81,15 +81,16 @@ body[data-stage="mini"] { --sx: calc(100vw - var(--gutter) - 64px); --sy: calc(1
 .glass__svg { width: 100%; height: 100%; }
 .glass__sheen { transform: translate(var(--gx, 0px), var(--gy, 0px)); }
 
-/* keys: A orange (lower left), B coral (lower right) */
+/* keys (product photos, art.js): A yellow at 10:30, B blue at 1:30; the power button red at 7:30 */
 .key {
   left: 0; top: 0; width: 44px; height: 92px; padding: 0; border: 0; background: none; cursor: pointer;
   transform-style: preserve-3d; -webkit-tap-highlight-color: transparent;
   transform: translate(var(--kx), var(--ky)) translate(-50%, -50%) rotate(var(--ka)) translateX(var(--press, 0px));
   transition: transform 90ms ease-out;
 }
-.key--a { --kx: 88px;  --ky: 512px; --ka: 135deg; --k1: #ffb454; --k2: #f07a0b; --k3: #8f4300; }
-.key--b { --kx: 512px; --ky: 512px; --ka: 45deg;  --k1: #ff8b82; --k2: #e5463d; --k3: #7e1d1a; }
+.key--a { --kx: 88px;  --ky: 88px;  --ka: 225deg; --k1: #ffd36b; --k2: #f5a417; --k3: #8a5a00; }
+.key--b { --kx: 512px; --ky: 88px;  --ka: 315deg; --k1: #8dbbff; --k2: #1f6fd6; --k3: #0c3570; }
+.key--pwr { --kx: 88px; --ky: 512px; --ka: 135deg; --k1: #ff8a80; --k2: #e3342f; --k3: #7a1412; cursor: default; pointer-events: none; height: 76px; }
 .key i {
   position: absolute; inset: 0; border-radius: 12px; backface-visibility: hidden;
   background: linear-gradient(115deg, var(--k3), var(--k2) 55%, var(--k3));
@@ -101,9 +102,18 @@ body[data-stage="mini"] { --sx: calc(100vw - var(--gutter) - 64px); --sy: calc(1
 .key:focus-visible { outline: none; }
 .key:focus-visible i:last-child { box-shadow: 0 0 0 3px var(--ink), 0 0 0 5px var(--c-accent); }
 
-/* USB-C on the right edge */
-.usb { left: 535px; top: 252px; width: 130px; height: 96px; transform: translateZ(-65px) rotateY(90deg) translateZ(-1px); pointer-events: none; display: grid; place-items: center;
-  background: linear-gradient(180deg, #181a20, #0a0b0e 40%, #15171c); border-radius: 18px; }
+/* Rim features: a plate standing on the rim at --rim-a (clockwise from 12), its width along the rim and
+   its height the puck's depth (130 px), facing out. */
+.rim { left: calc(300px - var(--rim-w) / 2); top: 235px; width: var(--rim-w); height: 130px; pointer-events: none;
+  display: grid; place-items: center; backface-visibility: hidden; border-radius: 18px;
+  background: linear-gradient(90deg, #15171c, #0a0b0e 40%, #181a20);
+  transform: translateZ(-65px) rotateZ(var(--rim-a)) translateY(-301px) rotateX(90deg); }
+/* USB-C at the bottom, a little right of 6; the HY2.0 port at about 4 */
+.usb { --rim-a: 165deg; --rim-w: 110px; }
+.grove { --rim-a: 125deg; --rim-w: 96px; }
+.grove__shell { width: 72px; height: 30px; border-radius: 4px; background: linear-gradient(180deg, #f4f4ef, #cfcfc8); padding: 4px 6px; box-shadow: 0 0 0 2px rgba(0,0,0,.5); }
+.grove__slot { width: 100%; height: 100%; border-radius: 2px; background: #2a2b2f; display: flex; justify-content: space-evenly; align-items: center; }
+.grove__slot i { width: 4px; height: 9px; background: linear-gradient(180deg, #e9e4cf, #a59f86); }
 .usb__shell { width: 78px; height: 36px; border-radius: 18px; background: linear-gradient(180deg, #dfe3ea, #7d8491 45%, #b8bdc8); padding: 3px; box-shadow: 0 0 0 2px rgba(0,0,0,.5); }
 .usb__slot { position: relative; width: 100%; height: 100%; border-radius: 15px; background: #020203; display: grid; place-items: center; }
 .usb__tongue { width: 76%; height: 7px; border-radius: 2px; background: linear-gradient(90deg, #3a3d45, #6b7080, #3a3d45); }
