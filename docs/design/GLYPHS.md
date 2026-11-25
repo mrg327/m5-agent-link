@@ -48,7 +48,7 @@ word by word.
    - A menu is an orbit of discs around its subject (§3.5).
    - No rows of labels, no pills with words.
 6. **Button hints sit at the buttons.** What A and B do is a glyph in a thin ring at the rim, next to
-   the physical button: A lower left in amber, B lower right in red. No letters.
+   the physical button: A lower left in amber, B lower right in blue (issue 20261125-d8b5: whether these sit beside the keys depends on which way up the watch is held). No letters.
 7. **A result is a burst.** Approved, denied, sent, handed back to the computer: one hero glyph
    filling the centre, in its colour, then the screen moves on. No words.
 8. **An error is a sign.** One or two glyphs side by side ("computer, refused"). A rare diagnostic
@@ -69,7 +69,7 @@ word by word.
 
 Unchanged tokens (`ui_theme.h`): working blue, question yellow, approval orange, done green, error
 vermillion, idle grey; black background. Colour still means state and nothing else. Button A's hint is
-amber and B's is red because the physical buttons are.
+amber and B's is blue because the physical buttons are (yellow and blue).
 
 ## 3. Primitives (`ui_kit.h`, built first, used by every screen)
 
@@ -171,7 +171,7 @@ leaves r 0 to 105 free.
 Rule 6: the glyph for A and for B, each in a thin ring at the rim.
 
 - `ui_key_hint_create(parent, UI_KEY_A | UI_KEY_B)`, `ui_key_hint_set(hint, icon)`. A is at (101, 365) in amber
-  (`RGB_KEY_A`), B at (365, 365) in red (`RGB_KEY_B`); the ring is r 20 and reaches r 207 from the screen
+  (`RGB_KEY_A`), B at (365, 365) in blue (`RGB_KEY_B`); the ring is r 20 and reaches r 207 from the screen
   centre, clear of the countdown (r 213) and the index ring (r 218).
 - A hint is a disc: hide and show it like one; `ui_disc_set_hold()` fills a ring round it for a hold on the button.
 - The slot between the two hints is x 129 to 337 (208 px). Below y 345 a row is only that wide.

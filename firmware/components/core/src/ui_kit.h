@@ -207,11 +207,13 @@ void ui_orbit_set_hold(lv_obj_t *o, int permille); /* the hold ring of the selec
 /* ── §3.6 key hints ── */
 
 typedef enum { UI_KEY_A, UI_KEY_B } ui_key_t;
-#define UI_KEY_A_X 101 /* lower left, beside button A */
-#define UI_KEY_B_X 365 /* lower right, beside button B */
+/* Hint positions: whether these sit beside the physical keys depends on which way up rotation 0 is
+ * on the watch (issue 20261125-d8b5); the colours follow the keys (A yellow, B blue). */
+#define UI_KEY_A_X 101 /* lower left */
+#define UI_KEY_B_X 365 /* lower right */
 #define UI_KEY_Y 365
-#define RGB_KEY_A 0xe69f00 /* the physical button is amber */
-#define RGB_KEY_B 0xe04a3a /* the physical button is red */
+#define RGB_KEY_A 0xe69f00 /* the physical button is yellow-amber */
+#define RGB_KEY_B 0x2f7fe0 /* the physical button is blue */
 
 /* What a button does: a glyph in a thin ring at the rim, beside the button, in the button's colour.
  * No letters. The hint is a disc (r 20): hide, show and ui_disc_set_hold() it like one (a hold on a
