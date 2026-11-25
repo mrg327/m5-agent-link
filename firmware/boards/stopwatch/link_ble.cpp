@@ -65,7 +65,7 @@ static uint16_t s_tx_handle;
 #warning \
     "one BLE central only: firmware/sdkconfig predates MULTI-LINK.md; delete it to take sdkconfig.defaults"
 #endif
-enum { ITVL_BASE, ITVL_FAST, ITVL_BULK };
+enum { ITVL_BASE, ITVL_FAST, ITVL_BULK, ITVL_REST };
 
 typedef struct {
     volatile uint16_t conn; /* BLE_HS_CONN_HANDLE_NONE: a free peer */
@@ -86,6 +86,7 @@ typedef struct {
     uint8_t applied;      /* ITVL_*: last granted (or, while req_pending, requested) */
     uint8_t prev_applied; /* before the pending request */
     bool bulk_refused;    /* this central refused the bulk interval */
+    bool rest_refused;    /* this central refused the rest interval: it keeps its own */
     bool req_pending;     /* one update at a time; the next is sent when it completes */
 } peer_t;
 
@@ -184,6 +185,16 @@ static void advertise(void);
 #define BLE_FAST_TIMEOUT 400 /* 10 ms units: 4 s */
 /* 30 ms (to 45 ms): the base after a connect at a remembered bulk interval */
 #define BLE_IDLE_ITVL 24
+/* At rest (display off, issue 20261123-d569): 60–75 ms with peripheral latency 12, so the watch's
+ * radio listens about once a second (75 ms x 13 = 975 ms) and an attention arrives within ~1 s; the
+ * watch can still send at any connection event. Apple's rules: max >= min + 15 ms, max x (latency
+ * + 1) <= 2 s, timeout 2–6 s and > 3 x max x (latency + 1) (2.9 s). */
+#define BLE_REST_ITVL_MIN 48
+#define BLE_REST_ITVL_MAX 60
+#define BLE_REST_LATENCY 12
+#define BLE_REST_TIMEOUT 500 /* 10 ms units: 5 s */
+/* the watch is at rest (sw_ble_link_rest); every central gets the rest interval */
+static bool s_rest;
 
 static void conn_params(peer_t *p, const char *why, bool save_base)
 {
@@ -202,9 +213,10 @@ static void conn_params(peer_t *p, const char *why, bool save_base)
 
 static uint8_t wanted_level(const peer_t *p)
 {
-    uint8_t lv = p->bulk && !p->bulk_refused ? ITVL_BULK
-                 : (p->fast || p->bulk)      ? ITVL_FAST
-                                             : ITVL_BASE;
+    uint8_t lv = p->bulk && !p->bulk_refused  ? ITVL_BULK
+                 : (p->fast || p->bulk)       ? ITVL_FAST
+                 : s_rest && !p->rest_refused ? ITVL_REST
+                                              : ITVL_BASE;
     uint16_t min = lv == ITVL_BULK ? BLE_BULK_ITVL_MIN : BLE_FAST_ITVL_MIN;
     /* the central already runs this fast */
     if (lv == ITVL_BULK && p->base_itvl <= min) lv = ITVL_FAST;
@@ -218,16 +230,20 @@ static void apply_interval(peer_t *p)
     if (p->conn == BLE_HS_CONN_HANDLE_NONE || !p->base_itvl || p->req_pending) return;
     uint8_t lv = wanted_level(p);
     if (lv == p->applied) return;
-    static const char *const kName[] = {"base", "fast", "bulk"};
+    static const char *const kName[] = {"base", "fast", "bulk", "rest"};
     struct ble_gap_upd_params u = {};
     u.itvl_min = lv == ITVL_BULK   ? BLE_BULK_ITVL_MIN
                  : lv == ITVL_FAST ? BLE_FAST_ITVL_MIN
+                 : lv == ITVL_REST ? BLE_REST_ITVL_MIN
                                    : p->base_itvl;
     u.itvl_max = lv == ITVL_BULK   ? BLE_BULK_ITVL_MAX
                  : lv == ITVL_FAST ? BLE_FAST_ITVL_MAX
+                 : lv == ITVL_REST ? BLE_REST_ITVL_MAX
                                    : (uint16_t)(p->base_itvl + 12);
-    u.latency = lv == ITVL_BASE ? p->base_latency : 0;
-    u.supervision_timeout = lv == ITVL_BASE ? p->base_timeout : BLE_FAST_TIMEOUT;
+    u.latency = lv == ITVL_BASE ? p->base_latency : lv == ITVL_REST ? BLE_REST_LATENCY : 0;
+    u.supervision_timeout = lv == ITVL_BASE   ? p->base_timeout
+                            : lv == ITVL_REST ? BLE_REST_TIMEOUT
+                                              : BLE_FAST_TIMEOUT;
     int rc = ble_gap_update_params(p->conn, &u);
     p->req_pending = rc == 0;
     if (rc == 0) {
@@ -244,6 +260,17 @@ void sw_ble_link_interactive(hal_link_kind_t port, bool on)
     if (!p || on == p->fast) return;
     p->fast = on;
     apply_interval(p);
+}
+
+void sw_ble_link_rest(bool on)
+{
+#ifdef CONFIG_AGENTLINK_BLE_REST_INTERVAL
+    if (on == s_rest) return;
+    s_rest = on;
+    for (int i = 0; i < BLE_PEERS; i++) apply_interval(&s_peers[i]);
+#else
+    (void)on;
+#endif
 }
 
 void sw_ble_link_bulk(hal_link_kind_t port, bool on)
@@ -288,7 +315,7 @@ static void peer_connected(peer_t *p, uint16_t conn)
             ble_att_set_preferred_mtu(BLE_SHORT_LL_MTU);
         }
     }
-    p->req_pending = p->bulk_refused = false;
+    p->req_pending = p->bulk_refused = p->rest_refused = false;
     p->applied = ITVL_BASE;
     conn_params(p, "connected", true);
     if (p->base_itvl && p->base_itvl < BLE_FAST_ITVL_MIN) {
@@ -398,11 +425,13 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
             ESP_LOGW(TAG, "interval update failed (handle %u): %d", p->conn,
                      ev->conn_update.status);
             if (ours) {
-                bool bulk = p->applied == ITVL_BULK;
+                uint8_t refused = p->applied;
                 p->applied = p->prev_applied;
-                if (bulk) { /* refused: ask for what every central takes */
+                if (refused == ITVL_BULK) { /* refused: ask for what every central takes */
                     p->bulk_refused = true;
                     apply_interval(p);
+                } else if (refused == ITVL_REST) {
+                    p->rest_refused = true; /* its own interval then, at rest too */
                 }
             }
         }

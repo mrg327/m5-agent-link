@@ -38,6 +38,8 @@ void sw_touch_reset(void);
 bool sw_touch_init(void);
 bool sw_touch_read(uint16_t *x, uint16_t *y);
 void sw_touch_sleep(bool sleep);
+/* At rest light sleep may swallow INT edges: read on every poll, ungated. */
+void sw_touch_rest(bool rest);
 bool sw_rtc_init(void);
 bool sw_imu_init(void); /* imu.cpp: BMI270 chip ID check, then the sampling task starts */
 void sw_input_init(void);
@@ -50,6 +52,8 @@ void sw_ble_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state); /*
  * ignored. */
 void sw_ble_link_interactive(hal_link_kind_t port, bool on);
 void sw_ble_link_bulk(hal_link_kind_t port, bool on);
+/* At rest (display off): ask every central for a slow interval with peripheral latency. */
+void sw_ble_link_rest(bool on);
 bool sw_ble_link_send(hal_link_kind_t port, const uint8_t *frame, size_t len);
 /* link_ble.cpp: the shortest connection interval in force (us, 0 = no central), and the Battery
  * Level (0x2A19) value; a change is notified to a subscribed central. Safe to call from the core

@@ -277,7 +277,11 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
     xSemaphoreTake(s_gfx_mtx, portMAX_DELAY);
     dma_finish_locked(); /* LVGL already waited via flush_wait_cb; this only guards a direct call */
     s_gfx->startWrite(); /* held open past pushImageDMA so its endWrite does not wait for the bus */
-    if (s_dma_ok) {
+    /* Dark (STANDBY): finish each band before returning, so no transfer is in flight when the core
+     * goes idle and the chip light-sleeps (issue 20261123-d569). Lit, the board holds a no-sleep
+     * PM lock and bands overlap as before. */
+    bool async = s_dma_ok && s_powered;
+    if (async) {
         s_gfx->pushImageDMA(area->x1, area->y1, w, h, (const lgfx::swap565_t *)px_map);
         s_pending = true;
     } else {
@@ -290,7 +294,7 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
     s_st.px += (uint32_t)(w * h);
 #endif
     ST_ADD(cpu_us);
-    if (!s_dma_ok) { lv_display_flush_ready(disp); }
+    if (!async) { lv_display_flush_ready(disp); }
 }
 
 /* LVGL calls this before reusing a buffer that is still being flushed (and treats it as flushed

@@ -82,6 +82,25 @@ Measured rails (from vendor docs): **L0** = M5PM1 only. **L1** = + IMU + RTC. **
 - **Touch-to-wake [D]:** off in STANDBY. Only lifting or a button wakes the device.
 - **As built (2026-11-08):** `core/power.c` owns the policy and `boards/stopwatch/board.cpp` the mechanism. Display off after 60 s without input. DEEP = ESP32-S3 deep sleep (PM1, IOE1 and the RTC domain stay up), entered only on battery with no link, 10 min after display-off; never with USB present (checked twice: `may_deep()` and the board guard). Wake: either button (G1/G2 via EXT1, any low) or the retry timer (5, 10, 20, 40, 60, 60, 60 min, the count kept in RTC memory, then buttons only); a wake is a reboot. A timer wake boots dark and silent, tries to reconnect for 90 s, then sleeps again; a link or any input resets the ladder. A held button aborts the sleep. Recovery: one click of the PM1 power button resets. Lift-to-wake waits for the IMU driver. Simulator: `--battery`, `--deep-after S`, `--wake timer|button --tries N`; tests `sim_deep_*`.
 
+- **STANDBY as built (issue 20261123-d569, 2026-11-25; not yet measured on the watch):**
+  - Automatic light sleep (`CONFIG_PM_ENABLE`, tickless idle, CPU 80–240 MHz) whenever every task is
+    idle. NimBLE keeps the link in modem sleep on the main crystal, which stays powered: the S3's
+    32 kHz crystal pins (G15/G16) carry I2S on this board.
+  - Only at rest: the board holds a no-light-sleep PM lock while the display is on, and a dark display
+    flushes each band synchronously, so no DMA is in flight when the chip sleeps. No light sleep while
+    USB Serial/JTAG is attached (`CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION`).
+  - Input that arrives during a sleep is not lost: the button task polls every 50 ms besides its
+    interrupt, and touch reads skip INT gating.
+  - BLE asks every central for 60–75 ms with peripheral latency 12 (the radio listens about once a
+    second; an attention arrives within ~1 s) and returns to the central's interval when the display
+    wakes. A central that refuses keeps its own. The power report's `itvl` shows the interval, not the
+    latency.
+  - Both are board Kconfig options (`AGENTLINK_LIGHT_SLEEP`, `AGENTLINK_BLE_REST_INTERVAL`), on by
+    default. An existing `firmware/sdkconfig` keeps PM off: delete it (the build warns).
+  - The core loop still polls every 50 ms with the display off.
+  - The vendor measured 3.5 mA for Wi-Fi connected in light sleep with the display off
+    (`docs/github/M5StopWatch-PowerDemo.md`); the 2026-11-22 run measured 105 mA linked before this.
+
 - **Measured (proto 0.19):** the watch reports its battery voltages and the time in each state (display on, dimmed, off, deep) every 5 minutes while linked; `agentlink power` fits a drain rate per state ([POWER.md](POWER.md)).
 
 **Budget estimate (to be measured in spike S4):**
