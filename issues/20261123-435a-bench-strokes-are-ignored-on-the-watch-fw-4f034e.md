@@ -1,11 +1,11 @@
 ---
 id: 20261123-435a
 title: Bench strokes are ignored on the watch (fw 4f034e5); real touch works
-status: claimed
+status: open
 severity: med
 area: firmware
 platforms: esp32
-owner: claude-code/cloud@cloud
+owner:
 created: 2026-11-23T18:12:48Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -58,3 +58,5 @@ checks are button actions. A real finger works (tap wakes, second tap opens AGEN
 - 2026-11-23T18:12:48Z · claude-code@linux-dev · linux-x86_64 · 4f034e5: filed
 - 2026-11-23T19:41:37Z · claude-code@linux-dev · linux-x86_64 · b7336c3: Not reproduced after a reboot. A debug build (touch-read and gesture logging, not committed) passed all 11 tasks x3, then main's 4f034e5 reflashed also passed all 11 x3, with the same two BLE centrals and rx_id_not_monotonic. So the failure is a device state, not the build: it started after the first flash plus a serial-port open (USB_UART_CHIP_RESET) and lasted through every task until the next reboot. Suspects: s.touch_down kept across bench start, the touch read timer, gesture state left pressed. Next time it happens, before rebooting: run a task with a debug build... not possible without reflash, so add a permanent dbg_ui_state field for bench_playing and the last read time.
 - 2026-11-25T04:45:43Z · claude-code/cloud@cloud · linux-x86_64 · 00d20be: claimed
+- 2026-11-25T05:00:31Z · claude-code/cloud@cloud · linux-x86_64 · 544b35b: Commit 544b35b: the watch now logs enough to diagnose this without a debug build (BENCH.md §2). bench touch adds read_ago (ms since the last touch read), prev/prev_seen and down; bench stroke_end gives reads, panel (reads where the real panel was also pressed: a finger or a stuck panel) and late; bench touch_unread (warn) fires when no read plays a stroke within 500 ms. Step 3 was already covered: sim strokes go through the firmware's own encoder and rx decode (sim_script.c send_stroke -> inject_env); new ctest sim_bench_stroke_read fails on touch_unread or a stroke ended with 0 reads. Checks: format structure commits docs lint atlas sim (246/246) firmware (build, check_dram 184801 B free) all PASS. Not verified on the watch. Next time strokes are ignored: read these lines before rebooting. touch_unread or a growing read_ago = reads stopped; reads > 0 with panel > 0 = the panel reports a press (stuck) over the stroke.
+- 2026-11-25T05:00:31Z · claude-code/cloud@cloud · linux-x86_64 · 544b35b: reopened: Released: root cause needs the watch; diagnostics landed in 544b35b
