@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod bench;
+mod devices;
 mod graph;
 mod hooks;
 mod ota;
@@ -32,9 +33,22 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+enum DevicesCmd {
+    /// Serve this watch over Bluetooth (its uid, as `agentlink status` shows it).
+    Trust { uid: String },
+    /// Stop serving this watch over Bluetooth.
+    Forget { uid: String },
+}
+
+#[derive(Subcommand)]
 enum Cmd {
     /// Ask the running daemon for its status.
     Status,
+    /// The watches served over Bluetooth (PROTOCOL.md §8); with no subcommand, list them.
+    Devices {
+        #[command(subcommand)]
+        cmd: Option<DevicesCmd>,
+    },
     /// Pretty-print today's JSONL trace.
     Trace {
         /// Keep printing new lines as they are written.
@@ -249,6 +263,14 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
         Cmd::Status => status::run(cli.json),
+        Cmd::Devices { cmd } => match cmd {
+            None => {
+                devices::list(cli.json);
+                Ok(())
+            }
+            Some(DevicesCmd::Trust { uid }) => devices::trust(&uid),
+            Some(DevicesCmd::Forget { uid }) => devices::forget(&uid),
+        },
         Cmd::Trace { follow, sid } => trace::run(cli.json, follow, sid),
         Cmd::Graph { sid } => graph::run(cli.json, sid),
         Cmd::Decode { hex } => decode(&hex, cli.json),

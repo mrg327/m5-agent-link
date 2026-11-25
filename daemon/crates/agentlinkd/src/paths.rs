@@ -26,6 +26,11 @@ pub fn trace_dir() -> PathBuf {
     home().join("trace")
 }
 
+/// Watches served over BLE (trust.rs, PROTOCOL.md §8).
+pub fn trusted_watches() -> PathBuf {
+    home().join("trusted-watches.txt")
+}
+
 pub fn audit_log() -> PathBuf {
     home().join("audit.jsonl")
 }

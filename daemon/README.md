@@ -114,11 +114,22 @@ docs/design/PRESENCE.md. The daemon asks whether the user is at the keyboard (sc
 
 `agentlink power [--hours H | --all] [--device <id>] [--csv FILE]` reads `~/.agentlink/power-reports.csv`, where the daemon logs every `power` report a watch with proto 0.19 sends (PROTOCOL §6f, docs/design/POWER.md): the battery now (volts, a LiPo open-circuit estimate), the discharge per hour since the last unplug, and each power state's share of the time and fitted drain; `--json` too. `agentlink status` shows each device's last report. The daemon never writes `~/.agentlink/power.csv`. End to end: `python3 daemon/tools/power_e2e.py`.
 
+## Trusted watches
+
+Any device can advertise an `AgentLink-` name, so the daemon serves a Bluetooth watch only when it is in
+`~/.agentlink/trusted-watches.txt` (one device uid per line; PROTOCOL.md §8, `agentlinkd/src/trust.rs`). A
+watch on USB is added on its own; while the list is empty, the first watch over Bluetooth is added; the
+simulator on 127.0.0.1 is always served. Anything else gets no welcome, no snapshot and no commands, and
+`agentlink status` lists it with `trusted: false`. `agentlink devices` lists the file, `agentlink devices trust
+UID` and `forget UID` edit it; a change applies when the watch next connects. The watch itself only talks
+over an encrypted link paired with the passkey on its screen. End to end: `daemon/tools/trust_e2e.py`.
+
 ## Files written
 
 - `~/.agentlink/trace/YYYY-MM-DD.jsonl`: `{ts_us, ts, src, dir, kind, sid?, rid?, msg, bytes?}` for every hook event, registry transition and protocol message (decoded JSON plus raw hex).
 - `~/.agentlink/audit.jsonl`: append-only record of focus actions and approval decisions.
 - `~/.agentlink/power-reports.csv`: one row per watch power report (columns in docs/design/POWER.md).
+- `~/.agentlink/trusted-watches.txt`: the watches served over Bluetooth (Trusted watches above).
 
 ## Status
 

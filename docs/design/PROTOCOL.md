@@ -38,7 +38,7 @@ summary: 'The wire protocol: envelope, messages, versions, AEAD'
   - **Fragmentation:** each write/notification is `[FIRST|LAST|seq:6] data…` (`FIRST=0x80`, `LAST=0x40`). `seq` starts at 0 on the FIRST fragment and wraps mod 64. A `seq` gap, a continuation without a FIRST, or a message over `max_msg` drops the partial message. A FIRST in the middle of a message drops the partial and starts a new one.
   - **Fragment size:** both sides send fragments of MTU−3 bytes (ATT header 3; the 1-byte fragment header leaves MTU−4 data bytes). The daemon reads the negotiated MTU from its BLE stack per frame and caps writes at 244 B; until the MTU exchange is reported (MTU 23) it writes 20 B, and after a failed large write it falls back to 20 B for the rest of the link. `AGENTLINK_BLE_WRITE_LEN` pins the daemon's write size. Receivers reassemble by header only, so any fragment size up to MTU−3 is valid. The device also requests LE Data Length 251 so that one MTU-sized fragment fits one link-layer packet. A central without data length extension (the BCM4350C0 in some Linux laptops) refuses that; the device then answers the MTU exchange with 239 instead of 247, so that each ATT packet (243 B with L2CAP) fills nine 27-byte link-layer packets exactly instead of ten with an 8-byte tail.
   - **Discovery:** the daemon connects to devices that advertise the service or a name starting with `AgentLink-`. `AGENTLINK_BLE_NAME` pins one device by name.
-  - **Security (current state):** no bonding and no encryption yet (`sm_bonding = 0`, no-IO capability). The LESC passkey and app-layer AEAD in §8 are planned, not implemented.
+  - **Security (current state, 2026-11-25):** LE Secure Connections pairing with a passkey shown on the watch, bonded; the watch counts a central as linked only on an encrypted, authenticated link, and the stack refuses rx writes before that. The daemon serves only watches in its trusted list (§8). The app-layer keys and AEAD in §8 are planned, not implemented.
 - **USB CDC:** each frame is `0x00 ‖ COBS(payload ‖ crc16_be) ‖ 0x00`. The CRC is CRC-16/CCITT-FALSE (poly `0x1021`, init `0xFFFF`, no reflection, xorout 0), and the payload is at most 4096 B.
   - **Shared stream:** the same port carries ESP-IDF log text and `#`-prefixed JSON debug lines. These never contain `0x00`. A receiver splits on `0x00`: chunks that COBS-decode and pass the CRC are frames, and everything else is text.
   - **Liveness:** after `hello` the daemon sends `ping` every 5 s. The device re-handshakes (sends a new `hello`) after 12 s without a frame.
@@ -534,6 +534,15 @@ The record layout and kinds (frame, down, up, gesture, mark, cmd) are in BENCH.m
 2. **Per connection:** `hello`/`welcome` carry nonces. The session key is derived as `HKDF(secret, nonces)`. After that, every message is AEAD-sealed. `id` is the nonce counter, so a replay is rejected.
 3. A daemon accepts `approve`/`deny`/`reply`/`cancel` only from paired devices, and only for a live `rid`. It logs every action.
 4. A simulator (WS on localhost) pairs like USB-first. It is never exposed beyond 127.0.0.1.
+
+**As built (2026-11-25), step 1 of the above:** BLE pairing is done by the link layer: LE Secure Connections,
+passkey shown on the watch (`BLE_HS_IO_DISPLAY_ONLY`, MITM), bonds in NVS; the watch sends a Security Request
+on connect and reports a central to the core only once the link is encrypted with an authenticated key (board
+Kconfig `AGENTLINK_BLE_SECURE`). The PC's Bluetooth settings ask for the passkey once per host. The daemon
+serves a BLE watch only when its uid is in `trusted-watches.txt` (USB and the first BLE watch are added on
+their own; `agentlink devices`); an unknown watch gets no welcome and no snapshot. This stops eavesdropping
+and a stranger's device, but the uid is not a secret: a device that copies a trusted watch's uid and address
+is not caught until the app-layer keys of items 1-2 exist.
 
 ## 9. Sizing sanity (StopWatch over BLE)
 

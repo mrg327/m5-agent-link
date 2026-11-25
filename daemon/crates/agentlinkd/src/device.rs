@@ -498,6 +498,9 @@ pub async fn run_link(
             None => return Ok(()),
         }
     };
+    if !trusted(&shared, &c, &peer, transport, &hello.1) {
+        return refuse(&shared, &mut c, &peer, transport, &hello.1).await;
+    }
     let link_id = shared.next_link.fetch_add(1, Ordering::Relaxed);
     let mut dev_key = None;
     let mut updates = handshake(
@@ -533,6 +536,68 @@ pub async fn run_link(
     shared.bench.link_down(link_id);
     tracing::info!("device disconnected: {peer}");
     result
+}
+
+/// PROTOCOL.md §8: whether this PC serves the watch that sent `hello` on `transport` (trust.rs).
+fn trusted(shared: &Shared, c: &Conn, peer: &str, transport: &str, hello: &Hello) -> bool {
+    let uid = hex::encode(hello.dev.uid);
+    // Test only: AGENTLINK_TRUST_WS_AS_BLE judges WebSocket links like BLE ones (tools/trust_e2e.py).
+    let judged = if transport == "ws" && std::env::var_os("AGENTLINK_TRUST_WS_AS_BLE").is_some() {
+        "ble"
+    } else {
+        transport
+    };
+    let v = crate::trust::check(&crate::paths::trusted_watches(), &uid, judged);
+    if let crate::trust::Verdict::Added(why) = v {
+        tracing::info!("{peer}: watch {uid} is now trusted ({why})");
+    }
+    let ok = v != crate::trust::Verdict::Refused;
+    if !ok {
+        tracing::warn!(
+            "{peer}: watch {uid} is not trusted on this PC, not served (`agentlink devices trust {uid}`, or connect it by USB once)"
+        );
+        shared.trace.record(
+            &c.src,
+            Dir::Internal,
+            "untrusted",
+            None,
+            None,
+            json!({"uid": uid, "peer": peer}),
+            None,
+        );
+    }
+    ok
+}
+
+/// An untrusted watch: no welcome, no snapshot, nothing it sends is acted on. The link stays open
+/// and silent until it drops, so the transport does not reconnect in a loop; `agentlink status`
+/// lists it with `trusted: false` meanwhile.
+async fn refuse(
+    shared: &Shared,
+    c: &mut Conn,
+    peer: &str,
+    transport: &'static str,
+    hello: &Hello,
+) -> Result<()> {
+    let key = format!("untrusted:{}", hex::encode(hello.dev.uid));
+    let info = serde_json::to_value(&hello.dev).unwrap_or_default();
+    if let Ok(mut d) = shared.devices.lock() {
+        d.insert(
+            key.clone(),
+            json!({"transport": transport, "peer": peer, "dev": info, "trusted": false}),
+        );
+    }
+    let res = loop {
+        match c.recv().await {
+            Ok(Some(_)) => {} // dropped unread
+            Ok(None) => break Ok(()),
+            Err(e) => break Err(e),
+        }
+    };
+    if let Ok(mut d) = shared.devices.lock() {
+        d.remove(&key);
+    }
+    res
 }
 
 /// hello → welcome → snapshot. Also used for a hello on a live link (device reboot or
@@ -663,6 +728,9 @@ async fn serve(
                 None => return Ok(()),
                 Some(Envelope { id, msg: Message::Hello(h), .. }) => {
                     shared.trace.record(&c.src, Dir::Internal, "rehandshake", None, None, json!({"peer": peer}), None);
+                    if !trusted(shared, c, peer, transport, &h) {
+                        return Ok(()); // a different, untrusted watch on this link
+                    }
                     *updates = handshake(shared, c, (id, h), link_id, transport, peer, dev_key).await?;
                     tracing::info!("device re-handshake: {peer} ({transport})");
                 }

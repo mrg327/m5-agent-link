@@ -63,6 +63,12 @@ Run the daemon (`cargo run -p agentlinkd` in `daemon/`; see `daemon/README.md`).
 - **Wrist or lanyard:** on battery over Bluetooth, with your own band through the strap
   holes. Battery life depends on the power work in issues 20261123-d569 and 20261117-0d15.
 
+**Pairing over Bluetooth.** The first time a PC connects, the watch shows a six-digit passkey and the PC's
+Bluetooth prompt asks for it; after that the two reconnect on their own. On Linux the prompt needs a Bluetooth
+agent (any desktop has one; otherwise `bluetoothctl`, `agent on`, `pair <address>`). On Windows, if no prompt
+appears, pair the watch once in Settings › Bluetooth. The daemon serves only watches it trusts: one on USB,
+or the first over Bluetooth; add another with `agentlink devices trust <uid>` (`daemon/README.md`).
+
 **macOS permissions**
 
 - **Bluetooth:** allow the terminal (or the `agentlinkd` binary) under System Settings › Privacy & Security › Bluetooth, or BLE scanning finds nothing. Under launchd, the `agentlinkd` binary needs its own grant.
