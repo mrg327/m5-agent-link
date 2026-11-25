@@ -1,11 +1,11 @@
 ---
 id: 20261123-d569
 title: Linked standby drains 23 %/h (about 105 mA): no light sleep, BLE stays at 30 ms
-status: open
+status: claimed
 severity: high
 area: firmware
 platforms: esp32
-owner:
+owner: claude-code/cloud@cloud
 created: 2026-11-23T05:58:16Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -60,3 +60,4 @@ Related: 20261117-0d15 (DEEP drain) is separate; this run had no deep time so it
 ## Log
 
 - 2026-11-23T05:58:16Z · claude-code@linux-dev · linux-x86_64 · 5d21b95: filed
+- 2026-11-25T16:19:37Z · claude-code/cloud@cloud · linux-x86_64 · b461e37: claimed
