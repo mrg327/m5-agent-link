@@ -66,6 +66,14 @@ void hal_link_bulk(hal_link_kind_t port, bool on)
 uint32_t hal_link_ble_interval_us(void)
 { return s_fake_up[HAL_LINK_BLE] || s_fake_up[HAL_LINK_BLE2] ? 30000u : 0u; }
 
+/* BLE pairing: a script's `pair` line plays what the board reports (PROTOCOL.md §8). */
+static hal_pair_cb_t s_pair_cb;
+void hal_link_set_pair_callback(hal_pair_cb_t cb) { s_pair_cb = cb; }
+void sim_link_pair_event(int32_t passkey_or_end)
+{
+    if (s_pair_cb) s_pair_cb(passkey_or_end);
+}
+
 void sim_link_enable_ws(bool enable) { s_ws_enabled = enable; }
 
 void sim_link_set_connected_kind(int kind, bool connected)

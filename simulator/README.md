@@ -54,8 +54,10 @@ result ok | result err stale|denied|... | clear RID [WHY]
 graph SID KIND:STATE:LANE[:f][:m]... [la=K,K..] [drop=N] [gen=N] | graph off
 expect_screen NAME | expect_label TEXT | expect_no_label TEXT | px_reset | expect_px_max PX | kit N | quit
 touch DT X Y [X Y...] | bench start|stop|mark N|save FILE|expect KIND MIN | expect_cmd OP
+pair NNNNNN | pair done | pair fail
 ```
 
+`pair` plays a BLE pairing as the board reports it (PROTOCOL.md §8): the passkey to show, then the end.
 `touch` and `bench` are the daemon's bench messages (BENCH.md, proto 0.24): a finger stroke played under the
 touch read path, and the frame timeline the device sends back after `bench stop`. `expect_cmd OP` checks that
 the device sent that command since the last `expect_cmd`.

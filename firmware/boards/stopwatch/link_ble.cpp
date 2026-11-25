@@ -9,6 +9,7 @@
 #include "board_priv.h"
 #include "esp_attr.h"
 #include "esp_log.h"
+#include "esp_random.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -19,6 +20,8 @@
 #include "nimble/nimble_port_freertos.h"
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
+
+extern "C" void ble_store_config_init(void); /* NimBLE's NVS bond store */
 
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers" /* NimBLE def tables are sparse */
 
@@ -87,6 +90,7 @@ typedef struct {
     uint8_t prev_applied; /* before the pending request */
     bool bulk_refused;    /* this central refused the bulk interval */
     bool rest_refused;    /* this central refused the rest interval: it keeps its own */
+    bool secure;          /* encrypted with an authenticated (passkey) key: PROTOCOL.md §8 */
     bool req_pending;     /* one update at a time; the next is sent when it completes */
 } peer_t;
 
@@ -162,6 +166,26 @@ static void rasm_feed(peer_t *p, const uint8_t *buf, size_t n)
 }
 
 /* ── link state ── */
+
+/* PROTOCOL.md §8 (Kconfig AGENTLINK_BLE_SECURE): a central counts as linked only once the link is
+ * encrypted with a key from LE Secure Connections passkey pairing (or a bond made that way); until
+ * then the core never sees it, nothing is sent and every write is dropped. */
+#ifdef CONFIG_AGENTLINK_BLE_SECURE
+#define BLE_SECURE 1
+#else
+#define BLE_SECURE 0
+#endif
+static bool link_ok(const peer_t *p) { return !BLE_SECURE || p->secure; }
+
+static hal_pair_cb_t s_pair_cb;
+static uint16_t s_pairing_conn = BLE_HS_CONN_HANDLE_NONE; /* a passkey is on the watch for it */
+void sw_ble_link_set_pair_callback(hal_pair_cb_t cb) { s_pair_cb = cb; }
+static void pair_end(uint16_t conn, bool ok)
+{
+    if (s_pairing_conn != conn) return;
+    s_pairing_conn = BLE_HS_CONN_HANDLE_NONE;
+    if (s_pair_cb) s_pair_cb(ok ? HAL_PAIR_DONE : HAL_PAIR_FAILED);
+}
 
 static void report_state(peer_t *p, bool up)
 {
@@ -330,8 +354,10 @@ static void peer_connected(peer_t *p, uint16_t conn)
 
 static void peer_gone(peer_t *p)
 {
+    pair_end(p->conn, false);
     p->conn = BLE_HS_CONN_HANDLE_NONE;
     p->subscribed = false;
+    p->secure = false;
     p->base_itvl = 0;
     p->cur_itvl = 0;
     report_state(p, false);
@@ -368,6 +394,12 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
             break;
         }
         peer_connected(p, h);
+        /* Ask the central to encrypt: pairing with the watch's passkey the first time, the bond
+         * after that (a Security Request; a write without response cannot ask for it). */
+        if (BLE_SECURE) {
+            int rc = ble_gap_security_initiate(h);
+            if (rc != 0) ESP_LOGW(TAG, "security request (handle %u): rc=%d", h, rc);
+        }
         advertise(); /* for the next central, while a peer is free */
         break;
     }
@@ -408,9 +440,42 @@ static int gap_event(struct ble_gap_event *ev, void *arg)
             p->subscribed = ev->subscribe.cur_notify;
             ESP_LOGI(TAG, "tx notify %s (handle %u, mtu %u)", p->subscribed ? "on" : "off", h,
                      ble_att_mtu(h));
-            report_state(p, p->subscribed);
+            report_state(p, p->subscribed && link_ok(p));
         }
         break;
+    case BLE_GAP_EVENT_ENC_CHANGE: {
+        uint16_t h = ev->enc_change.conn_handle;
+        peer_t *p = peer_for_conn(h);
+        struct ble_gap_conn_desc d;
+        bool ok = ev->enc_change.status == 0 && ble_gap_conn_find(h, &d) == 0 &&
+                  d.sec_state.encrypted && d.sec_state.authenticated;
+        ESP_LOGI(TAG, "encryption (handle %u): status %d, %s", h, ev->enc_change.status,
+                 ok ? "authenticated" : "not authenticated");
+        pair_end(h, ok);
+        if (!p) break;
+        p->secure = ok;
+        report_state(p, p->subscribed && link_ok(p));
+        break;
+    }
+    case BLE_GAP_EVENT_PASSKEY_ACTION:
+        if (ev->passkey.params.action == BLE_SM_IOACT_DISP) {
+            struct ble_sm_io io = {};
+            io.action = BLE_SM_IOACT_DISP;
+            io.passkey = esp_random() % 1000000u;
+            s_pairing_conn = ev->passkey.conn_handle;
+            int rc = ble_sm_inject_io(ev->passkey.conn_handle, &io);
+            ESP_LOGI(TAG, "pairing (handle %u): passkey on the watch, rc=%d",
+                     ev->passkey.conn_handle, rc);
+            if (s_pair_cb) s_pair_cb((int32_t)io.passkey);
+        }
+        break;
+    case BLE_GAP_EVENT_REPEAT_PAIRING: {
+        /* the central lost its bond and pairs again: forget ours and let it */
+        struct ble_gap_conn_desc d;
+        if (ble_gap_conn_find(ev->repeat_pairing.conn_handle, &d) == 0)
+            ble_store_util_delete_peer(&d.peer_id_addr);
+        return BLE_GAP_REPEAT_PAIRING_RETRY;
+    }
     case BLE_GAP_EVENT_CONN_UPDATE: {
         peer_t *p = peer_for_conn(ev->conn_update.conn_handle);
         if (!p) break;
@@ -510,6 +575,7 @@ static int rx_access(uint16_t conn_handle, uint16_t, struct ble_gatt_access_ctxt
     if (ble_hs_mbuf_to_flat(ctxt->om, buf, sizeof buf, &len) != 0) return BLE_ATT_ERR_UNLIKELY;
     peer_t *p = peer_for_conn(conn_handle);
     if (!p) return BLE_ATT_ERR_UNLIKELY; /* a central that is not set up (yet) */
+    if (!link_ok(p)) return BLE_ATT_ERR_INSUFFICIENT_AUTHEN; /* not paired: dropped */
     if (len > p->rx_frag_max) {
         p->rx_frag_max = len;
         ESP_LOGI(TAG, "rx fragment %u B (handle %u, mtu %u)", len, conn_handle,
@@ -559,9 +625,17 @@ static const ble_uuid16_t kFwUuid = BLE_UUID16_INIT(0x2A26);
 static const ble_uuid16_t kBatSvcUuid = BLE_UUID16_INIT(0x180F);
 static const ble_uuid16_t kBatLvlUuid = BLE_UUID16_INIT(0x2A19);
 
+/* the stack itself refuses a write from a central that is not paired (PROTOCOL.md §8) */
+#if BLE_SECURE
+#define RX_FLAGS \
+    (BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_WRITE_ENC | BLE_GATT_CHR_F_WRITE_AUTHEN)
+#else
+#define RX_FLAGS BLE_GATT_CHR_F_WRITE_NO_RSP
+#endif
+
 /* Member order matters: C++ requires designators in declaration order. */
 static const struct ble_gatt_chr_def kLinkChrs[] = {
-    {.uuid = &kRxUuid.u, .access_cb = rx_access, .flags = BLE_GATT_CHR_F_WRITE_NO_RSP},
+    {.uuid = &kRxUuid.u, .access_cb = rx_access, .flags = RX_FLAGS},
     {.uuid = &kTxUuid.u,
      .access_cb = tx_access,
      .flags = BLE_GATT_CHR_F_NOTIFY,
@@ -630,8 +704,21 @@ void sw_ble_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state)
     }
     ble_hs_cfg.reset_cb = on_reset;
     ble_hs_cfg.sync_cb = on_sync;
+#if BLE_SECURE
+    /* LE Secure Connections, passkey shown on the watch, bonded (NVS) so a known central reconnects
+     * encrypted with no prompt (PROTOCOL.md §8). */
+    ble_hs_cfg.sm_io_cap = BLE_HS_IO_DISPLAY_ONLY;
+    ble_hs_cfg.sm_bonding = 1;
+    ble_hs_cfg.sm_mitm = 1;
+    ble_hs_cfg.sm_sc = 1;
+    ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+    ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+    ble_hs_cfg.store_status_cb = ble_store_util_status_rr; /* full: drop the oldest bond */
+    ble_store_config_init();
+#else
     ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
     ble_hs_cfg.sm_bonding = 0;
+#endif
     ble_att_set_preferred_mtu(BLE_PREFERRED_MTU);
     ble_svc_gap_init();
     ble_svc_gatt_init();
@@ -658,7 +745,7 @@ bool sw_ble_link_send(hal_link_kind_t port, const uint8_t *frame, size_t len)
 {
     peer_t *p = peer_for_port(port);
     if (!p || !frame || len == 0 || len > BLE_MSG_MAX) return false;
-    if (!s_send_lock || !p->subscribed || p->conn == BLE_HS_CONN_HANDLE_NONE) {
+    if (!s_send_lock || !p->subscribed || !link_ok(p) || p->conn == BLE_HS_CONN_HANDLE_NONE) {
         send_failed("not linked (subscribed, conn)", p->subscribed, p->conn);
         return false;
     }

@@ -54,6 +54,8 @@ void sw_ble_link_interactive(hal_link_kind_t port, bool on);
 void sw_ble_link_bulk(hal_link_kind_t port, bool on);
 /* At rest (display off): ask every central for a slow interval with peripheral latency. */
 void sw_ble_link_rest(bool on);
+/* LE Secure Connections pairing: passkey to show, then HAL_PAIR_DONE / HAL_PAIR_FAILED. */
+void sw_ble_link_set_pair_callback(hal_pair_cb_t cb);
 bool sw_ble_link_send(hal_link_kind_t port, const uint8_t *frame, size_t len);
 /* link_ble.cpp: the shortest connection interval in force (us, 0 = no central), and the Battery
  * Level (0x2A19) value; a change is notified to a subscribed central. Safe to call from the core

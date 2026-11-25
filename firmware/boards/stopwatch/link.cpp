@@ -11,6 +11,7 @@ void hal_link_start(hal_link_rx_cb_t on_rx, hal_link_state_cb_t on_state)
 void hal_link_interactive(hal_link_kind_t port, bool on) { sw_ble_link_interactive(port, on); }
 void hal_link_bulk(hal_link_kind_t port, bool on) { sw_ble_link_bulk(port, on); }
 uint32_t hal_link_ble_interval_us(void) { return sw_ble_link_interval_us(); }
+void hal_link_set_pair_callback(hal_pair_cb_t cb) { sw_ble_link_set_pair_callback(cb); }
 
 bool hal_link_send(hal_link_kind_t kind, const uint8_t *frame, size_t len)
 {

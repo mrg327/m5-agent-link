@@ -137,6 +137,36 @@ static void on_gesture(const gesture_evt_t *g, void *ctx)
 
 /* The recognizer needs raw pointer samples, which LVGL does not expose as events. Wrap the HAL's
  * read callback, forward each sample, and handle the recognizer's output after lv_timer_handler. */
+/* BLE pairing (PROTOCOL.md §8): the board reports from its host task; core_step() takes the latest
+ * event over. A passkey then HAL_PAIR_DONE in quick succession just ends it. */
+static volatile uint32_t s_pair_seq;
+static volatile int32_t s_pair_val;
+static uint32_t s_pair_seen;
+static void on_pair(int32_t passkey_or_end)
+{
+    s_pair_val = passkey_or_end;
+    s_pair_seq = s_pair_seq + 1;
+}
+
+static void pair_step(uint32_t now)
+{
+    uint32_t seq = s_pair_seq;
+    if (seq == s_pair_seen) return;
+    s_pair_seen = seq;
+    int32_t v = s_pair_val;
+    if (v >= 0) {
+        power_activity(now); /* the PC waits for these digits: light the display */
+        ui_pair_show((uint32_t)v);
+        feedback_tick();
+        return;
+    }
+    ui_pair_hide();
+    bool done = v == HAL_PAIR_DONE;
+    ui_toast_sign(done ? "Paired" : "Pairing failed",
+                  done ? ICON_BLUETOOTH ICON_CHECK : ICON_BLUETOOTH ICON_X, NULL,
+                  done ? RGB_DONE : RGB_DANGER);
+}
+
 static lv_indev_read_cb_t s_hal_touch_read;
 
 static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
@@ -806,6 +836,7 @@ void core_init(void)
     hal_buttons_set_callback(on_button);
     hal_motion_set_callback(on_motion);
     hal_motion_stream_tilt(true);
+    hal_link_set_pair_callback(on_pair);
     hal_link_start(on_rx, on_state);
 #if CORE_BOOT_BUZZ
     if (!power_woke_by_timer()) feedback_hello(); /* a reconnect attempt stays silent and dark */
@@ -826,6 +857,7 @@ uint32_t core_step(void)
     if (motion_take_raise()) on_raise(now);
     cover_step();
     drain_link(now);
+    pair_step(now);
     power_tick(now);
     swallow_if_moved(seq);
     uint32_t wait = lv_timer_handler();

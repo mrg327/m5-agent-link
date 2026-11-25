@@ -44,6 +44,9 @@ static uint32_t s_toast_until_ms;
 static char s_toast_txt[64];
 static lv_obj_t *s_glow, *s_glow_ring;
 static lv_obj_t *s_wait_pip; /* a request waits behind the open screen (ui_offer_attention) */
+static lv_obj_t *s_pair, *s_pair_num; /* BLE pairing passkey (ui_pair_show) */
+static uint32_t s_pair_until_ms;
+#define PAIR_SHOW_MS 60000u /* the SM gives up after 30 s; this only guards a lost end event */
 
 lv_obj_t *ui_new_screen(void)
 {
@@ -54,6 +57,27 @@ lv_obj_t *ui_new_screen(void)
     lv_obj_set_style_bg_opa(s, LV_OPA_COVER, 0);
     lv_obj_remove_flag(s, LV_OBJ_FLAG_SCROLLABLE);
     return s;
+}
+
+/* BLE pairing (ui_pair_show): the Bluetooth glyph over six digits, on a black disc. */
+static void pair_create(lv_obj_t *top)
+{
+    s_pair = lv_obj_create(top);
+    lv_obj_remove_style_all(s_pair);
+    lv_obj_set_size(s_pair, UI_SIZE, UI_SIZE);
+    lv_obj_set_style_bg_color(s_pair, COL_BG, 0);
+    lv_obj_set_style_bg_opa(s_pair, LV_OPA_COVER, 0);
+    lv_obj_remove_flag(s_pair, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_t *glyph = lv_label_create(s_pair);
+    lv_label_set_text(glyph, ICON_BLUETOOTH);
+    lv_obj_set_style_text_font(glyph, FONT_ICON_XL, 0);
+    lv_obj_set_style_text_color(glyph, lv_color_hex(RGB_ACCENT), 0);
+    lv_obj_align(glyph, LV_ALIGN_CENTER, 0, -70);
+    s_pair_num = lv_label_create(s_pair);
+    lv_obj_set_style_text_font(s_pair_num, FONT_NUM, 0);
+    lv_obj_set_style_text_color(s_pair_num, COL_TEXT, 0);
+    lv_obj_align(s_pair_num, LV_ALIGN_CENTER, 0, 30);
+    lv_obj_add_flag(s_pair, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void create_overlays(void)
@@ -102,6 +126,35 @@ static void create_overlays(void)
     lv_obj_set_style_bg_opa(s_glow, LV_OPA_COVER, 0);
     s_glow_ring = ring_create(s_glow);
     lv_obj_add_flag(s_glow, LV_OBJ_FLAG_HIDDEN);
+
+    pair_create(top); /* over the glow too: the PC waits for these digits */
+}
+
+void ui_pair_show(uint32_t passkey)
+{
+    char digits[8];
+    snprintf(digits, sizeof digits, "%06u", (unsigned)(passkey % 1000000u));
+    lv_label_set_text(s_pair_num, digits);
+    lv_obj_align(s_pair_num, LV_ALIGN_CENTER, 0, 30);
+    lv_obj_remove_flag(s_pair, LV_OBJ_FLAG_HIDDEN);
+    s_pair_until_ms = s_now_ms + PAIR_SHOW_MS;
+    /* the passkey itself stays off the debug log */
+    dbg_event("ui", "pair", "\"shown\":true");
+}
+
+/* A lost end event: the passkey goes after PAIR_SHOW_MS. */
+static void pair_tick(uint32_t now_ms)
+{
+    if (!lv_obj_has_flag(s_pair, LV_OBJ_FLAG_HIDDEN) && (int32_t)(now_ms - s_pair_until_ms) >= 0) {
+        ui_pair_hide();
+    }
+}
+
+void ui_pair_hide(void)
+{
+    if (lv_obj_has_flag(s_pair, LV_OBJ_FLAG_HIDDEN)) { return; }
+    lv_obj_add_flag(s_pair, LV_OBJ_FLAG_HIDDEN);
+    dbg_event("ui", "pair", "\"shown\":false");
 }
 
 void ui_init(const ui_actions_t *actions)
@@ -558,6 +611,7 @@ void ui_tick(uint32_t now_ms)
         for (int i = 0; i < 2; i++) lv_obj_add_flag(s_toast_mask[i], LV_OBJ_FLAG_HIDDEN);
     }
     ui_burst_tick(now_ms);
+    pair_tick(now_ms);
     if (model_rev() != s_seen_rev) {
         s_seen_rev = model_rev();
         nav_mode_t was = s_mode;

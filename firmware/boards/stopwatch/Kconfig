@@ -73,3 +73,16 @@ menu "Agent Link StopWatch power"
             display returns to the central's own interval. A central that refuses keeps its own.
 
 endmenu
+
+menu "Agent Link StopWatch Bluetooth security"
+
+    config AGENTLINK_BLE_SECURE
+        bool "Pair with a passkey shown on the watch; talk only over an authenticated link"
+        default y
+        help
+            LE Secure Connections pairing with the passkey on the watch's screen, bonds kept in NVS.
+            A central counts as linked only once the link is encrypted with an authenticated key;
+            until then nothing is sent and writes are refused. The PC's Bluetooth settings ask for
+            the passkey once per host. PROTOCOL.md §8.
+
+endmenu
