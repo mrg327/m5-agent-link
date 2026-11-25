@@ -43,7 +43,8 @@ export function createStage(host, { bus, reducedMotion = false } = {}) {
   addEventListener('resize', fit, { passive: true });
 
   /* ---- tilt -------------------------------------------------------------- */
-  const rest = { hero: [13, -19], side: [10, -15], mini: [6, -8] };
+  // the top rim toward the viewer: keys A and B sit there (art.js)
+  const rest = { hero: [-14, -10], side: [-11, -8], mini: [-6, -4] };
   const amp = { hero: 1, side: 0.7, mini: 0.2 };
   let nx = 0,
     ny = 0,

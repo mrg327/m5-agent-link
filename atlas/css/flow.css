@@ -103,7 +103,7 @@
 .fx-watch__halo { fill: var(--lane); opacity: .13; }
 .fx-watch__puck { fill: url(#fx-puck); stroke: rgba(190,205,230,.3); stroke-width: 1.5; }
 .fx-watch__screen { fill: #000; stroke: rgba(190,205,230,.1); }
-.fx-watch__btn--a { fill: #ff9f1c; } .fx-watch__btn--b { fill: #ff5d5d; }
+.fx-watch__btn--a { fill: #f5a417; } .fx-watch__btn--b { fill: #1f6fd6; } .fx-watch__btn--pwr { fill: #e3342f; }
 .fx-watch__glyph { font: 400 20px var(--font-mono, monospace); fill: var(--muted, #7c8594); }
 
 /* beads */

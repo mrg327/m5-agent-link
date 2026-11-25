@@ -280,33 +280,32 @@ export function createDiagram(host, { facts, reducedMotion }) {
     );
     nodes.watch = g;
     el('circle', { r: r + 14, class: 'fx-watch__halo', filter: 'url(#fx-blur-lg)' }, g);
-    // buttons
-    el(
-      'rect',
-      {
-        x: -r - 5,
-        y: 6,
-        width: 10,
-        height: 24,
-        rx: 5,
-        class: 'fx-watch__btn fx-watch__btn--a',
-        transform: 'rotate(-32 ' + -r + ' 18)',
-      },
-      g,
-    );
-    el(
-      'rect',
-      {
-        x: r - 5,
-        y: 6,
-        width: 10,
-        height: 24,
-        rx: 5,
-        class: 'fx-watch__btn fx-watch__btn--b',
-        transform: 'rotate(32 ' + r + ' 18)',
-      },
-      g,
-    );
+    /**
+     * A key on the puck's rim, as on the StopWatch (art.js): A at 10:30, B at 1:30, power at 7:30.
+     * @param {number} deg clockwise from 12
+     * @param {string} cls its colour class
+     */
+    const key = (deg, cls) => {
+      const a = (deg * Math.PI) / 180;
+      const cx = r * Math.sin(a);
+      const cy = -r * Math.cos(a);
+      el(
+        'rect',
+        {
+          x: cx - 5,
+          y: cy - 12,
+          width: 10,
+          height: 24,
+          rx: 5,
+          class: 'fx-watch__btn ' + cls,
+          transform: `rotate(${deg - 180} ${cx} ${cy})`,
+        },
+        g,
+      );
+    };
+    key(-45, 'fx-watch__btn--a');
+    key(45, 'fx-watch__btn--b');
+    key(225, 'fx-watch__btn--pwr');
     el('circle', { r, class: 'fx-watch__puck' }, g);
     el('circle', { r: r - 7, class: 'fx-watch__screen' }, g);
     nodes.watchRing = el('g', { class: 'fx-watch__ring' }, g);
