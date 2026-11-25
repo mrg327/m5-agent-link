@@ -111,7 +111,7 @@ bool link_tx_hello(hal_link_kind_t to)
      * 0.21: delta firmware update (fw_begin.patch);
      * 0.22: agent graph (cmd graph, graph);
      * 0.23: agent_pi; 0.24: bench (dbg_touch, dbg_bench, dbg_frames) */
-    h->hello_major_l_minor = 24;
+    h->hello_major_l_minor = LINK_PROTO_MINOR;
     h->hello_device_info_m.device_info_device_class_m.device_class_choice = device_class(bi);
     h->hello_device_info_m.device_info_uint1tstr = zstr(bi->board);
     h->hello_device_info_m.device_info_uint2tstr = zstr(bi->fw_version);
@@ -279,7 +279,7 @@ bool link_send_bench_frames(uint32_t seq, const uint8_t *recs, size_t len, bool 
     return send_env(g_link.kind, "dbg_frames");
 }
 
-bool link_send_fw_ack(int st, uint32_t next, const char *msg)
+bool link_send_fw_ack(fw_status_t st, uint32_t next, const char *msg)
 {
     if (!g_link.welcomed) return false;
     memset(&g_tx_env, 0, sizeof g_tx_env);

@@ -82,7 +82,7 @@ static unsigned pct(void)
     return s.size ? (unsigned)((uint64_t)s.next * 100 / s.size) : 0;
 }
 
-static void ack(int st, const char *msg)
+static void ack(fw_status_t st, const char *msg)
 { link_send_fw_ack(st, s.st == OTA_IDLE ? 0 : s.next, msg); }
 
 static void free_patch(void)
@@ -108,7 +108,7 @@ static void stop(const char *why, const char *toast, const char *sign, bool tell
 {
     hal_ota_abort();
     dbg_event("ota", "ota_stopped", "\"why\":%s,\"next\":%u", dbg_q(why), (unsigned)s.next);
-    if (tell) ack(5, NULL);
+    if (tell) ack(FW_STATUS_STOPPED, NULL);
     close_transfer();
     if (toast) ui_toast_sign(toast, sign, NULL, RGB_AMBER);
 }
@@ -124,7 +124,7 @@ static const char *err_text(const char *fallback)
  * drivers' in boards/ and the simulator); the words still go to the daemon in the ack, to the log
  * and to the report. Words not listed here show the ack's status (3: the update was bad, 4: the
  * flash failed). */
-static int fail_code(int st, const char *msg)
+static int fail_code(fw_status_t st, const char *msg)
 {
     static const struct {
         const char *msg;
@@ -159,7 +159,7 @@ static int fail_code(int st, const char *msg)
 }
 
 /* The transfer failed: tell the daemon, drop the slot, show the reason. */
-static void fail_transfer(int st, const char *msg)
+static void fail_transfer(fw_status_t st, const char *msg)
 {
     char num[12];
     int code = fail_code(st, msg);
@@ -245,10 +245,10 @@ static void patch_failed(int err)
 {
     dbg_event("ota", "ota_patch_error", "\"err\":%d,\"out\":%u", err, (unsigned)s.out);
     if (s.werr != HAL_OTA_OK)
-        fail_transfer(s.werr == HAL_OTA_FAIL ? 4 : 3, s.werr == HAL_OTA_FAIL
-                                                          ? err_text("Flash error")
-                                                          : err_text("Update refused"));
-    else fail_transfer(3, s.overflow ? "Too much data" : "Bad patch");
+        fail_transfer(s.werr == HAL_OTA_FAIL ? FW_STATUS_FAIL : FW_STATUS_BAD,
+                      s.werr == HAL_OTA_FAIL ? err_text("Flash error")
+                                             : err_text("Update refused"));
+    else fail_transfer(FW_STATUS_BAD, s.overflow ? "Too much data" : "Bad patch");
 }
 
 static bool same_patch(const ota_patch_t *p)
@@ -265,12 +265,12 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
             stop("daemon", NULL, NULL, true);
         } else {
             if (s.st == OTA_IDLE) hal_ota_abort();
-            ack(5, NULL);
+            ack(FW_STATUS_STOPPED, NULL);
         }
         return;
     }
     if (sha_len != 32 || (patch && (patch->base_len != 32 || patch->psize == 0))) {
-        ack(3, "Bad update request");
+        ack(FW_STATUS_BAD, "Bad update request");
         return;
     }
     if (s.st == OTA_RECV && size == s.size && !memcmp(sha, s.sha, 32) && same_patch(patch)) {
@@ -280,7 +280,7 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
         dbg_event("ota", "ota_resume", "\"next\":%u,\"size\":%u", (unsigned)s.next,
                   (unsigned)s.size);
         ui_ota_progress(pct(), false);
-        ack(0, NULL);
+        ack(FW_STATUS_GO, NULL);
         return;
     }
     const char *busy = NULL;
@@ -296,7 +296,7 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
     }
     if (busy) {
         dbg_event("ota", "ota_busy", "\"msg\":%s", dbg_q(busy));
-        ack(2, busy);
+        ack(FW_STATUS_BUSY, busy);
         return;
     }
     uint32_t hash_ms = 0;
@@ -307,7 +307,7 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
         if (!ok) {
             dbg_event("ota", "ota_base_mismatch", "\"bsize\":%u,\"have\":%u,\"ms\":%u",
                       (unsigned)patch->bsize, (unsigned)hal_ota_base_size(), (unsigned)hash_ms);
-            ack(3, "Base mismatch");
+            ack(FW_STATUS_BAD, "Base mismatch");
             return;
         }
     }
@@ -319,7 +319,7 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
         if (!s_patch) {
             dbg_event("ota", "ota_bad", "\"st\":3,\"msg\":\"Patch too big\",\"psize\":%u",
                       (unsigned)patch->psize);
-            ack(3, "Patch too big");
+            ack(FW_STATUS_BAD, "Patch too big");
             return;
         }
     }
@@ -330,9 +330,9 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
                                                    : err_text("Flash error");
         hal_ota_abort();
         free_patch();
-        dbg_event("ota", "ota_bad", "\"st\":%d,\"msg\":%s,\"next\":0", r == HAL_OTA_FAIL ? 4 : 3,
-                  dbg_q(msg));
-        ack(r == HAL_OTA_FAIL ? 4 : 3, msg);
+        dbg_event("ota", "ota_bad", "\"st\":%d,\"msg\":%s,\"next\":0",
+                  r == HAL_OTA_FAIL ? FW_STATUS_FAIL : FW_STATUS_BAD, dbg_q(msg));
+        ack(r == HAL_OTA_FAIL ? FW_STATUS_FAIL : FW_STATUS_BAD, msg);
         return;
     }
     memset(&s, 0, sizeof s);
@@ -361,7 +361,7 @@ void ota_on_begin(uint32_t size, const uint8_t *sha, size_t sha_len, const char 
         dbg_event("ota", "ota_begin", "\"size\":%u,\"ver\":%s,\"patch\":%u,\"hash_ms\":%u",
                   (unsigned)size, dbg_q(s.ver), (unsigned)s.psize, (unsigned)hash_ms);
     else dbg_event("ota", "ota_begin", "\"size\":%u,\"ver\":%s", (unsigned)size, dbg_q(s.ver));
-    ack(0, NULL);
+    ack(FW_STATUS_GO, NULL);
 }
 
 static void finish(uint32_t now_ms)
@@ -369,12 +369,12 @@ static void finish(uint32_t now_ms)
     uint8_t got[32];
     sha256_final(&s.ctx, got);
     if (memcmp(got, s.sha, 32)) {
-        fail_transfer(3, "Checksum mismatch");
+        fail_transfer(FW_STATUS_BAD, "Checksum mismatch");
         return;
     }
     hal_ota_result_t r = hal_ota_finish();
     if (r != HAL_OTA_OK) {
-        fail_transfer(r == HAL_OTA_FAIL ? 4 : 3,
+        fail_transfer(r == HAL_OTA_FAIL ? FW_STATUS_FAIL : FW_STATUS_BAD,
                       r == HAL_OTA_FAIL ? err_text("Flash error") : err_text("Update refused"));
         return;
     }
@@ -386,7 +386,7 @@ static void finish(uint32_t now_ms)
     else
         dbg_event("ota", "ota_done", "\"size\":%u,\"ver\":%s,\"ms\":%u", (unsigned)s.size,
                   dbg_q(s.ver), (unsigned)(now_ms - s.begin_ms));
-    ack(1, NULL);
+    ack(FW_STATUS_DONE, NULL);
     s.st = OTA_RESTART;
     s.restart_at = now_ms + OTA_RESTART_DELAY_MS;
     ui_ota_restarting();
@@ -395,33 +395,33 @@ static void finish(uint32_t now_ms)
 void ota_on_chunk(uint32_t off, const uint8_t *data, size_t len, uint32_t now_ms)
 {
     if (s.st != OTA_RECV) {
-        if (s.st == OTA_IDLE) ack(5, NULL);
+        if (s.st == OTA_IDLE) ack(FW_STATUS_STOPPED, NULL);
         return;
     }
     s.last_ms = now_ms;
     if (off != s.next) { /* a duplicate or a gap: not written; the daemon resends from `next` */
         dbg_event("ota", "ota_gap", "\"off\":%u,\"next\":%u", (unsigned)off, (unsigned)s.next);
-        ack(0, NULL);
+        ack(FW_STATUS_GO, NULL);
         return;
     }
     if (len == 0) {
-        ack(0, NULL);
+        ack(FW_STATUS_GO, NULL);
         return;
     }
     if (len > total() - s.next) {
-        fail_transfer(3, "Too much data");
+        fail_transfer(FW_STATUS_BAD, "Too much data");
         return;
     }
     if (s.psize) { /* kept; ota_tick decodes it */
         memcpy(s_patch + s.next, data, len);
         s.next += (uint32_t)len;
         s.keep_ms = now_ms;
-        ack(0, NULL);
+        ack(FW_STATUS_GO, NULL);
         return;
     }
     hal_ota_result_t r = hal_ota_write(data, len);
     if (r != HAL_OTA_OK) {
-        fail_transfer(r == HAL_OTA_FAIL ? 4 : 3,
+        fail_transfer(r == HAL_OTA_FAIL ? FW_STATUS_FAIL : FW_STATUS_BAD,
                       r == HAL_OTA_FAIL ? err_text("Flash error") : err_text("Update refused"));
         return;
     }
@@ -432,7 +432,7 @@ void ota_on_chunk(uint32_t off, const uint8_t *data, size_t len, uint32_t now_ms
         return;
     }
     ui_ota_progress(pct(), s.waiting);
-    ack(0, NULL);
+    ack(FW_STATUS_GO, NULL);
 }
 
 static void note_step(uint32_t t0)
@@ -452,7 +452,7 @@ static void finish_patch(uint32_t t0, uint32_t now_ms)
     }
     if ((uint32_t)res != s.size || s.out != s.size) {
         dbg_event("ota", "ota_patch_error", "\"err\":0,\"out\":%u", (unsigned)s.out);
-        fail_transfer(3, "Bad patch");
+        fail_transfer(FW_STATUS_BAD, "Bad patch");
         return;
     }
     note_step(t0);
@@ -484,7 +484,7 @@ static void apply_step(uint32_t now_ms)
     if (s.next == s.psize && now_ms - s.keep_ms >= OTA_KEEPALIVE_MS) {
         s.keep_ms = now_ms;
         dbg_event("ota", "ota_keepalive", "\"out\":%u", (unsigned)s.out);
-        ack(0, NULL);
+        ack(FW_STATUS_GO, NULL);
     }
     ui_ota_progress(pct(), s.waiting);
 }

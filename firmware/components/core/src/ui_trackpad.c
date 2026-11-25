@@ -147,8 +147,9 @@ void ui_trackpad_failed(int err, const char *msg)
 {
     s_failed = true;
     /* the daemon's own words: to the report */
-    if (err == 1 && msg && msg[0]) set_pad(PAD_REFUSED, msg);
-    else if (err == 2) set_pad(PAD_NO_POINTER, "This PC has no pointer agentlinkd can drive");
+    if (err == RESULT_ERR_DENIED && msg && msg[0]) set_pad(PAD_REFUSED, msg);
+    else if (err == RESULT_ERR_UNSUPPORTED)
+        set_pad(PAD_NO_POINTER, "This PC has no pointer agentlinkd can drive");
     else set_pad(PAD_REFUSED, "The PC refused");
 }
 

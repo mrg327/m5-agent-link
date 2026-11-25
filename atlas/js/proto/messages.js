@@ -341,7 +341,7 @@ const SPECS = {
     w: [0, 'uint'],
     h: [1, 'uint'],
     offset: [2, 'uint'],
-    data: [3, 'bstr'],
+    data: [3, 'hex'],
     last: [4, 'bool'],
   },
   dbg_inject_input: { kind: [0, 'enum:input_event'], x: [1, 'int'], y: [2, 'int'] },
@@ -445,6 +445,8 @@ export function decodeMsg(bytes) {
 }
 
 // ───────────── builders ─────────────
+// The Atlas speaks the base protocol on purpose: with minor 1 the watch hides what the mock daemon
+// cannot serve (graph, power reports, last message). Not the current version (agentlink.cddl).
 const PROTO = [0, 1];
 export const hello = (id, o = {}) => ({
   t: 'hello',

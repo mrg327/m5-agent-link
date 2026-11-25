@@ -34,6 +34,21 @@ typedef enum {
     LINK_OP_GRAPH = 21 /* proto 0.22: ask for a session's agent graph (GRAPH.md) */
 } link_op_t;
 #define LINK_OP_UNKNOWN (-1)
+/* cmd_op_quiet (9) is reserved in the CDDL with no sender: quiet mode is the watch's own setting.
+ */
+
+/* The proto minor this firmware speaks in hello; its history is the comment in link_tx.c. */
+#define LINK_PROTO_MINOR 24
+
+/* fw_status: the state a fw_ack reports (proto 0.15, agentlink.cddl). */
+typedef enum {
+    FW_STATUS_GO = 0,
+    FW_STATUS_DONE = 1,
+    FW_STATUS_BUSY = 2,
+    FW_STATUS_BAD = 3,
+    FW_STATUS_FAIL = 4,
+    FW_STATUS_STOPPED = 5
+} fw_status_t;
 
 /* Notifications from the link to the app; all run inside link_on_frame()/link_tick(). */
 typedef struct {
@@ -112,9 +127,8 @@ bool link_send_pointer(int dx, int dy, int btn, int n, int wheel);
 /* cmd_op_graph (proto 0.22, GRAPH.md §3): ask for session sid's agent graph. Returns false unless
  * welcomed by a daemon with proto >= 0.22. */
 bool link_send_graph(uint32_t sid);
-/* Firmware update (proto 0.15): fw_ack {st, next, msg}; st is the wire value (0 go, 1 done, 2 busy,
- * 3 bad, 4 fail, 5 stopped). */
-bool link_send_fw_ack(int st, uint32_t next, const char *msg);
+/* Firmware update (proto 0.15): fw_ack {st, next, msg}. */
+bool link_send_fw_ack(fw_status_t st, uint32_t next, const char *msg);
 /* Power report (proto 0.19, POWER.md): voltages in mV, times in ms, itvl in us; field names as in
  * the CDDL. */
 typedef struct {

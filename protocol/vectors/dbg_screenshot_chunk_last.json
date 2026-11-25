@@ -1,0 +1,16 @@
+{
+  "desc": "Debug: the last chunk of a 466 x 466 RGB565 screenshot (two pixels at its end)",
+  "symbolic": {
+    "t": "dbg_screenshot_chunk",
+    "id": 17,
+    "re": 16,
+    "b": {
+      "w": 466,
+      "h": 466,
+      "offset": 434308,
+      "data": "1f00e007",
+      "last": true
+    }
+  },
+  "cbor_hex": "a40018430111021003a5001901d2011901d2021a0006a08403441f00e00704f5"
+}

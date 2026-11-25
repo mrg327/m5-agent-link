@@ -545,7 +545,7 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
         }
     }
     if (op == LINK_OP_SCROLL && sid) {
-        if (err == 2) {
+        if (err == RESULT_ERR_UNSUPPORTED) {
             /* unsupported: this terminal has no scroll API; the item disappears for the session */
             session_t d = {.sid = sid, .no_scroll = true};
             model_upsert(&d, SF_NO_SCROLL);
@@ -555,22 +555,22 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
     if (op == LINK_OP_POINTER) {
         /* TRACKPAD says why (e.g. the Accessibility permission); one toast */
         ui_pointer_failed(err, msg);
-        ui_toast(err == 1   ? "Not allowed on the PC"
-                 : err == 2 ? "Not supported"
-                            : "Failed",
+        ui_toast(err == RESULT_ERR_DENIED        ? "Not allowed on the PC"
+                 : err == RESULT_ERR_UNSUPPORTED ? "Not supported"
+                                                 : "Failed",
                  RGB_AMBER);
         feedback_reject();
         return;
     }
     static const char *const errs[] = {"Out of date", "Denied",    "Not supported",
                                        "No window",   "Timed out", "Failed"};
-    const char *text = err >= 0 && err < 6 ? errs[err] : msg[0] ? msg : "Failed";
+    const char *text = err >= 0 && err <= RESULT_ERR_INTERNAL ? errs[err] : msg[0] ? msg : "Failed";
     /* typing refusals say what to do ("Answer the agent first") */
     if ((op == LINK_OP_TYPE || op == LINK_OP_CANCEL || op == LINK_OP_RERUN ||
          (op >= LINK_OP_KB_PICK && op <= LINK_OP_KB_END)) &&
-        err == 1 && msg[0])
+        err == RESULT_ERR_DENIED && msg[0])
         text = msg;
-    ui_toast(text, err == 3 ? RGB_AMBER : RGB_DANGER);
+    ui_toast(text, err == RESULT_ERR_NO_WINDOW ? RGB_AMBER : RGB_DANGER);
     feedback_reject();
 }
 

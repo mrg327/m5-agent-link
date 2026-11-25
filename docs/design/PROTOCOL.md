@@ -18,7 +18,7 @@ summary: 'The wire protocol: envelope, messages, versions, AEAD'
 └ transport                              ┘  BLE GATT · USB CDC (COBS + CRC16) · WebSocket (binary frame)
 ```
 
-- **Encoding:** CBOR (RFC 8949). **[D]** The map keys are **small integers** to save bytes (~25%). The names in this document are the *symbolic* names. The integer assignment is normative in `protocol/agentlink.cddl` (e.g. `t=0, id=1, re=2, b=3`), and the daemon's `agentlink-cli decode` prints symbolic names for debugging.
+- **Encoding:** CBOR (RFC 8949). **[D]** The map keys are **small integers** to save bytes (~25%). The names in this document are the *symbolic* names. The integer assignment is normative in `protocol/agentlink.cddl` (e.g. `t=0, id=1, re=2, b=3`), and `agentlink decode` prints symbolic names for debugging.
   - Device side: `tinycbor` / `zcbor`.
   - Daemon side: `ciborium` / `minicbor`.
   - The schema is normative in CDDL (`protocol/agentlink.cddl`), with test vectors in `protocol/vectors/`.
@@ -57,7 +57,7 @@ Every message is a CBOR map:
 | `re` | uint? | the message `id` this message replies to |
 | `b` | map | body |
 
-Unknown `t` → ignore. Unknown keys in `b` → ignore. A breaking change means a bump of `proto` major.
+The daemon ignores an unknown `t` and unknown keys in `b`. The device does not: its zcbor decoder drops a message with a type, key or enum value it does not know. So the sender never sends what the peer's `proto` minor does not know, and every new key, value or type comes with a gate on that minor ([protocol.md](../conventions/protocol.md) §6, PROTO-20). A breaking change means a bump of `proto` major.
 
 ### 2a. Text
 
@@ -98,7 +98,7 @@ device                                 daemon
 
 ```cddl
 hello = {
-  proto: [uint, uint],             ; [major, minor] = [0, 20]
+  proto: [uint, uint],             ; [major, minor] = [0, 24]
   dev: { class: tstr,              ; "watch" | "desk" | "pad" | "sim" | ...
          board: tstr,              ; "m5stopwatch"
          fw: tstr,                 ; semver
@@ -263,7 +263,7 @@ cmd = {
   op: "focus"/"ack"/"snooze"/"approve"/"deny"/"reply"/"cancel"/"detail"/"notify_done"/"quiet"/"scroll"/"type"/"dictate"/"kb_pick"/"kb_del"/"kb_send"/"kb_end"/"rerun"/"unqueue"/"answer"/"pointer"/"graph",
   ? sid: uint,
   ? rid: uint,               ; required for approve/deny/reply
-  ? arg: uint / tstr / scroll_arg,  ; snooze minutes (the watch sends 30), reply option index, quiet duration,
+  ? arg: uint / tstr / scroll_arg,  ; snooze minutes (the watch sends 30), reply option index,
                              ; or the scroll argument (the CDDL names the union cmd_arg)
   hold_ms?: uint,            ; for approve: measured hold-to-confirm duration (daemon enforces ≥ 1000)
   ? rh: uint,                ; with approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of

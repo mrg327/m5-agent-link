@@ -1,0 +1,10 @@
+{
+  "desc": "Answer to ping 9",
+  "symbolic": {
+    "t": "pong",
+    "id": 4,
+    "re": 9,
+    "b": {}
+  },
+  "cbor_hex": "a4000e0104020903a0"
+}

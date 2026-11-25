@@ -1734,7 +1734,7 @@
           "name": "batt_pct"
         }
       ],
-      "source": "protocol/agentlink.cddl:65"
+      "source": "protocol/agentlink.cddl:68"
     },
     {
       "name": "welcome",
@@ -1792,7 +1792,7 @@
           "name": "pointer"
         }
       ],
-      "source": "protocol/agentlink.cddl:66"
+      "source": "protocol/agentlink.cddl:69"
     },
     {
       "name": "snapshot",
@@ -1815,7 +1815,7 @@
           "name": "away"
         }
       ],
-      "source": "protocol/agentlink.cddl:67"
+      "source": "protocol/agentlink.cddl:70"
     },
     {
       "name": "session_upd",
@@ -2076,7 +2076,7 @@
           "name": "lp"
         }
       ],
-      "source": "protocol/agentlink.cddl:68"
+      "source": "protocol/agentlink.cddl:71"
     },
     {
       "name": "gone",
@@ -2084,7 +2084,7 @@
       "dir": "pc→dev",
       "summary": "A session ended and left the list",
       "fields": [],
-      "source": "protocol/agentlink.cddl:69"
+      "source": "protocol/agentlink.cddl:72"
     },
     {
       "name": "attention",
@@ -2212,7 +2212,7 @@
           "name": "qs"
         }
       ],
-      "source": "protocol/agentlink.cddl:70"
+      "source": "protocol/agentlink.cddl:73"
     },
     {
       "name": "clear",
@@ -2235,7 +2235,7 @@
           "name": "why"
         }
       ],
-      "source": "protocol/agentlink.cddl:71"
+      "source": "protocol/agentlink.cddl:74"
     },
     {
       "name": "cmd",
@@ -2268,7 +2268,7 @@
           "key": 3,
           "optional": true,
           "type": "cmd_arg",
-          "note": "arg   snooze minutes, reply option index, quiet secs",
+          "note": "arg   snooze minutes, reply option index",
           "name": "arg"
         },
         {
@@ -2314,7 +2314,7 @@
           "name": "ptr"
         }
       ],
-      "source": "protocol/agentlink.cddl:72"
+      "source": "protocol/agentlink.cddl:75"
     },
     {
       "name": "result",
@@ -2351,7 +2351,7 @@
           "name": "pos"
         }
       ],
-      "source": "protocol/agentlink.cddl:73"
+      "source": "protocol/agentlink.cddl:76"
     },
     {
       "name": "detail",
@@ -2402,7 +2402,7 @@
           "name": "lm"
         }
       ],
-      "source": "protocol/agentlink.cddl:74"
+      "source": "protocol/agentlink.cddl:77"
     },
     {
       "name": "cfg",
@@ -2446,7 +2446,7 @@
           "name": "badge_handle"
         }
       ],
-      "source": "protocol/agentlink.cddl:75"
+      "source": "protocol/agentlink.cddl:78"
     },
     {
       "name": "batt",
@@ -2469,7 +2469,7 @@
           "name": "chg"
         }
       ],
-      "source": "protocol/agentlink.cddl:76"
+      "source": "protocol/agentlink.cddl:79"
     },
     {
       "name": "ping",
@@ -2477,7 +2477,7 @@
       "dir": "both",
       "summary": "Link-liveness probe",
       "fields": [],
-      "source": "protocol/agentlink.cddl:77"
+      "source": "protocol/agentlink.cddl:80"
     },
     {
       "name": "pong",
@@ -2485,7 +2485,7 @@
       "dir": "both",
       "summary": "Answer to a ping",
       "fields": [],
-      "source": "protocol/agentlink.cddl:78"
+      "source": "protocol/agentlink.cddl:81"
     },
     {
       "name": "log",
@@ -2508,7 +2508,7 @@
           "name": "msg"
         }
       ],
-      "source": "protocol/agentlink.cddl:79"
+      "source": "protocol/agentlink.cddl:82"
     },
     {
       "name": "audio_start",
@@ -2538,7 +2538,7 @@
           "name": "sid"
         }
       ],
-      "source": "protocol/agentlink.cddl:80"
+      "source": "protocol/agentlink.cddl:83"
     },
     {
       "name": "audio",
@@ -2568,7 +2568,7 @@
           "name": "data"
         }
       ],
-      "source": "protocol/agentlink.cddl:81"
+      "source": "protocol/agentlink.cddl:84"
     },
     {
       "name": "audio_end",
@@ -2605,7 +2605,7 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:82"
+      "source": "protocol/agentlink.cddl:85"
     },
     {
       "name": "transcript",
@@ -2635,7 +2635,7 @@
           "name": "autosend_ms"
         }
       ],
-      "source": "protocol/agentlink.cddl:83"
+      "source": "protocol/agentlink.cddl:86"
     },
     {
       "name": "kb_start",
@@ -2665,7 +2665,7 @@
           "name": "keys"
         }
       ],
-      "source": "protocol/agentlink.cddl:84"
+      "source": "protocol/agentlink.cddl:87"
     },
     {
       "name": "kb_stroke",
@@ -2695,7 +2695,7 @@
           "name": "pts"
         }
       ],
-      "source": "protocol/agentlink.cddl:85"
+      "source": "protocol/agentlink.cddl:88"
     },
     {
       "name": "kb_cands",
@@ -2739,7 +2739,7 @@
           "name": "err"
         }
       ],
-      "source": "protocol/agentlink.cddl:86"
+      "source": "protocol/agentlink.cddl:89"
     },
     {
       "name": "usage",
@@ -2797,7 +2797,7 @@
           "name": "wko"
         }
       ],
-      "source": "protocol/agentlink.cddl:87"
+      "source": "protocol/agentlink.cddl:90"
     },
     {
       "name": "fw_begin",
@@ -2834,7 +2834,7 @@
           "name": "patch"
         }
       ],
-      "source": "protocol/agentlink.cddl:88"
+      "source": "protocol/agentlink.cddl:91"
     },
     {
       "name": "fw_chunk",
@@ -2857,7 +2857,7 @@
           "name": "data"
         }
       ],
-      "source": "protocol/agentlink.cddl:89"
+      "source": "protocol/agentlink.cddl:92"
     },
     {
       "name": "fw_ack",
@@ -2887,7 +2887,7 @@
           "name": "msg"
         }
       ],
-      "source": "protocol/agentlink.cddl:90"
+      "source": "protocol/agentlink.cddl:93"
     },
     {
       "name": "power",
@@ -3001,7 +3001,7 @@
           "name": "nd"
         }
       ],
-      "source": "protocol/agentlink.cddl:91"
+      "source": "protocol/agentlink.cddl:94"
     },
     {
       "name": "graph",
@@ -3045,7 +3045,7 @@
           "name": "gen"
         }
       ],
-      "source": "protocol/agentlink.cddl:92"
+      "source": "protocol/agentlink.cddl:95"
     },
     {
       "name": "dbg_ui_state_req",
@@ -3053,7 +3053,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask which screen is showing",
       "fields": [],
-      "source": "protocol/agentlink.cddl:93"
+      "source": "protocol/agentlink.cddl:96"
     },
     {
       "name": "dbg_ui_state",
@@ -3104,7 +3104,7 @@
           "name": "fps"
         }
       ],
-      "source": "protocol/agentlink.cddl:94"
+      "source": "protocol/agentlink.cddl:97"
     },
     {
       "name": "dbg_screenshot_req",
@@ -3112,7 +3112,7 @@
       "dir": "pc→dev",
       "summary": "Debug: ask for a screenshot",
       "fields": [],
-      "source": "protocol/agentlink.cddl:95"
+      "source": "protocol/agentlink.cddl:98"
     },
     {
       "name": "dbg_screenshot_chunk",
@@ -3156,7 +3156,7 @@
           "name": "last"
         }
       ],
-      "source": "protocol/agentlink.cddl:96"
+      "source": "protocol/agentlink.cddl:99"
     },
     {
       "name": "dbg_inject_input",
@@ -3186,7 +3186,7 @@
           "name": "y"
         }
       ],
-      "source": "protocol/agentlink.cddl:97"
+      "source": "protocol/agentlink.cddl:100"
     },
     {
       "name": "dbg_set_log_level",
@@ -3198,11 +3198,11 @@
           "key": 0,
           "optional": false,
           "type": "log_level",
-          "note": "",
-          "name": ""
+          "note": "lvl",
+          "name": "lvl"
         }
       ],
-      "source": "protocol/agentlink.cddl:98"
+      "source": "protocol/agentlink.cddl:101"
     }
   ],
   "sounds": {

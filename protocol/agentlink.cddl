@@ -1,6 +1,9 @@
-; agentlink protocol v0.1 — single source of truth.
+; agentlink protocol 0.24 — single source of truth. The version is [major, minor] in hello and welcome;
+; its history is the comment above hello_major_l_minor in firmware/components/core/src/link_tx.c.
 ; See docs/design/PROTOCOL.md for semantics. Integer keys; symbolic names in comments.
-; Rule: decoders MUST ignore unknown map keys and unknown message types.
+; Compatibility rests on the sender (docs/conventions/protocol.md §6): the device's decoder drops a message
+; with a key, enum value or type it does not know, so a sender never sends what the peer's minor does not
+; know. Other decoders (the daemon's, Atlas) skip unknown keys and types.
 ; Keys are scoped per map (key 0 in `session` is unrelated to key 0 in `hello`).
 ; Text limits are UTF-8 bytes (the daemon's table: agentlink-proto `limits`). A sender cuts a longer
 ; string on a character boundary and ends it in "…"; U+FFFD stands for a run of text the device
@@ -61,7 +64,7 @@ msg_dbg_touch            = { 0 => mt_dbg_touch, hdr, 3 => dbg_touch }
 msg_dbg_bench            = { 0 => mt_dbg_bench, hdr, 3 => dbg_bench }
 msg_dbg_frames           = { 0 => mt_dbg_frames, hdr, 3 => dbg_frames }
 
-; types 64+ are debug / observability (DESIGN §0)
+; types 64+ are debug / observability (docs/conventions/protocol.md PROTO-13)
 mt_hello = 1
 mt_welcome = 2
 mt_snapshot = 3
@@ -104,7 +107,7 @@ empty = {}
 
 ; ───────────────────────── handshake ─────────────────────────
 hello = {
-  0 => [major: uint, minor: uint],   ; proto  (currently [0, 1])
+  0 => [major: uint, minor: uint],   ; proto  [0, 24] today; the daemon gates on the peer's minor
   1 => device_info,                  ; dev
   2 => caps,                         ; caps
   ? 3 => uint                       ; batt_pct
@@ -370,7 +373,7 @@ cmd = {
   0 => cmd_op,     ; op
   ? 1 => uint,     ; sid
   ? 2 => uint,     ; rid   (dictate: the card the transcript answers, proto 0.8)
-  ? 3 => cmd_arg,  ; arg   snooze minutes, reply option index, quiet secs
+  ? 3 => cmd_arg,  ; arg   snooze minutes, reply option index
   ? 4 => uint,    ; hold_ms  measured hold-to-confirm (approve)
   ? 5 => uint,    ; rh  with cmd_op_approve (proto 0.13): also save the request's standing rule. FNV-1a 32 of
                   ;     the rule's bytes, 0x00, the scope's value and the wide flag (0/1), as the device showed
@@ -402,7 +405,7 @@ cmd_op_cancel = 6   ; interrupt the session's running turn (the daemon sends Esc
 cmd_op_detail = 7   ; send request `rid`'s full text from byte `arg` (0 = from the start) as detail chunks (proto 0.11);
                     ; with no rid (proto 0.18): session `sid`'s last message, its chunks carry `lm`
 cmd_op_notify_done = 8
-cmd_op_quiet = 9
+cmd_op_quiet = 9    ; reserved: no sender. The watch's quiet mode is its own setting; the daemon ignores this op
 cmd_op_scroll = 10
 cmd_op_type = 11    ; type quick reply `arg` (an index into welcome.replies) + Enter into the session's terminal
 cmd_op_dictate = 12 ; type the transcript of recording `arg` (an aid) + Enter into the session's terminal
@@ -634,7 +637,7 @@ dbg_inject_input = {
   ? 2 => int   ; y
 }
 dbg_set_log_level = {
-  0 => log_level
+  0 => log_level   ; lvl
 }
 ; BENCH.md §2 (proto 0.24). The finger presses at the first point, moves to the next every dt ms and lifts dt ms
 ; after the last; the points are int16 little-endian x, y pairs in the coordinates the user sees.

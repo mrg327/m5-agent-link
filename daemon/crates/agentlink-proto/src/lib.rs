@@ -1,4 +1,4 @@
-//! agentlink wire protocol v0.1.
+//! agentlink wire protocol (the version this daemon speaks is [`PROTO`]).
 //!
 //! The schema is normative in `protocol/agentlink.cddl`; these types mirror it
 //! field-for-field (integer CBOR keys via `#[n(k)]`). Every type also implements
