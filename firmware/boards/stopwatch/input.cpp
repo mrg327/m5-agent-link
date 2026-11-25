@@ -37,12 +37,28 @@ static void IRAM_ATTR btn_isr(void *arg)
     portYIELD_FROM_ISR(woken);
 }
 
+/* With light sleep at rest, an edge that comes while the chip sleeps may raise no interrupt: the
+ * task also wakes every BTN_POLL_MS and compares the levels (issue 20261123-d569). */
+#ifdef CONFIG_AGENTLINK_LIGHT_SLEEP
+#define BTN_POLL_MS 50
+#endif
+
 static void btn_task(void *arg)
 {
     (void)arg;
     bool reported_down[2] = {false, false};
     for (;;) {
+#ifdef BTN_POLL_MS
+        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(BTN_POLL_MS)) == 0) {
+            bool changed = false;
+            for (int i = 0; i < 2; i++) {
+                changed = changed || (gpio_get_level(kBtnPin[i]) == 0) != reported_down[i];
+            }
+            if (!changed) { continue; }
+        }
+#else
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+#endif
         /* Let contact bounce settle, then report only real state changes. */
         vTaskDelay(pdMS_TO_TICKS(BTN_DEBOUNCE_MS));
         ulTaskNotifyTake(pdTRUE, 0);

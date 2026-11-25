@@ -97,6 +97,11 @@ bool sw_touch_init(void)
     return true;
 }
 
+/* At rest (STANDBY) light sleep may swallow INT edges, so every poll reads (issue 20261123-d569).
+ */
+static bool s_rest;
+void sw_touch_rest(bool rest) { s_rest = rest; }
+
 bool sw_touch_read(uint16_t *x, uint16_t *y)
 {
     uint8_t b[7];
@@ -105,7 +110,9 @@ bool sw_touch_read(uint16_t *x, uint16_t *y)
     uint32_t edges = s_int_edges;
     bool edge = edges != s_int_seen;
     int64_t now = esp_timer_get_time();
-    if (s_gate && !s_down && !edge && now - s_last_rd_us < TOUCH_FORCE_US) { return false; }
+    if (s_gate && !s_rest && !s_down && !edge && now - s_last_rd_us < TOUCH_FORCE_US) {
+        return false;
+    }
     s_int_seen = edges;
     s_last_rd_us = now;
 #endif
@@ -121,7 +128,7 @@ bool sw_touch_read(uint16_t *x, uint16_t *y)
     }
 #ifdef CONFIG_AGENTLINK_TOUCH_INT
     /* A forced read that finds a new finger with no INT edge: the line is not doing its job. */
-    if (s_gate && down && !s_down && !edge && ++s_strikes >= TOUCH_INT_STRIKES) {
+    if (s_gate && !s_rest && down && !s_down && !edge && ++s_strikes >= TOUCH_INT_STRIKES) {
         s_gate = false;
         ESP_LOGW(TAG, "touch without INT edge: INT-gated polling off");
     }

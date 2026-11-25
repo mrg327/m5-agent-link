@@ -1,0 +1,13 @@
+# BLE pairing (PROTOCOL.md §8): the board reports a passkey, the watch shows it over everything and
+# wakes a dark display; done or fail hides it. Run with --idle-off 1 so the display starts dark. The
+# digits stay out of the UI report and the log (the debug channel must not carry them), so the test
+# reads the pair events.
+wait 1500
+pair 042917
+wait 200
+pair done
+wait 200
+pair 551200
+wait 200
+pair fail
+wait 200

@@ -209,6 +209,13 @@ void hal_link_bulk(hal_link_kind_t port, bool on);
 /* The shortest BLE connection interval in force, in microseconds; 0 when no central is connected
  * (or no BLE). */
 uint32_t hal_link_ble_interval_us(void);
+#define HAL_PAIR_DONE (-1)
+#define HAL_PAIR_FAILED (-2)
+typedef void (*hal_pair_cb_t)(int32_t passkey_or_end);
+/* BLE pairing (PROTOCOL.md §8): a central pairs with LE Secure Connections and the user types the
+ * passkey the watch shows. The callback gets the passkey (0..999999) to show, then HAL_PAIR_DONE or
+ * HAL_PAIR_FAILED. It may run on any task: the core takes it over in core_step(). */
+void hal_link_set_pair_callback(hal_pair_cb_t cb);
 
 /* ───────────── firmware update (OTA, FIRMWARE.md §9, proto 0.15) ───────────── */
 

@@ -22,7 +22,9 @@ hal_wake_t hal_wake_reason(void) { return (hal_wake_t)0; }
 static uint32_t g_retained;
 uint32_t hal_retained_get(void) { return g_retained; }
 void hal_retained_set(uint32_t v) { g_retained = v; }
-hal_battery_t hal_battery_read(void) { return (hal_battery_t){.percent = 80, .usb_present = true}; }
+static bool g_usb; /* on battery unless a check says otherwise */
+hal_battery_t hal_battery_read(void)
+{ return (hal_battery_t){.percent = 80, .usb_present = g_usb}; }
 bool link_connected(void) { return true; }
 bool motion_face_down(void) { return g_face_down; }
 void preport_save(uint32_t now_ms) { (void)now_ms; }
@@ -40,6 +42,27 @@ static int g_fail;
             g_fail = 1;                                                  \
         }                                                                \
     } while (0)
+
+/* Desk mode: on USB the default 60 s timeout becomes 10 minutes; an explicit setting stays. */
+static void desk_mode(void)
+{
+    g_usb = true;
+    power_activity(400000);
+    power_activity(400001);
+    power_tick(400001 + 60000);
+    CHECK(power_display_on());
+    power_tick(400001 + 599999);
+    CHECK(power_display_on());
+    power_tick(400001 + 600000);
+    CHECK(!power_display_on());
+    /* an explicit setting stays as set, on USB too */
+    power_set_idle_timeout_ms(1000);
+    power_activity(1500000);
+    power_activity(1500001);
+    power_tick(1500001 + 1000);
+    CHECK(!power_display_on());
+    g_usb = false;
+}
 
 int main(void)
 {
@@ -93,5 +116,7 @@ int main(void)
     CHECK(!power_display_on());
 
     if (!g_fail) printf("power timers: ok\n");
+    desk_mode();
+
     return g_fail;
 }

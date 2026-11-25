@@ -12,6 +12,10 @@
  * the AMOLED and the battery both suffer from a panel left lit (the ring dims to ambient at 30 s).
  * The simulator overrides it (`--idle-off`, default never) so scripts see a stable screen. */
 #define IDLE_OFF_DEFAULT_MS (60u * 1000u)
+/* On USB power (a desk, docked on the magnetic back) the display stays on longer, as a glance; it
+ * still goes off so the AMOLED does not burn in (decision 2026-11-25). It replaces the default
+ * only: an explicit setting (the simulator's --idle-off) stays as set. */
+#define USB_IDLE_OFF_MS (10u * 60u * 1000u)
 /* Face down and still, the display has no reader: it goes off after this long without input. */
 #define FACE_DOWN_OFF_MS 3000u
 /* Display-off time after which an unattended, battery-powered, unlinked device goes DEEP. */
@@ -160,7 +164,9 @@ void power_tick(uint32_t now_ms)
         s_off_since = now_ms;
         return;
     }
-    if (s_on && !s_glowing && s_idle_ms && passed(now_ms, s_last_activity, s_idle_ms)) {
+    uint32_t idle_ms = s_idle_ms;
+    if (idle_ms == IDLE_OFF_DEFAULT_MS && hal_battery_read().usb_present) idle_ms = USB_IDLE_OFF_MS;
+    if (s_on && !s_glowing && idle_ms && passed(now_ms, s_last_activity, idle_ms)) {
         set_display(false);
         s_off_since = now_ms; /* DEEP counts from display-off, not from the last input */
     }

@@ -123,6 +123,10 @@ void ui_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_
                    uint32_t total, const char *preview);
 /* Brief dim ring for alerts while the display is otherwise idle; text-free by design. */
 void ui_glow(uint32_t rgb);
+/* BLE pairing (PROTOCOL.md §8): the passkey the PC asks for, as the Bluetooth glyph over six
+ * digits, above everything until ui_pair_hide() (or 60 s). */
+void ui_pair_show(uint32_t passkey);
+void ui_pair_hide(void);
 void ui_glow_hide(void);
 bool ui_glow_active(void);
 /* The wrist was raised: counts as looking at the watch (ends the ambient dim and the nagging), like

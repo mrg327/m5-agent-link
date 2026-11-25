@@ -271,6 +271,8 @@ void hal_link_bulk(hal_link_kind_t port, bool on)
     (void)on;
 }
 uint32_t hal_link_ble_interval_us(void) { return 0; }
+/* no BLE in the browser: nothing ever pairs */
+void hal_link_set_pair_callback(hal_pair_cb_t cb) { (void)cb; }
 
 /* Firmware update (FIRMWARE.md §9): the web watch has no flash to write. A transfer is refused, so
  * the update screen is never reached here. */

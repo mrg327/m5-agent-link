@@ -286,7 +286,8 @@ bool link_send_fw_ack(fw_status_t st, uint32_t next, const char *msg)
     g_tx_env.envelope_choice = envelope_msg_fw_ack_m_c;
     struct msg_fw_ack *m = &g_tx_env.envelope_msg_fw_ack_m;
     set_hdr(&m->msg_fw_ack_hdr_m, false, 0);
-    m->msg_fw_ack_fw_ack_m.fw_ack_fw_status_m.fw_status_choice = st;
+    m->msg_fw_ack_fw_ack_m.fw_ack_fw_status_m.fw_status_choice =
+        (int)st; /* same values: agentlink.cddl */
     m->msg_fw_ack_fw_ack_m.fw_ack_uint1uint = next;
     if (msg && msg[0]) {
         m->msg_fw_ack_fw_ack_m.fw_ack_uint2tstr_present = true;

@@ -1387,7 +1387,7 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:126"
+      "source": "firmware/components/core/src/ui.c:179"
     },
     {
       "id": "attention",
@@ -5771,13 +5771,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:1481",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:1413",
-    "gesture_map.chord": "firmware/components/core/src/app.c:616",
+    "gesture_map.chord": "firmware/components/core/src/app.c:646",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:199",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:216",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:463",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:493",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:18",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:11",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:651",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:681",
     "haptics.approved": "firmware/components/core/src/feedback.c:93",
     "haptics.denied": "firmware/components/core/src/feedback.c:100",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:80",
@@ -5790,8 +5790,8 @@
     "haptics.hold_ramp": "firmware/components/core/src/feedback.c:72",
     "haptics.kick_duty": "firmware/boards/stopwatch/input.cpp:18",
     "haptics.kick_ms": "firmware/boards/stopwatch/input.cpp:20",
-    "haptics.kick_only_rule": "firmware/boards/stopwatch/input.cpp:114",
-    "haptics.kick_rule": "firmware/boards/stopwatch/input.cpp:98",
+    "haptics.kick_only_rule": "firmware/boards/stopwatch/input.cpp:130",
+    "haptics.kick_rule": "firmware/boards/stopwatch/input.cpp:114",
     "haptics.permission": "firmware/components/core/src/feedback.c:30",
     "haptics.question": "firmware/components/core/src/feedback.c:31",
     "haptics.quiet_toggled": "firmware/components/core/src/feedback.c:134",

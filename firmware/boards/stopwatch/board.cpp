@@ -12,6 +12,7 @@
 #include "esp_app_desc.h"
 #include "esp_log.h"
 #include "esp_mac.h"
+#include "esp_pm.h"
 #include "esp_rtc_time.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -31,6 +32,51 @@ static hal_board_info_t s_info;
 static char s_fw_version[32];
 
 static hal_power_state_t s_power_state = HAL_POWER_ACTIVE;
+
+/* ───────────── light sleep (issue 20261123-d569) ───────────── */
+
+#ifndef CONFIG_PM_ENABLE
+#warning \
+    "no light sleep: firmware/sdkconfig predates issue 20261123-d569; delete it to take sdkconfig.defaults"
+#endif
+
+#ifdef CONFIG_AGENTLINK_LIGHT_SLEEP
+/* Held while the display is on: light sleep only at rest, so drawing and its DMA never meet one. */
+static esp_pm_lock_handle_t s_awake_lock;
+static bool s_awake_held;
+
+static void pm_init(void)
+{
+    /* The minimum stays at 80 MHz: the APB clock never drops below 80 MHz, so bus code that takes
+     * no PM lock of its own (M5GFX, the PM1 / IOE1 libraries) keeps its timing. Idle time is spent
+     * in light sleep, not at a low clock. */
+    esp_pm_config_t pm = {};
+    pm.max_freq_mhz = 240;
+    pm.min_freq_mhz = 80;
+    pm.light_sleep_enable = true;
+    esp_err_t err = esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "awake", &s_awake_lock);
+    if (err == ESP_OK) {
+        esp_pm_lock_acquire(s_awake_lock); /* the display is on at boot */
+        s_awake_held = true;
+        err = esp_pm_configure(&pm);
+    }
+    ESP_LOGI(TAG, "light sleep at rest: %s", err == ESP_OK ? "on" : esp_err_to_name(err));
+}
+
+static void pm_awake(bool awake)
+{
+    if (!s_awake_lock || awake == s_awake_held) { return; }
+    s_awake_held = awake;
+    if (awake) {
+        esp_pm_lock_acquire(s_awake_lock);
+    } else {
+        esp_pm_lock_release(s_awake_lock);
+    }
+}
+#else
+static void pm_init(void) {}
+static void pm_awake(bool awake) { (void)awake; }
+#endif
 
 /* Kept in RTC slow memory across deep sleep; the bootloader zeroes it on a power-on or reset. */
 static RTC_DATA_ATTR uint32_t s_retained;
@@ -108,10 +154,9 @@ static bool deep_sleep(uint32_t wake_after_s)
             return false; /* a held button would wake us at once and its release would be lost */
         }
     }
-    /* Tap to wake: the CST820 pulls INT (G13, an RTC IO) low while touched. If it is low now (a
-     * finger, or a line that idles low), leave it out rather than wake straight back up. */
+    /* Buttons only (decision 2026-11-25, issue 20261117-0d15): the AMOLED / touch rail is cut
+     * below, so a tap cannot wake a deep-sleeping watch. */
     uint64_t mask = (1ULL << SW_PIN_BTN_A) | (1ULL << SW_PIN_BTN_B);
-    if (gpio_get_level((gpio_num_t)SW_PIN_TOUCH_INT) == 1) { mask |= 1ULL << SW_PIN_TOUCH_INT; }
     hal_haptic_play(NULL, 0);
     vTaskDelay(pdMS_TO_TICKS(20));
     sw_ioe_motor_duty(0); /* IOE1 stays powered: a motor left on would run all night */
@@ -123,11 +168,15 @@ static bool deep_sleep(uint32_t wake_after_s)
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON); /* keeps the pull-ups */
     if (esp_sleep_enable_ext1_wakeup_io(mask, ESP_EXT1_WAKEUP_ANY_LOW) != ESP_OK) { return false; }
     if (wake_after_s) { esp_sleep_enable_timer_wakeup((uint64_t)wake_after_s * 1000000ULL); }
+    /* The panel and touch controller idle on L3B all night otherwise (brightness 0 is not off).
+     * Cut only once the wake sources are set: boot raises the rail again (sw_power_init). */
+    sw_ioe_write(SW_IOE_L3B_AMOLED, false);
     char line[80];
     snprintf(line, sizeof(line), "{\"cat\":\"power\",\"ev\":\"deep_sleep\",\"wake_after_s\":%u}",
              (unsigned)wake_after_s);
     hal_debug_line(line);
     vTaskDelay(pdMS_TO_TICKS(50)); /* let the line drain */
+    sw_power_i2c_idle_sleep();     /* the last I2C writes before the sleep */
     s_deep_unix = hal_rtc_get_unix();
     s_deep_rtc_us = esp_rtc_get_time_us();
     s_deep_mark = DEEP_MARK;
@@ -190,6 +239,7 @@ void hal_board_init(void)
     ESP_ERROR_CHECK(err);
 
     info_init();
+    pm_init();
     /* Rail bring-up order follows M5StopWatch-UserDemo: I2C -> PM1 -> IOE1 -> (50 ms) -> display ->
      * touch. */
     i2c_init();
@@ -221,17 +271,26 @@ hal_power_state_t hal_power_enter(hal_power_state_t state, uint32_t wake_after_s
     }
     switch (state) {
     case HAL_POWER_ACTIVE:
+        pm_awake(true);
+        sw_ble_link_rest(false);
+        sw_touch_rest(false);
         hal_display_set_power(true);
         sw_touch_sleep(false);
         break;
     case HAL_POWER_STANDBY:
-        /* TODO(power): auto light-sleep with BLE kept connected; wake on buttons / G12.
-         * Touch stays in its normal (self-dozing) mode so a tap wakes the display. */
+        /* Light sleep whenever every task is idle, BLE kept in modem sleep at a slow interval
+         * (FIRMWARE.md §4). Buttons are polled besides their interrupt and touch reads skip INT
+         * gating, so input during a sleep is not lost. Touch stays in its normal (self-dozing) mode
+         * so a tap wakes the display. */
         hal_display_set_power(false);
+        sw_touch_rest(true);
+        sw_ble_link_rest(true);
+        pm_awake(false);
         break;
     case HAL_POWER_DEEP:
         /* Only reached on battery with no host (guard above), so losing USB Serial/JTAG is fine.
-         * Touch stays awake: its INT line (G13) is a deep-sleep wake source, so a tap wakes too. */
+         * The display / touch rail is cut inside deep_sleep(): only the buttons (or the timer)
+         * wake. */
         hal_display_set_power(false);
         if (!deep_sleep(wake_after_s)) {
             /* a button is held: its release is input and wakes the display */

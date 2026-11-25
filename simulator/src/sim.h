@@ -49,6 +49,8 @@ void sim_link_inject_rx(const uint8_t *frame, size_t len);
  * daemon. */
 typedef void (*sim_tx_tap_t)(const uint8_t *frame, size_t len);
 void sim_link_set_tx_tap(sim_tx_tap_t tap);
+/* Plays a BLE pairing event: a passkey 0..999999, HAL_PAIR_DONE or HAL_PAIR_FAILED. */
+void sim_link_pair_event(int32_t passkey_or_end);
 
 /* sim_png.c: writes an RGB (3 bytes/pixel) image; returns false on I/O error. */
 bool sim_png_write(const char *path, const uint8_t *rgb, int w, int h);

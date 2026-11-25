@@ -164,6 +164,7 @@ typedef enum {
     E_KIT,
     E_QUESTION,
     E_STROKE,
+    E_PAIR,
     E_BENCH,
     E_BENCH_SAVE,
     E_BENCH_EXPECT,
@@ -564,6 +565,20 @@ static bool parse_line(char *line, uint32_t *t)
         *t += 50;
     } else if (!strcmp(cmd, "question") && arg[0]) {
         add(*t, E_QUESTION, 0, 0, 0, arg);
+        *t += 20;
+    } else if (!strcmp(cmd, "pair")) {
+        /* BLE pairing as the board reports it: a passkey, then done or fail (PROTOCOL.md §8) */
+        if (!strncmp(rest, "done", 4)) {
+            a = HAL_PAIR_DONE;
+        } else if (!strncmp(rest, "fail", 4)) {
+            a = HAL_PAIR_FAILED;
+        } else {
+            char *end = NULL;
+            long v = strtol(rest, &end, 10);
+            if (end == rest || v < 0 || v > 999999) return false;
+            a = (int)v;
+        }
+        add(*t, E_PAIR, a, 0, 0, NULL);
         *t += 20;
     } else if (!strcmp(cmd, "touch")) {
         int dt = 0, n = 0, used = 0;
@@ -1776,6 +1791,7 @@ static void run(const ev_t *e)
     case E_RX: send_hex_kind(e->b, e->text); break;
     case E_UI: core_dump_ui_state(); break;
     case E_STROKE: send_stroke(e->a, e->text); break;
+    case E_PAIR: sim_link_pair_event(e->a); break;
     case E_QUESTION: run_question(e->text); break;
     case E_BENCH: send_bench(e->a, e->b); break;
     case E_BENCH_SAVE: bench_save(e->text); break;

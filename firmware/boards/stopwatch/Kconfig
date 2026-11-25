@@ -50,3 +50,39 @@ menu "Agent Link StopWatch I2C and touch"
             with no INT edge (twice), gating turns itself off until reboot.
 
 endmenu
+
+menu "Agent Link StopWatch power"
+
+    config AGENTLINK_LIGHT_SLEEP
+        bool "Automatic light sleep while the display is off"
+        depends on PM_ENABLE && FREERTOS_USE_TICKLESS_IDLE
+        default y
+        help
+            With the display off (STANDBY), the ESP32-S3 light-sleeps whenever every task is idle;
+            NimBLE keeps the link in modem sleep. A no-light-sleep PM lock is held while the display
+            is on, so drawing and its DMA never meet a sleep. The button task polls every 50 ms
+            besides its edge interrupt, and touch reads skip INT gating at rest, so input that
+            arrives during a sleep is not lost. Issue 20261123-d569.
+
+    config AGENTLINK_BLE_REST_INTERVAL
+        bool "Ask BLE centrals for a slow interval while the display is off"
+        default y
+        help
+            At rest the watch asks each central for a 60-75 ms interval with peripheral latency 12,
+            so its radio listens about once a second (an attention arrives within ~1 s). Waking the
+            display returns to the central's own interval. A central that refuses keeps its own.
+
+endmenu
+
+menu "Agent Link StopWatch Bluetooth security"
+
+    config AGENTLINK_BLE_SECURE
+        bool "Pair with a passkey shown on the watch; talk only over an authenticated link"
+        default y
+        help
+            LE Secure Connections pairing with the passkey on the watch's screen, bonds kept in NVS.
+            A central counts as linked only once the link is encrypted with an authenticated key;
+            until then nothing is sent and writes are refused. The PC's Bluetooth settings ask for
+            the passkey once per host. PROTOCOL.md §8.
+
+endmenu

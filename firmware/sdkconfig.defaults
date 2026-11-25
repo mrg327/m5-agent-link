@@ -111,6 +111,19 @@ CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=247
 CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_2M_PHY=y
 CONFIG_BT_NIMBLE_PINNED_TO_CORE_0=y
 CONFIG_BT_CTRL_BLE_MAX_ACT=4
+# Bonds survive a reboot (PROTOCOL.md §8, board Kconfig AGENTLINK_BLE_SECURE)
+CONFIG_BT_NIMBLE_NVS_PERSIST=y
+# Power (issue 20261123-d569): automatic light sleep while the display is off (board Kconfig
+# AGENTLINK_LIGHT_SLEEP). The ESP32-S3's 32 kHz crystal pins (G15/G16) carry I2S here, so BLE sleeps
+# on the main crystal, kept powered during light sleep. No light sleep while USB Serial/JTAG is
+# attached, so the USB link and console keep working.
+CONFIG_PM_ENABLE=y
+CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
+CONFIG_BT_CTRL_MODEM_SLEEP=y
+CONFIG_BT_CTRL_MODEM_SLEEP_MODE_1=y
+CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL=y
+CONFIG_BT_CTRL_MAIN_XTAL_PU_DURING_LIGHT_SLEEP=y
+CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION=y
 # Big static tables (the session model, the snapshot buffer) live in PSRAM: internal DRAM is
 # what the BLE controller needs at boot.
 CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
