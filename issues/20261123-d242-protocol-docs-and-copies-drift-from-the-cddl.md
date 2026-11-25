@@ -1,11 +1,11 @@
 ---
 id: 20261123-d242
 title: Protocol docs and copies drift from the CDDL
-status: open
+status: claimed
 severity: low
 area: protocol
 platforms: any
-owner:
+owner: claude-code/cloud@cloud
 created: 2026-11-23T00:11:34Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -35,3 +35,4 @@ Found while writing docs/conventions/protocol.md (issue 20261122-db53). All valu
 ## Log
 
 - 2026-11-23T00:11:34Z · claude-code@linux-dev · linux-x86_64 · 76170d3+dirty: filed
+- 2026-11-25T04:45:43Z · claude-code/cloud@cloud · linux-x86_64 · 00d20be: claimed

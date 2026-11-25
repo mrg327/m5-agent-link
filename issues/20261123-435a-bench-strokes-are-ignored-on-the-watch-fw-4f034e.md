@@ -1,11 +1,11 @@
 ---
 id: 20261123-435a
 title: Bench strokes are ignored on the watch (fw 4f034e5); real touch works
-status: open
+status: claimed
 severity: med
 area: firmware
 platforms: esp32
-owner:
+owner: claude-code/cloud@cloud
 created: 2026-11-23T18:12:48Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -57,3 +57,4 @@ checks are button actions. A real finger works (tap wakes, second tap opens AGEN
 
 - 2026-11-23T18:12:48Z · claude-code@linux-dev · linux-x86_64 · 4f034e5: filed
 - 2026-11-23T19:41:37Z · claude-code@linux-dev · linux-x86_64 · b7336c3: Not reproduced after a reboot. A debug build (touch-read and gesture logging, not committed) passed all 11 tasks x3, then main's 4f034e5 reflashed also passed all 11 x3, with the same two BLE centrals and rx_id_not_monotonic. So the failure is a device state, not the build: it started after the first flash plus a serial-port open (USB_UART_CHIP_RESET) and lasted through every task until the next reboot. Suspects: s.touch_down kept across bench start, the touch read timer, gesture state left pressed. Next time it happens, before rebooting: run a task with a debug build... not possible without reflash, so add a permanent dbg_ui_state field for bench_playing and the last read time.
+- 2026-11-25T04:45:43Z · claude-code/cloud@cloud · linux-x86_64 · 00d20be: claimed
