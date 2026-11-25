@@ -1,11 +1,11 @@
 ---
 id: 20261117-0d15
 title: Deep sleep drains about 2 %/h, around 100x the design budget
-status: open
+status: claimed
 severity: high
 area: firmware
 platforms: esp32
-owner:
+owner: claude-code/cloud@cloud
 created: 2026-11-17T19:19:44Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
@@ -54,3 +54,4 @@ pull-ups on the I2C bus, GPIO hold states.
 
 - 2026-11-17T19:19:45Z · claude-code@linux-dev · linux-x86_64 · 99589b3: filed
 - 2026-11-23T05:58:25Z · claude-code@linux-dev · linux-x86_64 · 5d21b95: 2026-11-22 run (fw b980ef1) stayed linked to an awake host: 0 min deep, so no new deep number. It did measure r_off = 23.4 %/h (~105 mA), filed as 20261123-d569; fixing that (PM/light sleep) may also move the deep figure. Next deep A/B needs the host suspended or the daemon stopped, and a charged watch.
+- 2026-11-25T16:31:21Z · claude-code/cloud@cloud · linux-x86_64 · 4ea0a2a: claimed
