@@ -27,10 +27,10 @@ static bool s_link_up, s_animate = true;
 static uint32_t s_seen_rev;
 static uint32_t s_now_ms;
 
-/* Black under the sign, so what a screen has there rests while it shows: the slot between the two
- * key hints (x 125..341, y 340..406), and above the hints' rings a wider band for a row of text (x
- * 113..353, y 326..346). Only on the screens that keep content there (toast_blanks_slot): elsewhere
- * the sign's own black margin is all. */
+/* Black under the sign, so what a screen has there rests while it shows: the bottom slot (x
+ * 125..341, y 340..406), and above it a wider band for a row of text (x 113..353, y 326..346). Only
+ * on the screens that keep content there (toast_blanks_slot): elsewhere the sign's own black margin
+ * is all. */
 #define TOAST_MASK_W 216
 #define TOAST_MASK_Y 340
 #define TOAST_MASK_H 66
@@ -84,9 +84,8 @@ static void create_overlays(void)
 {
     lv_obj_t *top = lv_layer_top();
     ui_ota_init(top); /* under the toast, so a refusal shows over it */
-    /* One slot on every screen: between the two key hints, which stay in sight beside a sign of one
-     * or two glyphs; a sign that carries content is wider and covers them while it shows (its black
-     * margin). */
+    /* One slot on every screen, at the bottom (the key hints are on the upper rim and stay in
+     * sight); a sign that carries content is wider, with a black margin. */
     for (int i = 0; i < 2; i++) {
         lv_obj_t *m = s_toast_mask[i] = lv_obj_create(top);
         lv_obj_remove_style_all(m);
@@ -527,7 +526,7 @@ static void rise(lv_obj_t *o, int px)
 
 void ui_motion_enter(lv_obj_t *content) { rise(content, UI_MOTION_RISE); }
 
-/* The screens whose own rows and discs lie between the key hints, under the sign: HOME (its
+/* The screens whose own rows and discs lie in the bottom slot, under the sign: HOME (its
  * summary's second row, the graph strip, the book disc), AGENT (the queued message; Dictate and
  * Keyboard), READ (the page dots), STATUS (the About disc), LABS and TRACKPAD (their own sign for
  * why the trackpad cannot start or work). A rebuilt screen that puts content there adds its
@@ -670,7 +669,7 @@ bool ui_on_gesture(const gesture_evt_t *g)
 {
     if (g->kind == G_RELEASE) s_rel_y = g->y;
     nav_zone_t zone = nav_centre(g->x, g->y) ? ZONE_CENTRE : ZONE_RIM;
-    /* The deck's book disc and graph strip sit between the key hints and reach past the centre
+    /* The deck's book disc and graph strip sit in the bottom slot and reach past the centre
      * zone: a tap on one is a tap on it, not on the rim (a drag there still scrubs the
      * sessions). */
     if (zone == ZONE_RIM && s_mode == MODE_HOME && (g->kind == G_TAP || g->kind == G_DOUBLE_TAP) &&

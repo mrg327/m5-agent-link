@@ -48,10 +48,6 @@
 #define FADE_MS 250
 #define SPECIAL_H 40 /* the capsule of a key that is not a character */
 #define SPECIAL_PAD 4
-/* Under the key block (it ends at KEYS_BOTTOM_Y 386) the glass is 100 px wide: the two hints sit
- * there side by side, their hold rings inside r 207. */
-#define HINT_Y 409
-#define HINT_DX 44
 /* A's second ring: where ui_kit.c draws a key hint's hold (3 px out, 3 wide) */
 #define HINT_RING 25
 #define FLASH_MS 1800 /* how long a sign or a lit ring answers a gesture */
@@ -483,17 +479,14 @@ lv_obj_t *ui_keys_init(lv_obj_t *screen)
     lv_obj_set_style_line_rounded(s_trail, true, 0);
     lv_obj_add_flag(s_trail, LV_OBJ_FLAG_HIDDEN);
 
-    /* rule 6: what the buttons do. The key block reaches down to where the hints usually are, so
-     * they sit in the glass below it, side by side. A sends on a hold: the second ring round its
-     * hint is the ring to fill. */
-    s_ring_a = ui_arc_create(s_root, UI_CX - HINT_DX, HINT_Y, HINT_RING, 3);
+    /* rule 6: what the buttons do, beside the keys on the upper rim, clear of the candidates (y 132
+     * down). A sends on a hold: the second ring round its hint is the ring to fill. */
+    s_ring_a = ui_arc_create(s_root, UI_KEY_A_X, UI_KEY_Y, HINT_RING, 3);
     ui_arc_set(s_ring_a, 0, COL_TEXT, theme_dim(RGB_KEY_A, 40));
     s_key_a = ui_key_hint_create(s_root, UI_KEY_A);
     ui_key_hint_set(s_key_a, ICON_SENT);
-    ui_disc_set_pos(s_key_a, UI_CX - HINT_DX, HINT_Y);
     s_key_b = ui_key_hint_create(s_root, UI_KEY_B);
     ui_key_hint_set(s_key_b, ICON_BACKSPACE);
-    ui_disc_set_pos(s_key_b, UI_CX + HINT_DX, HINT_Y);
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     return s_root;
 }

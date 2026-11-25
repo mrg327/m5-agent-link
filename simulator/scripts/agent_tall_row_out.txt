@@ -1,4 +1,4 @@
-# With Stop selected on AGENT (its disc r 40 at 378,194, 10 px of slack), a hold 2 px outside that edge, above the
+# With Stop selected on AGENT (its disc r 40 at 378,272, 10 px of slack), a hold 2 px outside that edge, below the
 # disc (52 px from its centre) or beside it, is not on it and stops nothing.
 connect
 rx a400020101020103a50082000401a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
@@ -7,13 +7,13 @@ wait 300
 tap 233 233
 wait 400
 expect_screen agent
-tap 378 194
+tap 378 272
 wait 300
 expect_label > Stop
-hold 378 142 1500
+hold 378 324 1500
 wait 300
 expect_label > Stop
-hold 430 194 1500
+hold 430 272 1500
 wait 300
 expect_screen agent
 expect_label > Stop

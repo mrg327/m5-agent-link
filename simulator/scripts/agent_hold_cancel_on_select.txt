@@ -7,10 +7,10 @@ wait 300
 tap 233 233
 wait 400
 expect_screen agent
-tap 378 194
+tap 378 272
 wait 300
 expect_label > Stop
-press 378 194
+press 378 272
 wait 500
 btn B
 wait 150

@@ -110,7 +110,6 @@ readability-function-size	firmware/components/core/src/ui_ask.c	3
 readability-function-size	firmware/components/core/src/ui_graph.c	1
 readability-function-size	firmware/components/core/src/ui_home.c	1
 readability-function-size	firmware/components/core/src/ui_home_card.c	1
-readability-function-size	firmware/components/core/src/ui_keys.c	1
 readability-function-size	firmware/components/core/src/ui_kit.c	1
 readability-function-size	firmware/components/core/src/ui_read.c	1
 readability-function-size	firmware/components/core/src/ui_voice.c	1

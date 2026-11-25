@@ -1,6 +1,6 @@
 # A tap on a disc of the orbit acts on that disc (UI-V3 §3.3, X3; GLYPHS.md §5). Discs of a working session,
-# left to right over the sigil: Activity (88,194), Notify when done (170,97), Snooze 30 min (296,97), Stop
-# (378,194; a hold item). The discs reach past the centre zone (r 150): a touch on one is still a touch on it.
+# left to right under the sigil: Activity (88,272), Notify when done (170,369), Snooze 30 min (296,369), Stop
+# (378,272; a hold item). The discs reach past the centre zone (r 150): a touch on one is still a touch on it.
 connect
 rx a400020101020103a50082000401a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
 session 1 work webapp feat/login Running the test suite
@@ -11,20 +11,20 @@ expect_screen agent
 expect_label > Activity
 shot agent_row_tap_open.png
 # Stop is a hold item: the tap selects it and says why it did nothing more
-tap 378 194
+tap 378 272
 wait 200
 expect_screen agent
 expect_label > Stop
 expect_label Hold to stop
 shot agent_row_tap_stop.png
 # tapping the selected hold disc does not send it either
-tap 378 194
+tap 378 272
 wait 200
 expect_screen agent
 expect_label > Stop
 wait 2500
 # a hold in progress fills the disc's ring and the bezel; letting go early sends nothing
-press 378 194
+press 378 272
 wait 700
 shot agent_row_hold.png
 release
@@ -34,7 +34,7 @@ expect_screen agent
 btn B
 wait 150
 expect_label > Activity
-tap 170 97
+tap 170 369
 wait 300
 expect_screen ring
 quit

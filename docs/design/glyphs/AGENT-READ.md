@@ -18,14 +18,16 @@ before (rule 9).
 
 ## 1. The arch
 
-A menu on these screens is an orbit that is open at the bottom (`ui_orbit_set_arch(o, 222, 50)`):
+A menu on these screens is an orbit that is open at the top, where the key hints are (`ui_orbit_set_geometry(o,
+UI_ORBIT_R, 180)`, `ui_orbit_set_arch(o, 222, 50)`; issue 20261125-d8b5):
 
-- The discs sit on r 150 about the screen centre, from 249 degrees over 12 o'clock to 111 degrees. The first item
-  is at the left end; the rest follow clockwise. Up to five discs are 50 degrees apart and sit together at the
-  top; six and seven spread over the whole arc.
+- The discs sit on r 150 about the screen centre, from 291 degrees under 6 o'clock to 69 degrees. The first item
+  is at the left end; the rest follow left to right (anticlockwise). Up to five discs are 50 degrees apart and sit
+  together at the bottom; six and seven spread over the whole arc.
 - The arc ends 24 degrees short of each key hint. So a selected disc (r 40) with its hold ring never touches a
   hint, and the two hints read as the last two marks of the circle.
-- The bottom is free: the slot between the key hints holds a row of content, and the toast's sign.
+- The top between the hints is free for a row of content (AGENT's queued message); the subject and its text sit
+  above the arch, and the toast's sign keeps the bottom slot.
 - The discs reach past the centre zone (r 150). `ui.c` lets a tap, a press and a long press on a disc through as
   a centre touch (`ui_agent_hit`, `ui_read_hit`). A slide along the bezel still dials.
 
@@ -34,10 +36,10 @@ A menu on these screens is an orbit that is open at the bottom (`ui_orbit_set_ar
 | Where | What | Words in the report |
 |---|---|---|
 | Arch | One disc for each action. The selected one is r 40 in the session's colour; Stop is red, Run again blue | `> Activity`, the next four items, `N items` |
-| Centre (y 212) | The session's sigil, r 56, white. No folder: the dashed-folder glyph | |
-| y 298 | The project's name (rule 2: the one place it is spelled out). A remote session has the globe before it | `webapp`, `HOST · webapp` |
-| y 330 | The gauges' readout, drawn by `ui_gauges.c` in a window 208 px wide | as `ui_gauges.c` reports it |
-| y 368, between the key hints | The message that waits to be typed into the session, after the queue glyph (the user's own words: rule 1) | `Queued: …` |
+| y 170 | The session's sigil, r 56, white. No folder: the dashed-folder glyph | |
+| y 256 | The project's name (rule 2: the one place it is spelled out). A remote session has the globe before it | `webapp`, `HOST · webapp` |
+| y 288 | The gauges' readout, drawn by `ui_gauges.c` in a window 208 px wide | as `ui_gauges.c` reports it |
+| y 98, between the key hints | The message that waits to be typed into the session, after the queue glyph (the user's own words: rule 1) | `Queued: …` |
 | Key hints | A: tick (run the selection). B: caret (the next one), hidden when there is one item | |
 
 The glyphs of the actions:
@@ -76,7 +78,7 @@ Reply (and Reply now, for a working session) turns the screen into the list of q
   selected one in the middle, its neighbours above and below, dim; the list wraps. The selected reply is drawn
   at 34 px when it fits 300 px, else at 24 px, between two yellow arcs at 9 and 3 o'clock.
 - **Page dots** under the rows: one for each item, the selected one larger.
-- **Dictate and Keyboard** are discs between the key hints (microphone, keyboard). They are the last items of the
+- **Dictate and Keyboard** are discs at the bottom (microphone, keyboard). They are the last items of the
   list; the selected one is yellow. With no quick reply at all they are large and in the middle.
 - **Key hints:** A is the paper-plane on a row (it sends that reply) and the tick on a disc; B is the caret.
 - A tap on a row sends that row; a tap on a disc opens VOICE or KEYS; a tap elsewhere and button A run the
@@ -90,7 +92,7 @@ Reply (and Reply now, for a working session) turns the screen into the list of q
   `Last message`.
 - The message, seven lines of 20 px text, 320 px wide, left-aligned (a summary: rule 1). The page geometry is the
   one of the legibility pass, so page counts did not change.
-- On the key-hint row, between the hints: the page dots (`Reading 2 of 3`). Beside them a small ring that fills as
+- At the bottom (y 365): the page dots (`Reading 2 of 3`). Beside them a small ring that fills as
   the rest of the message arrives (`Loading`), or the error glyph in red when it did not (`Not loaded`).
 - Key hints: A is the desktop (open on the computer, as on HOME). B is the caret-down while there is more, the
   reply arrow on the last page.
@@ -99,7 +101,8 @@ Reply (and Reply now, for a working session) turns the screen into the list of q
 
 **The end**
 
-- An arch of discs over the session's sigil (r 40): Dictate (microphone) and Reply (reply arrow), yellow when
+- The session's sigil (r 40, y 140) and the message's last three lines under it, and an arch of discs along the
+  bottom: Dictate (microphone) and Reply (reply arrow), yellow when
   selected; Read again (book) and Open on PC (desktop), the session's colour when selected. In words: `Answer it`,
   `> Dictate`, `Reply`, `Read again`, `Open on PC`.
 - Under the sigil the last lines of the message, three lines, grey: what is being answered.
@@ -121,8 +124,8 @@ Reply (and Reply now, for a working session) turns the screen into the list of q
 ## 6. What changed outside the two files
 
 - `ui_kit.c`, `ui_kit.h`: `ui_orbit_set_arch()`. The whole circle stays the default.
-- `ui.c`: a touch on a disc of AGENT or READ past r 150 is a centre touch; the toast blanks the slot between the
-  key hints on AGENT and READ too.
+- `ui.c`: a touch on a disc of AGENT or READ past r 150 is a centre touch; the toast blanks the bottom
+  slot on AGENT and READ too.
 - `ui_theme.c`: two rows of the vocabulary, `Hold to stop` and `Hold to run again`.
 - `simulator/src/sim_script.c`: `session SID STATE -` makes a session with no folder.
 - Scripts: coordinates moved to the discs in `agent_row_tap`, `agent_hold_neighbour_row`, `agent_tall_row_in`,

@@ -33,9 +33,10 @@
 #include "ui_kit.h"
 #include "ui_theme.h"
 
-/* Geometry: centres. The orbit's radius puts Quiet and Volume straight above the two key hints and
- * About on their row. The gauges' arcs begin at r 180 (a selected disc ends at r 172); their rows
- * are y 139..193 (the disc at 12 o'clock ends at y 141). */
+/* Geometry: centres. The orbit's radius puts Quiet and Volume where the old lower key hints were
+ * and About at the bottom; the key hints are on the upper rim, clear of the orbit. The gauges' arcs
+ * begin at r 180 (a selected disc ends at r 172); their rows are y 139..193 (the disc at 12 o'clock
+ * ends at y 141). */
 #define ORBIT_R 132
 #define ORBIT_PHASE 270 /* the first toggle at 9 o'clock */
 /* A value arc keeps one radius: round the small disc (r 30) while it rests, and inside the rim of

@@ -52,7 +52,7 @@ and the toast is the sign "clock, cross".
 ## LABS (`ui_labs.c`)
 
 The atom at the centre is the subject; the experiments orbit it (r 150), one for now: the pointer, Trackpad.
-One that cannot start is dim, A's hint (the tick) is gone, and a sign between the key hints says why: the plug
+One that cannot start is dim, A's hint (the tick) is gone, and a sign in the bottom slot says why: the plug
 (offline) or "computer, download" (the daemon is too old). A refused tap shows the same sign as a toast.
 
 ## TRACKPAD (`ui_trackpad.c`)
@@ -64,7 +64,7 @@ gesture is made:
 - the mouse with its left button: a tap is a click (two are a double click);
 - the mouse with its right button inside a partly drawn hold ring: a hold is a right click.
 
-A's hint is the back arrow. When the pad cannot work the pictograms go and a sign stands between the key hints:
+A's hint is the back arrow. When the pad cannot work the pictograms go and a sign stands in the bottom slot:
 the plug (offline), "computer, download" (the daemon has no trackpad), "computer, pointer, cross" (this PC has no
 pointer to drive), "computer, refused" (the PC refused; its own message, when it sent one, is in the report).
 

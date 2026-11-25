@@ -1072,6 +1072,8 @@ static void orbit_apply(lv_obj_t *o)
     if (d->span > 0) { /* an arch: the page's discs centred on the phase, left to right */
         step = cnt > 1 ? (float)d->span / (float)(cnt - 1) : 0;
         if (step > (float)d->pitch) step = (float)d->pitch;
+        /* along the bottom, left to right is anticlockwise */
+        if (d->phase > 90 && d->phase < 270) step = -step;
         first_deg -= step * (float)(cnt - 1) / 2.0f;
     }
     int ccx = lv_obj_get_width(o) / 2, ccy = lv_obj_get_height(o) / 2, x, y;

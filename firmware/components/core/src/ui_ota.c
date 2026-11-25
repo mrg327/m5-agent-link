@@ -24,7 +24,7 @@
 #define HERO_Y UI_CX
 #define ARC_R 112 /* centre line: the hero glyph (128 px) sits inside with room to spare */
 #define ARC_W 10
-#define VER_Y 374   /* under the arc, between the key hints */
+#define VER_Y 374   /* under the arc, in the bottom slot */
 #define HOLD_PM 700 /* B's hold ring as drawn: a hold in progress */
 
 static lv_obj_t *s_root, *s_arc, *s_hero, *s_ver, *s_cancel;

@@ -14,7 +14,7 @@ expect_label 14m
 expect_label Running the test suite after the login refactor
 expect_no_label Review
 shot sigil_working.png
-# the agent graph and the context gauge between the key hints; the summary keeps one row
+# the agent graph and the context gauge at the bottom; the summary keeps one row
 gauge 16 76
 graph 16 read:ok:0 search:ok:0 agent:ok:0 search:ok:1:f read:ok:1 shell:ok:2:f read:ok:1:m git:ok:2 edit:ok:0 test:fail:2:m shell:fail:0 edit:ok:0 agent:ok:0 web:ok:3:f mcp:run:3 plan:run:0 la=0,1,4,5 drop=3 gen=1
 step 16 12 ok Bash npm test

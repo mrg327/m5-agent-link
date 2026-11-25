@@ -1,16 +1,16 @@
 /* The AGENT screen in Sigil (docs/design/GLYPHS.md §5): what can be done with the selected session.
  *
- * The menu is an orbit (rule 5): one disc for each action, arched over the session's sigil from the
- * left to the right, open at the bottom where the two key hints close the circle. The selected disc
- * is the large one in the session's colour (Stop in red, Run again in blue). Under the sigil is the
- * project's name: the one place a mark is spelled out (rule 2). Below it the gauges' readout
- * (ui_gauges.c) and, between the key hints, the message that waits to be typed into the session,
- * behind the queue glyph (the user's own words: rule 1).
+ * The menu is an orbit (rule 5): one disc for each action, arched under the session's sigil from
+ * the left to the right along the bottom, open at the top where the two key hints close the circle.
+ * The selected disc is the large one in the session's colour (Stop in red, Run again in blue).
+ * Under the sigil is the project's name: the one place a mark is spelled out (rule 2). Below it the
+ * gauges' readout (ui_gauges.c); between the key hints at the top, the message that waits to be
+ * typed into the session, behind the queue glyph (the user's own words: rule 1).
  *
  * Reply turns the screen into the reply list: the reply glyph beside the sigil, the agent's closing
  * question (what it asks: rule 1), the quick replies as rows of text (the user's own words, and the
  * session's own answers), the selected one in the middle between two arcs, and Dictate and Keyboard
- * as discs between the key hints. Page dots say where the selection is.
+ * as discs at the bottom. Page dots say where the selection is.
  *
  * The item list comes from nav_agent_items() (interaction model); this file names, draws and runs
  * the items. Every glyph is named in words in the report (rule 9), as the rows were. Gestures are
@@ -33,30 +33,31 @@
 #include "ui_theme.h"
 
 /* Geometry: centres. The orbit's discs sit on r 150 about the screen centre, between -111 and +111
- * degrees; the key hints are at (101, 365) and (365, 365), so below y 345 a row is only as wide as
- * the gap between them. */
+ * degrees about 6 o'clock; the key hints are at (101, 101) and (365, 101), so above y 121 a row is
+ * only as wide as the gap between them. */
 /* ends 24 degrees short of each key hint: clear of a selected disc and its hold ring */
 #define ARCH_SPAN 222
-#define ARCH_PITCH 50 /* a few discs sit together at the top */
-#define SIGIL_Y 212   /* the subject: inside the orbit, which leaves r 105 free */
+#define ARCH_PITCH 50  /* a few discs sit together at the bottom */
+#define ARCH_PHASE 180 /* open at the top, where the key hints are */
+#define SIGIL_Y 170    /* the subject: inside the orbit, which leaves r 105 free */
 #define SIGIL_R 56
-#define NAME_Y 298 /* the project's name, under its mark */
+#define NAME_Y 256 /* the project's name, under its mark */
 #define NAME_W 200
-#define READOUT_Y 330 /* the gauges' readout: model, mode, pull request */
+#define READOUT_Y 288 /* the gauges' readout: model, mode, pull request */
 #define READOUT_W 208
 #define READOUT_H 28
 /* ui_gauges.c: where the readout places itself in the parent it is given */
 #define GAUGES_OWN_Y 108
-#define QUEUED_Y 368 /* the queued message: between the key hints */
+#define QUEUED_Y 98 /* the queued message: between the key hints */
 #define QUEUED_W 200
 /* the reply list */
 #define HEAD_Y 96   /* the reply glyph and the sigil, side by side ... */
 #define HEAD_Y_Q 44 /* ... higher when the agent's question is under them */
 #define HEAD_DX 30
 #define HEAD_SIGIL_R 22
-#define QUESTION_Y 72 /* two lines of FONT_BODY_STRONG */
-#define QUESTION_W 270
-#define ROW_Y 236 /* the selected row; its neighbours a pitch above and below */
+#define QUESTION_Y 72  /* two lines of FONT_BODY_STRONG */
+#define QUESTION_W 216 /* level with the key hints: no wider than the gap between them */
+#define ROW_Y 236      /* the selected row; its neighbours a pitch above and below */
 #define ROW_PITCH 54
 #define ROW_W 300
 /* the two arcs that hold the selected row: on a circle about the row's centre */
@@ -64,7 +65,7 @@
 #define FOCUS_W 5
 #define FOCUS_DEG 18
 #define PIPS_Y 328
-#define TALK_Y 374 /* Dictate and Keyboard: discs between the key hints */
+#define TALK_Y 374 /* Dictate and Keyboard: discs at the bottom */
 #define TALK_R 26
 #define TALK_DX 36
 #define TALK_Y_ALONE 236 /* with no quick reply at all they are the screen */
@@ -287,7 +288,7 @@ static void draw_replies(const session_t *s)
     for (int i = 0; i < 2; i++) show(s_focus[i], on_row);
     ui_pips_set(s_pips, s_n, s_sel);
 
-    /* Dictate and Keyboard: small between the key hints, or the screen itself when there is no
+    /* Dictate and Keyboard: small at the bottom, or the screen itself when there is no
      * row */
     bool alone = s_rows == 0;
     int both = talk_item(0) >= 0 && talk_item(1) >= 0, dx = alone ? TALK_DX_ALONE : TALK_DX;
@@ -649,6 +650,7 @@ lv_obj_t *ui_agent_init(lv_obj_t *screen)
     /* the menu: the orbit, its subject, and what belongs to the session under it */
     s_menu = box(s_root, 0, 0, UI_SIZE, UI_SIZE);
     s_orbit = ui_orbit_create(s_menu);
+    ui_orbit_set_geometry(s_orbit, UI_ORBIT_R, ARCH_PHASE);
     ui_orbit_set_arch(s_orbit, ARCH_SPAN, ARCH_PITCH);
     s_sigil = ui_sigil_create(s_menu, UI_CX, SIGIL_Y, SIGIL_R);
     s_name = row(s_menu, FONT_HEAD, COL_TEXT, NAME_Y, NAME_W);
