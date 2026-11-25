@@ -1,0 +1,12 @@
+{
+  "desc": "Device battery at 64 %, charging",
+  "symbolic": {
+    "t": "batt",
+    "id": 5,
+    "b": {
+      "pct": 64,
+      "chg": true
+    }
+  },
+  "cbor_hex": "a3000c010503a200184001f5"
+}

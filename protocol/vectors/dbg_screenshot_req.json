@@ -1,0 +1,9 @@
+{
+  "desc": "Debug: ask the device for a screenshot (answered by dbg_screenshot_chunk)",
+  "symbolic": {
+    "t": "dbg_screenshot_req",
+    "id": 16,
+    "b": {}
+  },
+  "cbor_hex": "a3001842011003a0"
+}

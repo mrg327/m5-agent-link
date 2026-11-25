@@ -1,0 +1,15 @@
+{
+  "desc": "Device settings: preview privacy, quiet until a time, brightness and badge handle",
+  "symbolic": {
+    "t": "cfg",
+    "id": 15,
+    "b": {
+      "privacy": "preview",
+      "alert": "quiet",
+      "quiet_until": 1763900000,
+      "brightness": 180,
+      "badge_handle": "@dev"
+    }
+  },
+  "cbor_hex": "a3000b010f03a500010101021a6922fa600318b4046440646576"
+}

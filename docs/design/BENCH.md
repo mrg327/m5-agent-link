@@ -72,6 +72,12 @@ LVGL and the gesture recognizer, so they see a finger. The panel's real touches 
 A stroke that arrives while another plays lifts the first one. A stroke reaches the UI as a finger does: on a dark
 display its press only wakes it, and on a glow it only reveals the request.
 
+The watch logs each stroke, so a run whose strokes are ignored can be read without a debug build (issue 435a):
+`bench touch` adds `read_ago` (ms since the last touch read, -1 before the first), `prev` / `prev_seen` (a stroke
+was still playing, and whether a read had played it) and `down` (what that read reported). `bench stroke_end` gives
+the reads that played it, `panel` (those where the real panel was also pressed: a finger or a stuck panel) and
+`late`. `bench touch_unread` (warn) means no read played a stroke within 500 ms, with the `read_ago` at that point.
+
 A debug link can already inject gestures (`dbg_inject_input`), so a stroke grants nothing new. It is accepted
 only from a welcomed daemon, like every other debug message.
 

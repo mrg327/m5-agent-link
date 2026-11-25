@@ -52,8 +52,12 @@ MT = dict(
     fw_ack=26,
     power=27,
     graph=28,
+    dbg_ui_state_req=64,
     dbg_ui_state=65,
+    dbg_screenshot_req=66,
+    dbg_screenshot_chunk=67,
     dbg_inject_input=68,
+    dbg_set_log_level=69,
     dbg_touch=70,
     dbg_bench=71,
     dbg_frames=72,
@@ -1347,6 +1351,71 @@ VECTORS = {
         env("clear", 6, {0: 7, 1: 0}),
     ),
     "ping": ("Keepalive", {"t": "ping", "id": 9, "b": {}}, env("ping", 9, {})),
+    "pong": (
+        "Answer to ping 9",
+        {"t": "pong", "id": 4, "re": 9, "b": {}},
+        env("pong", 4, {}, re_=9),
+    ),
+    "gone": (
+        "Session 2 is gone: the device drops its card",
+        {"t": "gone", "id": 14, "b": {"sid": 2}},
+        env("gone", 14, {0: 2}),
+    ),
+    "cfg_quiet": (
+        "Device settings: preview privacy, quiet until a time, brightness and badge handle",
+        {
+            "t": "cfg",
+            "id": 15,
+            "b": {
+                "privacy": "preview",
+                "alert": "quiet",
+                "quiet_until": 1763900000,
+                "brightness": 180,
+                "badge_handle": "@dev",
+            },
+        },
+        env("cfg", 15, {0: 1, 1: 1, 2: 1763900000, 3: 180, 4: "@dev"}),
+    ),
+    "batt_charging": (
+        "Device battery at 64 %, charging",
+        {"t": "batt", "id": 5, "b": {"pct": 64, "chg": True}},
+        env("batt", 5, {0: 64, 1: True}),
+    ),
+    "log_warn": (
+        "Device log line at warn level",
+        {"t": "log", "id": 6, "b": {"lvl": "warn", "msg": "ble: reconnect"}},
+        env("log", 6, {0: 1, 1: "ble: reconnect"}),
+    ),
+    "dbg_ui_state_req": (
+        "Debug: ask the device what it shows (answered by dbg_ui_state)",
+        {"t": "dbg_ui_state_req", "id": 8, "b": {}},
+        env("dbg_ui_state_req", 8, {}),
+    ),
+    "dbg_screenshot_req": (
+        "Debug: ask the device for a screenshot (answered by dbg_screenshot_chunk)",
+        {"t": "dbg_screenshot_req", "id": 16, "b": {}},
+        env("dbg_screenshot_req", 16, {}),
+    ),
+    "dbg_screenshot_chunk_last": (
+        "Debug: the last chunk of a 466 x 466 RGB565 screenshot (two pixels at its end)",
+        {
+            "t": "dbg_screenshot_chunk",
+            "id": 17,
+            "re": 16,
+            "b": {"w": 466, "h": 466, "offset": 434308, "data": "1f00e007", "last": True},
+        },
+        env(
+            "dbg_screenshot_chunk",
+            17,
+            {0: 466, 1: 466, 2: 434308, 3: bytes.fromhex("1f00e007"), 4: True},
+            re_=16,
+        ),
+    ),
+    "dbg_set_log_level": (
+        "Debug: set the device's log level to debug",
+        {"t": "dbg_set_log_level", "id": 18, "b": {"lvl": "debug"}},
+        env("dbg_set_log_level", 18, {0: 3}),
+    ),
     "dbg_ui_state": (
         "Device reports it is showing the attention card",
         {

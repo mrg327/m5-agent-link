@@ -12,6 +12,16 @@
 #define MODEL_RULE_CAP 160 /* the daemon's standing::RULE_CAP */
 
 /* AGENT_SHELL is a job: a command the user started in a terminal (JOBS.md, proto 0.9). */
+/* result_err: why the daemon refused a command (agentlink.cddl). */
+typedef enum {
+    RESULT_ERR_STALE = 0,
+    RESULT_ERR_DENIED = 1,
+    RESULT_ERR_UNSUPPORTED = 2,
+    RESULT_ERR_NO_WINDOW = 3,
+    RESULT_ERR_TIMEOUT = 4,
+    RESULT_ERR_INTERNAL = 5
+} result_err_t;
+
 typedef enum {
     AGENT_COPILOT = 0,
     AGENT_CLAUDE = 1,

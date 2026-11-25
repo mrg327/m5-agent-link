@@ -1,0 +1,11 @@
+{
+  "desc": "Session 2 is gone: the device drops its card",
+  "symbolic": {
+    "t": "gone",
+    "id": 14,
+    "b": {
+      "sid": 2
+    }
+  },
+  "cbor_hex": "a30005010e03a10002"
+}

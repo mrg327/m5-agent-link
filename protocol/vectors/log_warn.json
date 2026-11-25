@@ -1,0 +1,12 @@
+{
+  "desc": "Device log line at warn level",
+  "symbolic": {
+    "t": "log",
+    "id": 6,
+    "b": {
+      "lvl": "warn",
+      "msg": "ble: reconnect"
+    }
+  },
+  "cbor_hex": "a3000f010603a20001016e626c653a207265636f6e6e656374"
+}

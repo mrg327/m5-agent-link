@@ -1,0 +1,9 @@
+{
+  "desc": "Debug: ask the device what it shows (answered by dbg_ui_state)",
+  "symbolic": {
+    "t": "dbg_ui_state_req",
+    "id": 8,
+    "b": {}
+  },
+  "cbor_hex": "a3001840010803a0"
+}

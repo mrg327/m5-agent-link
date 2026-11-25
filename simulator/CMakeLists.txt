@@ -149,6 +149,10 @@ sim_script_test(sim_bench_stroke bench_stroke.txt FAIL_REGULAR_EXPRESSION "SCRIP
                 PASS_REGULAR_EXPRESSION "\"ev\":\"bench_dump\"")
 sim_script_test(sim_bench_swipe bench_swipe.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"cat\":\"input\",\"ev\":\"swipe_right\"")
+# Issue 20261123-435a: every played stroke is read (reads > 0) and ends; touch_unread would mean reads stopped.
+sim_script_test(sim_bench_stroke_read bench_stroke.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|touch_unread|stroke_end\",\"reads\":0,"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"stroke_end\",\"reads\":[1-9]")
 # The bench's task scripts (bench/tasks, BENCH.md §5) play in the simulator too, each ending with its command.
 function(bench_task_test name pass)
     add_test(NAME sim_task_${name}

@@ -58,6 +58,7 @@ area_steps() {
         echo "step|.|uv|uv run protocol/tools/validate_vectors.py"
         echo "then|.|uv|uv run protocol/tools/gen_vectors.py"
         echo "then|.|git|git diff --exit-code protocol/vectors"
+        echo "step|.|uv|firmware/components/agentlink_proto/regen.sh --check"
         ;;
     atlas)
         echo "step|.|python3|python3 atlas/tools/extract.py --check"

@@ -1,0 +1,11 @@
+{
+  "desc": "Debug: set the device's log level to debug",
+  "symbolic": {
+    "t": "dbg_set_log_level",
+    "id": 18,
+    "b": {
+      "lvl": "debug"
+    }
+  },
+  "cbor_hex": "a3001845011203a10003"
+}

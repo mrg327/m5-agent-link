@@ -529,7 +529,7 @@ export function createMockDaemon({
           t: 'welcome',
           re: msg.id,
           b: {
-            proto: [0, 1],
+            proto: [0, 1], // base protocol on purpose, as messages.js PROTO
             host: self.host,
             time: { unix: unix(), tz_off: -new Date(clock()).getTimezoneOffset() },
             cfg: { privacy: 'preview', alert: 'full' },
