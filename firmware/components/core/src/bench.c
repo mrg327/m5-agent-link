@@ -15,10 +15,19 @@
 
 typedef struct {
     bool playing, seen; /* seen: a touch read has reported this stroke's press */
-    uint32_t t0, dt;
+    bool warned;        /* touch_unread was logged for this stroke */
+    uint32_t t0, dt, late_ms;
     uint16_t n;
+    uint16_t reads,
+        panel; /* touch reads that played it; of those, reads where the panel was pressed */
 } play_t;
 static play_t s_play;
+/* The last touch read, so a stroke that no read plays says whether reads stopped (issue 435a). */
+static uint32_t s_read_ms;
+static bool s_read_any, s_read_down; /* s_read_down: what that read reported, after a stroke's */
+
+/* ms since the last touch read, -1 before the first */
+static long read_age(uint32_t now_ms) { return s_read_any ? (long)(now_ms - s_read_ms) : -1; }
 MODEL_EXT_BSS static int16_t s_pts[BENCH_MAX_POINTS][2]; /* PSRAM on the watch */
 
 static int16_t rd16(const uint8_t *p) { return (int16_t)(p[0] | p[1] << 8); }
@@ -37,9 +46,14 @@ void bench_on_touch(uint32_t dt_ms, const uint8_t *pts, size_t len, uint32_t now
     }
     /* A stroke that arrives while another plays lifts that one first: the next read reports the
      * lift. */
+    bool prev = s_play.playing, prev_seen = s_play.seen;
     s_play = (play_t){.playing = true, .t0 = now_ms, .dt = dt_ms, .n = (uint16_t)n};
-    dbg_event("bench", "touch", "\"n\":%u,\"dt\":%u,\"x\":%d,\"y\":%d", (unsigned)n,
-              (unsigned)dt_ms, s_pts[0][0], s_pts[0][1]);
+    /* read_ago, prev and down say whether the read path is alive and what state it was left in */
+    dbg_event("bench", "touch",
+              "\"n\":%u,\"dt\":%u,\"x\":%d,\"y\":%d,\"read_ago\":%ld,\"prev\":%d,\"prev_seen\":%d,"
+              "\"down\":%d",
+              (unsigned)n, (unsigned)dt_ms, s_pts[0][0], s_pts[0][1], read_age(now_ms), prev,
+              prev_seen, s_read_down);
 }
 
 bool bench_playing(void) { return s_play.playing; }
@@ -90,14 +104,20 @@ bool bench_touch(uint32_t now_ms, bool *down, int32_t *x, int32_t *y)
 {
     bool played = false;
     uint32_t late_ms = 0;
+    s_read_ms = now_ms;
+    s_read_any = true;
     if (s_play.playing) {
         played = true;
+        if (s_play.reads < UINT16_MAX) s_play.reads++;
+        /* a real finger, or a stuck panel */
+        if (*down && s_play.panel < UINT16_MAX) s_play.panel++;
         uint32_t i = (now_ms - s_play.t0) / s_play.dt;
         /* The touch is polled, and a read can come tens of ms late while a frame renders: the
          * stroke's clock starts at the first read that plays it, so the watch sees the whole
          * stroke, a short tap included. */
         if (!s_play.seen) {
             late_ms = now_ms - s_play.t0;
+            s_play.late_ms = late_ms;
             s_play.seen = true;
             s_play.t0 = now_ms;
             i = 0;
@@ -111,8 +131,11 @@ bool bench_touch(uint32_t now_ms, bool *down, int32_t *x, int32_t *y)
             *x = s_pts[s_play.n - 1][0];
             *y = s_pts[s_play.n - 1][1];
             s_play.playing = false;
+            dbg_event("bench", "stroke_end", "\"reads\":%u,\"panel\":%u,\"late\":%u",
+                      (unsigned)s_play.reads, (unsigned)s_play.panel, (unsigned)s_play.late_ms);
         }
     }
+    s_read_down = *down;
     if (*down != s.touch_down) {
         s.touch_down = *down;
         int32_t cx = *x < 0 ? 0 : *x > 4095 ? 4095 : *x, cy = *y < 0 ? 0 : *y > 4095 ? 4095 : *y;
@@ -208,7 +231,11 @@ void bench_on_ctl(int op, uint32_t arg, uint32_t now_ms)
 
 void bench_tick(uint32_t now_ms)
 {
-    (void)now_ms;
+    /* A stroke no touch read has played for 500 ms: say so once, with the age of the last read. */
+    if (s_play.playing && !s_play.seen && !s_play.warned && now_ms - s_play.t0 >= 500) {
+        s_play.warned = true;
+        dbg_event_at(DBG_WARN, "bench", "touch_unread", "\"read_ago\":%ld", read_age(now_ms));
+    }
     for (int k = 0; k < 4 && s.dumping; k++) {
         uint32_t left = s.n - s.sent, m = left > BENCH_RECS_PER_MSG ? BENCH_RECS_PER_MSG : left;
         bool last = s.sent + m == s.n;
