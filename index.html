@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>AgentLink Atlas — your agents, on your wrist</title>
+<title>AgentLink Atlas — agents on the go</title>
 <meta name="description" content="A living explainer of AgentLink: a round AMOLED StopWatch that shows what your coding agents are doing and buzzes when one needs you; one key press brings its terminal to the front. The watch on this page runs the real firmware UI.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#05060a">
 <meta property="og:type" content="website">
-<meta property="og:title" content="AgentLink Atlas — your agents, on your wrist">
+<meta property="og:title" content="AgentLink Atlas — agents on the go">
 <meta property="og:description" content="Agent hooks → daemon → USB/BLE → a round watch. It buzzes when an agent needs you; press a key and its terminal comes forward. An interactive tour.">
 <meta property="og:site_name" content="AgentLink Atlas">
 <meta name="twitter:card" content="summary_large_image">
@@ -43,7 +43,7 @@
       <li><a href="#intro" data-nav="intro"><b>00</b><span>Hello</span></a></li>
       <li><a href="#glance" data-nav="glance"><b>01</b><span>Glance</span></a></li>
       <li><a href="#touch" data-nav="touch"><b>02</b><span>Touch</span></a></li>
-      <li><a href="#sound" data-nav="sound"><b>03</b><span>Sound</span></a></li>
+      <li><a href="#feel" data-nav="feel"><b>03</b><span>Feel</span></a></li>
       <li><a href="#flow" data-nav="flow"><b>04</b><span>Flow</span></a></li>
       <li><a href="#start" data-nav="start"><b>05</b><span>Start</span></a></li>
       <li><a href="#replay" data-nav="replay"><b>06</b><span>Replay</span></a></li>
@@ -69,7 +69,7 @@
     <div class="chapter__inner hero">
       <div class="hero__copy">
         <p class="chapter__eyebrow"><span class="mono">M5Stack StopWatch</span> · AgentLink</p>
-        <h1 class="hero__title" id="intro-title">Your agents,<br>on your wrist.</h1>
+        <h1 class="hero__title" id="intro-title">Agents<br>on the go.</h1>
         <p class="hero__lede">One glance tells you which agent is working, which is waiting for you and which is done. One key press brings its terminal to the front.</p>
         <p class="hero__note">It ships without a strap: stand it on your desk over USB, or wear it on your own band over Bluetooth.</p>
         <ol class="hero__beats" aria-hidden="true">
@@ -93,7 +93,7 @@
       <header class="chapter__head">
         <p class="chapter__eyebrow"><b class="mono">01</b> Colour means state</p>
         <h2 class="chapter__title" id="glance-title">What the watch shows</h2>
-        <p class="chapter__lede">Every session is an arc on the rim; the one you picked fills the middle. Colour says its state, and shape and motion say it again for anyone who can’t tell the colours apart. The amber and blue marks by the keys are the one exception. Pick a state or a part of the screen to see it on the watch.</p>
+        <p class="chapter__lede">Every session is an arc on the rim; the one you picked fills the middle. Colour says its state, and shape and motion say it again for anyone who can’t tell the colours apart. The yellow and blue marks by the keys are the one exception. Pick a state or a part of the screen to see it on the watch.</p>
       </header>
       <div class="glance__chips" data-slot="chips" role="group" aria-label="Agent states"></div>
       <div class="glyph-key" data-slot="glyphs" role="group" aria-label="Glyph key"></div>
@@ -112,11 +112,12 @@
     </div>
   </section>
 
-  <section class="chapter" data-chapter="sound" data-layout="wide" id="sound" aria-labelledby="sound-title">
-    <div class="chapter__inner" data-mount="sound">
+  <section class="chapter" data-chapter="feel" data-layout="wide" id="feel" aria-labelledby="feel-title">
+    <div class="chapter__inner" data-mount="feel">
       <header class="chapter__head">
-        <p class="chapter__eyebrow"><b class="mono">03</b> Blips, coins and fanfares</p>
-        <h2 class="chapter__title" id="sound-title">Notification sounds</h2>
+        <p class="chapter__eyebrow"><b class="mono">03</b> Buzzes, blips and fanfares</p>
+        <h2 class="chapter__title" id="feel-title">Buzz and sound</h2>
+        <p class="chapter__lede">The moments that matter buzz, and with sounds on they play a short cue too. Press a buzz or a sound to feel or hear it.</p>
       </header>
       <div class="chapter__body" data-slot="body"></div>
     </div>
@@ -125,7 +126,7 @@
   <section class="chapter" data-chapter="flow" data-layout="wide" id="flow" aria-labelledby="flow-title">
     <div class="chapter__inner" data-mount="flow">
       <header class="chapter__head">
-        <p class="chapter__eyebrow"><b class="mono">04</b> From hook to wrist</p>
+        <p class="chapter__eyebrow"><b class="mono">04</b> From hook to watch</p>
         <h2 class="chapter__title" id="flow-title">How data reaches the watch</h2>
         <p class="chapter__lede">An agent does something and runs a hook: a small program it calls on every event. The hook tells <code>agentlinkd</code>, the daemon (a background program) on your PC, which turns the event into a few bytes and sends them over whichever link is up. Watch the beads; click one to open the packet.</p>
       </header>

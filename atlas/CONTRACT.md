@@ -29,8 +29,8 @@ order, each a `<section data-chapter="id">`:
 |---|---|---|
 | `intro` | Hero: what it is, the watch in its best light | shell (`js/stage/*`) |
 | `glance` | What the watch shows: the ring's parts, states, colours, the link | shell |
-| `touch` | How you talk to it: gestures per screen (from nav.c), timing, haptics | gestures (`js/gestures/*`) |
-| `sound` | How it sounds: the five moments and their cues from the firmware sound bank | sound (`js/sound/*`) |
+| `touch` | How you talk to it: gestures per screen (from nav.c), timing | gestures (`js/gestures/*`) |
+| `feel` | Buzz and sound: each moment's buzz and cue side by side, every haptic pattern, the sound bank | sound (`js/sound/*`, seismograph from `js/gestures/haptics.js`) |
 | `flow` | How data travels: agent → hook → daemon → USB/BLE/WS → watch | flow (`js/flow/*`) |
 | `start` | Get started: what you need, setup, desk or wrist, keys, privacy and safety (static) | shell |
 | `replay` | Inside: drop a trace file and replay real sessions | gestures (`js/replay/*`) |

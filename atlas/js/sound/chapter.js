@@ -1,7 +1,25 @@
-// "sound" chapter: audition the watch's notification sounds. The bank is firmware data
-// (sound_bank.c → facts.sounds) rendered by the same chip synth the watch will run.
+// "feel" chapter: how the watch gets your attention. A table of the moments with their buzz and their
+// sound side by side (as feedback.c pairs them), every haptic pattern (facts.haptics), then the
+// notification sounds: firmware data (sound_bank.c → facts.sounds) rendered by the same chip synth
+// the watch runs.
 import { h, svg, bodySlot } from '../gestures/dom.js';
+import { createSeismograph } from '../gestures/haptics.js';
 import { render, hold, durationMs, repeat } from './synth.js';
+
+/**
+ * The moments that buzz or sound, as feedback.c pairs them: a facts.haptics pattern and a
+ * facts.sounds role, or null where the firmware plays none. `state` names a row of facts.states.
+ * @type {{ state?: string[], label: string, buzz: string | null, sound: string | null }[]}
+ */
+const MOMENTS = [
+  { state: ['input', '0'], label: 'Needs approval', buzz: 'permission', sound: 'input' },
+  { state: ['input', '1'], label: 'Has a question', buzz: 'question', sound: 'input' },
+  { state: ['done'], label: 'Done', buzz: 'done', sound: 'done' },
+  { state: ['error'], label: 'Error', buzz: 'error', sound: null },
+  { label: 'You approved', buzz: 'approved', sound: 'approved' },
+  { label: 'You denied', buzz: 'denied', sound: 'denied' },
+  { label: 'Firmware updated', buzz: null, sound: 'updated' },
+];
 
 const PICKS_KEY = 'atlas.sound.picks';
 const ROLE_COLOR = { done: 'var(--c-success)', input: 'var(--c-accent)' };
@@ -79,7 +97,22 @@ function roll(sound, lo, hi) {
 export function mount(section, ctx) {
   const bank = ctx.facts.sounds;
   const root = h('div', { class: 'snd' });
-  bodySlot(section).append(root);
+  const moments = h('div', { class: 'feel__moments' });
+  const hapRoot = h('div');
+  // every pattern, closed by default: the table above already plays the ones that alert you
+  const hapBox = h(
+    'details',
+    { class: 'feel__haptics snd__role' },
+    h(
+      'summary',
+      { class: 'snd__role-t' },
+      h('span', { class: 'mono', text: 'buzz' }),
+      ` Every pattern, drawn as the motor runs it · ${Object.keys(ctx.facts.haptics).length} patterns`,
+    ),
+    hapRoot,
+  );
+  bodySlot(section).append(moments, hapBox, root);
+  createSeismograph(hapRoot, ctx);
   if (!bank?.bank?.length) {
     root.append(
       h('p', { text: 'No sound bank in facts.json. Run python3 atlas/tools/extract.py.' }),
@@ -175,13 +208,99 @@ export function mount(section, ctx) {
     volume = Number(vol.value);
   });
 
+  // ── the moments: buzz and sound side by side ──
+  /**
+   * Buzzes one haptic pattern: on the stage watch, and on a phone that allows it.
+   * @param {string} name a key of facts.haptics
+   */
+  const buzz = (name) => {
+    /** @type {{ on_ms: number, off_ms: number }[]} */
+    const st = ctx.facts.haptics[name] ?? [];
+    ctx.stage?.pulse?.('haptic');
+    ctx.bus?.emit?.('watch:haptic', { steps: st, from: 'atlas' });
+    try {
+      navigator.vibrate?.(st.flatMap((x) => (x.off_ms ? [x.on_ms, x.off_ms] : [x.on_ms])));
+    } catch {
+      /* not allowed here */
+    }
+  };
+  const rowsEl = MOMENTS.map((m) => {
+    const st = m.state && ctx.facts.states?.[m.state[0]];
+    const label = (m.state?.[1] ? st?.sub_labels?.[m.state[1]] : st?.label) ?? m.label;
+    const tr = h('tr', { class: 'feel__row' });
+    /**
+     * A play button, or a dash where the firmware plays nothing.
+     * @param {'buzz' | 'sound'} kind which column
+     * @param {string | null} key the haptic pattern or sound role
+     * @param {() => void} act what a press does
+     * @returns {HTMLElement} the cell's content
+     */
+    const cell = (kind, key, act) =>
+      key
+        ? h(
+            'button',
+            {
+              type: 'button',
+              class: `feel__play feel__play--${kind}`,
+              'aria-label': `${kind === 'buzz' ? 'Buzz' : 'Sound'}: ${label}`,
+              onclick: act,
+            },
+            h('span', {
+              class: 'feel__ico',
+              'aria-hidden': 'true',
+              text: kind === 'buzz' ? '〰' : '♪',
+            }),
+            h('span', { class: 'mono', text: key }),
+          )
+        : h('span', { class: 'feel__none', text: '—', 'aria-label': 'none' });
+    tr.append(
+      h('th', { scope: 'row', text: label }),
+      h(
+        'td',
+        null,
+        cell('buzz', m.buzz, () => m.buzz && buzz(m.buzz)),
+      ),
+      h(
+        'td',
+        null,
+        cell('sound', m.sound, () => {
+          const s0 = bank.bank.find(
+            (/** @type {{ id: string }} */ x) => x.id === picks[m.sound ?? ''],
+          );
+          if (s0) play(s0, tr);
+        }),
+      ),
+    );
+    return tr;
+  });
+  moments.append(
+    h(
+      'table',
+      { class: 'feel__table' },
+      h(
+        'thead',
+        null,
+        h(
+          'tr',
+          null,
+          h('th', { scope: 'col', text: 'Moment' }),
+          h('th', { scope: 'col', text: 'Buzz' }),
+          h('th', { scope: 'col', text: 'Sound' }),
+        ),
+      ),
+      h('tbody', null, rowsEl),
+    ),
+    h('p', {
+      class: 'feel__note',
+      text: 'Sounds play only with Sounds on; quiet mode keeps the buzz, silent mode drops both, and a watch lying face down is silent.',
+    }),
+  );
+
   root.append(
     h(
       'p',
       { class: 'snd__lede' },
-      `The watch plays a sound at ${bank.roles.length} moments: an agent needs you, a session finishes, `,
-      'your answer goes out (rising for approve, falling for deny), and the first start after an update. ',
-      'Open a moment to hear its candidates and pick one; the one the watch plays is marked. ',
+      `Each of the ${bank.roles.length} sounds has candidates: open one to hear them and pick; the one the watch plays is marked. `,
       `They are short game cues: up to ${Math.max(...bank.bank.map((s) => s.tracks.length))} synth voices at ${bank.rate / 1000} kHz. `,
       h('i', { text: 'Watch speaker' }),
       ' imitates the little speaker; turn it off to hear the raw synth.',

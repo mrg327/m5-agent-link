@@ -54,7 +54,7 @@ const parts = (f) => {
     },
     {
       name: 'Key hints',
-      text: 'Beside each key, on the upper rim. A (amber) brings this session’s terminal to the front; A twice jumps to the next session that needs you. B (blue) picks the next session. They are the only colours that are not states.',
+      text: 'Beside each key, on the upper rim. A (yellow) brings this session’s terminal to the front; A twice jumps to the next session that needs you. B (blue) picks the next session. They are the only colours that are not states.',
       at: { x: r.key_a_x_px, y: r.key_y_px, text: 'key A' },
     },
     {

@@ -1,8 +1,7 @@
-// "touch" chapter: how you talk to it. Gesture lab, timing scope, haptic seismograph,
-// gesture → action matrix.
+// "touch" chapter: how you talk to it. Gesture lab, timing scope and the gesture → action matrix.
+// The haptic seismograph lives in the "feel" chapter (sound/chapter.js).
 import { h, bodySlot } from './dom.js';
 import { createLab } from './lab.js';
-import { createSeismograph } from './haptics.js';
 import { createMatrix } from './matrix.js';
 
 let lab = null;
@@ -57,18 +56,11 @@ export function mount(section, ctx) {
   root.append(intro);
 
   const labRoot = h('div');
-  const hapRoot = h('div');
   const mxRoot = h('div');
   root.append(
     block('A', 'Gesture lab', null, labRoot),
     block(
       'B',
-      'Haptic seismograph',
-      `${Object.keys(ctx.facts.haptics).length} patterns, one motor. This is what each buzz looks like and what it means; on a phone that allows it, the page buzzes too.`,
-      hapRoot,
-    ),
-    block(
-      'C',
       'What each gesture does',
       'Pick a cell and the real firmware performs it on the watch.',
       mxRoot,
@@ -91,7 +83,6 @@ export function mount(section, ctx) {
   bodySlot(section).append(root);
 
   lab = createLab(labRoot, ctx);
-  createSeismograph(hapRoot, ctx);
   createMatrix(mxRoot, ctx);
   lab.attachWatch?.();
   requestAnimationFrame(() => lab.resize());
