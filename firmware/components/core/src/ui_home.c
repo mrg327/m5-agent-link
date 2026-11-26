@@ -390,6 +390,7 @@ void ui_home_tick(uint32_t now)
     if (ui_mode() == MODE_HOME && !s_ambient) ui_graph_strip_tick(now);
     int16_t work[RING_MAX_SEGMENTS];
     int n_work = work_degs(work, RING_MAX_SEGMENTS);
+    ui_mote_note_deck(s_n == 0, !s_ambient, s_last_input); /* its home and its boot move */
     ui_mote_tick(now, s_ambient && ui_mode() == MODE_HOME, error_deg(), work, n_work);
     ui_eggs_tick(now, ui_mode() == MODE_HOME ? ui_home_card_clock() : NULL);
 }

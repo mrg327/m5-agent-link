@@ -404,8 +404,9 @@ seconds hand at r 216 and settled at 6 o'clock.
 - **Travel.** Every trip is the short way, eased in and out (smoothstep), and takes 0.8 s plus 20 ms a degree
   (half the ring in 4.4 s, at most 62°/s), so nothing pops; a new target mid-trip starts a new trip from where
   it is. Only the loops (the big finish's and the centuries egg's, §3.15) move faster.
-- **Rules.** It exists only where the gate allows a loop (`persona_allow(PF_MOTE)` with `PA_LOOP`: the dock,
-  the display lit, nothing waiting for you) and only on the idle face. It leaves the moment anything needs you,
+- **Rules.** On the idle face it exists only where the gate allows a loop (`persona_allow(PF_MOTE)` with
+  `PA_LOOP`: the dock, the display lit, nothing waiting for you); its other places are under Mascot
+  appearances below. It leaves the moment anything needs you,
   with no exit animation: the request is the picture. With reduced motion it is a still orb at its resting
   place (by the first working session, at 12 at rest, at the error), no breath, no travel, no cheer. A cheer
   that happens while it is gone is not saved for later, and an error during one ends it (it goes to hover). The deck goes ambient with a session in error (only a
@@ -453,9 +454,9 @@ seconds hand at r 216 and settled at 6 o'clock.
 - **Cost** (simulator, `fun_mote.txt`). Each change repaints the orb's box, old and new (about 4–5 k px each,
   joined where they overlap); nothing else on the face is touched. Lingering, the breath repaints it a level at
   a time: about 51 k px in 3.6 s (about 14 k px a second, like a breathing sigil). A trip moves the box
-  every tick: about 555 k px over the 4.4 s of half the ring in the simulator's 30 ms ticks (about two full
-  frames' worth, spread over the trip); on the watch the frame rate bounds it. A big finish is a trip (about
-  0.5 M px for half the ring), then the loop's box (about 4 k px) and the flare's (up to about 10 k px): about
+  every tick: about 590 k px over the 4.4 s of half the ring in the simulator's 30 ms ticks (under three
+  full frames' worth, spread over the trip); on the watch the frame rate bounds it. A big finish is a trip (about
+  0.6 M px for half the ring), then the loop's box (about 4 k px) and the flare's (up to about 10 k px): about
   0.4 M px over the loop, the flare and the linger's first 0.4 s. On battery it is gone and the face repaints
   nothing.
 - **Sim.** `fun_mote.txt` (shots `fun_mote_visit_a`, `_travel`, `_visit_b`, `_cheer` (the drift), `_loop`,
@@ -464,6 +465,30 @@ seconds hand at r 216 and settled at 6 o'clock.
   `"ev":"mote_finish"` when a cheer reaches its arc, `"ev":"mote_pair"` on the pairing screen and
   `"ev":"mote_day"` when a day counts.
   The simulator's RTC runs on the script's virtual clock, so the firefly moves in a headless run.
+- **Mascot appearances** (issue 20261126-f5be; design: the owner's mascot notes, 2026-11-26). The Mote is
+  becoming the watch's mascot. Owner's rules: off by default (`FUN_MOTE`) until a week on a device; absent
+  from the lit deck with sessions and from ASK; never talks or nags; never starts a buzz or a sound; alerts
+  always win; never the only sign of anything; reduced motion respected; growth not shown. Where it is today:
+
+  | Where | What it does | Gate |
+  |---|---|---|
+  | Idle face (sessions) | the Firefly above: visit, hover, cheer, rest, ember | `PA_LOOP` |
+  | **Empty deck** (no sessions), lit or ambient | rests at 12 on the track (r 175), at the lit level (100 %) on the lit deck and 45 % on the ambient face, breathing; **wanders** ±12° round 12 in one slow sine of 150 s (at most 0.5°/s, a pixel at a time); an **ember** after 5 minutes resting, back at 12 (two wanders make the five minutes); a touch that lights the deck wakes an ember to rest afresh. It needs no clock | `PA_LOOP` to move; with `PA_POSE` only (battery, reduced motion) a **still** orb at 12; gone while a request waits or a full-screen overlay (pairing, the update, the glow) covers the deck |
+  | **Boot** | `mote_boot()`: an ember at the centre (core r 2, 25 %) wakes to size L at full level (0–500 ms, `out3`), one flare (the profile's: the halo ×1.6 in 120 ms, back in 480 ms), and from 620 ms rises to its place at 12, shrinking to size M and dimming to the deck's level (smoothstep), 1.2 s in all; then the empty deck's Mote takes over where it landed (absent if sessions arrived meanwhile). Silent | `PA_ONESHOT` within 300 ms of the first step (else never); reduced motion: no move, it is simply at its place |
+
+  The boot move only draws, over the deck, which is up and takes input from the first frame: it adds no boot
+  time (in the simulator the first screen, the link's `hello` and a tap 350 ms in land on the same steps with
+  it on or off). It ends at once (in the step the cause lands, with no exit animation) on any input anywhere
+  (`"end":"input"`), on a request or a waiting session, read from the model so it does not wait a step for the
+  gate's context (`"request"`), on the gate refusing a one-shot or leaving HOME (`"gate"`), or at 1.2 s
+  (`"done"`). It never starts in a dark boot (a reconnect attempt). Cost (simulator): the boot repaints the
+  orb's box, old and new, each frame, up to about 38 k px at the flare and about 450 k px from 290 ms to the
+  end in 10 ms steps; the empty deck about 22 k px a second lit (breath and wander) and about 16 k px a second
+  ambient; nothing on battery or as an ember. Sim: `mote_boot.txt` (shots `mote_boot_wake`, `_flare`, `_rise`,
+  `_end`), `mote_boot_cut.txt` (a tap cuts it; `mote_boot_cut`), `mote_boot_request.txt`,
+  `mote_boot_still.txt` (reduced motion; `mote_boot_still`), `mote_boot_off.txt`, `mote_empty.txt` (shots
+  `mote_empty_lit`, `_ambient`, `_wander`, `_ember`, `_woken`, `_battery`); the simulator's `--pref fun=0x3db` stores the switch before boot as NVS would. The log
+  has `"ev":"mote_boot"` with `"start"` and `"end"`.
 - **Profile.** The look (colour, halo falloff, levels, breath, flare, sizes) has one source,
   `design/mote/mote.toml`; `design/mote/gen.py` writes the firmware header `mote_look.h`, the Atlas CSS and
   SVGs, the favicon and the CLI colour from it (`design/mote/README.md`, issue 20261126-0163). The idle-face

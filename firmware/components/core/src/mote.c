@@ -117,7 +117,28 @@ static void go(mote_t *m, int deg, uint32_t now, bool jump)
     m->pos = wrap(m->from + (int32_t)lroundf((float)short_way(m->from, m->to) * k));
 }
 
-static uint8_t base_lum(const mote_out_t *o) { return o->night ? MOTE_LUM_NIGHT : MOTE_LUM; }
+static uint8_t base_lum(const mote_in_t *in, const mote_out_t *o)
+{ return o->night ? MOTE_LUM_NIGHT : in->lit ? MOTE_LUM_LIT : MOTE_LUM; }
+
+/* The empty deck's wander, millidegrees either side of 12: one slow sine from when it began to
+ * rest, so it starts at its place and is back there, still, when it becomes an ember. */
+static int32_t wander(const mote_t *m, const mote_in_t *in, uint32_t now)
+{
+    if (!in->empty || in->reduced || !m->arrived) return 0;
+    float ph = (float)((now - m->idle_ms) % MOTE_WANDER_MS) / (float)MOTE_WANDER_MS;
+    return (int32_t)lroundf(sinf(ph * 6.2831853f) * (float)(MOTE_WANDER_DEG * 1000));
+}
+
+/* Where it is, at whole degrees on the track plus the rest (under half a degree) in px along it, so
+ * a slow move steps a pixel at a time rather than a degree (3 px) at a time. */
+static void place(int32_t mdeg, mote_out_t *o)
+{
+    o->deg = whole_deg(mdeg);
+    float rest = (float)short_way((int32_t)o->deg * 1000, wrap(mdeg)) * 1.7453292e-5f;
+    float a = (float)o->deg * 0.017453292f;
+    o->dx = (int8_t)lroundf((float)MOTE_TRACK_R * rest * cosf(a));
+    o->dy = (int8_t)lroundf((float)MOTE_TRACK_R * rest * sinf(a));
+}
 
 /* The halo's brightness for the night and a tired plan. */
 static void dim_halo(const mote_in_t *in, mote_out_t *o)
@@ -169,7 +190,7 @@ static bool cheer(mote_t *m, const mote_in_t *in, uint32_t now, mote_out_t *o)
         return true;
     }
     uint32_t t = now - m->fx_ms;
-    uint8_t lum = base_lum(o);
+    uint8_t lum = base_lum(in, o);
     if (t < MOTE_FIN_LOOP_MS + MOTE_FLARE_MS) {
         o->mode = MOTE_CHEER;
         o->deg = whole_deg(m->pos);
@@ -195,7 +216,7 @@ static bool effect(mote_t *m, const mote_in_t *in, uint32_t now, mote_out_t *o)
     if (m->fx == MOTE_LOOP && t < MOTE_LOOP_MS) {
         o->mode = MOTE_LOOP;
         o->deg = whole_deg(m->pos);
-        o->look = mote_look(100, base_lum(o), 1000);
+        o->look = mote_look(100, base_lum(in, o), 1000);
         dim_halo(in, o);
         loop_off(o, (float)t / (float)MOTE_LOOP_MS, MOTE_LOOP_R);
         return true;
@@ -207,7 +228,7 @@ static bool effect(mote_t *m, const mote_in_t *in, uint32_t now, mote_out_t *o)
 /* Its look in its base mode, and the sway beside an error. */
 static void settle_look(const mote_t *m, const mote_in_t *in, uint32_t now, mote_out_t *o)
 {
-    uint8_t lum = base_lum(o);
+    uint8_t lum = base_lum(in, o);
     int32_t at = m->pos;
     uint16_t breath = 0;
     if (m->base == MOTE_HOVER) {
@@ -225,10 +246,11 @@ static void settle_look(const mote_t *m, const mote_in_t *in, uint32_t now, mote
     } else if (!in->reduced) {
         bool tired = in->usage != 255 && in->usage >= MOTE_TIRED_PCT;
         breath = mote_breath(now, tired ? MOTE_BREATH_TIRED_MS : MOTE_BREATH_MS);
+        if (m->base == MOTE_REST) at += wander(m, in, now);
     }
     o->look = mote_look(100, lum, breath);
     dim_halo(in, o);
-    o->deg = whole_deg(at);
+    place(at, o);
 }
 
 static int target_of(const mote_t *m, const mote_in_t *in, uint32_t now)
@@ -237,6 +259,22 @@ static int target_of(const mote_t *m, const mote_in_t *in, uint32_t now)
     if (m->base == MOTE_HOVER) return ((int)in->error_deg % 360 + 360) % 360;
     if (m->base == MOTE_VISIT) return visit(m, in, now);
     return MOTE_REST_DEG;
+}
+
+/* A new base mode (or appearing) starts afresh; resting starts its clock (the wander, the ember).
+ */
+static void set_base(mote_t *m, const mote_in_t *in, mote_mode_t base, bool appear, uint32_t now)
+{
+    if (appear || base != m->base) {
+        m->base = base;
+        m->target = -1;
+        if (base == MOTE_REST) m->idle_ms = now;
+    }
+    /* woken onto the lit deck (a touch, a key, a raise): an ember rests afresh, at full size */
+    if (in->lit && !m->lit && !appear && base == MOTE_REST && now - m->idle_ms >= MOTE_EMBER_MS) {
+        m->idle_ms = now;
+    }
+    m->lit = in->lit;
 }
 
 mote_out_t mote_step(mote_t *m, const mote_in_t *in, uint32_t now_ms)
@@ -256,11 +294,7 @@ mote_out_t mote_step(mote_t *m, const mote_in_t *in, uint32_t now_ms)
     }
     mote_mode_t base = in->errors ? MOTE_HOVER : in->n_work ? MOTE_VISIT : MOTE_REST;
     bool appear = !m->shown;
-    if (appear || base != m->base) {
-        m->base = base;
-        m->target = -1;
-        if (base == MOTE_REST) m->idle_ms = now_ms;
-    }
+    set_base(m, in, base, appear, now_ms);
     if (in->cheers != m->cheers) {
         m->cheers = in->cheers;
         if (!in->reduced && !appear && base != MOTE_HOVER) {
@@ -296,6 +330,51 @@ mote_out_t mote_step(mote_t *m, const mote_in_t *in, uint32_t now_ms)
     if (!effect(m, in, now_ms, &o)) settle_look(m, in, now_ms, &o);
     m->mode = o.mode;
     return o;
+}
+
+/* 0..1 to 0..1, fast then gentle (out3). */
+static float out3(float t)
+{
+    float u = 1.0f - t;
+    return 1.0f - u * u * u;
+}
+
+static uint8_t mix8(int a, int b, float k)
+{ return (uint8_t)lroundf((float)a + (float)(b - a) * k); }
+
+bool mote_boot(uint32_t t_ms, uint8_t lum_end, mote_boot_t *out)
+{
+    const int l_core = MOTE_LOOK_L_CORE_D / 2, l_halo = MOTE_LOOK_L_HALO_D / 2;
+    const uint32_t flare_end = MOTE_BOOT_RISE_AT_MS + MOTE_LOOK_FLARE_FALL_MS;
+    bool on = t_ms < MOTE_BOOT_MS;
+    if (!on) t_ms = MOTE_BOOT_MS;
+    if (t_ms < MOTE_BOOT_WAKE_MS) { /* the ember wakes: grows to L, its halo fades in */
+        float k = out3(frac(t_ms, MOTE_BOOT_WAKE_MS));
+        uint8_t core = mix8(MOTE_EMBER_R, l_core, k);
+        out->look = (mote_look_t){core, mix8(core, l_halo, k),
+                                  mix8(MOTE_LUM_EMBER, MOTE_LUM_LIT, k), mix8(0, 100, k)};
+        out->rise_pm = 0;
+        return on;
+    }
+    /* the flare: the halo grows by the profile's scale, then falls back while it rises */
+    float flare = 0.0f;
+    uint32_t t_rise0 = MOTE_BOOT_RISE_AT_MS - MOTE_LOOK_FLARE_RISE_MS;
+    if (t_ms >= t_rise0 && t_ms < MOTE_BOOT_RISE_AT_MS) {
+        flare = smooth(frac(t_ms - t_rise0, MOTE_LOOK_FLARE_RISE_MS));
+    } else if (t_ms >= MOTE_BOOT_RISE_AT_MS && t_ms < flare_end) {
+        flare = 1.0f - out3(frac(t_ms - MOTE_BOOT_RISE_AT_MS, MOTE_LOOK_FLARE_FALL_MS));
+    }
+    float r = t_ms < MOTE_BOOT_RISE_AT_MS
+                  ? 0.0f
+                  : smooth(frac(t_ms - MOTE_BOOT_RISE_AT_MS, MOTE_BOOT_MS - MOTE_BOOT_RISE_AT_MS));
+    /* size L to size M as it rises: scale 200 to 100 */
+    out->look =
+        mote_look((uint16_t)lroundf(200.0f - 100.0f * r), mix8(MOTE_LUM_LIT, lum_end, r), 1000);
+    float grow = 1.0f + flare * (float)(MOTE_LOOK_FLARE_SCALE_PCT - 100) / 100.0f;
+    int halo = (int)lroundf((float)out->look.halo_r * grow);
+    out->look.halo_r = (uint8_t)(halo > 255 ? 255 : halo);
+    out->rise_pm = (uint16_t)lroundf(r * 1000.0f);
+    return on;
 }
 
 uint8_t mote_level(uint32_t days)

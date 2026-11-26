@@ -35,14 +35,17 @@ wait 450
 expect_px_max 330000
 wait 250
 shot mote_pair_after.png
-expect_px 233 58 000000
+# the screen is gone (no digits); the deck under it is empty, so the Mote rests at 12 there (issue
+# 20261126-f5be: the empty deck is its home)
+expect_px 321 262 000000
+expect_px 233 58 ffe2b8
 # a failure: no flare, the screen goes at once
 pair 551200
 wait 300
 expect_px 233 58 ffe2b8
 pair fail
 wait 100
-expect_px 233 58 000000
+expect_px 321 262 000000
 # reduced motion: the still orb, no flare
 pref fun 0x83db
 pair 042917
@@ -50,7 +53,7 @@ wait 300
 expect_px 233 58 ffe2b8
 pair done
 wait 100
-expect_px 233 58 000000
+expect_px 321 262 000000
 # the Mote off: no orb at all
 pref fun 0x3d3
 pair 042917

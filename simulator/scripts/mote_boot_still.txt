@@ -1,0 +1,11 @@
+# No boot move with reduced motion (issue 20261126-f5be), run with --pref fun=0x83db (the Mote on, reduced
+# motion): the Mote is simply at its place at 12 on the empty deck from the first steps, still (no breath, no
+# wander), and the log has no "ev":"mote_boot".
+rtc 1800000000
+wait 1500
+expect_screen ring
+shot mote_boot_still.png
+px_reset
+wait 3000
+expect_px_max 0
+quit

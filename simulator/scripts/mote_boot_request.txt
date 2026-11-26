@@ -1,0 +1,10 @@
+# The boot move is cut at once by a request (issue 20261126-f5be), run with --pref fun=0x3db: about 300 ms in,
+# an approval arrives; alerts win, so the move ends in that step with no exit animation (the gate gives it a
+# still pose at most) and the request takes the screen. The log has "ev":"mote_boot","end":"request".
+connect
+rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 2 work api main Indexing the repository
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 300
+expect_screen attention
+quit

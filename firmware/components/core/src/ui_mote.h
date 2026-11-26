@@ -1,7 +1,9 @@
 /* The Mote on the idle face (issue 20261126-59e0, GLYPHS.md §3.14): one object over the deck's
  * centre, so it drifts with the ambient face. mote.c decides; this file reads the fleet, the clock
  * and the persona gate, draws the firefly with ui_orb.h on its track at r 175 and repaints only the
- * orb's box, old and new. Silent: it has no haptic and no sound. */
+ * orb's box, old and new. Silent: it has no haptic and no sound. As the mascot (issue
+ * 20261126-f5be) it also rests on the empty deck, lit or ambient, and plays its boot move once at
+ * start-up over the deck as it comes up, cut by any input or anything that needs you. */
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
@@ -28,6 +30,11 @@ void ui_mote_tick(uint32_t now_ms, bool face, int error_deg, const int16_t *work
  * @param[in] present The fields the change carried (SF_*).
  */
 void ui_mote_on_session(const session_t *before, const session_t *now, uint32_t present);
+/**
+ * @brief What HOME shows, before each ui_mote_tick(): the empty deck (no sessions) is up, lit or
+ * dimmed, and when the last input anywhere was (it cuts the boot move).
+ */
+void ui_mote_note_deck(bool empty, bool lit, uint32_t input_ms);
 /** @brief The firefly is on screen now. */
 bool ui_mote_shown(void);
 /** @brief Loop once off the track (the centuries egg); nothing when it is not shown. */

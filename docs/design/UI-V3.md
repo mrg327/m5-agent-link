@@ -41,7 +41,10 @@ document wins. Finding numbers (H1, R1, X2 …) refer to the profile.
    breathing halo) on its own track inside the idle face's ring on the dock. It visits each working session's
    arc in turn, rests at 12 o'clock when nothing runs, and loops once and flares on a big finish
    ([GLYPHS.md](GLYPHS.md) §3.14; the owner chose the firefly on 2026-11-26). It is gone the moment anything
-   needs you.
+   needs you. As the watch's mascot (issue f5be) it also rests at 12 on the empty deck, lit or ambient
+   (wandering a little, an ember after 5 minutes, still on battery), and wakes at boot: an ember at the centre,
+   one flare, a rise to its place, 1.2 s over the deck as it comes up, cut by any touch or request. It is
+   absent from the lit deck with sessions and from ASK.
 10. **A few rare easter eggs** (2026-11-26, issue 7770), on by default: the clock's digits slip at 13:37 and
     04:04; the 100th and 1000th finish turn the sigil once, or loop the Mote (§3.15 there). Silent, never
     while anything needs you.

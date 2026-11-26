@@ -20,13 +20,14 @@ px_reset
 wait 3600
 expect_px_max 70000
 # after 8 s it crosses to the second (9 o'clock), the short way, eased: a 4.4 s trip that moves the box each
-# tick, about 555 k px in all (under three full frames' worth, spread over the trip; the halo holds r 30)
+# tick, about 590 k px in all (under three full frames' worth, spread over the trip; the halo holds r 30, and it
+# moves a pixel at a time rather than a degree)
 wait 2100
 px_reset
 wait 2200
 shot fun_mote_travel.png
 wait 2300
-expect_px_max 620000
+expect_px_max 700000
 pref fun 0x3db
 wait 1000
 shot fun_mote_visit_b.png
@@ -43,8 +44,9 @@ px_reset
 wait 2200
 shot fun_mote_cheer.png
 wait 2150
-# the drift: like any trip, the box moves every tick (about 0.5 M px, the finish's own ring change included)
-expect_px_max 600000
+# the drift: like any trip, the box moves every tick, a pixel at a time (about 0.6 M px, the finish's own
+# ring change included)
+expect_px_max 700000
 px_reset
 wait 150
 shot fun_mote_loop.png

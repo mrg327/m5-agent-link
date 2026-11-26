@@ -12,6 +12,12 @@
  * loop. Its look never changes under the user: the level (days with green tests) is counted and
  * never shrinks, but is not shown yet.
  *
+ * As the mascot (issue 20261126-f5be) it also lives on the empty deck (no sessions), lit or
+ * ambient: it rests at 12, wanders +-12 degrees round it while it may loop and becomes an ember
+ * after five minutes; and mote_boot() is its 1.2 s wake at boot (ember at the centre, wake to size
+ * L, one flare, rise to its place at 12 shrinking to M), which ui_mote.c draws over the deck as it
+ * comes up.
+ *
  * The look is reusable apart from this behaviour: mote_look() and mote_breath() give the firefly
  * at any size, and ui_orb_draw() (ui_orb.h) paints it anywhere, for the mascot on other screens. */
 #pragma once
@@ -67,6 +73,11 @@
 #define MOTE_LOOP_MS 1200u /* the centuries egg: once round a circle inside the track */
 #define MOTE_LOOP_R 16
 #define MOTE_LEVEL_MAX 7
+#define MOTE_WANDER_DEG 12        /* the empty deck: it wanders this far either side of 12 */
+#define MOTE_WANDER_MS 150000u    /* once there and back; two make the five minutes to the ember */
+#define MOTE_BOOT_MS 1200u        /* the boot move, all of it */
+#define MOTE_BOOT_WAKE_MS 500u    /* the ember wakes to size L, eased out */
+#define MOTE_BOOT_RISE_AT_MS 620u /* the flare has peaked: it rises to its place */
 
 /** What the firefly is doing. */
 typedef enum {
@@ -92,6 +103,8 @@ typedef struct {
     bool face;      /**< the idle face is up, with its clock */
     bool may;       /**< the gate lets it exist: PA_LOOP with reduced motion set aside */
     bool reduced;   /**< reduced motion: a still firefly at its resting place */
+    bool empty;     /**< the empty deck (no sessions): it rests at 12 and wanders round it */
+    bool lit;       /**< on the lit deck (not the ambient face): the profile's lit level */
     uint8_t n_work; /**< working sessions on the ring, at most MOTE_VISIT_MAX */
     /** Their slots' centres, degrees clockwise from 12, in ring order. */
     int16_t work_deg[MOTE_VISIT_MAX];
@@ -137,6 +150,7 @@ typedef struct {
     uint32_t cheers;    /**< the last count seen */
     uint32_t loops;     /**< the last count seen */
     mote_mode_t fx;     /**< MOTE_CHEER, MOTE_LOOP or MOTE_GONE (none) */
+    bool lit;           /**< on the lit deck last step */
 } mote_t;
 
 /**
@@ -169,6 +183,23 @@ mote_look_t mote_flare(mote_look_t base, uint8_t peak_lum, uint32_t t_ms);
  * @brief The breath at @p t_ms: 0..1000 and back over @p period_ms, in MOTE_BREATH_STEPS levels.
  */
 uint16_t mote_breath(uint32_t t_ms, uint32_t period_ms);
+
+/** The boot move at a moment: the orb's look and how far it has risen. */
+typedef struct {
+    mote_look_t look; /**< its core and halo */
+    uint16_t rise_pm; /**< 0 at the screen's centre, 1000 at its place (12 o'clock, MOTE_TRACK_R) */
+} mote_boot_t;
+
+/**
+ * @brief The boot move @p t_ms after it began: an ember at the centre (0 ms), wakes to size L at
+ * full level (to 500 ms), one flare (the profile's: the halo x 1.6 in 120 ms, back in 480 ms), and
+ * from 620 ms rises to its place, shrinking to size M and dimming to @p lum_end (1200 ms).
+ * @param[in]  t_ms    Since the move began.
+ * @param[in]  lum_end The level it ends at: the deck's (MOTE_LUM_LIT on the lit deck).
+ * @param[out] out     The pose. Must not be NULL.
+ * @return false once the move is over (@p out then holds its last pose).
+ */
+bool mote_boot(uint32_t t_ms, uint8_t lum_end, mote_boot_t *out);
 
 /** @brief The level for @p days green days: thresholds 1, 3, 7, 14, 30, 60, 120 give 1..7. */
 uint8_t mote_level(uint32_t days);

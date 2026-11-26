@@ -328,6 +328,33 @@ sim_script_test(sim_mote_pair mote_pair.txt
 sim_script_test(sim_fun_mote_error fun_mote_error.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"mode\":\"hover\"")
+# The Mote as the mascot (issue 20261126-f5be), with it stored on before boot (--pref, as NVS holds it):
+# the boot move plays and lands on the empty deck; a touch or a request cuts it at once; reduced motion skips
+# it (a still Mote at its place); switched off, nothing of it. The empty deck: rest, wander, ember, still on
+# battery, gone with a session.
+function(sim_mote_test name script prefs)
+    add_test(NAME ${name}
+             COMMAND agentlink_sim --headless --no-ws ${prefs}
+                     --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/${script})
+    set_tests_properties(${name} PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30 ${ARGN})
+endfunction()
+sim_mote_test(sim_mote_boot mote_boot.txt "--pref;fun=0x3db"
+              FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"mote_boot\",\"start\".*\"ev\":\"(haptic|sound)\""
+              PASS_REGULAR_EXPRESSION "\"mote_boot\",\"start\":[0-9]+.*\"mote_boot\",\"end\":\"done\",\"ms\":1200.*\"mode\":\"rest\",\"deg\":0,\"lum\":100")
+sim_mote_test(sim_mote_boot_touch mote_boot_cut.txt "--pref;fun=0x3db"
+              FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+              PASS_REGULAR_EXPRESSION "\"mote_boot\",\"end\":\"input\".*\"gesture\":\"tap\"")
+sim_mote_test(sim_mote_boot_request mote_boot_request.txt "--pref;fun=0x3db"
+              FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+              PASS_REGULAR_EXPRESSION "\"ev\":\"attention\",\"rid\":7.*\"mote_boot\",\"end\":\"request\"")
+sim_mote_test(sim_mote_boot_reduced mote_boot_still.txt "--pref;fun=0x83db"
+              FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"mote_boot\""
+              PASS_REGULAR_EXPRESSION "\"mode\":\"rest\",\"deg\":0")
+sim_mote_test(sim_mote_boot_off mote_boot_off.txt ""
+              FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"cat\":\"fun\",\"ev\":\"mote")
+sim_mote_test(sim_mote_empty mote_empty.txt "--pref;fun=0x3db"
+              FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+              PASS_REGULAR_EXPRESSION "\"mode\":\"rest\",\"deg\":0,\"lum\":100.*\"mode\":\"ember\",\"deg\":0,\"lum\":25.*\"mode\":\"rest\".*\"mode\":\"gone\"")
 # Easter eggs (issue 20261126-7770): the clock slip at 13:37 (once) and 04:04; the 100th finish spins the sigil,
 # held while a request waits and played after it; the 1000th loops the Mote.
 sim_script_test(sim_fun_eggs fun_eggs.txt

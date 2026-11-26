@@ -1,4 +1,5 @@
-/* mote.c: the Mote's state machine, the firefly (issue 20261126-59e0). */
+/* mote.c: the Mote's state machine, the firefly (issue 20261126-59e0), its empty deck and
+ * its boot move (issue 20261126-f5be). */
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -517,6 +518,98 @@ static void test_finish(void)
     EXPECT(!mote_finish_big(&f) && !mote_finish_green(&f), "an error is neither");
 }
 
+/* The empty deck (issue 20261126-f5be): rests at 12, at full level when lit, wanders +-12 degrees
+ * in pixel steps, back at 12 as an ember at five minutes; still where it may not loop. */
+static void test_empty(void)
+{
+    mote_t m = {0};
+    mote_in_t in = calm();
+    in.empty = true;
+    in.lit = true;
+    mote_out_t o = mote_step(&m, &in, 1000);
+    EXPECT(o.mode == MOTE_REST && o.deg == 0 && o.dx == 0 && o.dy == 0 &&
+               o.look.lum == MOTE_LUM_LIT,
+           "the lit empty deck: at 12, at the lit level");
+    in.lit = false;
+    o = mote_step(&m, &in, 1000 + TICK);
+    EXPECT(o.look.lum == MOTE_LUM, "dimmed: the ambient level");
+    int lo = 0, hi = 0, jump = 0;
+    float px_prev = 0.0f;
+    for (uint32_t t = 1000 + 2 * TICK; t < 1000 + MOTE_WANDER_MS; t += TICK) {
+        o = mote_step(&m, &in, t);
+        /* signed degrees from 12, and the position along the track in px */
+        int d = o.deg > 180 ? (int)o.deg - 360 : (int)o.deg;
+        if (d < lo) lo = d;
+        if (d > hi) hi = d;
+        float px =
+            (float)d * 3.0543f + (float)o.dx; /* r 175: 3.05 px a degree; dx along it at 12 */
+        if (t > 1000 + 2 * TICK && (px - px_prev > 2.5f || px_prev - px > 2.5f)) jump++;
+        px_prev = px;
+        EXPECT(o.mode == MOTE_REST, "resting while it wanders");
+    }
+    EXPECT(lo == -MOTE_WANDER_DEG && hi == MOTE_WANDER_DEG, "wanders 12 degrees either side of 12");
+    EXPECT(jump == 0, "a pixel or two at a time, never a jump");
+    o = mote_step(&m, &in, 1000 + MOTE_EMBER_MS);
+    EXPECT(o.mode == MOTE_EMBER && o.deg == 0 && o.dx == 0 && o.dy == 0,
+           "five minutes: an ember, back at 12");
+    in.lit = true; /* a touch lights the deck */
+    o = mote_step(&m, &in, 1000 + MOTE_EMBER_MS + 5000);
+    EXPECT(o.mode == MOTE_REST && o.look.core_r == MOTE_CORE_R && o.look.lum == MOTE_LUM_LIT,
+           "woken onto the lit deck: it rests afresh, full size");
+    o = mote_step(&m, &in, 1000 + MOTE_EMBER_MS + 9000);
+    EXPECT(o.mode == MOTE_REST, "and an ember only five minutes later");
+    /* on battery (no loop): a still pose at 12 */
+    m = (mote_t){0};
+    in.reduced = true;
+    mote_out_t first = mote_step(&m, &in, 0);
+    for (uint32_t t = TICK; t < 60000; t += TICK) {
+        o = mote_step(&m, &in, t);
+        EXPECT(o.deg == 0 && o.dx == 0 && o.look.halo_pct == first.look.halo_pct,
+               "still: no wander, no breath");
+    }
+    /* the idle face with sessions idle: it settles at 12 and does not wander */
+    m = (mote_t){0};
+    in = calm();
+    for (uint32_t t = 0; t < 60000; t += TICK) {
+        o = mote_step(&m, &in, t);
+        EXPECT(o.deg == 0 && o.dx == 0, "the idle face: no wander");
+    }
+}
+
+/* The boot move: an ember at the centre, wakes to L, one flare, rises to its place shrinking to M.
+ */
+static void test_boot(void)
+{
+    mote_boot_t b;
+    EXPECT(mote_boot(0, MOTE_LUM_LIT, &b), "playing at 0");
+    EXPECT(b.look.core_r == MOTE_EMBER_R && b.look.lum == MOTE_LUM_EMBER && b.look.halo_pct == 0 &&
+               b.rise_pm == 0,
+           "an ember at the centre");
+    mote_boot(MOTE_BOOT_WAKE_MS, MOTE_LUM_LIT, &b);
+    EXPECT(b.look.core_r == MOTE_LOOK_L_CORE_D / 2 && b.look.halo_r == MOTE_LOOK_L_HALO_D / 2 &&
+               b.look.lum == MOTE_LUM_LIT && b.rise_pm == 0,
+           "awake: size L, full level, still at the centre");
+    mote_boot(MOTE_BOOT_RISE_AT_MS, MOTE_LUM_LIT, &b);
+    int flare = MOTE_LOOK_L_HALO_D / 2 * MOTE_LOOK_FLARE_SCALE_PCT / 100;
+    EXPECT(b.look.halo_r >= flare - 1 && b.look.halo_r <= flare + 1, "the flare: halo x 1.6");
+    uint16_t rise = 0;
+    int max_halo = 0;
+    bool ok = true;
+    for (uint32_t t = 0; t < MOTE_BOOT_MS; t += 10) {
+        ok &= mote_boot(t, MOTE_LUM, &b);
+        if (b.rise_pm < rise || (b.look.halo_r <= b.look.core_r && b.look.halo_pct)) ok = false;
+        rise = b.rise_pm;
+        if (b.look.halo_r > max_halo) max_halo = b.look.halo_r;
+    }
+    EXPECT(ok, "plays to 1.2 s, rising only up");
+    EXPECT(max_halo <= flare + 1, "one flare, no bigger");
+    EXPECT(!mote_boot(MOTE_BOOT_MS, MOTE_LUM, &b), "over at 1.2 s");
+    mote_look_t end = mote_look(100, MOTE_LUM, 1000);
+    EXPECT(b.rise_pm == 1000 && b.look.core_r == end.core_r && b.look.halo_r == end.halo_r &&
+               b.look.lum == MOTE_LUM,
+           "it lands at its place as size M at the deck's level");
+}
+
 int main(void)
 {
     test_priority();
@@ -534,6 +627,8 @@ int main(void)
     test_look();
     test_level();
     test_finish();
+    test_empty();
+    test_boot();
     if (failures) {
         printf("%d failure(s)\n", failures);
         return 1;
