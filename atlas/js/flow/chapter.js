@@ -1,5 +1,5 @@
 // Chapter 02 — "From hook to wrist": how an agent event becomes bytes on a transport and a
-// light on the watch, and how a tap on the centre travels back as `cmd focus`.
+// light on the watch, and how key A travels back as `cmd focus`.
 import { createDiagram, LANE_META } from './diagram.js';
 import { createInspector } from './inspector.js';
 import { encodeMsg, hello, welcome, snapshot, cmd, describe } from '../proto/messages.js';
@@ -48,7 +48,7 @@ function tagsFor(kind, f) {
 }
 
 const BLURB = {
-  usb: 'A cable. Steady, and the watch charges too. Frames are wrapped in COBS so a 00 byte always means “frame boundary”.',
+  usb: 'Over the cable: preferred when plugged in, the watch charges, and its screen stays on for 10 minutes. Each message is encoded (COBS) so that a 00 byte only ever marks where a message ends.',
   ble: 'Wireless, no cable. Each frame is cut into small fragments that fit one Bluetooth write.',
   ws: 'For the simulator and the browser. WebSocket already delivers whole messages.',
 };
@@ -65,7 +65,7 @@ export function mount(section, ctx) {
   slot.append(root);
 
   root.innerHTML = `
-    <p class="flow__lede">An agent does something. A tiny hook tells the daemon. The daemon turns it into a few bytes and sends them over whichever link is up. <b>Watch the beads. Click one to open the packet.</b></p>
+    <p class="flow__lede">An agent does something and runs a hook: a small program it calls on every event. The hook tells <code>agentlinkd</code>, the daemon (a background program) on your PC, which turns the event into a few bytes and sends them over whichever link is up. <b>Watch the beads. Click one to open the packet.</b></p>
 
     <div class="flow__bar" role="group" aria-label="Scenario controls">
       <button type="button" class="fx-btn fx-btn--play" data-r="play" aria-pressed="true"><span class="fx-ico" aria-hidden="true"></span><span data-r="playTxt">Pause</span></button>
@@ -74,13 +74,13 @@ export function mount(section, ctx) {
     </div>
 
     <div class="flow__diagram" data-r="diagram"></div>
-    <p class="flow__return" data-r="ret" aria-live="polite">Tap the centre of the watch to send <code>cmd focus</code> back along the thread.</p>
+    <p class="flow__return" data-r="ret" aria-live="polite">Press key <b>A</b> (or <kbd class="kbd">A</kbd> on your keyboard) to send <code>cmd focus</code> back along the thread.</p>
 
     <div class="flow__transport">
       <div class="flow__tswitch" role="radiogroup" aria-label="Transport" data-r="tswitch"></div>
       <p class="flow__blurb" data-r="blurb"></p>
       <ul class="flow__tags" data-r="tags" aria-label="Transport facts"></ul>
-      <p class="flow__rule"><b>Arbitration:</b> every transport that is up sends <code>hello</code>; the first <code>welcome</code> wins.</p>
+      <p class="flow__rule"><b>Which link?</b> The watch says <code>hello</code> on every link that is up and uses the first that answers. USB wins when it is plugged in.</p>
     </div>
 
     <div class="flow__recent">

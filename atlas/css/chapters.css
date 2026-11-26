@@ -74,6 +74,9 @@
 .hero__led { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--glow); box-shadow: 0 0 10px 1px var(--glow); transition: background var(--dur-3); }
 .hero__tools { display: flex; flex-wrap: wrap; gap: var(--s-4); align-items: center; }
 .hero__hint { color: var(--muted); font-size: var(--t-sm); }
+.hero__note { color: var(--muted); font-size: var(--t-sm); max-width: 28rem; margin: calc(-1 * var(--s-5)) 0 var(--s-6); }
+/* no physical keyboard on a touch screen: the A/B shortcut is noise there */
+@media (hover: none) and (pointer: coarse) { .hero__hint-keys { display: none; } }
 .hero__scroll { position: absolute; left: 0; bottom: 0; display: flex; align-items: center; gap: .8rem; font: 500 var(--t-xs)/1 var(--font-sans); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
 .hero__scroll i { width: 1px; height: 2.6rem; background: linear-gradient(var(--paper), transparent); transform-origin: top; animation: drip 2.4s var(--ease-io) infinite; }
 @keyframes drip { 0% { transform: scaleY(0); } 60% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }

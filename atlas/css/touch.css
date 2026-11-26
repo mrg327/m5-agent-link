@@ -16,6 +16,7 @@
 
 .tc__intro { font-size: var(--t-lg, 1.15rem); line-height: 1.55; color: var(--paper-2, #b9c0cc); max-width: 38rem; }
 .tc__intro b { color: var(--p-paper); font-weight: 500; white-space: nowrap; }
+.tc__intro p + p { margin-top: .6em; font-size: var(--t-md, 1rem); color: var(--muted, #7c8594); }
 
 .tc__block { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1rem; }
 .tc__bh { display: flex; align-items: baseline; gap: .9rem; border-top: 1px solid var(--p-line); padding-top: 1rem; }
@@ -140,6 +141,18 @@
 .mx__cap-d { color: var(--paper-2, #b9c0cc); font-size: var(--t-sm, .9rem); }
 .mx__cap-s { font-size: .7rem; color: var(--p-muted); }
 .mx__foot { font-size: var(--t-sm, .875rem); color: var(--p-muted); max-width: 40rem; }
+/* the per-screen table (matrix.js): tabs, then gesture · what it does · source */
+.mx__tabs { display: flex; flex-wrap: wrap; gap: .4rem; }
+.mx__tab { appearance: none; cursor: pointer; padding: .35rem .8rem; border-radius: 999px; border: 1px solid var(--p-line); background: transparent; color: var(--p-muted); font-size: var(--t-sm, .875rem); }
+.mx__tab[aria-selected="true"] { color: var(--p-paper); border-color: var(--p-accent); background: color-mix(in srgb, var(--p-accent) 12%, transparent); }
+.mx__table--screen { min-width: 30rem; }
+.mx__table--screen th, .mx__table--screen td { text-align: left; vertical-align: top; padding: .55rem .8rem; }
+.mx__table--screen thead th { text-align: left; }
+.mx__table--screen tbody th { font-size: .95rem; white-space: nowrap; }
+.mx__table--screen .mx__cell { width: auto; min-width: 0; height: auto; padding: .2rem .5rem; margin-left: -.5rem; display: inline-block; text-align: left; color: var(--p-paper); font: inherit; text-decoration: underline dotted; text-underline-offset: .25em; }
+.mx__cases { margin: 0; padding: 0; list-style: none; display: grid; gap: .3rem; color: var(--paper-2, #b9c0cc); font-size: var(--t-sm, .9rem); }
+.mx__when { color: var(--p-muted); }
+.mx__src code { font-size: .7rem; color: var(--p-muted); white-space: nowrap; }
 
 .tc__next { display: flex; flex-wrap: wrap; align-items: baseline; gap: .6rem 1rem; padding: 1.1rem 1.2rem; border: 1px dashed var(--p-line2); border-radius: 14px; color: var(--paper-2, #b9c0cc); }
 .tc__next-k { font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--p-success); }

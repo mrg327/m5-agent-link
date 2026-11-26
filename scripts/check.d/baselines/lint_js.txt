@@ -7,7 +7,6 @@ TS18047	atlas/js/main.js	7
 TS18047	atlas/js/stage/stage.js	2
 TS18047	atlas/test/proto_codecs.test.mjs	8
 TS2322	atlas/js/gestures/lab.js	2
-TS2322	atlas/js/gestures/matrix.js	1
 TS2322	atlas/js/main.js	3
 TS2339	atlas/js/flow/chapter.js	1
 TS2339	atlas/js/flow/diagram.js	24
@@ -71,13 +70,13 @@ TS7006	atlas/js/bus.js	4
 TS7006	atlas/js/flow/chapter.js	25
 TS7006	atlas/js/flow/diagram.js	41
 TS7006	atlas/js/flow/inspector.js	19
-TS7006	atlas/js/gestures/actions.js	6
+TS7006	atlas/js/gestures/actions.js	5
 TS7006	atlas/js/gestures/chapter.js	7
 TS7006	atlas/js/gestures/classify.js	29
 TS7006	atlas/js/gestures/dom.js	14
 TS7006	atlas/js/gestures/haptics.js	19
-TS7006	atlas/js/gestures/lab.js	67
-TS7006	atlas/js/gestures/matrix.js	26
+TS7006	atlas/js/gestures/lab.js	62
+TS7006	atlas/js/gestures/matrix.js	25
 TS7006	atlas/js/main.js	6
 TS7006	atlas/js/proto/blefrag.js	3
 TS7006	atlas/js/proto/cbor.js	21
@@ -150,8 +149,7 @@ TS7034	tools/board/render.mjs	1
 TS7034	tools/board/server.mjs	3
 TS7053	atlas/js/flow/chapter.js	4
 TS7053	atlas/js/flow/diagram.js	16
-TS7053	atlas/js/gestures/lab.js	3
-TS7053	atlas/js/gestures/matrix.js	3
+TS7053	atlas/js/gestures/lab.js	2
 TS7053	atlas/js/main.js	2
 TS7053	atlas/js/proto/messages.js	11
 TS7053	atlas/js/proto/mock-daemon.js	3
@@ -213,7 +211,6 @@ jsdoc/require-returns	atlas/js/proto/cbor.js	2
 jsdoc/require-returns	atlas/js/proto/cobs.js	4
 jsdoc/require-returns	atlas/js/proto/messages.js	3
 jsdoc/require-returns	atlas/js/proto/mock-daemon.js	1
-new-cap	atlas/js/gestures/actions.js	11
 new-cap	atlas/js/gestures/haptics.js	32
 new-cap	atlas/js/gestures/lab.js	12
 new-cap	atlas/js/proto/mock-daemon.js	15
