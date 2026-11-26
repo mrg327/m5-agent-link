@@ -174,36 +174,36 @@
         "gesture": "G_TAP",
         "mode": "home",
         "zone": "centre",
-        "when": "with a permission or question pending",
+        "when": "when the session waits for your answer",
         "nav": "NAV_OPEN_ASK",
-        "action": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
+        "action": "Opens the request screen. Opening answers nothing",
         "source": "firmware/components/core/src/nav.c:11"
       },
       {
         "gesture": "G_TAP",
         "mode": "home",
         "zone": "centre",
-        "when": "with nothing to answer",
+        "when": "when nothing waits for you",
         "nav": "NAV_OPEN_AGENT",
-        "action": "Open the per-agent wheel for the selected session",
+        "action": "Opens the agent menu for the selected session",
         "source": "firmware/components/core/src/nav.c:12"
       },
       {
         "gesture": "G_DOUBLE_TAP",
         "mode": "home",
         "zone": "centre",
-        "when": "with a permission or question pending",
+        "when": "when the session waits for your answer",
         "nav": "NAV_OPEN_ASK",
-        "action": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
+        "action": "Opens the request screen. Opening answers nothing",
         "source": "firmware/components/core/src/nav.c:13"
       },
       {
         "gesture": "G_DOUBLE_TAP",
         "mode": "home",
         "zone": "centre",
-        "when": "with nothing to answer",
+        "when": "when nothing waits for you",
         "nav": "NAV_OPEN_AGENT",
-        "action": "Open the per-agent wheel for the selected session",
+        "action": "Opens the agent menu for the selected session",
         "source": "firmware/components/core/src/nav.c:14"
       },
       {
@@ -212,7 +212,7 @@
         "zone": "rim",
         "when": "",
         "nav": "NAV_PICK_RIM",
-        "action": "Select the segment under the finger on the HOME ring (AGENT and ASK rows are tapped directly)",
+        "action": "Selects the session under your finger",
         "source": "firmware/components/core/src/nav.c:15"
       },
       {
@@ -221,7 +221,7 @@
         "zone": "rim",
         "when": "",
         "nav": "NAV_PICK_RIM",
-        "action": "Select the segment under the finger on the HOME ring (AGENT and ASK rows are tapped directly)",
+        "action": "Selects the session under your finger",
         "source": "firmware/components/core/src/nav.c:16"
       },
       {
@@ -230,7 +230,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_OPEN_LABS",
-        "action": "Open Experiments (swipe up on the deck): a wheel of experimental features, the first is the Trackpad",
+        "action": "Opens Experiments; the first is the Trackpad",
         "source": "firmware/components/core/src/nav.c:17"
       },
       {
@@ -239,7 +239,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_OPEN_STATUS",
-        "action": "Open STATUS (swipe down on the deck): link, battery, quiet mode, sounds",
+        "action": "Opens Status: link, battery, quiet mode, sounds",
         "source": "firmware/components/core/src/nav.c:18"
       },
       {
@@ -248,7 +248,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:19"
       },
       {
@@ -257,7 +257,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:20"
       },
       {
@@ -266,7 +266,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:21"
       },
       {
@@ -275,7 +275,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_FOCUS",
-        "action": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
+        "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
         "source": "firmware/components/core/src/nav.c:22"
       },
       {
@@ -284,7 +284,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT_ATTENTION",
-        "action": "Jump to the next session that needs attention",
+        "action": "Jumps to the next session that needs you",
         "source": "firmware/components/core/src/nav.c:23"
       },
       {
@@ -293,7 +293,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:24"
       },
       {
@@ -302,7 +302,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_PREV",
-        "action": "Previous session",
+        "action": "Selects the previous session",
         "source": "firmware/components/core/src/nav.c:25"
       },
       {
@@ -311,7 +311,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_PRESS",
-        "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
+        "action": "Starts a hold on the selected item, if it needs one",
         "source": "firmware/components/core/src/nav.c:27"
       },
       {
@@ -320,7 +320,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
-        "action": "Lifting cancels a hold in progress",
+        "action": "Lifting the finger cancels a hold",
         "source": "firmware/components/core/src/nav.c:28"
       },
       {
@@ -329,7 +329,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:29"
       },
       {
@@ -338,7 +338,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:30"
       },
       {
@@ -347,7 +347,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
-        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
         "source": "firmware/components/core/src/nav.c:31"
       },
       {
@@ -356,7 +356,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_LONG",
-        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "action": "Holding still away from the items goes back",
         "source": "firmware/components/core/src/nav.c:32"
       },
       {
@@ -365,7 +365,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:33"
       },
       {
@@ -374,7 +374,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:34"
       },
       {
@@ -383,7 +383,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:35"
       },
       {
@@ -392,7 +392,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:36"
       },
       {
@@ -401,7 +401,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:37"
       },
       {
@@ -410,7 +410,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:38"
       },
       {
@@ -419,7 +419,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:39"
       },
       {
@@ -428,7 +428,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:40"
       },
       {
@@ -437,7 +437,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_PRESS",
-        "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
+        "action": "Starts a hold on the selected item, if it needs one",
         "source": "firmware/components/core/src/nav.c:43"
       },
       {
@@ -446,7 +446,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
-        "action": "Lifting cancels a hold in progress",
+        "action": "Lifting the finger cancels a hold",
         "source": "firmware/components/core/src/nav.c:44"
       },
       {
@@ -455,7 +455,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:45"
       },
       {
@@ -464,7 +464,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:46"
       },
       {
@@ -473,7 +473,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_LONG",
-        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "action": "Holding still away from the items goes back",
         "source": "firmware/components/core/src/nav.c:47"
       },
       {
@@ -482,7 +482,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
-        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
         "source": "firmware/components/core/src/nav.c:48"
       },
       {
@@ -491,7 +491,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:49"
       },
       {
@@ -500,7 +500,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:50"
       },
       {
@@ -509,7 +509,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:51"
       },
       {
@@ -518,7 +518,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:52"
       },
       {
@@ -527,7 +527,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_FOCUS",
-        "action": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
+        "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
         "source": "firmware/components/core/src/nav.c:53"
       },
       {
@@ -536,7 +536,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:54"
       },
       {
@@ -545,7 +545,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:55"
       },
       {
@@ -554,7 +554,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:56"
       },
       {
@@ -563,7 +563,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCROLL_CATCH",
-        "action": "SCROLL: any new touch stops a glide; a tap that stopped one does not leave",
+        "action": "A new touch stops the scrolling",
         "source": "firmware/components/core/src/nav.c:59"
       },
       {
@@ -572,7 +572,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
-        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
         "source": "firmware/components/core/src/nav.c:60"
       },
       {
@@ -581,7 +581,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_FLING",
-        "action": "SCROLL: lifting off a fast drag keeps scrolling (a glide that slows down, like a trackpad)",
+        "action": "A quick flick keeps the terminal scrolling, slowing down like a trackpad",
         "source": "firmware/components/core/src/nav.c:61"
       },
       {
@@ -590,7 +590,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:62"
       },
       {
@@ -599,7 +599,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:63"
       },
       {
@@ -608,7 +608,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_TO_BOTTOM",
-        "action": "SCROLL: button A jumps back to the live bottom and leaves the mode",
+        "action": "Jumps to the newest output and leaves Scroll",
         "source": "firmware/components/core/src/nav.c:64"
       },
       {
@@ -617,7 +617,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_PAGE_NEWER",
-        "action": "SCROLL: button B moves one page toward newer output",
+        "action": "Scrolls one page toward newer output",
         "source": "firmware/components/core/src/nav.c:65"
       },
       {
@@ -626,7 +626,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:66"
       },
       {
@@ -635,7 +635,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:67"
       },
       {
@@ -644,7 +644,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:71"
       },
       {
@@ -653,7 +653,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:72"
       },
       {
@@ -662,7 +662,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:73"
       },
       {
@@ -671,7 +671,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_LONG",
-        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "action": "Holding still away from the items goes back",
         "source": "firmware/components/core/src/nav.c:74"
       },
       {
@@ -680,7 +680,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:75"
       },
       {
@@ -689,7 +689,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:76"
       },
       {
@@ -698,7 +698,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:77"
       },
       {
@@ -707,7 +707,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:78"
       },
       {
@@ -716,7 +716,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:79"
       },
       {
@@ -725,7 +725,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:80"
       },
       {
@@ -734,7 +734,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:81"
       },
       {
@@ -743,25 +743,25 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:82"
       },
       {
         "gesture": "G_TAP",
         "mode": "watch",
         "zone": "centre",
-        "when": "with a permission or question pending",
+        "when": "when the session waits for your answer",
         "nav": "NAV_OPEN_ASK",
-        "action": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
+        "action": "Opens the request screen. Opening answers nothing",
         "source": "firmware/components/core/src/nav.c:87"
       },
       {
         "gesture": "G_TAP",
         "mode": "watch",
         "zone": "centre",
-        "when": "with nothing to answer",
+        "when": "when nothing waits for you",
         "nav": "NAV_FOCUS",
-        "action": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
+        "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
         "source": "firmware/components/core/src/nav.c:88"
       },
       {
@@ -770,7 +770,7 @@
         "zone": "rim",
         "when": "",
         "nav": "NAV_PICK_RIM",
-        "action": "Select the segment under the finger on the HOME ring (AGENT and ASK rows are tapped directly)",
+        "action": "Selects the session under your finger",
         "source": "firmware/components/core/src/nav.c:89"
       },
       {
@@ -779,7 +779,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
-        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
         "source": "firmware/components/core/src/nav.c:90"
       },
       {
@@ -788,7 +788,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:91"
       },
       {
@@ -797,7 +797,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:92"
       },
       {
@@ -806,7 +806,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:93"
       },
       {
@@ -815,7 +815,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_FOCUS",
-        "action": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
+        "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
         "source": "firmware/components/core/src/nav.c:94"
       },
       {
@@ -824,7 +824,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:95"
       },
       {
@@ -833,7 +833,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:96"
       },
       {
@@ -842,7 +842,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:97"
       },
       {
@@ -851,7 +851,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:98"
       },
       {
@@ -860,7 +860,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:99"
       },
       {
@@ -869,7 +869,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_PRESS",
-        "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
+        "action": "Starts a hold on the selected item, if it needs one",
         "source": "firmware/components/core/src/nav.c:102"
       },
       {
@@ -878,7 +878,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
-        "action": "Lifting cancels a hold in progress",
+        "action": "Lifting the finger cancels a hold",
         "source": "firmware/components/core/src/nav.c:103"
       },
       {
@@ -887,7 +887,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:104"
       },
       {
@@ -896,7 +896,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:105"
       },
       {
@@ -905,7 +905,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:106"
       },
       {
@@ -914,7 +914,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:107"
       },
       {
@@ -923,7 +923,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:108"
       },
       {
@@ -932,7 +932,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:109"
       },
       {
@@ -941,7 +941,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:113"
       },
       {
@@ -950,7 +950,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOLD_PRESS",
-        "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
+        "action": "Starts a hold on the selected item, if it needs one",
         "source": "firmware/components/core/src/nav.c:114"
       },
       {
@@ -959,7 +959,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_ERASE",
-        "action": "KEYS: button B deletes the last typed word",
+        "action": "Deletes the last typed word",
         "source": "firmware/components/core/src/nav.c:115"
       },
       {
@@ -968,7 +968,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:116"
       },
       {
@@ -977,7 +977,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:117"
       },
       {
@@ -986,7 +986,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_PRESS",
-        "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
+        "action": "Starts a hold on the selected item, if it needs one",
         "source": "firmware/components/core/src/nav.c:121"
       },
       {
@@ -995,7 +995,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
-        "action": "Lifting cancels a hold in progress",
+        "action": "Lifting the finger cancels a hold",
         "source": "firmware/components/core/src/nav.c:122"
       },
       {
@@ -1004,7 +1004,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:123"
       },
       {
@@ -1013,7 +1013,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:124"
       },
       {
@@ -1022,7 +1022,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
-        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
         "source": "firmware/components/core/src/nav.c:125"
       },
       {
@@ -1031,7 +1031,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_LONG",
-        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "action": "Holding still away from the items goes back",
         "source": "firmware/components/core/src/nav.c:126"
       },
       {
@@ -1040,7 +1040,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:127"
       },
       {
@@ -1049,7 +1049,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:128"
       },
       {
@@ -1058,7 +1058,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:129"
       },
       {
@@ -1067,7 +1067,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:130"
       },
       {
@@ -1076,7 +1076,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_FOCUS",
-        "action": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
+        "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
         "source": "firmware/components/core/src/nav.c:131"
       },
       {
@@ -1085,7 +1085,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:132"
       },
       {
@@ -1094,7 +1094,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:133"
       },
       {
@@ -1103,7 +1103,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:134"
       },
       {
@@ -1112,7 +1112,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:136"
       },
       {
@@ -1121,7 +1121,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:137"
       },
       {
@@ -1130,7 +1130,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:138"
       },
       {
@@ -1139,7 +1139,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:139"
       },
       {
@@ -1148,7 +1148,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_LONG",
-        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "action": "Holding still away from the items goes back",
         "source": "firmware/components/core/src/nav.c:140"
       },
       {
@@ -1157,7 +1157,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:141"
       },
       {
@@ -1166,7 +1166,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:142"
       },
       {
@@ -1175,7 +1175,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:143"
       },
       {
@@ -1184,7 +1184,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:144"
       },
       {
@@ -1193,7 +1193,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:145"
       },
       {
@@ -1202,7 +1202,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:146"
       },
       {
@@ -1211,7 +1211,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:147"
       },
       {
@@ -1220,7 +1220,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_POINTER",
-        "action": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
+        "action": "Moves the PC's pointer; tap clicks, hold right-clicks",
         "source": "firmware/components/core/src/nav.c:150"
       },
       {
@@ -1229,7 +1229,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_POINTER",
-        "action": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
+        "action": "Moves the PC's pointer; tap clicks, hold right-clicks",
         "source": "firmware/components/core/src/nav.c:151"
       },
       {
@@ -1238,7 +1238,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_POINTER",
-        "action": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
+        "action": "Moves the PC's pointer; tap clicks, hold right-clicks",
         "source": "firmware/components/core/src/nav.c:152"
       },
       {
@@ -1247,7 +1247,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_POINTER",
-        "action": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
+        "action": "Moves the PC's pointer; tap clicks, hold right-clicks",
         "source": "firmware/components/core/src/nav.c:153"
       },
       {
@@ -1256,7 +1256,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:154"
       },
       {
@@ -1265,7 +1265,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:155"
       },
       {
@@ -1274,7 +1274,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:156"
       },
       {
@@ -1283,7 +1283,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:157"
       },
       {
@@ -1292,7 +1292,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:158"
       },
       {
@@ -1301,7 +1301,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:159"
       },
       {
@@ -1310,7 +1310,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
-        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
         "source": "firmware/components/core/src/nav.c:161"
       },
       {
@@ -1319,7 +1319,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:162"
       },
       {
@@ -1328,7 +1328,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:163"
       },
       {
@@ -1337,7 +1337,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:164"
       },
       {
@@ -1346,7 +1346,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:165"
       },
       {
@@ -1355,7 +1355,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:166"
       },
       {
@@ -1364,7 +1364,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:167"
       },
       {
@@ -1373,7 +1373,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:168"
       },
       {
@@ -1382,7 +1382,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:169"
       }
     ],
@@ -3227,35 +3227,35 @@
     "roles": [
       {
         "id": "done",
-        "when": "A session you armed with Notify when done (or are watching) finishes",
+        "when": "A session you asked to be told about, or have open on the watch, finishes",
         "pick": "done-ff",
         "repeat": 1,
         "gap_ms": 0
       },
       {
         "id": "input",
-        "when": "An agent asks a question or needs your approval",
+        "when": "A session asks you a question or needs your approval",
         "pick": "input-ff",
         "repeat": 3,
         "gap_ms": 90
       },
       {
         "id": "approved",
-        "when": "An approval hold completes and the answer goes out (rises)",
+        "when": "You hold to approve and the answer is sent (rising)",
         "pick": "approved-rise",
         "repeat": 1,
         "gap_ms": 0
       },
       {
         "id": "denied",
-        "when": "A deny or stop hold completes and the answer goes out (falls)",
+        "when": "You hold to deny or stop and the answer is sent (falling)",
         "pick": "denied-fall",
         "repeat": 1,
         "gap_ms": 0
       },
       {
         "id": "updated",
-        "when": "The first welcome after an OTA update: the new image is running and confirmed",
+        "when": "The first connection to your PC after a firmware update",
         "pick": "updated-flourish",
         "repeat": 1,
         "gap_ms": 0

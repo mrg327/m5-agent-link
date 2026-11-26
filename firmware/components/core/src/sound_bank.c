@@ -14,11 +14,11 @@
 
 /* clang-format off */
 const snd_role_t snd_roles[] = {
-    {"done", "A session you armed with Notify when done (or are watching) finishes", "done-ff", 1, 0},
-    {"input", "An agent asks a question or needs your approval", "input-ff", 3, 90},
-    {"approved", "An approval hold completes and the answer goes out (rises)", "approved-rise", 1, 0},
-    {"denied", "A deny or stop hold completes and the answer goes out (falls)", "denied-fall", 1, 0},
-    {"updated", "The first welcome after an OTA update: the new image is running and confirmed", "updated-flourish", 1, 0},
+    {"done", "A session you asked to be told about, or have open on the watch, finishes", "done-ff", 1, 0},
+    {"input", "A session asks you a question or needs your approval", "input-ff", 3, 90},
+    {"approved", "You hold to approve and the answer is sent (rising)", "approved-rise", 1, 0},
+    {"denied", "You hold to deny or stop and the answer is sent (falling)", "denied-fall", 1, 0},
+    {"updated", "The first connection to your PC after a firmware update", "updated-flourish", 1, 0},
 };
 const unsigned snd_role_count = sizeof snd_roles / sizeof snd_roles[0];
 

@@ -80,7 +80,7 @@ E401	daemon/tools/standing_rules_e2e.py	2
 E401	daemon/tools/summary_e2e.py	2
 E401	docs/design/glyphs/mock.py	1
 E401	protocol/fixtures/ota/gen.py	1
-E501	atlas/tools/extract.py	23
+E501	atlas/tools/extract.py	14
 E501	daemon/crates/agentlink-keys/data/build_lexicon.py	1
 E501	daemon/tools/answer_window_e2e.py	10
 E501	daemon/tools/gauges_e2e.py	7

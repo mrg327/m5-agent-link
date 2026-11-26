@@ -186,3 +186,14 @@ test('every fact has a source and the CSS tokens mirror the facts', () => {
   assert.ok(css.includes(`--fw-permission: ${facts.palette.permission};`));
   assert.ok(!css.includes('tap-defer'));
 });
+
+test('gesture and sound texts are for readers: no mode, gesture or jargon names', () => {
+  const jargon =
+    /\b(HOME|AGENT|ASK|SCROLL|STATUS|WATCH|KEYS|READ|LABS|TRACKPAD|GRAPH)\b|\bG_|\bNAV_|deck|OTA|welcome/;
+  for (const c of facts.gesture_map.cases) {
+    assert.doesNotMatch(c.action, jargon, c.nav);
+    assert.doesNotMatch(c.when, jargon, c.nav);
+  }
+  for (const r of facts.sounds.roles)
+    assert.doesNotMatch(r.when, /Notify when done|OTA|welcome/, r.id);
+});
