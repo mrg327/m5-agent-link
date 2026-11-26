@@ -566,7 +566,7 @@ export function createLab(root, ctx) {
       };
       const anim = ctx.reducedMotion ? 0 : now;
       // UI-V3 §3.1: selected and needs-you segments at full brightness, the rest at 40 %; a pulse for
-      // ask / perm, one comet for working; a pip (10 px, r 205) marks an unselected segment that needs you
+      // ask / perm, one comet for working; a pip near r 205 marks an unselected segment that needs you
       const needs = r.kind === 'ask' || r.kind === 'perm' || r.kind === 'error';
       const rest = on || needs ? 1 : ring.others_pct / 100;
       switch (r.kind) {
@@ -586,11 +586,33 @@ export function createLab(root, ctx) {
           arc(a0, a1, rr, wd, rest);
       }
       if (needs && !on) {
-        const m = rad((a0 + a1) / 2);
+        // the pip's shape says the kind (issue 20261126-38fa): dot for a question, an 18 x 8 bar
+        // along the ring for a permission, a triangle pointing in (base 16 on r 210, point r 196)
+        const m = rad((a0 + a1) / 2),
+          ux = Math.cos(m),
+          uy = Math.sin(m);
+        /** @type {(pr: number, t: number) => [number, number]} radius pr, t px along the ring */
+        const pt = (pr, t) => [cx + (pr * ux - t * uy) * kk, cy + (pr * uy + t * ux) * kk];
         c.fillStyle = hexA(col, 1);
+        c.strokeStyle = hexA(col, 1);
         c.beginPath();
-        c.arc(cx + 205 * kk * Math.cos(m), cy + 205 * kk * Math.sin(m), 5 * kk, 0, 7);
-        c.fill();
+        if (r.kind === 'perm') {
+          c.lineWidth = 8 * kk;
+          c.lineCap = 'round';
+          c.moveTo(...pt(204, -5));
+          c.lineTo(...pt(204, 5));
+          c.stroke();
+          c.lineCap = 'butt';
+        } else if (r.kind === 'error') {
+          c.moveTo(...pt(210, -8));
+          c.lineTo(...pt(210, 8));
+          c.lineTo(...pt(196, 0));
+          c.closePath();
+          c.fill();
+        } else {
+          c.arc(...pt(205, 0), 5 * kk, 0, 7);
+          c.fill();
+        }
       }
     });
   }

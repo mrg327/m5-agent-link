@@ -51,6 +51,8 @@ static uint32_t rgb565_to_rgb888(uint16_t c)
 static lv_display_t *s_disp;
 static uint16_t s_mark[W * H];
 void sim_fb_mark(void) { memcpy(s_mark, s_fb, sizeof s_fb); }
+uint32_t sim_fb_rgb(int x, int y)
+{ return x < 0 || y < 0 || x >= W || y >= H ? 0 : rgb565_to_rgb888(s_fb[y * W + x]); }
 int sim_fb_flipped_match_pct(void)
 {
     long same = 0;

@@ -29,7 +29,8 @@ void sim_display_pump(void); /* SDL events (mouse/keys), then present if dirty *
 bool sim_display_quit_requested(void);
 void sim_input_pointer(bool down, int x, int y);
 bool sim_save_png(const char *path);
-void sim_fb_mark(void); /* remember the current framebuffer */
+void sim_fb_mark(void);            /* remember the current framebuffer */
+uint32_t sim_fb_rgb(int x, int y); /* one framebuffer pixel as 0xRRGGBB (0 off the screen) */
 int sim_fb_flipped_match_pct(void);
 /* % of pixels equal to the marked frame turned 180 degrees */ /* current framebuffer, round
                                                                   mask applied */

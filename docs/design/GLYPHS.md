@@ -284,7 +284,9 @@ Built with the primitives, as the model for the rest (`ui_home_card.c`; renders:
 - **Ambient:** the clock, dim, with the selected session's sigil and a small state glyph under it.
 - **Keys:** A = the desktop (it opens the session on the computer, as before), B = caret (next), shown
   when there is more than one session. The session menu opens by a tap, as before.
-- **The session ring** at the bezel is unchanged.
+- **The session ring** at the bezel is unchanged, except that a needs-you pip is a shape per kind: dot
+  (question), bar along the ring (permission), triangle pointing in (error); UI-V3 §3.1. The mark at 12
+  o'clock that says a request waits behind the screen takes the same shapes.
 
 ## 5. The other screens
 

@@ -163,9 +163,15 @@ carries black text. `theme_dim(rgb, pct)` mixes toward black (ring segments at r
 - Colour: the selected session and any session that needs you (question, permission, error) at
   100 %; everything else at 40 %. Working keeps its comet, Done its one sweep, needs-you its 1 Hz
   pulse.
-- Not colour alone: an *unselected* session that needs you carries a **pip**, a filled 10 px dot in
-  its colour at r 205 on the capsule's midpoint (the selected one is already wide and bright, so it has
-  none). Dots and twin tracks are gone. A pip never sits under a key hint: within 9° of 315° or 45°
+- Not colour alone: an *unselected* session that needs you carries a **pip** in its colour on the
+  capsule's midpoint, whose shape says what it needs (issue 20261126-38fa; `ring_pip_paint`): a
+  **dot** (Ø 10 at r 205) for a question, a **bar** along the ring (18 × 8, r 200–208) for a
+  permission, a **triangle** pointing at the centre (base 16 on r 210, point at r 196) for an error.
+  They differ in outline and length, not in corners, so they read without hue and while the ring is
+  still. The selected one is already wide and bright and its hero glyph says the kind, so it has none.
+  The mark that says a request waits behind the open screen (12 o'clock, every screen but HOME, the
+  queue of UI-V2 §4) takes the same three shapes at size 16, with a 2 px black edge over the ring;
+  the report reads `waiting 3 · approval`. Dots and twin tracks are gone. A pip never sits under a key hint: within 9° of 315° or 45°
   it moves along its capsule to 9° away, on the side with room (`ring_pip_deg`); a capsule too short
   for that puts it at its end.
 - The ring shows the index on **every** screen. While a hold is in progress the index drops to

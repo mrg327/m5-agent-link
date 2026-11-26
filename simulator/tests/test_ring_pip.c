@@ -46,7 +46,10 @@ static double nearest_hint_px(int deg)
 
 int main(void)
 {
-    const double clear = HINT_R + PIP_D / 2.0; /* closer than this, the hint covers the pip */
+    /* closer than this, the hint covers the pip: its farthest point is the triangle's base corner
+     * (issue 20261126-38fa), half the base along the ring and half the size outward */
+    const double reach = hypot(PIP_D * PIP_TRI_BASE_PCT / 200.0, PIP_D / 2.0);
+    const double clear = HINT_R + reach;
     for (int n = 2; n <= RING_MAX_SEGMENTS; n++) {
         for (int i = 0; i < n; i++) {
             int a0, a1;
@@ -73,7 +76,7 @@ int main(void)
     CHECK((a0 + a1) / 2 == PIP_KEY_A_DEG);
     int p = ring_pip_deg(a0, a1);
     CHECK(abs(p - PIP_KEY_A_DEG) >= PIP_KEEP_OUT_DEG);
-    CHECK(gap_px(p, UI_KEY_A_X, UI_KEY_Y) > clear + 10);
+    CHECK(gap_px(p, UI_KEY_A_X, UI_KEY_Y) > clear + 5); /* the triangle too, with room */
     if (!g_fail) printf("ring pips clear of the key hints\n");
     return g_fail ? EXIT_FAILURE : EXIT_SUCCESS;
 }

@@ -136,6 +136,7 @@ typedef enum {
     E_DELTA,
     E_PX_RESET,
     E_EXPECT_PX_MAX,
+    E_EXPECT_PX,
     E_MIC,
     E_TRANSCRIPT,
     E_CANDS,
@@ -533,6 +534,13 @@ static bool parse_line(char *line, uint32_t *t)
         add(*t, E_PX_RESET, 0, 0, 0, NULL);
     } else if (!strcmp(cmd, "expect_px_max") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_EXPECT_PX_MAX, a, 0, 0, NULL);
+    } else if (!strcmp(cmd, "expect_px") && arg[0]) {
+        /* expect_px X Y RRGGBB: one pixel, about that colour */
+        char *end = NULL;
+        long x = strtol(rest, &end, 10), y = strtol(end, &end, 10);
+        unsigned long rgb = strtoul(end, &end, 16);
+        if (*end != '\0') return false; /* a bad line, as an unknown command */
+        add(*t, E_EXPECT_PX, (int)x, (int)y, (int)rgb, NULL);
     } else if (!strcmp(cmd, "fw_image") && arg[0]) {
         add(*t, E_FW_IMAGE, 0, 0, 0, arg);
         *t += 20;
@@ -1816,6 +1824,20 @@ static void run(const ev_t *e)
     case E_EXPECT_NO_LABEL:
         if (core_ui_has_label(e->text)) fail("unexpected label", e->text);
         break;
+    case E_EXPECT_PX: {
+        /* within 24 a channel: RGB565 and the edge anti-aliasing */
+        uint32_t got = sim_fb_rgb(e->a, e->b), want = (uint32_t)e->c;
+        bool ok = true;
+        for (int sh = 0; sh < 24; sh += 8) {
+            int d = (int)(got >> sh & 0xff) - (int)(want >> sh & 0xff);
+            if (d > 24 || d < -24) ok = false;
+        }
+        char buf[48];
+        snprintf(buf, sizeof buf, "%d,%d is %06x, not %06x", e->a, e->b, (unsigned)got,
+                 (unsigned)want);
+        if (!ok) fail("pixel", buf);
+        break;
+    }
     case E_PX_RESET:
         s_px0 = core_px_flushed();
         s_cpu0 = sim_core_cpu_us();

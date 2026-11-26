@@ -1,5 +1,5 @@
 /* Shared by the index ring's two files only: ui_ring.c (the object, its segments, invalidation and
- * animation clock) and ui_ring_draw.c (how one capsule, dot row, track or arc is painted). */
+ * animation clock) and ui_ring_draw.c (how one capsule, pip, track or arc is painted). */
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
@@ -22,12 +22,17 @@
 #define CAP_DEG 1
 #define REST_PCT 40     /* brightness of a session that does not need you */
 #define HOLD_DIM_PCT 20 /* the selected capsule while a hold arc is drawn over it */
-/* needs-you pip: centre radius and diameter (10 px across); drawn on unselected segments only */
+/* needs-you pip: centre radius and size (a 10 px dot); drawn on unselected segments only. Its shape
+ * says the kind (ring_pip_paint): a dot for a question, an 18 x 8 bar along the ring for a
+ * permission, a triangle (base 16 on r 210, point 14 px in, at r 196) for an error. */
 #define PIP_R 205
 #define PIP_D 10
+#define PIP_BAR_W_PCT 80     /* bar width: 8 px at size 10; its length is size + width */
+#define PIP_TRI_BASE_PCT 160 /* triangle base: 16 px at size 10, on r_mid + size / 2 */
+#define PIP_TRI_H_PCT 140    /* triangle height: 14 px at size 10 */
 /* The key hints (ui_kit.h §3.6, centre r 187, ring r 20) sit at these angles, and a pip at r 205
  * under one would be painted over. A pip keeps this far from either: at 9° its centre is 36 px from
- * the hint's, 11 px clear of hint and pip together (they touch at 5°). */
+ * the hint's, 6 px clear of the hint's ring for the widest pip (the triangle reaches 9.4 px). */
 #define PIP_KEY_A_DEG 315
 #define PIP_KEY_B_DEG 45
 #define PIP_KEEP_OUT_DEG 9
@@ -36,8 +41,9 @@
 #define TRACK_RING_W 4 /* ring_set_track: the grey track and the position arc share this width */
 #define PROG_OUT 230   /* hold arc: 10 px over the selected capsule */
 #define PROG_W 10
-/* every invalidated chunk covers this radius band: all the ring draws */
-#define INV_R_IN (PIP_R - PIP_D / 2 - 1)
+/* every invalidated chunk covers this radius band: all the ring draws (the error triangle's point
+ * is the innermost, at r 196) */
+#define INV_R_IN (PIP_R + PIP_D / 2 - PIP_D * PIP_TRI_H_PCT / 100 - 1)
 #define INV_R_OUT SEL_OUT
 #define TICK_MS 30
 

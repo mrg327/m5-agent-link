@@ -10,14 +10,15 @@
 
 #define RING_MAX_SEGMENTS 32
 
-/* The kind decides shape and motion as well as colour, so state never depends on colour alone. */
+/* The kind decides motion and, for one that needs you, the pip's shape as well as colour, so state
+ * never depends on colour alone (UI-V3 §3.1). */
 typedef enum {
     RING_WORK,  /* dim capsule + a comet sweeping along it */
-    RING_ASK,   /* full capsule, gentle pulse */
-    RING_PERM,  /* two thin round tracks, faster pulse */
+    RING_ASK,   /* 1 Hz pulse; pip: a dot */
+    RING_PERM,  /* 1 Hz pulse; pip: a bar along the ring */
     RING_DONE,  /* one sweep, then solid; dim once acknowledged */
-    RING_ERROR, /* a row of round dots; one fast flicker, then solid */
-    RING_IDLE   /* thin, dim, still */
+    RING_ERROR, /* one fast flicker, then solid; pip: a triangle pointing at the centre */
+    RING_IDLE   /* dim, still */
 } ring_kind_t;
 
 typedef struct {
@@ -45,5 +46,11 @@ void ring_set_still(lv_obj_t *ring, bool still);
 /* Advances the comet, pulses and entry animations; call every core_step. Holds still while the
  * display is off. */
 void ring_tick(lv_obj_t *ring, uint32_t now_ms);
+/* The needs-you mark of `kind` inside a draw callback, centred at polar (r_mid, deg clockwise from
+ * 12 o'clock) about the screen centre: a dot of diameter `size` (RING_ASK), a bar along the ring
+ * 1.8 size long and 0.8 size wide (RING_PERM), a triangle 1.6 size wide pointing at the centre
+ * (RING_ERROR). Nothing for any other kind. The ring's pips are size 10; the waiting-request mark
+ * (ui.c) uses it too. */
+void ring_pip_paint(lv_layer_t *l, uint8_t kind, int r_mid, int deg, int size, lv_color_t c);
 /* Segment index under a screen point, or -1 when it is in the centre or off the ring. */
 int ring_hit(lv_obj_t *ring, int x, int y);

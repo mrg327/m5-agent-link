@@ -98,8 +98,8 @@ Parts, in order: `3 files` (`1 file`), `+120 –14` (en dash, the font has no mi
 (vermillion, the icon with it); everything else stays grey, so the one thing that wants attention is the only
 thing coloured. Offline, the card is dimmed and the colour is dropped, as for the state word.
 
-**Width.** The line may be 372 px wide: the ring's pips sit at r 200 and the line at y 246 reaches 13 px
-below the centre, so it keeps about 12 px from them. When it is wider it gives way in this order:
+**Width.** The line may be 372 px wide: the ring's pips reach in to r 196 and the line at y 246 reaches 13 px
+below the centre, so it keeps about 8 px from them. When it is wider it gives way in this order:
 
 1. `tests passed` becomes `passed` (`tests failed` becomes `failed`); the icon and the colour say the rest;
 2. the lines (`+120 –14`) go;

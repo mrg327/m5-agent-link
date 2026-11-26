@@ -1,0 +1,45 @@
+# The mark that says a request waits behind the open screen takes the ring pip's shape for its kind
+# (issue 20261126-38fa): a bar for an approval, a dot for a question, a triangle pointing at the
+# centre for an error. It sits at 12 o'clock, centred on (233, 14); the ring's tangent there is
+# horizontal and the centre is below (+y).
+#   (233, 14)  the mark's centre: every shape covers it
+#   (243, 15)  10 px along the ring: the bar only
+#   (233, 25)  r 208, below the dot and the bar: the triangle only
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 1 done webapp feat/login Finished the work
+session 2 work api main Working
+wait 300
+swipe 233 150 233 330 200
+wait 300
+expect_screen status
+session 2 input api main
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 600
+expect_screen status
+expect_label waiting 2 · approval
+expect_px 233 14 e69f00
+expect_px 243 15 e69f00
+expect_px 233 25 000000
+shot wait_pip_approval.png
+clear 7
+session 2 ask api main
+attention 8 2 question reply,focus 0 Which one?|Pick a test runner
+wait 600
+expect_screen status
+expect_label waiting 2 · question
+expect_px 233 14 f0e442
+expect_px 243 15 000000
+expect_px 233 25 000000
+shot wait_pip_question.png
+clear 8
+session 2 error api main
+attention 9 2 error ack,focus 0 Failed|The build broke
+wait 600
+expect_screen status
+expect_label waiting 2 · error
+expect_px 233 14 d55e00
+expect_px 243 15 000000
+expect_px 233 25 d55e00
+shot wait_pip_error.png
+quit

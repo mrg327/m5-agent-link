@@ -13,8 +13,14 @@
 #include "ui_theme.h"
 
 #define TOAST_MS 1800
-#define WAIT_PIP_D 16 /* the waiting-request dot */
-#define WAIT_PIP_Y 6
+/* The waiting-request mark: the ring pip's shapes (ring_pip_paint) at size 16, centred on y 14 at
+ * 12 o'clock, with a 2 px black edge where it lies over the ring. The box holds the widest (the
+ * bar, 36 px with its edge) and the tallest (the triangle, from y 4 to y 32). */
+#define WAIT_PIP_D 16
+#define WAIT_PIP_R 219
+#define WAIT_PIP_EDGE 2
+#define WAIT_PIP_BOX_W 40
+#define WAIT_PIP_BOX_H 36
 
 const ui_actions_t *g_ui_actions;
 static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch, *s_voice, *s_keys,
@@ -44,6 +50,8 @@ static uint32_t s_toast_until_ms;
 static char s_toast_txt[64];
 static lv_obj_t *s_glow, *s_glow_ring;
 static lv_obj_t *s_wait_pip; /* a request waits behind the open screen (ui_offer_attention) */
+static uint32_t s_pip_rgb;   /* the mark's colour and ring kind as drawn */
+static uint8_t s_pip_kind = RING_ASK;
 static lv_obj_t *s_pair, *s_pair_num; /* BLE pairing passkey (ui_pair_show) */
 static uint32_t s_pair_until_ms;
 #define PAIR_SHOW_MS 60000u /* the SM gives up after 30 s; this only guards a lost end event */
@@ -80,6 +88,14 @@ static void pair_create(lv_obj_t *top)
     lv_obj_add_flag(s_pair, LV_OBJ_FLAG_HIDDEN);
 }
 
+/* The waiting-request mark: black one edge larger, then the pip of its kind over it. */
+static void wait_pip_draw(lv_event_t *e)
+{
+    lv_layer_t *l = lv_event_get_layer(e);
+    ring_pip_paint(l, s_pip_kind, WAIT_PIP_R, 0, WAIT_PIP_D + 2 * WAIT_PIP_EDGE, COL_BG);
+    ring_pip_paint(l, s_pip_kind, WAIT_PIP_R, 0, WAIT_PIP_D, lv_color_hex(s_pip_rgb));
+}
+
 static void create_overlays(void)
 {
     lv_obj_t *top = lv_layer_top();
@@ -105,16 +121,13 @@ static void create_overlays(void)
     lv_obj_add_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
     ui_burst_init(top); /* over the toast, under the glow */
 
-    /* A dot of the request's colour at 12 o'clock, on the rim: something waits behind this screen
-     * (glyphs over words). */
+    /* The request's pip at 12 o'clock, on the rim, in its colour and shape: something waits behind
+     * this screen (glyphs over words). */
     s_wait_pip = lv_obj_create(top);
     lv_obj_remove_style_all(s_wait_pip);
-    lv_obj_set_size(s_wait_pip, WAIT_PIP_D, WAIT_PIP_D);
-    lv_obj_set_pos(s_wait_pip, UI_CX - WAIT_PIP_D / 2, WAIT_PIP_Y);
-    lv_obj_set_style_radius(s_wait_pip, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_opa(s_wait_pip, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(s_wait_pip, COL_BG, 0);
-    lv_obj_set_style_border_width(s_wait_pip, 2, 0);
+    lv_obj_set_size(s_wait_pip, WAIT_PIP_BOX_W, WAIT_PIP_BOX_H);
+    lv_obj_set_pos(s_wait_pip, UI_CX - WAIT_PIP_BOX_W / 2, 0);
+    lv_obj_add_event_cb(s_wait_pip, wait_pip_draw, LV_EVENT_DRAW_MAIN, NULL);
     lv_obj_remove_flag(s_wait_pip, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
 
@@ -397,7 +410,6 @@ uint32_t ui_pending_attention_sid(void)
 static bool s_wait_req;       /* requests wait in the queue */
 static uint32_t s_wait_err;   /* the session of an error card that waits, 0 = none */
 static uint32_t s_wait_seq;   /* the mode it found: offered again once the mode has changed */
-static uint32_t s_pip_rgb;    /* the dot's colour as drawn */
 static uint32_t s_report_sid; /* the session the dot stands for, in words for the report */
 
 uint32_t ui_mode_seq(void) { return s_mode_seq; }
@@ -509,11 +521,12 @@ void ui_reveal_attention(void)
     }
 }
 
-static void pip_show(bool on, uint32_t rgb)
+static void pip_show(bool on, uint8_t kind, uint32_t rgb)
 {
-    if (on && rgb != s_pip_rgb) {
+    if (on && (rgb != s_pip_rgb || kind != s_pip_kind)) {
         s_pip_rgb = rgb;
-        lv_obj_set_style_bg_color(s_wait_pip, lv_color_hex(rgb), 0);
+        s_pip_kind = kind;
+        lv_obj_invalidate(s_wait_pip);
     }
     if (on == !lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN)) {
         return; /* already so: no redraw */
@@ -534,7 +547,7 @@ static void wait_step(void)
     const attention_t *next = s_wait_req ? queue_next() : NULL;
     if (!next) { s_wait_req = false; /* answered, gone, gone back from, or open in ASK */ }
     if (!next && !s_wait_err) {
-        pip_show(false, 0);
+        pip_show(false, 0, 0);
         return;
     }
     uint32_t sid = next ? next->sid : s_wait_err;
@@ -545,9 +558,12 @@ static void wait_step(void)
         return;
     }
     s_report_sid = sid;
-    pip_show(s_mode != MODE_HOME, !next                        ? RGB_ERROR
-                                  : next->kind == ATT_QUESTION ? RGB_ASK
-                                                               : RGB_PERMISSION);
+    /* the ring's pip for the kind: dot, bar or triangle (issue 20261126-38fa) */
+    uint8_t kind = !next ? RING_ERROR : next->kind == ATT_QUESTION ? RING_ASK : RING_PERM;
+    pip_show(s_mode != MODE_HOME, kind,
+             kind == RING_ERROR ? RGB_ERROR
+             : kind == RING_ASK ? RGB_ASK
+                                : RGB_PERMISSION);
 }
 
 void ui_report_add(ui_report_t *r, const char *fmt, ...)
@@ -571,7 +587,10 @@ void ui_report(ui_report_t *r)
     ui_burst_report(r);
     if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_toast_txt);
     if (!lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN)) {
-        ui_report_add(r, "waiting %u", (unsigned)s_report_sid);
+        ui_report_add(r, "waiting %u · %s", (unsigned)s_report_sid,
+                      s_pip_kind == RING_ERROR ? "error"
+                      : s_pip_kind == RING_ASK ? "question"
+                                               : "approval");
     }
     if (s_mode == MODE_AGENT) ui_agent_report(r);
     else if (s_mode == MODE_ASK) ui_ask_report(r);

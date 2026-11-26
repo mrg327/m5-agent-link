@@ -1,0 +1,35 @@
+# The needs-you pip's shape says the kind (issue 20261126-38fa): a dot for a question, a bar along
+# the ring for a permission, a triangle pointing at the centre for an error. Two sessions: the
+# second, unselected, has its capsule centred on 270 degrees, so its pip is at (28, 233), the ring's
+# tangent there is vertical and the centre is to the right (+x).
+#   (28, 233)  the pip's centre: dot, bar (r 200..208) and triangle all cover it
+#   (29, 226)  7 px along the ring: the bar only (the dot is 5 px, the triangle 5 px wide there)
+#   (34, 233)  r 199, just inside the dot and the bar: the triangle only
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work ember
+session 2 ask grove
+wait 1000
+expect_screen ring
+expect_px 28 233 f0e442
+expect_px 29 226 000000
+expect_px 34 233 000000
+shot ring_pip_question.png
+session 2 input grove
+wait 1000
+expect_px 28 233 e69f00
+expect_px 29 226 e69f00
+expect_px 34 233 000000
+shot ring_pip_permission.png
+session 2 error grove
+wait 1000
+expect_px 28 233 d55e00
+expect_px 29 226 000000
+expect_px 34 233 d55e00
+shot ring_pip_error.png
+# the selected session carries no pip: B selects the second
+btn B
+wait 600
+expect_px 28 233 000000
+expect_px 34 233 000000
+quit
