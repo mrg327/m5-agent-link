@@ -1,5 +1,6 @@
-/* Stored preferences: speaker volume (stepped by STATUS's Volume toggle) and display orientation.
- * Read once at start from the HAL's persistent store (NVS on the watch), written when changed. */
+/* Stored preferences: speaker volume (stepped by STATUS's Volume toggle), display orientation and
+ * the personality switchboard. Read once at start from the HAL's persistent store (NVS on the
+ * watch), written when changed. */
 #pragma once
 #include <stdint.h>
 
@@ -16,3 +17,8 @@ uint8_t prefs_volume_percent(void); /* what hal_audio_set_volume gets */
 void prefs_set_volume(uint8_t step);
 orient_mode_t prefs_orient(void);
 void prefs_set_orient(orient_mode_t m);
+/* The `fun` word (persona.h FUN_* bits): a bit per fun feature and one for reduced motion;
+ * FUN_DEFAULT until set, unknown bits dropped. Set from LABS > Personality until STATUS has rows;
+ * every feature reads it through persona_allow(), never on its own. */
+uint32_t prefs_fun(void);
+void prefs_set_fun(uint32_t word);

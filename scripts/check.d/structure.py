@@ -176,6 +176,8 @@ TIERS = {
         "sha256",
         "sound_bank",
         "toy_gate",
+        "persona",
+        "temper",
     },
     "leaf": {"debug.h", "ui_icons"},
 }

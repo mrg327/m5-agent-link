@@ -116,7 +116,7 @@ halving -6 dB) and the speaker task applies it before each sound; step 0 plays n
 `sim_motion_face_up_restores`, `sim_motion_orientation` (dwell, hysteresis, no turn during a touch, raw swipe
 through the turned UI, framebuffer equals the 180-degree turn of the upright one), `sim_motion_orientation_stored`,
 `sim_motion_cover_mute` and `_control`, `sim_tone_approved`, `sim_tone_denied`, `sim_tone_quiet`, `sim_volume_step`,
-`sim_volume_zero`. Simulator script commands: `pose NAME|X Y Z`, `cover`, `uncover`, `pref orient|volume V`,
+`sim_volume_zero`. Simulator script commands: `pose NAME|X Y Z`, `cover`, `uncover`, `pref orient|volume|fun V`,
 `fb_mark`, `expect_fb_flipped`, `expect_flipped 0|1`.
 
 ## Unverified (needs a wrist)

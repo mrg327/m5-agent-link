@@ -183,6 +183,7 @@ void ui_labs_refresh(uint32_t now_ms);
 bool ui_labs_act(nav_action_t a, const gesture_evt_t *g);
 bool ui_labs_tick(uint32_t now_ms); /* true: wants to close */
 void ui_labs_report(ui_report_t *r);
+bool ui_labs_back(void); /* true: a view inside LABS (Personality) closed, LABS stays */
 void ui_go_trackpad(void);
 
 /* The TRACKPAD screen (ui_trackpad.c): the glass drives the PC's pointer (proto 0.20). */

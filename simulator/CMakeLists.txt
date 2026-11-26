@@ -98,6 +98,15 @@ target_include_directories(test_ring_pip PRIVATE ${FW}/core/src ${FW}/agentlink_
 target_link_libraries(test_ring_pip PRIVATE agentlink_proto lvgl::lvgl m)
 add_test(NAME ring_pip_clearance COMMAND test_ring_pip)
 
+# Living marks (issue 20261126-98a6): the personality gate's guardrails; the temperament and its poses.
+add_executable(test_persona tests/test_persona.c ${FW}/core/src/persona.c)
+target_include_directories(test_persona PRIVATE ${FW}/core/src)
+add_test(NAME persona_gate COMMAND test_persona)
+add_executable(test_temper tests/test_temper.c ${FW}/core/src/temper.c ${FW}/core/src/sha256.c)
+target_include_directories(test_temper PRIVATE ${FW}/core/src)
+target_link_libraries(test_temper PRIVATE m)
+add_test(NAME temper_poses COMMAND test_temper)
+
 add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
 target_include_directories(test_ring PRIVATE ${FW}/core/src)
 find_package(Threads REQUIRED)
@@ -264,6 +273,11 @@ sim_script_test(sim_agent_timeout agent_timeout.txt)
 sim_script_test(sim_labs_trackpad labs_trackpad.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"wheel\":-"
                 PASS_REGULAR_EXPRESSION "\"btn\":0,\"n\":2.*\"btn\":1,\"n\":1.*\"wheel\":1")
+# Living marks (issue 20261126-98a6): the breath on the dock and its stillness on battery, with reduced motion,
+# off and while needed; the one-shots of done, error and snooze; LABS > Personality and the stored word.
+sim_script_test(sim_fun_temper fun_temper.txt)
+sim_script_test(sim_fun_temper_states fun_temper_states.txt)
+sim_script_test(sim_labs_fun labs_fun.txt)
 # UI-V2 Phase 3: ASK. Question options reply by tap; grants and Deny are holds; a tap never approves;
 # a rejected answer restores the options; a hold is bound to its request id.
 sim_script_test(sim_ask_reply ask_reply.txt

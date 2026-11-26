@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #include "lvgl.h"
+#include "temper.h"
 #include "ui_internal.h"
 
 /* ── glyphs ── */
@@ -50,6 +51,10 @@ void ui_sigil_set_name(lv_obj_t *s, const char *name); /* "" (no folder): the da
 void ui_sigil_set_session(lv_obj_t *s, const char *name, uint32_t sid);
 void ui_sigil_set_color(lv_obj_t *s, lv_color_t c); /* white until set */
 void ui_sigil_set_pos(lv_obj_t *s, int cx, int cy);
+/* Living marks (temper.h): draw the mark moved, resized, turned and dimmed by a pose; neutral
+ * until set. Change-only: one redraw of the object (r + 6 each side) per new pose. The shape is the
+ * name's, whatever the pose. */
+void ui_sigil_set_pose(lv_obj_t *s, const temper_pose_t *p);
 /* The same mark inside a screen's own draw callback (screen coordinates; w 0 = the stroke for
  * r). */
 void ui_sigil_hash(const char *name, uint8_t h[UI_SIGIL_HASH]);

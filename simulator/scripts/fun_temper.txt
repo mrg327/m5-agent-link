@@ -1,0 +1,77 @@
+# Living marks (issue 20261126-98a6, GLYPHS.md §3.11): the deck's sigil breathes on the dock, by its own
+# temperament; it holds still on battery, with reduced motion, with the feature off, and while anything needs
+# you, when the asking mark leans toward the hero glyph and stays. Each redraw is the sigil's own box.
+#
+# The budgets are the same window measured with Living marks off (pref fun 0) plus about 3 %: the ring's comet
+# is most of it. A breath adds about 95 k px in 6.5 s (the sigil's 57 x 57 box, at most 16 times a breath),
+# so a mark that moves where it must not fails them. `lift` keeps the deck from going ambient.
+connect
+rtc 1800000000
+rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 16 work webapp feat/login Running the test suite after the login refactor
+wait 400
+expect_screen ring
+expect_label webapp
+# the breath: webapp's period is 3.25 s (test_temper.c); three moments of one breath
+shot fun_temper_a.png
+wait 800
+shot fun_temper_b.png
+wait 800
+shot fun_temper_c.png
+# the cost on the dock: the comet and the breath
+lift
+px_reset
+wait 6500
+expect_px_max 610000
+# the same window with Living marks off: the comet alone
+pref fun 0
+lift
+px_reset
+wait 6500
+expect_px_max 515000
+pref fun 0x3d3
+# on battery: still (guardrail 6)
+battery 60
+lift
+px_reset
+wait 6500
+expect_px_max 515000
+battery 80 chg
+# reduced motion: still
+pref fun 0x83d3
+lift
+px_reset
+wait 6500
+expect_px_max 515000
+pref fun 0x3d3
+# a second session, another temperament
+session 2 work api main Indexing the repository
+wait 300
+btn B
+wait 400
+expect_label api
+shot fun_temper_api.png
+btn B
+wait 400
+expect_label webapp
+# the ambient face on the dock: the dim mark keeps breathing (32..45 %)
+wait 31000
+shot fun_temper_ambient.png
+lift
+wait 400
+# needs you: the request takes the screen; back on the deck the mark has leant toward the hand, and is still
+session 16 input webapp feat/login
+attention 7 16 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen ask
+btn B long
+wait 400
+expect_screen attention
+shot fun_temper_lean.png
+lift
+px_reset
+wait 6500
+expect_px_max 3860000
+clear 7
+wait 300
+quit

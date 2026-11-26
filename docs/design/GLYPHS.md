@@ -2,7 +2,7 @@
 status: implemented
 owner: ui
 issue: 20261114-8c3d
-last_reviewed: 2026-11-22
+last_reviewed: 2026-11-26
 summary: '"Sigil": the glyph-first design system'
 ---
 
@@ -102,6 +102,8 @@ is a dot or a bar). Round caps. An empty name (no folder) draws the dashed-folde
 - Inside a screen's own draw callback: `ui_sigil_hash(name, h)` once, then
   `ui_sigil_paint(layer, h, cx, cy, r, w, colour)` (`w` 0 = the stroke for `r`).
 - Sizes in use: r 22 on HOME (top) and the ambient face; r 52 as the subject of an orbit.
+- `ui_sigil_set_pose(s, pose)`: the mark moved, resized, turned and dimmed by a Living-marks pose (§3.11); the
+  shape stays the name's.
 
 ### 3.2 Glyphs: `ui_glyph_*`, `FONT_ICON_HERO` (128 px), `FONT_ICON_XXL` (96 px), `FONT_ICON_XL` (64 px)
 
@@ -262,6 +264,74 @@ Rule 4, a quantity as geometry.
   and white: which page of a reader or a transcript. One page draws nothing; more than 12 show 12 and the
   position in proportion. The orbit draws its pages with the same pips.
 
+### 3.11 Living marks: `temper.c`, `persona.c`, `ui_living.c` (issue 20261126-98a6)
+
+No character is added. The marks the watch already draws move by one grammar, so after a week a project is
+known by how its mark breathes. Colour still means state only: a mark is never given a colour of its own.
+
+| Meaning | Gesture | Sigil | Hero glyph | Duration |
+|---|---|---|---|---|
+| alive, working | breath | brightness `cos8` 72–100 % and the middle ring swayed 2–6° | still (too large to loop) | 3–6 s loop |
+| idle | slow breath | brightness 80–100 % at twice the period, no sway | still | loop |
+| wants you | lean, then **still** | 3 px toward the hero glyph (1, 2, 3 px over 200 ms), full bright | still | 200 ms, then nothing |
+| arrived (done) | dip and settle | r × 0.90, × 1.06, back (`out3`) | 3 px down, 2 up, back | 300 ms |
+| joy (done) | radial | — | eight sparks in the done colour leave it, r 70 → 104, fading | 450 ms |
+| wrong (error) | shiver | sideways +2 −2 +2 −1 +1 0 px, 40 ms each, first the temper's way | the same at 3 px | 240 ms |
+| asleep (snoozed) | droop | 60 % and the outer ring turned 6° the temper's way | still | static |
+| ended, offline, handed back | still | as drawn | still | — |
+
+Rules: one gesture at a time per mark (a new state cuts the old one); **nothing loops while anything needs
+you**, so stillness says "waiting for you"; loops are slow and small, one-shots under 900 ms; the same name and
+the same event always give the same gesture. A scale breath is invisible at r 22 (±0.66 px), so the breath is
+brightness and sway; the radius moves only in the dip.
+
+- **Temperament** (`temper.c`, pure): bytes 10..19 of the same SHA-256 the shape uses (bytes 0..9), from the
+  same key (`temper_key()`: the folder name, or `"\x01sid N"` with none; `ui_sigil_set_session` uses it).
+  t[5] the period (3.0–6.0 s in 250 ms steps), t[6] the sway (2–6°), t[7] bit 0 the sway period (3/2 or 2
+  breaths), bit 1 the direction, t[8] the phase, t[9] the sparks' rotation. `temper_pose()`, `temper_hero()`
+  and `temper_joy()` turn a state and the time in it into a pose; a pose never reaches more than 4 px past the
+  rest, and the loop is sampled in sixteenths of a breath, so a breathing mark repaints at most 16 times a
+  breath.
+- **The gate** (`persona.c`, pure): see §3.12.
+- **On screen** (`ui_living.c`): a screen binds its sigil and hero glyph to a slot (`ui_living_bind`) and says
+  in its update what the slot shows (`ui_living_show`, `ui_living_state`); `app.c` hands the step's persona
+  context to `ui_living_tick()` after `ui_tick()`. A mark out of sight rests; a newly selected session starts
+  at rest, so scrolling onto a finished one does not dip it. `ui_sigil_set_pose()` is change-only; the sigil
+  object is r + 6 px a side to hold a pose.
+- Bound today: HOME's sigil (r 22) and hero glyph, and the ambient face's sigil (it breathes at 32–45 % on the
+  dock; it helps burn-in rather than hurting it). AGENT and ASK hold still by rule; WATCH is not bound yet.
+- **The ring** keeps its own motion, which already speaks the grammar: the comet is the working loop, done is
+  one sweep then solid (settle), error one flicker then solid (shiver), idle thin and still, and the ambient
+  ring is still. Its pulses on a request are the alert, not fun, so they stay; no fun gesture is drawn on the
+  ring.
+- Cost (simulator, `fun_temper.txt`): a breathing r 22 sigil adds about 95 k px in 6.5 s, about 15 k px a
+  second (7 % of one full frame a second); the comet alone is about 500 k px in the same window. A finish
+  repaints the hero glyph's box (about 12 k px) for 10 frames and the sparks' dots (about 1.6 k px a frame).
+  Frame time and the AMOLED's look at desk distance are for the device (open questions in the issue).
+
+### 3.12 The fun switchboard: `persona_allow()`, the `fun` word
+
+Every fun feature asks `persona_allow(feature, ctx)` (or `ui_living_allow(feature)` from a screen) what it may
+do now, and tests none of the conditions itself. It returns `PA_POSE` (a static pose), `PA_ONESHOT`,
+`PA_LOOP`, `PA_HAPTIC`, `PA_SOUND`:
+
+| Condition | Result |
+|---|---|
+| the feature's bit off in `fun`, or the display dark or only glowing | nothing |
+| anything needs you (a request, a session waiting for input) | a finish keeps its buzz and sound, not its picture; the asking mark keeps its lean (`alerting`); all else a static pose at most |
+| face down, silent, hush | no buzz, no sound |
+| quiet (mode or setting) | no sound; a buzz only when the user started it or the event alerts |
+| on battery | no loop (one-shots stay) |
+| `FUN_REDUCED` | no loop, no one-shot: the end frame |
+| neither started by the user nor riding on an alert | no buzz, no sound: fun never initiates |
+
+The glue (`app.c`) fills the context once a step from the model, power, motion and `prefs_fun()`; a feature
+copies it and sets `user_started` / `alerting` / `hush` for its own event. The stored word (`prefs_fun()`,
+NVS key `fun`) has a bit per feature: `FUN_TEMPER` 0 (on), `FUN_CELEBRATE` 1 (on), `FUN_MOTIF` 2 (off),
+`FUN_MOTE` 3 (off), `FUN_HELLO` 4 (on), `FUN_REPLAY` 5 (off), `FUN_EGGS` 6 (on), `FUN_TRAIL` 7 (on), `FUN_CUP`
+8 (on), `FUN_TOYS` 9 (on), and `FUN_REDUCED` 15 (off). It is set in LABS > Personality until STATUS has rows
+([EXPERIMENTS.md](EXPERIMENTS.md)); a script sets it with `pref fun 0x3d3`.
+
 ## 4. Reference screen: HOME
 
 Built with the primitives, as the model for the rest (`ui_home_card.c`; renders:
@@ -312,7 +382,7 @@ owner's, inside the rules.
 | **VOICE** (`ui_voice.c`) | Record, level, stop, transcribing, the transcript with pages, use / send (hold), try again, queued, not sent | The microphone hero with a live level ring; the transcript is text (rule 1); discs for send, retry; page dots |
 | **KEYS** (`ui_keys.c`) | Swipe typing, candidates, space, delete, send (hold), errors | Text entry (rule 1): keys and candidates stay letters. Space, delete and send are glyph keys. Errors are signs |
 | **SCROLL** (`ui_scroll.c`) | Scroll the terminal by dial and drag, live / lines up, bottom, page, preview | A scroll track as an arc with a thumb; the live glyph at the bottom; the count of lines up as the thumb's position, not a number. The preview is text (terminal content) |
-| **TRACKPAD, LABS** (`ui_trackpad.c`, `ui_labs.c`) | Move, click, right click, double click, wheel; how-to; refusal; the experiments list | The pad is the screen: a faint cursor glyph; the how-to is three pictograms. Labs is an orbit |
+| **TRACKPAD, LABS** (`ui_trackpad.c`, `ui_labs.c`) | Move, click, right click, double click, wheel; how-to; refusal; the experiments list; the fun switches (`ui_fun.c`) | The pad is the screen: a faint cursor glyph; the how-to is three pictograms. Labs is an orbit; Personality an orbit of toggle discs, the off ones dim |
 | **OTA** (`ui_ota.c`, `ota.c` toasts) | Updating with progress, restarting, waiting for the computer, hold B to cancel, the errors | The download hero inside a progress arc; restarting is the working glyph; cancel is B's key hint with a cross and a hold ring; an error is the error glyph and a number (rule 8) |
 | **Toasts, glow** (`ui.c`, `app.c`) | Every toast | Signs through the vocabulary (§3.7) |
 | **GRAPH** (`ui_graph.c`) | unchanged | Already the reference for lanes and nodes; only its key hints change |

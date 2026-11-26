@@ -3,10 +3,10 @@ status: implemented
 owner: ui
 issue: 20261113-61ce
 last_reviewed: 2026-11-26
-summary: LABS, the Trackpad and the toys' groundwork
+summary: LABS, the Trackpad, the Personality switches and the toys' groundwork
 ---
 
-# Experiments (LABS) and the Trackpad
+# Experiments (LABS), the Trackpad and Personality
 
 Issue 61ce. Experiments are features that sit outside the agent flow. They may change or go away. The toys'
 groundwork (issue 20261126-b5d1) is in [Toys](#toys).
@@ -102,6 +102,23 @@ and face down nothing sounds.
 the watch), with `sound_toy_render()`; a runtime note is a `snd_sound_t` on the stack. It is apart from the six
 alert-cue slots of `sound_play()`, which a toy never touches. Nothing is allocated.
 
+## Personality (issue 20261126-98a6)
+
+The second item (the waveform glyph) is the fun switchboard, until STATUS has rows. It needs no link.
+
+- An orbit of toggle discs, eight to a page with page pips, one glyph per switch: Living marks (waveform),
+  celebrations (check), motif (speaker), the Mote (dot), hello and close (clock), replay (fast-forward), easter
+  eggs (asterisk), trail (calendar), break cup (timer), toys (hand tap), reduced motion (stop). An off switch
+  is a dim disc; the selected switch's glyph is the subject, white when on and grey when off.
+- A, or a tap on the selected disc, flips it; a tap on another disc selects it; B and the dial move. A swipe
+  down or right, B long, or a hold off the discs goes back to the experiments; the chord goes home.
+- Each flip writes the stored `fun` word (`prefs_set_fun`, NVS key `fun`) at once. What each bit does, its
+  default and the rules every feature obeys are in [GLYPHS.md](GLYPHS.md) §3.11 and §3.12. Only Living marks
+  exists yet; the other switches are there for the features filed beside it (celebrations, the Mote, replay,
+  eggs, toys …), which ask `persona_allow()` for their bit.
+- Arrivals wait here as on the rest of LABS. No word is drawn; the report names each switch with "on" or
+  "off".
+
 ## Daemon
 
 `daemon/crates/agentlinkd/src/pointer.rs` has three backends:
@@ -128,4 +145,7 @@ alert-cue slots of `sound_play()`, which a toy never touches. Nothing is allocat
   and microphone, and the hold-off.
 - `simulator/scripts/toy_yield.txt` drives the simulator's stub toy (script command `toy_stub`): raw keys, the
   refusal while a finish's cue plays, a request taking over and the return to the paused toy.
+- `simulator/scripts/labs_fun.txt` covers Personality: entry, flips, selection, the back paths, and the deck's
+  mark holding still once Living marks is off. The gate and the poses are `test_persona.c` and
+  `test_temper.c`; the motion is `fun_temper.txt` and `fun_temper_states.txt`.
 - Protocol vectors: `cmd_pointer_*.json` and `welcome_pointer.json`.

@@ -10,6 +10,7 @@
 
 #include "debug.h"
 #include "nav.h"
+#include "ui_fun.h"
 #include "ui_icons.h"
 #include "ui_internal.h"
 #include "ui_kit.h"
@@ -20,15 +21,23 @@
 /* in the bottom slot: the toast a refused tap shows is the same sign, in the same place */
 #define SIGN_Y UI_Y_TOAST
 
-/* The trackpad, then the toys (ui_toy.h) in their table's order. */
-enum { LAB_TRACKPAD, LAB_TOYS };
+/* The trackpad, the Personality switchboard, then the toys (ui_toy.h) in their table's order. */
+enum { LAB_TRACKPAD, LAB_FUN, LAB_TOYS };
 #define LAB_MAX (LAB_TOYS + UI_TOY_MAX)
 
 static int lab_count(void) { return LAB_TOYS + ui_toy_count(); }
 static const char *lab_name(int id)
-{ return id == LAB_TRACKPAD ? "Trackpad" : ui_toy_get(id - LAB_TOYS)->name; }
+{
+    if (id == LAB_TRACKPAD) return "Trackpad";
+    if (id == LAB_FUN) return "Personality";
+    return ui_toy_get(id - LAB_TOYS)->name;
+}
 static const char *lab_glyph(int id)
-{ return id == LAB_TRACKPAD ? ICON_CURSOR : ui_toy_get(id - LAB_TOYS)->glyph; }
+{
+    if (id == LAB_TRACKPAD) return ICON_CURSOR;
+    if (id == LAB_FUN) return ICON_WAVE;
+    return ui_toy_get(id - LAB_TOYS)->glyph;
+}
 
 static lv_obj_t *s_root, *s_subject, *s_orbit, *s_sign, *s_hint[2];
 static uint32_t s_now, s_last_input;
@@ -79,6 +88,8 @@ static void render(void)
     if (sel == LAB_TRACKPAD)
         snprintf(s_desc_txt, sizeof s_desc_txt, "%s",
                  why ? why : "Use the watch as this PC's trackpad");
+    else if (sel == LAB_FUN)
+        snprintf(s_desc_txt, sizeof s_desc_txt, "Turn the watch's fun on and off");
     else snprintf(s_desc_txt, sizeof s_desc_txt, "%s", why ? why : lab_name(sel));
     const char *icons = why ? blocked_sign(sel) : "";
     if (icons != s_sign_icons) { /* literals: the pointer is the identity */
@@ -109,7 +120,19 @@ void ui_labs_open(uint32_t now)
               model_pointer() ? "true" : "false");
 }
 
-void ui_labs_close(void) { show(s_root, false); }
+void ui_labs_close(void)
+{
+    ui_fun_close();
+    show(s_root, false);
+}
+
+bool ui_labs_back(void)
+{
+    if (!ui_fun_is_open()) return false;
+    ui_fun_close();
+    show(s_root, true);
+    return true;
+}
 
 static void select_item(int i, const char *via, void (*haptic)(void))
 {
@@ -138,6 +161,9 @@ static void commit(int sel)
     }
     if (sel == LAB_TRACKPAD) {
         ui_go_trackpad();
+    } else if (sel == LAB_FUN) { /* the switchboard, inside LABS: back returns here */
+        show(s_root, false);
+        ui_fun_open();
     } else {
         ui_go_toy(sel - LAB_TOYS);
     }
@@ -147,6 +173,11 @@ static void commit(int sel)
 bool ui_labs_act(nav_action_t a, const gesture_evt_t *g)
 {
     if (g->kind != G_LIFT && g->kind != G_SHAKE) s_last_input = s_now;
+    if (ui_fun_is_open()) {
+        bool used = ui_fun_act(a, g);
+        if (!ui_fun_is_open()) show(s_root, true); /* held off the discs: back to the list */
+        return used;
+    }
     switch (a) {
     case NAV_COMMIT: {
         int hit = g->kind == G_TAP ? ui_orbit_hit(s_orbit, g->x, g->y) : -1;
@@ -186,6 +217,10 @@ bool ui_labs_tick(uint32_t now)
 void ui_labs_report(ui_report_t *r)
 {
     snprintf(r->screen, sizeof r->screen, "labs");
+    if (ui_fun_is_open()) {
+        ui_fun_report(r);
+        return;
+    }
     ui_report_add(r, "Experiments");
     int sel = ui_orbit_selected(s_orbit);
     int n = lab_count();
@@ -212,5 +247,6 @@ lv_obj_t *ui_labs_init(lv_obj_t *screen)
     ui_key_hint_set(s_hint[1], ICON_NEXT);
     show(s_sign, false);
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
+    ui_fun_init(screen);
     return s_root;
 }

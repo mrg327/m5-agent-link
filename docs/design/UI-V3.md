@@ -2,7 +2,7 @@
 status: implemented
 owner: ui
 issue: 20261111-7732
-last_reviewed: 2026-11-22
+last_reviewed: 2026-11-26
 summary: '"Halo": the Apple-style overhaul; its look is replaced by GLYPHS.md, its gestures and safety rules stand'
 ---
 
@@ -31,6 +31,12 @@ document wins. Finding numbers (H1, R1, X2 …) refer to the profile.
    colour, shape or position wherever one can carry it. Use a word only when no glyph can. Check
    every new screen against this first, and when a screen changes, look for text a glyph can
    replace. The agent graph ([GRAPH.md](GRAPH.md)) is the reference: lanes and glyphs, no text.
+8. **Living marks, and stillness means "waiting for you"** (2026-11-26, issue 98a6). The sigil, the
+   hero glyph and the ring move by one grammar ([GLYPHS.md](GLYPHS.md) §3.11): a working mark
+   breathes by its own temperament on the dock, a finish dips and throws sparks, an error shivers,
+   a snoozed mark droops, and the mark that wants you leans toward the hero glyph and holds still.
+   Nothing loops while anything needs you, on battery, or with reduced motion; fun never starts a
+   buzz or a sound (§3.12 there). Every fun feature asks `persona_allow()` first.
 
 Safety invariants, unchanged and not negotiable in any later reskin: the approval card shows the
 request text; a tap never approves or denies; an approve-class commit is a 1.2 s hold bound to the

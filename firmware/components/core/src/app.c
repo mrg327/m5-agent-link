@@ -23,6 +23,7 @@
 #include "ota.h"
 #include "prefs.h"
 #include "ui.h"
+#include "ui_living.h"
 #include "ui_theme.h"
 
 #define FRAME_MAX 4096
@@ -904,6 +905,24 @@ void core_init(void)
     s_fps_t0 = app_now_ms();
 }
 
+/* Living marks (issue 20261126-98a6): the persona gate's view of this step, from the glue that can
+ * see power, motion and the model; the marks then move by it. */
+static void persona_step(uint32_t now)
+{
+    persona_ctx_t c = {0};
+    model_counts_t n = model_counts();
+    uint32_t unix_now = app_now_unix();
+    c.needs_you = (uint8_t)((model_attention_first() ? 1 : 0) + (n.waiting ? 1 : 0));
+    c.alert = (uint8_t)model_settings()->alert;
+    c.quiet = model_quiet_active(unix_now);
+    c.face_down = motion_face_down();
+    c.usb = hal_battery_read().usb_present;
+    c.display_on = power_display_on() && !ui_glow_active();
+    c.ambient = ui_dimmed();
+    c.fun = prefs_fun();
+    ui_living_tick(&c, now);
+}
+
 uint32_t core_step(void)
 {
     uint32_t now = app_now_ms();
@@ -934,6 +953,7 @@ uint32_t core_step(void)
     if (voice_state() == VOICE_REC || voice_state() == VOICE_WAIT) power_activity(now);
     seq = ui_mode_seq();
     ui_tick(now);
+    persona_step(now);
     swallow_if_moved(seq);
     orientation_step();
     dbg_tick(now);

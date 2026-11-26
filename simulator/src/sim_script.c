@@ -72,6 +72,7 @@
  *                                   fw_begin then carries the patch, fw_send sends it (corrupt: one byte flipped)
  *   fw_expect_slot                  the spare slot holds exactly the image
  *   battery PCT [chg]               the battery reading (chg = charging and on USB)
+ *   pref volume|orient|fun V        a stored preference; fun takes the word (persona.h FUN_*, e.g. 0x3d3)
  *   skip MS                         jump the clock forward (the script's own timeline stays put): long timeouts
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
  *   question SID Q|ANSWER|ANSWER...  a delta with the agent's closing question and its answers (proto 0.5)
@@ -1989,7 +1990,9 @@ static void run(const ev_t *e)
             prefs_set_orient(!strcmp(val, "flipped") ? ORIENT_FLIPPED
                              : !strcmp(val, "auto")  ? ORIENT_AUTO
                                                      : ORIENT_NORMAL);
-        else fail("bad pref", e->text);
+        else if (!strcmp(key, "fun")) {
+            prefs_set_fun((uint32_t)strtoul(val, NULL, 0));
+        } else fail("bad pref", e->text);
         break;
     }
     case E_EXPECT_FLIPPED:
