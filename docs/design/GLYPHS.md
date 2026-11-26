@@ -49,7 +49,8 @@ word by word.
    - No rows of labels, no pills with words.
 6. **Button hints sit at the buttons.** What A and B do is a glyph in a thin ring at the rim, next to
    the physical button: A upper left in amber, B upper right in blue, as the StopWatch's keys sit on its upper
-   rim when it is upright with USB at the bottom (issue 20261125-d8b5). No letters.
+   rim when it is upright with USB at the bottom (issue 20261125-d8b5). No letters. Where the key is
+   safe (HOME, WATCH) a tap on the hint presses it (§3.6).
 7. **A result is a burst.** Approved, denied, sent, handed back to the computer: one hero glyph
    filling the centre, in its colour, then the screen moves on. No words.
 8. **An error is a sign.** One or two glyphs side by side ("computer, refused"). A rare diagnostic
@@ -178,6 +179,11 @@ Rule 6: the glyph for A and for B, each in a thin ring at the rim.
   reaches r 207 from the screen centre, clear of the countdown (r 213) and the index ring (r 218). KEYS uses
   the same places: its candidates begin below them.
 - A hint is a disc: hide and show it like one; `ui_disc_set_hold()` fills a ring round it for a hold on the button.
+- On HOME and WATCH a hint is also the key (issue 20261126-34e5): `ui_key_hint_hit()` (within `UI_KEY_HIT_R` 36
+  of its centre, while shown) makes a tap `ZONE_KEY_A` / `ZONE_KEY_B`, and `ui_key_hint_flash()` lights its ring
+  for 150 ms on a tap or a press of the key. `ui_key_hint_set_count(hint, n)`: a white badge r 11 on the
+  hint's inner lower edge with the digit in black (rule 4), 0 hides it, 9 at most. A's counts the other
+  sessions that need you, the pips on the ring; finished sessions are not counted.
 - Above y 121 a row level with the hints is only as wide as the gap between them (x 125 to 341; ASK's title
   and AGENT's question are 216 px). The bottom slot, x 129 to 337 below y 345, is as narrow by the round
   glass alone: the toast, page dots and docks live there.
@@ -282,8 +288,9 @@ Built with the primitives, as the model for the rest (`ui_home_card.c`; renders:
     (`ui_gauges.c`), under whichever of them shows.
 - **Empty deck:** the clock in digits, alone.
 - **Ambient:** the clock, dim, with the selected session's sigil and a small state glyph under it.
-- **Keys:** A = the desktop (it opens the session on the computer, as before), B = caret (next), shown
-  when there is more than one session. The session menu opens by a tap, as before.
+- **Keys:** A = the desktop (it opens the session on the computer, as before), with a count badge of the
+  other sessions that need you; B = caret (next), shown when there is more than one session. A tap on
+  a shown hint presses its key. The session menu opens by a tap, as before.
 - **The session ring** at the bezel is unchanged, except that a needs-you pip is a shape per kind: dot
   (question), bar along the ring (permission), triangle pointing in (error); UI-V3 §3.1. The mark at 12
   o'clock that says a request waits behind the screen takes the same shapes.

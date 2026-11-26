@@ -1,0 +1,49 @@
+# Issue 20261126-34e5: a white count badge on button A's hint says how many other sessions need
+# you, the same number as the pips on the ring. Finished sessions are not counted, nor is the
+# selected one. The badge is a white disc r 11 at (116, 116) with the digit in black, so a pixel
+# just inside its rim, (116, 107), is white while it shows.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work ember
+session 2 work fjord
+session 3 done grove
+wait 600
+expect_screen ring
+expect_label ember
+expect_no_label more need you
+expect_px 116 107 000000
+session 2 input fjord
+session 3 ask grove
+wait 600
+expect_label ember
+expect_label 2 more need you
+expect_px 116 107 ffffff
+shot hint_badge_2.png
+session 3 done grove
+wait 600
+expect_label 1 more need you
+expect_px 116 107 ffffff
+session 2 error fjord
+wait 600
+expect_label 1 more need you
+# selecting the one that needs you takes it out of the count
+btn B
+wait 600
+expect_label fjord
+expect_no_label more need you
+expect_px 116 107 000000
+# WATCH shows the same badge
+btn B
+wait 600
+expect_label grove
+tap 233 233
+wait 400
+expect_screen agent
+expect_label > Activity
+btn A
+wait 500
+expect_screen watch
+expect_label 1 more need you
+expect_px 116 107 ffffff
+shot hint_badge_watch.png
+quit

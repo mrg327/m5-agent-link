@@ -230,7 +230,8 @@ anywhere else in the centre behaves as in v2. A tap still never commits a hold i
   (prominent, the state colour, 160 × 44, centred on y 320, `Review` for a permission and `Answer` for a question)
   when the session needs you › the agent graph strip (proto 0.22, [GRAPH.md](GRAPH.md) §5) › a lone `ICON_QUIET`
   in `COL_TEXT3` while quiet runs › nothing.
-- Legends: A `Open`, B `Next` (hidden with one session).
+- Legends: A `Open`, B `Next` (hidden with one session). A tap on a shown hint presses its key (§5). A white
+  badge on A counts the other sessions that need you, the pips on the ring (issue 20261126-34e5).
 - Offline: the card drops to 50 % as in v2.
 - **Empty**: the time in `FONT_NUM` at y 200 and `Nothing running` in `FONT_BODY` `COL_TEXT2` at
   y 262; before the clock is set, `Ready` in `FONT_TITLE`. No "swipe down for status" (M1).
@@ -424,7 +425,7 @@ chord (`Running the test suite` fits; longer ends in dots); its argument in `FON
 two lines, top at y 252. Footer on y 322 in `FONT_CAPTION` `COL_TEXT3`: `Step 3 · 1:37`. No hint
 line. When the session is not working: the state icon at 44 px on y 176, the state word in
 `FONT_TITLE` on y 236, a caption on y 278 (`Finished 3m ago`), and for a session that needs you the
-**Answer** button on y 318. Legends: A `Open`, B `Next`.
+**Answer** button on y 318. Legends: A `Open`, B `Next`, tappable and with A's count badge as on HOME.
 
 ### 4.5 SCROLL
 
@@ -560,6 +561,7 @@ oldest row.
 | Every v2 way back stays as an alias | none removed | principle 6 |
 | A tap on a list row acts on that row | handled in the screen via `wheel_hit`; the binding stays `NAV_COMMIT` | X3 |
 | `NAV_PICK_RIM` leaves AGENT and ASK | two rows removed | the rim no longer shows rows (§3.1) |
+| **A tap on a key hint presses its key** on HOME and WATCH (issue 20261126-34e5) | `{MODE_HOME, G_TAP, ZONE_KEY_A, WHEN_ALWAYS, NAV_FOCUS}`, `ZONE_KEY_B` → `NAV_NEXT`, the same two for `MODE_WATCH`, before the `ZONE_RIM` rows | A tap within `UI_KEY_HIT_R` (36) of a shown hint was a rim tap that picked the session at 315° or 45°, or nothing. Only a tap, acting at once (no touch "A twice"); a slide from a hint still scrubs; a hidden hint is rim. The hint's ring lights for 150 ms on a tap and on the key. Other screens keep their own rules |
 
 Nothing else in the gesture table changes. HOME keeps left/right for sessions; KEYS keeps touch for
 strokes and B held for back.

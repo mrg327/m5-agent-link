@@ -75,6 +75,10 @@ bool ui_home_askable(void);
 bool ui_home_read_hit(int x, int y);
 /* the point is on the card's graph strip, which opens GRAPH (GRAPH.md §5) */
 bool ui_home_strip_hit(int x, int y);
+/* the key hint of key 0 (A) or 1 (B): a tap on it presses that key (issue 20261126-34e5) */
+lv_obj_t *ui_home_key_hint(int key);
+/* sessions other than the selected one that need you: the pips on the ring, A's badge */
+int ui_home_pip_count(void);
 uint32_t ui_home_sel_sid(void);
 /* the selected session's unanswered permission or question */
 const attention_t *ui_home_sel_request(void);
@@ -200,4 +204,5 @@ bool ui_watch_refresh(uint32_t now_ms); /* false: the session is gone */
 bool ui_watch_act(nav_action_t a, const gesture_evt_t *g);
 void ui_watch_tick(uint32_t now_ms); /* the clock; WATCH never closes by itself */
 uint32_t ui_watch_sid(void);
+lv_obj_t *ui_watch_key_hint(int key); /* as ui_home_key_hint */
 void ui_watch_report(ui_report_t *r);

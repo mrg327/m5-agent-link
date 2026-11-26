@@ -224,6 +224,20 @@ typedef enum { UI_KEY_A, UI_KEY_B } ui_key_t;
 lv_obj_t *ui_key_hint_create(lv_obj_t *parent, ui_key_t key);
 /* an ICON_* literal; "" or NULL: the ring alone */
 void ui_key_hint_set(lv_obj_t *hint, const char *icon);
+/* On HOME and WATCH a tap this close to a shown hint presses its key (issue 20261126-34e5): the r
+ * 20 ring plus 16 px, 6.9 mm across. Its inner edge is at r 151 from the screen centre, outside the
+ * centre zone (NAV_CENTRE_R 150). */
+#define UI_KEY_HIT_R 36
+/* The point is within UI_KEY_HIT_R of the hint's centre. False while the hint is hidden. */
+bool ui_key_hint_hit(lv_obj_t *hint, int x, int y);
+/* A count in a badge (GLYPHS rule 4): a white disc r 11 on the hint's inner lower edge with the
+ * digit in black; 0 hides it, more than 9 shows 9. Change-only: a change repaints the badge. */
+void ui_key_hint_set_count(lv_obj_t *hint, int n);
+int ui_key_hint_count(lv_obj_t *hint);
+/* A press, by the key or by a tap on its hint: the hint's ring lights full for 150 ms. One hint at
+ * a time; ui_key_hint_tick() puts it out. */
+void ui_key_hint_flash(lv_obj_t *hint, uint32_t now_ms);
+void ui_key_hint_tick(uint32_t now_ms);
 
 /* ── §3.7 burst and sign ── */
 

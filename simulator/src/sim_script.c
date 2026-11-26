@@ -300,6 +300,8 @@ static void btn(uint32_t *t, int b, uint32_t down_at, uint32_t up_at)
 
 static int s_last_x, s_last_y; /* where `press` put the finger, for `release` */
 
+static void on_device_tx(const uint8_t *frame, size_t len);
+
 static bool parse_line(char *line, uint32_t *t)
 {
     /* the line's argument: `rx` hex up to one frame, long UTF-8 text (issue d379) */
@@ -607,6 +609,7 @@ static bool parse_line(char *line, uint32_t *t)
         else return false;
         *t += 50;
     } else if (!strcmp(cmd, "expect_cmd") && arg[0]) {
+        sim_link_set_tx_tap(on_device_tx); /* from the start: a plain focus is seen too */
         add(*t, E_EXPECT_CMD, 0, 0, 0, arg);
         *t += 50;
     } else if (!strcmp(cmd, "quit")) {

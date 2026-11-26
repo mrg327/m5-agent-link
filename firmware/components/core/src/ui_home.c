@@ -239,6 +239,19 @@ void ui_home_note_input(void) { noted_input(); }
 const session_t *ui_home_sel_session(void) { return sel_session(); }
 const home_slot_t *ui_home_sel_slot(void) { return s_n > 0 ? &s_slots[s_sel] : NULL; }
 int ui_home_slot_count(void) { return s_n; }
+
+/* The ring draws a pip on each of these (ui_ring_draw.c): finished sessions are not counted. */
+int ui_home_pip_count(void)
+{
+    int n = 0;
+    for (int i = 0; i < s_n; i++) {
+        const session_t *s = model_find(s_slots[i].sid);
+        if (i == s_sel || !s || s_slots[i].n_merged) continue;
+        ring_kind_t k = kind_of(s);
+        n += k == RING_ASK || k == RING_PERM || k == RING_ERROR;
+    }
+    return n;
+}
 /* What a rim drag means now: a dial through a list's items (AGENT, ASK, STATUS), or the session
  * segments. */
 void ui_home_rim_mode(bool dial)

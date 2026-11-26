@@ -874,6 +874,11 @@ void ui_pips_set(lv_obj_t *o, int n, int current)
 #define KEY_HOLD_GAP 3
 #define KEY_HOLD_W 3
 #define KEY_RING_W 2
+/* the count badge on a key hint: a white disc on the hint's inner lower edge, inside the disc's box
+ * (half 28: 15 + 11 = 26) */
+#define KEY_BADGE_DX 15
+#define KEY_BADGE_R 11
+#define KEY_FLASH_MS 150
 
 typedef struct {
     int16_t r, cx, cy, hold;
@@ -881,6 +886,7 @@ typedef struct {
     uint8_t state;
     /* the hold ring's path is drawn, dim, under the ring: this disc is held, not tapped */
     bool track;
+    uint8_t count; /* a key hint's badge: 0 = none (ui_key_hint_set_count) */
     const char *glyph;
     const lv_font_t *font;
 } disc_t;
@@ -926,6 +932,12 @@ static void disc_draw(lv_event_t *e)
     if (d->hold > 0)
         arc(l, cx, cy, d->r + disc_hold_gap(d) + disc_hold_w(d), disc_hold_w(d), 0,
             d->hold * 360 / 1000, COL_TEXT);
+    if (disc_is_key(d) && d->count > 0) { /* white, not a state colour: a hint is never one */
+        char digit[2] = {(char)('0' + d->count), 0};
+        dot(l, cx + KEY_BADGE_DX, cy + KEY_BADGE_DX, KEY_BADGE_R, COL_TEXT);
+        ui_glyph_draw(l, FONT_CAPTION, digit, cx + KEY_BADGE_DX, cy + KEY_BADGE_DX, COL_ON_ACCENT,
+                      LV_OPA_COVER);
+    }
 }
 
 lv_obj_t *ui_disc_create(lv_obj_t *parent, int cx, int cy, int r)
@@ -1212,6 +1224,52 @@ lv_obj_t *ui_key_hint_create(lv_obj_t *parent, ui_key_t key)
 }
 
 void ui_key_hint_set(lv_obj_t *hint, const char *icon) { ui_disc_set_glyph(hint, icon); }
+
+bool ui_key_hint_hit(lv_obj_t *hint, int x, int y)
+{
+    if (!hint || !lv_obj_is_visible(hint)) return false;
+    int cx, cy;
+    centre_of(hint, &cx, &cy);
+    int dx = x - cx, dy = y - cy;
+    return dx * dx + dy * dy <= UI_KEY_HIT_R * UI_KEY_HIT_R;
+}
+
+void ui_key_hint_set_count(lv_obj_t *hint, int n)
+{
+    disc_t *d = lv_obj_get_user_data(hint);
+    n = n < 0 ? 0 : n > 9 ? 9 : n;
+    if (d->count == n) return;
+    d->count = (uint8_t)n;
+    int cx, cy;
+    centre_of(hint, &cx, &cy);
+    lv_area_t a = {cx + KEY_BADGE_DX - KEY_BADGE_R - 2, cy + KEY_BADGE_DX - KEY_BADGE_R - 2,
+                   cx + KEY_BADGE_DX + KEY_BADGE_R + 2, cy + KEY_BADGE_DX + KEY_BADGE_R + 2};
+    lv_obj_invalidate_area(hint, &a);
+}
+
+int ui_key_hint_count(lv_obj_t *hint)
+{
+    const disc_t *d = lv_obj_get_user_data(hint);
+    return d->count;
+}
+
+static lv_obj_t *s_flash_hint; /* the hint whose ring is lit for a press, until s_flash_until */
+static uint32_t s_flash_until;
+
+void ui_key_hint_flash(lv_obj_t *hint, uint32_t now_ms)
+{
+    if (s_flash_hint && s_flash_hint != hint) ui_disc_set_hold(s_flash_hint, 0);
+    s_flash_hint = hint;
+    s_flash_until = now_ms + KEY_FLASH_MS;
+    ui_disc_set_hold(hint, 1000);
+}
+
+void ui_key_hint_tick(uint32_t now_ms)
+{
+    if (!s_flash_hint || (int32_t)(now_ms - s_flash_until) < 0) return;
+    ui_disc_set_hold(s_flash_hint, 0);
+    s_flash_hint = NULL;
+}
 
 /* ───────── §3.7 burst ───────── */
 

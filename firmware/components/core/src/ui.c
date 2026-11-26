@@ -713,6 +713,7 @@ void ui_tick(uint32_t now_ms)
         for (int i = 0; i < 2; i++) lv_obj_add_flag(s_toast_mask[i], LV_OBJ_FLAG_HIDDEN);
     }
     ui_burst_tick(now_ms);
+    ui_key_hint_tick(now_ms);
     pair_tick(now_ms);
     if (model_rev() != s_seen_rev) {
         s_seen_rev = model_rev();
@@ -768,6 +769,36 @@ void ui_tick(uint32_t now_ms)
 
 /* The interaction layer maps the gesture to an action; mode changes are handled here, everything
  * else goes to the screen that owns the mode. */
+/* The key hint of key 0 (A) or 1 (B) on HOME or WATCH; NULL elsewhere. */
+static lv_obj_t *key_hint(int key)
+{
+    if (s_mode == MODE_HOME) return ui_home_key_hint(key);
+    if (s_mode == MODE_WATCH) return ui_watch_key_hint(key);
+    return NULL;
+}
+
+/* The key whose shown hint is under the point (0 A, 1 B), or -1. */
+static int key_hint_at(int x, int y)
+{
+    for (int k = 0; k < 2; k++) {
+        if (ui_key_hint_hit(key_hint(k), x, y)) return k;
+    }
+    return -1;
+}
+
+/* A press on HOME or WATCH, by the key or a tap on its hint, lights that hint's ring: it teaches
+ * which hint belongs to which key. */
+static void key_hint_flash(gesture_kind_t kind, int key)
+{
+    if (kind == G_BTN_A || kind == G_BTN_A_DOUBLE) {
+        key = 0;
+    } else if (kind == G_BTN_B) {
+        key = 1;
+    }
+    lv_obj_t *hint = key >= 0 ? key_hint(key) : NULL;
+    if (hint && lv_obj_is_visible(hint)) ui_key_hint_flash(hint, s_now_ms);
+}
+
 bool ui_on_gesture(const gesture_evt_t *g)
 {
     if (g->kind == G_RELEASE) s_rel_y = g->y;
@@ -791,8 +822,12 @@ bool ui_on_gesture(const gesture_evt_t *g)
         ((s_mode == MODE_AGENT && ui_agent_hit(g->x, g->y)) ||
          (s_mode == MODE_READ && ui_read_hit(g->x, g->y))))
         zone = ZONE_CENTRE;
+    /* HOME and WATCH: a tap on a shown key hint presses its key (issue 20261126-34e5) */
+    int key = zone == ZONE_RIM && g->kind == G_TAP ? key_hint_at(g->x, g->y) : -1;
+    if (key >= 0) zone = key ? ZONE_KEY_B : ZONE_KEY_A;
     nav_action_t a =
         nav_lookup(s_mode, g->kind, zone, ui_home_request_pending(), ui_home_askable());
+    if (a != NAV_NONE) key_hint_flash(g->kind, key);
     /* moves: a stream */
     if (a != NAV_NONE && g->kind != G_PRESS && g->kind != G_RELEASE && g->kind != G_MOVE)
         dbg_event("ui", "nav", "\"mode\":\"%s\",\"gesture\":\"%s\",\"action\":\"%s\"",

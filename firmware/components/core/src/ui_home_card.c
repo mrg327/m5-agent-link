@@ -553,6 +553,7 @@ void ui_home_card_update(void)
     ui_gauges_card_update(s, !sl->n_merged && !req && !theme_is_job(s), off);
     show(s_badge[0], true);
     show(s_badge[1], n > 1);
+    ui_key_hint_set_count(s_badge[0], ui_home_pip_count()); /* who else needs you (issue 34e5) */
     apply_dim();
     apply_shift();
 }
@@ -612,7 +613,12 @@ void ui_home_card_report(ui_report_t *r)
     if (s_look == LOOK_CARD && s_btn_word[0]) ui_report_add(r, "%s", s_btn_word);
     ui_graph_strip_report(r);
     if (s_quiet_shown) ui_report_add(r, "quiet");
+    if (shown(s_badge[0]) && ui_key_hint_count(s_badge[0])) {
+        ui_report_add(r, "%d more need you", ui_key_hint_count(s_badge[0]));
+    }
 }
+
+lv_obj_t *ui_home_key_hint(int key) { return s_badge[key ? 1 : 0]; }
 
 void ui_home_card_create(lv_obj_t *centre)
 {
