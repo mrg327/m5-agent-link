@@ -456,9 +456,13 @@ seconds hand at r 216 and settled at 6 o'clock.
   a time: about 51 k px in 3.6 s (about 14 k px a second, like a breathing sigil). A trip moves the box
   every tick: about 590 k px over the 4.4 s of half the ring in the simulator's 30 ms ticks (under three
   full frames' worth, spread over the trip); on the watch the frame rate bounds it. A big finish is a trip (about
-  0.6 M px for half the ring), then the loop's box (about 4 k px) and the flare's (up to about 10 k px): about
-  0.4 M px over the loop, the flare and the linger's first 0.4 s. On battery it is gone and the face repaints
-  nothing.
+  0.6 M px for half the ring), then the loop's box (about 4-5 k px) and the flare's (up to about 10 k px):
+  about 0.17 M px over the loop and the flare. On battery it is gone and the face repaints nothing.
+  **Per frame** (BENCH.md §9): one area of 4-5 k px in every mode (about 10 k px at the loop and the flare),
+  predicted at 8-16 ms on the watch, so the 30 fps trips and the hover keep their cadence; the boot move at
+  size L (up to 39 k px a frame, predicted 27-57 ms) and the pairing flare (about 21 k px, 28 ms) are over or
+  near the 33 ms period. The scripts hold these with `expect_frame_px_max`; `bench/tasks/mote_*.txt`
+  measure them on the watch.
 - **Sim.** `fun_mote.txt` (shots `fun_mote_visit_a`, `_travel`, `_visit_b`, `_cheer` (the drift), `_loop`,
   `_flare`, `_linger`, `_rest`, `_ember`, `_tired`, `_night`) and `fun_mote_error.txt` (`fun_mote_hover`); the
   log has `"ev":"mote"` at each mode (`visit`, `rest`, `ember`, `hover`, `cheer`, `loop`, `gone`),

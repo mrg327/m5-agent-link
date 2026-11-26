@@ -71,7 +71,7 @@ the detail (what is not yet verified on the device, for example).
 
 | Doc | What it covers | Status | Issue | Reviewed |
 |---|---|---|---|---|
-| [BENCH.md](BENCH.md) | Drive the real watch like a finger and measure what the user feels | implemented | [bb2e](../../issues/20261122-bb2e-bench-drive-the-real-watch-like-a-finger-and-mea.md) | 2026-11-22 |
+| [BENCH.md](BENCH.md) | Drive the real watch like a finger and measure what the user feels | implemented | [bb2e](../../issues/20261122-bb2e-bench-drive-the-real-watch-like-a-finger-and-mea.md), [59e0](../../issues/20261126-59e0-the-mote-a-light-on-the-idle-ring.md) | 2026-11-26 |
 | [BOARD.md](BOARD.md) | The design board (tools/board) | accepted | – | 2026-11-22 |
 
 <!-- index:end -->
