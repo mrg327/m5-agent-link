@@ -43,6 +43,8 @@
   --fw-centre-r-px: 150px;
   --fw-hold-show-ms: 250ms;
   --fw-card-arm-ms: 300ms;
+  --fw-ask-hold-x-px: 304px;
+  --fw-ask-hold-y-px: 262px;
   --fw-long-swipe-px: 120px;
   --fw-deny-hold-ms: 800ms;
   --fw-agent-timeout-ms: 8000ms;

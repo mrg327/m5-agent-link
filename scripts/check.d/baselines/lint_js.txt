@@ -88,7 +88,6 @@ TS7006	atlas/js/sound/chapter.js	23
 TS7006	atlas/js/sound/synth.js	15
 TS7006	atlas/js/stage/chapters/build.js	13
 TS7006	atlas/js/stage/chapters/glance.js	14
-TS7006	atlas/js/stage/chapters/intro.js	4
 TS7006	atlas/js/stage/fx.js	16
 TS7006	atlas/js/stage/stage.js	23
 TS7006	atlas/js/stage/stub-watch.js	8
@@ -183,7 +182,6 @@ jsdoc/require-jsdoc	atlas/js/sound/synth.js	4
 jsdoc/require-jsdoc	atlas/js/stage/art.js	5
 jsdoc/require-jsdoc	atlas/js/stage/chapters/build.js	3
 jsdoc/require-jsdoc	atlas/js/stage/chapters/glance.js	2
-jsdoc/require-jsdoc	atlas/js/stage/chapters/intro.js	1
 jsdoc/require-jsdoc	atlas/js/stage/fx.js	1
 jsdoc/require-jsdoc	atlas/js/stage/stage.js	1
 jsdoc/require-jsdoc	atlas/js/stage/stub-watch.js	1

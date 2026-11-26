@@ -74,7 +74,6 @@ js atlas/js/stage/chapters/build.js onEnter
 js atlas/js/stage/chapters/build.js onLeave
 js atlas/js/stage/chapters/glance.js mount
 js atlas/js/stage/chapters/glance.js onLeave
-js atlas/js/stage/chapters/intro.js mount
 js atlas/js/stage/fx.js createFx
 js atlas/js/stage/stage.js createStage
 js atlas/js/stage/stub-watch.js createStubWatch

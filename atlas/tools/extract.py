@@ -328,6 +328,11 @@ def extract_gesture():
     g["card_arm_ms"] = int(
         find(nav, r"#define NAV_CARD_ARM_MS\s+(\d+)", "gesture.card_arm_ms").group(1)
     )
+    # where the primary hold disc (Approve) sits on ASK: the hero demo holds it there
+    for key, macro in [("ask_hold_x_px", "P_X"), ("ask_hold_y_px", "P_Y")]:
+        g[key] = int(
+            find(CORE + "ui_ask.c", rf"#define {macro}\s+(\d+)", f"gesture.{key}").group(1)
+        )
     g["long_swipe_px"] = int(
         find(nav, r"#define NAV_LONG_SWIPE_PX\s+(\d+)", "gesture.long_swipe_px").group(1)
     )

@@ -29,6 +29,17 @@ const session = (sid, ag, repo, br, st, extra = {}) => ({
   ...extra,
 });
 
+/**
+ * The daemon calls a typed scenario step makes.
+ * @typedef {object} StoryDaemon
+ * @property {(s: object) => void} addSession add a session
+ * @property {(sid: number, patch: object) => void} update apply a session delta
+ * @property {(sid: number, req: {rid: number, title: string, text: string}) => void}
+ *   requestApproval raise an approval request
+ * @property {(rid: number, why?: string) => void} clearAttention answer a request
+ * @property {(sid: number) => void} removeSession end a session
+ */
+
 // Each step: [atMs, text, (d) => void]. A scenario loops after `length` ms.
 const SCENARIOS = {
   demo: {
@@ -339,6 +350,61 @@ const SCENARIOS = {
         'Everything settles',
         (d) => {
           for (let s = 1; s <= 8; s++) d.update(s, { st: 'done', tool: undefined });
+        },
+      ],
+    ],
+  },
+  // The hero's four beats, one step each (the page performs the hold and the key press).
+  story: {
+    title: 'Work, ask, approve, done',
+    length: 21000,
+    steps: [
+      [
+        0,
+        'An agent is working',
+        /** @param {StoryDaemon} d the daemon */
+        (d) => {
+          d.addSession({
+            sid: 1,
+            ag: 'claude',
+            repo: 'webapp',
+            br: 'feat/login',
+            st: 'work',
+            seen: false,
+            host: 0,
+            tool: 'Edit',
+            sum: 'Editing login form',
+          });
+        },
+      ],
+      [
+        4000,
+        'It needs approval: the watch buzzes',
+        /** @param {StoryDaemon} d the daemon */
+        (d) => {
+          d.requestApproval(1, {
+            rid: 9,
+            title: 'Run shell command',
+            text: 'npm test -- --watch=false',
+          });
+        },
+      ],
+      [8000, 'Hold to approve; a tap never approves', () => {}],
+      [
+        12500,
+        'Done: press A to bring its terminal forward',
+        /** @param {StoryDaemon} d the daemon */
+        (d) => {
+          d.clearAttention(9, 'answered_pc'); // a no-op once the hold has approved it
+          d.update(1, { st: 'done', tool: undefined, sum: 'Login form refactored' });
+        },
+      ],
+      [
+        19500,
+        'The session ends',
+        /** @param {StoryDaemon} d the daemon */
+        (d) => {
+          d.removeSession(1);
         },
       ],
     ],
