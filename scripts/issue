@@ -115,7 +115,16 @@ set_field() { # set_field FILE KEY VALUE (front matter only)
 }
 append_log() { printf -- '- %s · %s: %s\n' "$(now)" "$(stamp)" "$2" >>"$1"; }
 slug() { echo "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-//; s/-$//' | cut -c1-48 | sed 's/-$//'; }
-new_id() { echo "$(date -u +%Y%m%d)-$(od -An -N2 -tx1 /dev/urandom | tr -d ' \n')"; }
+# The random suffix alone names an issue (file_of), so it must be unique across every issue, not
+# only today's: draw again while any issue file already uses it.
+new_id() {
+    local sfx
+    while :; do
+        sfx=$(od -An -N2 -tx1 /dev/urandom | tr -d ' \n')
+        compgen -G "$DIR/*-$sfx-*.md" >/dev/null || break
+    done
+    echo "$(date -u +%Y%m%d)-$sfx"
+}
 
 # ── commands ──
 cmd_new() {
