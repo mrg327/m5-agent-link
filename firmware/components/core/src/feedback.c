@@ -2,6 +2,7 @@
 
 #include "hal.h"
 #include "motion.h"
+#include "persona.h"
 #include "prefs.h"
 #include "sound.h"
 #include "toy_gate.h"
@@ -16,6 +17,14 @@ static uint64_t s_toy_sound_end_us, s_toy_buzz_end_us; /* what a toy plays runs 
 
 static uint32_t now_ms(void) { return (uint32_t)(hal_time_us() / 1000); }
 
+/* The fun word (persona.h): with the toys bit off every toy stays still. A toy is started by the
+ * user, so only the bit decides here; the gate below does the rest. */
+static bool toys_off(void)
+{
+    persona_ctx_t c = {.fun = prefs_fun(), .display_on = true, .user_started = true};
+    return persona_allow(PF_TOYS, &c) == 0;
+}
+
 static toy_gate_in_t toy_in(void)
 {
     return (toy_gate_in_t){
@@ -23,9 +32,7 @@ static toy_gate_in_t toy_in(void)
         .face_down = motion_face_down(),
         .volume = prefs_volume(),
         .mic_on = s_toy_mic,
-        /* TODO(fun preference, persona.c): set fun_off from the fun bit for toys once it lands,
-         * so a watch set to "no fun" keeps every toy still. */
-        .fun_off = false,
+        .fun_off = toys_off(),
     };
 }
 

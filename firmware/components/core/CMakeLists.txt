@@ -4,6 +4,7 @@ set(CORE_SRCS
     src/motion.c src/prefs.c src/persona.c src/temper.c src/ui_living.c src/replay.c src/ui_replay.c src/ui_fun.c src/mote.c src/ui_mote.c src/eggs.c src/ui_eggs.c
     src/nav.c src/ui.c src/ui_theme.c src/ui_kit.c src/ui_ring.c src/ui_ring_draw.c src/ui_wheel.c src/ui_home.c src/ui_home_card.c
     src/ui_agent.c src/ui_ask.c src/ui_scroll.c src/ui_voice.c src/ui_read.c src/ui_graph.c src/graph.c src/voice.c src/ui_keys.c src/keys.c src/ui_status.c src/ui_labs.c src/ui_trackpad.c src/ui_toy.c src/toy_gate.c src/ui_gauges.c src/done.c src/ui_done.c src/ui_countdown.c src/ui_watch.c src/sound_bank.c src/sound.c
+    src/decide.c src/toy_rand.c src/toy_motion.c src/ui_decide.c
     src/fonts/font_figtree_20_500.c src/fonts/font_figtree_20_400.c src/fonts/font_figtree_20_600.c
     src/fonts/font_figtree_24_600.c src/fonts/font_figtree_34_600.c src/fonts/font_figtree_56_600.c
     src/fonts/font_phosphor_20.c src/fonts/font_phosphor_28.c src/fonts/font_phosphor_44.c

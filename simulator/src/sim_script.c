@@ -87,6 +87,7 @@
  *   toy_stub                        add the stub toy to LABS, after the Trackpad (ui_toy.h; EXPERIMENTS.md "Toys"):
  *                                   raw keys; A down plays a tone and B down buzzes through the toy gate. Its labels:
  *                                   "keys D U", "played P refused R", "opens O pauses Q" and "running" or "paused"
+ *   toy_seed N                      restart the decision toys' random source from N (ui_decide.h): repeatable throws
  *   px_reset | expect_px_max PX     redraw budget: pixels flushed since px_reset must stay within PX
  *                                   (the log line also reports core_step host CPU as cpu_us, not
  * asserted) */
@@ -108,6 +109,7 @@
 #include "ui_countdown.h"
 #include "ui_kit.h"
 #include "ui_theme.h"
+#include "ui_decide.h"
 #include "ui_toy.h"
 #include "sound.h"
 #include "voice.h"
@@ -148,6 +150,7 @@ typedef enum {
     E_TRANSCRIPT,
     E_CANDS,
     E_POSE,
+    E_TOY_SEED,
     E_COVER,
     E_PREF,
     E_FB_MARK,
@@ -699,6 +702,12 @@ static bool parse_line(char *line, uint32_t *t)
         sim_link_set_tx_tap(on_device_tx); /* from the start: a plain focus is seen too */
         add(*t, E_EXPECT_CMD, 0, 0, 0, arg);
         *t += 50;
+    } else if (!strcmp(cmd, "toy_seed") && arg[0]) {
+        char *end;
+        unsigned long seed = strtoul(rest, &end, 0);
+        if (end == rest) return false;
+        add(*t, E_TOY_SEED, (int)seed, 0, 0, NULL);
+        *t += 20;
     } else if (!strcmp(cmd, "toy_stub")) {
         static bool added;
         if (!added) { added = ui_toy_register(&s_stub_toy) >= 0; }
@@ -1996,6 +2005,7 @@ static void run(const ev_t *e)
     case E_CANDS: run_cands(e->text); break;
     case E_CFG: run_cfg(e->text); break;
     case E_POSE: sim_set_pose(e->a, e->b, e->c); break;
+    case E_TOY_SEED: ui_decide_seed((uint32_t)e->a); break;
     case E_COVER: sim_set_cover(e->a != 0); break;
     case E_PREF: {
         char key[16] = "", val[16] = "";

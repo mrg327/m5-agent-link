@@ -25,7 +25,8 @@
 enum { LAB_TRACKPAD, LAB_FUN, LAB_TOYS };
 #define LAB_MAX (LAB_TOYS + UI_TOY_MAX)
 
-static int lab_count(void) { return LAB_TOYS + ui_toy_count(); }
+/* the fun word's toys bit (persona.h FUN_TOYS) off: no toys in the list */
+static int lab_count(void) { return LAB_TOYS + (ui_toy_allow() ? ui_toy_count() : 0); }
 static const char *lab_name(int id)
 {
     if (id == LAB_TRACKPAD) { return "Trackpad"; }
@@ -111,8 +112,8 @@ void ui_labs_refresh(uint32_t now)
 void ui_labs_open(uint32_t now)
 {
     s_now = s_last_input = now;
-    int paused = ui_toy_paused(); /* the toy left paused comes first */
-    render();                     /* the items first, so the selection fits them */
+    int paused = ui_toy_allow() ? ui_toy_paused() : -1; /* the toy left paused comes first */
+    render(); /* the items first, so the selection fits them */
     ui_orbit_select(s_orbit, paused >= 0 ? LAB_TOYS + paused : 0);
     show(s_hint[1], lab_count() > 1); /* one experiment: nothing to step to */
     ui_home_rim_mode(true);           /* a rim drag dials through the experiments */

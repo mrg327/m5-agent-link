@@ -44,6 +44,9 @@ int ui_toy_count(void);
 const ui_toy_t *ui_toy_get(int i);
 /* The toy that was left paused (a takeover or leaving), -1 when none: LABS opens on it. */
 int ui_toy_paused(void);
+/* What the fun word lets toys do now (persona_allow(PF_TOYS), the user starting it): 0 when the
+ * toys are off, so LABS lists none; without PA_ONESHOT (reduced motion) a toy shows end frames. */
+unsigned ui_toy_allow(void);
 
 /* The host (ui.c). */
 lv_obj_t *ui_toy_init(lv_obj_t *screen);

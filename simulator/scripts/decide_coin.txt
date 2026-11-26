@@ -1,0 +1,77 @@
+# The coin (issue 20261126-74ee, EXPERIMENTS.md "Toys"): LABS lists the Trackpad, Personality, then
+# Decide; A, a tap and a flick of the watch throw; a request that arrives mid-toss takes the screen at
+# once, the coin freezes, and after the answer the watch comes back to it dim and paused; a tap
+# carries the toss on to its landing.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login Running the test suite
+toy_seed 7
+pose face_up
+wait 300
+swipe 233 300 233 180 160
+wait 300
+expect_screen labs
+expect_label > Trackpad
+btn B
+wait 100
+btn B
+wait 100
+expect_label > Decide
+shot decide_labs.png
+tap 233 233
+wait 300
+expect_screen toy
+expect_label Decide
+expect_label coin
+expect_label ready
+shot decide_coin_ready.png
+# A throws at once (raw keys): the disc turns for a second and lands
+btn A down
+wait 300
+expect_label throwing
+shot decide_coin_turning.png
+btn A up
+wait 900
+expect_label shown
+expect_label result cross
+shot decide_coin_landed.png
+# a tap throws again
+tap 233 233
+wait 1200
+expect_label shown
+expect_label result cross
+# a flick of the watch throws too (computed from the tilt samples)
+pose 600 0 700
+wait 200
+pose face_up
+wait 1300
+expect_label shown
+expect_label result cross
+# a request arrives mid-toss: it takes the screen at once
+btn A
+wait 200
+expect_label throwing
+session 1 input webapp feat/login
+attention 31 1 approval approve,deny,focus 0 Run shell command|npm test
+wait 300
+expect_screen ask
+shot decide_coin_request.png
+clear 31 answered_pc
+session 1 work webapp feat/login Running the test suite
+wait 1200
+# back to the coin, frozen where it was, dim
+expect_screen toy
+expect_label paused
+shot decide_coin_paused.png
+wait 2000
+expect_label paused
+# a tap carries the toss on; it lands after the rest of its second
+tap 233 233
+wait 100
+expect_label throwing
+wait 1000
+expect_label shown
+expect_label result tick
+shot decide_coin_resumed.png
+quit

@@ -3,13 +3,13 @@ status: implemented
 owner: ui
 issue: 20261113-61ce
 last_reviewed: 2026-11-26
-summary: LABS, the Trackpad, the Personality switches and the toys' groundwork
+summary: LABS, the Trackpad, the Personality switches, the toys' groundwork and the decision toys
 ---
 
 # Experiments (LABS), the Trackpad and Personality
 
 Issue 61ce. Experiments are features that sit outside the agent flow. They may change or go away. The toys'
-groundwork (issue 20261126-b5d1) is in [Toys](#toys).
+groundwork (issue 20261126-b5d1) and the first toy, Decide (issue 20261126-74ee), are in [Toys](#toys).
 
 ## Entry
 
@@ -53,9 +53,9 @@ The watch drives the pointer of the machine `agentlinkd` runs on (protocol §6g,
 
 ## Toys
 
-A toy is something to play with for a few seconds (a coin, a die, a timer), listed in LABS after the Trackpad.
-None ships yet; this is the groundwork every toy uses, so a toy is one `ui_<toy>.c` plus a pure `<toy>.c` and a
-row in `s_builtin` (`ui_toy.c`). The host is one mode, `MODE_TOY` (`ui_toy.h`): it gives the toy a root to draw
+A toy is something to play with for a few seconds (a coin, a die, a timer), listed in LABS after the Trackpad
+and Personality. One ships, [Decide](#decide-coin-die-and-oracle). This is the groundwork every toy uses, so a toy
+is one `ui_<toy>.c` plus a pure `<toy>.c` and a row in `s_builtin` (`ui_toy.c`). The host is one mode, `MODE_TOY` (`ui_toy.h`): it gives the toy a root to draw
 on, every gesture with its nav action, and calls `open`, `pause`, `tick` and `report`.
 
 **An agent always comes first.**
@@ -91,8 +91,9 @@ rim `NAV_SCRUB`, and a swipe down or right goes back.
 | Sound | yes | no | no | no | no | no | no |
 
 A toy's sound plays at its own level, never above the stored one; the next alert cue sets the stored level
-again. The timed Quiet of STATUS is for agents, so it does not hold toys back. A placeholder in `feedback.c`
-(`toy_in()`) is where the coming fun preference will keep every toy still.
+again. The timed Quiet of STATUS is for agents, so it does not hold toys back. The fun word's toys bit
+(`FUN_TOYS`, asked through `persona_allow(PF_TOYS, ...)`) off keeps every toy still (`toy_in()` in `feedback.c`)
+and takes the toys out of LABS (`ui_toy_allow()`); reduced motion (`FUN_REDUCED`) shows a toy's end frames.
 
 **Timers obey the alert mode, not timed Quiet.** A timer the user set (a later toy) buzzes and sounds by the alert
 mode as an alert does (full: buzz and cue; quiet: buzz; silent: neither). The timed Quiet does not silence it,
@@ -101,6 +102,34 @@ and face down nothing sounds.
 **Sound memory.** Toys render into one static block, `sound_toy_pcm()` (`SOUND_TOY_SAMPLES`, 200 KB, in PSRAM on
 the watch), with `sound_toy_render()`; a runtime note is a `snd_sound_t` on the stack. It is apart from the six
 alert-cue slots of `sound_play()`, which a toy never touches. Nothing is allocated.
+
+**Random numbers and motion.** `toy_rand.c` is xorshift32 stirred with the microsecond of each key or touch edge
+and the tilt sample of a flick; `hal.h` has no hardware random source, so this needs no HAL change. A script's
+`toy_seed N` restarts it and stops the stirring, so simulator runs repeat. `toy_motion.c` finds a flick (the
+gravity vector moved `TOY_JOLT_MG` between samples of `motion_pose()`, one per `TOY_JOLT_GAP_MS`) and a still hold
+(face up and still after a move, so a watch left on the desk never holds by itself) from the 10 Hz tilt samples:
+no board emits `HAL_MOTION_SHAKE`. Both read the size of a change and z only, so they hold whatever the board's
+x/y signs turn out to be.
+
+### Decide: coin, die and oracle
+
+Issue 20261126-74ee (the UX research's idea 17): for "tabs or spaces, who reviews, which task first", five
+seconds and back to work. One toy, `ui_decide.c` over `decide.c`, with the dice glyph in LABS. B (on release)
+steps coin, die, oracle; three pips at the legend row say which. B held goes back to LABS, the chord Home.
+
+| | Look | Throw | Lands with |
+|---|---|---|---|
+| Coin | a white disc r 90, blank until the first throw | A (at once, raw keys), a tap, or a flick | five or six half-turns about its vertical axis in 1 s, slowing (a detent each), on a black tick or cross; a 60 ms pulse and a two-note cue |
+| Die | a ring r 156 in as many pieces as sides, filled to the number; the number 56 px | as the coin; the bezel picks 4, 6, 8, 12 or 20 sides (a detent a step) | nine numbers at 60 to 240 ms (a detent each), then the result; a 50 ms pulse and its cue |
+| Oracle | the hand-tap glyph in a dim ring | held 2 s: a finger in the middle, key A, or the watch face up and still | the grey ring fills; one of six glyphs rises 20 px into place; a 70 ms pulse and a bell |
+
+The oracle's six answers are 128 px glyphs, all white (a green tick would read as "done"): tick (yes), cross
+(no), hourglass (later), the working arrows (ask again), moon (sleep on it), speech bubble (unclear). They are to
+be tried on people before they are settled. The result is drawn when the throw starts; the animation only shows
+it arriving. Decide sets `not_over_request`: LABS will not open it while a request waits, and if the watch
+comes back to it with one still waiting (B held on ASK), a throw or a hold is refused with the hand sign and
+the reject buzz. A request that arrives mid-toss freezes the throw; the toy comes back dim, and a tap or A
+carries the throw on to its landing. A hold ends with the takeover.
 
 ## Personality (issue 20261126-98a6)
 

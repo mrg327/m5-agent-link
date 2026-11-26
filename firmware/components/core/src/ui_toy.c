@@ -6,9 +6,12 @@
 #include <stdio.h>
 
 #include "debug.h"
+#include "persona.h"
+#include "ui_decide.h"
+#include "ui_living.h"
 
-/* The toys built into the firmware, in LABS order. G17 (coin, die, oracle) adds its row here. */
-static const ui_toy_t *const s_builtin[] = {NULL};
+/* The toys built into the firmware, in LABS order. */
+static const ui_toy_t *const s_builtin[] = {&ui_decide_toy};
 
 static const ui_toy_t *s_toys[UI_TOY_MAX];
 static lv_obj_t *s_roots[UI_TOY_MAX];
@@ -40,6 +43,14 @@ int ui_toy_register(const ui_toy_t *toy)
 int ui_toy_count(void) { return s_n; }
 const ui_toy_t *ui_toy_get(int i) { return i >= 0 && i < s_n ? s_toys[i] : NULL; }
 int ui_toy_paused(void) { return s_paused ? s_cur : -1; }
+
+unsigned ui_toy_allow(void)
+{
+    persona_ctx_t c = *ui_living_ctx();
+    c.display_on = true;   /* a toy on screen is looked at; a glow does not hide it */
+    c.user_started = true; /* the user opened it: buzz and sound are the toy gate's call */
+    return persona_allow(PF_TOYS, &c);
+}
 
 lv_obj_t *ui_toy_init(lv_obj_t *screen)
 {

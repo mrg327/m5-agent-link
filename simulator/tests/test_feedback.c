@@ -9,6 +9,7 @@
 #include "hal.h"
 #include "model.h"
 #include "motion.h"
+#include "persona.h"
 #include "prefs.h"
 #include "sound.h"
 
@@ -19,6 +20,8 @@ bool motion_face_down(void) { return false; }
 static uint8_t g_volume, g_set_volume;
 uint8_t prefs_volume(void) { return g_volume; }
 uint8_t prefs_volume_percent(void) { return g_volume ? 60 : 0; }
+static uint32_t g_fun = FUN_DEFAULT;
+uint32_t prefs_fun(void) { return g_fun; }
 static int g_cues; /* alert cues played */
 void sound_play(const char *role) { (void)role, g_cues++; }
 void hal_audio_set_volume(uint8_t percent) { g_set_volume = percent; }
@@ -172,6 +175,12 @@ static void test_toys(void)
     CHECK(g_audio_stops == stops + 1 && g_playing == NULL);
     feedback_toy_interrupt(); /* nothing plays: nothing to stop, an alert is never cut */
     CHECK(g_audio_stops == stops + 1);
+    /* the fun word's toys bit off (persona.h): every toy stays still */
+    g_fun = FUN_DEFAULT & ~(uint32_t)FUN_TOYS;
+    CHECK(!feedback_toy_play(tone, 1600, 20) && !feedback_toy_buzz(pip, 1));
+    CHECK(!feedback_toy_detent());
+    g_fun = FUN_DEFAULT;
+    CHECK(feedback_toy_play(tone, 1600, 20) && feedback_toy_buzz(pip, 1));
 }
 
 int main(void)
