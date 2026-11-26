@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "debug.h"
+#include "eggs.h"
 #include "ui_internal.h"
 #include "ui_kit.h"
 #include "ui_theme.h"
@@ -35,6 +36,8 @@ typedef struct {
 static mark_t s_marks[UI_LIVING_SLOTS];
 static persona_ctx_t s_ctx;
 static uint32_t s_now;
+static uint32_t s_spin_ms; /* the centuries egg's spin began */
+static bool s_spin;
 
 /* ───────── the burst ───────── */
 
@@ -170,6 +173,11 @@ static void advance(mark_t *m, int slot, uint32_t now)
         p.dx = p.dy;
         p.dy = 0;
     }
+    if (s_spin) { /* the egg turns the rings once, over the gesture */
+        int d = eggs_spin_deg(now - s_spin_ms);
+        p.rot_out = (int16_t)(p.rot_out + d);
+        p.rot_mid = (int16_t)(p.rot_mid + d);
+    }
     ui_sigil_set_pose(m->sigil, &p);
     if (m->hero) {
         temper_pose_t h = temper_hero(&m->tp, m->st, since, allow);
@@ -182,6 +190,7 @@ void ui_living_tick(const persona_ctx_t *ctx, uint32_t now_ms)
 {
     s_ctx = *ctx;
     s_now = now_ms;
+    if (s_spin && now_ms - s_spin_ms >= EGGS_SPIN_MS) s_spin = false;
     for (int i = 0; i < UI_LIVING_SLOTS; i++) {
         mark_t *m = &s_marks[i];
         if (!m->sigil) continue;
@@ -193,6 +202,12 @@ void ui_living_tick(const persona_ctx_t *ctx, uint32_t now_ms)
         }
         advance(m, i, now_ms);
     }
+}
+
+void ui_living_spin(uint32_t now_ms)
+{
+    s_spin = true;
+    s_spin_ms = now_ms;
 }
 
 unsigned ui_living_allow(persona_feat_t f) { return persona_allow(f, &s_ctx); }

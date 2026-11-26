@@ -114,9 +114,9 @@ The second item (the waveform glyph) is the fun switchboard, until STATUS has ro
   down or right, B long, or a hold off the discs goes back to the experiments; the chord goes home.
 - Each flip writes the stored `fun` word (`prefs_set_fun`, NVS key `fun`) at once. What each bit does, its
   default and the rules every feature obeys are in [GLYPHS.md](GLYPHS.md) §3.11 and §3.12. Living marks,
-  replay (§3.13) and the Mote (§3.14: a light on the idle face, off by default) exist; the other switches are
-  there for the features filed beside them (celebrations, eggs, toys …), which ask `persona_allow()` for
-  their bit.
+  replay (§3.13), the Mote (§3.14: a light on the idle face, off by default) and the easter eggs (§3.15, on)
+  exist; the other switches are there for the features filed beside them (celebrations, toys …), which ask
+  `persona_allow()` for their bit.
 - Arrivals wait here as on the rest of LABS. No word is drawn; the report names each switch with "on" or
   "off".
 

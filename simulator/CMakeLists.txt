@@ -115,6 +115,11 @@ add_executable(test_mote tests/test_mote.c ${FW}/core/src/mote.c)
 target_include_directories(test_mote PRIVATE ${FW}/core/src)
 target_link_libraries(test_mote PRIVATE m)
 add_test(NAME mote_modes COMMAND test_mote)
+# Easter eggs (issue 20261126-7770): the clock slip's minutes and frames, the centuries, the spin.
+add_executable(test_eggs tests/test_eggs.c ${FW}/core/src/eggs.c)
+target_include_directories(test_eggs PRIVATE ${FW}/core/src)
+target_link_libraries(test_eggs PRIVATE m)
+add_test(NAME eggs_triggers COMMAND test_eggs)
 
 add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
 target_include_directories(test_ring PRIVATE ${FW}/core/src)
@@ -307,6 +312,11 @@ sim_script_test(sim_labs_fun labs_fun.txt)
 sim_script_test(sim_fun_mote fun_mote.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"mode\":\"lap\".*\"mote_day\",\"days\":1.*\"mode\":\"cheer\".*\"mode\":\"settle\".*\"mode\":\"ember\".*\"mode\":\"gone\".*\"mode\":\"lap\".*\"mode\":\"gone\"")
+# Easter eggs (issue 20261126-7770): the clock slip at 13:37 (once) and 04:04; the 100th finish spins the sigil,
+# held while a request waits and played after it; the 1000th loops the Mote.
+sim_script_test(sim_fun_eggs fun_eggs.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"hm\":1337.*\"hm\":1337"
+                PASS_REGULAR_EXPRESSION "\"hm\":1337.*\"hm\":404.*\"egg\":\"century\",\"n\":100,\"by\":\"sigil\".*\"ev\":\"century\",\"n\":100.*\"ev\":\"state\",\"screen\":\"ask\".*\"egg\":\"century\",\"n\":100,\"by\":\"sigil\".*\"egg\":\"century\",\"n\":1000,\"by\":\"mote\".*\"mode\":\"loop\"")
 # UI-V2 Phase 3: ASK. Question options reply by tap; grants and Deny are holds; a tap never approves;
 # a rejected answer restores the options; a hold is bound to its request id.
 sim_script_test(sim_ask_reply ask_reply.txt

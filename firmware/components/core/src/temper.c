@@ -16,7 +16,7 @@
 #define ASLEEP_TURN 6
 #define IDLE_LUM_LOW 80
 
-const temper_pose_t temper_neutral = {0, 0, 0, 0, 0, 100};
+const temper_pose_t temper_neutral = {.lum = 100};
 
 bool temper_key(const char *name, uint32_t sid, char *key, size_t n)
 {
@@ -91,7 +91,7 @@ static void breathe(const temper_t *tp, bool idle, uint32_t now_ms, temper_pose_
     }
     p->lum = (uint8_t)(TEMPER_LUM_LOW + (100 - TEMPER_LUM_LOW) * lv / (LOOP_LEVELS - 1));
     float s = sinf(6.2831853f * (float)(t % tp->sway_period_ms) / (float)tp->sway_period_ms);
-    p->rot_mid = (int8_t)lroundf((float)(tp->dir * tp->sway_deg) * s);
+    p->rot_mid = (int16_t)lroundf((float)(tp->dir * tp->sway_deg) * s);
 }
 
 static int8_t dip(uint32_t since_ms, int r)
@@ -140,7 +140,7 @@ temper_pose_t temper_pose(const temper_t *tp, temper_state_t st, uint32_t since_
         break;
     case TEMPER_ASLEEP:
         p.lum = ASLEEP_LUM;
-        p.rot_out = (int8_t)(tp->dir * ASLEEP_TURN);
+        p.rot_out = (int16_t)(tp->dir * ASLEEP_TURN);
         break;
     default: break;
     }

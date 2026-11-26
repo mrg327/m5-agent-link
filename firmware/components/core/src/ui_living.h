@@ -57,6 +57,11 @@ temper_state_t ui_living_state(const session_t *s, bool asks, bool snoozed, bool
  * @param[in] ctx The step's persona context (glue-filled; copied). Must not be NULL.
  */
 void ui_living_tick(const persona_ctx_t *ctx, uint32_t now_ms);
+/**
+ * @brief Turn the rings of the mark on show once round (the centuries egg, eggs.h): 800 ms over
+ * whatever it is doing. The caller has asked the gate (PF_EGGS); a mark held still does not turn.
+ */
+void ui_living_spin(uint32_t now_ms);
 /** @brief persona_allow() for a UI feature with this step's context (nothing user-started). */
 unsigned ui_living_allow(persona_feat_t f);
 /** @brief This step's persona context, for a feature that sets its own fields and asks. */

@@ -1,4 +1,4 @@
-/* The Mote on the idle face (issue 20261126-59e0, GLYPHS.md §3.13): one object over the deck's
+/* The Mote on the idle face (issue 20261126-59e0, GLYPHS.md §3.14): one object over the deck's
  * centre, so it drifts with the ambient face. mote.c decides; this file reads the fleet, the clock
  * and the persona gate, draws the light (a head and a three-step tail on the track at r 216) and
  * repaints only the small boxes it moved through. Silent: it has no haptic and no sound. */

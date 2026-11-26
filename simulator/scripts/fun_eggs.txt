@@ -1,0 +1,59 @@
+# Easter eggs (issue 20261126-7770, GLYPHS.md §3.15): on by default (FUN_EGGS), silent, once per trigger, never
+# while anything needs you. The clock slip: at 13:37 and 04:04 the digits on show slip 3 px right for one
+# 90 ms frame and back, twice. The centuries: the 100th and the 1000th finished turn; the sigil's rings each
+# turn once (800 ms), or, with the Mote on the face, the Mote loops off its track (1.2 s). The log carries
+# each egg ("ev":"egg"); the test asserts their order and that a request holds them.
+connect
+rtc 1800000000
+rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 300
+expect_screen ring
+# the empty deck shows the clock; 13:36:58, local
+rtc 1794001018
+px_reset
+wait 2090
+shot fun_eggs_slip.png
+wait 400
+shot fun_eggs_slip_after.png
+# the cost: the new minute, then the clock label's box (about 25 k px) for each of the slip's 3 frames
+expect_px_max 110000
+# once a minute: the rest of 13:37 holds still
+px_reset
+wait 5000
+expect_px_max 0
+# 04:04 the next morning slips too
+rtc 1794053038
+wait 2500
+# the centuries, the Mote off: the 100th finish turns the sigil's rings once
+pref finishes 99
+session 16 work webapp feat/login Running the test suite
+wait 500
+lift
+session 16 done webapp feat/login Bash cargo test --workspace
+wait 300
+shot fun_eggs_spin.png
+wait 1000
+# a request holds it: the 100th again while a request waits; it plays once the request is gone
+pref finishes 99
+session 2 work api main Indexing the repository
+session 3 input cli main
+attention 9 3 approval approve,deny,focus 0 Run shell command|make release
+wait 400
+session 2 done api main Indexed
+wait 1500
+ui
+clear 9
+session 3 work cli main Releasing
+wait 1500
+btn B long
+wait 1000
+# the 1000th with the Mote on the face: it loops once off its track
+pref fun 0x3db
+pref finishes 999
+session 2 work api main Indexing the repository
+wait 32000
+session 2 done api main Indexed
+wait 500
+shot fun_eggs_loop.png
+wait 1500
+quit

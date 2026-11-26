@@ -181,6 +181,7 @@ TIERS = {
         "temper",
         "replay",
         "mote",
+        "eggs",
     },
     "leaf": {"debug.h", "ui_icons"},
 }

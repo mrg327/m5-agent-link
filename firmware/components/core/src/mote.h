@@ -1,4 +1,4 @@
-/* The Mote (issue 20261126-59e0, GLYPHS.md §3.13): a point of light on its own track of the idle
+/* The Mote (issue 20261126-59e0, GLYPHS.md §3.14): a point of light on its own track of the idle
  * face that mirrors the fleet. It never asks, buzzes or sounds; it leaves the moment anything
  * needs you, and it lives only on the dock (the persona gate's PA_LOOP).
  *

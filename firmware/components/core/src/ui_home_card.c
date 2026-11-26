@@ -360,6 +360,8 @@ static void draw_clock(void)
     theme_set_text(s_clock, s_clock_txt, sizeof s_clock_txt, buf);
 }
 
+lv_obj_t *ui_home_card_clock(void) { return s_clock_set && shown(s_clock) ? s_clock : NULL; }
+
 void ui_home_card_set_ambient(bool ambient)
 {
     s_ambient = ambient;

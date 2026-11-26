@@ -118,7 +118,7 @@ code follows today; the include script makes them visible.
    service prefs  sound  feedback  voice  keys    (hal.h, link.h, pure, leaves; no LVGL)
      |
    pure    model nav gesture steps graph ring gauges detail done motion sha256 sound_bank
-           persona temper toy_gate nag replay mote
+           persona temper toy_gate nag replay mote eggs
                                                   (C library and leaves only; unit-tested on the host)
    leaves  debug.h  ui_icons.h                    (no includes beyond the C library)
 ```

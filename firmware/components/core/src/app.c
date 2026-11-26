@@ -23,6 +23,7 @@
 #include "ota.h"
 #include "prefs.h"
 #include "ui.h"
+#include "ui_eggs.h"
 #include "ui_living.h"
 #include "ui_mote.h"
 #include "ui_theme.h"
@@ -637,6 +638,7 @@ static void finished_all(bool error, uint32_t sid)
 static void on_session(const session_t *before, const session_t *now, uint32_t present)
 {
     ui_mote_on_session(before, now, present); /* green days and big finishes (issue 59e0) */
+    ui_eggs_on_session(before, now, present); /* the finish count (issue 7770) */
     if (!(present & SF_STATE)) return;
     if (now->state != SESS_DONE && now->state != SESS_ERROR) return;
     if (before && before->state == now->state) return;

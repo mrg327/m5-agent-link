@@ -8,6 +8,7 @@
 
 #include "debug.h"
 #include "nag.h"
+#include "ui_eggs.h"
 #include "ui_home_internal.h"
 #include "ui_replay.h"
 #include "ui_mote.h"
@@ -364,6 +365,7 @@ void ui_home_tick(uint32_t now)
     }
     if (ui_mode() == MODE_HOME && !s_ambient) ui_graph_strip_tick(now);
     ui_mote_tick(now, s_ambient && ui_mode() == MODE_HOME, error_deg());
+    ui_eggs_tick(now, ui_mode() == MODE_HOME ? ui_home_card_clock() : NULL);
 }
 
 bool ui_home_ambient(void) { return s_ambient; }

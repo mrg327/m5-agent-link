@@ -26,3 +26,5 @@ void ui_home_card_update(void); /* redraw from the model and the selection */
 void ui_home_card_tick(void);
 void ui_home_card_set_ambient(bool ambient);
 void ui_home_card_report(ui_report_t *r);
+/* the clock (the empty deck, the ambient face) when it is on show, else NULL: the slip egg */
+lv_obj_t *ui_home_card_clock(void);

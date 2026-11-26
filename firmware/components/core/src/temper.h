@@ -45,11 +45,11 @@ typedef struct {
 
 /** Where a mark is drawn, relative to its rest. */
 typedef struct {
-    int8_t dx, dy;  /**< centre offset, px (a lean is +dy: the caller turns it to its hero) */
-    int8_t dr;      /**< radius change, px */
-    int8_t rot_mid; /**< middle ring turned, degrees clockwise */
-    int8_t rot_out; /**< outer ring turned, degrees clockwise */
-    uint8_t lum;    /**< brightness, % of the mark's colour */
+    int8_t dx, dy;   /**< centre offset, px (a lean is +dy: the caller turns it to its hero) */
+    int8_t dr;       /**< radius change, px */
+    uint8_t lum;     /**< brightness, % of the mark's colour */
+    int16_t rot_mid; /**< middle ring turned, degrees clockwise (a whole turn fits: the spin egg) */
+    int16_t rot_out; /**< outer ring turned, degrees clockwise */
 } temper_pose_t;
 
 extern const temper_pose_t temper_neutral;

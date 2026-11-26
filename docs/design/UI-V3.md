@@ -39,7 +39,10 @@ document wins. Finding numbers (H1, R1, X2 …) refer to the profile.
    buzz or a sound (§3.12 there). Every fun feature asks `persona_allow()` first.
 9. **The Mote** (2026-11-26, issue 59e0), off by default: a silent light on its own track of the idle face
    on the dock, a seconds hand while agents work, resting at 6 o'clock when nothing runs, three laps on a big
-   finish ([GLYPHS.md](GLYPHS.md) §3.13). It is gone the moment anything needs you.
+   finish ([GLYPHS.md](GLYPHS.md) §3.14). It is gone the moment anything needs you.
+10. **A few rare easter eggs** (2026-11-26, issue 7770), on by default: the clock's digits slip at 13:37 and
+    04:04; the 100th and 1000th finish turn the sigil once, or loop the Mote (§3.15 there). Silent, never
+    while anything needs you.
 
 Safety invariants, unchanged and not negotiable in any later reskin: the approval card shows the
 request text; a tap never approves or denies; an approve-class commit is a 1.2 s hold bound to the

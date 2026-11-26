@@ -13,7 +13,7 @@
 static uint8_t s_vol = PREFS_VOL_DEFAULT;
 static orient_mode_t s_orient = PREFS_ORIENT_DEFAULT;
 static uint32_t s_fun = FUN_DEFAULT;
-static uint32_t s_mote_days;
+static uint32_t s_mote_days, s_finishes;
 
 void prefs_init(void)
 {
@@ -23,6 +23,7 @@ void prefs_init(void)
     s_orient = o > ORIENT_AUTO ? PREFS_ORIENT_DEFAULT : (orient_mode_t)o;
     s_fun = hal_pref_get("fun", FUN_DEFAULT) & FUN_KNOWN;
     s_mote_days = hal_pref_get("mote_days", 0);
+    s_finishes = hal_pref_get("fin_n", 0);
 }
 
 uint8_t prefs_volume(void) { return s_vol; }
@@ -71,4 +72,12 @@ void prefs_set_mote_days(uint32_t word)
     if (word == s_mote_days) return;
     s_mote_days = word;
     hal_pref_set("mote_days", word);
+}
+
+uint32_t prefs_finishes(void) { return s_finishes; }
+
+void prefs_set_finishes(uint32_t n, bool store)
+{
+    s_finishes = n;
+    if (store) hal_pref_set("fin_n", n);
 }

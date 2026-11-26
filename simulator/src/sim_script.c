@@ -73,6 +73,7 @@
  *   fw_expect_slot                  the spare slot holds exactly the image
  *   battery PCT [chg]               the battery reading (chg = charging and on USB)
  *   pref volume|orient|fun V        a stored preference; fun takes the word (persona.h FUN_*, e.g. 0x3d3)
+ *   pref finishes N                 the finished turns seen so far (the centuries egg, eggs.h), stored
  *   skip MS                         jump the clock forward (the script's own timeline stays put): long timeouts
  *   expect_screen NAME | expect_label TEXT | expect_no_label TEXT | quit
  *   question SID Q|ANSWER|ANSWER...  a delta with the agent's closing question and its answers (proto 0.5)
@@ -2006,6 +2007,8 @@ static void run(const ev_t *e)
                                                      : ORIENT_NORMAL);
         else if (!strcmp(key, "fun")) {
             prefs_set_fun((uint32_t)strtoul(val, NULL, 0));
+        } else if (!strcmp(key, "finishes")) {
+            prefs_set_finishes((uint32_t)strtoul(val, NULL, 0), true);
         } else fail("bad pref", e->text);
         break;
     }

@@ -2,6 +2,7 @@
  * the personality switchboard. Read once at start from the HAL's persistent store (NVS on the
  * watch), written when changed. */
 #pragma once
+#include <stdbool.h>
 #include <stdint.h>
 
 typedef enum { ORIENT_NORMAL = 0, ORIENT_FLIPPED = 1, ORIENT_AUTO = 2 } orient_mode_t;
@@ -26,3 +27,7 @@ void prefs_set_fun(uint32_t word);
  * 0 until the first. Written at most once a day. */
 uint32_t prefs_mote_days(void);
 void prefs_set_mote_days(uint32_t word);
+/* Finished turns this watch saw (the centuries egg, eggs.h); stored only when `store` (every
+ * EGGS_SAVE_EVERY), so a reboot may lose the last few, never add any. */
+uint32_t prefs_finishes(void);
+void prefs_set_finishes(uint32_t n, bool store);

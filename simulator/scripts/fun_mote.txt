@@ -1,4 +1,4 @@
-# The Mote (issue 20261126-59e0, GLYPHS.md §3.13): a light on its own track (r 216) of the idle face, on the
+# The Mote (issue 20261126-59e0, GLYPHS.md §3.14): a light on its own track (r 216) of the idle face, on the
 # dock, with the Mote switched on (pref fun 0x3db). It laps as a seconds hand while anything works, settles at
 # 6 o'clock when nothing runs and becomes an ember after five minutes; a big finish with green tests cheers
 # (three laps) and counts the day; plan use over 80 % halves its tail; at night it is amber. It leaves at once

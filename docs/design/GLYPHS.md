@@ -398,6 +398,29 @@ buzzes or sounds. Off by default: LABS > Personality, the dot (`FUN_MOTE`, bit 3
   `_night`); the log has `"ev":"mote"` at each mode and `"ev":"mote_day"` when a day counts. The simulator's RTC
   now runs on the script's virtual clock, so a lap moves in a headless run.
 
+### 3.15 Easter eggs: `eggs.c`, `ui_eggs.c` (issue 20261126-7770)
+
+Small surprises with a date or a number behind them. Each is under 2 s, silent, without haptic, once per
+trigger, never while anything needs you and never waking the display: the screen asks `persona_allow(PF_EGGS)`
+for `PA_ONESHOT`, so a request, a dark or glowing display and reduced motion all hold them. On by default
+(`FUN_EGGS`, bit 6, the asterisk in LABS > Personality). The table stays short: an egg leaves when a new one
+enters.
+
+| Egg | Trigger | Picture |
+|---|---|---|
+| Clock slip | the clock on show (the empty deck or the ambient face) reads 13:37 or 04:04 | the digits slip 3 px right for one 90 ms frame, back, and once more (a style translate of the label: about 25 k px a frame); once per such minute, the first moment in it the egg may play |
+| Centuries | the 100th and the 1000th turn this watch saw finish (done, not error; a session first met finished does not count) | with the Mote on the face, it loops once round a 40 px circle inside the ring and returns (1.2 s); otherwise the sigil's rings each turn once round (800 ms, `inout`), over whatever gesture it is making |
+
+- The finish count is `prefs_finishes()` (NVS `fin_n`), stored every 5 finishes and at a century, so a reboot
+  may lose the last few, never add any, and a century plays once. A century waits up to 10 minutes for a
+  moment it may play in (a request answered, the display lit), then lapses: nothing is saved up for later.
+- `temper_pose_t`'s ring turns are 16-bit so a whole turn fits; `ui_living_spin()` adds the turn to the mark on
+  show.
+- Left out, from the brief: the scatter on a shake (the accelerometer's x/y mapping is unverified), the
+  anniversary ring (needs the daemon to keep first-seen dates), the tumbleweed and the key code (dropped).
+- Sim: `fun_eggs.txt` (shots `fun_eggs_slip`, `_slip_after`, `_spin`, `_loop`); the log has `"ev":"egg"` with
+  `"egg":"clock-slip"` or `"century"`, and `"ev":"century"` when the count reaches one.
+
 ## 4. Reference screen: HOME
 
 Built with the primitives, as the model for the rest (`ui_home_card.c`; renders:
