@@ -13,6 +13,8 @@ wait 300
 expect_screen labs
 btn B
 wait 100
+btn B
+wait 100
 expect_label > Stub
 tap 233 233
 wait 300

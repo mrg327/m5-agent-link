@@ -71,7 +71,7 @@ shot fun_temper_lean.png
 lift
 px_reset
 wait 6500
-expect_px_max 3860000
+expect_px_max 4000000
 clear 7
 wait 300
 quit

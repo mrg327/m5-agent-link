@@ -75,7 +75,7 @@ readability-braces-around-statements	firmware/components/core/src/ui_home.c	2
 readability-braces-around-statements	firmware/components/core/src/ui_home_card.c	10
 readability-braces-around-statements	firmware/components/core/src/ui_keys.c	12
 readability-braces-around-statements	firmware/components/core/src/ui_kit.c	22
-readability-braces-around-statements	firmware/components/core/src/ui_labs.c	4
+readability-braces-around-statements	firmware/components/core/src/ui_labs.c	2
 readability-braces-around-statements	firmware/components/core/src/ui_ota.c	4
 readability-braces-around-statements	firmware/components/core/src/ui_read.c	8
 readability-braces-around-statements	firmware/components/core/src/ui_ring.c	7

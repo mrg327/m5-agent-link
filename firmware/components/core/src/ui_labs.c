@@ -28,14 +28,14 @@ enum { LAB_TRACKPAD, LAB_FUN, LAB_TOYS };
 static int lab_count(void) { return LAB_TOYS + ui_toy_count(); }
 static const char *lab_name(int id)
 {
-    if (id == LAB_TRACKPAD) return "Trackpad";
-    if (id == LAB_FUN) return "Personality";
+    if (id == LAB_TRACKPAD) { return "Trackpad"; }
+    if (id == LAB_FUN) { return "Personality"; }
     return ui_toy_get(id - LAB_TOYS)->name;
 }
 static const char *lab_glyph(int id)
 {
-    if (id == LAB_TRACKPAD) return ICON_CURSOR;
-    if (id == LAB_FUN) return ICON_WAVE;
+    if (id == LAB_TRACKPAD) { return ICON_CURSOR; }
+    if (id == LAB_FUN) { return ICON_WAVE; }
     return ui_toy_get(id - LAB_TOYS)->glyph;
 }
 
@@ -85,12 +85,14 @@ static void render(void)
         items[i] = (ui_orbit_item_t){lab_glyph(i), 0, blocked(i) != NULL};
     }
     ui_orbit_set_items(s_orbit, items, n);
-    if (sel == LAB_TRACKPAD)
+    if (sel == LAB_TRACKPAD) {
         snprintf(s_desc_txt, sizeof s_desc_txt, "%s",
                  why ? why : "Use the watch as this PC's trackpad");
-    else if (sel == LAB_FUN)
+    } else if (sel == LAB_FUN) {
         snprintf(s_desc_txt, sizeof s_desc_txt, "Turn the watch's fun on and off");
-    else snprintf(s_desc_txt, sizeof s_desc_txt, "%s", why ? why : lab_name(sel));
+    } else {
+        snprintf(s_desc_txt, sizeof s_desc_txt, "%s", why ? why : lab_name(sel));
+    }
     const char *icons = why ? blocked_sign(sel) : "";
     if (icons != s_sign_icons) { /* literals: the pointer is the identity */
         s_sign_icons = icons;
