@@ -166,6 +166,8 @@ void ui_glow(uint32_t rgb, uint32_t sid, const char *icon);
  * digits, above everything until ui_pair_hide() (or 60 s). */
 void ui_pair_show(uint32_t passkey);
 void ui_pair_hide(void);
+/* Pairing completed: as ui_pair_hide(), after the Mote's one flare when it is on (FUN_MOTE). */
+void ui_pair_done(void);
 void ui_glow_hide(void);
 bool ui_glow_active(void);
 /* The wrist was raised: counts as looking at the watch (ends the ambient dim and the nagging), like

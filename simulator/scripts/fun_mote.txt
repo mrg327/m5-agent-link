@@ -1,7 +1,7 @@
 # The Mote (issue 20261126-59e0, GLYPHS.md §3.14): a firefly on its own track (r 175) inside the idle face's
 # ring, on the dock, with the Mote switched on (pref fun 0x3db). It visits each working session's arc in turn
 # (8 s by each, an eased trip between), rests at 12 o'clock when nothing runs and becomes an ember after five
-# minutes; a big finish with green tests cheers (once round the track and a flare) and counts the day; plan use
+# minutes; a big finish with green tests counts the day and cheers (to its arc, one loop, a flare, a linger); plan use
 # over 80 % slows and dims its breath; at night it is a dimmer warm white. It leaves at once on battery and when
 # a request arrives. The log carries each mode ("ev":"mote"); the test asserts their order.
 connect
@@ -30,14 +30,32 @@ expect_px_max 550000
 pref fun 0x3db
 wait 1000
 shot fun_mote_visit_b.png
-# a big finish: green tests, 15 minutes, six files; the firefly cheers (once round the track, then a flare)
+# back by the first (3 o'clock) after 8 s, then a big finish there (issue 20261126-2de2): green tests, 15
+# minutes, six files; the other still works. The ring lays the finished one after the working one, at 9
+# o'clock, and the firefly drifts there (an ordinary 4.4 s trip, the short way), loops
+# once round a 40 px circle inside its track (600 ms), flares (the halo 1.6 times as wide, 120 ms up, 480 ms
+# back), lingers 8 s by the finished arc and goes back to the working one. It adds no buzz and no sound: the
+# finish's own alert is all there is.
+wait 12000
 session 16 done webapp feat/login Bash cargo test --workspace
 done 16 6 220/31 pass 900
-wait 600
+px_reset
+wait 2200
 shot fun_mote_cheer.png
-wait 650
+wait 2150
+# the drift: like any trip, the box moves every tick (about 0.5 M px, the finish's own ring change included)
+expect_px_max 600000
+px_reset
+wait 150
+shot fun_mote_loop.png
+wait 420
 shot fun_mote_flare.png
-wait 3000
+wait 1030
+# the loop (boxes of about 4 k px) and the flare (up to about 10 k px): about 0.4 M px in 1.6 s
+expect_px_max 450000
+wait 4000
+shot fun_mote_linger.png
+wait 9000
 # nothing runs: it drifts the short way to 12 o'clock, under the ring's gap, and breathes there
 session 2 idle api main
 wait 6000

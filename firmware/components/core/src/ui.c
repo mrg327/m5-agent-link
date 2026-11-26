@@ -8,6 +8,7 @@
 #include "ui_countdown.h"
 #include "ui_internal.h"
 #include "ui_kit.h"
+#include "ui_mote_pair.h"
 #include "ui_ota.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
@@ -90,6 +91,7 @@ static void pair_create(lv_obj_t *top)
     lv_obj_set_style_text_font(s_pair_num, FONT_NUM, 0);
     lv_obj_set_style_text_color(s_pair_num, COL_TEXT, 0);
     lv_obj_align(s_pair_num, LV_ALIGN_CENTER, 0, 30);
+    ui_mote_pair_create(s_pair); /* the Mote, still at 12 while the digits wait (FUN_MOTE) */
     lv_obj_add_flag(s_pair, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -168,6 +170,7 @@ void ui_pair_show(uint32_t passkey)
     lv_obj_align(s_pair_num, LV_ALIGN_CENTER, 0, 30);
     lv_obj_remove_flag(s_pair, LV_OBJ_FLAG_HIDDEN);
     s_pair_until_ms = s_now_ms + PAIR_SHOW_MS;
+    ui_mote_pair_wait();
     /* the passkey itself stays off the debug log */
     dbg_event("ui", "pair", "\"shown\":true");
 }
@@ -175,9 +178,16 @@ void ui_pair_show(uint32_t passkey)
 /* A lost end event: the passkey goes after PAIR_SHOW_MS. */
 static void pair_tick(uint32_t now_ms)
 {
-    if (!lv_obj_has_flag(s_pair, LV_OBJ_FLAG_HIDDEN) && (int32_t)(now_ms - s_pair_until_ms) >= 0) {
+    bool shown = !lv_obj_has_flag(s_pair, LV_OBJ_FLAG_HIDDEN);
+    if (ui_mote_pair_tick(now_ms, shown) || (shown && (int32_t)(now_ms - s_pair_until_ms) >= 0)) {
         ui_pair_hide();
     }
+}
+
+void ui_pair_done(void)
+{
+    /* the Mote's one flare keeps the digits up for its 600 ms; otherwise they go at once */
+    if (lv_obj_has_flag(s_pair, LV_OBJ_FLAG_HIDDEN) || !ui_mote_pair_done(s_now_ms)) ui_pair_hide();
 }
 
 void ui_pair_hide(void)

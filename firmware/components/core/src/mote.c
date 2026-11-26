@@ -127,35 +127,76 @@ static void dim_halo(const mote_in_t *in, mote_out_t *o)
     }
 }
 
-/* The cheer's loop and flare, or the loop off the track; false once it is over. */
-static bool effect(mote_t *m, const mote_in_t *in, uint32_t now, mote_out_t *o)
+mote_look_t mote_flare(mote_look_t base, uint8_t peak_lum, uint32_t t_ms)
 {
+    if (t_ms >= MOTE_FLARE_MS) return base;
+    float k;
+    if (t_ms < MOTE_FLARE_RISE_MS) {
+        k = frac(t_ms, MOTE_FLARE_RISE_MS);
+    } else { /* back, easing out (out3): quick at first, then settling */
+        float u = 1.0f - frac(t_ms - MOTE_FLARE_RISE_MS, MOTE_FLARE_FALL_MS);
+        k = u * u * u;
+    }
+    if (peak_lum > 100) peak_lum = 100;
+    int32_t halo_peak = base.halo_r * MOTE_FLARE_PCT / 100;
+    if (halo_peak > 255) halo_peak = 255;
+    mote_look_t o = base;
+    o.lum = (uint8_t)(base.lum + lroundf((float)(peak_lum - base.lum) * k));
+    o.halo_r = (uint8_t)(base.halo_r + lroundf((float)(halo_peak - base.halo_r) * k));
+    o.halo_pct = (uint8_t)(base.halo_pct + lroundf((float)(100 - base.halo_pct) * k));
+    return o;
+}
+
+/* Off the track round a circle of radius r tangent to the place at deg, inside it: ph 0..1. */
+static void loop_off(mote_out_t *o, float ph01, int r)
+{
+    float a = (float)o->deg * 0.017453292f, ph = ph01 * 6.2831853f;
+    float inw = 1.0f - cosf(ph), along = sinf(ph);
+    o->dx = (int8_t)lroundf((float)r * (along * cosf(a) - inw * sinf(a)));
+    o->dy = (int8_t)lroundf((float)r * (along * sinf(a) + inw * cosf(a)));
+}
+
+static void settle_look(const mote_t *m, const mote_in_t *in, uint32_t now, mote_out_t *o);
+
+/* A big finish: on its way to the finished arc (an ordinary trip), then one loop, the flare, and it
+ * lingers by the arc in its base look; false while it lingers or once it is over. */
+static bool cheer(mote_t *m, const mote_in_t *in, uint32_t now, mote_out_t *o)
+{
+    if (!m->fin_here) {
+        settle_look(m, in, now, o);
+        o->mode = MOTE_CHEER;
+        return true;
+    }
     uint32_t t = now - m->fx_ms;
     uint8_t lum = base_lum(o);
-    if (m->fx == MOTE_CHEER && t < MOTE_CHEER_MS + MOTE_FLARE_MS) {
+    if (t < MOTE_FIN_LOOP_MS + MOTE_FLARE_MS) {
         o->mode = MOTE_CHEER;
-        if (t < MOTE_CHEER_MS) {
-            o->deg = whole_deg(m->pos + (int32_t)lroundf(smooth(frac(t, MOTE_CHEER_MS)) * FULL));
-            o->look = mote_look(100, lum, 1000);
-        } else { /* the flare: bright and wide, falling back over MOTE_FLARE_MS */
-            uint32_t f = MOTE_FLARE_MS - (t - MOTE_CHEER_MS);
-            o->deg = whole_deg(m->pos);
-            o->look =
-                mote_look(100, (uint8_t)(lum + (MOTE_LUM_FLARE - lum) * f / MOTE_FLARE_MS), 1000);
-            o->look.halo_r = (uint8_t)(o->look.halo_r + MOTE_FLARE_PX * f / MOTE_FLARE_MS);
-            o->look.halo_pct = 100;
+        o->deg = whole_deg(m->pos);
+        o->look = mote_look(100, lum, 1000);
+        if (t < MOTE_FIN_LOOP_MS) {
+            dim_halo(in, o);
+            loop_off(o, smooth(frac(t, MOTE_FIN_LOOP_MS)), MOTE_FIN_LOOP_R);
+        } else {
+            o->look = mote_flare(o->look, (uint8_t)(lum * MOTE_LUM_FLARE / MOTE_LUM),
+                                 t - MOTE_FIN_LOOP_MS);
         }
         return true;
     }
+    if (t >= MOTE_FIN_LOOP_MS + MOTE_FLARE_MS + MOTE_FIN_LINGER_MS) m->fx = MOTE_GONE;
+    return false;
+}
+
+/* The cheer, or the loop off the track; false once it is over (or while the cheer lingers). */
+static bool effect(mote_t *m, const mote_in_t *in, uint32_t now, mote_out_t *o)
+{
+    if (m->fx == MOTE_CHEER) return cheer(m, in, now, o);
+    uint32_t t = now - m->fx_ms;
     if (m->fx == MOTE_LOOP && t < MOTE_LOOP_MS) {
         o->mode = MOTE_LOOP;
         o->deg = whole_deg(m->pos);
-        o->look = mote_look(100, lum, 1000);
+        o->look = mote_look(100, base_lum(o), 1000);
         dim_halo(in, o);
-        float a = (float)o->deg * 0.017453292f, ph = (float)t / (float)MOTE_LOOP_MS * 6.2831853f;
-        float inw = 1.0f - cosf(ph), along = sinf(ph);
-        o->dx = (int8_t)lroundf((float)MOTE_LOOP_R * (along * cosf(a) - inw * sinf(a)));
-        o->dy = (int8_t)lroundf((float)MOTE_LOOP_R * (along * sinf(a) + inw * cosf(a)));
+        loop_off(o, (float)t / (float)MOTE_LOOP_MS, MOTE_LOOP_R);
         return true;
     }
     m->fx = MOTE_GONE;
@@ -192,6 +233,7 @@ static void settle_look(const mote_t *m, const mote_in_t *in, uint32_t now, mote
 
 static int target_of(const mote_t *m, const mote_in_t *in, uint32_t now)
 {
+    if (m->fx == MOTE_CHEER) return m->fin_deg; /* never under an error: that ends the cheer */
     if (m->base == MOTE_HOVER) return ((int)in->error_deg % 360 + 360) % 360;
     if (m->base == MOTE_VISIT) return visit(m, in, now);
     return MOTE_REST_DEG;
@@ -223,8 +265,15 @@ mote_out_t mote_step(mote_t *m, const mote_in_t *in, uint32_t now_ms)
         m->cheers = in->cheers;
         if (!in->reduced && !appear && base != MOTE_HOVER) {
             m->fx = MOTE_CHEER;
-            m->fx_ms = now_ms;
+            m->fin_here = false;
+            m->fin_deg = in->fin_at ? (int16_t)(((int)in->fin_deg % 360 + 360) % 360)
+                                    : (int16_t)whole_deg(m->pos);
+            m->idle_ms = now_ms; /* resting afterwards starts afresh */
         }
+    }
+    if (m->fx == MOTE_CHEER && (base == MOTE_HOVER || in->reduced)) m->fx = MOTE_GONE;
+    if (m->fx == MOTE_CHEER && !m->fin_here && in->fin_at) { /* the ring re-laid on the way */
+        m->fin_deg = (int16_t)(((int)in->fin_deg % 360 + 360) % 360);
     }
     if (in->loops != m->loops) {
         m->loops = in->loops;
@@ -236,6 +285,10 @@ mote_out_t mote_step(mote_t *m, const mote_in_t *in, uint32_t now_ms)
     m->shown = true;
     /* it arrives with the face, at its place; with reduced motion it never travels */
     go(m, target_of(m, in, now_ms), now_ms, appear || in->reduced);
+    if (m->fx == MOTE_CHEER && !m->fin_here && !m->travelling && m->target == m->fin_deg) {
+        m->fin_here = true; /* there: the loop starts */
+        m->fx_ms = now_ms;
+    }
 
     o.night = in->hour != 255 && (in->hour >= 23 || in->hour < 6);
     o.rgb = MOTE_RGB;

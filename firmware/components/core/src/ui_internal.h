@@ -88,6 +88,9 @@ void ui_home_rim_mode(bool dial);
 void ui_home_set_card_shown(bool shown);
 void ui_home_select_sid(uint32_t sid, const char *via);
 void ui_home_report(ui_report_t *r);
+/* The centre of the session's own slot on the ring, degrees clockwise from 12; -1 when it has none
+ * (not on the ring, or inside a merged Done group): where the Mote goes for a big finish. */
+int ui_home_slot_deg(uint32_t sid);
 void ui_home_animations_changed(void);
 
 /* The AGENT screen (ui_agent.c). */

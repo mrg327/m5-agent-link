@@ -23,6 +23,7 @@ static lv_obj_t *s_obj;
 static mote_t s_m;
 static mote_out_t s_out; /* what is drawn */
 static uint32_t s_cheers, s_loops;
+static uint32_t s_fin_sid; /* the latest big finish: the Mote goes to its arc */
 
 /* ───────── geometry, in screen coordinates ───────── */
 
@@ -117,6 +118,9 @@ static void read_moment(mote_in_t *in, bool face, int error_deg, const int16_t *
     in->hour = (uint8_t)(local / 3600 % 24);
     in->usage = gauges_h5(unix_now, &h5) ? h5.pct : 255;
     in->cheers = s_cheers;
+    int fin = s_fin_sid ? ui_home_slot_deg(s_fin_sid) : -1;
+    in->fin_at = fin >= 0;
+    in->fin_deg = (int16_t)(fin >= 0 ? fin : 0);
     in->loops = s_loops;
 }
 
@@ -131,6 +135,10 @@ void ui_mote_tick(uint32_t now_ms, bool face, int error_deg, const int16_t *work
         dbg_event("fun", "mote", "\"mode\":%s,\"deg\":%u,\"lum\":%u,\"halo\":%u,\"night\":%d",
                   dbg_q(mode_name(o.mode)), (unsigned)o.deg, (unsigned)o.look.lum,
                   (unsigned)o.look.halo_r, o.night ? 1 : 0);
+    }
+    if (s_m.fx == MOTE_CHEER && s_m.fin_here && s_m.fx_ms == now_ms) { /* there: the loop */
+        dbg_event("fun", "mote_finish", "\"deg\":%u,\"arc\":%d", (unsigned)o.deg,
+                  in.fin_at ? (int)in.fin_deg : -1);
     }
     set_out(&o);
 }
@@ -174,5 +182,8 @@ void ui_mote_on_session(const session_t *before, const session_t *now, uint32_t 
                       (unsigned)mote_level(mote_days(nw)));
         }
     }
-    if (mote_finish_big(&f)) s_cheers++;
+    if (mote_finish_big(&f)) {
+        s_cheers++;
+        s_fin_sid = now->sid;
+    }
 }

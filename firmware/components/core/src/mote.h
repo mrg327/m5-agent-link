@@ -4,12 +4,13 @@
  *
  * Pure: mote_step() turns what the fleet is doing and the time into where the firefly is and how it
  * looks. Highest priority first: GONE (not allowed, or the idle face is not up), HOVER beside the
- * first error capsule, CHEER (one quick loop round the track and a flare, on a big finish) or LOOP
- * (the centuries egg), VISIT (it drifts to each working session's arc in turn, ring order, and
- * lingers by it), REST (nothing runs: at 12 o'clock, under the ring's gap), EMBER (rested five
- * minutes: small, dim, still). It travels the short way, eased, at a calm speed; only CHEER and
- * LOOP move faster. Its halo breathes where it may loop. Its look never changes under the user:
- * the level (days with green tests) is counted and never shrinks, but is not shown yet.
+ * first error capsule, CHEER (a big finish: it drifts to the finished session's arc, loops once
+ * round a 40 px circle, flares and lingers there) or LOOP (the centuries egg), VISIT (it drifts to
+ * each working session's arc in turn, ring order, and lingers by it), REST (nothing runs: at 12
+ * o'clock, under the ring's gap), EMBER (rested five minutes: small, dim, still). It travels the
+ * short way, eased, at a calm speed; only the loops move faster. Its halo breathes where it may
+ * loop. Its look never changes under the user: the level (days with green tests) is counted and
+ * never shrinks, but is not shown yet.
  *
  * The look is reusable apart from this behaviour: mote_look() and mote_breath() give the firefly
  * at any size, and ui_orb_draw() (ui_orb.h) paints it anywhere, for the mascot on other screens. */
@@ -36,7 +37,7 @@
 #define MOTE_LUM 45        /* % of full: the ambient face's brightness */
 #define MOTE_LUM_NIGHT 28
 #define MOTE_LUM_EMBER 22
-#define MOTE_LUM_FLARE 90 /* the cheer's flare, falling back to MOTE_LUM */
+#define MOTE_LUM_FLARE 100 /* the flare's peak, from MOTE_LUM (in proportion at night) */
 #define MOTE_EMBER_SCALE 60
 #define MOTE_EMBER_MS 300000u /* rested this long: an ember */
 #define MOTE_REST_DEG 0       /* 12 o'clock: under the ring's gap, clear of the gauges below */
@@ -46,9 +47,17 @@
 #define MOTE_TRAVEL_MS_DEG 20u /* 180 degrees in 4.4 s: at most 62 degrees a second */
 #define MOTE_HOVER_SWAY 3      /* degrees either side of the error, at 1 Hz */
 #define MOTE_FLICKER_MS 600u
-#define MOTE_CHEER_MS 1200u /* once round the track, eased */
-#define MOTE_FLARE_MS 400u  /* then the halo flares and falls back */
-#define MOTE_FLARE_PX 10
+/* A big finish (issue 20261126-2de2): an ordinary trip to the finished arc, then one loop round a
+ * 40 px circle tangent to its place, inside the track, eased; then the flare; then it lingers. */
+#define MOTE_FIN_LOOP_MS 600u
+#define MOTE_FIN_LOOP_R 20
+#define MOTE_FIN_LINGER_MS 8000u /* = MOTE_VISIT_MS: by the finished arc, then on */
+/* The flare (the profile's [flare], design/mote/mote.toml): the halo to 1.6 times its radius and
+ * full strength, and the core to its peak, in 120 ms; back in 480 ms, easing out. */
+#define MOTE_FLARE_RISE_MS 120u
+#define MOTE_FLARE_FALL_MS 480u
+#define MOTE_FLARE_MS (MOTE_FLARE_RISE_MS + MOTE_FLARE_FALL_MS)
+#define MOTE_FLARE_PCT 160
 #define MOTE_LOOP_MS 1200u /* the centuries egg: once round a circle inside the track */
 #define MOTE_LOOP_R 16
 #define MOTE_LEVEL_MAX 7
@@ -57,7 +66,7 @@
 typedef enum {
     MOTE_GONE = 0, /**< not drawn */
     MOTE_HOVER,    /**< beside an error, swaying and flickering */
-    MOTE_CHEER,    /**< one quick loop round the track and a flare, on a big finish */
+    MOTE_CHEER,    /**< a big finish: to its arc, one loop and a flare (then it lingers) */
     MOTE_LOOP,     /**< the centuries egg: a loop off the track */
     MOTE_VISIT,    /**< by a working session's arc, then the next one's */
     MOTE_REST,     /**< nothing runs: at 12 o'clock, breathing */
@@ -85,6 +94,8 @@ typedef struct {
     uint8_t hour;      /**< local hour, 0..23; 255 unknown */
     uint8_t usage;     /**< the 5-hour plan use, percent; 255 unknown */
     uint32_t cheers;   /**< big finishes seen so far; a change cheers */
+    bool fin_at;       /**< the latest big finish's session has a slot of its own on the ring */
+    int16_t fin_deg;   /**< its slot's centre, degrees clockwise from 12 (with fin_at) */
     uint32_t loops;    /**< loops asked for so far (eggs); a change loops */
 } mote_in_t;
 
@@ -114,7 +125,9 @@ typedef struct {
     uint32_t dur;       /**< the trip's length, ms */
     uint32_t arrive_ms; /**< it reached target */
     uint32_t idle_ms;   /**< nothing has run since (REST, then EMBER) */
-    uint32_t fx_ms;     /**< the cheer or loop began */
+    uint32_t fx_ms;     /**< the cheer's loop (once there) or the egg's loop began */
+    int16_t fin_deg;    /**< the cheer's place: the finished arc, whole degrees */
+    bool fin_here;      /**< the cheer has reached its place (fx_ms is set) */
     uint32_t cheers;    /**< the last count seen */
     uint32_t loops;     /**< the last count seen */
     mote_mode_t fx;     /**< MOTE_CHEER, MOTE_LOOP or MOTE_GONE (none) */
@@ -135,6 +148,15 @@ mote_out_t mote_step(mote_t *m, const mote_in_t *in, uint32_t now_ms);
  * @param[in] breath_pm The breath, 0 (exhaled) to 1000 (inhaled): the halo grows and brightens.
  */
 mote_look_t mote_look(uint16_t scale_pct, uint8_t lum, uint16_t breath_pm);
+
+/**
+ * @brief The flare at @p t_ms after it began: from @p base to its peak in MOTE_FLARE_RISE_MS (the
+ * core at @p peak_lum, the halo at MOTE_FLARE_PCT of its radius and full strength), back to
+ * @p base over MOTE_FLARE_FALL_MS, easing out; @p base itself from MOTE_FLARE_MS on.
+ * @param[in] base     The look it flares from (mote_look()).
+ * @param[in] peak_lum The core's brightness at the peak, % of full.
+ */
+mote_look_t mote_flare(mote_look_t base, uint8_t peak_lum, uint32_t t_ms);
 
 /**
  * @brief The breath at @p t_ms: 0..1000 and back over @p period_ms, in MOTE_BREATH_STEPS levels.

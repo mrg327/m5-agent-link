@@ -1522,12 +1522,12 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:210"
+      "source": "firmware/components/core/src/ui.c:220"
     },
     {
       "id": "attention",
       "title": "Deck · a request is waiting",
-      "source": "firmware/components/core/src/ui_home.c:407"
+      "source": "firmware/components/core/src/ui_home.c:415"
     },
     {
       "id": "agent",
@@ -6170,13 +6170,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:1510",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:1442",
-    "gesture_map.chord": "firmware/components/core/src/app.c:767",
+    "gesture_map.chord": "firmware/components/core/src/app.c:771",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:191",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:234",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:560",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:564",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:20",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:11",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:820",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:824",
     "glyphs.agents": "firmware/components/core/src/ui_theme.c:70",
     "glyphs.agents.name": "firmware/components/core/src/ui_theme.c:202",
     "glyphs.font": "firmware/components/core/src/fonts/font_phosphor_44.c:3",
@@ -6368,7 +6368,7 @@
     "ring.summary_y_px": "firmware/components/core/src/ui_home_card.c:45",
     "ring.time_dots_r_px": "firmware/components/core/src/ui_home_card.c:41",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:50",
-    "screens": "firmware/components/core/src/ui_home.c:407",
+    "screens": "firmware/components/core/src/ui_home.c:415",
     "screens.agent": "firmware/components/core/src/ui_agent.c:605",
     "screens.ask": "firmware/components/core/src/ui_ask.c:1547",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:408",

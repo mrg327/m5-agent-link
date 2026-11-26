@@ -357,6 +357,14 @@ static int work_degs(int16_t *out, int max)
     return k;
 }
 
+int ui_home_slot_deg(uint32_t sid)
+{
+    for (int i = 0; i < s_n; i++) {
+        if (s_slots[i].sid == sid && !s_slots[i].n_merged) return ring_slot_mid_deg(s_n, i);
+    }
+    return -1;
+}
+
 void ui_home_tick(uint32_t now)
 {
     s_now = now;

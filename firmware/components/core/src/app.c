@@ -168,8 +168,12 @@ static void pair_step(uint32_t now)
         feedback_tick();
         return;
     }
-    ui_pair_hide();
     bool done = v == HAL_PAIR_DONE;
+    if (done) {
+        ui_pair_done();
+    } else {
+        ui_pair_hide();
+    }
     ui_toast_sign(done ? "Paired" : "Pairing failed",
                   done ? ICON_BLUETOOTH ICON_CHECK : ICON_BLUETOOTH ICON_X, NULL,
                   done ? RGB_DONE : RGB_DANGER);

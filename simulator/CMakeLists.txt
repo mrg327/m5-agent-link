@@ -314,11 +314,16 @@ set_tests_properties(sim_fun_replay_blocked PROPERTIES WORKING_DIRECTORY ${CMAKE
                      PASS_REGULAR_EXPRESSION "\"why\":\"gate\".*\"why\":\"gate\".*\"why\":\"still\"")
 sim_script_test(sim_labs_fun labs_fun.txt)
 # The Mote (issue 20261126-59e0), a firefly: it visits the working sessions in turn, a big green finish (the
-# day counted, a cheer), rest at 12, ember, a visit again (tired, night); gone on battery and at once for a
+# day counted; issue 20261126-2de2: it drifts to the finished arc, loops, flares and lingers), rest at 12, ember, a visit again (tired, night); gone on battery and at once for a
 # request.
 sim_script_test(sim_fun_mote fun_mote.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
-                PASS_REGULAR_EXPRESSION "\"mode\":\"visit\".*\"mote_day\",\"days\":1.*\"mode\":\"cheer\".*\"mode\":\"rest\".*\"mode\":\"ember\".*\"mode\":\"visit\".*\"mode\":\"gone\".*\"mode\":\"visit\",\"deg\":[0-9]+,\"lum\":28,\"halo\":[0-9]+,\"night\":1.*\"mode\":\"gone\"")
+                PASS_REGULAR_EXPRESSION "\"mode\":\"visit\".*\"mote_day\",\"days\":1.*\"mode\":\"cheer\",\"deg\":90.*\"mote_finish\",\"deg\":270,\"arc\":270.*\"mode\":\"visit\",\"deg\":270.*\"mode\":\"rest\".*\"mode\":\"ember\".*\"mode\":\"visit\".*\"mode\":\"gone\".*\"mode\":\"visit\",\"deg\":[0-9]+,\"lum\":28,\"halo\":[0-9]+,\"night\":1.*\"mode\":\"gone\"")
+# The Mote at pairing (issue 20261126-2de2): a still orb at 12 while the passkey shows, clear of the digits;
+# one flare on done (the screen goes after it), nothing on fail; reduced motion: no flare; off: no orb.
+sim_script_test(sim_mote_pair mote_pair.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|042917|551200"
+                PASS_REGULAR_EXPRESSION "\"act\":\"still\".*\"act\":\"flare\".*\"text\":\"Paired\".*\"shown\":false.*\"act\":\"still\".*\"shown\":false.*\"Pairing failed\".*\"act\":\"still\".*\"shown\":false.*\"text\":\"Paired\"")
 # A session in error lets the idle face come up, and the Mote hovers beside its capsule.
 sim_script_test(sim_fun_mote_error fun_mote_error.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"

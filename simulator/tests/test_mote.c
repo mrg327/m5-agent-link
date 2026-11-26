@@ -244,50 +244,121 @@ static void test_hover(void)
     EXPECT(t && sw && mv <= 2, "to the error the short way, calm");
 }
 
+/* A big finish (issue 20261126-2de2): to the finished arc (an ordinary trip, the short way), one
+ * loop round a 40 px circle inside the track, the flare, 8 s by the arc, then on to the working
+ * one. */
 static void test_cheer(void)
+{
+    mote_t m = {0};
+    mote_in_t in = calm();
+    const int two[] = {90, 200};
+    working(&in, 2, two);
+    run(&m, &in, 0, 3000, NULL);
+    EXPECT(mote_step(&m, &in, 3000).deg == 90, "by the nearest working session");
+    /* the session at 200 finishes; the other still works */
+    const int one[] = {90};
+    working(&in, 1, one);
+    in.cheers = 1;
+    in.fin_at = true;
+    in.fin_deg = 200;
+    mote_out_t o = mote_step(&m, &in, 3030);
+    EXPECT(o.mode == MOTE_CHEER && o.dx == 0 && o.dy == 0,
+           "a cheer: first it drifts, on the track");
+    int mv;
+    bool sw;
+    uint32_t t = until_at(&m, &in, 3060, 12000, 200, &mv, &sw);
+    EXPECT(t && sw && mv <= 3, "to the finished arc the short way, at the calm speed");
+    for (int i = 0; i < 10 && !m.fin_here; i++) mote_step(&m, &in, t += TICK);
+    EXPECT(m.fin_here, "there: the loop starts");
+    uint32_t t0 = m.fx_ms;
+    int far = 0, max_halo = 0, max_lum = 0, max_pct = 0;
+    bool inside = true, still_on = true;
+    for (t = t0; t < t0 + MOTE_FIN_LOOP_MS; t += TICK) {
+        o = mote_step(&m, &in, t);
+        EXPECT(o.mode == MOTE_CHEER && o.deg == 200, "the loop, from the finished arc");
+        int d = abs(o.dx) + abs(o.dy);
+        if (d > far) far = d;
+        /* inside the track at 200 degrees: towards the centre, which is up and a little right */
+        if (o.dy > 1) inside = false;
+    }
+    EXPECT(inside, "the loop is inside the track");
+    EXPECT(far >= 2 * MOTE_FIN_LOOP_R - 4, "a 40 px circle");
+    for (; t < t0 + MOTE_FIN_LOOP_MS + MOTE_FLARE_MS; t += TICK) {
+        o = mote_step(&m, &in, t);
+        if (o.mode != MOTE_CHEER || o.deg != 200 || o.dx || o.dy) still_on = false;
+        if (o.look.halo_r > max_halo) max_halo = o.look.halo_r;
+        if (o.look.lum > max_lum) max_lum = o.look.lum;
+        if (o.look.halo_pct > max_pct) max_pct = o.look.halo_pct;
+    }
+    EXPECT(still_on, "the flare, in place on the track");
+    EXPECT(max_halo >= (MOTE_HALO_R + MOTE_BREATH_PX) * MOTE_FLARE_PCT / 100 - 2 &&
+               max_lum >= MOTE_LUM_FLARE - 5 && max_pct >= 95,
+           "a bright flare, the halo 1.6 times as wide");
+    _Static_assert(MOTE_FIN_LOOP_MS + MOTE_FLARE_MS == 1200, "loop and flare in 1.2 s");
+    /* it lingers 8 s by the finished arc, breathing, then goes on to the working one */
+    o = run(&m, &in, t, t0 + MOTE_FIN_LOOP_MS + MOTE_FLARE_MS + MOTE_FIN_LINGER_MS - TICK, NULL);
+    EXPECT(o.mode == MOTE_VISIT && o.deg == 200, "lingers by the finished arc");
+    t = until_at(&m, &in, t0 + 9200 + TICK, t0 + 20000, 90, NULL, NULL);
+    EXPECT(t, "then on to the session still working");
+}
+
+/* A cheer with no arc, cut by an error, while gone, with reduced motion. */
+static void test_cheer_edges(void)
 {
     mote_t m = {0};
     mote_in_t in = calm();
     const int one[] = {90};
     working(&in, 1, one);
-    run(&m, &in, 0, 3000, NULL);
-    in.cheers = 1;
-    int crossings = 0, prev = -1, max_halo = 0, max_lum = 0;
+    uint32_t t = 5000;
+    run(&m, &in, 0, t, NULL);
     mote_out_t o;
-    uint32_t t;
-    for (t = 3030; t < 3030 + MOTE_CHEER_MS; t += TICK) {
-        o = mote_step(&m, &in, t);
-        EXPECT(o.mode == MOTE_CHEER, "cheer: a loop round the track");
-        if (prev > 180 && o.deg < 180) crossings++;
-        prev = o.deg;
-    }
-    EXPECT(crossings == 1, "once round (crossing 12 once)");
-    for (; t < 3030 + MOTE_CHEER_MS + MOTE_FLARE_MS; t += TICK) {
-        o = mote_step(&m, &in, t);
-        EXPECT(o.mode == MOTE_CHEER && o.deg == 90, "the flare, back where it was");
-        if (o.look.halo_r > max_halo) max_halo = o.look.halo_r;
-        if (o.look.lum > max_lum) max_lum = o.look.lum;
-    }
-    EXPECT(max_halo >= MOTE_HALO_R + MOTE_BREATH_PX + MOTE_FLARE_PX - 1 &&
-               max_lum >= MOTE_LUM_FLARE - 2,
-           "a bright, wide flare of the halo");
-    _Static_assert(MOTE_CHEER_MS + MOTE_FLARE_MS >= 1500 && MOTE_CHEER_MS + MOTE_FLARE_MS <= 2000,
-                   "the cheer lasts 1.5-2 s");
+
+    /* the arc unknown (inside a merged group): the loop and flare where it is */
+    in.cheers = 1;
+    in.fin_at = false;
     o = mote_step(&m, &in, t + TICK);
-    EXPECT(o.mode == MOTE_VISIT && o.deg == 90, "then on, by its session");
+    EXPECT(o.mode == MOTE_CHEER && m.fin_here && o.deg == 90, "unknown arc: at once, in place");
+
+    /* an error wins: the cheer ends and it goes to hover */
+    in.cheers = 2;
+    in.fin_at = true;
+    in.fin_deg = 300;
+    mote_step(&m, &in, t + 2 * TICK);
+    in.errors = 1;
+    in.error_deg = 10;
+    o = mote_step(&m, &in, t + 3 * TICK);
+    EXPECT(o.mode == MOTE_HOVER && m.fx != MOTE_CHEER, "an error ends the cheer");
+    in.errors = 0;
+    run(&m, &in, t + 4 * TICK, t + 20000, NULL);
+    t += 20000;
     /* a cheer while gone is not kept for later */
     in.face = false;
     mote_step(&m, &in, t + 4000);
-    in.cheers = 2;
+    in.cheers = 3;
     mote_step(&m, &in, t + 4030);
     in.face = true;
     o = mote_step(&m, &in, t + 4060);
     EXPECT(o.mode == MOTE_VISIT, "no cheer saved up");
     /* reduced motion: no cheer */
     in.reduced = true;
-    in.cheers = 3;
+    in.cheers = 4;
     o = mote_step(&m, &in, t + 4090);
     EXPECT(o.mode == MOTE_VISIT && o.deg == 90, "reduced: still, no cheer");
+}
+
+/* The flare on its own (the pairing screen uses it): up in 120 ms, back in 480 ms, the base after.
+ */
+static void test_flare(void)
+{
+    mote_look_t base = mote_look(100, 100, 0), o;
+    o = mote_flare(base, 100, 0);
+    EXPECT(o.halo_r == base.halo_r && o.lum == base.lum, "starts from the base");
+    o = mote_flare(base, 100, MOTE_FLARE_RISE_MS);
+    EXPECT(o.halo_r == base.halo_r * MOTE_FLARE_PCT / 100 && o.halo_pct == 100, "the peak");
+    mote_look_t mid = mote_flare(base, 100, MOTE_FLARE_RISE_MS + MOTE_FLARE_FALL_MS / 2);
+    EXPECT(mid.halo_r > base.halo_r && mid.halo_r < o.halo_r, "falling back");
+    o = mote_flare(base, 100, MOTE_FLARE_MS);
+    EXPECT(o.halo_r == base.halo_r && o.halo_pct == base.halo_pct, "the base once over");
 }
 
 static void test_reduced(void)
@@ -449,6 +520,8 @@ int main(void)
     test_rest_and_ember();
     test_hover();
     test_cheer();
+    test_cheer_edges();
+    test_flare();
     test_reduced();
     test_loop();
     test_night();

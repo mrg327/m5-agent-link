@@ -387,10 +387,14 @@ seconds hand at r 216 and settled at 6 o'clock.
   stays clear of the clock's digits (56 px at y 190: corners near r 131). The faint rim of the halo may lie
   over a gauge arc or a capsule; nothing it covers is lost.
 - **Modes**, highest first: gone (not allowed, or the idle face is not up with its clock); hover beside the
-  first error capsule (±3° at 1 Hz, two brightness levels at 600 ms, no breath); cheer on a big finish (not
+  first error capsule (±3° at 1 Hz, two brightness levels at 600 ms, no breath); **cheer** on a big finish (not
   an error, tests not failed, and 10 min or more, 5 files or more, or 200 lines or more: the medium and large
-  tiers of the celebrations brief): once round the track in 1.2 s, eased, then the halo flares to 90 % and
-  10 px wider and falls back over 0.4 s; **visit** while anything works: it goes to the centre of a working
+  tiers of the celebrations brief; issue 20261126-2de2): it drifts to the finished session's arc (an ordinary
+  trip, below), loops once round a 40 px circle tangent to its place, inside the track (600 ms, eased), flares
+  (the core to 100 %, the halo 1.6 times as wide and at full strength in 120 ms, back in 480 ms, easing out:
+  the profile's `[flare]`), lingers 8 s by the arc, breathing, then goes back to visiting. When the finished
+  session has no slot of its own (inside a merged Done group) it loops and flares where it is. It rides the
+  finish's own buzz and sound and adds none; on the lit deck the finish's picture stays the sigil's; **visit** while anything works: it goes to the centre of a working
   session's slot (`ring_slot_mid_deg`), lingers 8 s, then moves on to the next working one clockwise (ring
   order), so where it is tells you who is busy; with one working session it stays by that one; it starts by
   the nearest, and when the one it is by stops, or the ring re-lays, it goes to the nearest still working;
@@ -398,12 +402,12 @@ seconds hand at r 216 and settled at 6 o'clock.
   resting: 60 % of the size, 22 %, still.
 - **Travel.** Every trip is the short way, eased in and out (smoothstep), and takes 0.8 s plus 20 ms a degree
   (half the ring in 4.4 s, at most 62°/s), so nothing pops; a new target mid-trip starts a new trip from where
-  it is. Only the cheer and the centuries egg (§3.15) move faster.
+  it is. Only the loops (the big finish's and the centuries egg's, §3.15) move faster.
 - **Rules.** It exists only where the gate allows a loop (`persona_allow(PF_MOTE)` with `PA_LOOP`: the dock,
   the display lit, nothing waiting for you) and only on the idle face. It leaves the moment anything needs you,
   with no exit animation: the request is the picture. With reduced motion it is a still orb at its resting
   place (by the first working session, at 12 at rest, at the error), no breath, no travel, no cheer. A cheer
-  that happens while it is gone is not saved for later. The deck goes ambient with a session in error (only a
+  that happens while it is gone is not saved for later, and an error during one ends it (it goes to hover). The deck goes ambient with a session in error (only a
   waiting approval or question keeps it lit; owner's call, 2026-11-26), so the Mote hovers beside the red
   capsule (`fun_mote_error.txt`). Plan use at 80 % or more (5-hour window): a slower (6 s) and dimmer (70 %)
   breath.
@@ -420,7 +424,7 @@ seconds hand at r 216 and settled at 6 o'clock.
   `mote_look(scale_pct, lum, breath_pm)` (pure, `mote.h`) gives the core and halo at any size,
   brightness and breath; `mote_breath(t_ms, period_ms)` gives the breath; `ui_orb_draw(layer, x, y,
   &look, MOTE_RGB)` (`ui_orb.h`) paints it from any draw event, and `ui_orb_area(x, y, &look, &box)` is the
-  box to invalidate round its old and new places.
+  box to invalidate round its old and new places; `mote_flare(look, peak, t_ms)` gives the flare.
 - **Riding an arc** (`ui_mote_ride.c`, issue 20261126-9fe3). On another screen's arc the Mote is the profile's
   tucked size (core 6 px, halo 16 px across), lit, no breath, in its own object the size of the orb's box, so a
   move repaints that box, old and new, and nothing else. It sits on the arc's head and moves only when the arc
@@ -434,15 +438,30 @@ seconds hand at r 216 and settled at 6 o'clock.
   `_waiting`, `_flare`, `_restarting`; `"ev":"mote_ride"` at the flare). **Replay**: the hour hand's tip
   (§3.13). With the Mote off both screens are as before, frame for frame and redraw for redraw
   (`mote_ota_off.txt`, `mote_replay_off.txt`).
+- **At pairing** (`ui_mote_pair.c`, issue 20261126-2de2). With the Mote on, the passkey screen
+  (`ui_pair_show`) has the orb at 12 o'clock (y 58, where it rests on the idle face), at full brightness and
+  still: no breath, no drift, because the PC is waiting for you (pairing asks `persona_allow(PF_MOTE)` as
+  something that needs you, so only `PA_POSE` comes back). Its box (y 30–86, y 14–102 at the flare) keeps
+  clear of the Bluetooth glyph (from y 131) and the digits (y 243–282). `pair done`: one flare (600 ms, a
+  `PA_ONESHOT`), then the screen goes and the "paired" sign shows (`ui_pair_done`); with reduced motion, a
+  request waiting or the Mote off, the screen goes at once. `pair fail` or the 60 s guard: nothing. It adds
+  no buzz and no sound (the passkey's own tick is the screen's). `mote_pair.txt` (shots `mote_pair_wait`,
+  `_flare`, `_after`, `_off`) checks pixels: the orb is at 12, the space above the glyph and round the digits
+  stays black and the digits white; nothing repaints while the digits wait; the flare repaints only the
+  orb's box (about 0.3 M px over its 450 ms in the simulator's ticks).
 - **Cost** (simulator, `fun_mote.txt`). Each change repaints the orb's box, old and new (about 4–5 k px each,
   joined where they overlap); nothing else on the face is touched. Lingering, the breath repaints it a level at
   a time: about 53 k px a 3.6 s breath (about 15 k px a second, like a breathing sigil). A trip moves the box
   every tick: about 485 k px over the 4.4 s of half the ring in the simulator's 30 ms ticks (about two full
-  frames' worth, spread over the trip); on the watch the frame rate bounds it. The flare's box is about 7–10 k px
-  for its 0.4 s. On battery it is gone and the face repaints nothing.
-- **Sim.** `fun_mote.txt` (shots `fun_mote_visit_a`, `_travel`, `_visit_b`, `_cheer`, `_flare`, `_rest`,
-  `_ember`, `_tired`, `_night`) and `fun_mote_error.txt` (`fun_mote_hover`); the log has `"ev":"mote"` at each
-  mode (`visit`, `rest`, `ember`, `hover`, `cheer`, `loop`, `gone`) and `"ev":"mote_day"` when a day counts.
+  frames' worth, spread over the trip); on the watch the frame rate bounds it. A big finish is a trip (about
+  0.5 M px for half the ring), then the loop's box (about 4 k px) and the flare's (up to about 10 k px): about
+  0.4 M px over the loop, the flare and the linger's first 0.4 s. On battery it is gone and the face repaints
+  nothing.
+- **Sim.** `fun_mote.txt` (shots `fun_mote_visit_a`, `_travel`, `_visit_b`, `_cheer` (the drift), `_loop`,
+  `_flare`, `_linger`, `_rest`, `_ember`, `_tired`, `_night`) and `fun_mote_error.txt` (`fun_mote_hover`); the
+  log has `"ev":"mote"` at each mode (`visit`, `rest`, `ember`, `hover`, `cheer`, `loop`, `gone`),
+  `"ev":"mote_finish"` when a cheer reaches its arc, `"ev":"mote_pair"` on the pairing screen and
+  `"ev":"mote_day"` when a day counts.
   The simulator's RTC runs on the script's virtual clock, so the firefly moves in a headless run.
 - **Profile.** The look (colour, halo falloff, levels, breath, flare, sizes) has one source,
   `design/mote/mote.toml`; `design/mote/gen.py` writes the firmware header `mote_look.h`, the Atlas CSS and
