@@ -1,0 +1,21 @@
+# The Mote on the idle face (GLYPHS.md §3.14, BENCH.md §9): two agents at work, nobody touching the watch, on
+# the dock. On the watch the Mote must be on (LABS > Personality, the dot) and the run on USB (it loops only on
+# the dock); the simulator runs this with --pref fun=0x3db. The face goes ambient 30 s in; the firefly lingers
+# by the first working agent, breathing (mark 1 to 2), then crosses half the ring to the other (mark 2 to 3).
+# Read the frame ms p50 / p95 / max against the 33 ms period, and the trip's anim fps.
+connect
+rx a400020101020103a5008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e20746865207465737473
+bench start
+session 1 work ember feat/login Running the test suite
+session 2 work fjord main Fixing the flaky retry test
+wait 31500
+expect_screen ring
+bench mark 1
+wait 5500
+bench mark 2
+wait 5000
+bench mark 3
+expect_screen ring
+bench stop
+wait 1500
+bench save mote_visit.bin

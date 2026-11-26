@@ -228,6 +228,19 @@ foreach(t agent_back watch status labs busy arrival)
     set_tests_properties(sim_task_${t} PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
                          FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 endforeach()
+# The Mote's frame-cost tasks (BENCH.md §9): on the watch the Mote is switched on by hand; here the
+# switch is stored before boot, and the check is that the Mote showed in the mode the task measures.
+function(bench_mote_task name pass)
+    add_test(NAME sim_task_${name}
+             COMMAND agentlink_sim --headless --no-ws --pref fun=0x3db
+                     --script ${CMAKE_CURRENT_SOURCE_DIR}/../bench/tasks/${name}.txt)
+    set_tests_properties(sim_task_${name} PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                         FAIL_REGULAR_EXPRESSION "SCRIPT FAIL" PASS_REGULAR_EXPRESSION "${pass}")
+endfunction()
+bench_mote_task(mote_visit "\"mode\":\"visit\".*\"ev\":\"bench_dump\"")
+bench_mote_task(mote_hover "\"mode\":\"hover\".*\"ev\":\"bench_dump\"")
+bench_mote_task(mote_empty "\"mode\":\"rest\".*\"ev\":\"bench_dump\"")
+bench_mote_task(mote_alert "\"mode\":\"visit\".*\"mode\":\"gone\".*\"ev\":\"attention\",\"rid\":7")
 # Approval safety: the card shows the request; a short or low swipe never denies; a hold before
 # the card has been visible never approves.
 sim_script_test(sim_approve_card approve_card.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
