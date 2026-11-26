@@ -66,7 +66,8 @@ typedef struct {
     int16_t dx, dy; /* swipes: whole travel; G_DRAG: travel since the previous G_DRAG */
     /* G_DRAG_END: release velocity over GESTURE_FLICK_WINDOW_MS, px/s */
     int16_t vy;
-    bool flick; /* swipes: released at flick speed */
+    bool flick;    /* swipes: released at flick speed */
+    bool injected; /* from the debug channel (app_inject_gesture), not a contact or a press */
 } gesture_evt_t;
 
 typedef void (*gesture_cb_t)(const gesture_evt_t *evt, void *ctx);

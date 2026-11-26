@@ -1,0 +1,26 @@
+# Issue 20261126-86cd: a tap aimed at HOME does not land on the ASK that took over under it (the
+# UX research's homebusy repro). B moves the deck, a request takes over 150 ms later, and a tap
+# that starts 120 ms after the takeover, and a second one just past ASK's own 300 ms arming, are
+# dropped while ASK settles (TAKEOVER_SETTLE_MS). A deliberate tap after that acts at once.
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 2 work api main Working
+session 3 work cli main Working
+wait 300
+btn B
+wait 150
+session 3 input cli main
+attention 8 3 approval approve,deny,focus 0 Edit file|src/main.rs
+wait 120
+tap 233 282
+wait 90
+tap 233 282
+wait 300
+expect_screen ask
+expect_label Edit file
+expect_no_label Hold to approve
+# a deliberate tap, past the settle time, acts at once (on Approve: it only says to hold)
+tap 233 282
+wait 300
+expect_label Hold to approve
+quit

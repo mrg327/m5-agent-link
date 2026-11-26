@@ -381,6 +381,14 @@ sim_script_test(sim_queue_skip_back queue_skip_back.txt FAIL_REGULAR_EXPRESSION 
 sim_script_test(sim_queue_finger_down queue_finger_down.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3,\"sid\":3"
   PASS_REGULAR_EXPRESSION "\"op\":3,\"sid\":2,\"rid\":7.*\"queue_next\",\"rid\":8")
+# A takeover's screen settles (issue 20261126-86cd): a tap or button A begun before, or just after, a
+# request opens ASK does not act on it; a deliberate one after TAKEOVER_SETTLE_MS does at once.
+sim_script_test(sim_takeover_settle_tap takeover_settle_tap.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+  PASS_REGULAR_EXPRESSION "\"settling\",\"gesture\":\"tap\".*\"mode\":\"ask\",\"gesture\":\"tap\",\"action\":\"commit\"")
+sim_script_test(sim_takeover_settle_button takeover_settle_button.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0,.*\"op\":0,"
+  PASS_REGULAR_EXPRESSION "\"settling\",\"gesture\":\"btn_a\".*\"op\":0,\"sid\":3,\"rid\":8")
 add_test(NAME sim_takeover_glow_missed
          COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/takeover_glow_missed.txt)
 set_tests_properties(sim_takeover_glow_missed PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30

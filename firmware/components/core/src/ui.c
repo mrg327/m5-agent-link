@@ -432,6 +432,26 @@ static const attention_t *queue_next(void)
 static bool input_down(void)
 { return g_ui_actions->touching() || g_ui_actions->button_down(0) || g_ui_actions->button_down(1); }
 
+/* The screen a takeover opened settles before input acts on it (issue 20261126-86cd): a touch or a
+ * press that began before the takeover, or within TAKEOVER_SETTLE_MS after it, was aimed at the
+ * screen before. */
+static bool s_settle_on;
+static uint32_t s_settle_ms, s_settle_seq;
+
+bool ui_input_settling(uint32_t began_ms)
+{
+    if (!s_settle_on || s_mode_seq != s_settle_seq) { return false; }
+    return (int32_t)(began_ms - s_settle_ms) < TAKEOVER_SETTLE_MS;
+}
+
+/* Long settled (and clear of the clock's wrap), or the user has moved on. */
+static void settle_step(void)
+{
+    if (s_settle_on && (s_mode_seq != s_settle_seq || s_now_ms - s_settle_ms > 60000u)) {
+        s_settle_on = false;
+    }
+}
+
 static void take_over(uint32_t sid, bool error)
 {
     if (error) { s_wait_err = 0; }
@@ -441,6 +461,9 @@ static void take_over(uint32_t sid, bool error)
     } else {
         ui_show_attention(sid);
     }
+    s_settle_on = true;
+    s_settle_ms = lv_tick_get(); /* now: this runs while the link drains, before ui_tick */
+    s_settle_seq = s_mode_seq;
 }
 
 void ui_wait_attention(uint32_t sid, bool error, uint32_t rgb)
@@ -506,6 +529,7 @@ static void pip_show(bool on, uint32_t rgb)
  * show the dot elsewhere. */
 static void wait_step(void)
 {
+    settle_step();
     if (s_wait_err && (!model_find(s_wait_err) || ui_asking(s_wait_err))) { s_wait_err = 0; }
     const attention_t *next = s_wait_req ? queue_next() : NULL;
     if (!next) { s_wait_req = false; /* answered, gone, gone back from, or open in ASK */ }

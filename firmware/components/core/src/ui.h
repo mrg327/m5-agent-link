@@ -112,6 +112,12 @@ void ui_wait_attention(uint32_t sid, bool error, uint32_t rgb);
 void ui_resent_attention(uint32_t sid, uint32_t rid, uint32_t rgb);
 /* The display woke: what waits opens now, unless the open screen keeps it waiting. */
 void ui_reveal_attention(void);
+/* A takeover's screen settles this long: input that began before it, or within this after it, does
+ * not act on it (issue 20261126-86cd). A tap that starts later acts at once. */
+#define TAKEOVER_SETTLE_MS 400
+/* True when input that began at began_ms (app_now_ms clock) must not act: the screen in front was
+ * opened by a takeover (a request, the queue's next one, an error card) at or after that. */
+bool ui_input_settling(uint32_t began_ms);
 /* Counts mode changes: a change the user did not make swallows a finger already down. */
 uint32_t ui_mode_seq(void);
 /* ASK is open on session sid. */

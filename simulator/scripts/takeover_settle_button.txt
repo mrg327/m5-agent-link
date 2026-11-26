@@ -1,0 +1,21 @@
+# Issue 20261126-86cd: button A pressed on HOME just before a request takes over is not ASK's
+# button A. Its single press is emitted after the double-press window, inside ASK, where it is Open
+# on PC and would hand the request back; it began before the takeover, so it is dropped.
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 2 work api main Working
+session 3 work cli main Working
+wait 300
+btn A down
+wait 60
+session 3 input cli main
+attention 8 3 approval approve,deny,focus 0 Edit file|src/main.rs
+wait 40
+btn A up
+wait 800
+expect_screen ask
+expect_label Edit file
+# button A later is Open on PC again
+btn A
+wait 400
+quit

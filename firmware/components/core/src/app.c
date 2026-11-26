@@ -97,7 +97,12 @@ void app_clock_resync(void)
 
 static uint32_t tick_cb(void) { return app_now_ms(); }
 
-void app_inject_gesture(const gesture_evt_t *g) { ring_push(&s_gestures, g); }
+void app_inject_gesture(const gesture_evt_t *g)
+{
+    gesture_evt_t e = *g;
+    e.injected = true;
+    ring_push(&s_gestures, &e);
+}
 void app_set_sectors(int n) { gesture_set_sectors(&s_gesture, n); }
 
 /* ── HAL callbacks (any context) ── */
@@ -686,6 +691,21 @@ static void swallow_if_moved(uint32_t seq)
     if (ui_mode_seq() != seq && s_gesture.pressed) s_swallow_touch = true;
 }
 
+/* When the contact or the press behind gesture g began, on the app_now_ms clock. */
+static uint32_t gesture_began(const gesture_evt_t *g)
+{
+    const gesture_btn_t *a = &s_gesture.btn[0], *b = &s_gesture.btn[1];
+    switch (g->kind) {
+    case G_BTN_A:
+    case G_BTN_A_LONG:
+    case G_BTN_A_DOUBLE: return a->t_down;
+    case G_BTN_B:
+    case G_BTN_B_LONG: return b->t_down;
+    case G_CHORD: return (int32_t)(a->t_down - b->t_down) < 0 ? a->t_down : b->t_down;
+    default: return s_gesture.t_down;
+    }
+}
+
 static void dispatch(const gesture_evt_t *g)
 {
     log_gesture(g);
@@ -706,6 +726,14 @@ static void dispatch(const gesture_evt_t *g)
     }
     if (ota_active()) { /* the Updating overlay owns the screen: only B held does anything */
         if (g->kind == G_BTN_B_LONG) ota_cancel(app_now_ms());
+        return;
+    }
+    /* A request took over just now: what began before, or in the first moments after, was aimed
+     * at the screen it replaced (issue 20261126-86cd). */
+    if (!g->injected && g->kind != G_SHAKE && ui_input_settling(gesture_began(g))) {
+        if (g->kind != G_PRESS && g->kind != G_RELEASE && g->kind != G_MOVE) {
+            dbg_event("input", "settling", "\"gesture\":\"%s\"", gesture_name(g->kind));
+        }
         return;
     }
     ui_on_gesture(g);
