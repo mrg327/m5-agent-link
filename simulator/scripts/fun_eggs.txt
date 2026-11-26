@@ -17,6 +17,8 @@ wait 400
 shot fun_eggs_slip_after.png
 # the cost: the new minute, then the clock label's box (about 25 k px) for each of the slip's 3 frames
 expect_px_max 110000
+# per frame: the minute's new digits, then the label's box (about 20 k px)
+expect_frame_px_max 22000 1
 # once a minute: the rest of 13:37 holds still
 px_reset
 wait 5000

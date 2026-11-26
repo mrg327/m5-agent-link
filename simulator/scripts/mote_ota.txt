@@ -23,6 +23,8 @@ px_reset
 fw_send 4096 2048
 wait 300
 expect_px_max 4000
+# per frame: about 2.8 k px, one area
+expect_frame_px_max 3500 1
 fw_send 6144 2048 2
 wait 300
 # 51 %: the head past 6 o'clock

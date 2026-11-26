@@ -22,6 +22,9 @@ expect_px 233 17 ffffff
 px_reset
 wait 1100
 expect_px_max 160000
+# per frame: the orb's box and the arc's step, except the step where the capsule changes (about
+# 113 k px, 12 areas: the ring's own repaint, the same with the Mote off)
+expect_frame_px_max 120000 12
 shot mote_replay_b.png
 wait 1200
 # over: now, the arc and the orb gone

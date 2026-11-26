@@ -16,6 +16,8 @@ shot mote_empty_lit.png
 px_reset
 wait 4000
 expect_px_max 120000
+# per frame: the orb's box, about 4.3 k px
+expect_frame_px_max 5000 1
 # the deck dims after 30 s without input: the same Mote at the ambient level
 wait 26000
 shot mote_empty_ambient.png
@@ -26,6 +28,7 @@ shot mote_empty_wander.png
 px_reset
 wait 10000
 expect_px_max 220000
+expect_frame_px_max 5000 1
 # five minutes resting: an ember (r 2, 25 %, no halo), back at 12 and still
 skip 300000
 wait 1000

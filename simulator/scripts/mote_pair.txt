@@ -29,7 +29,11 @@ expect_px 233 120 000000
 expect_px 200 225 000000
 expect_px 266 225 000000
 expect_px 321 262 ffffff
-wait 450
+wait 300
+# per frame, while the digits are up: the orb's box at the flare and the "paired" sign the toast draws under
+# the screen (about 21 k px, 2 areas; BENCH.md §9)
+expect_frame_px_max 23000 2
+wait 150
 # the flare repaints the orb's box, old and new, each tick (up to about 2 x 8 k px; about 0.3 M px over the
 # 450 ms in the simulator's 30 ms ticks, the toast drawn under the screen included)
 expect_px_max 330000

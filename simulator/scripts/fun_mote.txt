@@ -19,6 +19,8 @@ pref fun 0x3da
 px_reset
 wait 3600
 expect_px_max 70000
+# one frame is the orb's box, old and new: about 4.2 k px, a breath level at a time
+expect_frame_px_max 5000 1
 # after 8 s it crosses to the second (9 o'clock), the short way, eased: a 4.4 s trip that moves the box each
 # tick, about 590 k px in all (under three full frames' worth, spread over the trip; the halo holds r 30, and it
 # moves a pixel at a time rather than a degree)
@@ -28,6 +30,8 @@ wait 2200
 shot fun_mote_travel.png
 wait 2300
 expect_px_max 700000
+# each frame of the trip: the box, old and new, joined (about 4.6-5 k px), one area
+expect_frame_px_max 5500 1
 pref fun 0x3db
 wait 1000
 shot fun_mote_visit_b.png
@@ -47,33 +51,58 @@ wait 2150
 # the drift: like any trip, the box moves every tick, a pixel at a time (about 0.6 M px, the finish's own
 # ring change included)
 expect_px_max 700000
+# the drift: the box (about 4.6 k px); the finish's own ring change makes the larger frames
+expect_frame_px_max 8500 2
+# (the ambient face's burn-in guard moves it 1 px at the minute, 58 ms in: one full frame, not the Mote's)
+wait 70
 px_reset
-wait 150
+wait 80
 shot fun_mote_loop.png
 wait 420
 shot fun_mote_flare.png
 wait 1030
-# the loop (boxes of about 4 k px) and the flare (up to about 10 k px): about 0.4 M px in 1.6 s
-expect_px_max 450000
+# the loop (boxes of about 4-5 k px) and the flare (up to about 10 k px): about 0.17 M px in 1.5 s
+expect_px_max 200000
+# a frame of the loop is the box, old and new (up to about 10 k px); of the flare, the wider halo
+expect_frame_px_max 11500 1
 wait 4000
 shot fun_mote_linger.png
-wait 9000
+px_reset
+wait 4000
+# lingering by the finished arc: the breath, a level at a time
+expect_frame_px_max 5000 1
+wait 5000
 # nothing runs: it drifts the short way to 12 o'clock, under the ring's gap, and breathes there
 session 2 idle api main
 wait 6000
 shot fun_mote_rest.png
+px_reset
+wait 4000
+# resting at 12: the breath
+expect_frame_px_max 5000 1
 skip 300000
 wait 600
 shot fun_mote_ember.png
+px_reset
+wait 3000
+expect_px_max 0
 # plan use over 80 %: tired, a slower, dimmer breath (a turn starts again: it visits)
 usage 85 3600 - 20 86400
 session 2 work api main Indexing the repository
 wait 6000
 shot fun_mote_tired.png
+px_reset
+wait 6000
+# tired: the same box, at a slower breath (about 3 frames a second)
+expect_frame_px_max 5000 1
 # 23:30: the same warm white, dimmer (no state colour)
 rtc 1794036600
 wait 1000
 shot fun_mote_night.png
+px_reset
+wait 4000
+# night: the same box
+expect_frame_px_max 5000 1
 # on battery: gone, and the face holds still (Living marks off: nothing else moves on it)
 pref fun 0x3da
 battery 60

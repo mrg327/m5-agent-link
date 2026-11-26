@@ -9,5 +9,8 @@ session 16 error webapp feat/login Build failed
 session 2 work api main Indexing the repository
 wait 31500
 shot fun_mote_hover.png
+px_reset
 wait 2000
+# hovering: the box, old and new, about 26 frames a second while it sways
+expect_frame_px_max 5000 1
 quit

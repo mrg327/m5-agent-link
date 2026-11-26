@@ -15,5 +15,7 @@ wait 300
 # done: at its place on the empty deck, at the lit level; no buzz or sound came of it
 shot mote_boot_end.png
 expect_px_max 520000
+# per frame: up to about 39 k px (size L at the flare, and the first steps of the rise)
+expect_frame_px_max 42000 1
 expect_screen ring
 quit
