@@ -67,7 +67,7 @@ add_executable(test_detail tests/test_detail.c ${FW}/core/src/detail.c ${FW}/cor
 target_include_directories(test_detail PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
 target_link_libraries(test_detail PRIVATE m)
 add_test(NAME detail_model COMMAND test_detail)
-# The request store: new or re-sent (issue 20261126-d95a).
+# The request store: new or re-sent (issue 20261126-d95a); the queue's order (issue 20261126-aa28).
 add_executable(test_model tests/test_model.c ${FW}/core/src/model.c ${FW}/core/src/steps.c)
 target_include_directories(test_model PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
 target_link_libraries(test_model PRIVATE m)
@@ -374,6 +374,13 @@ sim_script_test(sim_takeover_finger_carry takeover_finger_carry.txt FAIL_REGULAR
 sim_script_test(sim_seen_resend_silent seen_resend_silent.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\].*\"rid\":8,\"sid\":3"
   PASS_REGULAR_EXPRESSION "\"ev\":\"resent\".*\"ev\":\"ask_restored\".*\"rid\":8,\"sid\":3,\"kind\":0,\"new\":true.*pattern_ms\":\\[250,120,250\\]")
+# The request queue (issue 20261126-aa28): every pending request opens in turn, least time left first;
+# one the user went back from is skipped; none opens under a finger, and that finger approves nothing.
+sim_script_test(sim_queue_three queue_three.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_queue_skip_back queue_skip_back.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
+sim_script_test(sim_queue_finger_down queue_finger_down.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3,\"sid\":3"
+  PASS_REGULAR_EXPRESSION "\"op\":3,\"sid\":2,\"rid\":7.*\"queue_next\",\"rid\":8")
 add_test(NAME sim_takeover_glow_missed
          COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/takeover_glow_missed.txt)
 set_tests_properties(sim_takeover_glow_missed PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30

@@ -78,6 +78,7 @@ typedef struct {
     void (*reject)(void);         /* nothing to do: buzz */
     void (*sent)(void);           /* KEYS: the composed text went out: the approve pattern */
     bool (*button_down)(int btn); /* KEYS: is physical button 0 (A) / 1 (B) still held */
+    bool (*touching)(void);       /* a finger is on the glass (no card opens under it) */
     void (*nag)(void);            /* unanswered permission request: remind */
     void (*sectors)(int n);       /* the rim now has n selectable segments */
     /* TRACKPAD (proto 0.20, EXPERIMENTS.md): one cmd_op_pointer (btn -1 = no click); false when it

@@ -232,7 +232,13 @@ static void enter_mode(nav_mode_t m)
     if (s_mode == MODE_AGENT) ui_agent_close();
     if (s_mode == MODE_ASK) {
         uint32_t rid = ui_ask_rid();
-        s_ask_lost_rid = rid && !model_attention_find(rid) ? rid : 0;
+        const attention_t *a = rid ? model_attention_find(rid) : NULL;
+        /* back to the deck or WATCH without an answer: the queue passes over it (issue
+         * 20261126-aa28) */
+        if (a && !a->answer_sent && (m == MODE_HOME || m == MODE_WATCH)) {
+            model_attention_skip(rid);
+        }
+        s_ask_lost_rid = rid && !a ? rid : 0;
         s_ask_lost_seq = s_mode_seq + 1;
         ui_ask_close();
     }
@@ -365,6 +371,7 @@ void ui_show_attention(uint32_t sid)
     uint32_t resume = s_mode == MODE_WATCH                          ? ui_watch_sid()
                       : s_mode == MODE_ASK || s_mode == MODE_SCROLL ? s_resume_watch_sid
                                                                     : 0;
+    if (ui_asking(sid)) { return; /* ASK already shows its session's request */ }
     ui_show_session(sid);
     if (ui_home_sel_sid() == sid && ui_home_askable()) {
         enter_mode(MODE_ASK);
@@ -379,15 +386,19 @@ uint32_t ui_pending_attention_sid(void)
                                                                                         : 0;
 }
 
-/* ───────── a request that waits (issue 20261122-883f) ───────── */
+/* ───────── what waits: the queue (issues 20261122-883f, 20261126-aa28) ───────── */
 
-/* A request or an error that did not take over: the screen the user works in owns it, ASK shows
- * another request, or the display was dark. It is offered again when the user comes back to the
- * deck or WATCH, or wakes the display (ui_reveal_attention); meanwhile a dot of its colour waits on
- * the rim. */
-static uint32_t s_wait_sid;
-static bool s_wait_error;
-static uint32_t s_wait_seq; /* the mode it found: offered again once the mode has changed */
+/* Requests or an error that did not take over: the screen the user works in owns them, ASK shows
+ * another request, or the display was dark. The requests form a queue (model_attention_next: least
+ * time left first, passing over those the user went back from); its head opens when the user comes
+ * back to the deck or WATCH, after an answer closes ASK, or when the display wakes
+ * (ui_reveal_attention), never under a finger or a held button. Meanwhile a dot of its colour waits
+ * on the rim. */
+static bool s_wait_req;       /* requests wait in the queue */
+static uint32_t s_wait_err;   /* the session of an error card that waits, 0 = none */
+static uint32_t s_wait_seq;   /* the mode it found: offered again once the mode has changed */
+static uint32_t s_pip_rgb;    /* the dot's colour as drawn */
+static uint32_t s_report_sid; /* the session the dot stands for, in words for the report */
 
 uint32_t ui_mode_seq(void) { return s_mode_seq; }
 bool ui_asking(uint32_t sid) { return s_mode == MODE_ASK && ui_home_sel_sid() == sid; }
@@ -410,15 +421,21 @@ static const attention_t *askable_for(uint32_t sid)
 static bool takeover_blocked(uint32_t sid)
 { return mode_keeps_work(s_mode) || (s_mode == MODE_ASK && !ui_asking(sid)); }
 
-static void wait_clear(void)
+/* The queue's head, other than the request ASK shows. */
+static const attention_t *queue_next(void)
 {
-    s_wait_sid = 0;
-    lv_obj_add_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
+    const attention_t *shown = s_mode == MODE_ASK ? ui_ask_request() : NULL;
+    return model_attention_next(s_now_ms, shown ? shown->rid : 0);
 }
+
+/* A finger on the glass or a button held: no card opens under it (issue 20261126-aa28). */
+static bool input_down(void)
+{ return g_ui_actions->touching() || g_ui_actions->button_down(0) || g_ui_actions->button_down(1); }
 
 static void take_over(uint32_t sid, bool error)
 {
-    wait_clear();
+    if (error) { s_wait_err = 0; }
+    lv_obj_add_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
     if (error && !askable_for(sid)) {
         ui_show_session(sid);
     } else {
@@ -428,10 +445,13 @@ static void take_over(uint32_t sid, bool error)
 
 void ui_wait_attention(uint32_t sid, bool error, uint32_t rgb)
 {
-    s_wait_sid = sid;
-    s_wait_error = error;
+    (void)rgb; /* the dot takes the colour of what the queue opens next */
+    if (error) {
+        s_wait_err = sid;
+    } else {
+        s_wait_req = true;
+    }
     s_wait_seq = s_mode_seq;
-    lv_obj_set_style_bg_color(s_wait_pip, lv_color_hex(rgb), 0);
     dbg_event("ui", "wait", "\"sid\":%u,\"mode\":\"%s\"", (unsigned)sid, nav_mode_name(s_mode));
 }
 
@@ -458,33 +478,52 @@ void ui_resent_attention(uint32_t sid, uint32_t rid, uint32_t rgb)
 
 void ui_reveal_attention(void)
 {
-    if (s_wait_sid && !takeover_blocked(s_wait_sid)) { take_over(s_wait_sid, s_wait_error); }
+    const attention_t *next = s_wait_req ? queue_next() : NULL;
+    if (next && !takeover_blocked(next->sid)) {
+        take_over(next->sid, false);
+    } else if (!next && s_wait_err && !takeover_blocked(s_wait_err)) {
+        take_over(s_wait_err, true);
+    }
 }
 
-/* Per step: drop what no longer waits, offer it on the way back to the deck or WATCH, show the
- * dot elsewhere. */
-static void wait_step(void)
+static void pip_show(bool on, uint32_t rgb)
 {
-    if (!s_wait_sid) { return; }
-    bool still = s_wait_error ? model_find(s_wait_sid) != NULL : askable_for(s_wait_sid) != NULL;
-    /* gone, answered on the PC, or the user opened it */
-    if (!still || ui_asking(s_wait_sid)) {
-        wait_clear();
-        return;
+    if (on && rgb != s_pip_rgb) {
+        s_pip_rgb = rgb;
+        lv_obj_set_style_bg_color(s_wait_pip, lv_color_hex(rgb), 0);
     }
-    if (s_mode_seq != s_wait_seq && (s_mode == MODE_HOME || s_mode == MODE_WATCH)) {
-        take_over(s_wait_sid, s_wait_error);
-        return;
-    }
-    bool pip = s_mode != MODE_HOME;
-    if (pip != lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN)) {
+    if (on == !lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN)) {
         return; /* already so: no redraw */
     }
-    if (pip) {
+    if (on) {
         lv_obj_remove_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
     }
+}
+
+/* Per step: drop what no longer waits, open the queue's head on the way back to the deck or WATCH,
+ * show the dot elsewhere. */
+static void wait_step(void)
+{
+    if (s_wait_err && (!model_find(s_wait_err) || ui_asking(s_wait_err))) { s_wait_err = 0; }
+    const attention_t *next = s_wait_req ? queue_next() : NULL;
+    if (!next) { s_wait_req = false; /* answered, gone, gone back from, or open in ASK */ }
+    if (!next && !s_wait_err) {
+        pip_show(false, 0);
+        return;
+    }
+    uint32_t sid = next ? next->sid : s_wait_err;
+    if (s_mode_seq != s_wait_seq && (s_mode == MODE_HOME || s_mode == MODE_WATCH) &&
+        !input_down()) {
+        if (next) { dbg_event("ui", "queue_next", "\"rid\":%u", (unsigned)next->rid); }
+        take_over(sid, !next);
+        return;
+    }
+    s_report_sid = sid;
+    pip_show(s_mode != MODE_HOME, !next                        ? RGB_ERROR
+                                  : next->kind == ATT_QUESTION ? RGB_ASK
+                                                               : RGB_PERMISSION);
 }
 
 void ui_report_add(ui_report_t *r, const char *fmt, ...)
@@ -508,7 +547,7 @@ void ui_report(ui_report_t *r)
     ui_burst_report(r);
     if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_toast_txt);
     if (!lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN)) {
-        ui_report_add(r, "waiting %u", (unsigned)s_wait_sid);
+        ui_report_add(r, "waiting %u", (unsigned)s_report_sid);
     }
     if (s_mode == MODE_AGENT) ui_agent_report(r);
     else if (s_mode == MODE_ASK) ui_ask_report(r);

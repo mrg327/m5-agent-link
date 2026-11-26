@@ -409,6 +409,7 @@ static void act_dictate(uint32_t sid, uint32_t rid, uint32_t aid, uint32_t hold_
 }
 
 static bool act_button_down(int btn) { return btn >= 0 && btn < 2 && s_gesture.btn[btn].down; }
+static bool act_touching(void) { return s_gesture.pressed; }
 
 static bool sid_snoozed(uint32_t sid)
 { return model_session_snoozed(model_find(sid), app_now_unix()); }
@@ -477,6 +478,7 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .nag = act_nag,
                                        .sent = feedback_approved,
                                        .button_down = act_button_down,
+                                       .touching = act_touching,
                                        .sectors = app_set_sectors,
                                        .pointer = act_pointer,
                                        .moves = act_moves};

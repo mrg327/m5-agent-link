@@ -16,7 +16,7 @@ static bool s_att_used[MODEL_MAX_ATTENTION];
 /* What model_attention_clear_all() dropped, so the daemon's re-sends after a welcome are known. */
 typedef struct {
     uint32_t rid, sid, hash;
-    bool sent;
+    bool sent, skipped;
     uint8_t answer, answer_opt;
 } att_known_t;
 static att_known_t s_known[MODEL_MAX_ATTENTION];
@@ -465,13 +465,14 @@ bool model_attention_add(const attention_t *a)
     if (slot < 0) slot = 0; /* queue full: oldest is least likely to still be live */
     bool had = s_att_used[slot] && s_att[slot].rid == a->rid;
     /* only these, not a copy: attention_t is ~0.5 KB of stack */
-    bool sent = s_att[slot].answer_sent;
+    bool sent = s_att[slot].answer_sent, skipped = s_att[slot].skipped;
     uint8_t answer = s_att[slot].answer, answer_opt = s_att[slot].answer_opt;
     const att_known_t *k = had ? NULL : known_take(a);
     if (k) { /* re-sent after a welcome */
         sent = k->sent;
         answer = k->answer;
         answer_opt = k->answer_opt;
+        skipped = k->skipped;
     }
     s_att[slot] = *a;
     s_att[slot].n_qs = 0; /* the questions follow with model_attention_set_questions() */
@@ -479,6 +480,7 @@ bool model_attention_add(const attention_t *a)
         s_att[slot].answer_sent = sent;
         s_att[slot].answer = answer;
         s_att[slot].answer_opt = answer_opt;
+        s_att[slot].skipped = skipped;
     }
     s_att_used[slot] = true;
     int ss = find_slot(a->sid);
@@ -532,8 +534,13 @@ void model_attention_clear_all(void)
     for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
         if (s_att_used[i]) {
             const attention_t *a = &s_att[i];
-            s_known[s_n_known++] = (att_known_t){a->rid,         a->sid,    att_hash(a),
-                                                 a->answer_sent, a->answer, a->answer_opt};
+            s_known[s_n_known++] = (att_known_t){.rid = a->rid,
+                                                 .sid = a->sid,
+                                                 .hash = att_hash(a),
+                                                 .sent = a->answer_sent,
+                                                 .skipped = a->skipped,
+                                                 .answer = a->answer,
+                                                 .answer_opt = a->answer_opt};
         }
         n += s_att_used[i];
         s_att_used[i] = false;
@@ -562,6 +569,34 @@ const attention_t *model_attention_first(void)
     for (int i = 0; i < MODEL_MAX_ATTENTION; i++)
         if (s_att_used[i]) return &s_att[i];
     return NULL;
+}
+
+void model_attention_skip(uint32_t rid)
+{
+    for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
+        if (s_att_used[i] && s_att[i].rid == rid && !s_att[i].skipped) {
+            s_att[i].skipped = true;
+            dbg_event("model", "attention_skip", "\"rid\":%u", (unsigned)rid);
+        }
+    }
+}
+
+const attention_t *model_attention_next(uint32_t now_ms, uint32_t except_rid)
+{
+    const attention_t *best = NULL;
+    uint32_t best_left = 0;
+    for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
+        const attention_t *a = &s_att[i];
+        if (!s_att_used[i] || a->rid == except_rid || a->answer_sent || a->skipped) continue;
+        if (a->kind != ATT_APPROVAL && a->kind != ATT_QUESTION) continue;
+        uint32_t left = model_attention_left_ms(a, now_ms);
+        if (left == 0) continue; /* its window is over: it goes back to the computer */
+        if (!best || left < best_left || (left == best_left && a->rid < best->rid)) {
+            best = a;
+            best_left = left;
+        }
+    }
+    return best;
 }
 
 void model_attention_set_answer(uint32_t rid, uint8_t answer, uint8_t opt)

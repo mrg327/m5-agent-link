@@ -235,6 +235,9 @@ typedef struct {
     bool answer_sent;   /* an answer (approve/deny/reply/dictate) is out; waiting for clear */
     uint8_t answer;     /* what was sent: ATT_ANSWER_* */
     uint8_t answer_opt; /* option index for ATT_ANSWER_REPLY */
+    /* not on the wire: the user went back from it in ASK, so the queue passes over it (it stays on
+     * the ring and opens from its card; issue 20261126-aa28) */
+    bool skipped;
 } attention_t;
 enum {
     ATT_ANSWER_NONE = 0,
@@ -306,6 +309,13 @@ void model_attention_clear_all(void);
 const attention_t *model_attention_for_sid(uint32_t sid);
 const attention_t *model_attention_find(uint32_t rid);
 const attention_t *model_attention_first(void);
+/* The user went back from request rid without answering it (model_attention_next passes over it).
+ */
+void model_attention_skip(uint32_t rid);
+/* The request the queue opens next (issue 20261126-aa28): an unanswered approval or question the
+ * user has not gone back from, other than except_rid; least time left first, then the requests
+ * without a window, oldest rid first. NULL when none. */
+const attention_t *model_attention_next(uint32_t now_ms, uint32_t except_rid);
 /* Records the answer that went out (ATT_ANSWER_*); ATT_ANSWER_NONE restores the unanswered state
  * (the daemon rejected the command). */
 void model_attention_set_answer(uint32_t rid, uint8_t answer, uint8_t opt);
