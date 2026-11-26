@@ -37,7 +37,7 @@ scripts/atlas --open        # serves index.html at http://localhost:8700/
 | `issues/` | The shared work log: one Markdown file per issue (`scripts/issue`, `issues/README.md`) |
 | `scripts/` | `check` (every check, `docs/conventions/`), `issue`, `atlas`, `fetch_docs.py` |
 | `tools/` | Host helpers: `board/` (the design board), `linux/` (a Bluetooth driver fix for one Linux laptop chipset) |
-| `design/` | Design board sources (`design/board/`) |
+| `design/` | Design board sources (`design/board/`); the Mote's look profile and generator (`design/mote/`) |
 
 ## Principles
 

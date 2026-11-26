@@ -186,7 +186,7 @@ TIERS = {
         "mote",
         "eggs",
     },
-    "leaf": {"debug.h", "ui_icons"},
+    "leaf": {"debug.h", "ui_icons", "mote_look"},
 }
 # What each tier may include inside core/src and outside it; rule ID for a breach.
 TIER_ALLOW = {
@@ -218,6 +218,11 @@ GENERATED = [
     "protocol/fixtures/ota/*.patch",
     "atlas/data/facts.json",
     "atlas/css/tokens.generated.css",
+    "atlas/css/mote.generated.css",
+    "atlas/img/mote.svg",
+    "atlas/img/favicon-*.svg",
+    f"{CORE}/src/mote_look.h",
+    "daemon/crates/agentlink/src/mote.rs",
     "atlas/vendor/watch.*",
     f"{CORE}/src/fonts/font_*.c",
     "daemon/crates/agentlink-keys/data/english.txt",

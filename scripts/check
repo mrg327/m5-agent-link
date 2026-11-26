@@ -76,6 +76,8 @@ area_steps() {
         ;;
     structure)
         echo "step|.|python3|python3 scripts/check.d/structure.py"
+        # Generated files whose source is not one area's: the Mote look (design/mote/README.md)
+        echo "step|.|python3|python3 design/mote/gen.py --check"
         ;;
     commits)
         echo "step|.|python3 git|python3 scripts/check.d/commit_msg.py"

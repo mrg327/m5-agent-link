@@ -31,7 +31,7 @@ The tree is split by component, not by language.
 | `protocol/` | `agentlink.cddl` (normative), `vectors/`, `fixtures/`, `tools/` | CDDL, Python |
 | `index.html`, `atlas/` | The Atlas: page, JS, extracted facts, `wasm/` (core built for the browser) | JS, Python, C |
 | `bench/` | Task scripts the bench plays on the real watch | text |
-| `design/` | Design-board state (`board/*.json`), written by `tools/board` and sessions | JSON |
+| `design/` | Design-board state (`board/*.json`), written by `tools/board` and sessions; the Mote's look profile and its generator (`mote/`) | JSON, TOML, Python |
 | `docs/` | `design/` (ours), `research/` (ours), `conventions/` (this), the rest vendor docs | Markdown |
 | `issues/` | The shared work log, driven by `scripts/issue` | Markdown |
 | `scripts/` | Repo-wide entry points run from the root: `issue`, `atlas`, `check`, `fetch_docs.py` | sh, Python |
@@ -120,7 +120,7 @@ code follows today; the include script makes them visible.
    pure    model nav gesture steps graph ring gauges detail done motion sha256 sound_bank
            persona temper toy_gate toy_rand toy_motion decide nag replay mote eggs
                                                   (C library and leaves only; unit-tested on the host)
-   leaves  debug.h  ui_icons.h                    (no includes beyond the C library)
+   leaves  debug.h  ui_icons.h  mote_look.h       (no includes beyond the C library)
 ```
 
 - **S-CORE-01** Pure modules include no `hal.h`, no `lvgl.h` and no `ui*.h` other than the leaf
@@ -222,6 +222,7 @@ code follows today; the include script makes them visible.
 | `protocol/fixtures/ota/{base,new}.bin`, `python.patch` | `uv run protocol/fixtures/ota/gen.py` | none |
 | `protocol/fixtures/ota/rust.patch` | the `agentlink-delta` test | `checked: cargo test` (compares) |
 | `atlas/data/facts.json`, `atlas/css/tokens.generated.css` | `python3 atlas/tools/extract.py` (firmware, protocol, daemon sources) | `checked: atlas.yml` (`--check`) |
+| `firmware/components/core/src/mote_look.h`, `atlas/css/mote.generated.css`, `atlas/img/{mote,favicon-*}.svg`, `daemon/crates/agentlink/src/mote.rs` | `python3 design/mote/gen.py` (`design/mote/mote.toml`) | `checked: scripts/check structure` (`--check`) |
 | `atlas/vendor/watch.{js,wasm}` | `atlas/wasm/build.sh` (core + LVGL, Emscripten) | none (needs Emscripten) |
 | `firmware/components/core/src/fonts/font_*.c` | `firmware/tools/fonts/gen.mjs` (lv_font_conv, `tabular.py`) | partial: `test_fonts` (equal-width digits) |
 | `daemon/crates/agentlink-keys/data/english.txt` | `data/build_lexicon.py` (a SCOWL checkout) | none (input not in the repo) |
@@ -301,3 +302,6 @@ an entry that no longer occurs fails as stale, and `--update-baseline` rewrites 
    parent row. Not yet: every path named in a README exists (S-DOC-03).
 6. **Source lists** (S-NEW-01): every `core/src/*.c` appears in `CORE_SRCS`, so a new file is not silently left
    out of one of the three builds (none missing today).
+
+The area also runs `python3 design/mote/gen.py --check`: the Mote's look feeds the firmware, the
+Atlas and the CLI, so its staleness check runs on every change rather than in one of their areas.

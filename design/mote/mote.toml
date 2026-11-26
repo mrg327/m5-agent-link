@@ -1,0 +1,65 @@
+# The Mote's look: the one source of truth for the watch, the Atlas, the favicon and the CLI.
+# Edit this file, then run `python3 design/mote/gen.py` and commit the outputs with it
+# (design/mote/README.md). `scripts/check structure` fails while an output is stale.
+
+[look]
+colour = "#FFE2B8" # warm white at every hour; never a state colour
+halo_ratio = [30, 7] # halo radius = core radius x 30 / 7
+halo_peak = 0.40 # halo alpha at the core's edge
+halo_exponent = 2 # alpha = peak x (1 - t)^exponent; t is 0 at the core's edge, 1 at the halo's
+falloff_steps = 64 # entries - 1 in the firmware's falloff table
+css_stops = 6 # gradient stops across the halo in the CSS and SVG
+
+# Brightness of the whole orb, by where it is shown.
+[levels]
+lit = 1.00 # the lit deck
+idle = 0.45 # the idle (ambient) face
+night = 0.30 # 23:00 to 06:00: dimmer, the same warm white
+ember = 0.25
+
+# The breath changes the halo's alpha only, never its radius, so one sprite serves every frame.
+[breath]
+period_ms = 4000
+halo_min = 0.60
+halo_max = 1.00
+
+# A big finish: the halo grows, then settles.
+[flare]
+halo_scale = 1.6
+rise_ms = 120
+fall_ms = 480
+
+# Core radius in px; the halo radius is core_r x halo_ratio unless halo_r is given (0: no halo).
+# sprite = true puts a pre-rendered A8 halo sprite in the firmware header.
+[sizes.s] # small marks: the Atlas brand mark
+core_r = 3.5
+sprite = true
+
+[sizes.tucked] # beside a thin arc (the update arc, the replay hand), so the halo never tints a capsule
+core_r = 3
+halo_r = 8
+sprite = true
+
+[sizes.m] # the watch: the idle-face Firefly (r 175 track), toys, About, the Atlas
+core_r = 7
+
+[sizes.l] # boot, the Atlas hero
+core_r = 14
+
+[sizes.ember] # small, dim and still
+core_r = 2
+halo_r = 0
+
+[brand]
+size = "s" # the Atlas top-bar mark
+svg_size = "m" # atlas/img/mote.svg
+
+# A black disc with a thin grey rim and the orb off-centre at about 1:30.
+[favicon]
+sizes = [16, 32, 96]
+disc = "#000000"
+rim = "#3A3A3C"
+rim_ratio = 0.03125 # rim width / icon size, at least 1 px
+orb_clock = 1.5 # the orb's position, in clock hours
+orb_offset = 0.45 # distance from the centre / disc radius
+core_ratio = 0.09 # core radius / icon size, at least 1.5 px

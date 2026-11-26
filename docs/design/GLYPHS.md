@@ -425,6 +425,10 @@ seconds hand at r 216 and settled at 6 o'clock.
   `_ember`, `_tired`, `_night`) and `fun_mote_error.txt` (`fun_mote_hover`); the log has `"ev":"mote"` at each
   mode (`visit`, `rest`, `ember`, `hover`, `cheer`, `loop`, `gone`) and `"ev":"mote_day"` when a day counts.
   The simulator's RTC runs on the script's virtual clock, so the firefly moves in a headless run.
+- **Profile.** The look (colour, halo falloff, levels, breath, flare, sizes) has one source,
+  `design/mote/mote.toml`; `design/mote/gen.py` writes the firmware header `mote_look.h`, the Atlas CSS and
+  SVGs, the favicon and the CLI colour from it (`design/mote/README.md`, issue 20261126-0163). The idle-face Firefly is size M (core 7 px, halo to 30 px);
+  nothing reads the outputs yet.
 
 ### 3.15 Easter eggs: `eggs.c`, `ui_eggs.c` (issue 20261126-7770)
 
