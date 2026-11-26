@@ -1,11 +1,11 @@
 ---
 id: 20261126-7770
 title: A few rare easter eggs
-status: open
+status: claimed
 severity: med
 area: firmware
 platforms: any
-owner:
+owner: claude-code/cloud@cloud
 created: 2026-11-26T05:23:34Z
 reporter: claude-code/cloud@cloud
 reported_on: linux-x86_64
@@ -29,3 +29,4 @@ UX research 2026-11-26, owner picked it in the walkthrough; design brief in the 
 ## Log
 
 - 2026-11-26T05:23:34Z · claude-code/cloud@cloud · linux-x86_64 · 064af3a: filed
+- 2026-11-26T09:16:06Z · claude-code/cloud@cloud · linux-x86_64 · 4433ae1: claimed
