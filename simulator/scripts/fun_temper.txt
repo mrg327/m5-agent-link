@@ -23,6 +23,8 @@ lift
 px_reset
 wait 6500
 expect_px_max 610000
+# per frame: the comet's and the sigil's boxes (up to about 9 k px, up to 5 areas)
+expect_frame_px_max 10000 5
 # the same window with Living marks off: the comet alone
 pref fun 0
 lift
@@ -68,10 +70,16 @@ btn B long
 wait 400
 expect_screen attention
 shot fun_temper_lean.png
+# The window is the request's own alert: the pulsing ring repaints about 56 k px a level, about 10 levels a
+# second (about 4.04 M px in 6.5 s with Living marks off), and the still mark adds nothing past its lean. The
+# sum depends on where the pulse's phase falls in the window: 3.76-4.15 M px over clock origins before the
+# simulator's clock was made the same in every run (BENCH.md §9); the budget holds the worst of them.
 lift
 px_reset
 wait 6500
-expect_px_max 4000000
+expect_px_max 4300000
+# per frame: a pulse level repaints the ring (up to about 58 k px, 8 areas)
+expect_frame_px_max 62000 8
 clear 7
 wait 300
 quit

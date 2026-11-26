@@ -41,11 +41,21 @@ static uint64_t s_skip_us; /* `skip`: the clock jumps, to test long timeouts */
 static bool s_virtual;
 static uint64_t s_virtual_us;
 
+/* The clock reads as if the process started an hour after boot, so its phase does not depend on
+ * how long the host has been up. A periodic animation keyed to the clock (a breath, a pulse) then
+ * starts at the same phase in every run, and so do the frames a script's redraw budget counts:
+ * with the host's uptime as the origin, sim_fun_temper's 6.5 s window on the pulsing ring varied
+ * from 3.76 to 4.15 M px between runs (BENCH.md §9). */
+#define SIM_CLOCK_BASE_US 3600000000ull
+
 static uint64_t real_us(void)
 {
+    static uint64_t s_start;
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000u + (uint64_t)ts.tv_nsec / 1000u;
+    uint64_t now = (uint64_t)ts.tv_sec * 1000000u + (uint64_t)ts.tv_nsec / 1000u;
+    if (!s_start) s_start = now;
+    return SIM_CLOCK_BASE_US + (now - s_start);
 }
 
 uint64_t hal_time_us(void) { return (s_virtual ? s_virtual_us : real_us()) + s_skip_us; }

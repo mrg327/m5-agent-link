@@ -90,14 +90,16 @@ int main(int argc, char **argv)
     sim_set_battery(battery);
     sim_set_wake(wake, tries);
     sim_set_deep_slept_ms(slept_s * 1000u);
+    /* Nobody watches a headless scripted run and nothing outside it keeps time, so its clock is
+     * virtual: the script's timeline holds however slow the machine is (issue 6eb4). It is virtual
+     * from before the core starts, so start-up takes no time on it and every run of a script sees
+     * the same clock, frame for frame (BENCH.md §9). */
+    if (script && headless && no_ws && !getenv("AGENTLINK_SIM_REAL_CLOCK")) sim_clock_virtual();
     hal_board_init();
     core_init();
     core_set_idle_timeout_ms(idle_s * 1000);
     if (deep_s) core_set_deep_after_ms(deep_s * 1000);
     if (script && !sim_script_load(script)) return 2;
-    /* Nobody watches a headless scripted run and nothing outside it keeps time, so its clock is
-     * virtual: the script's timeline holds however slow the machine is (issue 6eb4). */
-    if (script && headless && no_ws && !getenv("AGENTLINK_SIM_REAL_CLOCK")) sim_clock_virtual();
 
     bool script_running = script != NULL;
     while (!sim_display_quit_requested()) {
