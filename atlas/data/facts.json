@@ -1520,7 +1520,7 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:193"
+      "source": "firmware/components/core/src/ui.c:203"
     },
     {
       "id": "attention",
@@ -6096,13 +6096,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:1510",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:1442",
-    "gesture_map.chord": "firmware/components/core/src/app.c:727",
+    "gesture_map.chord": "firmware/components/core/src/app.c:754",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:199",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:234",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:525",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:552",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:20",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:11",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:780",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:807",
     "glyphs.agents": "firmware/components/core/src/ui_theme.c:70",
     "glyphs.agents.name": "firmware/components/core/src/ui_theme.c:202",
     "glyphs.font": "firmware/components/core/src/fonts/font_phosphor_44.c:3",

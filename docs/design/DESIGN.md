@@ -185,7 +185,7 @@ Priority for sorting: `needs_input > error > done(unseen) > working > idle > don
 | A+B chord | Reserved (logged, no action) |
 | (Push-to-talk, badge mode) | Not in the Ring UI; deferred |
 
-**Alerting while at rest [D]:** The screen faces outward on the lanyard, so text is never lit at rest. For `needs_input` and `error`, the device vibrates and shows a **brief dim colored ring glow** (about 2 s, no text, then off). Lifting it shows the attention card.
+**Alerting while at rest [D]:** The screen faces outward on the lanyard, so text is never lit at rest. For `needs_input` and `error`, the device vibrates and shows a **brief dim colored ring glow** (3 s, no text, then off) with the session's sigil and the kind's glyph inside it, so a glance says who and what (issue 20261126-0ca0); a reminder lights it again. Lifting it shows the attention card.
 
 **Haptics + sound [D]:** both are on by default, with a **quiet mode** (haptics only) and **silent mode** (glow only). The mode is toggled from a quick-settings swipe-down on Glance and can also be scheduled from the daemon (e.g. during meetings, synced later from calendar/OS focus mode **[P]**).
 

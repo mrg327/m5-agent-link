@@ -149,8 +149,10 @@ void ui_scroll_failed(void);
 void ui_pointer_failed(int err, const char *msg);
 void ui_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total,
                    uint32_t total, const char *preview);
-/* Brief dim ring for alerts while the display is otherwise idle; text-free by design. */
-void ui_glow(uint32_t rgb);
+/* The alert glow on a display that was dark (issue 20261126-0ca0): a dim ring in the kind's colour
+ * (rgb), the sigil of session sid (grey) and the kind's hero glyph (icon, an ICON_* literal), no
+ * text. Called again while it shows, it takes the new content. */
+void ui_glow(uint32_t rgb, uint32_t sid, const char *icon);
 /* BLE pairing (PROTOCOL.md §8): the passkey the PC asks for, as the Bluetooth glyph over six
  * digits, above everything until ui_pair_hide() (or 60 s). */
 void ui_pair_show(uint32_t passkey);

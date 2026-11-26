@@ -442,6 +442,33 @@ static bool act_pointer(int dx, int dy, int btn, int n, int wheel)
 static void act_moves(bool on) { gesture_set_moves(&s_gesture, on); }
 static void act_raw_keys(bool on) { gesture_set_raw_keys(&s_gesture, on); }
 
+/* What an alert of this kind looks like: its colour, and its hero glyph on the glow. */
+static uint32_t att_rgb(att_kind_t kind)
+{
+    return kind == ATT_ERROR      ? RGB_ERROR
+           : kind == ATT_DONE     ? RGB_DONE
+           : kind == ATT_QUESTION ? RGB_ASK
+                                  : RGB_PERMISSION;
+}
+
+static const char *att_icon(att_kind_t kind)
+{
+    return kind == ATT_ERROR      ? ICON_ERROR
+           : kind == ATT_DONE     ? ICON_DONE
+           : kind == ATT_QUESTION ? ICON_QUESTION
+                                  : ICON_PERMISSION;
+}
+
+/* The glow (who and what) on a dark display, or the glow that shows taken over; face down nobody
+ * sees it. */
+static void glow_for(const attention_t *a)
+{
+    if (motion_face_down()) return;
+    if (!power_display_on() || power_glowing()) {
+        power_attention(att_rgb(a->kind), a->sid, att_icon(a->kind), app_now_ms());
+    }
+}
+
 /* The nag is an alert too: quiet mode holds it as it holds the arrival buzz. */
 static uint32_t s_muted_rid, s_muted_sid; /* the request a palm cover silenced (0 = none) */
 
@@ -452,7 +479,10 @@ static void act_nag(void)
     /* covered: no reminders */
     if (first && s_muted_rid && first->rid == s_muted_rid && first->sid == s_muted_sid) return;
     if (first && first->hush) return; /* the user is looking at its terminal (PRESENCE.md) */
-    if (!model_quiet_active(app_now_unix())) feedback_attention(ATT_APPROVAL);
+    if (model_quiet_active(app_now_unix())) return;
+    feedback_attention(ATT_APPROVAL);
+    /* a dark display lights again: who and what (issue 20261126-0ca0) */
+    if (first) glow_for(first);
 }
 
 static const ui_actions_t s_actions = {.focus = act_focus,
@@ -518,10 +548,7 @@ static void on_attention(const attention_t *a, bool is_new)
         }
         return;
     }
-    uint32_t rgb = a->kind == ATT_ERROR      ? RGB_ERROR
-                   : a->kind == ATT_DONE     ? RGB_DONE
-                   : a->kind == ATT_QUESTION ? RGB_ASK
-                                             : RGB_PERMISSION;
+    uint32_t rgb = att_rgb(a->kind);
     if (model_quiet_active(hal_rtc_get_unix())) {
         /* once per attention; atlas extract.py matches this line */
         /* Quiet (UI-V2 §4.5): no buzz, no glow, no nag. The card and the ring still change, and a
@@ -536,7 +563,7 @@ static void on_attention(const attention_t *a, bool is_new)
     } else {
         feedback_attention(a->kind);
         /* face down nobody sees a glow */
-        if (!motion_face_down()) power_attention(rgb, app_now_ms());
+        if (!motion_face_down()) power_attention(rgb, a->sid, att_icon(a->kind), app_now_ms());
         /* a new request */
         if (a->rid != s_muted_rid || a->sid != s_muted_sid) s_muted_rid = s_muted_sid = 0;
     }

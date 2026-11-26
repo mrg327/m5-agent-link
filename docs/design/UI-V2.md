@@ -28,7 +28,7 @@ Six modes, one screen each. HOME is the only place you can stay, except WATCH, w
                  lift / button / touch-wake              attention arrives
    ┌─────┐ ──────────────────────────────► ┌──────────┐ ───────────────────► ┌──────────┐
    │ OFF │ ◄──────── 10 s idle ─────────── │   HOME   │ ◄── commit/back ──── │   ASK    │
-   │glow │   (glow 2 s on attention,       │  (deck)  │                      │ card+list│
+   │glow │   (glow 3 s on attention,       │  (deck)  │                      │ card+list│
    └─────┘    first touch = wake only)     └──────────┘                      └──────────┘
                                           │  ▲    │  ▲
                         tap centre /      │  │    │  │ swipe down
@@ -293,6 +293,8 @@ While quiet runs (`model_quiet_active()`), an attention that arrives neither buz
 ### 4.6 OFF and glow
 
 Unchanged intent, two fixes carried from `2702775`: the first touch after a glow or a dark display only wakes (`power_activity()` returns true while `s_glowing`), and the glow colour follows the attention kind. Lifting during a glow (IMU, later) opens ASK directly.
+
+The glow says who and what, without a word (issue 20261126-0ca0): the ring (r 219–233, the kind's colour at 55 %), the session's sigil (r 40, grey, at y 112) and the kind's hero glyph (128 px: hand, question, error or done, the kind's colour at 55 %, at y 262). It is drawn once and does not move. It lasts 3 s (`GLOW_MS`); a second alert while it shows takes it over and starts the 3 s again. A reminder on a dark display lights the same glow again (not face down, not for a request the palm cover muted). The words are in the report: `Glow`, the folder name, `Needs approval` / `Question` / `Error` / `Done`.
 
 ### 4.7 WATCH
 

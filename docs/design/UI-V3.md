@@ -559,6 +559,14 @@ oldest row.
 - The rim (one detent per row) and a centre drag scroll the rows; B moves one row older. Back is swipe right,
   B held or a finger held still (to HOME); A+B is Home. The session going away returns HOME.
 
+### 4.12 Alerts: the glow (2026-11-26)
+
+- **The glow says who and what** (issue 20261126-0ca0). A request, an error or a done on a dark display
+  lights, for 3 s, the ring in the kind's colour at 55 % (r 219–233), the session's sigil (r 40, `COL_TEXT2`,
+  y 112) and the kind's hero glyph (`FONT_ICON_HERO`: hand, question, error, done; the kind's colour at 55 %,
+  y 262). No text, no motion. A second alert while it shows takes it over and starts the 3 s again; a reminder
+  lights it again on a dark display. The first touch or raise during it only reveals (ASK, or the card).
+
 ## 5. Interaction changes (`nav.c`)
 
 | Change | Rows | Why |

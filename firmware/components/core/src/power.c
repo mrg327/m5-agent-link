@@ -7,7 +7,9 @@
 #include "power_report.h"
 #include "ui.h"
 
-#define GLOW_MS 2000
+/* The glow says who and what (issue 20261126-0ca0): long enough for the arrival buzz (620 ms) and
+ * a wrist turn (about a second) before the glance. */
+#define GLOW_MS 3000
 /* Display-off timeout with no input. 0 would mean "never", so the device default must be set here:
  * the AMOLED and the battery both suffer from a panel left lit (the ring dims to ambient at 30 s).
  * The simulator overrides it (`--idle-off`, default never) so scripts see a stable screen. */
@@ -88,6 +90,7 @@ static void reset_retries(void)
 }
 void power_set_idle_timeout_ms(uint32_t ms) { s_idle_ms = ms; }
 bool power_display_on(void) { return s_on; }
+bool power_glowing(void) { return s_glowing; }
 const char *power_name(void) { return s_on ? "active" : s_deep ? "deep" : "standby"; }
 
 bool power_activity(uint32_t now_ms)
@@ -106,14 +109,15 @@ bool power_activity(uint32_t now_ms)
     return true;
 }
 
-void power_attention(uint32_t rgb, uint32_t now_ms)
+void power_attention(uint32_t rgb, uint32_t sid, const char *icon, uint32_t now_ms)
 {
-    if (s_on) {
+    if (s_on && !s_glowing) {
         s_last_activity = now_ms;
         return;
     }
+    /* dark, or already glowing: a second alert takes the glow over and restarts its time */
     set_display(true);
-    ui_glow(rgb);
+    ui_glow(rgb, sid, icon);
     s_glowing = true;
     s_glow_until = now_ms + GLOW_MS;
 }

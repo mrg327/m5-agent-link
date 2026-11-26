@@ -416,7 +416,14 @@ add_test(NAME sim_takeover_glow_missed
          COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/takeover_glow_missed.txt)
 set_tests_properties(sim_takeover_glow_missed PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
                      FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3"
-                     PASS_REGULAR_EXPRESSION "\"ev\":\"glow\".*\"wake_input\",\"touch\":true")
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"glow\".*\"display_off\".*\"wake_input\",\"touch\":true")
+# The glow says who and what (issue 20261126-0ca0): the sigil and the kind's glyph for 3 s, one glow
+# per alert, and a reminder lights the dark display again; the touch after it only reveals.
+add_test(NAME sim_glow_who_what
+         COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/glow_who_what.txt)
+set_tests_properties(sim_glow_who_what PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]"
+                     PASS_REGULAR_EXPRESSION "\"glow\",\"rgb\":[0-9]+,\"sid\":2.*\"display_off\".*\"sid\":3.*\"display_off\".*\"sid\":4.*\"display_off\".*\"glow\",\"rgb\":[0-9]+,\"sid\":2.*\"wake_input\",\"touch\":true")
 # Quick replies and interrupt (issue b150): reply 1 goes out as op 11 with arg 1; a tap on Interrupt
 # sends nothing; the hold sends op 6 with hold_ms >= 1000.
 sim_script_test(sim_quick_replies quick_replies.txt

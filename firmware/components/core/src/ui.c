@@ -49,7 +49,14 @@ static lv_obj_t *s_toast, *s_toast_mask[2];
 static uint32_t s_toast_until_ms;
 /* the toast in words: the report and the log; the screen shows its glyphs */
 static char s_toast_txt[64];
-static lv_obj_t *s_glow, *s_glow_ring;
+/* The alert glow (issue 20261126-0ca0): the kind's ring, the session's sigil and the kind's hero
+ * glyph, so a glance says who and what without a word. */
+#define GLOW_SIGIL_Y 112
+#define GLOW_SIGIL_R 40
+#define GLOW_HERO_Y 262
+static lv_obj_t *s_glow, *s_glow_ring, *s_glow_sigil, *s_glow_hero;
+static char s_glow_name[48]; /* the words, for the report */
+static const char *s_glow_kind = "";
 static lv_obj_t *s_wait_pip; /* a request waits behind the open screen (ui_offer_attention) */
 static uint32_t s_pip_rgb;   /* the mark's colour and ring kind as drawn */
 static uint8_t s_pip_kind = RING_ASK;
@@ -138,6 +145,9 @@ static void create_overlays(void)
     lv_obj_set_style_bg_color(s_glow, COL_BG, 0);
     lv_obj_set_style_bg_opa(s_glow, LV_OPA_COVER, 0);
     s_glow_ring = ring_create(s_glow);
+    s_glow_sigil = ui_sigil_create(s_glow, UI_CX, GLOW_SIGIL_Y, GLOW_SIGIL_R);
+    ui_sigil_set_color(s_glow_sigil, COL_TEXT2); /* grey: the only colour is the kind's */
+    s_glow_hero = ui_glyph_create(s_glow, FONT_ICON_HERO, UI_CX, GLOW_HERO_Y);
     lv_obj_add_flag(s_glow, LV_OBJ_FLAG_HIDDEN);
 
     pair_create(top); /* over the glow too: the PC waits for these digits */
@@ -605,6 +615,11 @@ void ui_report(ui_report_t *r)
         return;
     }
     ui_burst_report(r);
+    if (ui_glow_active()) {
+        ui_report_add(r, "Glow");
+        if (s_glow_name[0]) ui_report_add(r, "%s", s_glow_name);
+        if (s_glow_kind[0]) ui_report_add(r, "%s", s_glow_kind);
+    }
     if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_toast_txt);
     if (!lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN)) {
         ui_report_add(r, "waiting %u · %s", (unsigned)s_report_sid,
@@ -704,11 +719,33 @@ void ui_toast(const char *text, uint32_t rgb)
     toast_show(text, icons, content, rgb);
 }
 
-void ui_glow(uint32_t rgb)
+/* The kind in words, for the report (GLYPHS.md rule 9): the glass shows its glyph. */
+static const char *glow_kind_words(const char *icon)
 {
-    ring_set_solid(s_glow_ring, lv_color_mix(lv_color_hex(rgb), COL_BG, 140)); /* dim: ~55 % */
+    if (!strcmp(icon, ICON_PERMISSION)) return "Needs approval";
+    if (!strcmp(icon, ICON_QUESTION)) return "Question";
+    if (!strcmp(icon, ICON_ERROR)) return "Error";
+    if (!strcmp(icon, ICON_DONE)) return "Done";
+    return "";
+}
+
+void ui_glow(uint32_t rgb, uint32_t sid, const char *icon)
+{
+    lv_color_t dim = lv_color_mix(lv_color_hex(rgb), COL_BG, 140); /* dim: ~55 % */
+    ring_set_solid(s_glow_ring, dim);
+    const session_t *s = model_find(sid);
+    const char *base = s ? theme_basename(s->repo) : "";
+    ui_sigil_set_session(s_glow_sigil, base, sid);
+    if (s) {
+        lv_obj_remove_flag(s_glow_sigil, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(s_glow_sigil, LV_OBJ_FLAG_HIDDEN);
+    }
+    ui_glyph_set(s_glow_hero, icon ? icon : "", dim);
+    snprintf(s_glow_name, sizeof s_glow_name, "%s", s ? (base[0] ? base : "(no folder)") : "");
+    s_glow_kind = glow_kind_words(icon ? icon : "");
     lv_obj_remove_flag(s_glow, LV_OBJ_FLAG_HIDDEN);
-    dbg_event("ui", "glow", "\"rgb\":%u", (unsigned)rgb);
+    dbg_event("ui", "glow", "\"rgb\":%u,\"sid\":%u", (unsigned)rgb, (unsigned)sid);
 }
 
 void ui_glow_hide(void) { lv_obj_add_flag(s_glow, LV_OBJ_FLAG_HIDDEN); }
