@@ -116,8 +116,10 @@
   "ring": {
     "merge_at": 9,
     "ambient_ms": 30000,
-    "nag_ms": 15000,
-    "nag_max": 3,
+    "nag_steps": 3,
+    "nag_r1_ms": 25000,
+    "nag_r2_ms": 40000,
+    "nag_floor_ms": 10000,
     "summary_w_px": 300,
     "sigil_r_px": 22,
     "time_dots_r_px": 88,
@@ -1525,7 +1527,7 @@
     {
       "id": "attention",
       "title": "Deck · a request is waiting",
-      "source": "firmware/components/core/src/ui_home.c:371"
+      "source": "firmware/components/core/src/ui_home.c:372"
     },
     {
       "id": "agent",
@@ -1797,6 +1799,75 @@
       },
       {
         "on_ms": 35,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ],
+    "reminder_soft": [
+      {
+        "on_ms": 60,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ],
+    "reminder_permission": [
+      {
+        "on_ms": 250,
+        "off_ms": 120,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 250,
+        "off_ms": 400,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 250,
+        "off_ms": 120,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 250,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ],
+    "reminder_question": [
+      {
+        "on_ms": 40,
+        "off_ms": 90,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 40,
+        "off_ms": 400,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 40,
+        "off_ms": 90,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 40,
         "off_ms": 0,
         "duty": 85,
         "kick_ms": 15,
@@ -6042,7 +6113,10 @@
     "question": "An agent is asking a question",
     "permission": "An agent needs approval",
     "scroll_stop": "SCROLL reached the bottom or the top of the scrollback: one thud",
-    "quiet_toggled": "Quiet mode turned on, extended or off: two spaced pulses"
+    "quiet_toggled": "Quiet mode turned on, extended or off: two spaced pulses",
+    "reminder_soft": "First reminder of an unanswered request: one soft pulse",
+    "reminder_permission": "Last reminder of an unanswered approval: its pattern twice (with the sound)",
+    "reminder_question": "Last reminder of an unanswered question: its pattern twice (with the sound)"
   },
   "haptic_motor": {
     "hold_duty": 85,
@@ -6096,13 +6170,13 @@
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
     "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:1510",
     "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:1442",
-    "gesture_map.chord": "firmware/components/core/src/app.c:754",
-    "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:199",
+    "gesture_map.chord": "firmware/components/core/src/app.c:761",
+    "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:188",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:234",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:552",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:558",
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:20",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:11",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:807",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:814",
     "glyphs.agents": "firmware/components/core/src/ui_theme.c:70",
     "glyphs.agents.name": "firmware/components/core/src/ui_theme.c:202",
     "glyphs.font": "firmware/components/core/src/fonts/font_phosphor_44.c:3",
@@ -6213,27 +6287,30 @@
     "glyphs.px": "firmware/components/core/src/ui_theme.h:31",
     "glyphs.states": "firmware/components/core/src/ui_theme.c:57",
     "glyphs.states.input": "firmware/components/core/src/ui_theme.c:59",
-    "haptics.approved": "firmware/components/core/src/feedback.c:207",
-    "haptics.denied": "firmware/components/core/src/feedback.c:214",
-    "haptics.deny_ramp": "firmware/components/core/src/feedback.c:194",
-    "haptics.detent": "firmware/components/core/src/feedback.c:175",
+    "haptics.approved": "firmware/components/core/src/feedback.c:228",
+    "haptics.denied": "firmware/components/core/src/feedback.c:235",
+    "haptics.deny_ramp": "firmware/components/core/src/feedback.c:215",
+    "haptics.detent": "firmware/components/core/src/feedback.c:196",
     "haptics.detent_min_gap_ms": "firmware/components/core/src/feedback.c:9",
     "haptics.done": "firmware/components/core/src/feedback.c:141",
     "haptics.duty": "firmware/boards/stopwatch/input.cpp:17",
     "haptics.error": "firmware/components/core/src/feedback.c:140",
-    "haptics.hello": "firmware/components/core/src/feedback.c:291",
-    "haptics.hold_ramp": "firmware/components/core/src/feedback.c:186",
+    "haptics.hello": "firmware/components/core/src/feedback.c:312",
+    "haptics.hold_ramp": "firmware/components/core/src/feedback.c:207",
     "haptics.kick_duty": "firmware/boards/stopwatch/input.cpp:18",
     "haptics.kick_ms": "firmware/boards/stopwatch/input.cpp:20",
     "haptics.kick_only_rule": "firmware/boards/stopwatch/input.cpp:130",
     "haptics.kick_rule": "firmware/boards/stopwatch/input.cpp:114",
     "haptics.permission": "firmware/components/core/src/feedback.c:138",
     "haptics.question": "firmware/components/core/src/feedback.c:139",
-    "haptics.quiet_toggled": "firmware/components/core/src/feedback.c:249",
-    "haptics.reject": "firmware/components/core/src/feedback.c:233",
-    "haptics.reply_sent": "firmware/components/core/src/feedback.c:227",
-    "haptics.scroll_stop": "firmware/components/core/src/feedback.c:240",
-    "haptics.tick": "firmware/components/core/src/feedback.c:167",
+    "haptics.quiet_toggled": "firmware/components/core/src/feedback.c:270",
+    "haptics.reject": "firmware/components/core/src/feedback.c:254",
+    "haptics.reminder_permission": "firmware/components/core/src/feedback.c:171",
+    "haptics.reminder_question": "firmware/components/core/src/feedback.c:172",
+    "haptics.reminder_soft": "firmware/components/core/src/feedback.c:170",
+    "haptics.reply_sent": "firmware/components/core/src/feedback.c:248",
+    "haptics.scroll_stop": "firmware/components/core/src/feedback.c:261",
+    "haptics.tick": "firmware/components/core/src/feedback.c:188",
     "link.hello_retry_ms": "firmware/components/core/src/link.c:12",
     "link.idle_ping_ms": "firmware/components/core/src/link.c:18",
     "link.ping_interval_ms": "daemon/crates/agentlinkd/src/usb.rs:26",
@@ -6258,7 +6335,7 @@
     "palette.text2": "firmware/components/core/src/ui_theme.h:42",
     "palette.text3": "firmware/components/core/src/ui_theme.h:43",
     "palette.working": "firmware/components/core/src/ui_theme.h:68",
-    "ring.ambient_ms": "firmware/components/core/src/ui_home.c:14",
+    "ring.ambient_ms": "firmware/components/core/src/ui_home.c:15",
     "ring.ask_period_ms": "firmware/components/core/src/ui_ring_internal.h:51",
     "ring.band_out_px": "firmware/components/core/src/ui_ring_internal.h:16",
     "ring.band_w_px": "firmware/components/core/src/ui_ring_internal.h:17",
@@ -6271,10 +6348,12 @@
     "ring.key_y_px": "firmware/components/core/src/ui_kit.h:221",
     "ring.kinds": "firmware/components/core/src/ui_ring.h:16",
     "ring.max_segments": "firmware/components/core/src/ui_ring.h:11",
-    "ring.merge_at": "firmware/components/core/src/ui_home.c:15",
-    "ring.nag_max": "firmware/components/core/src/ui_home.c:17",
-    "ring.nag_ms": "firmware/components/core/src/ui_home.c:16",
-    "ring.nothing_else": "firmware/components/core/src/ui_home.c:219",
+    "ring.merge_at": "firmware/components/core/src/ui_home.c:16",
+    "ring.nag_floor_ms": "firmware/components/core/src/nag.h:30",
+    "ring.nag_r1_ms": "firmware/components/core/src/nag.h:22",
+    "ring.nag_r2_ms": "firmware/components/core/src/nag.h:23",
+    "ring.nag_steps": "firmware/components/core/src/nag.h:21",
+    "ring.nothing_else": "firmware/components/core/src/ui_home.c:208",
     "ring.others_pct": "firmware/components/core/src/ui_ring_internal.h:23",
     "ring.perm_period_ms": "firmware/components/core/src/ui_ring_internal.h:52",
     "ring.prog_out_px": "firmware/components/core/src/ui_ring_internal.h:42",
@@ -6288,7 +6367,7 @@
     "ring.summary_y_px": "firmware/components/core/src/ui_home_card.c:45",
     "ring.time_dots_r_px": "firmware/components/core/src/ui_home_card.c:41",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:50",
-    "screens": "firmware/components/core/src/ui_home.c:371",
+    "screens": "firmware/components/core/src/ui_home.c:372",
     "screens.agent": "firmware/components/core/src/ui_agent.c:605",
     "screens.ask": "firmware/components/core/src/ui_ask.c:1547",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:408",

@@ -7,25 +7,13 @@
 #include <string.h>
 
 #include "debug.h"
+#include "nag.h"
 #include "ui_home_internal.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
 
 #define AMBIENT_MS 30000
 #define MERGE_AT 9
-#define NAG_MS 15000
-#define NAG_MAX 3
-/* Reminders fit the answer window (ANSWER-WINDOW.md §5): NAG_MAX of them spread over it, at least
- * NAG_MS apart (a 60 s window: 15, 30, 45 s, as before; 300 s: 75, 150, 225 s), and none in its
- * last NAG_TAIL_MS, when the request is about to go back to the computer anyway. A request without
- * a window: every NAG_MS. */
-#define NAG_TAIL_MS 5000
-static uint32_t nag_gap(const attention_t *a)
-{
-    uint32_t gap = a->win_ms / (NAG_MAX + 1);
-    return gap > NAG_MS ? gap : NAG_MS;
-}
-
 static lv_obj_t *s_root, *s_ring, *s_centre;
 
 static home_slot_t s_slots[RING_MAX_SEGMENTS];
@@ -36,8 +24,7 @@ static bool s_scrubbing, s_freeze_expand, s_rim_dial;
 static uint32_t s_now, s_last_input, s_last_elapsed;
 static bool s_ambient;
 
-static uint32_t s_nag_rid, s_nag_next;
-static int s_nag_n;
+static nag_t s_nag; /* the reminders' ladder (nag.c); all zero: none, no input yet */
 
 static const session_t *sel_session(void) { return s_has_sel ? model_find(s_sel_sid) : NULL; }
 
@@ -71,7 +58,8 @@ static ring_kind_t kind_of(const session_t *s)
 static void noted_input(void)
 {
     s_last_input = s_now;
-    s_nag_n = NAG_MAX;
+    /* the clock of this moment, not of the last step: a request that arrived this step is seen */
+    nag_note_input(&s_nag, lv_tick_get());
 }
 
 static bool before(const session_t *a, const session_t *b)
@@ -170,7 +158,8 @@ static bool select_idx(int i, const char *via, void (*haptic)(void))
 void ui_home_select_sid(uint32_t sid, const char *via)
 {
     if (!model_find(sid)) return;
-    noted_input();
+    /* the deck wakes from ambient; the reminders go on: a takeover is not the user looking */
+    s_last_input = s_now;
     for (int i = 0; i < s_n; i++)
         if (s_slots[i].sid == sid) {
             select_idx(i, via, NULL);
@@ -315,25 +304,37 @@ static bool needs_you(void)
     return c.waiting > 0 || c.error > 0;
 }
 
+/* Unanswered requests (approvals and questions) are reminded three times, louder each time, until
+ * the user touches anything (issue 20261126-a909, nag.c). A request the daemon hushes is not. */
+static void nag_tick(uint32_t now)
+{
+    nag_req_t reqs[MODEL_MAX_ATTENTION];
+    int n = 0;
+    for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
+        const attention_t *a = model_attention_at(i);
+        if (!a || a->answer_sent || a->hush) continue;
+        if (a->kind != ATT_APPROVAL && a->kind != ATT_QUESTION) continue;
+        bool win = a->deadline_ms != 0;
+        reqs[n++] = (nag_req_t){
+            .rid = a->rid,
+            .start_ms = win ? a->deadline_ms - a->win_ms : a->arrived_ms,
+            .arrived_ms = a->arrived_ms,
+            .win_ms = win ? a->win_ms : 0,
+            .left_ms = model_attention_left_ms(a, now),
+        };
+    }
+    uint32_t rid = 0;
+    int level = nag_step(&s_nag, reqs, n, now, &rid);
+    if (level) g_ui_actions->nag(rid, level);
+}
+
 void ui_home_tick(uint32_t now)
 {
     s_now = now;
     if (!s_last_input) s_last_input = now;
     if (ui_animations_allowed()) ring_tick(s_ring, now);
 
-    /* Unanswered permission requests nag a few times, until the user touches anything. */
-    const attention_t *first = model_attention_first();
-    if (first && first->kind == ATT_APPROVAL && !first->answer_sent) {
-        if (first->rid != s_nag_rid) {
-            s_nag_rid = first->rid;
-            s_nag_n = 0;
-            s_nag_next = now + nag_gap(first);
-        } else if (s_nag_n < NAG_MAX && (int32_t)(now - s_nag_next) >= 0) {
-            s_nag_n++;
-            s_nag_next = now + nag_gap(first);
-            if (model_attention_left_ms(first, now) > NAG_TAIL_MS) g_ui_actions->nag();
-        }
-    }
+    nag_tick(now);
 
     bool amb = now - s_last_input > AMBIENT_MS && !needs_you();
     if (amb != s_ambient) {

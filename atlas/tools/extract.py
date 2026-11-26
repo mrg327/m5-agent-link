@@ -385,10 +385,16 @@ def extract_ring():
     for key, macro in [
         ("merge_at", "MERGE_AT"),
         ("ambient_ms", "AMBIENT_MS"),
-        ("nag_ms", "NAG_MS"),
-        ("nag_max", "NAG_MAX"),
     ]:
         r[key] = int(find(home, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
+    # the reminders' ladder (nag.h, issue 20261126-a909): three steps, the first at 25 s
+    for key, macro in [
+        ("nag_steps", "NAG_STEPS"),
+        ("nag_r1_ms", "NAG_R1_MS"),
+        ("nag_r2_ms", "NAG_R2_MS"),
+        ("nag_floor_ms", "NAG_FLOOR_MS"),
+    ]:
+        r[key] = int(find(CORE + "nag.h", rf"#define {macro}\s+(\d+)u?", f"ring.{key}").group(1))
     r["summary_w_px"] = int(find(card, r"#define SUMMARY_W\s+(\d+)", "ring.summary_w_px").group(1))
     for key, macro in [("sigil_r_px", "SIGIL_R"), ("time_dots_r_px", "DOTS_R")]:
         r[key] = int(find(card, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
@@ -624,6 +630,15 @@ HAPTIC_MEANING = {
     "permission": ("permission", "An agent needs approval"),
     "scroll_stop": ("stop", "SCROLL reached the bottom or the top of the scrollback: one thud"),
     "quiet_toggled": ("quiet", "Quiet mode turned on, extended or off: two spaced pulses"),
+    "reminder_soft": ("soft", "First reminder of an unanswered request: one soft pulse"),
+    "reminder_permission": (
+        "perm_twice",
+        "Last reminder of an unanswered approval: its pattern twice (with the sound)",
+    ),
+    "reminder_question": (
+        "ask_twice",
+        "Last reminder of an unanswered question: its pattern twice (with the sound)",
+    ),
 }
 
 

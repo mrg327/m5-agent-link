@@ -162,6 +162,27 @@ void feedback_attention(att_kind_t kind)
     }
 }
 
+/* Reminders grow louder (issue 20261126-a909): a soft pulse first, for a user who is already
+ * reaching; then the kind's own pattern; last the pattern twice, 400 ms apart, with the sound, so
+ * the last one stands out even with the sound off. */
+void feedback_reminder(att_kind_t kind, int level)
+{
+    static const uint16_t soft[] = {60};
+    static const uint16_t perm_twice[] = {250, 120, 250, 400, 250, 120, 250};
+    static const uint16_t ask_twice[] = {40, 90, 40, 400, 40, 90, 40};
+    bool q = kind == ATT_QUESTION;
+    if (level <= 1) {
+        haptic(soft, 1);
+    } else if (level == 2) {
+        static const uint16_t perm_once[] = {250, 120, 250}; /* the arrival patterns */
+        static const uint16_t ask_once[] = {40, 90, 40};
+        haptic(q ? ask_once : perm_once, 3);
+    } else {
+        haptic(q ? ask_twice : perm_twice, 7);
+        sound("input");
+    }
+}
+
 void feedback_tick(void)
 {
     static const uint16_t tick[] = {35};

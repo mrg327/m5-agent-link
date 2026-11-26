@@ -70,6 +70,11 @@ static int g_fail;
 
 static void play_finished_done(void) { feedback_finished(false); }
 static void play_finished_error(void) { feedback_finished(true); }
+static void play_remind_1(void) { feedback_reminder(ATT_APPROVAL, 1); }
+static void play_remind_2(void) { feedback_reminder(ATT_APPROVAL, 2); }
+static void play_remind_3(void) { feedback_reminder(ATT_APPROVAL, 3); }
+static void play_remind_q2(void) { feedback_reminder(ATT_QUESTION, 2); }
+static void play_remind_q3(void) { feedback_reminder(ATT_QUESTION, 3); }
 
 typedef struct {
     const char *name;
@@ -89,6 +94,13 @@ static const entry_t k_entries[] = {
     {"finished_error", play_finished_error, 3, false},
     {"scroll_stop", feedback_scroll_stop, 1, false},
     {"usage_warn", feedback_usage_warn, 1, false},
+    /* reminders grow louder (issue 20261126-a909): one soft pulse, the pattern, the pattern twice
+     */
+    {"remind_1", play_remind_1, 1, false},
+    {"remind_2", play_remind_2, 2, false},
+    {"remind_3", play_remind_3, 4, false},
+    {"remind_q2", play_remind_q2, 2, false},
+    {"remind_q3", play_remind_q3, 4, false},
 };
 #define N_ENTRIES (sizeof k_entries / sizeof k_entries[0])
 
@@ -197,6 +209,15 @@ int main(void)
     const pattern_t *sent = &p[2], *denied = &p[1];
     CHECK(sent->ms[2] >= 3 * sent->ms[0]);
     CHECK(denied->ms[0] == denied->ms[2]);
+    /* the last reminder is the second one twice, so it stands out with the sound off too */
+    pattern_t r2 = record(&k_entries[N_ENTRIES - 4]), r3 = record(&k_entries[N_ENTRIES - 3]);
+    CHECK(r3.n == 2 * r2.n + 1);
+    for (size_t i = 0; i < r2.n && r3.n == 2 * r2.n + 1; i++) {
+        CHECK(r3.ms[i] == r2.ms[i] && r3.ms[r2.n + 1 + i] == r2.ms[i]);
+    }
+    /* the first is softer than the second: one pulse, shorter than the pattern's */
+    pattern_t r1 = record(&k_entries[N_ENTRIES - 5]);
+    CHECK(r1.n == 1 && r1.ms[0] < r2.ms[0]);
     /* the detent is the one sub-floor pulse: the 15 ms kick only */
     g_last.n = 0;
     feedback_detent();

@@ -467,6 +467,7 @@ bool model_attention_add(const attention_t *a)
     /* only these, not a copy: attention_t is ~0.5 KB of stack */
     bool sent = s_att[slot].answer_sent, skipped = s_att[slot].skipped;
     uint8_t answer = s_att[slot].answer, answer_opt = s_att[slot].answer_opt;
+    uint32_t arrived_ms = s_att[slot].arrived_ms;
     const att_known_t *k = had ? NULL : known_take(a);
     if (k) { /* re-sent after a welcome */
         sent = k->sent;
@@ -482,6 +483,7 @@ bool model_attention_add(const attention_t *a)
         s_att[slot].answer_opt = answer_opt;
         s_att[slot].skipped = skipped;
     }
+    if (had) s_att[slot].arrived_ms = arrived_ms;
     s_att_used[slot] = true;
     int ss = find_slot(a->sid);
     if (ss >= 0 && !had && !k) {
@@ -570,6 +572,9 @@ const attention_t *model_attention_first(void)
         if (s_att_used[i]) return &s_att[i];
     return NULL;
 }
+
+const attention_t *model_attention_at(int i)
+{ return i >= 0 && i < MODEL_MAX_ATTENTION && s_att_used[i] ? &s_att[i] : NULL; }
 
 void model_attention_skip(uint32_t rid)
 {

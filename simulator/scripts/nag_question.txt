@@ -1,0 +1,15 @@
+# Issue 20261126-a909 (run with --idle-off 3): a question is reminded like an approval, with its own
+# pattern: a soft pulse at 25 s, the question's two short pulses at 40 s, twice with the sound at
+# 50 s; the second and third light the dark display with the question glyph.
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 3 work cli main Working
+wait 3500
+session 3 ask cli main
+attention_win 60000 60000 - 8 3 question focus 0 Which branch?|main or dev
+wait 40500
+expect_label Glow
+expect_label Question
+expect_label cli
+wait 12000
+quit

@@ -48,7 +48,7 @@ CheckOptions:
   readability-identifier-naming.FunctionCase: lower_case
   readability-identifier-naming.GlobalFunctionCase: lower_case
   readability-identifier-naming.GlobalFunctionPrefix: 'MODULE_'
-  readability-identifier-naming.GlobalFunctionIgnoredRegexp: '^(app|bench|cbor|core|dbg|detail|done|feedback|gauges|gesture|graph|hal|keys|link|model|motion|nav|ota|power|preport|persona|prefs|ring|sess|sha256|sim|snd|sound|steps|temper|theme|toy|ui|voice|wheel|ws|agent)_[a-z0-9_]+$'
+  readability-identifier-naming.GlobalFunctionIgnoredRegexp: '^(app|bench|cbor|core|dbg|detail|done|feedback|gauges|gesture|graph|hal|keys|link|model|motion|nag|nav|ota|power|preport|persona|prefs|ring|sess|sha256|sim|snd|sound|steps|temper|theme|toy|ui|voice|wheel|ws|agent)_[a-z0-9_]+$'
   readability-identifier-naming.ParameterCase: lower_case
   readability-identifier-naming.LocalVariableCase: lower_case
   readability-identifier-naming.LocalConstantCase: lower_case

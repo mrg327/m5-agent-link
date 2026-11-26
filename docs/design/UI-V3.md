@@ -566,6 +566,10 @@ oldest row.
   y 112) and the kind's hero glyph (`FONT_ICON_HERO`: hand, question, error, done; the kind's colour at 55 %,
   y 262). No text, no motion. A second alert while it shows takes it over and starts the 3 s again; a reminder
   lights it again on a dark display. The first touch or raise during it only reveals (ASK, or the card).
+- **Reminders grow louder** (issue 20261126-a909, UI-V2 §4.3): a soft pulse at 25 s that leaves a dark display
+  dark, then the kind's pattern with the glow, then the pattern twice with the sound and the glow, scaled to
+  the answer window; questions too; one ladder at a time, for the request with the least time left. No new
+  drawing.
 
 ## 5. Interaction changes (`nav.c`)
 

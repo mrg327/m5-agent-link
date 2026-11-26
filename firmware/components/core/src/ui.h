@@ -79,8 +79,10 @@ typedef struct {
     void (*sent)(void);           /* KEYS: the composed text went out: the approve pattern */
     bool (*button_down)(int btn); /* KEYS: is physical button 0 (A) / 1 (B) still held */
     bool (*touching)(void);       /* a finger is on the glass (no card opens under it) */
-    void (*nag)(void);            /* unanswered permission request: remind */
-    void (*sectors)(int n);       /* the rim now has n selectable segments */
+    /* unanswered request rid: remind at level 1 (soft), 2 (its pattern, the glow) or 3 (the
+     * pattern twice, the sound, the glow); nag.h */
+    void (*nag)(uint32_t rid, int level);
+    void (*sectors)(int n); /* the rim now has n selectable segments */
     /* TRACKPAD (proto 0.20, EXPERIMENTS.md): one cmd_op_pointer (btn -1 = no click); false when it
      * could not go out */
     bool (*pointer)(int dx, int dy, int btn, int n, int wheel);

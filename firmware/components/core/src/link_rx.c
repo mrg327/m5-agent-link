@@ -311,6 +311,7 @@ static void on_attention(const struct attention *in, uint32_t now_ms)
         a.deadline_ms = now_ms + (left < win ? left : win);
         if (!a.deadline_ms) a.deadline_ms = 1; /* 0 means "no window" */
     }
+    a.arrived_ms = now_ms;
     a.len_known = model_peer_minor() >= 11;
     if (in->attention_uint11uint_present)
         a.full_len = in->attention_uint11uint.attention_uint11uint;

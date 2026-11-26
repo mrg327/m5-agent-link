@@ -1,7 +1,8 @@
 # Issue 20261126-0ca0 (run with --idle-off 3): the alert glow on a dark display says who and what
 # without a word: the session's sigil and the kind's hero glyph inside the ring, for 3 s. A
 # permission (api), then a question (cli) and an error (web), each its own glyph; a reminder lights
-# the dark display again; the touch after it only reveals the request (ASK).
+# the dark display again (the second one, issue 20261126-a909); the touch after it only reveals the
+# request (ASK).
 connect
 rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
 session 2 work api main Working
@@ -32,8 +33,11 @@ expect_label web
 expect_label Error
 wait 3200
 expect_no_label Glow
-# the first reminder (15 s after the request) lights it again
-wait 5500
+# the first reminder (25 s after the request) is a soft pulse and leaves the display dark; the
+# second (40 s) lights it again (issue 20261126-a909)
+wait 15500
+expect_no_label Glow
+wait 14800
 expect_label Glow
 expect_label Needs approval
 tap 233 233

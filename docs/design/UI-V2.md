@@ -225,7 +225,7 @@ Items in *italics* need a daemon that types into terminals (decision 28: the wel
 - Question options (`attention.opts`, ≤ 4 × 24 chars) commit by tap or A; they are not destructive. The reply is `cmd_op_reply` with `arg = option index`.
 - Toasts on ASK (`Hold to confirm`, `Out of date`, `Offline`) take the hint line under the key badges (`UI_TOAST_LOW_Y`; the hint hides meanwhile), not the action-pill slot the deck uses, which would sit on the wheel's selected row. STATUS does the same.
 - After an answer: the wheel collapses to one line `Approved · waiting for PC` (or `Denied`, `Sent "Yes" · waiting for PC`) in the answer's colour (green, vermillion, yellow); the index ring shows one dim capsule; the card stays until `clear`, then HOME returns. A `result.ok = false` shows the error as a toast, restores the options and buzzes the reject pattern.
-- Nag: up to 3 re-buzzes every 15 s while a permission is unanswered and the display is off; any input stops it. (2026-11-12: spread over the answer window, at least 15 s apart, none in its last 5 s: [ANSWER-WINDOW.md](ANSWER-WINDOW.md) §1. A request the daemon marks `hush` (the user is looking at its terminal, [PRESENCE.md](PRESENCE.md)) is not nagged, and does not buzz or glow.)
+- Reminders that grow louder (issue 20261126-a909, `nag.c`). An unanswered approval or question is reminded three times, never a fourth: **R1** one soft pulse (60 ms), the display stays dark; **R2** the kind's arrival pattern and the glow (who and what, §4.6) on a dark display; **R3** the pattern twice, 400 ms apart, the `input` sound and the glow. They are counted from the start of the answer window `win`: R1 at 25 s, R2 at max(40 s, win / 2), R3 at max(R2 + 10 s, win − 10 s) (60 s: 25, 40, 50; 120 s: 25, 60, 110; 300 s: 25, 150, 290). A window under 40 s gets R1 only, at its half; under 20 s none; nothing in a window's last 5 s; without a window (a daemon before 0.11) 25, 40, 55 s. One ladder runs at a time, for the request with the least time left; when it is answered or gone the next one starts its own, skipping its steps already past, never within 10 s of the last reminder. Any touch, press, raise or the wake that lights the display ends the ladders of every request that arrived before it (a takeover does not: it is not the user looking); a palm cover drops that request's; Quiet, snooze and `hush` ([PRESENCE.md](PRESENCE.md)) hold them; face down they are silent and still advance. The screen adds nothing: the countdown ring turns white in the last 10 s, about when R3 comes.
 
 ### 4.4 SCROLL: the terminal's scrollback
 
@@ -360,7 +360,7 @@ A swipe keyboard for one session, for fine edits or when speaking is not possibl
 
 ## 5. Haptic vocabulary
 
-ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a detent only. Distinguish by **count and rhythm, never by 10 ms differences**; gaps ≥ 60 ms; at most 3 pulses outside ramps. The approve/deny/reject triple is already in `feedback.c` (`2702775`).
+ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a detent only. Distinguish by **count and rhythm, never by 10 ms differences**; gaps ≥ 60 ms; at most 3 pulses outside ramps (the last reminder, an arrival pattern played twice, is the one exception). The approve/deny/reject triple is already in `feedback.c` (`2702775`).
 
 | Event | Pattern (on/off ms) | Shape | Where |
 |---|---|---|---|
@@ -384,6 +384,9 @@ ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a deten
 | **Finished: done** | 35, 200, 35 | two soft, long gap | a session moved into Done, when notify is armed or it is watched |
 | **Finished: error** | 120, 90, 120, 90, 120 | three firm | a session moved into Error, same rule |
 | Usage warning | 200 | one long | the plan is running low |
+| Reminder 1 | 60 | one soft | an unanswered request, 25 s in (§4.3) |
+| Reminder 2 | the arrival pattern | as arrived | half the window, at least 40 s |
+| Reminder 3 | the arrival pattern, 400 ms, the pattern again | twice | near the window's end, with the sound |
 
 Whatever grants ends in one pulse, whatever denies in two equal ones, a refusal in three (`feedback.c`, `act_reply` in `app.c`). The sent buzz is two pulses too, told from denied by its rhythm: 35 then 120.
 

@@ -1,0 +1,18 @@
+# Issue 20261126-a909 (run with --idle-off 3): one ladder at a time, for the request with the least
+# time left. 7 has two minutes, 8 (two seconds later) one: only 8 is reminded (27, 42, 52 s). Once
+# 8 is answered on the computer, 7 takes over: its first step (25 s) is past and skipped, its second
+# is due at 60 s and waits for 10 s after 8's last (52 s): 62 s.
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 2 work api main Working
+session 3 work cli main Working
+wait 3500
+session 2 input api main
+attention_win 120000 120000 - 7 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 2000
+session 3 input cli main
+attention_win 60000 60000 - 8 3 approval approve,deny,focus 0 Edit file|src/main.rs
+wait 51000
+clear 8 answered_pc
+wait 10000
+quit

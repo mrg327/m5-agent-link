@@ -119,6 +119,10 @@ add_test(NAME sha256 COMMAND test_sha256)
 add_executable(test_nav tests/test_nav.c ${FW}/core/src/nav.c)
 target_include_directories(test_nav PRIVATE ${FW}/core/src)
 add_test(NAME nav_model COMMAND test_nav)
+# Reminders that grow louder (issue 20261126-a909): the schedule, one ladder, the floor, the tail.
+add_executable(test_nag tests/test_nag.c ${FW}/core/src/nag.c)
+target_include_directories(test_nag PRIVATE ${FW}/core/src)
+add_test(NAME nag_ladder COMMAND test_nag)
 
 add_executable(test_sound tests/test_sound.c ${FW}/core/src/sound.c ${FW}/core/src/sound_bank.c)
 target_include_directories(test_sound PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
@@ -424,6 +428,29 @@ add_test(NAME sim_glow_who_what
 set_tests_properties(sim_glow_who_what PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
                      FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]"
                      PASS_REGULAR_EXPRESSION "\"glow\",\"rgb\":[0-9]+,\"sid\":2.*\"display_off\".*\"sid\":3.*\"display_off\".*\"sid\":4.*\"display_off\".*\"glow\",\"rgb\":[0-9]+,\"sid\":2.*\"wake_input\",\"touch\":true")
+# Reminders grow louder (issue 20261126-a909): on a dark display the soft pulse leaves it dark, the
+# second and third light the glow; a question is reminded with its own pattern; one ladder at a time,
+# for the request with the least time left, then the next one's, 10 s apart at least.
+add_test(NAME sim_nag_glow_dark
+         COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/nag_glow_dark.txt)
+set_tests_properties(sim_nag_glow_dark PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]|\"level\":4"
+                     PASS_REGULAR_EXPRESSION "\"level\":1}([^g]|g[^l]|gl[^o])*\"level\":2.*pattern_ms\":\\[250,120,250\\].*\"ev\":\"glow\".*\"level\":3.*pattern_ms\":\\[250,120,250,400,250,120,250\\].*\"ev\":\"sound\".*\"ev\":\"glow\"")
+add_test(NAME sim_nag_question
+         COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/nag_question.txt)
+set_tests_properties(sim_nag_question PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]"
+                     PASS_REGULAR_EXPRESSION "\"nag\",\"rid\":8,\"level\":1.*pattern_ms\":\\[60\\].*\"level\":2.*pattern_ms\":\\[40,90,40\\].*\"level\":3.*pattern_ms\":\\[40,90,40,400,40,90,40\\]")
+add_test(NAME sim_nag_two_requests
+         COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/nag_two_requests.txt)
+set_tests_properties(sim_nag_two_requests PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"nag\",\"rid\":7.*\"nag\",\"rid\":8|\"nag\",\"rid\":7,\"level\":1"
+                     PASS_REGULAR_EXPRESSION "\"nag\",\"rid\":8,\"level\":1.*\"nag\",\"rid\":8,\"level\":2.*\"nag\",\"rid\":8,\"level\":3.*\"nag\",\"rid\":7,\"level\":2")
+add_test(NAME sim_nag_wake_stops
+         COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/nag_wake_stops.txt)
+set_tests_properties(sim_nag_wake_stops PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]|\"level\":2"
+                     PASS_REGULAR_EXPRESSION "\"nag\",\"rid\":7,\"level\":1.*\"wake_input\".*\"display_off\"")
 # Quick replies and interrupt (issue b150): reply 1 goes out as op 11 with arg 1; a tap on Interrupt
 # sends nothing; the hold sends op 6 with hold_ms >= 1000.
 sim_script_test(sim_quick_replies quick_replies.txt
@@ -534,10 +561,11 @@ sim_script_test(sim_window_handback window_handback.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3"
   PASS_REGULAR_EXPRESSION "\"tx_cmd\",\"id\":[0-9]+,\"op\":0,\"sid\":2,\"rid\":7")
 sim_script_test(sim_window_old_daemon window_old_daemon.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
-# reminders spread over the window: arrival, nothing by 16 s (the `ui` dump), the first reminder at 30 s
+# reminders grow louder over the window (issue 20261126-a909): nothing by 24 s (the `ui` dump), a soft
+# pulse at 25 s, the pattern at 60 s, the pattern twice and the sound at 110 s
 sim_script_test(sim_window_nag window_nag.txt
-  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\].*\"ev\":\"state\""
-  PASS_REGULAR_EXPRESSION "\"ev\":\"state\".*pattern_ms\":\\[250,120,250\\]")
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"nag\".*\"ev\":\"state\""
+  PASS_REGULAR_EXPRESSION "\"ev\":\"state\".*\"nag\",\"rid\":7,\"level\":1.*pattern_ms\":\\[60\\].*\"nag\",\"rid\":7,\"level\":2.*pattern_ms\":\\[250,120,250\\].*\"nag\",\"rid\":7,\"level\":3.*pattern_ms\":\\[250,120,250,400,250,120,250\\].*\"ev\":\"sound\"")
 set_tests_properties(sim_window_nag PROPERTIES TIMEOUT 60)
 sim_script_test(sim_window_nag_short window_nag_short.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]"
@@ -694,7 +722,7 @@ sim_script_test(sim_presence_hush_ask presence_hush_ask.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"ev\":\"glow\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"hush\",\"rid\":7,([^p]|p[^a]|pa[^t])*\"ev\":\"attention\",\"rid\":8.*pattern_ms\":\\[250,120,250\\]")
 sim_script_test(sim_presence_hush_nag presence_hush_nag.txt
-                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\]|\"op\":3"
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\]|\"ev\":\"nag\"|\"op\":3"
                 PASS_REGULAR_EXPRESSION "\"ev\":\"hush\",\"rid\":7")
 sim_script_test(sim_presence_hush_done presence_hush_done.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"glow\""
@@ -742,13 +770,13 @@ sim_script_test(sim_motion_orientation motion_orientation.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"ev\":\"orientation\",\"flipped\":true.*\"ev\":\"orientation\",\"flipped\":false")
 sim_script_test(sim_motion_orientation_stored motion_orientation_stored.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
-# Palm cover: the motor and speaker stop and the 15 s reminder is dropped; the request is not answered.
+# Palm cover: the motor and speaker stop and the reminders are dropped; the request is not answered.
 sim_script_test(sim_motion_cover_mute motion_cover_mute.txt
-                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]"
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]|\"ev\":\"nag\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"sound\".*pattern_ms\":\\[\\].*\"ev\":\"sound_stop\".*\"ev\":\"cover_mute\"")
 sim_script_test(sim_motion_cover_control motion_cover_nag_control.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"cover_mute\""
-                PASS_REGULAR_EXPRESSION "pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]")
+                PASS_REGULAR_EXPRESSION "pattern_ms\":\\[250,120,250\\].*\"nag\",\"rid\":7,\"level\":1.*pattern_ms\":\\[60\\].*\"nag\",\"rid\":7,\"level\":2.*pattern_ms\":\\[250,120,250\\]")
 # Confirmation tones: rising on an approve hold, falling on a deny hold; none with Sounds off.
 sim_script_test(sim_tone_approved approve_hold.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"

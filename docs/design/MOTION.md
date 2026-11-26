@@ -79,7 +79,7 @@ Three stored values (`prefs.c`, key `orient`): `normal` (default), `flipped`, `a
 The CST820B datasheet has no contact-size or palm field; the controller reports positions (one point plus
 a documented "real two-point" capability). The nearest safe signal is **two or more simultaneous contacts**
 (`hal_touch_covered`, register 0x02 finger count). On that edge `app.c` stops the motor and speaker
-(`feedback_silence_now`) and records the request currently on top as muted, so its 15 s reminders are
+(`feedback_silence_now`) and records the request whose buzz is running as muted, so its reminders are
 dropped; the next request alerts normally. It answers, dismisses and selects nothing. Unverified on hardware:
 whether a palm reports two points, one point or none. If it reports one, the cover does nothing (a one-finger
 touch behaves as always: it wakes, and touching ends the nag).

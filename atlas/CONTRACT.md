@@ -156,7 +156,7 @@ site's own art direction on top.
                "btn_double_ms": 300, "cx_px": 233, "cy_px": 233, "centre_r_px": 150,
                "rim_in_px": 160, "rim_out_px": 260, "rim_track_in_px": 110, "rim_track_out_px": 340,
                "scrub_start_deg": 10, "scrub_hyst_deg": 5, "hold_confirm_ms": 1200, "hold_show_ms": 250 },
-  "ring": { "merge_at": 9, "ambient_ms": 30000, "nag_ms": 15000, "nag_max": 3,
+  "ring": { "merge_at": 9, "ambient_ms": 30000, "nag_steps": 3, "nag_r1_ms": 25000, "nag_r2_ms": 40000, "nag_floor_ms": 10000,
             "sigil_y_px": 50, "hero_y_px": 206, "summary_y_px": 316, "time_dots_r_px": 88,
             "key_a_x_px": 101, "key_b_x_px": 365, "key_y_px": 101,
             "kinds": { "<work|ask|perm|done|error|idle>": "shape and motion text" } /* plus geometry and per-kind periods */ },

@@ -472,17 +472,23 @@ static void glow_for(const attention_t *a)
 /* The nag is an alert too: quiet mode holds it as it holds the arrival buzz. */
 static uint32_t s_muted_rid, s_muted_sid; /* the request a palm cover silenced (0 = none) */
 
-static void act_nag(void)
+static uint32_t s_alert_rid; /* the request that buzzed last: the one a palm cover silences */
+
+static void act_nag(uint32_t rid, int level)
 {
-    const attention_t *first = model_attention_first();
-    if (first && sid_snoozed(first->sid)) return;
-    /* covered: no reminders */
-    if (first && s_muted_rid && first->rid == s_muted_rid && first->sid == s_muted_sid) return;
-    if (first && first->hush) return; /* the user is looking at its terminal (PRESENCE.md) */
+    const attention_t *a = model_attention_find(rid);
+    if (!a || sid_snoozed(a->sid)) return;
+    if (s_muted_rid && a->rid == s_muted_rid && a->sid == s_muted_sid) return; /* covered */
+    if (a->hush) return; /* the user is looking at its terminal (PRESENCE.md) */
     if (model_quiet_active(app_now_unix())) return;
-    feedback_attention(ATT_APPROVAL);
-    /* a dark display lights again: who and what (issue 20261126-0ca0) */
-    if (first) glow_for(first);
+    /* No exception for a request open in ASK on a lit display: a takeover opens it whether or not
+     * anyone is there (a watch on the desk stays lit for 10 min), and a user who looks has touched
+     * or raised it, which ends the ladder (nag_note_input). */
+    dbg_event("ui", "nag", "\"rid\":%u,\"level\":%d", (unsigned)rid, level);
+    s_alert_rid = rid;
+    feedback_reminder(a->kind, level);
+    /* the second and third light a dark display: who and what (issue 20261126-0ca0) */
+    if (level >= 2) glow_for(a);
 }
 
 static const ui_actions_t s_actions = {.focus = act_focus,
@@ -562,6 +568,7 @@ static void on_attention(const attention_t *a, bool is_new)
         dbg_event("ui", "hush", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
     } else {
         feedback_attention(a->kind);
+        s_alert_rid = a->rid;
         /* face down nobody sees a glow */
         if (!motion_face_down()) power_attention(rgb, a->sid, att_icon(a->kind), app_now_ms());
         /* a new request */
@@ -805,7 +812,9 @@ static void dispatch(const gesture_evt_t *g)
     }
     if (g->kind == G_PRESS) s_swallow_touch = false; /* a new contact */
     if (power_activity(app_now_ms())) {
-        /* first touch only wakes the display and shows what buzzed while it was dark */
+        /* first touch only wakes the display and shows what buzzed while it was dark; it is
+         * looking, as a raise is: the ambient dim and the reminders end */
+        ui_note_motion();
         ui_reveal_attention();
         if (touch && s_gesture.pressed) s_swallow_touch = true;
         dbg_event("power", "wake_input", "\"touch\":%s", touch ? "true" : "false");
@@ -895,10 +904,12 @@ static void cover_step(void)
     bool cov = hal_touch_covered();
     if (cov && !was) {
         feedback_silence_now();
-        const attention_t *first = model_attention_first();
-        if (first) {
-            s_muted_rid = first->rid;
-            s_muted_sid = first->sid;
+        /* the request whose buzz is running, else the first */
+        const attention_t *a = s_alert_rid ? model_attention_find(s_alert_rid) : NULL;
+        if (!a) a = model_attention_first();
+        if (a) {
+            s_muted_rid = a->rid;
+            s_muted_sid = a->sid;
         }
         dbg_event("ui", "cover_mute", "\"rid\":%u", (unsigned)s_muted_rid);
     }

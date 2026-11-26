@@ -7,6 +7,9 @@
 #include "model.h"
 
 void feedback_attention(att_kind_t kind);
+/* Reminder `level` (1 to 3, nag.h) of an unanswered request of this kind: one soft pulse; the
+ * arrival pattern; the pattern twice and the sound. */
+void feedback_reminder(att_kind_t kind, int level);
 void feedback_tick(void);       /* selection change by button, command sent */
 void feedback_detent(void);     /* one rim-scrub segment crossed: 15 ms kick only, rate limited */
 void feedback_hold_ramp(void);  /* approve hold started: escalating pulses over ~1 s */

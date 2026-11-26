@@ -241,6 +241,8 @@ typedef struct {
     /* not on the wire: the user went back from it in ASK, so the queue passes over it (it stays on
      * the ring and opens from its card; issue 20261126-aa28) */
     bool skipped;
+    /* not on the wire: when it reached the watch (app_now_ms); a re-send keeps the first */
+    uint32_t arrived_ms;
 } attention_t;
 enum {
     ATT_ANSWER_NONE = 0,
@@ -313,6 +315,8 @@ void model_attention_clear_all(void);
 const attention_t *model_attention_for_sid(uint32_t sid);
 const attention_t *model_attention_find(uint32_t rid);
 const attention_t *model_attention_first(void);
+/* The request in slot i (0 to MODEL_MAX_ATTENTION - 1), or NULL when the slot is free. */
+const attention_t *model_attention_at(int i);
 /* The user went back from request rid without answering it (model_attention_next passes over it).
  */
 void model_attention_skip(uint32_t rid);
