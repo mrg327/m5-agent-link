@@ -1,5 +1,6 @@
 # Sigil (GLYPHS.md §5): VOICE in every state. It still says in the report what its glyphs
 # mean (rule 9), a tap never sends, and the screen at rest repaints nothing.
+# the user leaves the deck alone 1.5 s before a request takes it over (issue 20261126-0a74)
 connect
 rx a400020101020103a70082001201a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f506f5
 session 1 done webapp feat/login Finished the work
@@ -121,6 +122,7 @@ wait 300
 expect_screen ring
 # ── VOICE answering one question of two: the question glyph, and the tick ("Use") instead of the plane ──
 session 2 ask dashboard main
+wait 1500
 ask 33 2 60000 60000 Name|What should the new command be called?|single|agentlink read|agentlink last ;; Scope|Where does it go?|single|CLI|Daemon
 wait 600
 expect_screen ask

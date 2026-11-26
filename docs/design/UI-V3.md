@@ -570,6 +570,12 @@ oldest row.
   dark, then the kind's pattern with the glow, then the pattern twice with the sound and the glow, scaled to
   the answer window; questions too; one ladder at a time, for the request with the least time left. No new
   drawing.
+- **Requests stop yanking open screens** (issue 20261126-0a74). A request opens ASK by itself only from HOME or
+  WATCH once the user has left them alone for 1.5 s, or on the wake of a dark display; AGENT and SCROLL now keep
+  their work like KEYS, VOICE, READ, GRAPH, STATUS and LABS. Elsewhere a **badge** at 12 o'clock (r 14 at
+  (233, 20)) in the colour of the next request holds the number waiting in black, or with one the kind's glyph
+  (20 px); it enters with one 160 ms pulse and is a 72 × 56 target that opens the request (not in KEYS or
+  TRACKPAD). It replaces the 16 px dot.
 
 ## 5. Interaction changes (`nav.c`)
 

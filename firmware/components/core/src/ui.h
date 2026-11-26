@@ -114,9 +114,13 @@ void ui_show_session(uint32_t sid);
 void ui_show_attention(uint32_t sid);
 /* A request (with error: an error) on session sid, in colour rgb, as it arrives: open it (ASK, or
  * the card for an error) unless that would lose work (KEYS, VOICE, READ, GRAPH, STATUS, LABS,
- * TRACKPAD) or hide another request open in ASK. Then it waits, a dot on the rim, and opens when
- * the user is back on the deck or WATCH (issue 20261122-883f). */
+ * TRACKPAD, AGENT, SCROLL) or hide another request open in ASK. Then it waits, a badge on the rim,
+ * and opens when the user is back on the deck or WATCH (issue 20261122-883f). On the deck or WATCH
+ * it waits until the user has left them alone for TAKEOVER_QUIET_MS (issue 20261126-0a74). */
 void ui_offer_attention(uint32_t sid, bool error, uint32_t rgb);
+/* A request the daemon refused the answer to comes back: the user is waiting for that answer, so
+ * it opens at once on the deck or WATCH (no quiet time); elsewhere it waits as a new one would. */
+void ui_restore_attention(uint32_t sid, uint32_t rgb);
 /* The same, but it only waits (the display is dark or glowing): see ui_reveal_attention. */
 void ui_wait_attention(uint32_t sid, bool error, uint32_t rgb);
 /* Request rid on session sid was re-sent (not new): nothing alerts; ASK reopens on it only when it
@@ -127,6 +131,9 @@ void ui_reveal_attention(void);
 /* A takeover's screen settles this long: input that began before it, or within this after it, does
  * not act on it (issue 20261126-86cd). A tap that starts later acts at once. */
 #define TAKEOVER_SETTLE_MS 400
+/* A request takes over HOME or WATCH only once the user has not touched the glass or a button for
+ * this long, and no finger or button is down (issue 20261126-0a74). A raise does not count. */
+#define TAKEOVER_QUIET_MS 1500
 /* True when input that began at began_ms (app_now_ms clock) must not act: the screen in front was
  * opened by a takeover (a request, the queue's next one, an error card) at or after that. */
 bool ui_input_settling(uint32_t began_ms);

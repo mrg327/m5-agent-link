@@ -686,7 +686,7 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
         if (a && !ui_asking(a->sid)) {
             uint32_t rgb = a->kind == ATT_QUESTION ? RGB_ASK : RGB_PERMISSION;
             if (!power_display_on() || ui_glow_active()) ui_wait_attention(a->sid, false, rgb);
-            else ui_offer_attention(a->sid, false, rgb);
+            else ui_restore_attention(a->sid, rgb);
         }
     }
     if (op == LINK_OP_SCROLL && sid) {

@@ -1,5 +1,6 @@
 # A vertical drag in the centre moves a list with the finger (one item per 40 px; up = next), and a finger held
 # still off the rows goes back. In ASK neither answers: no approve (op 3), deny (op 4), reply (op 5), focus (op 0).
+# the user leaves the deck alone 1.5 s before a request takes it over (issue 20261126-0a74)
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 session 2 work webapp feat/login
@@ -21,6 +22,7 @@ hold 233 130 800
 wait 300
 expect_screen ring
 session 2 input webapp feat/login
+wait 1500
 attention 7 2 approval approve,deny,focus 0 Run shell command|npm test
 wait 500
 expect_screen ask

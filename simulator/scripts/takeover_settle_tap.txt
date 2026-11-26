@@ -8,7 +8,8 @@ session 2 work api main Working
 session 3 work cli main Working
 wait 300
 btn B
-wait 150
+# the deck left alone 1.5 s, so the request takes over on arrival (issue 20261126-0a74)
+wait 1600
 session 3 input cli main
 attention 8 3 approval approve,deny,focus 0 Edit file|src/main.rs
 wait 120

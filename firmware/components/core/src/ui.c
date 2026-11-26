@@ -14,14 +14,13 @@
 #include "ui_toy.h"
 
 #define TOAST_MS 1800
-/* The waiting-request mark: the ring pip's shapes (ring_pip_paint) at size 16, centred on y 14 at
- * 12 o'clock, with a 2 px black edge where it lies over the ring. The box holds the widest (the
- * bar, 36 px with its edge) and the tallest (the triangle, from y 4 to y 32). */
-#define WAIT_PIP_D 16
-#define WAIT_PIP_R 219
-#define WAIT_PIP_EDGE 2
-#define WAIT_PIP_BOX_W 40
-#define WAIT_PIP_BOX_H 36
+/* The badge at 12 o'clock (issue 20261126-0a74): what waits behind the open screen, and how many;
+ * a target 72 x 56 around it. */
+#define BADGE_D 28
+#define BADGE_CY 20
+#define BADGE_HIT_W 72
+#define BADGE_HIT_H 56
+#define BADGE_POP 358 /* it enters at 1.4 x (256 = 1.0) */
 
 const ui_actions_t *g_ui_actions;
 static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch, *s_voice, *s_keys,
@@ -57,10 +56,8 @@ static char s_toast_txt[64];
 static lv_obj_t *s_glow, *s_glow_ring, *s_glow_sigil, *s_glow_hero;
 static char s_glow_name[48]; /* the words, for the report */
 static const char *s_glow_kind = "";
-static lv_obj_t *s_wait_pip; /* a request waits behind the open screen (ui_offer_attention) */
-static uint32_t s_pip_rgb;   /* the mark's colour and ring kind as drawn */
-static uint8_t s_pip_kind = RING_ASK;
-static lv_obj_t *s_pair, *s_pair_num; /* BLE pairing passkey (ui_pair_show) */
+static lv_obj_t *s_badge, *s_badge_num, *s_badge_glyph; /* what waits (ui_offer_attention) */
+static lv_obj_t *s_pair, *s_pair_num;                   /* BLE pairing passkey (ui_pair_show) */
 static uint32_t s_pair_until_ms;
 #define PAIR_SHOW_MS 60000u /* the SM gives up after 30 s; this only guards a lost end event */
 
@@ -96,12 +93,30 @@ static void pair_create(lv_obj_t *top)
     lv_obj_add_flag(s_pair, LV_OBJ_FLAG_HIDDEN);
 }
 
-/* The waiting-request mark: black one edge larger, then the pip of its kind over it. */
-static void wait_pip_draw(lv_event_t *e)
+/* A disc of the waiting request's colour at 12 o'clock, on the rim, with how many wait in black,
+ * or with one waiting its kind's glyph (glyphs over words; GLYPHS.md rule 4 allows a count in a
+ * badge). */
+static void badge_create(lv_obj_t *top)
 {
-    lv_layer_t *l = lv_event_get_layer(e);
-    ring_pip_paint(l, s_pip_kind, WAIT_PIP_R, 0, WAIT_PIP_D + 2 * WAIT_PIP_EDGE, COL_BG);
-    ring_pip_paint(l, s_pip_kind, WAIT_PIP_R, 0, WAIT_PIP_D, lv_color_hex(s_pip_rgb));
+    s_badge = lv_obj_create(top);
+    lv_obj_remove_style_all(s_badge);
+    lv_obj_set_size(s_badge, BADGE_D, BADGE_D);
+    lv_obj_set_pos(s_badge, UI_CX - BADGE_D / 2, BADGE_CY - BADGE_D / 2);
+    lv_obj_set_style_radius(s_badge, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(s_badge, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(s_badge, COL_BG, 0);
+    lv_obj_set_style_border_width(s_badge, 2, 0);
+    lv_obj_set_style_transform_pivot_x(s_badge, BADGE_D / 2, 0);
+    lv_obj_set_style_transform_pivot_y(s_badge, BADGE_D / 2, 0);
+    lv_obj_remove_flag(s_badge, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    s_badge_num = lv_label_create(s_badge);
+    lv_obj_set_style_text_font(s_badge_num, FONT_CAPTION, 0);
+    lv_obj_set_style_text_color(s_badge_num, COL_ON_ACCENT, 0);
+    lv_label_set_text(s_badge_num, "");
+    lv_obj_center(s_badge_num);
+    /* children sit inside the 2 px border */
+    s_badge_glyph = ui_glyph_create(s_badge, FONT_ICON_S, BADGE_D / 2 - 2, BADGE_D / 2 - 2);
+    lv_obj_add_flag(s_badge, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void create_overlays(void)
@@ -129,15 +144,7 @@ static void create_overlays(void)
     lv_obj_add_flag(s_toast, LV_OBJ_FLAG_HIDDEN);
     ui_burst_init(top); /* over the toast, under the glow */
 
-    /* The request's pip at 12 o'clock, on the rim, in its colour and shape: something waits behind
-     * this screen (glyphs over words). */
-    s_wait_pip = lv_obj_create(top);
-    lv_obj_remove_style_all(s_wait_pip);
-    lv_obj_set_size(s_wait_pip, WAIT_PIP_BOX_W, WAIT_PIP_BOX_H);
-    lv_obj_set_pos(s_wait_pip, UI_CX - WAIT_PIP_BOX_W / 2, 0);
-    lv_obj_add_event_cb(s_wait_pip, wait_pip_draw, LV_EVENT_DRAW_MAIN, NULL);
-    lv_obj_remove_flag(s_wait_pip, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
+    badge_create(top);
 
     s_glow = lv_obj_create(top);
     lv_obj_remove_style_all(s_glow);
@@ -432,24 +439,42 @@ uint32_t ui_pending_attention_sid(void)
  * another request, or the display was dark. The requests form a queue (model_attention_next: least
  * time left first, passing over those the user went back from); its head opens when the user comes
  * back to the deck or WATCH, after an answer closes ASK, or when the display wakes
- * (ui_reveal_attention), never under a finger or a held button. Meanwhile a dot of its colour waits
- * on the rim. */
-static bool s_wait_req;       /* requests wait in the queue */
-static uint32_t s_wait_err;   /* the session of an error card that waits, 0 = none */
-static uint32_t s_wait_seq;   /* the mode it found: offered again once the mode has changed */
-static uint32_t s_report_sid; /* the session the dot stands for, in words for the report */
+ * (ui_reveal_attention), never under a finger or a held button, and on the deck or WATCH only once
+ * the user has left them alone (issue 20261126-0a74). Meanwhile a badge of its colour, with how
+ * many wait, sits on the rim. */
+static bool s_wait_req;      /* requests wait in the queue */
+static uint32_t s_wait_err;  /* the session of an error card that waits, 0 = none */
+static uint32_t s_wait_seq;  /* the mode it found: offered again once the mode has changed */
+static bool s_wait_quiet;    /* it waits only for the user to stop touching HOME or WATCH */
+static uint32_t s_badge_rgb; /* the badge as drawn: colour, count, glyph */
+static int s_badge_n = -1;
+static const char *s_badge_icon = "";
+static uint32_t s_report_sid; /* the session the badge stands for, in words for the report */
+static int s_report_n;        /* how many it counts, for the report */
 
 uint32_t ui_mode_seq(void) { return s_mode_seq; }
 bool ui_asking(uint32_t sid) { return s_mode == MODE_ASK && ui_home_sel_sid() == sid; }
 
 /* Screens where the user composes, reads or works: an automatic takeover would lose the typed
- * text, the recording, the page or the place (UI-V3 §1.6 "Nothing is lost"). A toy is not one: it
- * pauses and yields at once, and ASK comes back to it (s_resume_toy). */
+ * text, the recording, the page or the place (UI-V3 §1.6 "Nothing is lost"). AGENT (a hold on Stop
+ * or Run again) and SCROLL (the place in the terminal) too (issue 20261126-0a74); both close
+ * themselves after 8 s idle, and the request opens then. A toy is not one: it pauses and yields
+ * at once, and ASK comes back to it (s_resume_toy). */
 static bool mode_keeps_work(nav_mode_t m)
 {
     return m == MODE_KEYS || m == MODE_VOICE || m == MODE_READ || m == MODE_GRAPH ||
-           m == MODE_STATUS || m == MODE_LABS || m == MODE_TRACKPAD;
+           m == MODE_STATUS || m == MODE_LABS || m == MODE_TRACKPAD || m == MODE_AGENT ||
+           m == MODE_SCROLL;
 }
+
+/* The last touch or button on any screen (not a raise): a request takes over HOME or WATCH only
+ * once the user has left them alone for TAKEOVER_QUIET_MS (issue 20261126-0a74), so a tap aimed at
+ * the deck never lands on ASK. */
+static bool s_touched;
+static uint32_t s_touch_ms;
+
+static bool quiet_for_takeover(void)
+{ return !s_touched || (int32_t)(lv_tick_get() - s_touch_ms) >= TAKEOVER_QUIET_MS; }
 
 static const attention_t *askable_for(uint32_t sid)
 {
@@ -495,7 +520,8 @@ static void settle_step(void)
 static void take_over(uint32_t sid, bool error)
 {
     if (error) { s_wait_err = 0; }
-    lv_obj_add_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
+    s_wait_quiet = false;
+    lv_obj_add_flag(s_badge, LV_OBJ_FLAG_HIDDEN);
     bool from_toy = s_mode == MODE_TOY || (s_mode == MODE_ASK && s_resume_toy);
     if (error && !askable_for(sid)) {
         ui_show_session(sid);
@@ -510,7 +536,7 @@ static void take_over(uint32_t sid, bool error)
 
 void ui_wait_attention(uint32_t sid, bool error, uint32_t rgb)
 {
-    (void)rgb; /* the dot takes the colour of what the queue opens next */
+    (void)rgb; /* the badge takes the colour of what the queue opens next */
     if (error) {
         s_wait_err = sid;
     } else {
@@ -524,8 +550,22 @@ void ui_offer_attention(uint32_t sid, bool error, uint32_t rgb)
 {
     if (takeover_blocked(sid)) {
         ui_wait_attention(sid, error, rgb);
+    } else if ((s_mode == MODE_HOME || s_mode == MODE_WATCH) &&
+               (!quiet_for_takeover() || input_down())) {
+        /* the user is at the deck or WATCH: it opens once they let go of it */
+        ui_wait_attention(sid, error, rgb);
+        s_wait_quiet = true;
     } else {
         take_over(sid, error);
+    }
+}
+
+void ui_restore_attention(uint32_t sid, uint32_t rgb)
+{
+    if (takeover_blocked(sid)) {
+        ui_wait_attention(sid, false, rgb);
+    } else {
+        take_over(sid, false);
     }
 }
 
@@ -551,25 +591,62 @@ void ui_reveal_attention(void)
     }
 }
 
-static void pip_show(bool on, uint8_t kind, uint32_t rgb)
+/* Unanswered requests other than the one ASK shows: how many wait. */
+static int waiting_count(void)
 {
-    if (on && (rgb != s_pip_rgb || kind != s_pip_kind)) {
-        s_pip_rgb = rgb;
-        s_pip_kind = kind;
-        lv_obj_invalidate(s_wait_pip);
+    const attention_t *shown = s_mode == MODE_ASK ? ui_ask_request() : NULL;
+    return model_attention_pending(s_now_ms, shown ? shown->rid : 0);
+}
+
+static void anim_scale(void *o, int32_t v) { lv_obj_set_style_transform_scale(o, v, 0); }
+
+/* It enters with one pulse, 1.4 x to 1 x, then rests. */
+static void badge_pop(void)
+{
+    lv_anim_delete(s_badge, anim_scale);
+    lv_obj_set_style_transform_scale(s_badge, 256, 0);
+    if (!ui_animations_allowed()) return;
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, s_badge);
+    lv_anim_set_exec_cb(&a, anim_scale);
+    lv_anim_set_values(&a, BADGE_POP, 256);
+    lv_anim_set_duration(&a, UI_MOTION_MS);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    lv_anim_start(&a);
+}
+
+/* Change-only: the colour of what opens next, and how many wait (one: its kind's glyph). */
+static void badge_show(bool on, uint32_t rgb, int n, const char *icon)
+{
+    bool shown = !lv_obj_has_flag(s_badge, LV_OBJ_FLAG_HIDDEN);
+    if (!on) {
+        if (shown) lv_obj_add_flag(s_badge, LV_OBJ_FLAG_HIDDEN);
+        return;
     }
-    if (on == !lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN)) {
-        return; /* already so: no redraw */
+    if (rgb != s_badge_rgb) {
+        s_badge_rgb = rgb;
+        lv_obj_set_style_bg_color(s_badge, lv_color_hex(rgb), 0);
     }
-    if (on) {
-        lv_obj_remove_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_add_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
+    if (n >= 2) icon = "";
+    if (n != s_badge_n) {
+        s_badge_n = n;
+        char digits[4] = "";
+        if (n >= 2) snprintf(digits, sizeof digits, "%d", n > 9 ? 9 : n);
+        lv_label_set_text(s_badge_num, digits);
+    }
+    if (icon != s_badge_icon) {
+        s_badge_icon = icon;
+        ui_glyph_set(s_badge_glyph, icon, COL_ON_ACCENT);
+    }
+    if (!shown) {
+        lv_obj_remove_flag(s_badge, LV_OBJ_FLAG_HIDDEN);
+        badge_pop();
     }
 }
 
-/* Per step: drop what no longer waits, open the queue's head on the way back to the deck or WATCH,
- * show the dot elsewhere. */
+/* Per step: drop what no longer waits, open the queue's head on the way back to the deck or WATCH
+ * (once the user has left them alone), show the badge elsewhere. */
 static void wait_step(void)
 {
     settle_step();
@@ -577,23 +654,50 @@ static void wait_step(void)
     const attention_t *next = s_wait_req ? queue_next() : NULL;
     if (!next) { s_wait_req = false; /* answered, gone, gone back from, or open in ASK */ }
     if (!next && !s_wait_err) {
-        pip_show(false, 0, 0);
+        s_wait_quiet = false;
+        badge_show(false, 0, 0, "");
         return;
     }
     uint32_t sid = next ? next->sid : s_wait_err;
-    if (s_mode_seq != s_wait_seq &&
-        (s_mode == MODE_HOME || s_mode == MODE_WATCH || s_mode == MODE_TOY) && !input_down()) {
+    if ((s_mode_seq != s_wait_seq || s_wait_quiet) && !input_down() &&
+        (s_mode == MODE_TOY ||
+         ((s_mode == MODE_HOME || s_mode == MODE_WATCH) && quiet_for_takeover()))) {
         if (next) { dbg_event("ui", "queue_next", "\"rid\":%u", (unsigned)next->rid); }
         take_over(sid, !next);
         return;
     }
     s_report_sid = sid;
-    /* the ring's pip for the kind: dot, bar or triangle (issue 20261126-38fa) */
-    uint8_t kind = !next ? RING_ERROR : next->kind == ATT_QUESTION ? RING_ASK : RING_PERM;
-    pip_show(s_mode != MODE_HOME, kind,
-             kind == RING_ERROR ? RGB_ERROR
-             : kind == RING_ASK ? RGB_ASK
-                                : RGB_PERMISSION);
+    s_report_n = waiting_count();
+    uint32_t rgb = !next ? RGB_ERROR : next->kind == ATT_QUESTION ? RGB_ASK : RGB_PERMISSION;
+    const char *icon = !next                        ? ICON_ERROR
+                       : next->kind == ATT_QUESTION ? ICON_QUESTION
+                                                    : ICON_PERMISSION;
+    badge_show(s_mode != MODE_HOME, rgb, s_report_n, icon);
+}
+
+/* The badge's touch target; not in KEYS or TRACKPAD, where the glass is the stroke recorder or the
+ * pointer. */
+static bool badge_hit(int x, int y)
+{
+    if (lv_obj_has_flag(s_badge, LV_OBJ_FLAG_HIDDEN)) return false;
+    if (s_mode == MODE_KEYS || s_mode == MODE_TRACKPAD) return false;
+    return x >= UI_CX - BADGE_HIT_W / 2 && x < UI_CX + BADGE_HIT_W / 2 && y >= 0 && y < BADGE_HIT_H;
+}
+
+/* A tap on the badge goes to what it stands for: the queue's head on its session in ASK, or the
+ * error's card. Only navigation: nothing is answered. */
+static void badge_go(void)
+{
+    const attention_t *next = queue_next();
+    uint32_t err = s_wait_err;
+    dbg_event("ui", "badge_tap", "\"rid\":%u", next ? (unsigned)next->rid : 0u);
+    if (next) {
+        ui_show_attention(next->sid);
+    } else if (err) {
+        s_wait_err = 0;
+        ui_show_session(err);
+    }
+    g_ui_actions->tick();
 }
 
 void ui_report_add(ui_report_t *r, const char *fmt, ...)
@@ -621,11 +725,13 @@ void ui_report(ui_report_t *r)
         if (s_glow_kind[0]) ui_report_add(r, "%s", s_glow_kind);
     }
     if (!lv_obj_has_flag(s_toast, LV_OBJ_FLAG_HIDDEN)) ui_report_add(r, "%s", s_toast_txt);
-    if (!lv_obj_has_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN)) {
-        ui_report_add(r, "waiting %u · %s", (unsigned)s_report_sid,
-                      s_pip_kind == RING_ERROR ? "error"
-                      : s_pip_kind == RING_ASK ? "question"
-                                               : "approval");
+    if (!lv_obj_has_flag(s_badge, LV_OBJ_FLAG_HIDDEN)) {
+        ui_report_add(r, "waiting %u", (unsigned)s_report_sid);
+        if (s_report_n > 0) {
+            ui_report_add(r, "%d waiting", s_report_n);
+        } else {
+            ui_report_add(r, "error waiting");
+        }
     }
     if (s_mode == MODE_TOY) {
         ui_toy_report(r);
@@ -870,6 +976,15 @@ static void key_hint_flash(gesture_kind_t kind, int key)
 bool ui_on_gesture(const gesture_evt_t *g)
 {
     if (g->kind == G_RELEASE) s_rel_y = g->y;
+    if (g->kind != G_SHAKE && g->kind != G_LIFT) {
+        s_touched = true;
+        s_touch_ms = lv_tick_get();
+    }
+    /* the badge: what waits behind this screen (issue 20261126-0a74) */
+    if (g->kind == G_TAP && badge_hit(g->x, g->y)) {
+        badge_go();
+        return true;
+    }
     nav_zone_t zone = nav_centre(g->x, g->y) ? ZONE_CENTRE : ZONE_RIM;
     /* The deck's book disc and graph strip sit in the bottom slot and reach past the centre
      * zone: a tap on one is a tap on it, not on the rim (a drag there still scrubs the

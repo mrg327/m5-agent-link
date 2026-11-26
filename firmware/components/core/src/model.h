@@ -324,6 +324,9 @@ void model_attention_skip(uint32_t rid);
  * user has not gone back from, other than except_rid; least time left first, then the requests
  * without a window, oldest rid first. NULL when none. */
 const attention_t *model_attention_next(uint32_t now_ms, uint32_t except_rid);
+/* How many unanswered approvals and questions wait, other than except_rid (skipped ones too; not
+ * those whose window is over). */
+int model_attention_pending(uint32_t now_ms, uint32_t except_rid);
 /* Records the answer that went out (ATT_ANSWER_*); ATT_ANSWER_NONE restores the unanswered state
  * (the daemon rejected the command). */
 void model_attention_set_answer(uint32_t rid, uint8_t answer, uint8_t opt);

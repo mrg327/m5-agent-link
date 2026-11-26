@@ -15,6 +15,9 @@ expect_screen status
 expect_label waiting 2
 swipe 140 233 330 233 160
 wait 400
+# back on the deck: it opens once the user has left it alone 1.5 s (issue 20261126-0a74)
+expect_screen ring
+wait 1200
 expect_screen ask
 expect_label Run shell command
 quit

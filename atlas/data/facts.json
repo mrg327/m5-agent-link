@@ -1522,7 +1522,7 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:203"
+      "source": "firmware/components/core/src/ui.c:210"
     },
     {
       "id": "attention",

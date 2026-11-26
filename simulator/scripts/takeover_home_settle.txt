@@ -1,0 +1,21 @@
+# Issue 20261126-0a74: the user is pressing B on the deck when a request arrives. It does not take
+# over under them: the next press 120 ms later still moves the deck (it would have landed on ASK), and
+# ASK opens once the deck has been left alone for 1.5 s.
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 2 work api main Working
+session 3 work cli main Working
+session 4 work web main Working
+wait 300
+btn B
+wait 150
+session 3 input cli main
+attention 8 3 approval approve,deny,focus 0 Edit file|src/main.rs
+wait 120
+btn B
+wait 500
+expect_no_label Edit file
+wait 1200
+expect_screen ask
+expect_label Edit file
+quit

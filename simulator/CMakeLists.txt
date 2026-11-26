@@ -395,7 +395,17 @@ sim_script_test(sim_takeover_agent_keeps_item takeover_agent_keeps_item.txt FAIL
 sim_script_test(sim_takeover_late_err takeover_late_err.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
   PASS_REGULAR_EXPRESSION "\"result\",\"ok\":false,\"err\":0,\"op\":3.*\"mode\":\"ask\".*\"text\":\"Out of date\"")
-sim_script_test(sim_takeover_finger_carry takeover_finger_carry.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"action\":\"back\"")
+# Requests stop yanking open screens (issue 20261126-0a74): AGENT and SCROLL keep the work and show the
+# badge, opening the request when they close themselves; on the deck a request waits until the user has
+# left it alone 1.5 s; a tap on the badge goes to the most urgent request and answers nothing.
+sim_script_test(sim_takeover_scroll_waits takeover_scroll_waits.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]")
+sim_script_test(sim_takeover_agent_waits takeover_agent_waits.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[3456]")
+sim_script_test(sim_takeover_home_settle takeover_home_settle.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"settling\"|\"op\":[345]"
+  PASS_REGULAR_EXPRESSION "\"mode\":\"home\",\"gesture\":\"btn_b\".*\"ev\":\"wait\",\"sid\":3.*\"mode\":\"home\",\"gesture\":\"btn_b\".*\"queue_next\",\"rid\":8.*\"mode\":\"ask\"")
+sim_script_test(sim_takeover_badge_tap takeover_badge_tap.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]"
+  PASS_REGULAR_EXPRESSION "\"badge_tap\",\"rid\":8.*\"mode\":\"ask\"")
 # Only a new rid alerts (issue 20261126-d95a): a resync's and a reconnect's re-send of the open request
 # gives one arrival pattern in all, and ASK comes back after the welcome; the new rid 8 still buzzes.
 sim_script_test(sim_seen_resend_silent seen_resend_silent.txt

@@ -604,6 +604,19 @@ const attention_t *model_attention_next(uint32_t now_ms, uint32_t except_rid)
     return best;
 }
 
+int model_attention_pending(uint32_t now_ms, uint32_t except_rid)
+{
+    int n = 0;
+    for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
+        const attention_t *a = &s_att[i];
+        if (!s_att_used[i] || a->rid == except_rid || a->answer_sent) continue;
+        if (a->kind != ATT_APPROVAL && a->kind != ATT_QUESTION) continue;
+        if (model_attention_left_ms(a, now_ms) == 0) continue;
+        n++;
+    }
+    return n;
+}
+
 void model_attention_set_answer(uint32_t rid, uint8_t answer, uint8_t opt)
 {
     for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
