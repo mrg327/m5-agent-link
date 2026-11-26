@@ -1,8 +1,7 @@
-// "touch" chapter: how you talk to it. Gesture lab, timing scope, haptic seismograph,
-// gesture → action matrix.
+// "touch" chapter: how you talk to it. Gesture lab, timing scope and the gesture → action matrix.
+// The haptic seismograph lives in the "feel" chapter (sound/chapter.js).
 import { h, bodySlot } from './dom.js';
 import { createLab } from './lab.js';
-import { createSeismograph } from './haptics.js';
 import { createMatrix } from './matrix.js';
 
 let lab = null;
@@ -27,56 +26,63 @@ export function mount(section, ctx) {
   const f = ctx.facts,
     g = f.gesture;
 
+  const s = (/** @type {number} */ ms) => `${(ms / 1000).toFixed(1).replace(/\.0$/, '')} s`;
   const intro = h(
-    'p',
+    'div',
     { class: 'tc__intro' },
-    'One screen, one ring. Scrub the rim to pick a session, tap the centre to act, hold it for ',
-    h('b', { class: 'mono', text: `${g.hold_confirm_ms} ms` }),
-    ' to approve, a long swipe down (from above the centre) to deny. The classifier below is the firmware’s own rule set: ',
-    h('b', { class: 'mono', text: `${g.tap_slop_px} px` }),
-    ' slop, ',
-    h('b', { class: 'mono', text: `${g.swipe_min_px} px` }),
-    ' in ',
-    h('b', { class: 'mono', text: `${g.swipe_max_ms} ms` }),
-    ' for a swipe, ',
-    h('b', { class: 'mono', text: `${g.long_press_ms} ms` }),
-    ' for a long press.',
+    h(
+      'p',
+      null,
+      'Drag round the rim to pick a session. Tap the centre to open it: its menu, or the request when one waits. To approve, hold the approve disc for ',
+      h('b', { class: 'mono', text: s(g.hold_confirm_ms) }),
+      '; to deny, hold the deny disc for ',
+      h('b', { class: 'mono', text: s(g.deny_hold_ms) }),
+      '. A tap never answers a request.',
+    ),
+    h(
+      'p',
+      null,
+      'The lab below uses the firmware’s own thresholds: a tap may drift ',
+      h('b', { class: 'mono', text: `${g.tap_slop_px} px` }),
+      ', a swipe is ',
+      h('b', { class: 'mono', text: `${g.swipe_min_px} px` }),
+      ' within ',
+      h('b', { class: 'mono', text: s(g.swipe_max_ms) }),
+      ', a long press is ',
+      h('b', { class: 'mono', text: s(g.long_press_ms) }),
+      '.',
+    ),
   );
   root.append(intro);
 
   const labRoot = h('div');
-  const hapRoot = h('div');
   const mxRoot = h('div');
   root.append(
     block('A', 'Gesture lab', null, labRoot),
     block(
       'B',
-      'Haptic seismograph',
-      'Ten patterns, one motor. This is what each buzz looks like, and what it means.',
-      hapRoot,
-    ),
-    block(
-      'C',
       'What each gesture does',
-      'Hover a cell and the real firmware performs it on the watch.',
+      'Pick a cell and the real firmware performs it on the watch.',
       mxRoot,
     ),
     h(
       'aside',
       { class: 'tc__next' },
-      h('span', { class: 'tc__next-k mono', text: 'Shipped' }),
+      h('span', { class: 'tc__next-k mono', text: 'Design' }),
       h(
         'p',
         null,
-        'The ring replaced glance → list → detail: one screen, and every action is one gesture. ',
-        h('a', { href: 'docs/design/UI-RING.md', text: 'Read the design notes →' }),
+        'The rules behind these gestures: ',
+        h('a', { href: 'docs/design/UI-V3.md', text: 'UI-V3' }),
+        ' (gestures and safety) and ',
+        h('a', { href: 'docs/design/GLYPHS.md', text: 'GLYPHS' }),
+        ' (the glyph-first look).',
       ),
     ),
   );
   bodySlot(section).append(root);
 
   lab = createLab(labRoot, ctx);
-  createSeismograph(hapRoot, ctx);
   createMatrix(mxRoot, ctx);
   lab.attachWatch?.();
   requestAnimationFrame(() => lab.resize());

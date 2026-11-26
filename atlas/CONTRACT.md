@@ -2,7 +2,7 @@
 
 The Atlas is the project's living, visual explainer. It is a static site with no build
 step. The root `index.html` is the entry point, and everything else lives in `atlas/`.
-Serve it with `scripts/atlas` (`python3 -m http.server`). Browsers block ES modules and
+Serve it with `scripts/atlas` (node `atlas/tools/serve.mjs`, else python3). Browsers block ES modules and
 WASM on `file://`, so `index.html` shows a hint when it's opened from disk.
 
 ## Rules
@@ -28,12 +28,15 @@ order, each a `<section data-chapter="id">`:
 | id | Chapter | Owner module |
 |---|---|---|
 | `intro` | Hero: what it is, the watch in its best light | shell (`js/stage/*`) |
-| `glance` | What the watch shows: the ring anatomy, states, colours | shell |
+| `glance` | What the watch shows: the ring's parts, states, colours, the link | shell |
+| `touch` | How you talk to it: gestures per screen (from nav.c), timing | gestures (`js/gestures/*`) |
+| `feel` | Buzz and sound: each moment's buzz and cue side by side, every haptic pattern, the sound bank | sound (`js/sound/*`, seismograph from `js/gestures/haptics.js`) |
 | `flow` | How data travels: agent → hook → daemon → USB/BLE/WS → watch | flow (`js/flow/*`) |
-| `touch` | How you talk to it: gestures, timing, haptics, focus-on-PC | gestures (`js/gestures/*`) |
-| `sound` | How it sounds: audition the notification cues from the firmware sound bank | sound (`js/sound/*`) |
-| `replay` | Your own data: drop a trace file and replay real sessions | gestures (`js/replay/*`) |
-| `build` | Under the hood: firmware/daemon/protocol map, links to docs | shell |
+| `start` | Get started: what you need, setup, desk or wrist, keys, privacy and safety (static) | shell |
+| `replay` | Inside: drop a trace file and replay real sessions | gestures (`js/replay/*`) |
+| `build` | Inside: the hardware, the software map, how the page stays true | shell |
+
+The order is what it is, how you use it, how it works, how to start, then the appendices.
 
 Chapter modules export `export function mount(sectionEl, ctx)`, which is called once at
 start-up, plus an optional `export function onEnter(ctx)` and `export function onLeave(ctx)`
@@ -60,7 +63,7 @@ ctx = {
 | `watch:rx` | `{bytes, msg}` frame delivered to the watch | daemon |
 | `watch:haptic` | `{steps: [{on_ms, off_ms, duty}]}` | watch |
 | `watch:gesture` | `{kind: 'tap'\|'long_press'\|'scrub'\|'select'\|'chord'\|'swipe_l'\|'swipe_r'\|'swipe_u'\|'swipe_d'\|'btn_a'\|'btn_b', x, y}` | watch |
-| `watch:screen` | `{screen: 'ring'\|'attention', sel}` | watch |
+| `watch:screen` | `{screen, sel}`, `screen` one of the `facts.screens` ids (`ring`, `attention`, `agent`, `ask`, `scroll`, `status`) | watch |
 | `pc:focus` | `{sid, ok}` the mock PC brought a terminal forward | daemon |
 | `scenario:step` | `{name, step, text}` | daemon |
 | `transport:set` | `{kind: 'usb'\|'ble'\|'ws'}` which link the story shows | flow |
@@ -100,7 +103,7 @@ They are pure functions with tests in `atlas/test/` (`node --test atlas/test/*.t
 ## Stage API (owned by **shell**)
 
 ```js
-ctx.stage.focus(region)        // 'screen'|'buttons'|'motor'|'usb'|'antenna'|null: spotlight a hardware part
+ctx.stage.focus(region)        // 'screen'|'buttons'|'keya'|'keyb'|'power'|'grove'|'motor'|'usb'|'antenna'|null: spotlight a part (atlas/js/stage/art.js)
 ctx.stage.annotate(id, {x, y, text} | null)  // callout on the watch, in canvas coords
 ctx.stage.trace(points)        // draw a fading finger trail over the screen [{x,y,t}]
 ctx.stage.pulse(kind)          // visual haptic/radio pulse: 'haptic'|'usb'|'ble'
@@ -116,8 +119,11 @@ and mirrors it on `body[data-layout]`. A chapter may override it in `onEnter`.
 - Firmware UI change: rebuild the WASM watch with `atlas/wasm/build.sh` and commit `atlas/vendor/watch.*`.
 - Constants changed (palette, gesture timings, haptics, protocol): run `python3 atlas/tools/extract.py`.
   CI (`.github/workflows/atlas.yml`) runs `--check` and `node --test atlas/test/*.test.mjs`.
-- Hand-written prose in the chapters (for example the gesture→action matrix) must be updated by hand
-  when interaction design changes (see `docs/design/UI-RING.md`).
+- The Touch matrix is generated from `facts.gesture_map` (nav.c). The prose around the facts (Glance
+  cards, Start, chapter ledes) is written by hand: update it when the interaction design changes
+  (`docs/design/UI-V3.md`, `docs/design/GLYPHS.md`).
+- The `states` scenario keeps the watch on the ring with one session per state; Glance and the
+  Touch matrix play it. The `ring` scenario adds a live request, which takes the watch to ASK.
 
 ## File ownership
 
@@ -150,19 +156,28 @@ site's own art direction on top.
                "btn_double_ms": 300, "cx_px": 233, "cy_px": 233, "centre_r_px": 150,
                "rim_in_px": 160, "rim_out_px": 260, "rim_track_in_px": 110, "rim_track_out_px": 340,
                "scrub_start_deg": 10, "scrub_hyst_deg": 5, "hold_confirm_ms": 1200, "hold_show_ms": 250 },
-  "ring": { "merge_at": 9, "ambient_ms": 30000, "nag_ms": 15000, "nag_max": 3, "hint_a_deg": 225, "hint_b_deg": 135,
-            "repo_w_px": 250, "repo_px": 32, "repo_small_px": 24,
-            "kinds": { "<work|ask|perm|done|error|idle>": "shape and motion text" },
-            "pills": { "approve": "HOLD ✓ APPROVE", "done": "FOCUS + ACK", "default": "FOCUS" },
-            "edge_hints": { "a": "FOCUS", "b": "NEXT" } /* plus geometry and per-kind periods */ },
-  "gesture_map": { "cases": [ { "gesture": "G_TAP", "source": "file:line", "text": "..." } ], "chord": "...", "first_touch_wakes_only": true },
-  "screens": [ "ring", "attention" ],
+  "ring": { "merge_at": 9, "ambient_ms": 30000, "nag_ms": 15000, "nag_max": 3,
+            "sigil_y_px": 50, "hero_y_px": 206, "summary_y_px": 316, "time_dots_r_px": 88,
+            "key_a_x_px": 101, "key_b_x_px": 365, "key_y_px": 101,
+            "kinds": { "<work|ask|perm|done|error|idle>": "shape and motion text" } /* plus geometry and per-kind periods */ },
+  "gesture_map": { "cases": [ { "gesture": "G_TAP", "mode": "home", "zone": "centre", "when": "...",
+                   "nav": "NAV_OPEN_ASK", "action": "plain words", "source": "file:line" } ],
+                   "chord": "...", "first_touch_wakes_only": true },
+  "screens": [ { "id": "ring", "title": "Deck", "source": "file:line" } ],
   "haptics": { "<detent|hold_ramp|tick|confirm|reject|hello|done|error|question|permission>": [ { "on_ms": 35, "off_ms": 0, "duty": 100 } ] },
   "link":   { "hello_retry_ms": 3000, "ping_interval_ms": 5000, "silence_timeout_ms": 12000 },
   "usb":    { "vid": "0x303A", "pid": "0x1001", "crc": "CRC-16/CCITT-FALSE", "max_payload": 4096 },
   "ble":    { "service": "uuid", "rx": "uuid", "tx": "uuid", "name_prefix": "AgentLink-", "default_write_len": 20 },
   "display":{ "width": 466, "height": 466, "shape": "round" },
   "messages": [ { "name": "hello", "dir": "dev→pc", "summary": "..." } ],
+  "glyphs": { "font": "font_phosphor_44", "px": 44, "line_height": 42, "base_line": 2,
+              // ICON_* per state (theme_state_glyph; "*" = default, input split by sub)
+              "states": { "done": "ICON_DONE", "*": "ICON_WORKING", "input": { "0": "ICON_PERMISSION" } },
+              // the deck's key hints: word, glyph, the key's colour (RGB_KEY_*), ring size (ui_kit)
+              "keys": { "a": { "word": "Open", "icon": "ICON_COMPUTER", "color": "#e69f00" }, "r_px": 20, "ring_w_px": 2 },
+              "agents": [ { "id": "claude", "name": "Claude Code", "icon": "ICON_AG_CLAUDE" } ],
+              // the font's 4 bpp bitmap: ink box, offset, advance, one hex digit (alpha 0-15) per pixel
+              "icons": { "ICON_DONE": { "cp": "e184", "w": 36, "h": 36, "x": 4, "y": 1, "adv": 44, "a": "0012…" } } },
   "sources": { "<key>": "file:line" }
 }
 ```

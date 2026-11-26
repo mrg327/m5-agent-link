@@ -152,7 +152,7 @@ test('scenarios: busy has 8 sessions, pause/resume, loop, inject', () => {
   );
   assert.deepEqual(
     h.daemon.scenarios.map((s) => s.name),
-    ['demo', 'single', 'attention', 'ring', 'busy'],
+    ['demo', 'single', 'attention', 'ring', 'states', 'busy', 'story'],
   );
 });
 

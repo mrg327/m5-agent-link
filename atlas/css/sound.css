@@ -32,3 +32,23 @@
 @media (prefers-reduced-motion: reduce) {
   .snd__card[data-playing="1"]::after { animation: none; }
 }
+/* each moment is a closed disclosure: the summary is the moment, the grid its candidates */
+details.snd__role { border-top: 1px solid var(--line); padding: var(--s-3) 0; }
+details.snd__role > summary { cursor: pointer; list-style: none; margin-bottom: 0; }
+details.snd__role > summary::-webkit-details-marker { display: none; }
+details.snd__role > summary::before { content: '+'; display: inline-block; width: 1.2em; color: var(--muted); }
+details.snd__role[open] > summary::before { content: '−'; }
+details.snd__role[open] > summary { margin-bottom: var(--s-3); }
+.snd__count { color: var(--muted); font-size: var(--t-sm); }
+/* Feel: the moments, buzz and sound side by side */
+.feel__moments { margin-bottom: var(--s-8); }
+.feel__table { width: 100%; border-collapse: collapse; }
+.feel__table th, .feel__table td { text-align: left; padding: var(--s-2) var(--s-3); border-bottom: 1px solid var(--line); }
+.feel__table thead th { font: 500 var(--t-xs)/1 var(--font-sans); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.feel__table tbody th { font-weight: 500; color: var(--paper); }
+.feel__play { display: inline-flex; gap: .45rem; align-items: center; padding: .3rem .7rem; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.03); color: var(--paper-2); cursor: pointer; font: inherit; }
+.feel__play:hover, .feel__play:focus-visible { border-color: var(--paper-2); color: var(--paper); }
+.feel__none { color: var(--muted); }
+.feel__note { color: var(--muted); font-size: var(--t-sm); margin-top: var(--s-3); }
+.feel__haptics { margin-bottom: var(--s-8); }
+@media (max-width: 560px) { .feel__play .mono { display: none; } .feel__table th, .feel__table td { padding: var(--s-2); } }

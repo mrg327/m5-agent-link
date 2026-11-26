@@ -46,7 +46,7 @@ const CHAPTER_MODULES = {
   build,
   flow: () => import('./flow/chapter.js'),
   touch: () => import('./gestures/chapter.js'),
-  sound: () => import('./sound/chapter.js'),
+  feel: () => import('./sound/chapter.js'),
   replay: () => import('./replay/chapter.js'),
 };
 
@@ -113,6 +113,7 @@ async function boot() {
   }
 
   await mountChapters(ctx);
+  addNextLinks();
   wireScroll(ctx);
   document.documentElement.dataset.atlas = 'ready';
   bus.emit('atlas:ready', { watch: ctx.watch.kind, daemon: !!ctx.daemon });
@@ -136,6 +137,40 @@ async function mountChapters(ctx) {
   ctx.chapters = mods;
 }
 
+/**
+ * Ends every chapter but the hero and the last with a link to the next one, named as in the rail.
+ */
+function addNextLinks() {
+  const sections = /** @type {HTMLElement[]} */ ([...document.querySelectorAll('[data-chapter]')]);
+  sections.forEach((section, i) => {
+    const next = sections[i + 1];
+    if (i === 0 || !next) return;
+    const id = next.dataset.chapter ?? '';
+    const nav = document.querySelector(`[data-nav="${id}"]`);
+    const a = document.createElement('a');
+    a.className = 'chapter-next';
+    a.href = `#${next.id}`;
+    const label = document.createElement('span');
+    label.textContent = 'Next';
+    const num = document.createElement('b');
+    num.textContent = nav?.querySelector('b')?.textContent ?? '';
+    a.append(label, num, nav?.querySelector('span')?.textContent ?? id, ' →');
+    (section.querySelector('.chapter__inner') ?? section).append(a);
+  });
+}
+
+/**
+ * Keeps the current rail link in view when the rail scrolls (phones).
+ * @param {HTMLElement} a the rail link
+ */
+function revealInRail(a) {
+  const rail = a.closest('.rail');
+  if (!rail || rail.scrollWidth <= rail.clientWidth) return;
+  const r = rail.getBoundingClientRect();
+  const b = a.getBoundingClientRect();
+  rail.scrollLeft += b.left - r.left - (r.width - b.width) / 2;
+}
+
 function wireScroll(ctx) {
   const sections = [...document.querySelectorAll('[data-chapter]')];
   const links = new Map(
@@ -148,6 +183,8 @@ function wireScroll(ctx) {
     if (current) ctx.chapters?.[current.dataset.chapter]?.onLeave?.(ctx);
     current = section;
     for (const [k, a] of links) a.setAttribute('aria-current', String(k === id));
+    const here = links.get(id);
+    if (here) requestAnimationFrame(() => revealInRail(/** @type {HTMLElement} */ (here)));
     const layout = section.dataset.layout;
     document.body.dataset.layout = layout || '';
     ctx.stage.setMode(layout === 'hero' ? 'hero' : layout === 'side' ? 'side' : 'mini');

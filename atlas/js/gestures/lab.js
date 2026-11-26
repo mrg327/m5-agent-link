@@ -1,9 +1,10 @@
 // The gesture lab: a practice ring + live classifier readouts + oscilloscope timing diagram.
 // Everything is driven by classify.js (a JS mirror of gesture.c: tap, swipe, long press and the
-// rim-scrub recogniser) using the thresholds in facts.gesture. What a gesture DOES for the selected
-// session comes from actions.js (the per-state defaults of the Ring UI, UI-RING.md).
+// rim-scrub recogniser) using the thresholds in facts.gesture. What a gesture DOES on the ring comes
+// from facts.gesture_map (nav.c's HOME rows). The practice ring draws only the rim, the centre zone and
+// the finger: the real watch beside it is the display ("Also send to the watch" is on by default).
 import { createClassifier, angleDeg } from './classify.js';
-import { STATE_ROWS, pillFor, rowColor, tone } from './actions.js';
+import { STATE_ROWS, stateLabel, askable, rowColor } from './actions.js';
 import { h, fitCanvas, hexA, clamp, cssVar } from './dom.js';
 
 const GLYPH = { swipe_u: '↑', swipe_d: '↓', swipe_l: '←', swipe_r: '→' };
@@ -12,14 +13,6 @@ const NAME = {
   swipe_d: 'Swipe down',
   swipe_l: 'Swipe left',
   swipe_r: 'Swipe right',
-};
-const SAMPLE = {
-  work: ['copilot', 'api'],
-  ask: ['claude', 'docs'],
-  perm: ['claude', 'webapp'],
-  done: ['copilot', 'cli'],
-  error: ['copilot', 'infra'],
-  idle: ['claude', 'blog'],
 };
 const tri = (ms, period) => {
   const p = (ms % period) / period;
@@ -44,7 +37,7 @@ export function createLab(root, ctx) {
 
   // ── state ──
   let sel = STATE_ROWS.findIndex((r) => r.id === 'perm');
-  let mirror = false;
+  let mirror = true;
   const S = {
     down: false,
     x0: 0,
@@ -129,8 +122,27 @@ export function createLab(root, ctx) {
     return true;
   }
   const sectorAtDeg = (deg) => Math.min(N - 1, Math.trunc((deg * N) / 360));
+  const label = (/** @type {import('./actions.js').StateRow} */ r) => stateLabel(r, f);
+  // nav.c's action text for a gesture on the ring; `when` picks between its pending / nothing rows
+  /**
+   * @param {string} gesture a nav.c gesture kind
+   * @param {string} [when] 'pending' or 'nothing' for the rows that depend on a request
+   * @returns {string} the action text
+   */
+  function homeAction(gesture, when) {
+    /** @type {import('./matrix.js').NavCase[]} */
+    const all = f.gesture_map?.cases ?? [];
+    const rows = all.filter((c) => c.mode === 'home' && c.gesture === gesture);
+    const pick =
+      when === 'pending'
+        ? rows.find((c) => /pending/.test(c.when))
+        : when === 'nothing'
+          ? rows.find((c) => /nothing/.test(c.when))
+          : rows[0];
+    return (pick ?? rows[0])?.action ?? '';
+  }
 
-  // mirrors ui_home_gesture()
+  // what nav.c binds on the ring (HOME); the action text is the firmware's own (facts.gesture_map)
   function onGesture(e, t) {
     const r = row();
     switch (e.kind) {
@@ -138,11 +150,6 @@ export function createLab(root, ctx) {
         S.pressCentre = angleDeg(th, e.x, e.y).r < th.centre_r_px;
         S.holdFired = false;
         log('press', 'press', t);
-        if (S.pressCentre && r.id === 'perm') {
-          S.holding = true;
-          S.holdT0 = t;
-          S.rampOn = false;
-        }
         break;
       case 'release':
         log('release', 'release', t);
@@ -151,47 +158,47 @@ export function createLab(root, ctx) {
       case 'tap': {
         const a = angleDeg(th, e.x, e.y);
         if (a.r < th.centre_r_px) {
-          const c = r.cells.tap;
-          log('fire', 'act', t);
-          verdict('Tap · centre', tone(c), c.text);
+          log('fire', 'open', t);
+          verdict('Tap · centre', 'ok', homeAction('G_TAP', askable(r) ? 'pending' : 'nothing'));
         } else {
           log('tap', 'tap', t);
           const i = sectorAtDeg(a.deg);
           select(i, t, 'tap');
-          verdict('Tap · segment', 'ok', `selects ${STATE_ROWS[i].label}; no action`);
+          verdict('Tap · rim', 'ok', `selects the ${label(STATE_ROWS[i])} session; no action`);
         }
         break;
       }
       case 'long_press': {
         if (!S.pressCentre) break;
-        const c = r.cells.long_press;
         log('long', 'long press', t);
-        verdict('Long-press', tone(c), c.text);
+        verdict(
+          'Long press',
+          'no',
+          'No action on the ring. Approve and deny are holds on their own discs inside the request',
+        );
         break;
       }
       case 'swipe_d':
-        log('swipe', 'swipe ↓', t);
-        if (S.pressCentre && r.id === 'perm') {
-          cancelHold(t, true);
-          verdict('Swipe down', 'danger', r.cells.swipe_d.text);
-          buzz('denied');
-        } else verdict('Swipe down', 'no', r.cells.swipe_d.text);
-        break;
       case 'swipe_u':
       case 'swipe_l':
-      case 'swipe_r':
+      case 'swipe_r': {
         log('swipe', 'swipe ' + GLYPH[e.kind], t);
-        verdict(NAME[e.kind], 'no', 'No action: the only swipe on the ring is down, to deny');
+        /** @type {Record<string, string>} */
+        const SW = { swipe_d: 'G_SWIPE_DOWN', swipe_u: 'G_SWIPE_UP' };
+        const g = SW[e.kind];
+        const act = g && S.pressCentre ? homeAction(g) : '';
+        verdict(NAME[e.kind], act ? 'ok' : 'no', act || 'No action on the ring');
         break;
+      }
       case 'scrub_start':
         cancelHold(t, true);
         log('scrub', 'scrub', t);
         if (select(e.x, t, 'scrub')) buzz('detent');
-        verdict('Scrub', 'ok', `along the rim: ${row().label} selected`);
+        verdict('Scrub', 'ok', `along the rim: ${label(row())} selected`);
         break;
       case 'scrub':
         if (select(e.x, t, 'scrub')) buzz('detent');
-        verdict('Scrub', 'ok', `${row().label} · ${e.dur_ms}° swept`);
+        verdict('Scrub', 'ok', `${label(row())} · ${e.dur_ms}° swept`);
         break;
       case 'scrub_end':
         log('scrub', 'scrub end', t);
@@ -228,7 +235,7 @@ export function createLab(root, ctx) {
       S.rampOn = false;
       S.flashAt = now;
       log('fire', 'approve', now);
-      verdict('Approved', 'ok', `held ${Math.round(el)} ms. ${row().cells.hold.text}`);
+      verdict('Approved', 'ok', `held ${Math.round(el)} ms`);
       buzz('approved');
     }
   }
@@ -242,12 +249,12 @@ export function createLab(root, ctx) {
     role: 'application',
     tabindex: 0,
     'aria-label':
-      'Practice ring. Drag around the rim to select a session, tap the centre to act, hold the centre to approve, swipe down to deny.',
+      'Practice ring. Drag around the rim to select a session, tap the centre to open it, swipe up or down from the centre.',
   });
   const chipText = h('b', { class: 'chip__text', text: 'Try it' });
   const chipSub = h('span', {
     class: 'chip__sub',
-    text: 'drag round the rim, tap or hold the centre',
+    text: 'drag round the rim, tap the centre, swipe',
   });
   const chip = h(
     'div',
@@ -303,7 +310,7 @@ export function createLab(root, ctx) {
         type: 'button',
         class: 'pick__b',
         'aria-pressed': String(i === sel),
-        title: `Select a ${r.label} session`,
+        title: `Select a ${label(r)} session`,
         style: { '--st': rowColor(r, f) },
         onclick: () => {
           select(i, performance.now(), 'tap');
@@ -311,7 +318,7 @@ export function createLab(root, ctx) {
         },
       },
       h('i', { class: 'pick__dot' }),
-      h('span', { text: r.label }),
+      h('span', { text: label(r) }),
     ),
   );
   function syncPicker() {
@@ -326,7 +333,7 @@ export function createLab(root, ctx) {
     {
       type: 'button',
       class: 'toggle',
-      'aria-pressed': 'false',
+      'aria-pressed': 'true',
       onclick: () => {
         mirror = !mirror;
         mirrorBtn.setAttribute('aria-pressed', String(mirror));
@@ -345,9 +352,10 @@ export function createLab(root, ctx) {
   const why = h(
     'p',
     { class: 'lab__why' },
-    h('b', { text: 'No waiting. ' }),
-    `A tap acts the moment you lift. Approving is the one irreversible action, so it can’t be a tap: the arc starts filling after ${th.hold_show_ms} ms ` +
-      `(a casual touch never flashes it) and the approval is sent at ${th.hold_confirm_ms} ms. Let go early and nothing happens.`,
+    h('b', { text: 'A tap opens, never answers. ' }),
+    `On the ring a tap acts the moment you lift, and the most it does is open the session or its request. ` +
+      `Answering takes a hold on the answer’s own disc inside the request: ${(th.hold_confirm_ms / 1000).toFixed(1)} s to approve, ` +
+      `${(th.deny_hold_ms / 1000).toFixed(1)} s to deny. Its ring starts filling after ${th.hold_show_ms} ms, so a casual touch never flashes it; let go early and nothing is sent.`,
   );
 
   root.append(
@@ -587,12 +595,10 @@ export function createLab(root, ctx) {
     });
   }
 
-  function drawCentre(c, w, now, kk, C) {
+  function drawCentre(c, w, now, kk) {
     const cx = w / 2,
       cy = w / 2,
-      r = row(),
-      col = rowColor(r, f);
-    const [agent, repo] = SAMPLE[r.kind];
+      col = rowColor(row(), f);
     const flash = clamp(1 - (now - S.flashAt) / 500, 0, 1);
     if (flash > 0) {
       const g = c.createRadialGradient(cx, cy, 20 * kk, cx, cy, 150 * kk);
@@ -603,49 +609,14 @@ export function createLab(root, ctx) {
       c.arc(cx, cy, 150 * kk, 0, 7);
       c.fill();
     }
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    const font = (px, wgt = 500) =>
-      `${wgt} ${Math.max(8, Math.round(px * kk))}px ui-sans-serif, system-ui, sans-serif`;
-    c.font = font(17);
-    c.fillStyle = C.muted;
-    c.fillText(agent, cx, cy - 86 * kk);
-    c.font = font(34, 600);
-    c.fillStyle = C.text;
-    c.fillText(repo, cx, cy - 54 * kk);
-    c.font = font(25);
-    c.fillStyle = col;
-    c.fillText(`${r.icon}  ${r.label}`, cx, cy - 12 * kk);
-    // default-action pill
-    const pill = pillFor(r, f);
-    c.font = font(21, 600);
-    const pwid = c.measureText(pill).width + 34 * kk,
-      ph2 = 40 * kk,
-      py = cy + 52 * kk;
-    c.strokeStyle = col;
-    c.lineWidth = 2 * kk;
-    c.fillStyle = hexA(col, 0.12);
+    // the centre zone: a tap here opens the session (no words: the watch beside is the display)
+    c.setLineDash([4 * kk, 6 * kk]);
+    c.strokeStyle = hexA(col, 0.45);
+    c.lineWidth = 1.5 * kk;
     c.beginPath();
-    c.roundRect(cx - pwid / 2, py - ph2 / 2, pwid, ph2, ph2 / 2);
-    c.fill();
+    c.arc(cx, cy, th.centre_r_px * kk, 0, 7);
     c.stroke();
-    c.fillStyle = col;
-    c.fillText(pill, cx, py + 1);
-    if (r.id === 'perm') {
-      c.font = font(16);
-      c.fillStyle = C.muted;
-      c.fillText('long swipe down to deny', cx, cy + 96 * kk);
-    }
-    // edge hints beside the buttons
-    const hint = (deg, text, colr) => {
-      const x = cx + ring.hint_r_px * kk * Math.sin((deg * Math.PI) / 180),
-        y = cy - ring.hint_r_px * kk * Math.cos((deg * Math.PI) / 180);
-      c.font = font(14, 600);
-      c.fillStyle = colr;
-      c.fillText(text, x, y);
-    };
-    hint(ring.hint_a_deg, ring.edge_hints.a, col);
-    hint(ring.hint_b_deg, ring.edge_hints.b, C.muted);
+    c.setLineDash([]);
   }
 
   function drawPad(now) {
@@ -689,7 +660,7 @@ export function createLab(root, ctx) {
     }
 
     drawRing(c, w, now, kk, C);
-    drawCentre(c, w, now, kk, C);
+    drawCentre(c, w, now, kk);
 
     // hold-to-approve arc, filling to hold_confirm_ms
     if (S.holding && now - S.holdT0 >= th.hold_show_ms) {
@@ -740,7 +711,7 @@ export function createLab(root, ctx) {
       c.fillStyle = 'rgba(230,237,243,0.34)';
       c.font = `500 ${Math.round(12 * Math.max(kk, 0.8))}px ui-sans-serif, system-ui`;
       c.textAlign = 'center';
-      c.fillText('drag the rim · tap · hold', cx, cy + 124 * kk);
+      c.fillText('drag the rim · tap · swipe', cx, cy + 124 * kk);
     }
   }
 

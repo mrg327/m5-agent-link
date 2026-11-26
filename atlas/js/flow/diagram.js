@@ -14,9 +14,9 @@ const txt = (parent, x, y, s, cls, attrs = {}) => {
 };
 
 export const LANE_META = {
-  usb: { label: 'USB', sub: 'CDC serial' },
-  ble: { label: 'BLE', sub: 'GATT notify/write' },
-  ws: { label: 'WS', sub: 'WebSocket' },
+  usb: { label: 'USB', sub: 'serial over the cable' },
+  ble: { label: 'BLE', sub: 'Bluetooth Low Energy' },
+  ws: { label: 'WS', sub: 'WebSocket: simulator, this page' },
 };
 
 function layout(vertical) {

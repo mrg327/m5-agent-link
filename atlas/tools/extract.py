@@ -24,14 +24,14 @@ OUT_CSS = ROOT / "atlas/css/tokens.generated.css"
 
 CORE = "firmware/components/core/src/"
 SOURCES = {}
-_cache = {}
+_cache: dict[str, str] = {}
 
 
 class Drift(Exception):
     pass
 
 
-def text(rel):
+def text(rel: str) -> str:
     if rel not in _cache:
         p = ROOT / rel
         if not p.exists():
@@ -40,11 +40,11 @@ def text(rel):
     return _cache[rel]
 
 
-def line_of(rel, pos):
+def line_of(rel: str, pos: int) -> int:
     return text(rel).count("\n", 0, pos) + 1
 
 
-def find(rel, pattern, key=None, flags=0):
+def find(rel: str, pattern: str, key: str | None = None, flags: int = 0) -> re.Match[str]:
     """Return the first regex match in `rel`; record file:line under `key`."""
     m = re.search(pattern, text(rel), flags)
     if not m:
@@ -54,7 +54,7 @@ def find(rel, pattern, key=None, flags=0):
     return m
 
 
-def find_all(rel, pattern, flags=0):
+def find_all(rel: str, pattern: str, flags: int = 0) -> list[re.Match[str]]:
     ms = list(re.finditer(pattern, text(rel), flags))
     if not ms:
         raise Drift(f"pattern not found in {rel}: {pattern}")
@@ -328,6 +328,11 @@ def extract_gesture():
     g["card_arm_ms"] = int(
         find(nav, r"#define NAV_CARD_ARM_MS\s+(\d+)", "gesture.card_arm_ms").group(1)
     )
+    # where the primary hold disc (Approve) sits on ASK: the hero demo holds it there
+    for key, macro in [("ask_hold_x_px", "P_X"), ("ask_hold_y_px", "P_Y")]:
+        g[key] = int(
+            find(CORE + "ui_ask.c", rf"#define {macro}\s+(\d+)", f"gesture.{key}").group(1)
+        )
     g["long_swipe_px"] = int(
         find(nav, r"#define NAV_LONG_SWIPE_PX\s+(\d+)", "gesture.long_swipe_px").group(1)
     )
@@ -372,10 +377,6 @@ def extract_gesture():
     return g
 
 
-# Ring constants UI-V3 §3.1 removed (the underline, the error dots, the permission tracks).
-REMOVED_IN_V3 = {"UNDERLINE_W", "UNDERLINE_GAP", "DOT_STEP_DEG", "TRACK_W"}
-
-
 def extract_ring():
     # the deck is two files: ui_home.c (slots, selection, timers) and ui_home_card.c (the centre card);
     # the ring's constants live in its private header, shared by ui_ring.c and ui_ring_draw.c
@@ -388,30 +389,28 @@ def extract_ring():
         ("nag_max", "NAG_MAX"),
     ]:
         r[key] = int(find(home, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
-    # key badges beside the buttons (UI-V2 §4.1); the fact keys keep their old names for the Atlas
-    # Sigil (GLYPHS.md §4): the card no longer spells the project's name, it draws its sigil. The Atlas still
-    # reads repo_w_px, so the key stays, as 0 (like the ring constants UI-V3 removed); the new card facts follow.
-    r["repo_w_px"] = 0
     r["summary_w_px"] = int(find(card, r"#define SUMMARY_W\s+(\d+)", "ring.summary_w_px").group(1))
     for key, macro in [("sigil_r_px", "SIGIL_R"), ("time_dots_r_px", "DOTS_R")]:
         r[key] = int(find(card, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
+    # where the card's parts sit (centres, canvas px): the Atlas anchors its callouts there
+    for key, macro in [
+        ("sigil_y_px", "SIGIL_Y"),
+        ("hero_y_px", "HERO_Y"),
+        ("summary_y_px", "LINE1_Y"),
+    ]:
+        r[key] = int(find(card, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
+    # the key hints beside the physical keys on the upper rim (GLYPHS.md §3.6, issue 20261125-d8b5)
+    for key, macro in [
+        ("key_a_x_px", "UI_KEY_A_X"),
+        ("key_b_x_px", "UI_KEY_B_X"),
+        ("key_y_px", "UI_KEY_Y"),
+    ]:
+        r[key] = int(find(CORE + "ui_kit.h", rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
     r["hero_px"] = int(
         find(
             CORE + "ui_theme.h", r"#define FONT_ICON_HERO \(&font_phosphor_(\d+)\)", "ring.hero_px"
         ).group(1)
     )
-    for key, tok in [("repo_px", "FONT_TITLE"), ("repo_small_px", "FONT_HEAD")]:
-        r[key] = int(
-            find(
-                CORE + "ui_theme.h", rf"#define {tok} \(&font_figtree_(\d+)_", f"ring.{key}"
-            ).group(1)
-        )
-    for key, macro in [
-        ("hint_a_deg", "UI_BADGE_A_DEG"),
-        ("hint_b_deg", "UI_BADGE_B_DEG"),
-        ("hint_r_px", "UI_BADGE_R"),
-    ]:
-        r[key] = int(find(CORE + "ui_theme.h", rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
     for key, macro in [
         ("band_out_px", "BAND_OUT"),
         ("band_w_px", "BAND_W"),
@@ -419,10 +418,6 @@ def extract_ring():
         ("sel_w_px", "SEL_W"),
         ("seg_gap_deg", "SEG_GAP_DEG"),
         ("others_pct", "OTHERS_PCT"),
-        ("underline_w_px", "UNDERLINE_W"),
-        ("underline_gap_px", "UNDERLINE_GAP"),
-        ("dot_step_deg", "DOT_STEP_DEG"),
-        ("track_w_px", "TRACK_W"),
         ("prog_out_px", "PROG_OUT"),
         ("prog_w_px", "PROG_W"),
         ("work_period_ms", "WORK_PERIOD_MS"),
@@ -432,11 +427,7 @@ def extract_ring():
         ("error_flicker_ms", "ERROR_FLICKER_MS"),
     ]:
         m = re.search(rf"#define {macro}\s+(\d+)", text(ring))
-        if not m and macro in REMOVED_IN_V3:
-            r[key] = (
-                0  # no such element any more; the Atlas lab still reads the key (restyled in UI-V3 stage C)
-            )
-        elif not m and macro == "OTHERS_PCT":
+        if not m and macro == "OTHERS_PCT":
             r[key] = int(find(ring, r"#define REST_PCT\s+(\d+)", f"ring.{key}").group(1))
         else:
             r[key] = int(find(ring, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
@@ -451,54 +442,45 @@ def extract_ring():
         f"{CORE}ui_ring.h:{line_of(CORE + 'ui_ring.h', find(CORE + 'ui_ring.h', r'RING_WORK,').start())}"
     )
     r["kinds"] = kinds
-    # no action pill (UI-V3 §4.1), and in Sigil no button either: a tap on the hero glyph of a session that needs
-    # you opens ASK; the report still names it Review / Answer, and A's hint is "Open" (drawn as a glyph). The
-    # `pills` fact keeps its key for the Atlas.
-    find(card, r'"Review" : "Answer"', "ring.pill_approve")
-    find(card, r'static const char \*const words\[2\] = \{"Open", "Next"\};', "ring.pill_done")
-    r["pills"] = {"approve": "Review / Answer", "done": "Open", "default": "Open"}
-    words = find(
-        card, r'static const char \*const words\[2\] = \{"(\w+)", "(\w+)"\};', "ring.edge_hint_a"
-    )
-    SOURCES["ring.edge_hint_b"] = SOURCES["ring.edge_hint_a"]
-    r["edge_hints"] = {"a": words.group(1), "b": words.group(2)}
     find(home, r"Nothing else needs you", "ring.nothing_else")
     return r
 
 
 # The gesture map is one table in nav.c (interaction layer). Each nav action has a hand-written
 # description here; a new action in the source without one, or a stale one here, fails the check.
+# The page shows these to readers as "what each gesture does", so they use the words of the page
+# (the ring, the request screen, the agent menu, Status, Scroll, the terminal), not mode or G_* names.
 ACTION_TEXT = {
-    "NAV_HOLD_PRESS": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
-    "NAV_HOLD_RELEASE": "Lifting cancels a hold in progress",
-    "NAV_FOCUS": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
-    "NAV_OPEN_AGENT": "Open the per-agent wheel for the selected session",
-    "NAV_OPEN_ASK": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
-    "NAV_OPEN_STATUS": "Open STATUS (swipe down on the deck): link, battery, quiet mode, sounds",
-    "NAV_PICK_RIM": "Select the segment under the finger on the HOME ring (AGENT and ASK rows are tapped directly)",
-    "NAV_HOLD_LONG": "An injected long press that already covers the selected hold item's time commits it directly",
-    "NAV_SCRUB": "A drag around the rim moves the selection with a detent per step",
-    "NAV_NEXT_ATTENTION": "Jump to the next session that needs attention",
-    "NAV_NEXT": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
-    "NAV_PREV": "Previous session",
-    "NAV_COMMIT": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
-    "NAV_BACK": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
-    "NAV_HOME": "A+B chord: straight back to the deck",
-    "NAV_SCROLL_DRAG": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
-    "NAV_SCROLL_FLING": "SCROLL: lifting off a fast drag keeps scrolling (a glide that slows down, like a trackpad)",
-    "NAV_SCROLL_CATCH": "SCROLL: any new touch stops a glide; a tap that stopped one does not leave",
-    "NAV_PAGE_NEWER": "SCROLL: button B moves one page toward newer output",
-    "NAV_TO_BOTTOM": "SCROLL: button A jumps back to the live bottom and leaves the mode",
-    "NAV_ERASE": "KEYS: button B deletes the last typed word",
-    "NAV_OPEN_LABS": "Open Experiments (swipe up on the deck): a wheel of experimental features, the first is the Trackpad",
-    "NAV_POINTER": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
+    "NAV_HOLD_PRESS": "Starts a hold on the selected item, if it needs one",
+    "NAV_HOLD_RELEASE": "Lifting the finger cancels a hold",
+    "NAV_FOCUS": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
+    "NAV_OPEN_AGENT": "Opens the agent menu for the selected session",
+    "NAV_OPEN_ASK": "Opens the request screen. Opening answers nothing",
+    "NAV_OPEN_STATUS": "Opens Status: link, battery, quiet mode, sounds",
+    "NAV_PICK_RIM": "Selects the session under your finger",
+    "NAV_HOLD_LONG": "Holding still away from the items goes back",
+    "NAV_SCRUB": "Sliding round the rim moves the selection, one tick per step",
+    "NAV_NEXT_ATTENTION": "Jumps to the next session that needs you",
+    "NAV_NEXT": "Selects the next session, item or page",
+    "NAV_PREV": "Selects the previous session",
+    "NAV_COMMIT": "Chooses the selected item. Approve, deny and stop need a hold instead",
+    "NAV_BACK": "Goes back one screen. A request stays open: going back never denies",
+    "NAV_HOME": "Goes straight back to the ring",
+    "NAV_SCROLL_DRAG": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
+    "NAV_SCROLL_FLING": "A quick flick keeps the terminal scrolling, slowing down like a trackpad",
+    "NAV_SCROLL_CATCH": "A new touch stops the scrolling",
+    "NAV_PAGE_NEWER": "Scrolls one page toward newer output",
+    "NAV_TO_BOTTOM": "Jumps to the newest output and leaves Scroll",
+    "NAV_ERASE": "Deletes the last typed word",
+    "NAV_OPEN_LABS": "Opens Experiments; the first is the Trackpad",
+    "NAV_POINTER": "Moves the PC's pointer; tap clicks, hold right-clicks",
 }
 WHEN_TEXT = {
     "WHEN_ALWAYS": "",
-    "WHEN_REQUEST": "with an approvable request on screen",
-    "WHEN_NO_REQUEST": "without an approvable request",
-    "WHEN_ASKABLE": "with a permission or question pending",
-    "WHEN_NOT_ASKABLE": "with nothing to answer",
+    "WHEN_REQUEST": "when a request waits for approval",
+    "WHEN_NO_REQUEST": "when no request waits for approval",
+    "WHEN_ASKABLE": "when the session waits for your answer",
+    "WHEN_NOT_ASKABLE": "when nothing waits for you",
 }
 
 
@@ -837,6 +819,151 @@ def extract_sounds():
     return {"rate": rate, "waves": waves, "roles": roles, "bank": sounds}
 
 
+# ───────────────────────── glyphs ─────────────────────────
+# FONT_ICON_L: the largest icon font that has every glyph the Atlas's glyph key shows
+GLYPH_FONT = "font_phosphor_44"
+
+
+def switch_returns(rel: str, signature: str, enum: str, ret: str) -> tuple[dict[str, str], int]:
+    """Map `case ENUM_X: return RET;` lines of one C function to {x: RET}, `default` as `*`."""
+    m = find(rel, signature + r"\s*\{(.*?)\n\}", None, re.S)
+    out = {}
+    for c in re.finditer(rf"case {enum}_(\w+): return ({ret});", m.group(1)):
+        out[c.group(1).lower()] = c.group(2)
+    d = re.search(rf"default: return ({ret});", m.group(1))
+    if not out or not d:
+        raise Drift(f"{rel}: no case/default returns in {signature}")
+    out["*"] = d.group(1)
+    return out, line_of(rel, m.start(1))
+
+
+def icon_codepoints() -> dict[str, int]:
+    """Map each single-glyph ICON_* of ui_icons.h to its code point."""
+    rel = CORE + "ui_icons.h"
+    out = {}
+    for m in find_all(rel, r'#define (ICON_\w+) "((?:\\x[0-9A-Fa-f]{2})+)"'):
+        raw = bytes(int(h, 16) for h in re.findall(r"\\x([0-9A-Fa-f]{2})", m.group(2)))
+        s = raw.decode("utf-8")
+        if len(s) == 1:
+            out[m.group(1)] = ord(s)
+            SOURCES[f"glyphs.icons.{m.group(1)}"] = f"{rel}:{line_of(rel, m.start())}"
+    return out
+
+
+def font_glyphs(name: str) -> tuple[int, int, dict[int, dict[str, object]]]:
+    """Read an lv_font_conv C font (4 bpp, uncompressed, sparse cmaps).
+
+    Returns the line height, the base line and {code point: glyph}; a glyph's `a` is one hex
+    digit (alpha 0-15) per pixel, row by row.
+    """
+    rel = f"{CORE}fonts/{name}.c"
+    find(rel, r"\* Bpp: 4\n", "glyphs.font")
+    if "--no-compress" not in text(rel):
+        raise Drift(f"{rel}: compressed bitmaps are not read")
+    bm = find(rel, r"glyph_bitmap\[\] = \{(.*?)\n\};", None, re.S).group(1)
+    data = bytes(int(v, 16) for v in re.findall(r"0x([0-9a-f]+)", re.sub(r"/\*.*?\*/", "", bm)))
+    dsc = find_all(
+        rel,
+        r"\{\.bitmap_index = (\d+), \.adv_w = (\d+), \.box_w = (\d+), \.box_h = (\d+), "
+        r"\.ofs_x = (-?\d+), \.ofs_y = (-?\d+)\}",
+    )
+    glyphs: dict[int, dict[str, object]] = {}
+    for cm in find_all(
+        rel,
+        r"\.range_start = (\d+), \.range_length = \d+, \.glyph_id_start = (\d+),\s*"
+        r"\.unicode_list = (\w+), \.glyph_id_ofs_list = NULL, \.list_length = (\d+), "
+        r"\.type = LV_FONT_FMT_TXT_CMAP_SPARSE_TINY",
+    ):
+        lst = find(rel, rf"{cm.group(3)}\[\] = \{{(.*?)\}};", None, re.S).group(1)
+        offs = [int(v, 16) for v in re.findall(r"0x([0-9a-f]+)", lst)]
+        if len(offs) != int(cm.group(4)):
+            raise Drift(f"{rel}: {cm.group(3)} has {len(offs)} entries, not {cm.group(4)}")
+        for i, off in enumerate(offs):
+            # dsc[0] is the reserved id 0, so glyph id k is dsc[k]
+            idx, adv, w, h, ox, oy = (int(g) for g in dsc[int(cm.group(2)) + i].groups())
+            n = w * h  # pixels, two to a byte, rows not padded
+            glyphs[int(cm.group(1)) + off] = {
+                "w": w,
+                "h": h,
+                "x": ox,
+                "y": oy,
+                "adv": adv // 16,
+                "a": data[idx : idx + (n + 1) // 2].hex()[:n],
+            }
+    lh = int(find(rel, r"\.line_height = (\d+),").group(1))
+    bl = int(find(rel, r"\.base_line = (\d+),").group(1))
+    return lh, bl, glyphs
+
+
+def extract_glyphs() -> dict[str, object]:
+    """Return the glyphs of the Atlas's glyph key as the firmware's own bitmaps (GLYPHS.md §3.2)."""
+    theme, card, kit = CORE + "ui_theme.c", CORE + "ui_home_card.c", CORE + "ui_kit.h"
+    st, line = switch_returns(
+        theme, r"const char \*theme_state_glyph\(const session_t \*s\)", "SESS", r"ICON_\w+"
+    )
+    SOURCES["glyphs.states"] = f"{theme}:{line}"
+    inp = find(
+        theme,
+        r"case SESS_INPUT: return s->sub == 0 \? (ICON_\w+) : (ICON_\w+);",
+        "glyphs.states.input",
+    )
+    states: dict[str, object] = dict(st)
+    states["input"] = {"0": inp.group(1), "1": inp.group(2)}
+    ag, line = switch_returns(
+        theme, r"const char \*theme_agent_glyph\(agent_t a\)", "AGENT", r"ICON_\w+"
+    )
+    SOURCES["glyphs.agents"] = f"{theme}:{line}"
+    names, line = switch_returns(
+        theme, r"const char \*theme_agent_name\(agent_t a\)", "AGENT", r'"[^"]+"'
+    )
+    SOURCES["glyphs.agents.name"] = f"{theme}:{line}"
+    agents = []
+    for m in find_all(CORE + "model.h", r"AGENT_(\w+) = \d+"):
+        a = m.group(1).lower()
+        name = names.get(a, names["*"]).strip('"')
+        agents.append({"id": a, "name": name, "icon": ag.get(a, ag["*"])})
+    # the deck's key hints (ui_home_card.c): A is set to a glyph, B is its word's glyph (kGlyphs)
+    words = find(card, r'static const char \*const words\[2\] = \{"(\w+)", "(\w+)"\};')
+    a_icon = find(card, r"ui_key_hint_set\(s_badge\[0\], (ICON_\w+)\);", "glyphs.keys.a").group(1)
+    b_icon = find(theme, rf'\{{"{words.group(2)}", (ICON_\w+)\}}', "glyphs.keys.b").group(1)
+    keys: dict[str, object] = {}
+    for k, word, icon in (("a", words.group(1), a_icon), ("b", words.group(2), b_icon)):
+        rgb = find(
+            kit, rf"#define RGB_KEY_{k.upper()} 0x([0-9a-fA-F]{{6}})", f"glyphs.keys.{k}.color"
+        )
+        keys[k] = {"word": word, "icon": icon, "color": "#" + rgb.group(1).lower()}
+    keys["r_px"] = int(find(kit, r"#define UI_DISC_R_KEY\s+(\d+)", "glyphs.keys.r_px").group(1))
+    keys["ring_w_px"] = int(
+        find(CORE + "ui_kit.c", r"#define KEY_RING_W (\d+)", "glyphs.keys.ring_w_px").group(1)
+    )
+    find(CORE + "ui_theme.h", rf"#define FONT_ICON_L \(&{GLYPH_FONT}\)", "glyphs.px")
+    used = sorted(
+        set(st.values())
+        | {inp.group(1), inp.group(2), a_icon, b_icon}
+        | {a["icon"] for a in agents}
+    )
+    cps = icon_codepoints()
+    lh, bl, bitmaps = font_glyphs(GLYPH_FONT)
+    icons = {}
+    for name in used:
+        if name not in cps:
+            raise Drift(f"{name} is not a single-glyph ICON_* in ui_icons.h")
+        g = bitmaps.get(cps[name])
+        if g is None:
+            raise Drift(f"{GLYPH_FONT} has no glyph for {name} (U+{cps[name]:04X})")
+        icons[name] = {"cp": f"{cps[name]:04x}", **g}
+    return {
+        "font": GLYPH_FONT,
+        "px": int(GLYPH_FONT.rsplit("_", 1)[1]),
+        "line_height": lh,
+        "base_line": bl,
+        "states": states,
+        "keys": keys,
+        "agents": agents,
+        "icons": icons,
+    }
+
+
 # ───────────────────────── output ─────────────────────────
 def build():
     SOURCES.clear()
@@ -856,6 +983,7 @@ def build():
         "display": extract_display(),
         "messages": extract_messages(),
         "sounds": extract_sounds(),
+        "glyphs": extract_glyphs(),
     }
     h = extract_haptics()
     facts["haptics"] = h["patterns"]

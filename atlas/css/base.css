@@ -99,10 +99,21 @@ button { font: inherit; color: inherit; }
 .rail a:hover { color: var(--paper); }
 .rail a[aria-current="true"] { color: var(--paper); background: rgba(255,255,255,.07); }
 .topbar__progress { position: absolute; left: 0; bottom: 0; height: 1px; width: 100%; background: linear-gradient(90deg, var(--glow), transparent); transform-origin: 0 50%; transform: scaleX(var(--p, 0)); opacity: .8; }
+.rail { min-width: 0; }
 @media (max-width: 760px) {
+  /* phones: numbers, plus the current chapter's name; the rail scrolls, never the page */
+  .rail { overflow-x: auto; scrollbar-width: none; }
+  .rail::-webkit-scrollbar { display: none; }
   .rail a span { display: none; }
   .rail a { padding: .5rem .4rem; }
+  .rail a[aria-current="true"] { padding: .5rem .7rem; }
+  .rail a[aria-current="true"] span { display: inline; white-space: nowrap; }
   .topbar__brand span { display: none; }
+}
+@media (max-width: 480px) {
+  .topbar { gap: var(--s-2); }
+  .topbar__brand { font-size: 0; gap: 0; } /* the dot alone; the link's aria-label names it */
+  .rail a { padding: .5rem .3rem; }
 }
 
 /* --- film grain (cheap: one tiled SVG feTurbulence) ------------------- */

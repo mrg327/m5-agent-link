@@ -71,14 +71,29 @@ test('gesture thresholds describe the ring recogniser, with no tap deferral', ()
   assert.ok(g.hold_confirm_ms > g.long_press_ms && g.hold_show_ms < g.hold_confirm_ms);
 });
 
-test('ring facts: screens, per-kind shapes, pills and the gesture cases', () => {
+test('ring facts: screens, per-kind shapes and the gesture cases', () => {
   assert.deepEqual(
     facts.screens.map((s) => s.id),
     ['ring', 'attention', 'agent', 'ask', 'scroll', 'status'],
   );
   assert.deepEqual(Object.keys(facts.ring.kinds), ['work', 'ask', 'perm', 'done', 'error', 'idle']);
   assert.ok(facts.ring.merge_at >= 2 && facts.ring.max_segments >= facts.ring.merge_at);
-  assert.equal(facts.ring.pills.approve, 'Review / Answer'); // the slot's button opens ASK; approving is a hold there
+  // the superseded ring UI's underline, error dots and permission tracks are gone from the facts
+  for (const k of [
+    'underline_w_px',
+    'underline_gap_px',
+    'dot_step_deg',
+    'track_w_px',
+    'pills',
+    'edge_hints',
+    'hint_a_deg',
+    'hint_b_deg',
+    'hint_r_px',
+    'repo_w_px',
+    'repo_px',
+    'repo_small_px',
+  ])
+    assert.ok(!(k in facts.ring), k);
   const cases = facts.gesture_map.cases.map((c) => c.gesture);
   for (const c of [
     'G_TAP',
@@ -185,4 +200,15 @@ test('every fact has a source and the CSS tokens mirror the facts', () => {
   assert.ok(css.includes(`--fw-hold-confirm-ms: ${facts.gesture.hold_confirm_ms}ms;`));
   assert.ok(css.includes(`--fw-permission: ${facts.palette.permission};`));
   assert.ok(!css.includes('tap-defer'));
+});
+
+test('gesture and sound texts are for readers: no mode, gesture or jargon names', () => {
+  const jargon =
+    /\b(HOME|AGENT|ASK|SCROLL|STATUS|WATCH|KEYS|READ|LABS|TRACKPAD|GRAPH)\b|\bG_|\bNAV_|deck|OTA|welcome/;
+  for (const c of facts.gesture_map.cases) {
+    assert.doesNotMatch(c.action, jargon, c.nav);
+    assert.doesNotMatch(c.when, jargon, c.nav);
+  }
+  for (const r of facts.sounds.roles)
+    assert.doesNotMatch(r.when, /Notify when done|OTA|welcome/, r.id);
 });

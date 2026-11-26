@@ -98,6 +98,8 @@
     "centre_r_px": 150,
     "hold_show_ms": 250,
     "card_arm_ms": 300,
+    "ask_hold_x_px": 304,
+    "ask_hold_y_px": 262,
     "long_swipe_px": 120,
     "deny_hold_ms": 800,
     "agent_timeout_ms": 8000,
@@ -116,26 +118,22 @@
     "ambient_ms": 30000,
     "nag_ms": 15000,
     "nag_max": 3,
-    "repo_w_px": 0,
     "summary_w_px": 300,
     "sigil_r_px": 22,
     "time_dots_r_px": 88,
+    "sigil_y_px": 50,
+    "hero_y_px": 206,
+    "summary_y_px": 316,
+    "key_a_x_px": 101,
+    "key_b_x_px": 365,
+    "key_y_px": 101,
     "hero_px": 128,
-    "repo_px": 34,
-    "repo_small_px": 24,
-    "hint_a_deg": 225,
-    "hint_b_deg": 135,
-    "hint_r_px": 158,
     "band_out_px": 228,
     "band_w_px": 6,
     "sel_out_px": 231,
     "sel_w_px": 12,
     "seg_gap_deg": 8,
     "others_pct": 40,
-    "underline_w_px": 0,
-    "underline_gap_px": 0,
-    "dot_step_deg": 0,
-    "track_w_px": 0,
     "prog_out_px": 230,
     "prog_w_px": 10,
     "work_period_ms": 1400,
@@ -151,15 +149,6 @@
       "done": "one sweep, then solid; dim once acknowledged",
       "error": "a row of round dots; one fast flicker, then solid",
       "idle": "thin, dim, still"
-    },
-    "pills": {
-      "approve": "Review / Answer",
-      "done": "Open",
-      "default": "Open"
-    },
-    "edge_hints": {
-      "a": "Open",
-      "b": "Next"
     }
   },
   "gesture_map": {
@@ -168,36 +157,36 @@
         "gesture": "G_TAP",
         "mode": "home",
         "zone": "centre",
-        "when": "with a permission or question pending",
+        "when": "when the session waits for your answer",
         "nav": "NAV_OPEN_ASK",
-        "action": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
+        "action": "Opens the request screen. Opening answers nothing",
         "source": "firmware/components/core/src/nav.c:11"
       },
       {
         "gesture": "G_TAP",
         "mode": "home",
         "zone": "centre",
-        "when": "with nothing to answer",
+        "when": "when nothing waits for you",
         "nav": "NAV_OPEN_AGENT",
-        "action": "Open the per-agent wheel for the selected session",
+        "action": "Opens the agent menu for the selected session",
         "source": "firmware/components/core/src/nav.c:12"
       },
       {
         "gesture": "G_DOUBLE_TAP",
         "mode": "home",
         "zone": "centre",
-        "when": "with a permission or question pending",
+        "when": "when the session waits for your answer",
         "nav": "NAV_OPEN_ASK",
-        "action": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
+        "action": "Opens the request screen. Opening answers nothing",
         "source": "firmware/components/core/src/nav.c:13"
       },
       {
         "gesture": "G_DOUBLE_TAP",
         "mode": "home",
         "zone": "centre",
-        "when": "with nothing to answer",
+        "when": "when nothing waits for you",
         "nav": "NAV_OPEN_AGENT",
-        "action": "Open the per-agent wheel for the selected session",
+        "action": "Opens the agent menu for the selected session",
         "source": "firmware/components/core/src/nav.c:14"
       },
       {
@@ -206,7 +195,7 @@
         "zone": "rim",
         "when": "",
         "nav": "NAV_PICK_RIM",
-        "action": "Select the segment under the finger on the HOME ring (AGENT and ASK rows are tapped directly)",
+        "action": "Selects the session under your finger",
         "source": "firmware/components/core/src/nav.c:15"
       },
       {
@@ -215,7 +204,7 @@
         "zone": "rim",
         "when": "",
         "nav": "NAV_PICK_RIM",
-        "action": "Select the segment under the finger on the HOME ring (AGENT and ASK rows are tapped directly)",
+        "action": "Selects the session under your finger",
         "source": "firmware/components/core/src/nav.c:16"
       },
       {
@@ -224,7 +213,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_OPEN_LABS",
-        "action": "Open Experiments (swipe up on the deck): a wheel of experimental features, the first is the Trackpad",
+        "action": "Opens Experiments; the first is the Trackpad",
         "source": "firmware/components/core/src/nav.c:17"
       },
       {
@@ -233,7 +222,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_OPEN_STATUS",
-        "action": "Open STATUS (swipe down on the deck): link, battery, quiet mode, sounds",
+        "action": "Opens Status: link, battery, quiet mode, sounds",
         "source": "firmware/components/core/src/nav.c:18"
       },
       {
@@ -242,7 +231,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:19"
       },
       {
@@ -251,7 +240,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:20"
       },
       {
@@ -260,7 +249,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:21"
       },
       {
@@ -269,7 +258,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_FOCUS",
-        "action": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
+        "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
         "source": "firmware/components/core/src/nav.c:22"
       },
       {
@@ -278,7 +267,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT_ATTENTION",
-        "action": "Jump to the next session that needs attention",
+        "action": "Jumps to the next session that needs you",
         "source": "firmware/components/core/src/nav.c:23"
       },
       {
@@ -287,7 +276,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:24"
       },
       {
@@ -296,7 +285,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_PREV",
-        "action": "Previous session",
+        "action": "Selects the previous session",
         "source": "firmware/components/core/src/nav.c:25"
       },
       {
@@ -305,7 +294,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_PRESS",
-        "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
+        "action": "Starts a hold on the selected item, if it needs one",
         "source": "firmware/components/core/src/nav.c:27"
       },
       {
@@ -314,7 +303,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
-        "action": "Lifting cancels a hold in progress",
+        "action": "Lifting the finger cancels a hold",
         "source": "firmware/components/core/src/nav.c:28"
       },
       {
@@ -323,7 +312,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:29"
       },
       {
@@ -332,7 +321,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:30"
       },
       {
@@ -341,7 +330,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
-        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
         "source": "firmware/components/core/src/nav.c:31"
       },
       {
@@ -350,7 +339,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_LONG",
-        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "action": "Holding still away from the items goes back",
         "source": "firmware/components/core/src/nav.c:32"
       },
       {
@@ -359,7 +348,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:33"
       },
       {
@@ -368,7 +357,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:34"
       },
       {
@@ -377,7 +366,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:35"
       },
       {
@@ -386,7 +375,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:36"
       },
       {
@@ -395,7 +384,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:37"
       },
       {
@@ -404,7 +393,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:38"
       },
       {
@@ -413,7 +402,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:39"
       },
       {
@@ -422,7 +411,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:40"
       },
       {
@@ -431,7 +420,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_PRESS",
-        "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
+        "action": "Starts a hold on the selected item, if it needs one",
         "source": "firmware/components/core/src/nav.c:43"
       },
       {
@@ -440,7 +429,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
-        "action": "Lifting cancels a hold in progress",
+        "action": "Lifting the finger cancels a hold",
         "source": "firmware/components/core/src/nav.c:44"
       },
       {
@@ -449,7 +438,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:45"
       },
       {
@@ -458,7 +447,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:46"
       },
       {
@@ -467,7 +456,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_LONG",
-        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "action": "Holding still away from the items goes back",
         "source": "firmware/components/core/src/nav.c:47"
       },
       {
@@ -476,7 +465,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
-        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
         "source": "firmware/components/core/src/nav.c:48"
       },
       {
@@ -485,7 +474,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:49"
       },
       {
@@ -494,7 +483,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:50"
       },
       {
@@ -503,7 +492,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:51"
       },
       {
@@ -512,7 +501,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:52"
       },
       {
@@ -521,7 +510,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_FOCUS",
-        "action": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
+        "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
         "source": "firmware/components/core/src/nav.c:53"
       },
       {
@@ -530,7 +519,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:54"
       },
       {
@@ -539,7 +528,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:55"
       },
       {
@@ -548,7 +537,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:56"
       },
       {
@@ -557,7 +546,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCROLL_CATCH",
-        "action": "SCROLL: any new touch stops a glide; a tap that stopped one does not leave",
+        "action": "A new touch stops the scrolling",
         "source": "firmware/components/core/src/nav.c:59"
       },
       {
@@ -566,7 +555,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
-        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
         "source": "firmware/components/core/src/nav.c:60"
       },
       {
@@ -575,7 +564,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_FLING",
-        "action": "SCROLL: lifting off a fast drag keeps scrolling (a glide that slows down, like a trackpad)",
+        "action": "A quick flick keeps the terminal scrolling, slowing down like a trackpad",
         "source": "firmware/components/core/src/nav.c:61"
       },
       {
@@ -584,7 +573,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:62"
       },
       {
@@ -593,7 +582,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:63"
       },
       {
@@ -602,7 +591,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_TO_BOTTOM",
-        "action": "SCROLL: button A jumps back to the live bottom and leaves the mode",
+        "action": "Jumps to the newest output and leaves Scroll",
         "source": "firmware/components/core/src/nav.c:64"
       },
       {
@@ -611,7 +600,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_PAGE_NEWER",
-        "action": "SCROLL: button B moves one page toward newer output",
+        "action": "Scrolls one page toward newer output",
         "source": "firmware/components/core/src/nav.c:65"
       },
       {
@@ -620,7 +609,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:66"
       },
       {
@@ -629,7 +618,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:67"
       },
       {
@@ -638,7 +627,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:71"
       },
       {
@@ -647,7 +636,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:72"
       },
       {
@@ -656,7 +645,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:73"
       },
       {
@@ -665,7 +654,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_LONG",
-        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "action": "Holding still away from the items goes back",
         "source": "firmware/components/core/src/nav.c:74"
       },
       {
@@ -674,7 +663,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:75"
       },
       {
@@ -683,7 +672,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:76"
       },
       {
@@ -692,7 +681,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:77"
       },
       {
@@ -701,7 +690,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:78"
       },
       {
@@ -710,7 +699,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:79"
       },
       {
@@ -719,7 +708,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:80"
       },
       {
@@ -728,7 +717,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:81"
       },
       {
@@ -737,25 +726,25 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:82"
       },
       {
         "gesture": "G_TAP",
         "mode": "watch",
         "zone": "centre",
-        "when": "with a permission or question pending",
+        "when": "when the session waits for your answer",
         "nav": "NAV_OPEN_ASK",
-        "action": "Open the request's options (ASK). Opening answers nothing: a tap never approves",
+        "action": "Opens the request screen. Opening answers nothing",
         "source": "firmware/components/core/src/nav.c:87"
       },
       {
         "gesture": "G_TAP",
         "mode": "watch",
         "zone": "centre",
-        "when": "with nothing to answer",
+        "when": "when nothing waits for you",
         "nav": "NAV_FOCUS",
-        "action": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
+        "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
         "source": "firmware/components/core/src/nav.c:88"
       },
       {
@@ -764,7 +753,7 @@
         "zone": "rim",
         "when": "",
         "nav": "NAV_PICK_RIM",
-        "action": "Select the segment under the finger on the HOME ring (AGENT and ASK rows are tapped directly)",
+        "action": "Selects the session under your finger",
         "source": "firmware/components/core/src/nav.c:89"
       },
       {
@@ -773,7 +762,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
-        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
         "source": "firmware/components/core/src/nav.c:90"
       },
       {
@@ -782,7 +771,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:91"
       },
       {
@@ -791,7 +780,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:92"
       },
       {
@@ -800,7 +789,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:93"
       },
       {
@@ -809,7 +798,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_FOCUS",
-        "action": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
+        "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
         "source": "firmware/components/core/src/nav.c:94"
       },
       {
@@ -818,7 +807,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:95"
       },
       {
@@ -827,7 +816,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:96"
       },
       {
@@ -836,7 +825,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:97"
       },
       {
@@ -845,7 +834,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:98"
       },
       {
@@ -854,7 +843,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:99"
       },
       {
@@ -863,7 +852,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_PRESS",
-        "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
+        "action": "Starts a hold on the selected item, if it needs one",
         "source": "firmware/components/core/src/nav.c:102"
       },
       {
@@ -872,7 +861,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
-        "action": "Lifting cancels a hold in progress",
+        "action": "Lifting the finger cancels a hold",
         "source": "firmware/components/core/src/nav.c:103"
       },
       {
@@ -881,7 +870,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:104"
       },
       {
@@ -890,7 +879,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:105"
       },
       {
@@ -899,7 +888,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:106"
       },
       {
@@ -908,7 +897,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:107"
       },
       {
@@ -917,7 +906,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:108"
       },
       {
@@ -926,7 +915,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:109"
       },
       {
@@ -935,7 +924,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:113"
       },
       {
@@ -944,7 +933,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOLD_PRESS",
-        "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
+        "action": "Starts a hold on the selected item, if it needs one",
         "source": "firmware/components/core/src/nav.c:114"
       },
       {
@@ -953,7 +942,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_ERASE",
-        "action": "KEYS: button B deletes the last typed word",
+        "action": "Deletes the last typed word",
         "source": "firmware/components/core/src/nav.c:115"
       },
       {
@@ -962,7 +951,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:116"
       },
       {
@@ -971,7 +960,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:117"
       },
       {
@@ -980,7 +969,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_PRESS",
-        "action": "Finger down in the centre: arms a hold if the selected item is a hold item and the request is armed",
+        "action": "Starts a hold on the selected item, if it needs one",
         "source": "firmware/components/core/src/nav.c:121"
       },
       {
@@ -989,7 +978,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
-        "action": "Lifting cancels a hold in progress",
+        "action": "Lifting the finger cancels a hold",
         "source": "firmware/components/core/src/nav.c:122"
       },
       {
@@ -998,7 +987,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:123"
       },
       {
@@ -1007,7 +996,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:124"
       },
       {
@@ -1016,7 +1005,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
-        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
         "source": "firmware/components/core/src/nav.c:125"
       },
       {
@@ -1025,7 +1014,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_LONG",
-        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "action": "Holding still away from the items goes back",
         "source": "firmware/components/core/src/nav.c:126"
       },
       {
@@ -1034,7 +1023,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:127"
       },
       {
@@ -1043,7 +1032,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:128"
       },
       {
@@ -1052,7 +1041,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:129"
       },
       {
@@ -1061,7 +1050,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:130"
       },
       {
@@ -1070,7 +1059,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_FOCUS",
-        "action": "Focus the terminal (Done also acknowledges). On ASK it is button A, 'Open on PC': the review path never approves",
+        "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
         "source": "firmware/components/core/src/nav.c:131"
       },
       {
@@ -1079,7 +1068,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:132"
       },
       {
@@ -1088,7 +1077,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:133"
       },
       {
@@ -1097,7 +1086,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:134"
       },
       {
@@ -1106,7 +1095,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:136"
       },
       {
@@ -1115,7 +1104,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:137"
       },
       {
@@ -1124,7 +1113,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:138"
       },
       {
@@ -1133,7 +1122,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:139"
       },
       {
@@ -1142,7 +1131,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_HOLD_LONG",
-        "action": "An injected long press that already covers the selected hold item's time commits it directly",
+        "action": "Holding still away from the items goes back",
         "source": "firmware/components/core/src/nav.c:140"
       },
       {
@@ -1151,7 +1140,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:141"
       },
       {
@@ -1160,7 +1149,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:142"
       },
       {
@@ -1169,7 +1158,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:143"
       },
       {
@@ -1178,7 +1167,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_COMMIT",
-        "action": "Commit the selected item (on STATUS: cycle quiet, toggle sounds); an approve-class or deny item only toasts 'Hold to approve' / 'Hold to deny' / 'Hold to stop'",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
         "source": "firmware/components/core/src/nav.c:144"
       },
       {
@@ -1187,7 +1176,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:145"
       },
       {
@@ -1196,7 +1185,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:146"
       },
       {
@@ -1205,7 +1194,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:147"
       },
       {
@@ -1214,7 +1203,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_POINTER",
-        "action": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
+        "action": "Moves the PC's pointer; tap clicks, hold right-clicks",
         "source": "firmware/components/core/src/nav.c:150"
       },
       {
@@ -1223,7 +1212,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_POINTER",
-        "action": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
+        "action": "Moves the PC's pointer; tap clicks, hold right-clicks",
         "source": "firmware/components/core/src/nav.c:151"
       },
       {
@@ -1232,7 +1221,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_POINTER",
-        "action": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
+        "action": "Moves the PC's pointer; tap clicks, hold right-clicks",
         "source": "firmware/components/core/src/nav.c:152"
       },
       {
@@ -1241,7 +1230,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_POINTER",
-        "action": "TRACKPAD: a centre drag moves the PC's pointer, a tap left-clicks (a quick second tap double-clicks), a hold right-clicks",
+        "action": "Moves the PC's pointer; tap clicks, hold right-clicks",
         "source": "firmware/components/core/src/nav.c:153"
       },
       {
@@ -1250,7 +1239,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:154"
       },
       {
@@ -1259,7 +1248,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:155"
       },
       {
@@ -1268,7 +1257,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:156"
       },
       {
@@ -1277,7 +1266,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:157"
       },
       {
@@ -1286,7 +1275,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:158"
       },
       {
@@ -1295,7 +1284,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:159"
       },
       {
@@ -1304,7 +1293,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
-        "action": "SCROLL: each 10 px of vertical drag is one wheel line (up = older); the first goes out at once, then one command per 40 ms. On WATCH the first drag opens SCROLL over it",
+        "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
         "source": "firmware/components/core/src/nav.c:161"
       },
       {
@@ -1313,7 +1302,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:162"
       },
       {
@@ -1322,7 +1311,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:163"
       },
       {
@@ -1331,7 +1320,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_SCRUB",
-        "action": "A drag around the rim moves the selection with a detent per step",
+        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:164"
       },
       {
@@ -1340,7 +1329,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:165"
       },
       {
@@ -1349,7 +1338,7 @@
         "zone": "centre",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:166"
       },
       {
@@ -1358,7 +1347,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_NEXT",
-        "action": "Next session (HOME) or next item (AGENT, ASK, STATUS)",
+        "action": "Selects the next session, item or page",
         "source": "firmware/components/core/src/nav.c:167"
       },
       {
@@ -1367,7 +1356,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_BACK",
-        "action": "Back, one level (a swipe right in the centre, a long swipe down, or B held; on SCROLL also a tap, keeping the terminal where it is; on STATUS also a swipe up); a request stays pending, a swipe is never a deny",
+        "action": "Goes back one screen. A request stays open: going back never denies",
         "source": "firmware/components/core/src/nav.c:168"
       },
       {
@@ -1376,7 +1365,7 @@
         "zone": "any",
         "when": "",
         "nav": "NAV_HOME",
-        "action": "A+B chord: straight back to the deck",
+        "action": "Goes straight back to the ring",
         "source": "firmware/components/core/src/nav.c:169"
       }
     ],
@@ -3221,35 +3210,35 @@
     "roles": [
       {
         "id": "done",
-        "when": "A session you armed with Notify when done (or are watching) finishes",
+        "when": "A session you asked to be told about, or have open on the watch, finishes",
         "pick": "done-ff",
         "repeat": 1,
         "gap_ms": 0
       },
       {
         "id": "input",
-        "when": "An agent asks a question or needs your approval",
+        "when": "A session asks you a question or needs your approval",
         "pick": "input-ff",
         "repeat": 3,
         "gap_ms": 90
       },
       {
         "id": "approved",
-        "when": "An approval hold completes and the answer goes out (rises)",
+        "when": "You hold to approve and the answer is sent (rising)",
         "pick": "approved-rise",
         "repeat": 1,
         "gap_ms": 0
       },
       {
         "id": "denied",
-        "when": "A deny or stop hold completes and the answer goes out (falls)",
+        "when": "You hold to deny or stop and the answer is sent (falling)",
         "pick": "denied-fall",
         "repeat": 1,
         "gap_ms": 0
       },
       {
         "id": "updated",
-        "when": "The first welcome after an OTA update: the new image is running and confirmed",
+        "when": "The first connection to your PC after a firmware update",
         "pick": "updated-flourish",
         "repeat": 1,
         "gap_ms": 0
@@ -5704,6 +5693,196 @@
       }
     ]
   },
+  "glyphs": {
+    "font": "font_phosphor_44",
+    "px": 44,
+    "line_height": 42,
+    "base_line": 2,
+    "states": {
+      "error": "ICON_ERROR",
+      "done": "ICON_DONE",
+      "idle": "ICON_IDLE",
+      "*": "ICON_WORKING",
+      "input": {
+        "0": "ICON_PERMISSION",
+        "1": "ICON_QUESTION"
+      }
+    },
+    "keys": {
+      "a": {
+        "word": "Open",
+        "icon": "ICON_COMPUTER",
+        "color": "#e69f00"
+      },
+      "b": {
+        "word": "Next",
+        "icon": "ICON_NEXT",
+        "color": "#2f7fe0"
+      },
+      "r_px": 20,
+      "ring_w_px": 2
+    },
+    "agents": [
+      {
+        "id": "copilot",
+        "name": "Copilot CLI",
+        "icon": "ICON_AG_COPILOT"
+      },
+      {
+        "id": "claude",
+        "name": "Claude Code",
+        "icon": "ICON_AG_CLAUDE"
+      },
+      {
+        "id": "cloud",
+        "name": "Cloud agent",
+        "icon": "ICON_AG_CLOUD"
+      },
+      {
+        "id": "shell",
+        "name": "Terminal",
+        "icon": "ICON_G_SHELL"
+      },
+      {
+        "id": "pi",
+        "name": "pi",
+        "icon": "ICON_AG_PI"
+      },
+      {
+        "id": "other",
+        "name": "Agent",
+        "icon": "ICON_G_ROBOT"
+      }
+    ],
+    "icons": {
+      "ICON_AG_CLAUDE": {
+        "cp": "e6a2",
+        "w": 41,
+        "h": 40,
+        "x": 2,
+        "y": 0,
+        "adv": 44,
+        "a": "0000000000000000000000000008c300000000000000000000000000000000000001ff900000000000000000000000000000000000001ffa00000000000000000000000000000000000001ffa00000000000000000000000000000000008bbcffebbb3000000000000000000000000000002ffffffffffb000000000000000000000000000000cfffffffff500000000000000000000005dfa00000001ffa00000000000000000000000002ffffa0000001ffa00000000000000000000000009fffff1000001ffa0000003000000000000000000efffff7000000cf500000afa00000000000000004ffffffd00000001000000dfe0000000000000000afffffff30000000000067eff7600000000000001ffffffff900000000008fffffff80000000000006ffffffffe00000000006fffffff6000000000000cfffffffff5000000000023efe320000000000002ffffffffffa000000000000dfe000000000000009fffffffffff3000000000007f7000000000004affffffffffffffd71000000000000000000028efffffffffffffffffffb50000000000000016cfffffffffffffffffffffffff9400000000005ffffffffffffffffffffffffffffffc100000000ffffffffffffffffffffffffffffffff800000003ffffffffffffffffffffffffffffffffb00000000ffffffffffffffffffffffffffffffff8000000005ffffffffffffffffffffffffffffffc100000000016cfffffffffffffffffffffffff940000000000000028efffffffffffffffffffb5000000000000000000004affffffffffffffd7100000000000000000000000009fffffffffff300000000000000000000000000002ffffffffffa000000000000000000000000000000cfffffffff40000000000000000000000000000006ffffffffe00000000000000000000000000000001ffffffff900000000000000000000000000000000afffffff3000000000000000000000000000000004ffffffd0000000000000000000000000000000000efffff700000000000000000000000000000000009fffff100000000000000000000000000000000002ffffa0000000000000000000000000000000000005dfa1000000000000000000000"
+      },
+      "ICON_AG_CLOUD": {
+        "cp": "e1aa",
+        "w": 42,
+        "h": 31,
+        "x": 1,
+        "y": 4,
+        "adv": 44,
+        "a": "0000000000000000000000002343200000000000000000000000000000000017cfffffffb6000000000000000000000000000019ffffffffffffe600000000000000000000000006ffffffffffffffffd200000000000000000000009fffffffffffffffffff500000000000000000000afffffffffffffffffffff40000000000000000008fffffffffffffffffffffff300000000000000003ffffffffffffffffffffffffe0000000000000000dfffffffffffffffffffffffff70000000005a3005fffffffffffffffffffffffffff10000005eff500cfffffffffffffffffffffffffff700000affff101ffffffffffffffffffffffffffffd0000cffffc006fffffffffffffffffffffffffffff100afffffa009fffffffffffffffffffffffffffff404ffffff900bfffffffffffffffffffffffffffff60cffffff800cfffffffffffffffffffffffffffff72fffffffb01efffffffffffffffffffffffffffff77ffffffffefffffffffffffffffffffffffffffff6affffffffffffffffffffffffffffffffffffffff3bffffffffffffffffffffffffffffffffffffffff0bfffffffffffffffffffffffffffffffffffffffb09fffffffffffffffffffffffffffffffffffffff506ffffffffffffffffffffffffffffffffffffffd001ffffffffffffffffffffffffffffffffffffff5000bffffffffffffffffffffffffffffffffffffb00002fffffffffffffffffffffffffffffffffffd0000007fffffffffffffffffffffffffffffffffe200000009fffffffffffffffffffffffffffffffc10000000007fffffffffffffffffffffffffffff80000000000003cfffffffffffffffffffffffff9100000000000000038cdffffffffffffffffec9510000000000"
+      },
+      "ICON_AG_COPILOT": {
+        "cp": "e5d6",
+        "w": 35,
+        "h": 35,
+        "x": 4,
+        "y": 1,
+        "adv": 44,
+        "a": "00000000000000000000000000039ba5000000005200000000000000000007fffffc100000cffc610000000000000008fffffffb0000cffffffb50000000000008fffffffff300cfffffffffe93000000008ffffffffff70cfffffffffffffd8200008fffffffffff7afffffffffffffffffc618ffffffffffff3cffffffffffffffffffffffffffffffffc02cffffffffffffffffffffffffffffffe10007ffffffffffffffffffffffffffffe2000002cfffffffffffffffffffffffffe2000000007fffffffffffffffffffffffe200000000002cffffffffffffffffffffe200000000000007ffffffffffffffffffe20000000000000002cffffffffffffffffe0000000000000000007ffffffffffffffff4000000000000000008ffffffffffffffff900000000000000008ffffffffffffffffff0000000000000008fffffffffffffffffff50000000037888affffffffffffffffffffb00000005fffffffffffffffffffffffffff1000005ffffffffffffffffffffffffffff700005fffffffffffffffffefffffffffffc0000cffffffffffffffffe28fffffffffff20007fffffffffffffffe200dffffffffff8000018efffffffffffe20003ffffffffffe00000005bfffffffff4000008ffffffffff4000000002cfffffff4000000dfffffffff90000000004fffffff40000003ffffffffff0000000000dffffff400000008fffffffff00000000007ffffff300000000dfffffff500000000001fffffc0000000003ffffff5000000000000afffc000000000008ffff500000000000004ffc0000000000000dff50000000000000006800000000000000294000000"
+      },
+      "ICON_AG_PI": {
+        "cp": "ec80",
+        "w": 34,
+        "h": 34,
+        "x": 5,
+        "y": 2,
+        "adv": 44,
+        "a": "06dfffffffffffffffffffffffffffeb204fffffffffffffffffffffffffffffffd09ffffffffffffffffffffffffffffffff2affffffffffffffffffffffffffffffff3affffffffffffffffffffffffffffffff3affffffffffffffffffffffffffffffff3affffffffffffffffffffffffffffffff3affffffffffffffffffffffffffffffff3affffffc75444444444444444444affff3affffe30000000000000000000000ffff3afffd100000000000000000000004ffff3afff20019de600deeee800ceeeeefffff3affa002efff600effff900effffffffff3aff400bffff600effff900effffffffff3aff200fffff600effff900effffffffff3aff202fffff600effff900effffffffff3affd7dfffff600effff900effffffffff3affffffffff600effff900effffffffff3affffffffff600effff900effffffffff3affffffffff600effff900effffffffff3affffffffff600effff900efffa16ffff3affffffffff600effff900dfff300ffff3affffffffff600effffb008ffd001ffff3affffffffff600efffff100561006ffff3affffffffff600efffffb0000002fffff3affffffffffa02fffffffc30006efffff3afffffffffffeffffffffffedffffffff3affffffffffffffffffffffffffffffff3affffffffffffffffffffffffffffffff3affffffffffffffffffffffffffffffff3affffffffffffffffffffffffffffffff25fffffffffffffffffffffffffffffffd007effffffffffffffffffffffffffffc200000000000000000000000000000000000"
+      },
+      "ICON_COMPUTER": {
+        "cp": "e560",
+        "w": 36,
+        "h": 34,
+        "x": 4,
+        "y": 1,
+        "adv": 44,
+        "a": "00379999999999999999999999999999720008ffffffffffffffffffffffffffffffff705ffffffffffffffffffffffffffffffffff4cffffffffffffffffffffffffffffffffffaeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdeffffffffffffffffffffffffffffffffffdefd000000000000000000000000000000efdefd000000000000000000000000000000efdefd000000000000000000000000000000efddff100000000000000000000000000002ffc9ffebbbbbbbbbbbbbbbbbbbbbbbbbbbbeff71effffffffffffffffffffffffffffffffd001affffffffffffffffffffffffffffff91000000000000000007ff5000000000000000000000000000000006ff5000000000000000000000000000000007ff50000000000000000000000000008ffffffffffff70000000000000000000000dffffffffffffc00000000000000000000004abbbbbbbbbba300000000000"
+      },
+      "ICON_DONE": {
+        "cp": "e184",
+        "w": 36,
+        "h": 36,
+        "x": 4,
+        "y": 1,
+        "adv": 44,
+        "a": "000000000000048bdeedb84000000000000000000000003affffffffffffa30000000000000000002bffffffffffffffffa20000000000000007ffffffffffffffffffff60000000000000bffffffffffffffffffffff900000000000cffffffffffffffffffffffffb000000000bffffffffffffffffffffffffff900000007ffffffffffffffffffffffffffff6000002ffffffffffffffffffffffffffffff10000bffffffffffffffffffffffffffffffa0003ffffffffffffffffffffffffffffffff300affffffffffffffffffffffffffffffffa00fffffffffffffffffffffff9afffffffff04ffffffffffffffffffffff400dffffffff48fffffffffffffffffffff4000effffffff8bffffffffffffffffffff4000cfffffffffacfffffffffffffffffff4000cffffffffffcdffffffffffffffffff4000cfffffffffffddfffffffff31bfffff4000cffffffffffffdcffffffffc000bfff4000cfffffffffffffcafffffffff5000bf4000cffffffffffffffa8ffffffffff50003000cfffffffffffffff84fffffffffff500000cffffffffffffffff40ffffffffffff5000cfffffffffffffffff009ffffffffffff63cfffffffffffffffff9002ffffffffffffffffffffffffffffffff2000bffffffffffffffffffffffffffffffa00002ffffffffffffffffffffffffffffff2000006ffffffffffffffffffffffffffff60000000affffffffffffffffffffffffffa000000000bffffffffffffffffffffffffb00000000000affffffffffffffffffffffa00000000000006ffffffffffffffffffff60000000000000002affffffffffffffffa200000000000000000029ffffffffffff920000000000000000000000047acddca740000000000000"
+      },
+      "ICON_ERROR": {
+        "cp": "e4e2",
+        "w": 36,
+        "h": 37,
+        "x": 4,
+        "y": 1,
+        "adv": 44,
+        "a": "00000000000000000110000000000000000000000000000038ceffffec8300000000000000000000006dffffffffffffd60000000000000000005effffffffffffffffe5000000000000001bffffffffffffffffffffa1000000000002dffffffffffffffffffffffd10000000002effffffffffffffffffffffffe100000000dffffffffffffffffffffffffffd0000000affffffffffffffffffffffffffffa000004fffffffffffffe44efffffffffffff40000dfffffffffffff9009fffffffffffffd0005ffffffffffffff9009ffffffffffffff500bffffffffffffff9009ffffffffffffffb01fffffffffffffff9009fffffffffffffff16fffffffffffffff9009fffffffffffffff59fffffffffffffff9009fffffffffffffff9cfffffffffffffff9009fffffffffffffffbdfffffffffffffff9009fffffffffffffffdefffffffffffffff9009fffffffffffffffeefffffffffffffff9009fffffffffffffffedfffffffffffffffb00bfffffffffffffffdbffffffffffffffffccffffffffffffffffb8ffffffffffffffffffffffffffffffffff84ffffffffffffffffffffffffffffffffff40fffffffffffffffc44cfffffffffffffff00affffffffffffff1001ffffffffffffffa003fffffffffffffe0000ffffffffffffff3000bfffffffffffff3003fffffffffffffb00002fffffffffffffe88efffffffffffff2000007ffffffffffffffffffffffffffff70000000affffffffffffffffffffffffffa000000000bffffffffffffffffffffffffb00000000000affffffffffffffffffffffa00000000000006ffffffffffffffffffff60000000000000002affffffffffffffffa200000000000000000029effffffffffe920000000000000000000000037acddca740000000000000"
+      },
+      "ICON_G_ROBOT": {
+        "cp": "e762",
+        "w": 36,
+        "h": 38,
+        "x": 4,
+        "y": 2,
+        "adv": 44,
+        "a": "000000000000000009c2000000000000000000000000000000002ff9000000000000000000000000000000002ff9000000000000000000000000000000002ff9000000000000000000000000000000002ff9000000000000000000000000000000002ff9000000000000000000000000000000002ff900000000000000000018dffffffffffffffffffffffffffe910003effffffffffffffffffffffffffffffe301effffffffffffffffffffffffffffffffe17ffffffffffffffffffffffffffffffffff7cffffffffffffffffffffffffffffffffffcdffffffffffffffffffffffffffffffffffddffffffffffffffffffffffffffffffffffddffffffffffffffffffffffffffffffffffddffffffff84bffffffffffffb48ffffffffddfffffff9000dffffffffffd0009fffffffddfffffff6000bffffffffffb0006fffffffddfffffffc002ffffffffffff200cfffffffddffffffffdaeffffffffffffeadffffffffddffffffffffffffffffffffffffffffffffddffffffffffffffffffffffffffffffffffddffffffffffffffffffffffffffffffffffddffffffffffffffffffffffffffffffffffddffffffffeddfffeddddefffddeffffffffddffffffd2000aff100001ffa0003dffffffddffffff30000aff100001ffa00004ffffffddffffff00000aff100001ffa00000ffffffddffffff30000aff100001ffa00003ffffffddffffffd2000aff100001ffa0002dffffffddffffffffdddfffddddddfffdddffffffffddffffffffffffffffffffffffffffffffffdcffffffffffffffffffffffffffffffffffc8ffffffffffffffffffffffffffffffffff81effffffffffffffffffffffffffffffffe103effffffffffffffffffffffffffffffe300029effffffffffffffffffffffffffe9200000000000000000000000000000000000000"
+      },
+      "ICON_G_SHELL": {
+        "cp": "eae8",
+        "w": 36,
+        "h": 31,
+        "x": 4,
+        "y": 4,
+        "adv": 44,
+        "a": "0034444444444444444444444444444443002dffffffffffffffffffffffffffffffffd2bffffffffffffffffffffffffffffffffffbeffffffffffffffffffffffffffffffffffeeffffffffffffffffffffffffffffffffffeeffffffffffffffffffffffffffffffffffeeffffffffffffffffffffffffffffffffffeeffffffffffffffffffffffffffffffffffeeffffffffffffffffffffffffffffffffffeefffffffa03efffffffffffffffffffffffeefffffff6001cffffffffffffffffffffffeefffffffd20008fffffffffffffffffffffeeffffffffe40005ffffffffffffffffffffeeffffffffff70002dffffffffffffffffffeefffffffffffa0001bfffffffffffffffffeeffffffffffffd1000fffffffffffffffffeeffffffffffff80003fffffffffffffffffeefffffffffff50004efffffffffffffffffeefffffffffd20007fffffffffffffffffffeeffffffffb1000bffffffffffffffffffffeefffffffa0002dffff500000000afffffffeefffffff6005ffffff0000000006fffffffeefffffffd59fffffffa44444445dfffffffeeffffffffffffffffffffffffffffffffffeeffffffffffffffffffffffffffffffffffeeffffffffffffffffffffffffffffffffffeeffffffffffffffffffffffffffffffffffeeffffffffffffffffffffffffffffffffffedffffffffffffffffffffffffffffffffffd8ffffffffffffffffffffffffffffffffff809effffffffffffffffffffffffffffffe90"
+      },
+      "ICON_IDLE": {
+        "cp": "e330",
+        "w": 36,
+        "h": 36,
+        "x": 5,
+        "y": 2,
+        "adv": 44,
+        "a": "0000000000017b50000000000000000000000000000002afffe000000000000000000000000000007fffffc0000000000000000000000000001bffffff8000000000000000000000000001dfffffff600000000000000000000000001dffffffff50000000000000000000000000cfffffffff40000000000000000000000007ffffffffff4000000000000000000000002fffffffffff600000000000000000000000afffffffffff900000000000000000000001ffffffffffffd00000000000000000000007fffffffffffff2000000000000000000000cfffffffffffff9000000000000000000000fffffffffffffff200000000000000000004fffffffffffffffa00000000000000000005ffffffffffffffff50000000000000000006fffffffffffffffff3000000000000000007fffffffffffffffffe400000000000000007fffffffffffffffffff60000000000000005ffffffffffffffffffffb300000000000003ffffffffffffffffffffffa4000000001100fffffffffffffffffffffffffc9889adff50bfffffffffffffffffffffffffffffffff706fffffffffffffffffffffffffffffffff200ffffffffffffffffffffffffffffffffb0008fffffffffffffffffffffffffffffff40001efffffffffffffffffffffffffffffa000005fffffffffffffffffffffffffffff10000009fffffffffffffffffffffffffff400000000bfffffffffffffffffffffffff70000000000bfffffffffffffffffffffff70000000000008fffffffffffffffffffff5000000000000004dfffffffffffffffffb1000000000000000006dfffffffffffffb400000000000000000000038dfffffffb7200000000000000000000000000023321000000000000000"
+      },
+      "ICON_NEXT": {
+        "cp": "e13a",
+        "w": 19,
+        "h": 33,
+        "x": 14,
+        "y": 3,
+        "adv": 44,
+        "a": "00000000000000000000bfc1000000000000007fffd100000000000007ffffd10000000000000dffffd10000000000001dffffd10000000000001dffffd10000000000001dffffd10000000000001dffffd10000000000001dffffd10000000000001dffffd10000000000001dffffd10000000000001dffffd10000000000001dffffd10000000000001dffffd10000000000001dffffd00000000000001effff40000000000006fffff2000000000006fffff6000000000006fffff6000000000006fffff6000000000006fffff6000000000006fffff6000000000006fffff6000000000006fffff6000000000006fffff6000000000006fffff6000000000006fffff6000000000006fffff6000000000004fffff60000000000008ffff600000000000004fff6000000000000000483000000000000000"
+      },
+      "ICON_PERMISSION": {
+        "cp": "e57e",
+        "w": 32,
+        "h": 39,
+        "x": 6,
+        "y": 0,
+        "adv": 44,
+        "a": "000000000026500000000000000000000000000004fffd000000000000000000000000000cffff600000000000000000000000000effff900029a50000000000000000000effff9002ffff6000000000000000000effff9007ffffd00000000001bfd4000effff9009ffffe0000000000bffff100effff9009ffffe0000000000fffff500effff9009ffffe0000000001fffff600effff9009ffffe0000000001fffff600effff9009ffffe0000000001fffff600effff9009ffffe0000000001fffff600effff9009ffffe0000010001fffff600effff9009ffffe0005ffd201fffff600effff9009ffffe002ffffc01fffff600effff9009ffffe006fffff01fffff600effff9009ffffe006fffff11fffff600effffb00bffffe006fffff11fffff700ffffffccfffffe006fffff11fffffe59fffffffffffffe006fffff11fffffffffffffffffffb40006fffff11ffffffffffffffffff5000008fffff11fffffffffffffffff3000369ffffff11ffffffffffffffff6002cfffffffff10fffffffffffffffd001effffffffff00fffffffffffffff700afffffffffff00dffffffffffffff301fffffffffffd00affffffffffffff104fffffffffff9005ffffffffffffff307fffffffffff5000efffffffffffffeafffffffffffe00007ffffffffffffffffffffffffff700000effffffffffffffffffffffffe0000005ffffffffffffffffffffffff500000008ffffffffffffffffffffff8000000000bffffffffffffffffffffa000000000008ffffffffffffffffff800000000000005effffffffffffffe500000000000000007effffffffffe70000000000000000000049ceffec9400000000000"
+      },
+      "ICON_QUESTION": {
+        "cp": "e16c",
+        "w": 36,
+        "h": 37,
+        "x": 4,
+        "y": 1,
+        "adv": 44,
+        "a": "00000000000000000110000000000000000000000000000038ceffffec8300000000000000000000007dffffffffffffd70000000000000000005effffffffffffffffe5000000000000001bffffffffffffffffffffb1000000000002dffffffffffffffffffffffd10000000001effffffffffffffffffffffffd100000000dffffffffffffffffffffffffffc0000000affffffffffffffffffffffffffff9000004ffffffffffffffffffffffffffffff30000dffffffffffffffffffffffffffffffb0004ffffffffffffffffffffffffffffffff400bffffffffffffffffffffffffffffffffb01ffffffffffffffffffffffffffffffffff15ffffffffffffffffffffffffffffffffff59ffffffffffffffffffffffffffffffffff9bffffffffebffffffccffffffbeffffffffbdfffffffd001efff6007fffe100dfffffffcdfffffff60008fff0000fff80006fffffffddfffffff8000afff1001fffa0008fffffffdcffffffff637ffffc33cffff736ffffffffcaffffffffffffffffffffffffffffffffffa7ffffffffffffffffffffffffffffffffff73ffffffffffffffffffffffffffffffffff30effffffffffffffffffffffffffffffffe008ffffffffffffffffffffffffffffffff8001ffffffffffffffffffffffffffffffff1000effffffffffffffffffffffffffffff70003ffffffffffffffffffffffffffffffe00008ffffffffffffffffffffffffffffff30000efffffffffffffffffffffffffffff600003fffffffffffffffffffffffffffff8000008ffffffffffffffffffffffffffff7000000dffffffffffffffffffffffffffe40000000cfffffffeaefffffffffffffff80000000004ffffe940006cffffffffffc60000000000003994000000001479aa97510000000000000"
+      },
+      "ICON_WORKING": {
+        "cp": "e094",
+        "w": 34,
+        "h": 33,
+        "x": 5,
+        "y": 3,
+        "adv": 44,
+        "a": "000000000000024565410000000000000000000000005aefffffffd9300000000430000000005dfffffffffffffb2000008ff20000002cffffea76568bfffff90008fff4000004efffb30000000005dfffc18ffff400004fffc300000000000005effffffff400007ffa00000000000000002dfffffff400000850000000000000000008fffffff40000000000000000000000008ffffffff4000000000000000000000008fffffffff400000000000000000000007ffffffffff40000000000000000000000affffffffff3000000000000000000000019aaaaaaa960000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001111111110000000000000000000000006fffffffffe10000000000000000000000bffffffffff30000000000000000000000bfffffffff900000000000000000000000bffffffff9000000000000000000000000bfffffff90000000000000000000000000bffffffe1000000000000000007fd00000bfffffffe3000000000000000afff10000bffffadfffa2000000000007efff600000bfff900bffffb620000038efffe3000000bff900006effffffedeffffff9100000004d800000007efffffffffffa200000000000000000000038bdeedb95100000000000"
+      }
+    }
+  },
   "haptic_meaning": {
     "detent": "A click each time the rim scrub crosses into another segment",
     "hold_ramp": "Pulses grow longer and the gaps shorter while the approve hold fills",
@@ -5739,6 +5918,8 @@
     "display.shape": "firmware/boards/stopwatch/display.cpp:1",
     "display.width": "firmware/boards/stopwatch/board_priv.h:27",
     "gesture.agent_timeout_ms": "firmware/components/core/src/nav.h:111",
+    "gesture.ask_hold_x_px": "firmware/components/core/src/ui_ask.c:52",
+    "gesture.ask_hold_y_px": "firmware/components/core/src/ui_ask.c:53",
     "gesture.b_immediate": "firmware/components/core/src/gesture.c:273",
     "gesture.btn_double_ms": "firmware/components/core/src/gesture.h:12",
     "gesture.card_arm_ms": "firmware/components/core/src/nav.h:108",
@@ -5778,6 +5959,116 @@
     "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:18",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:11",
     "gesture_map.wake_swallow": "firmware/components/core/src/app.c:681",
+    "glyphs.agents": "firmware/components/core/src/ui_theme.c:70",
+    "glyphs.agents.name": "firmware/components/core/src/ui_theme.c:202",
+    "glyphs.font": "firmware/components/core/src/fonts/font_phosphor_44.c:3",
+    "glyphs.icons.ICON_ACTIVITY": "firmware/components/core/src/ui_icons.h:30",
+    "glyphs.icons.ICON_AG_CLAUDE": "firmware/components/core/src/ui_icons.h:62",
+    "glyphs.icons.ICON_AG_CLOUD": "firmware/components/core/src/ui_icons.h:64",
+    "glyphs.icons.ICON_AG_COPILOT": "firmware/components/core/src/ui_icons.h:63",
+    "glyphs.icons.ICON_AG_PI": "firmware/components/core/src/ui_icons.h:65",
+    "glyphs.icons.ICON_ALWAYS": "firmware/components/core/src/ui_icons.h:71",
+    "glyphs.icons.ICON_BACK": "firmware/components/core/src/ui_icons.h:67",
+    "glyphs.icons.ICON_BACKSPACE": "firmware/components/core/src/ui_icons.h:36",
+    "glyphs.icons.ICON_BATTERY_CHARGING": "firmware/components/core/src/ui_icons.h:22",
+    "glyphs.icons.ICON_BATTERY_FULL": "firmware/components/core/src/ui_icons.h:17",
+    "glyphs.icons.ICON_BATTERY_HIGH": "firmware/components/core/src/ui_icons.h:18",
+    "glyphs.icons.ICON_BATTERY_LOW": "firmware/components/core/src/ui_icons.h:20",
+    "glyphs.icons.ICON_BATTERY_MED": "firmware/components/core/src/ui_icons.h:19",
+    "glyphs.icons.ICON_BATTERY_WARN": "firmware/components/core/src/ui_icons.h:21",
+    "glyphs.icons.ICON_BELL": "firmware/components/core/src/ui_icons.h:25",
+    "glyphs.icons.ICON_BLUETOOTH": "firmware/components/core/src/ui_icons.h:14",
+    "glyphs.icons.ICON_BYPASS": "firmware/components/core/src/ui_icons.h:89",
+    "glyphs.icons.ICON_CARET_DOWN": "firmware/components/core/src/ui_icons.h:101",
+    "glyphs.icons.ICON_CHECK": "firmware/components/core/src/ui_icons.h:68",
+    "glyphs.icons.ICON_CLICK": "firmware/components/core/src/ui_icons.h:82",
+    "glyphs.icons.ICON_CLOCK": "firmware/components/core/src/ui_icons.h:111",
+    "glyphs.icons.ICON_COMPUTER": "firmware/components/core/src/ui_icons.h:16",
+    "glyphs.icons.ICON_CURSOR": "firmware/components/core/src/ui_icons.h:114",
+    "glyphs.icons.ICON_DENIED": "firmware/components/core/src/ui_icons.h:12",
+    "glyphs.icons.ICON_DONE": "firmware/components/core/src/ui_icons.h:9",
+    "glyphs.icons.ICON_DONT_ASK": "firmware/components/core/src/ui_icons.h:112",
+    "glyphs.icons.ICON_DOWN": "firmware/components/core/src/ui_icons.h:96",
+    "glyphs.icons.ICON_ERROR": "firmware/components/core/src/ui_icons.h:10",
+    "glyphs.icons.ICON_EXACT": "firmware/components/core/src/ui_icons.h:105",
+    "glyphs.icons.ICON_EYE_HALF": "firmware/components/core/src/ui_icons.h:78",
+    "glyphs.icons.ICON_EYE_OFF": "firmware/components/core/src/ui_icons.h:79",
+    "glyphs.icons.ICON_FILES": "firmware/components/core/src/ui_icons.h:91",
+    "glyphs.icons.ICON_FOLDER": "firmware/components/core/src/ui_icons.h:106",
+    "glyphs.icons.ICON_FORWARD": "firmware/components/core/src/ui_icons.h:100",
+    "glyphs.icons.ICON_GRAPH": "firmware/components/core/src/ui_icons.h:39",
+    "glyphs.icons.ICON_G_DOT": "firmware/components/core/src/ui_icons.h:41",
+    "glyphs.icons.ICON_G_EDIT": "firmware/components/core/src/ui_icons.h:43",
+    "glyphs.icons.ICON_G_EXPLORE": "firmware/components/core/src/ui_icons.h:53",
+    "glyphs.icons.ICON_G_GIT": "firmware/components/core/src/ui_icons.h:50",
+    "glyphs.icons.ICON_G_MAP": "firmware/components/core/src/ui_icons.h:57",
+    "glyphs.icons.ICON_G_MCP": "firmware/components/core/src/ui_icons.h:52",
+    "glyphs.icons.ICON_G_PLAN": "firmware/components/core/src/ui_icons.h:49",
+    "glyphs.icons.ICON_G_READ": "firmware/components/core/src/ui_icons.h:42",
+    "glyphs.icons.ICON_G_RESEARCH": "firmware/components/core/src/ui_icons.h:56",
+    "glyphs.icons.ICON_G_REVIEW": "firmware/components/core/src/ui_icons.h:55",
+    "glyphs.icons.ICON_G_ROBOT": "firmware/components/core/src/ui_icons.h:48",
+    "glyphs.icons.ICON_G_SEARCH": "firmware/components/core/src/ui_icons.h:45",
+    "glyphs.icons.ICON_G_SHELL": "firmware/components/core/src/ui_icons.h:44",
+    "glyphs.icons.ICON_G_TASK": "firmware/components/core/src/ui_icons.h:54",
+    "glyphs.icons.ICON_G_TEST": "firmware/components/core/src/ui_icons.h:51",
+    "glyphs.icons.ICON_G_WEB": "firmware/components/core/src/ui_icons.h:46",
+    "glyphs.icons.ICON_HOLD": "firmware/components/core/src/ui_icons.h:38",
+    "glyphs.icons.ICON_IDLE": "firmware/components/core/src/ui_icons.h:11",
+    "glyphs.icons.ICON_INFO": "firmware/components/core/src/ui_icons.h:34",
+    "glyphs.icons.ICON_KEYBOARD": "firmware/components/core/src/ui_icons.h:24",
+    "glyphs.icons.ICON_LABS": "firmware/components/core/src/ui_icons.h:113",
+    "glyphs.icons.ICON_LEFT_CLICK": "firmware/components/core/src/ui_icons.h:115",
+    "glyphs.icons.ICON_LINK_BREAK": "firmware/components/core/src/ui_icons.h:97",
+    "glyphs.icons.ICON_LIVE": "firmware/components/core/src/ui_icons.h:35",
+    "glyphs.icons.ICON_MIC": "firmware/components/core/src/ui_icons.h:23",
+    "glyphs.icons.ICON_MORE": "firmware/components/core/src/ui_icons.h:70",
+    "glyphs.icons.ICON_MOVE": "firmware/components/core/src/ui_icons.h:85",
+    "glyphs.icons.ICON_MUTE": "firmware/components/core/src/ui_icons.h:28",
+    "glyphs.icons.ICON_NEXT": "firmware/components/core/src/ui_icons.h:66",
+    "glyphs.icons.ICON_NOTIFY": "firmware/components/core/src/ui_icons.h:72",
+    "glyphs.icons.ICON_NO_FOLDER": "firmware/components/core/src/ui_icons.h:92",
+    "glyphs.icons.ICON_OFFLINE": "firmware/components/core/src/ui_icons.h:13",
+    "glyphs.icons.ICON_OPEN": "firmware/components/core/src/ui_icons.h:29",
+    "glyphs.icons.ICON_PERMISSION": "firmware/components/core/src/ui_icons.h:8",
+    "glyphs.icons.ICON_PR": "firmware/components/core/src/ui_icons.h:90",
+    "glyphs.icons.ICON_QUESTION": "firmware/components/core/src/ui_icons.h:7",
+    "glyphs.icons.ICON_QUEUED": "firmware/components/core/src/ui_icons.h:98",
+    "glyphs.icons.ICON_QUIET": "firmware/components/core/src/ui_icons.h:26",
+    "glyphs.icons.ICON_READ": "firmware/components/core/src/ui_icons.h:75",
+    "glyphs.icons.ICON_REFUSED": "firmware/components/core/src/ui_icons.h:93",
+    "glyphs.icons.ICON_REPLY": "firmware/components/core/src/ui_icons.h:32",
+    "glyphs.icons.ICON_RERUN": "firmware/components/core/src/ui_icons.h:73",
+    "glyphs.icons.ICON_RETRY": "firmware/components/core/src/ui_icons.h:74",
+    "glyphs.icons.ICON_RIGHT_CLICK": "firmware/components/core/src/ui_icons.h:83",
+    "glyphs.icons.ICON_SENT": "firmware/components/core/src/ui_icons.h:33",
+    "glyphs.icons.ICON_SESSIONS": "firmware/components/core/src/ui_icons.h:80",
+    "glyphs.icons.ICON_SKIP": "firmware/components/core/src/ui_icons.h:88",
+    "glyphs.icons.ICON_SOUND": "firmware/components/core/src/ui_icons.h:27",
+    "glyphs.icons.ICON_STOP": "firmware/components/core/src/ui_icons.h:31",
+    "glyphs.icons.ICON_TAP": "firmware/components/core/src/ui_icons.h:99",
+    "glyphs.icons.ICON_TIMER": "firmware/components/core/src/ui_icons.h:108",
+    "glyphs.icons.ICON_UNSNOOZE": "firmware/components/core/src/ui_icons.h:77",
+    "glyphs.icons.ICON_UP": "firmware/components/core/src/ui_icons.h:95",
+    "glyphs.icons.ICON_UPDATE": "firmware/components/core/src/ui_icons.h:86",
+    "glyphs.icons.ICON_USB": "firmware/components/core/src/ui_icons.h:15",
+    "glyphs.icons.ICON_WAIT": "firmware/components/core/src/ui_icons.h:76",
+    "glyphs.icons.ICON_WAVE": "firmware/components/core/src/ui_icons.h:81",
+    "glyphs.icons.ICON_WEEK": "firmware/components/core/src/ui_icons.h:87",
+    "glyphs.icons.ICON_WHEEL": "firmware/components/core/src/ui_icons.h:84",
+    "glyphs.icons.ICON_WILD": "firmware/components/core/src/ui_icons.h:103",
+    "glyphs.icons.ICON_WINDOW": "firmware/components/core/src/ui_icons.h:94",
+    "glyphs.icons.ICON_WORKING": "firmware/components/core/src/ui_icons.h:6",
+    "glyphs.icons.ICON_X": "firmware/components/core/src/ui_icons.h:69",
+    "glyphs.keys.a": "firmware/components/core/src/ui_home_card.c:670",
+    "glyphs.keys.a.color": "firmware/components/core/src/ui_kit.h:217",
+    "glyphs.keys.b": "firmware/components/core/src/ui_theme.c:90",
+    "glyphs.keys.b.color": "firmware/components/core/src/ui_kit.h:218",
+    "glyphs.keys.r_px": "firmware/components/core/src/ui_kit.h:137",
+    "glyphs.keys.ring_w_px": "firmware/components/core/src/ui_kit.c:876",
+    "glyphs.px": "firmware/components/core/src/ui_theme.h:31",
+    "glyphs.states": "firmware/components/core/src/ui_theme.c:57",
+    "glyphs.states.input": "firmware/components/core/src/ui_theme.c:59",
     "haptics.approved": "firmware/components/core/src/feedback.c:93",
     "haptics.denied": "firmware/components/core/src/feedback.c:100",
     "haptics.deny_ramp": "firmware/components/core/src/feedback.c:80",
@@ -5828,13 +6119,12 @@
     "ring.band_out_px": "firmware/components/core/src/ui_ring_internal.h:16",
     "ring.band_w_px": "firmware/components/core/src/ui_ring_internal.h:17",
     "ring.done_sweep_ms": "firmware/components/core/src/ui_ring_internal.h:41",
-    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:666",
-    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:666",
     "ring.error_flicker_ms": "firmware/components/core/src/ui_ring_internal.h:42",
     "ring.hero_px": "firmware/components/core/src/ui_theme.h:37",
-    "ring.hint_a_deg": "firmware/components/core/src/ui_theme.h:80",
-    "ring.hint_b_deg": "firmware/components/core/src/ui_theme.h:81",
-    "ring.hint_r_px": "firmware/components/core/src/ui_theme.h:82",
+    "ring.hero_y_px": "firmware/components/core/src/ui_home_card.c:39",
+    "ring.key_a_x_px": "firmware/components/core/src/ui_kit.h:214",
+    "ring.key_b_x_px": "firmware/components/core/src/ui_kit.h:215",
+    "ring.key_y_px": "firmware/components/core/src/ui_kit.h:216",
     "ring.kinds": "firmware/components/core/src/ui_ring.h:15",
     "ring.max_segments": "firmware/components/core/src/ui_ring.h:11",
     "ring.merge_at": "firmware/components/core/src/ui_home.c:15",
@@ -5843,17 +6133,15 @@
     "ring.nothing_else": "firmware/components/core/src/ui_home.c:219",
     "ring.others_pct": "firmware/components/core/src/ui_ring_internal.h:23",
     "ring.perm_period_ms": "firmware/components/core/src/ui_ring_internal.h:40",
-    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:543",
-    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:666",
     "ring.prog_out_px": "firmware/components/core/src/ui_ring_internal.h:31",
     "ring.prog_w_px": "firmware/components/core/src/ui_ring_internal.h:32",
-    "ring.repo_px": "firmware/components/core/src/ui_theme.h:26",
-    "ring.repo_small_px": "firmware/components/core/src/ui_theme.h:25",
     "ring.seg_gap_deg": "firmware/components/core/src/ui_ring_internal.h:20",
     "ring.sel_out_px": "firmware/components/core/src/ui_ring_internal.h:18",
     "ring.sel_w_px": "firmware/components/core/src/ui_ring_internal.h:19",
     "ring.sigil_r_px": "firmware/components/core/src/ui_home_card.c:35",
+    "ring.sigil_y_px": "firmware/components/core/src/ui_home_card.c:34",
     "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:47",
+    "ring.summary_y_px": "firmware/components/core/src/ui_home_card.c:44",
     "ring.time_dots_r_px": "firmware/components/core/src/ui_home_card.c:40",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:38",
     "screens": "firmware/components/core/src/ui_home.c:358",
