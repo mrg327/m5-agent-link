@@ -170,6 +170,14 @@ site's own art direction on top.
   "ble":    { "service": "uuid", "rx": "uuid", "tx": "uuid", "name_prefix": "AgentLink-", "default_write_len": 20 },
   "display":{ "width": 466, "height": 466, "shape": "round" },
   "messages": [ { "name": "hello", "dir": "dev→pc", "summary": "..." } ],
+  "glyphs": { "font": "font_phosphor_44", "px": 44, "line_height": 42, "base_line": 2,
+              // ICON_* per state (theme_state_glyph; "*" = default, input split by sub)
+              "states": { "done": "ICON_DONE", "*": "ICON_WORKING", "input": { "0": "ICON_PERMISSION" } },
+              // the deck's key hints: word, glyph, the key's colour (RGB_KEY_*), ring size (ui_kit)
+              "keys": { "a": { "word": "Open", "icon": "ICON_COMPUTER", "color": "#e69f00" }, "r_px": 20, "ring_w_px": 2 },
+              "agents": [ { "id": "claude", "name": "Claude Code", "icon": "ICON_AG_CLAUDE" } ],
+              // the font's 4 bpp bitmap: ink box, offset, advance, one hex digit (alpha 0-15) per pixel
+              "icons": { "ICON_DONE": { "cp": "e184", "w": 36, "h": 36, "x": 4, "y": 1, "adv": 44, "a": "0012…" } } },
   "sources": { "<key>": "file:line" }
 }
 ```

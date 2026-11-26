@@ -7,6 +7,7 @@
  * @typedef {{ daemon?: { play?: (name: string) => void }, watch?: { screen?: () => string, pointer?: (type: string, x: number, y: number) => void }, stage?: { trace?: (pts: object[]) => void } }} GlanceCtx
  */
 import { STATE_ROWS, stateLabel, rowColor } from '../../gestures/actions.js';
+import { mountGlyphKey } from './glyph-key.js';
 
 const mid = 233;
 const RIM_R = 200; // inside the rim's touch band (ring_hit: r > 150)
@@ -140,6 +141,7 @@ export function mount(section, ctx) {
   const chips = section.querySelector('[data-slot="chips"]');
   const screens = section.querySelector('[data-slot="screens"]');
   const link = section.querySelector('[data-slot="link"]');
+  mountGlyphKey(section.querySelector('[data-slot="glyphs"]'), f);
 
   STATE_ROWS.forEach((row, i) => {
     const color = rowColor(row, f),

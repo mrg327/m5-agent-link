@@ -24,14 +24,14 @@ OUT_CSS = ROOT / "atlas/css/tokens.generated.css"
 
 CORE = "firmware/components/core/src/"
 SOURCES = {}
-_cache = {}
+_cache: dict[str, str] = {}
 
 
 class Drift(Exception):
     pass
 
 
-def text(rel):
+def text(rel: str) -> str:
     if rel not in _cache:
         p = ROOT / rel
         if not p.exists():
@@ -40,7 +40,7 @@ def text(rel):
     return _cache[rel]
 
 
-def line_of(rel, pos):
+def line_of(rel: str, pos: int) -> int:
     return text(rel).count("\n", 0, pos) + 1
 
 
@@ -54,7 +54,7 @@ def find(rel: str, pattern: str, key: str | None = None, flags: int = 0) -> re.M
     return m
 
 
-def find_all(rel, pattern, flags=0):
+def find_all(rel: str, pattern: str, flags: int = 0) -> list[re.Match[str]]:
     ms = list(re.finditer(pattern, text(rel), flags))
     if not ms:
         raise Drift(f"pattern not found in {rel}: {pattern}")
@@ -814,6 +814,151 @@ def extract_sounds():
     return {"rate": rate, "waves": waves, "roles": roles, "bank": sounds}
 
 
+# ───────────────────────── glyphs ─────────────────────────
+# FONT_ICON_L: the largest icon font that has every glyph the Atlas's glyph key shows
+GLYPH_FONT = "font_phosphor_44"
+
+
+def switch_returns(rel: str, signature: str, enum: str, ret: str) -> tuple[dict[str, str], int]:
+    """Map `case ENUM_X: return RET;` lines of one C function to {x: RET}, `default` as `*`."""
+    m = find(rel, signature + r"\s*\{(.*?)\n\}", None, re.S)
+    out = {}
+    for c in re.finditer(rf"case {enum}_(\w+): return ({ret});", m.group(1)):
+        out[c.group(1).lower()] = c.group(2)
+    d = re.search(rf"default: return ({ret});", m.group(1))
+    if not out or not d:
+        raise Drift(f"{rel}: no case/default returns in {signature}")
+    out["*"] = d.group(1)
+    return out, line_of(rel, m.start(1))
+
+
+def icon_codepoints() -> dict[str, int]:
+    """Map each single-glyph ICON_* of ui_icons.h to its code point."""
+    rel = CORE + "ui_icons.h"
+    out = {}
+    for m in find_all(rel, r'#define (ICON_\w+) "((?:\\x[0-9A-Fa-f]{2})+)"'):
+        raw = bytes(int(h, 16) for h in re.findall(r"\\x([0-9A-Fa-f]{2})", m.group(2)))
+        s = raw.decode("utf-8")
+        if len(s) == 1:
+            out[m.group(1)] = ord(s)
+            SOURCES[f"glyphs.icons.{m.group(1)}"] = f"{rel}:{line_of(rel, m.start())}"
+    return out
+
+
+def font_glyphs(name: str) -> tuple[int, int, dict[int, dict[str, object]]]:
+    """Read an lv_font_conv C font (4 bpp, uncompressed, sparse cmaps).
+
+    Returns the line height, the base line and {code point: glyph}; a glyph's `a` is one hex
+    digit (alpha 0-15) per pixel, row by row.
+    """
+    rel = f"{CORE}fonts/{name}.c"
+    find(rel, r"\* Bpp: 4\n", "glyphs.font")
+    if "--no-compress" not in text(rel):
+        raise Drift(f"{rel}: compressed bitmaps are not read")
+    bm = find(rel, r"glyph_bitmap\[\] = \{(.*?)\n\};", None, re.S).group(1)
+    data = bytes(int(v, 16) for v in re.findall(r"0x([0-9a-f]+)", re.sub(r"/\*.*?\*/", "", bm)))
+    dsc = find_all(
+        rel,
+        r"\{\.bitmap_index = (\d+), \.adv_w = (\d+), \.box_w = (\d+), \.box_h = (\d+), "
+        r"\.ofs_x = (-?\d+), \.ofs_y = (-?\d+)\}",
+    )
+    glyphs: dict[int, dict[str, object]] = {}
+    for cm in find_all(
+        rel,
+        r"\.range_start = (\d+), \.range_length = \d+, \.glyph_id_start = (\d+),\s*"
+        r"\.unicode_list = (\w+), \.glyph_id_ofs_list = NULL, \.list_length = (\d+), "
+        r"\.type = LV_FONT_FMT_TXT_CMAP_SPARSE_TINY",
+    ):
+        lst = find(rel, rf"{cm.group(3)}\[\] = \{{(.*?)\}};", None, re.S).group(1)
+        offs = [int(v, 16) for v in re.findall(r"0x([0-9a-f]+)", lst)]
+        if len(offs) != int(cm.group(4)):
+            raise Drift(f"{rel}: {cm.group(3)} has {len(offs)} entries, not {cm.group(4)}")
+        for i, off in enumerate(offs):
+            # dsc[0] is the reserved id 0, so glyph id k is dsc[k]
+            idx, adv, w, h, ox, oy = (int(g) for g in dsc[int(cm.group(2)) + i].groups())
+            n = w * h  # pixels, two to a byte, rows not padded
+            glyphs[int(cm.group(1)) + off] = {
+                "w": w,
+                "h": h,
+                "x": ox,
+                "y": oy,
+                "adv": adv // 16,
+                "a": data[idx : idx + (n + 1) // 2].hex()[:n],
+            }
+    lh = int(find(rel, r"\.line_height = (\d+),").group(1))
+    bl = int(find(rel, r"\.base_line = (\d+),").group(1))
+    return lh, bl, glyphs
+
+
+def extract_glyphs() -> dict[str, object]:
+    """Return the glyphs of the Atlas's glyph key as the firmware's own bitmaps (GLYPHS.md §3.2)."""
+    theme, card, kit = CORE + "ui_theme.c", CORE + "ui_home_card.c", CORE + "ui_kit.h"
+    st, line = switch_returns(
+        theme, r"const char \*theme_state_glyph\(const session_t \*s\)", "SESS", r"ICON_\w+"
+    )
+    SOURCES["glyphs.states"] = f"{theme}:{line}"
+    inp = find(
+        theme,
+        r"case SESS_INPUT: return s->sub == 0 \? (ICON_\w+) : (ICON_\w+);",
+        "glyphs.states.input",
+    )
+    states: dict[str, object] = dict(st)
+    states["input"] = {"0": inp.group(1), "1": inp.group(2)}
+    ag, line = switch_returns(
+        theme, r"const char \*theme_agent_glyph\(agent_t a\)", "AGENT", r"ICON_\w+"
+    )
+    SOURCES["glyphs.agents"] = f"{theme}:{line}"
+    names, line = switch_returns(
+        theme, r"const char \*theme_agent_name\(agent_t a\)", "AGENT", r'"[^"]+"'
+    )
+    SOURCES["glyphs.agents.name"] = f"{theme}:{line}"
+    agents = []
+    for m in find_all(CORE + "model.h", r"AGENT_(\w+) = \d+"):
+        a = m.group(1).lower()
+        name = names.get(a, names["*"]).strip('"')
+        agents.append({"id": a, "name": name, "icon": ag.get(a, ag["*"])})
+    # the deck's key hints (ui_home_card.c): A is set to a glyph, B is its word's glyph (kGlyphs)
+    words = find(card, r'static const char \*const words\[2\] = \{"(\w+)", "(\w+)"\};')
+    a_icon = find(card, r"ui_key_hint_set\(s_badge\[0\], (ICON_\w+)\);", "glyphs.keys.a").group(1)
+    b_icon = find(theme, rf'\{{"{words.group(2)}", (ICON_\w+)\}}', "glyphs.keys.b").group(1)
+    keys: dict[str, object] = {}
+    for k, word, icon in (("a", words.group(1), a_icon), ("b", words.group(2), b_icon)):
+        rgb = find(
+            kit, rf"#define RGB_KEY_{k.upper()} 0x([0-9a-fA-F]{{6}})", f"glyphs.keys.{k}.color"
+        )
+        keys[k] = {"word": word, "icon": icon, "color": "#" + rgb.group(1).lower()}
+    keys["r_px"] = int(find(kit, r"#define UI_DISC_R_KEY\s+(\d+)", "glyphs.keys.r_px").group(1))
+    keys["ring_w_px"] = int(
+        find(CORE + "ui_kit.c", r"#define KEY_RING_W (\d+)", "glyphs.keys.ring_w_px").group(1)
+    )
+    find(CORE + "ui_theme.h", rf"#define FONT_ICON_L \(&{GLYPH_FONT}\)", "glyphs.px")
+    used = sorted(
+        set(st.values())
+        | {inp.group(1), inp.group(2), a_icon, b_icon}
+        | {a["icon"] for a in agents}
+    )
+    cps = icon_codepoints()
+    lh, bl, bitmaps = font_glyphs(GLYPH_FONT)
+    icons = {}
+    for name in used:
+        if name not in cps:
+            raise Drift(f"{name} is not a single-glyph ICON_* in ui_icons.h")
+        g = bitmaps.get(cps[name])
+        if g is None:
+            raise Drift(f"{GLYPH_FONT} has no glyph for {name} (U+{cps[name]:04X})")
+        icons[name] = {"cp": f"{cps[name]:04x}", **g}
+    return {
+        "font": GLYPH_FONT,
+        "px": int(GLYPH_FONT.rsplit("_", 1)[1]),
+        "line_height": lh,
+        "base_line": bl,
+        "states": states,
+        "keys": keys,
+        "agents": agents,
+        "icons": icons,
+    }
+
+
 # ───────────────────────── output ─────────────────────────
 def build():
     SOURCES.clear()
@@ -833,6 +978,7 @@ def build():
         "display": extract_display(),
         "messages": extract_messages(),
         "sounds": extract_sounds(),
+        "glyphs": extract_glyphs(),
     }
     h = extract_haptics()
     facts["haptics"] = h["patterns"]

@@ -180,7 +180,7 @@ mypy:import-untyped	protocol/tools/validate_vectors.py	2
 mypy:index	daemon/tools/ota_e2e.py	3
 mypy:name-defined	daemon/tools/presence_e2e.py	15
 mypy:no-any-return	protocol/tools/gen_vectors.py	1
-mypy:no-untyped-call	atlas/tools/extract.py	48
+mypy:no-untyped-call	atlas/tools/extract.py	23
 mypy:no-untyped-call	daemon/crates/agentlink-keys/data/build_lexicon.py	3
 mypy:no-untyped-call	daemon/crates/agentlinkd/src/focus/kitty_wheel.py	13
 mypy:no-untyped-call	daemon/tools/answer_window_e2e.py	95
@@ -196,7 +196,7 @@ mypy:no-untyped-call	docs/design/glyphs/mock.py	107
 mypy:no-untyped-call	protocol/fixtures/ota/gen.py	4
 mypy:no-untyped-call	protocol/tools/gen_vectors.py	1
 mypy:no-untyped-call	scripts/fetch_docs.py	1
-mypy:no-untyped-def	atlas/tools/extract.py	23
+mypy:no-untyped-def	atlas/tools/extract.py	20
 mypy:no-untyped-def	daemon/crates/agentlink-keys/data/build_lexicon.py	2
 mypy:no-untyped-def	daemon/crates/agentlinkd/src/focus/kitty_wheel.py	10
 mypy:no-untyped-def	daemon/tools/answer_window_e2e.py	15
@@ -222,7 +222,7 @@ mypy:union-attr	daemon/tools/last_message_e2e.py	3
 mypy:union-attr	daemon/tools/presence_e2e.py	3
 mypy:union-attr	daemon/tools/standing_rules_e2e.py	3
 mypy:union-attr	scripts/check.d/commit_msg.py	1
-mypy:var-annotated	atlas/tools/extract.py	3
+mypy:var-annotated	atlas/tools/extract.py	2
 mypy:var-annotated	daemon/crates/agentlink-keys/data/build_lexicon.py	2
 mypy:var-annotated	daemon/tools/jobs_e2e.py	1
 mypy:var-annotated	daemon/tools/last_message_e2e.py	1
