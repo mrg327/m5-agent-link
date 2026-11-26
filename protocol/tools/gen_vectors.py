@@ -1376,6 +1376,36 @@ VECTORS = {
         },
         env("cfg", 15, {0: 1, 1: 1, 2: 1763900000, 3: 180, 4: "@dev"}),
     ),
+    "cfg_done_buzz": (
+        "Device settings (proto 0.25): every turn of 30 s or more buzzes, not only armed ones",
+        {"t": "cfg", "id": 16, "b": {"done_buzz": "all"}},
+        env("cfg", 16, {5: 1}),
+    ),
+    "welcome_done_buzz": (
+        "Welcome (proto 0.25): the PC's notify setting is armed only, as before 0.25",
+        {
+            "t": "welcome",
+            "id": 1,
+            "re": 1,
+            "b": {
+                "proto": [0, 25],
+                "host": {"id": "a1a2a3a4a5a6a7a8", "name": "dev-linux", "os": "linux"},
+                "time": {"unix": 1793995200, "tz_off": -480},
+                "cfg": {"privacy": "preview", "alert": "full", "done_buzz": "armed"},
+            },
+        },
+        env(
+            "welcome",
+            1,
+            {
+                0: [0, 25],
+                1: {0: bytes.fromhex("a1a2a3a4a5a6a7a8"), 1: "dev-linux", 2: 2},
+                2: {0: 1793995200, 1: -480},
+                3: {0: 1, 1: 0, 5: 0},
+            },
+            re_=1,
+        ),
+    ),
     "batt_charging": (
         "Device battery at 64 %, charging",
         {"t": "batt", "id": 5, "b": {"pct": 64, "chg": True}},

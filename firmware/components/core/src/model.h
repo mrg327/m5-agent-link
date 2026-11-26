@@ -50,6 +50,9 @@ typedef enum {
 } att_action_t;
 typedef enum { PRIVACY_META = 0, PRIVACY_PREVIEW = 1, PRIVACY_FULL = 2 } privacy_t;
 typedef enum { ALERT_FULL = 0, ALERT_QUIET = 1, ALERT_SILENT = 2 } alert_mode_t;
+/* Which finishes buzz (device_cfg.done_buzz, proto 0.25): only armed ones, jobs and the watched
+ * session (a daemon before 0.25), or also every other long turn and every error. */
+typedef enum { DONE_BUZZ_ARMED = 0, DONE_BUZZ_ALL = 1 } done_buzz_t;
 
 /* Large static tables go to PSRAM on the device (internal DRAM is what BLE needs at boot). In the
  * simulator they get a section of their own, so simulator/tools/ram_budget.py can count everything
@@ -266,6 +269,7 @@ typedef struct {
     uint32_t quiet_until;
     int32_t tz_off_min;
     char handle[25];
+    done_buzz_t done_buzz; /* DONE_BUZZ_ARMED until a 0.25 daemon's welcome or cfg says otherwise */
 } settings_t;
 
 void model_init(void);

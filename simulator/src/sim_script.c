@@ -1221,14 +1221,23 @@ static void run_result(char *spec)
     inject_env(&env, "result");
 }
 
-/* cfg privacy meta|preview|full */
+/* cfg privacy meta|preview|full | cfg done_buzz armed|all (proto 0.25) */
 static void run_cfg(const char *spec)
 {
     static const char *const privacy[] = {"meta", "preview", "full"};
+    static const char *const done_buzz[] = {"armed", "all"};
     char key[12], val[12];
-    int v;
-    if (sscanf(spec, "%11s %11s", key, val) != 2 || strcmp(key, "privacy") ||
-        (v = enum_of(val, privacy, 3)) < 0) {
+    int v = -1;
+    bool buzz = false;
+    if (sscanf(spec, "%11s %11s", key, val) == 2) {
+        buzz = !strcmp(key, "done_buzz");
+        if (buzz) {
+            v = enum_of(val, done_buzz, 2);
+        } else if (!strcmp(key, "privacy")) {
+            v = enum_of(val, privacy, 3);
+        }
+    }
+    if (v < 0) {
         fail("bad cfg", spec);
         return;
     }
@@ -1237,8 +1246,13 @@ static void run_cfg(const char *spec)
     env.envelope_choice = envelope_msg_cfg_m_c;
     env.envelope_msg_cfg_m.msg_cfg_hdr_m.hdr_uint1uint = ++s_rx_id;
     struct device_cfg *c = &env.envelope_msg_cfg_m.msg_cfg_device_cfg_m;
-    c->device_cfg_privacy_m_present = true;
-    c->device_cfg_privacy_m.device_cfg_privacy_m.privacy_choice = v;
+    if (buzz) {
+        c->device_cfg_uint5uint_present = true;
+        c->device_cfg_uint5uint.device_cfg_uint5uint = (uint32_t)v;
+    } else {
+        c->device_cfg_privacy_m_present = true;
+        c->device_cfg_privacy_m.device_cfg_privacy_m.privacy_choice = v;
+    }
     inject_env(&env, "cfg");
 }
 

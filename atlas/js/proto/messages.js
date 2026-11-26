@@ -60,6 +60,7 @@ const ENUMS = {
   perm_mode: { default: 0, plan: 1, accept_edits: 2, auto: 3, dont_ask: 4, bypass: 5 },
   pr_state: { none: 0, pending: 1, approved: 2, changes: 3, draft: 4 },
   rule_scope: { session: 0, project: 1 }, // proto 0.13 (STANDING-RULES.md)
+  done_buzz: { armed: 0, all: 1 }, // proto 0.25 (PROTOCOL.md 6j)
   fw_status: { go: 0, done: 1, busy: 2, bad: 3, fail: 4, stopped: 5 }, // proto 0.15 (PROTOCOL.md 6c)
   input_event: {
     tap: 0,
@@ -160,6 +161,7 @@ const SPECS = {
     quiet_until: [2, 'uint'],
     brightness: [3, 'uint'],
     badge_handle: [4, 'tstr'],
+    done_buzz: [5, 'enum:done_buzz'],
   },
   welcome: {
     proto: [0, 'ints'],

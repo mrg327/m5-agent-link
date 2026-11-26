@@ -561,22 +561,71 @@ static void on_attention(const attention_t *a, bool is_new)
     ui_offer_attention(a->sid, error, rgb);
 }
 
-/* A session moved into done or error: buzz when it was armed with Notify, or the watch is on it. */
+/* Under DONE_BUZZ_ALL (issue 20261126-27b7): a turn shorter than this ends silently, unless it was
+ * armed, a job or watched; an error always buzzes. Finishes closer together than DONE_BURST_MS buzz
+ * once (the ring shows the rest). */
+#define DONE_MIN_S 30
+#define DONE_BURST_MS 3000u
+static uint32_t s_finish_ms; /* when the last finish buzzed */
+static bool s_finished;      /* one has buzzed since boot */
+
+/* How long the turn that just ended ran, in seconds: the daemon's count (session.dur, proto 0.14),
+ * which comes with the delta that enters done, else the time since the last state change. -1 =
+ * unknown (no clock, or no earlier state). */
+static int64_t turn_secs(const session_t *before, const session_t *now, uint32_t unix_now)
+{
+    if (now->sum.secs_known) return now->sum.secs;
+    if (!before || !before->tst || !unix_now) return -1;
+    return (int64_t)unix_now - (int64_t)before->tst;
+}
+
+/* Under DONE_BUZZ_ALL: one buzz per burst of finishes, and a dark display glows as for a request
+ * (face down nobody sees it). No takeover and no reminders: the card and the ring say the rest. */
+static void finished_all(bool error, uint32_t sid)
+{
+    uint32_t ms = app_now_ms();
+    if (s_finished && ms - s_finish_ms < DONE_BURST_MS) {
+        dbg_event("ui", "finish_burst", "\"sid\":%u", (unsigned)sid);
+    } else {
+        feedback_finished(error);
+        s_finish_ms = ms;
+        s_finished = true;
+    }
+    if (!motion_face_down()) power_attention(error ? RGB_ERROR : RGB_DONE, ms);
+}
+
+/* A session moved into done or error. It buzzes when it was armed with Notify, is a job or is open
+ * in WATCH; under DONE_BUZZ_ALL also when it failed or its turn ran DONE_MIN_S or more. Quiet,
+ * snooze and presence hush hold it. */
 static void on_session(const session_t *before, const session_t *now, uint32_t present)
 {
     if (!(present & SF_STATE)) return;
     if (now->state != SESS_DONE && now->state != SESS_ERROR) return;
     if (before && before->state == now->state) return;
+    bool error = now->state == SESS_ERROR;
     bool armed = before && before->ntf;
     bool job = now->agent == AGENT_SHELL; /* a job is on the watch to say when it ends (JOBS.md) */
-    if (!armed && !job && now->sid != ui_watched_sid()) return;
+    bool all = model_settings()->done_buzz == DONE_BUZZ_ALL;
     uint32_t unix_now = app_now_unix();
+    if (!armed && !job && now->sid != ui_watched_sid()) {
+        /* no earlier state: a session first seen finished buzzes for nothing it did meanwhile */
+        if (!all || !before) return;
+        int64_t secs = turn_secs(before, now, unix_now);
+        if (!error && secs >= 0 && secs < DONE_MIN_S) {
+            dbg_event("ui", "short_turn", "\"sid\":%u,\"secs\":%d", (unsigned)now->sid, (int)secs);
+            return;
+        }
+    }
     if (model_session_snoozed(now, unix_now) || model_quiet_active(unix_now)) return;
     if ((present & SF_HUSH) && now->hush) { /* the user is looking at its terminal (PRESENCE.md) */
         dbg_event("ui", "hush", "\"sid\":%u,\"state\":%d", (unsigned)now->sid, (int)now->state);
         return;
     }
-    feedback_finished(now->state == SESS_ERROR);
+    if (all) {
+        finished_all(error, now->sid);
+    } else {
+        feedback_finished(error); /* as before proto 0.25 */
+    }
 }
 
 static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, const char *msg)

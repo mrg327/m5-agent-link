@@ -667,6 +667,20 @@ sim_script_test(sim_finished_buzz finished_buzz.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"glow\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"mode\",\"mode\":\"watch\"([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[35,200,35\\]([^p]|p[^a]|pa[^t])*\"ev\":\"snoozed\",\"rid\":8,([^p]|p[^a]|pa[^t])*\"ev\":\"attention\",\"rid\":9.*\"pattern_ms\":\\[250,120,250\\]")
 
+# Finishes buzz by default (issue 20261126-27b7, proto 0.25 done_buzz): under all, a long turn or an error
+# buzzes and a dark display glows, a burst buzzes once, a turn under 30 s is silent; armed is the old rule.
+add_test(NAME sim_done_buzz_all
+         COMMAND agentlink_sim --headless --no-ws --idle-off 1 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/done_buzz_all.txt)
+set_tests_properties(sim_done_buzz_all PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|finish_burst.*pattern_ms"
+                     PASS_REGULAR_EXPRESSION "\"done_buzz\":1.*\"display_off\".*\"pattern_ms\":\\[35,200,35\\].*\"ev\":\"glow\".*\"pattern_ms\":\\[120,90,120,90,120\\].*\"ev\":\"glow\".*\"ev\":\"finish_burst\",\"sid\":4")
+sim_script_test(sim_done_buzz_short done_buzz_short.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"ev\":\"glow\"|pattern_ms\":\\[35,200,35\\].*pattern_ms\":\\[35"
+                PASS_REGULAR_EXPRESSION "\"short_turn\",\"sid\":2,\"secs\":5([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[35,200,35\\]")
+sim_script_test(sim_done_buzz_armed done_buzz_armed.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4"
+                PASS_REGULAR_EXPRESSION "\"done_buzz\":0([^p]|p[^a]|pa[^t])*\"sid\":4,\"st\":\"done\"([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[35,200,35\\]([^p]|p[^a]|pa[^t])*\"done_buzz\":1([^p]|p[^a]|pa[^t])*\"short_turn\",\"sid\":2([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[35,200,35\\]")
+
 # Presence (PRESENCE.md, proto 0.12): hush holds the arrival buzz, the reminders and the finished buzz; the
 # card and ASK are as ever, and nothing is answered.
 sim_script_test(sim_presence_hush_ask presence_hush_ask.txt

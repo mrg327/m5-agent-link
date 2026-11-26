@@ -106,6 +106,10 @@ echo '{"session_id":"s1","context_window":{"used_percentage":42}}' | cargo run -
 
 docs/design/PRESENCE.md. The daemon asks whether the user is at the keyboard (screen saver / idle monitor over D-Bus and logind on Linux, `ioreg` on macOS; unknown elsewhere) and whether a session's terminal is the focused window (kitty remote control, X11 `xdotool`). With the terminal focused the default answer window is 2 s and the watch is told not to buzz (`hush`, proto 0.12); at the keyboard elsewhere the window is 10 s; away, locked or unknown nothing changes. An explicit `answer_window` setting is never shortened. `AGENTLINK_PRESENCE=off` / `~/.agentlink/presence` turns the rules off. While a session works or waits on the user, or a job runs, the daemon holds an idle-sleep inhibitor (`systemd-inhibit --what=idle` on Linux, `caffeinate -i` on macOS) according to `~/.agentlink/keep_awake`: `ac` (default, on AC power only), `always`, `off`. `agentlink status` prints both (`presence:`, `keep awake:`, and `--json`). End to end: `uv run --with cbor2 --with websockets python daemon/tools/presence_e2e.py "$PWD/.."`.
 
+## Notify
+
+Which finished sessions buzz on the watch (PROTOCOL §6j, issue 20261126-27b7). `~/.agentlink/notify` (or `AGENTLINK_NOTIFY`) holds `all`, the default: every turn of 30 s or more that ends done, every error, and the sessions armed with Notify; or `armed`: only armed sessions, jobs and the session open on the watch, as before. `agentlink notify [all|armed]` writes the file and prints the setting; `agentlink status` prints it too (`notify:`, and `--json`). The daemon reads it at every welcome and before every delta that enters done / error, and sends it as `device_cfg.done_buzz` to watches with proto 0.25 (`notify.rs`, gate `NOTIFY_MINOR`); the watch applies the 30 s minimum itself. End to end: `uv run --with cbor2 --with websockets python daemon/tools/notify_e2e.py "$PWD"`.
+
 ## Firmware update
 
 `agentlink ota <image.bin> [--unsigned] [--device <id>]` sends a signed app image to a connected watch over the air (PROTOCOL §6c, FIRMWARE.md §9), only on request and only to a device that announced proto 0.15. The daemon checks the image first (ESP magic, `agentlink` project name, at most 6 MB, signature block unless `--unsigned`), sends `fw_begin` and 2 KB `fw_chunk`s with at most 4 unanswered, resends from the watch's `next` after a gap, then waits up to 90 s for the restarted watch to say hello and compares its `fw` with the image's version. Ctrl-C stops the transfer. Chunk data never reaches the trace (its length does); the audit log has `ota_start` and `ota_end`. End to end: `uv run --with cbor2 --with websockets python daemon/tools/ota_e2e.py "$PWD"`.
@@ -130,6 +134,7 @@ over an encrypted link paired with the passkey on its screen. End to end: `daemo
 - `~/.agentlink/audit.jsonl`: append-only record of focus actions and approval decisions.
 - `~/.agentlink/power-reports.csv`: one row per watch power report (columns in docs/design/POWER.md).
 - `~/.agentlink/trusted-watches.txt`: the watches served over Bluetooth (Trusted watches above).
+- `~/.agentlink/notify`: which finishes buzz on the watch, written by `agentlink notify` (Notify above).
 
 ## Status
 

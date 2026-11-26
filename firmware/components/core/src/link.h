@@ -38,7 +38,7 @@ typedef enum {
  */
 
 /* The proto minor this firmware speaks in hello; its history is the comment in link_tx.c. */
-#define LINK_PROTO_MINOR 24
+#define LINK_PROTO_MINOR 25
 
 /* fw_status: the state a fw_ack reports (proto 0.15, agentlink.cddl). */
 typedef enum {

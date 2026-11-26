@@ -1,4 +1,4 @@
-; agentlink protocol 0.24 — single source of truth. The version is [major, minor] in hello and welcome;
+; agentlink protocol 0.25 — single source of truth. The version is [major, minor] in hello and welcome;
 ; its history is the comment above hello_major_l_minor in firmware/components/core/src/link_tx.c.
 ; See docs/design/PROTOCOL.md for semantics. Integer keys; symbolic names in comments.
 ; Compatibility rests on the sender (docs/conventions/protocol.md §6): the device's decoder drops a message
@@ -190,8 +190,14 @@ device_cfg = {
   ? 1 => alert_mode,   ; alert
   ? 2 => uint,         ; quiet_until (unix, 0 = none)
   ? 3 => uint,         ; brightness 0..255
-  ? 4 => tstr         ; badge_handle  <= 24 bytes
+  ? 4 => tstr,        ; badge_handle  <= 24 bytes
+  ? 5 => uint         ; done_buzz  which finishes buzz, a done_buzz value (proto 0.25, PROTOCOL.md §6j)
+                      ;            A uint, not the enum, so a value a device does not know costs that setting,
+                      ;            not the welcome. Only to devices with proto >= 0.25; absent = unchanged
 }
+done_buzz = done_buzz_armed / done_buzz_all
+done_buzz_armed = 0  ; only a session armed with Notify, a job or the watched session (before 0.25)
+done_buzz_all = 1    ; also every other turn of 30 s or more that ends done, and every error
 privacy = privacy_meta / privacy_preview / privacy_full
 privacy_meta = 0
 privacy_preview = 1

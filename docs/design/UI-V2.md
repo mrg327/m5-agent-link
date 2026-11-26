@@ -385,7 +385,7 @@ ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a deten
 
 Whatever grants ends in one pulse, whatever denies in two equal ones, a refusal in three (`feedback.c`, `act_reply` in `app.c`). The sent buzz is two pulses too, told from denied by its rhythm: 35 then 120.
 
-The finished buzz needs: the session just entered Done or Error, and (its `ntf` was set, or it is the watched session), and it is not snoozed, and quiet mode is not running. A snoozed session's attentions do not buzz, glow or nag either.
+The finished buzz needs: the session just entered Done or Error, and (its `ntf` was set, or it is the watched session), and it is not snoozed, and quiet mode is not running. Since proto 0.25 the PC's notify setting widens this by default (`all`): every error and every done after a turn of 30 s or more buzzes too, and a dark display glows ([PROTOCOL.md](PROTOCOL.md) §6j, issue 20261126-27b7). A snoozed session's attentions do not buzz, glow or nag either.
 
 Three controls (§4.5): the alert mode `silent` suppresses every haptic but `hello`; the alert mode `quiet` ("Sounds: off") suppresses sound only (the speaker plays the sound bank's `done` pick when a session finishes and its `input` pick when an agent asks a question or needs approval, `core/src/sound.c`); the timed **Quiet** (`quiet_until`) suppresses the *alerts* (attention arrival, glow, nag) while leaving the detents, ticks and commit haptics, which answer the user's own input.
 

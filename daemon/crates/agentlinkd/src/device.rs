@@ -144,6 +144,9 @@ struct Conn {
     /// The device's board and firmware as its hello named them, for the power log.
     board: String,
     fw: String,
+    /// The notify setting this link last gave the device (`device_cfg.done_buzz`); `None` before
+    /// proto 0.25.
+    done_buzz: Option<DoneBuzz>,
 }
 
 /// Terminal content leaves the daemon only when the device may show it (UI-V2 §4.4).
@@ -236,6 +239,24 @@ impl Conn {
             (s.pr, s.prs) = (None, None);
         }
         s
+    }
+
+    /// A changed notify setting, to a device that can decode it (proto 0.25), before the finish it
+    /// decides: an edit of `~/.agentlink/notify` reaches the watch with the next finish.
+    async fn send_notify(&mut self, mode: DoneBuzz) -> Result<()> {
+        if self.peer_minor < NOTIFY_MINOR || self.done_buzz == Some(mode) {
+            return Ok(());
+        }
+        self.done_buzz = Some(mode);
+        let cfg = DeviceCfg {
+            privacy: None,
+            alert: None,
+            quiet_until: None,
+            brightness: None,
+            badge_handle: None,
+            done_buzz: Some(mode),
+        };
+        self.send(None, Message::Cfg(cfg)).await
     }
 
     /// The plan's usage windows, to a device that can decode them (proto 0.10).
@@ -429,6 +450,8 @@ const ANSWER_MINOR: u64 = 18;
 const POINTER_MINOR: u64 = 20;
 /// The agent graph: `cmd graph` and its `graph` answer (GRAPH.md).
 const GRAPH_MINOR: u64 = 22;
+/// Which finishes buzz: `device_cfg.done_buzz` in `welcome` and `cfg` (notify.rs, PROTOCOL.md §6j).
+const NOTIFY_MINOR: u64 = 25;
 /// `agent_pi`; an older device's decoder rejects an agent value it does not know.
 const PI_MINOR: u64 = 23;
 
@@ -442,6 +465,7 @@ fn welcome(
     voice: Option<bool>,
     keys: Option<bool>,
     pointer: Option<bool>,
+    done_buzz: Option<DoneBuzz>,
 ) -> Welcome {
     let tz = chrono::Local::now().offset().local_minus_utc() / 60;
     Welcome {
@@ -457,6 +481,7 @@ fn welcome(
             quiet_until: None,
             brightness: None,
             badge_handle: None,
+            done_buzz,
         },
         replies,
         voice,
@@ -485,6 +510,7 @@ pub async fn run_link(
         linked: None,
         board: String::new(),
         fw: String::new(),
+        done_buzz: None,
     };
 
     let hello = loop {
@@ -637,7 +663,8 @@ async fn handshake(
         && c.peer_minor >= DICTATE_MINOR
         && hello.1.caps.feats.contains(&Feature::Voice);
     let pointer = (c.peer_minor >= POINTER_MINOR && shared.pointer.available()).then_some(true);
-    let w = welcome(&shared.host, replies, voice, keys, pointer);
+    c.done_buzz = (c.peer_minor >= NOTIFY_MINOR).then(crate::notify::mode);
+    let w = welcome(&shared.host, replies, voice, keys, pointer, c.done_buzz);
     c.privacy = w.cfg.privacy.unwrap_or(Privacy::Meta);
     c.send(Some(hello.0), Message::Welcome(w)).await?;
     let sessions = c.sessions_for_peer(sessions);
@@ -789,6 +816,9 @@ async fn serve(
                 // held for the bench: dropped here, the resync at the end brings the watch up to date
                 Ok(_) | Err(RecvError::Lagged(_)) if held => {}
                 Ok(Update::Upsert(mut s)) => {
+                    if enters_finished(&s) {
+                        c.send_notify(crate::notify::mode()).await?;
+                    }
                     if c.peer_minor >= PRESENCE_MINOR {
                         s.hush = finished_hush(shared, &s).await;
                     }
@@ -2043,6 +2073,7 @@ mod tests {
                 linked: None,
                 board: String::new(),
                 fw: String::new(),
+                done_buzz: None,
             };
             let out = c.for_peer(s.clone());
             assert_eq!(
@@ -2285,6 +2316,7 @@ mod tests {
                 linked: None,
                 board: String::new(),
                 fw: String::new(),
+                done_buzz: None,
             };
             assert_eq!(c.for_peer(s.clone()).qd.as_deref(), want, "minor {minor}");
         }
@@ -2304,6 +2336,7 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         };
         s.qd = Some(String::new());
         assert_eq!(
@@ -2978,6 +3011,7 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         };
         c.send(
             None,
@@ -3548,6 +3582,7 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         };
         let mut s = Session::delta(1);
         (s.snz, s.ntf, s.n, s.ok, s.sum) = (
@@ -3584,7 +3619,50 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         }
+    }
+
+    #[tokio::test]
+    async fn notify_setting_goes_only_to_0_25_and_only_when_it_changes() {
+        let sent = |minor: u64, modes: &[DoneBuzz]| {
+            let modes = modes.to_vec();
+            async move {
+                let (_tx, rx) = mpsc::unbounded_channel();
+                let (tx, mut out) = mpsc::unbounded_channel();
+                let mut c = Conn {
+                    link: Box::new(ChanLink { rx, tx }),
+                    ..test_conn(minor)
+                };
+                c.done_buzz = (minor >= NOTIFY_MINOR).then_some(DoneBuzz::All); // as the welcome gave it
+                for m in modes {
+                    c.send_notify(m).await.unwrap();
+                }
+                drop(c);
+                let mut got = vec![];
+                while let Some(b) = out.recv().await {
+                    let Message::Cfg(cfg) = Envelope::from_bytes(&b).unwrap().msg else {
+                        panic!("not a cfg")
+                    };
+                    assert_eq!(cfg.privacy, None, "a partial update: only done_buzz");
+                    got.push(cfg.done_buzz.unwrap());
+                }
+                got
+            }
+        };
+        let flip = [
+            DoneBuzz::All,
+            DoneBuzz::Armed,
+            DoneBuzz::Armed,
+            DoneBuzz::All,
+        ];
+        assert_eq!(sent(25, &flip).await, [DoneBuzz::Armed, DoneBuzz::All]);
+        assert!(
+            sent(24, &flip).await.is_empty(),
+            "an older watch cannot decode cfg.5"
+        );
+        let w = welcome(&host_info(), None, None, None, None, None);
+        assert_eq!(w.cfg.done_buzz, None);
     }
 
     #[test]
@@ -3807,6 +3885,7 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         };
         let mut s = Session::delta(1);
         (s.eta, s.exit) = (Some(60), Some(1));
@@ -3835,6 +3914,7 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         };
         let mut s = Session::delta(1);
         (s.ctx, s.mdl, s.pm, s.pr, s.prs) = (
@@ -3874,6 +3954,7 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         };
         let mut s = Session::delta(1);
         (s.fc, s.la, s.lr, s.tp, s.dur) = (Some(3), Some(120), Some(14), Some(false), Some(252));

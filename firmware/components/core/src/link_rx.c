@@ -210,8 +210,13 @@ static void apply_cfg(const struct device_cfg *c)
     }
     if (c->device_cfg_uint4tstr_present)
         STR(c->device_cfg_uint4tstr.device_cfg_uint4tstr, s->handle);
-    dbg_event("link", "cfg", "\"privacy\":%d,\"alert\":%d,\"quiet_until\":%u", (int)s->privacy,
-              (int)s->alert, (unsigned)s->quiet_until);
+    /* proto 0.25: a value this build does not know leaves the setting as it was */
+    if (c->device_cfg_uint5uint_present &&
+        c->device_cfg_uint5uint.device_cfg_uint5uint <= DONE_BUZZ_ALL) {
+        s->done_buzz = (done_buzz_t)c->device_cfg_uint5uint.device_cfg_uint5uint;
+    }
+    dbg_event("link", "cfg", "\"privacy\":%d,\"alert\":%d,\"quiet_until\":%u,\"done_buzz\":%d",
+              (int)s->privacy, (int)s->alert, (unsigned)s->quiet_until, (int)s->done_buzz);
     if (g_link.hooks.on_cfg) g_link.hooks.on_cfg();
 }
 
@@ -233,6 +238,8 @@ static void on_welcome(const struct welcome *w)
     dbg_event("link", "welcome", "\"host\":%s,\"unix\":%u,\"tz_off\":%d", dbg_q(host),
               (unsigned)w->welcome_time_sync_m.time_sync_uint0uint,
               (int)w->welcome_time_sync_m.time_sync_uint1int);
+    /* a daemon before 0.25 sends no done_buzz: finishes buzz as they did before it */
+    model_settings()->done_buzz = DONE_BUZZ_ARMED;
     apply_cfg(&w->welcome_device_cfg_m);
     /* Quick replies (proto 0.4): their presence means the daemon can type into terminals. */
     {

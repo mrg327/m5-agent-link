@@ -98,7 +98,7 @@ device                                 daemon
 
 ```cddl
 hello = {
-  proto: [uint, uint],             ; [major, minor] = [0, 24]
+  proto: [uint, uint],             ; [major, minor] = [0, 25]
   dev: { class: tstr,              ; "watch" | "desk" | "pad" | "sim" | ...
          board: tstr,              ; "m5stopwatch"
          fw: tstr,                 ; semver
@@ -124,7 +124,8 @@ welcome = {
   time: { unix: uint, tz_off: int },   ; device RTC sync (RX8130CE)
   cfg: { privacy: "meta"/"preview"/"full",
          alert: "full"/"quiet"/"silent",
-         quiet_until?: uint },
+         quiet_until?: uint,
+         done_buzz?: "armed"/"all" },   ; key 5 (proto 0.25): which finishes buzz (§6j)
   ? replies: [0*6 tstr],      ; quick replies, each ≤ 24 chars (proto 0.4)
   ? pointer: bool             ; key 7 (proto 0.20): the daemon drives its machine's pointer (§6g)
 }
@@ -518,6 +519,31 @@ dbg_frames (72) device → daemon  { seq, recs: bstr, last, lost }   after stop:
 ```
 
 The record layout and kinds (frame, down, up, gesture, mark, cmd) are in BENCH.md §3.
+
+## 6j. Which finishes buzz (proto 0.25, issue 20261126-27b7)
+
+`device_cfg.done_buzz` (key 5, a uint: `0` armed, `1` all) says which sessions buzz when they enter `done` or
+`error`. The PC chooses: `~/.agentlink/notify` (or `AGENTLINK_NOTIFY`) holds `all` (the default) or `armed`, and
+`agentlink notify [all|armed]` writes it. The daemon puts it in every `welcome` and sends a `cfg` with only
+this key before the next finish after the file changed; it reaches only devices with proto ≥ 0.25 (gate
+`NOTIFY_MINOR` in `device.rs`).
+
+| Session that enters done / error | `armed` (and every daemon below 0.25) | `all` |
+|---|---|---|
+| Armed with Notify, a job, or open in WATCH | buzz | buzz, and a dark display glows |
+| Error | silent | buzz, and a dark display glows |
+| Done after a turn of 30 s or more | silent | buzz, and a dark display glows |
+| Done after a shorter turn, or a session first seen finished | silent | silent |
+
+- **Turn length.** The watch reads `session.dur` (key 34, proto 0.14), which comes with the delta that enters
+  done; without it, the time since the session's last state change (`tst`). The 30 s minimum is the watch's
+  (`DONE_MIN_S` in `app.c`); nothing new is on the wire for it.
+- **Unchanged gates.** Quiet, snooze, alert mode, face down and presence `hush` (§4) hold the buzz as before:
+  a finish in front of the focused terminal stays silent. Finishes within 3 s of a buzz buzz once (the ring
+  shows the rest). No takeover and no reminders for a finish.
+- **Compatibility.** A device below 0.25 never gets key 5 and behaves as before. A daemon below 0.25 sends
+  none, so the watch resets to `armed` at each welcome and keeps the old rule. A value the watch does not
+  know leaves its setting unchanged.
 
 ## 7. Misc
 

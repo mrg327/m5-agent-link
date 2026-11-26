@@ -21,6 +21,7 @@ is in the comment at the top of each script.
 | `gauges_e2e.py` | Status line to gauges ([GAUGES.md](../../docs/design/GAUGES.md)) |
 | `jobs_e2e.py` | Terminal jobs in a real bash pty ([JOBS.md](../../docs/design/JOBS.md)) |
 | `last_message_e2e.py` | Last message and questions ([LAST-MESSAGE.md](../../docs/design/LAST-MESSAGE.md)) |
+| `notify_e2e.py` | Which finishes buzz, `agentlink notify` ([PROTOCOL.md](../../docs/design/PROTOCOL.md) §6j) |
 | `ota_e2e.py` | Firmware update ([FIRMWARE.md](../../docs/design/FIRMWARE.md) §9) |
 | `power_e2e.py` | Power report log and `agentlink power` ([POWER.md](../../docs/design/POWER.md)) |
 | `presence_e2e.py` | Presence and keep-awake ([PRESENCE.md](../../docs/design/PRESENCE.md)) |
