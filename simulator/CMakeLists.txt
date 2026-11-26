@@ -47,6 +47,10 @@ add_executable(test_gesture tests/test_gesture.c ${FW}/core/src/gesture.c)
 target_include_directories(test_gesture PRIVATE ${FW}/core/src)
 target_link_libraries(test_gesture PRIVATE m)
 add_test(NAME gesture_recognizer COMMAND test_gesture)
+# EXPERIMENTS.md "Toys": a toy never buzzes or sounds over an alert, nor where alerts would not.
+add_executable(test_toy_gate tests/test_toy_gate.c ${FW}/core/src/toy_gate.c)
+target_include_directories(test_toy_gate PRIVATE ${FW}/core/src)
+add_test(NAME toy_gate COMMAND test_toy_gate)
 
 add_executable(test_steps tests/test_steps.c ${FW}/core/src/steps.c)
 target_include_directories(test_steps PRIVATE ${FW}/core/src)
@@ -84,7 +88,7 @@ target_include_directories(test_power PRIVATE ${FW}/core/src ${FW}/agentlink_hal
 target_link_libraries(test_power PRIVATE lvgl::lvgl)
 add_test(NAME power_timers COMMAND test_power)
 # UI-V2 §5 as a check: pulse counts, the 35 ms floor, 60 ms gaps, commit buzzes told apart (issue 20261126-e39b).
-add_executable(test_feedback tests/test_feedback.c ${FW}/core/src/feedback.c)
+add_executable(test_feedback tests/test_feedback.c ${FW}/core/src/feedback.c ${FW}/core/src/toy_gate.c)
 target_include_directories(test_feedback PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
 target_link_libraries(test_feedback PRIVATE lvgl::lvgl)
 add_test(NAME feedback_haptics COMMAND test_feedback)
@@ -425,6 +429,8 @@ set_tests_properties(sim_agent_items PROPERTIES TIMEOUT 60)
 sim_script_test(sim_watch watch.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_watch PROPERTIES TIMEOUT 60)
 sim_script_test(sim_watch_ask_return watch_ask_return.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# EXPERIMENTS.md "Toys" (issue 20261126-b5d1): raw keys, the toy gate, yield to a request and return.
+sim_script_test(sim_toy_yield toy_yield.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_watch_ask_return PROPERTIES TIMEOUT 60)
 sim_script_test(sim_watch_states watch_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_watch_states PROPERTIES TIMEOUT 60)

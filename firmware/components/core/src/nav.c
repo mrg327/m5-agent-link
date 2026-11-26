@@ -161,6 +161,20 @@ const nav_binding_t nav_bindings[] = {
     {MODE_TRACKPAD, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_TRACKPAD, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
     {MODE_TRACKPAD, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
+    /* TOY (ui_toy.h): the open toy gets every gesture with these actions (and NAV_NONE for the rest);
+     * only leaving is fixed. With raw keys A and B are edges at once; B held, A+B and the swipes leave */
+    {MODE_TOY, G_KEY_DOWN, ZONE_ANY, WHEN_ALWAYS, NAV_TOY_KEY},
+    {MODE_TOY, G_KEY_UP, ZONE_ANY, WHEN_ALWAYS, NAV_TOY_KEY},
+    {MODE_TOY, G_TAP, ZONE_ANY, WHEN_ALWAYS, NAV_COMMIT},
+    {MODE_TOY, G_BTN_A, ZONE_ANY, WHEN_ALWAYS, NAV_COMMIT},
+    {MODE_TOY, G_BTN_B, ZONE_ANY, WHEN_ALWAYS, NAV_NEXT},
+    {MODE_TOY, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_TOY, G_SCRUB, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_TOY, G_SCRUB_END, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
+    {MODE_TOY, G_SWIPE_DOWN, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK},
+    {MODE_TOY, G_SWIPE_RIGHT, ZONE_CENTRE, WHEN_ALWAYS, NAV_BACK},
+    {MODE_TOY, G_BTN_B_LONG, ZONE_ANY, WHEN_ALWAYS, NAV_BACK},
+    {MODE_TOY, G_CHORD, ZONE_ANY, WHEN_ALWAYS, NAV_HOME},
     /* GRAPH (GRAPH.md §4): the rim and a centre drag move through the rows; everything else goes back */
     {MODE_GRAPH, G_DRAG, ZONE_CENTRE, WHEN_ALWAYS, NAV_SCROLL_DRAG},
     {MODE_GRAPH, G_SCRUB_START, ZONE_ANY, WHEN_ALWAYS, NAV_SCRUB},
@@ -194,9 +208,9 @@ nav_action_t nav_lookup(nav_mode_t mode, gesture_kind_t g, nav_zone_t zone, bool
 
 const char *nav_mode_name(nav_mode_t m)
 {
-    static const char *const names[MODE_COUNT] = {"home",   "agent", "ask",      "scroll",
-                                                  "status", "watch", "voice",    "keys",
-                                                  "read",   "labs",  "trackpad", "graph"};
+    static const char *const names[MODE_COUNT] = {"home",     "agent", "ask",  "scroll", "status",
+                                                  "watch",    "voice", "keys", "read",   "labs",
+                                                  "trackpad", "graph", "toy"};
     return (unsigned)m < MODE_COUNT ? names[m] : "?";
 }
 
@@ -207,7 +221,7 @@ const char *nav_action_name(nav_action_t a)
         "back",      "home",        "next",         "prev",         "next_attention",
         "pick_rim",  "scrub",       "commit",       "hold_press",   "hold_release",
         "hold_long", "scroll_drag", "scroll_fling", "scroll_catch", "page_newer",
-        "to_bottom", "erase",       "open_labs",    "pointer"};
+        "to_bottom", "erase",       "open_labs",    "pointer",      "toy_key"};
     return (unsigned)a < NAV_COUNT ? names[a] : "?";
 }
 

@@ -21,6 +21,7 @@ typedef enum {
     MODE_LABS,
     MODE_TRACKPAD,
     MODE_GRAPH,
+    MODE_TOY, /* a toy from LABS (ui_toy.h): the open toy gets the input */
     MODE_COUNT
 } nav_mode_t;
 
@@ -70,6 +71,7 @@ typedef enum {
     /* TRACKPAD: the gesture kind says move (G_MOVE), left click (G_TAP) or right click
      * (G_LONG_PRESS) */
     NAV_POINTER,
+    NAV_TOY_KEY, /* TOY with raw keys: a key went down or up (G_KEY_DOWN / G_KEY_UP, x = key) */
     NAV_COUNT
 } nav_action_t;
 
@@ -114,8 +116,8 @@ const char *nav_action_name(nav_action_t a);
 #define NAV_SCROLL_TIMEOUT_MS 8000 /* SCROLL closes this long after the last input */
 #define NAV_STATUS_TIMEOUT_MS 8000 /* STATUS closes this long after the last input */
 #define NAV_LABS_TIMEOUT_MS 8000   /* LABS closes this long after the last input */
-/* WATCH has no timeout: it monitors until the user leaves (UI-V2 §4.7). TRACKPAD has none
- * either. */
+/* WATCH has no timeout: it monitors until the user leaves (UI-V2 §4.7). TRACKPAD and TOY have
+ * none either. */
 
 /* ── TRACKPAD (EXPERIMENTS.md): the device side of cmd_op_pointer ── */
 /* moves are summed into one command per window (an idle link sends at once) */

@@ -75,7 +75,7 @@ readability-braces-around-statements	firmware/components/core/src/ui_home.c	2
 readability-braces-around-statements	firmware/components/core/src/ui_home_card.c	10
 readability-braces-around-statements	firmware/components/core/src/ui_keys.c	12
 readability-braces-around-statements	firmware/components/core/src/ui_kit.c	22
-readability-braces-around-statements	firmware/components/core/src/ui_labs.c	6
+readability-braces-around-statements	firmware/components/core/src/ui_labs.c	4
 readability-braces-around-statements	firmware/components/core/src/ui_ota.c	4
 readability-braces-around-statements	firmware/components/core/src/ui_read.c	8
 readability-braces-around-statements	firmware/components/core/src/ui_ring.c	7
@@ -131,7 +131,6 @@ readability-identifier-naming	firmware/components/core/src/ota.c	1
 readability-identifier-naming	firmware/components/core/src/sha256.c	1
 readability-identifier-naming	firmware/components/core/src/sound_bank.c	54
 readability-identifier-naming	firmware/components/core/src/ui_agent.c	2
-readability-identifier-naming	firmware/components/core/src/ui_labs.c	2
 readability-identifier-naming	firmware/components/core/src/ui_theme.c	1
 readability-identifier-naming	firmware/components/core/src/ui_trackpad.c	1
 readability-identifier-naming	firmware/components/core/src/ui_watch.c	1

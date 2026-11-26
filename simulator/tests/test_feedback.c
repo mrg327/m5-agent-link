@@ -16,12 +16,36 @@
 static settings_t g_settings; /* alert = ALERT_FULL */
 settings_t *model_settings(void) { return &g_settings; }
 bool motion_face_down(void) { return false; }
-uint8_t prefs_volume(void) { return 0; }
-uint8_t prefs_volume_percent(void) { return 0; }
-void sound_play(const char *role) { (void)role; }
-void hal_audio_set_volume(uint8_t percent) { (void)percent; }
-void hal_audio_play(const int16_t *pcm, size_t n) { (void)pcm, (void)n; }
-uint64_t hal_time_us(void) { return 0; }
+static uint8_t g_volume, g_set_volume;
+uint8_t prefs_volume(void) { return g_volume; }
+uint8_t prefs_volume_percent(void) { return g_volume ? 60 : 0; }
+static int g_cues; /* alert cues played */
+void sound_play(const char *role) { (void)role, g_cues++; }
+void hal_audio_set_volume(uint8_t percent) { g_set_volume = percent; }
+static const int16_t *g_playing; /* what the speaker plays; NULL after a stop */
+static int g_audio_stops;
+void hal_audio_play(const int16_t *pcm, size_t n)
+{
+    g_playing = n ? pcm : NULL;
+    if (!pcm) g_audio_stops++;
+}
+static uint64_t g_now_us;
+uint64_t hal_time_us(void) { return g_now_us; }
+static bool g_mic_on;
+bool hal_mic_start(void) { return g_mic_on = true; }
+void hal_mic_stop(void) { g_mic_on = false; }
+const hal_board_info_t *hal_board_info(void)
+{
+    static const hal_board_info_t info = {.has_speaker = true};
+    return &info;
+}
+/* the alert cues: "input" is 400 ms long, the others unknown */
+static const snd_role_t s_role;
+static const snd_sound_t s_sound;
+const snd_role_t *snd_role(const char *id) { return strcmp(id, "input") ? NULL : &s_role; }
+const snd_sound_t *snd_for(const char *role) { return strcmp(role, "input") ? NULL : &s_sound; }
+size_t snd_role_length(const snd_role_t *r, const snd_sound_t *s)
+{ return r && s ? 400u * SND_RATE / 1000u : 0; }
 
 #define MAX_STEPS 32
 typedef struct {
@@ -86,6 +110,58 @@ static bool alike(const pattern_t *a, const pattern_t *b)
     return true;
 }
 
+/* Toys (EXPERIMENTS.md "Toys"): the gate in place, and an alert always first. */
+static void test_toys(void)
+{
+    static const int16_t tone[1600];
+    static const uint16_t pip[] = {50};
+    g_settings.alert = ALERT_FULL;
+    g_volume = 3;
+    g_now_us = 100000000ull;
+    CHECK(feedback_toy_play(tone, 1600, 100));
+    CHECK(g_playing == tone && g_set_volume == 60); /* never louder than the stored level */
+    CHECK(feedback_toy_play(tone, 1600, 20) && g_set_volume == 20);
+    CHECK(feedback_toy_buzz(pip, 1));
+    CHECK(feedback_toy_mic(true) && g_mic_on);
+    CHECK(!feedback_toy_play(tone, 1600, 20)); /* the microphone records */
+    CHECK(feedback_toy_mic(false) == false && !g_mic_on);
+    /* a toy sound runs (100 ms of 1600 samples), a toy mic too: a request arrives */
+    CHECK(feedback_toy_play(tone, 1600, 20));
+    CHECK(feedback_toy_mic(true));
+    int cues = g_cues, stops = g_audio_stops;
+    g_last.n = 0;
+    feedback_attention(ATT_APPROVAL);
+    CHECK(!g_mic_on);                           /* the microphone stopped before the cue */
+    CHECK(g_audio_stops == stops + 1);          /* the toy's sound was cut */
+    CHECK(g_cues == cues + 1 && g_last.n == 3); /* the alert's cue and buzz played */
+    /* toys stay quiet while it plays, then may again */
+    g_now_us += 1000000;
+    CHECK(!feedback_toy_play(tone, 1600, 20) && !feedback_toy_buzz(pip, 1));
+    CHECK(!feedback_toy_detent() && !feedback_toy_mic(true));
+    g_now_us += 600000;
+    CHECK(feedback_toy_play(tone, 1600, 20) && feedback_toy_buzz(pip, 1));
+    /* the alert modes and the pose, as for alerts */
+    g_now_us += 1000000;
+    g_settings.alert = ALERT_QUIET;
+    CHECK(!feedback_toy_play(tone, 1600, 20) && feedback_toy_buzz(pip, 1));
+    g_settings.alert = ALERT_SILENT;
+    CHECK(!feedback_toy_play(tone, 1600, 20) && !feedback_toy_buzz(pip, 1));
+    g_settings.alert = ALERT_FULL;
+    g_volume = 0;
+    CHECK(!feedback_toy_play(tone, 1600, 20));
+    g_volume = 3;
+    /* a done holds toys for the hold-off too; closing a toy stops what it plays */
+    feedback_attention(ATT_DONE);
+    CHECK(!feedback_toy_play(tone, 1600, 20));
+    g_now_us += 2000000;
+    CHECK(feedback_toy_play(tone, 1600, 20));
+    stops = g_audio_stops;
+    feedback_toy_interrupt();
+    CHECK(g_audio_stops == stops + 1 && g_playing == NULL);
+    feedback_toy_interrupt(); /* nothing plays: nothing to stop, an alert is never cut */
+    CHECK(g_audio_stops == stops + 1);
+}
+
 int main(void)
 {
     pattern_t p[N_ENTRIES];
@@ -125,6 +201,8 @@ int main(void)
     g_last.n = 0;
     feedback_detent();
     CHECK(g_last.n == 1 && g_last.ms[0] == 15);
+
+    test_toys();
     if (!g_fail) printf("feedback haptics ok\n");
     return g_fail ? EXIT_FAILURE : EXIT_SUCCESS;
 }

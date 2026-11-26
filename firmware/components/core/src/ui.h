@@ -85,6 +85,16 @@ typedef struct {
      * could not go out */
     bool (*pointer)(int dx, int dy, int btn, int n, int wheel);
     void (*moves)(bool on); /* TRACKPAD: the recognizer streams G_MOVE while on */
+    /* Toys (EXPERIMENTS.md "Toys", ui_toy.h). The host turns raw keys on for a toy that asks
+     * (G_KEY_DOWN / G_KEY_UP at once, no double-press wait) and off when it closes. */
+    void (*raw_keys)(bool on);
+    /* Through the toy gate (feedback.h): false when an alert, the alert mode, the pose or the
+     * volume says no. A toy never calls the alert feedback above for its own effects. */
+    bool (*toy_buzz)(const uint16_t *pattern, size_t n);
+    bool (*toy_detent)(void);
+    bool (*toy_play)(const int16_t *pcm, size_t n, uint8_t volume_pct);
+    bool (*toy_mic)(bool on);
+    void (*toy_interrupt)(void); /* the toy closes: its sound, buzz and microphone stop */
 } ui_actions_t;
 
 void ui_init(const ui_actions_t *actions);

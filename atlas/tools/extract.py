@@ -474,6 +474,7 @@ ACTION_TEXT = {
     "NAV_ERASE": "Deletes the last typed word",
     "NAV_OPEN_LABS": "Opens Experiments; the first is the Trackpad",
     "NAV_POINTER": "Moves the PC's pointer; tap clicks, hold right-clicks",
+    "NAV_TOY_KEY": "In a toy, a key acts the moment it goes down or up",
 }
 WHEN_TEXT = {
     "WHEN_ALWAYS": "",

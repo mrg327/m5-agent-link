@@ -439,6 +439,7 @@ static void act_scroll(uint32_t sid, nav_scroll_unit_t unit, int delta)
 static bool act_pointer(int dx, int dy, int btn, int n, int wheel)
 { return link_send_pointer(dx, dy, btn, n, wheel); }
 static void act_moves(bool on) { gesture_set_moves(&s_gesture, on); }
+static void act_raw_keys(bool on) { gesture_set_raw_keys(&s_gesture, on); }
 
 /* The nag is an alert too: quiet mode holds it as it holds the arrival buzz. */
 static uint32_t s_muted_rid, s_muted_sid; /* the request a palm cover silenced (0 = none) */
@@ -486,7 +487,13 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .touching = act_touching,
                                        .sectors = app_set_sectors,
                                        .pointer = act_pointer,
-                                       .moves = act_moves};
+                                       .moves = act_moves,
+                                       .raw_keys = act_raw_keys,
+                                       .toy_buzz = feedback_toy_buzz,
+                                       .toy_detent = feedback_toy_detent,
+                                       .toy_play = feedback_toy_play,
+                                       .toy_mic = feedback_toy_mic,
+                                       .toy_interrupt = feedback_toy_interrupt};
 
 /* ── link → app ── */
 
@@ -675,7 +682,8 @@ static void log_gesture(const gesture_evt_t *g)
 static bool is_touch_gesture(gesture_kind_t k)
 {
     return !(k == G_BTN_A || k == G_BTN_B || k == G_BTN_A_LONG || k == G_BTN_B_LONG ||
-             k == G_BTN_A_DOUBLE || k == G_CHORD || k == G_LIFT || k == G_SHAKE);
+             k == G_BTN_A_DOUBLE || k == G_CHORD || k == G_LIFT || k == G_SHAKE ||
+             k == G_KEY_DOWN || k == G_KEY_UP);
 }
 
 /* The touch that wakes the display (or reveals a glow) is spent on that: every later touch event of
@@ -702,6 +710,8 @@ static uint32_t gesture_began(const gesture_evt_t *g)
     case G_BTN_B:
     case G_BTN_B_LONG: return b->t_down;
     case G_CHORD: return (int32_t)(a->t_down - b->t_down) < 0 ? a->t_down : b->t_down;
+    case G_KEY_DOWN:
+    case G_KEY_UP: return g->x ? b->t_down : a->t_down;
     default: return s_gesture.t_down;
     }
 }

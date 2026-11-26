@@ -14,15 +14,21 @@
 #include "ui_internal.h"
 #include "ui_kit.h"
 #include "ui_theme.h"
+#include "ui_toy.h"
 
 #define SUBJECT_Y 233
 /* in the bottom slot: the toast a refused tap shows is the same sign, in the same place */
 #define SIGN_Y UI_Y_TOAST
 
-enum { LAB_TRACKPAD, LAB_COUNT };
+/* The trackpad, then the toys (ui_toy.h) in their table's order. */
+enum { LAB_TRACKPAD, LAB_TOYS };
+#define LAB_MAX (LAB_TOYS + UI_TOY_MAX)
 
-static const char *const k_name[LAB_COUNT] = {"Trackpad"};
-static const char *const k_glyph[LAB_COUNT] = {ICON_CURSOR};
+static int lab_count(void) { return LAB_TOYS + ui_toy_count(); }
+static const char *lab_name(int id)
+{ return id == LAB_TRACKPAD ? "Trackpad" : ui_toy_get(id - LAB_TOYS)->name; }
+static const char *lab_glyph(int id)
+{ return id == LAB_TRACKPAD ? ICON_CURSOR : ui_toy_get(id - LAB_TOYS)->glyph; }
 
 static lv_obj_t *s_root, *s_subject, *s_orbit, *s_sign, *s_hint[2];
 static uint32_t s_now, s_last_input;
@@ -44,12 +50,18 @@ static const char *blocked(int id)
         if (!ui_link_connected()) return "Offline";
         if (!model_pointer()) return "agentlinkd on this PC has no trackpad (needs 0.20)";
     }
+    /* a toy that could sway an answer waits until nothing is asked (EXPERIMENTS.md "Toys") */
+    if (id >= LAB_TOYS && ui_toy_get(id - LAB_TOYS)->not_over_request &&
+        ui_pending_attention_sid()) {
+        return "Answer the request first";
+    }
     return NULL;
 }
 
 /* The same reason as a sign: the vocabulary's glyphs for "Offline" and "Out of date". */
 static const char *blocked_sign(int id)
 {
+    if (id >= LAB_TOYS) { return ICON_PERMISSION; /* a request waits */ }
     if (id == LAB_TRACKPAD && ui_link_connected()) return ICON_COMPUTER ICON_UPDATE;
     return ICON_OFFLINE;
 }
@@ -58,14 +70,16 @@ static void render(void)
 {
     int sel = ui_orbit_selected(s_orbit);
     const char *why = blocked(sel);
-    ui_orbit_item_t items[LAB_COUNT];
-    for (int i = 0; i < LAB_COUNT; i++)
-        items[i] = (ui_orbit_item_t){k_glyph[i], 0, blocked(i) != NULL};
-    ui_orbit_set_items(s_orbit, items, LAB_COUNT);
+    ui_orbit_item_t items[LAB_MAX];
+    int n = lab_count();
+    for (int i = 0; i < n; i++) {
+        items[i] = (ui_orbit_item_t){lab_glyph(i), 0, blocked(i) != NULL};
+    }
+    ui_orbit_set_items(s_orbit, items, n);
     if (sel == LAB_TRACKPAD)
         snprintf(s_desc_txt, sizeof s_desc_txt, "%s",
                  why ? why : "Use the watch as this PC's trackpad");
-    else s_desc_txt[0] = 0;
+    else snprintf(s_desc_txt, sizeof s_desc_txt, "%s", why ? why : lab_name(sel));
     const char *icons = why ? blocked_sign(sel) : "";
     if (icons != s_sign_icons) { /* literals: the pointer is the identity */
         s_sign_icons = icons;
@@ -84,11 +98,14 @@ void ui_labs_refresh(uint32_t now)
 void ui_labs_open(uint32_t now)
 {
     s_now = s_last_input = now;
-    ui_orbit_select(s_orbit, 0);
-    ui_home_rim_mode(true); /* a rim drag dials through the experiments */
+    int paused = ui_toy_paused(); /* the toy left paused comes first */
+    render();                     /* the items first, so the selection fits them */
+    ui_orbit_select(s_orbit, paused >= 0 ? LAB_TOYS + paused : 0);
+    show(s_hint[1], lab_count() > 1); /* one experiment: nothing to step to */
+    ui_home_rim_mode(true);           /* a rim drag dials through the experiments */
     render();
     show(s_root, true);
-    dbg_event("ui", "labs", "\"items\":%d,\"pointer\":%s", LAB_COUNT,
+    dbg_event("ui", "labs", "\"items\":%d,\"pointer\":%s", lab_count(),
               model_pointer() ? "true" : "false");
 }
 
@@ -96,7 +113,8 @@ void ui_labs_close(void) { show(s_root, false); }
 
 static void select_item(int i, const char *via, void (*haptic)(void))
 {
-    i = ((i % LAB_COUNT) + LAB_COUNT) % LAB_COUNT;
+    int n = lab_count();
+    i = ((i % n) + n) % n;
     if (i == ui_orbit_selected(s_orbit)) return;
     ui_orbit_select(s_orbit, i);
     render();
@@ -109,14 +127,21 @@ static void commit(int sel)
     const char *why = blocked(sel);
     dbg_event("ui", "labs_open", "\"idx\":%d,\"ok\":%s", sel, why ? "false" : "true");
     if (why) {
-        ui_toast(sel == LAB_TRACKPAD && ui_link_connected() ? "Update agentlinkd" : why, RGB_AMBER);
+        if (sel >= LAB_TOYS) {
+            ui_toast_sign(why, ICON_PERMISSION, NULL, RGB_AMBER);
+        } else {
+            ui_toast(sel == LAB_TRACKPAD && ui_link_connected() ? "Update agentlinkd" : why,
+                     RGB_AMBER);
+        }
         g_ui_actions->reject();
         return;
     }
     if (sel == LAB_TRACKPAD) {
         ui_go_trackpad();
-        g_ui_actions->tick();
+    } else {
+        ui_go_toy(sel - LAB_TOYS);
     }
+    g_ui_actions->tick();
 }
 
 bool ui_labs_act(nav_action_t a, const gesture_evt_t *g)
@@ -163,8 +188,10 @@ void ui_labs_report(ui_report_t *r)
     snprintf(r->screen, sizeof r->screen, "labs");
     ui_report_add(r, "Experiments");
     int sel = ui_orbit_selected(s_orbit);
-    for (int k = 0; k < LAB_COUNT; k++)
-        ui_report_add(r, "%s%s", k == 0 ? "> " : "", k_name[(sel + k) % LAB_COUNT]);
+    int n = lab_count();
+    for (int k = 0; k < n; k++) {
+        ui_report_add(r, "%s%s", k == 0 ? "> " : "", lab_name((sel + k) % n));
+    }
     if (s_desc_txt[0]) ui_report_add(r, "%s", s_desc_txt);
 }
 
@@ -183,7 +210,6 @@ lv_obj_t *ui_labs_init(lv_obj_t *screen)
     s_hint[1] = ui_key_hint_create(s_root, UI_KEY_B);
     ui_key_hint_set(s_hint[0], ICON_CHECK);
     ui_key_hint_set(s_hint[1], ICON_NEXT);
-    show(s_hint[1], LAB_COUNT > 1); /* one experiment: nothing to step to */
     show(s_sign, false);
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     return s_root;

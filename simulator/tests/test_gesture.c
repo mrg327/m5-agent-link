@@ -330,6 +330,59 @@ int main(void)
     gesture_touch(&g, false, 389, 77, 3080);
     EXPECT(count(G_MOVE) == 0 && count(G_SCRUB_START) == 1, "a rim drag scrubs, it does not move");
 
+    /* raw keys (a toy, EXPERIMENTS.md "Toys"): each edge at once, no double-press wait */
+    reset(&g, 0);
+    gesture_set_raw_keys(&g, true);
+    gesture_button(&g, 0, true, 0);
+    EXPECT(n_seen == 1 && seen[0].kind == G_KEY_DOWN && seen[0].x == 0, "raw: A down at once");
+    gesture_button(&g, 0, false, 80);
+    EXPECT(n_seen == 2 && seen[1].kind == G_KEY_UP && seen[1].x == 0 && seen[1].dur_ms == 80,
+           "raw: A up at once, with its length");
+    gesture_tick(&g, 1000);
+    EXPECT(count(G_BTN_A) == 0 && count(G_BTN_A_DOUBLE) == 0, "raw: no delayed G_BTN_A");
+    gesture_button(&g, 0, true, 1100);
+    gesture_button(&g, 0, false, 1150);
+    gesture_button(&g, 0, true, 1200);
+    gesture_button(&g, 0, false, 1250);
+    EXPECT(count(G_KEY_DOWN) == 3 && count(G_KEY_UP) == 3 && count(G_BTN_A_DOUBLE) == 0,
+           "raw: a quick second press is two presses, not a double");
+    n_seen = 0;
+    gesture_button(&g, 1, true, 2000);
+    gesture_button(&g, 1, false, 2040);
+    EXPECT(n_seen == 2 && seen[0].kind == G_KEY_DOWN && seen[0].x == 1 &&
+               seen[1].kind == G_KEY_UP && count(G_BTN_B) == 0,
+           "raw: B edges, no G_BTN_B");
+    n_seen = 0;
+    gesture_button(&g, 1, true, 3000);
+    gesture_tick(&g, 3000 + GESTURE_LONG_PRESS_MS);
+    gesture_button(&g, 1, false, 3700);
+    EXPECT(count(G_BTN_B_LONG) == 1 && count(G_KEY_UP) == 1, "raw: B held still goes back");
+    n_seen = 0;
+    gesture_button(&g, 0, true, 4000);
+    gesture_button(&g, 1, true, 4030);
+    gesture_button(&g, 1, false, 4200);
+    gesture_button(&g, 0, false, 4210);
+    EXPECT(count(G_CHORD) == 1 && count(G_KEY_DOWN) == 1 && count(G_KEY_UP) == 1,
+           "raw: A+B is still the chord; the first key's down has its up");
+    /* a key held across the switch makes nothing for the next screen */
+    n_seen = 0;
+    gesture_button(&g, 0, true, 5000);
+    gesture_set_raw_keys(&g, false);
+    gesture_button(&g, 0, false, 5100);
+    gesture_tick(&g, 6000);
+    EXPECT(n_seen == 1 && seen[0].kind == G_KEY_DOWN, "raw off with A held: its release is spent");
+    n_seen = 0;
+    gesture_button(&g, 1, true, 7000);
+    gesture_set_raw_keys(&g, true);
+    gesture_button(&g, 1, false, 7100);
+    EXPECT(n_seen == 0, "raw on with B held: no G_KEY_UP without its down, no G_BTN_B");
+    gesture_set_raw_keys(&g, false);
+    n_seen = 0;
+    gesture_button(&g, 0, true, 8000);
+    gesture_button(&g, 0, false, 8050);
+    gesture_tick(&g, 8050 + GESTURE_BTN_DOUBLE_MS);
+    EXPECT(n_seen == 1 && seen[0].kind == G_BTN_A, "raw off: A is G_BTN_A again");
+
     if (!failures) printf("gesture tests passed\n");
     return failures ? 1 : 0;
 }

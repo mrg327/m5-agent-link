@@ -11,6 +11,7 @@
 #include "ui_ota.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
+#include "ui_toy.h"
 
 #define TOAST_MS 1800
 /* The waiting-request mark: the ring pip's shapes (ring_pip_paint) at size 16, centred on y 14 at
@@ -24,7 +25,7 @@
 
 const ui_actions_t *g_ui_actions;
 static lv_obj_t *s_home, *s_agent, *s_ask, *s_scroll, *s_status, *s_watch, *s_voice, *s_keys,
-    *s_read, *s_labs, *s_trackpad, *s_graph;
+    *s_read, *s_labs, *s_trackpad, *s_graph, *s_toy;
 static nav_mode_t s_mode = MODE_HOME;
 static uint32_t s_mode_seq; /* counts mode changes (ui_mode_seq) */
 static uint32_t s_mode_sid; /* the session selected when the mode opened */
@@ -184,6 +185,7 @@ void ui_init(const ui_actions_t *actions)
     s_graph = ui_graph_init(s_home);
     s_labs = ui_labs_init(s_home);
     s_trackpad = ui_trackpad_init(s_home);
+    s_toy = ui_toy_init(s_home);
     ui_countdown_init(s_home); /* over every mode's content, under the toast and the glow */
     create_overlays();
     lv_screen_load(s_home);
@@ -229,6 +231,8 @@ int ui_last_release_y(void) { return s_rel_y; }
 
 /* The session WATCH was on when ASK or SCROLL took over; they return there instead of HOME. */
 static uint32_t s_resume_watch_sid;
+/* A request took over from a toy: ASK returns to it, paused (EXPERIMENTS.md "Toys"). */
+static bool s_resume_toy;
 static uint32_t s_voice_rid; /* the request VOICE answers (ui_go_voice) */
 static bool s_voice_queue;   /* VOICE queues the dictation (ui_go_voice) */
 static int s_voice_qi = -1;  /* VOICE answers that question of s_voice_rid (ui_go_voice_answer) */
@@ -241,6 +245,7 @@ static uint32_t s_ask_lost_rid, s_ask_lost_seq;
 static void enter_mode(nav_mode_t m)
 {
     if (m != MODE_ASK && m != MODE_SCROLL) s_resume_watch_sid = 0;
+    if (m != MODE_ASK) { s_resume_toy = false; }
     if (m == s_mode) return;
     if (s_mode == MODE_AGENT) ui_agent_close();
     if (s_mode == MODE_ASK) {
@@ -248,7 +253,7 @@ static void enter_mode(nav_mode_t m)
         const attention_t *a = rid ? model_attention_find(rid) : NULL;
         /* back to the deck or WATCH without an answer: the queue passes over it (issue
          * 20261126-aa28) */
-        if (a && !a->answer_sent && (m == MODE_HOME || m == MODE_WATCH)) {
+        if (a && !a->answer_sent && (m == MODE_HOME || m == MODE_WATCH || m == MODE_TOY)) {
             model_attention_skip(rid);
         }
         s_ask_lost_rid = rid && !a ? rid : 0;
@@ -264,6 +269,7 @@ static void enter_mode(nav_mode_t m)
     if (s_mode == MODE_LABS) ui_labs_close();
     if (s_mode == MODE_TRACKPAD) ui_trackpad_close();
     if (s_mode == MODE_GRAPH) ui_graph_close();
+    if (s_mode == MODE_TOY) { ui_toy_close(); }
     s_mode = m;
     s_mode_seq++;
     s_mode_sid = ui_home_sel_sid();
@@ -286,22 +292,28 @@ static void enter_mode(nav_mode_t m)
     } else if (m == MODE_TRACKPAD) ui_trackpad_open(s_now_ms);
     else if (m == MODE_GRAPH) ui_graph_open(ui_home_sel_sid(), s_now_ms);
     else ui_home_refresh(s_now_ms); /* the ring shows sessions again */
+    if (m == MODE_TOY) { ui_toy_open(s_now_ms); }
     if (m != MODE_HOME && m != MODE_KEYS) {
         /* deeper modes rise into place; KEYS records strokes at once */
-        lv_obj_t *const roots[MODE_COUNT] = {NULL,     s_agent, s_ask,      s_scroll,
-                                             s_status, s_watch, s_voice,    s_keys,
-                                             s_read,   s_labs,  s_trackpad, s_graph};
+        lv_obj_t *const roots[MODE_COUNT] = {NULL,       s_agent, s_ask,  s_scroll, s_status,
+                                             s_watch,    s_voice, s_keys, s_read,   s_labs,
+                                             s_trackpad, s_graph, s_toy};
         ui_motion_enter(roots[m]);
     }
     dbg_event("ui", "mode", "\"mode\":\"%s\"", nav_mode_name(m));
 }
 
 /* ASK or SCROLL opened over WATCH goes back to WATCH when it closes, if the watched session is
- * still there. TRACKPAD goes back to the experiments it was opened from. */
+ * still there; ASK that took over from a toy goes back to the toy, paused (what waits next takes
+ * over from there at once). TRACKPAD and a toy go back to the experiments they were opened from. */
 static void leave_mode(void)
 {
-    if (s_mode == MODE_TRACKPAD) {
+    if (s_mode == MODE_TRACKPAD || s_mode == MODE_TOY) {
         enter_mode(MODE_LABS);
+        return;
+    }
+    if (s_mode == MODE_ASK && s_resume_toy) {
+        enter_mode(MODE_TOY);
         return;
     }
     uint32_t sid = s_mode == MODE_ASK || s_mode == MODE_SCROLL ? s_resume_watch_sid : 0;
@@ -352,6 +364,11 @@ void ui_go_replies(void)
 }
 void ui_go_keys(void) { enter_mode(MODE_KEYS); }
 void ui_go_trackpad(void) { enter_mode(MODE_TRACKPAD); }
+void ui_go_toy(int i)
+{
+    ui_toy_select(i);
+    enter_mode(MODE_TOY);
+}
 uint32_t ui_watched_sid(void) { return s_mode == MODE_WATCH ? ui_watch_sid() : 0; }
 
 void ui_scroll_failed(void)
@@ -416,7 +433,8 @@ uint32_t ui_mode_seq(void) { return s_mode_seq; }
 bool ui_asking(uint32_t sid) { return s_mode == MODE_ASK && ui_home_sel_sid() == sid; }
 
 /* Screens where the user composes, reads or works: an automatic takeover would lose the typed
- * text, the recording, the page or the place (UI-V3 §1.6 "Nothing is lost"). */
+ * text, the recording, the page or the place (UI-V3 §1.6 "Nothing is lost"). A toy is not one: it
+ * pauses and yields at once, and ASK comes back to it (s_resume_toy). */
 static bool mode_keeps_work(nav_mode_t m)
 {
     return m == MODE_KEYS || m == MODE_VOICE || m == MODE_READ || m == MODE_GRAPH ||
@@ -468,11 +486,13 @@ static void take_over(uint32_t sid, bool error)
 {
     if (error) { s_wait_err = 0; }
     lv_obj_add_flag(s_wait_pip, LV_OBJ_FLAG_HIDDEN);
+    bool from_toy = s_mode == MODE_TOY || (s_mode == MODE_ASK && s_resume_toy);
     if (error && !askable_for(sid)) {
         ui_show_session(sid);
     } else {
         ui_show_attention(sid);
     }
+    if (from_toy && s_mode == MODE_ASK) { s_resume_toy = true; }
     s_settle_on = true;
     s_settle_ms = lv_tick_get(); /* now: this runs while the link drains, before ui_tick */
     s_settle_seq = s_mode_seq;
@@ -551,8 +571,8 @@ static void wait_step(void)
         return;
     }
     uint32_t sid = next ? next->sid : s_wait_err;
-    if (s_mode_seq != s_wait_seq && (s_mode == MODE_HOME || s_mode == MODE_WATCH) &&
-        !input_down()) {
+    if (s_mode_seq != s_wait_seq &&
+        (s_mode == MODE_HOME || s_mode == MODE_WATCH || s_mode == MODE_TOY) && !input_down()) {
         if (next) { dbg_event("ui", "queue_next", "\"rid\":%u", (unsigned)next->rid); }
         take_over(sid, !next);
         return;
@@ -591,6 +611,10 @@ void ui_report(ui_report_t *r)
                       s_pip_kind == RING_ERROR ? "error"
                       : s_pip_kind == RING_ASK ? "question"
                                                : "approval");
+    }
+    if (s_mode == MODE_TOY) {
+        ui_toy_report(r);
+        return;
     }
     if (s_mode == MODE_AGENT) ui_agent_report(r);
     else if (s_mode == MODE_ASK) ui_ask_report(r);
@@ -759,6 +783,7 @@ void ui_tick(uint32_t now_ms)
     if (s_mode == MODE_GRAPH) ui_graph_tick(now_ms);
     if (s_mode == MODE_LABS && ui_labs_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_TRACKPAD) ui_trackpad_tick(now_ms);
+    if (s_mode == MODE_TOY) { ui_toy_tick(now_ms); }
     wait_step(); /* after the screens that closed themselves this step */
     /* the answer window runs on the request it belongs to: on ASK, and on its card on the deck */
     ui_countdown_show(s_mode == MODE_ASK    ? ui_ask_request()
@@ -957,6 +982,10 @@ bool ui_on_gesture(const gesture_evt_t *g)
     if (s_mode == MODE_TRACKPAD) {
         ui_home_note_input();
         return ui_trackpad_act(a, g);
+    }
+    if (s_mode == MODE_TOY) {
+        ui_home_note_input();
+        return ui_toy_act(a, g);
     }
     return ui_home_act(a, g);
 }

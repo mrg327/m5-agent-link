@@ -82,6 +82,9 @@
  *   bench expect frame|down|up|gesture|mark|cmd MIN   at least MIN records of that kind arrived
  *   expect_cmd OP                   the device sent a cmd OP (focus ack ... graph, CDDL names without cmd_op_) since
  *                                   the script began or the last expect_cmd
+ *   toy_stub                        add the stub toy to LABS, after the Trackpad (ui_toy.h; EXPERIMENTS.md "Toys"):
+ *                                   raw keys; A down plays a tone and B down buzzes through the toy gate. Its labels:
+ *                                   "keys D U", "played P refused R", "opens O pauses Q" and "running" or "paused"
  *   px_reset | expect_px_max PX     redraw budget: pixels flushed since px_reset must stay within PX
  *                                   (the log line also reports core_step host CPU as cpu_us, not
  * asserted) */
@@ -103,6 +106,8 @@
 #include "ui_countdown.h"
 #include "ui_kit.h"
 #include "ui_theme.h"
+#include "ui_toy.h"
+#include "sound.h"
 #include "voice.h"
 #include "sim.h"
 
@@ -301,6 +306,86 @@ static void btn(uint32_t *t, int b, uint32_t down_at, uint32_t up_at)
 static int s_last_x, s_last_y; /* where `press` put the finger, for `release` */
 
 static void on_device_tx(const uint8_t *frame, size_t len);
+
+/* ── the stub toy (toy_stub): proves the toy host, raw keys, the gate, yield and return ── */
+static struct {
+    lv_obj_t *label;
+    int down, up, played, refused, opens, pauses;
+    bool running;
+    size_t tone_n;
+} s_stub;
+
+static void stub_init(lv_obj_t *root)
+{
+    s_stub.label = lv_label_create(root);
+    lv_label_set_text(s_stub.label, ICON_LABS);
+    lv_obj_set_style_text_font(s_stub.label, FONT_ICON_XL, 0);
+    lv_obj_set_style_text_color(s_stub.label, COL_TEXT, 0);
+    lv_obj_center(s_stub.label);
+}
+
+static void stub_open(uint32_t now_ms)
+{
+    (void)now_ms;
+    s_stub.opens++;
+    if (!s_stub.tone_n) { /* rendered once into the toy block, never into the alert cues */
+        static const snd_step_t steps[] = {{SND_SQ25, 86, 0, 9, 80, 1}};
+        snd_sound_t tone = {.tracks = {{steps, 1}}};
+        s_stub.tone_n = sound_toy_render(&tone, 0);
+    }
+}
+
+static void stub_pause(uint32_t now_ms)
+{
+    (void)now_ms;
+    s_stub.pauses++;
+    s_stub.running = false;
+}
+
+static bool stub_act(nav_action_t a, const gesture_evt_t *g)
+{
+    if (a == NAV_COMMIT) { /* a tap resumes */
+        s_stub.running = true;
+        return true;
+    }
+    if (a != NAV_TOY_KEY) return false;
+    if (g->kind == G_KEY_UP) {
+        s_stub.up++;
+        return true;
+    }
+    s_stub.down++;
+    s_stub.running = true;
+    static const uint16_t pip[] = {50};
+    bool ok = g->x == 0 ? g_ui_actions->toy_play(sound_toy_pcm(), s_stub.tone_n, 50)
+                        : g_ui_actions->toy_buzz(pip, 1);
+    if (ok) {
+        s_stub.played++;
+    } else {
+        s_stub.refused++;
+    }
+    return true;
+}
+
+static void stub_tick(uint32_t now_ms) { (void)now_ms; }
+
+static void stub_report(ui_report_t *r)
+{
+    ui_report_add(r, "Stub");
+    ui_report_add(r, "%s", s_stub.running ? "running" : "paused");
+    ui_report_add(r, "keys %d %d", s_stub.down, s_stub.up);
+    ui_report_add(r, "played %d refused %d", s_stub.played, s_stub.refused);
+    ui_report_add(r, "opens %d pauses %d", s_stub.opens, s_stub.pauses);
+}
+
+static const ui_toy_t s_stub_toy = {.name = "Stub",
+                                    .glyph = ICON_LABS,
+                                    .raw_keys = true,
+                                    .init = stub_init,
+                                    .open = stub_open,
+                                    .pause = stub_pause,
+                                    .act = stub_act,
+                                    .tick = stub_tick,
+                                    .report = stub_report};
 
 static bool parse_line(char *line, uint32_t *t)
 {
@@ -612,6 +697,9 @@ static bool parse_line(char *line, uint32_t *t)
         sim_link_set_tx_tap(on_device_tx); /* from the start: a plain focus is seen too */
         add(*t, E_EXPECT_CMD, 0, 0, 0, arg);
         *t += 50;
+    } else if (!strcmp(cmd, "toy_stub")) {
+        static bool added;
+        if (!added) { added = ui_toy_register(&s_stub_toy) >= 0; }
     } else if (!strcmp(cmd, "quit")) {
         add(*t, E_QUIT, 0, 0, 0, NULL);
     } else {

@@ -4,8 +4,116 @@
 #include "motion.h"
 #include "prefs.h"
 #include "sound.h"
+#include "toy_gate.h"
 
 #define DETENT_MIN_GAP_MS 45
+
+/* ── toys (EXPERIMENTS.md "Toys"): what a toy plays, and the gate that puts every alert first ── */
+
+static toy_gate_t s_toy_gate;
+static bool s_toy_mic;                                 /* a toy started the microphone */
+static uint64_t s_toy_sound_end_us, s_toy_buzz_end_us; /* what a toy plays runs until then */
+
+static uint32_t now_ms(void) { return (uint32_t)(hal_time_us() / 1000); }
+
+static toy_gate_in_t toy_in(void)
+{
+    return (toy_gate_in_t){
+        .alert = model_settings()->alert,
+        .face_down = motion_face_down(),
+        .volume = prefs_volume(),
+        .mic_on = s_toy_mic,
+        /* TODO(fun preference, persona.c): set fun_off from the fun bit for toys once it lands,
+         * so a watch set to "no fun" keeps every toy still. */
+        .fun_off = false,
+    };
+}
+
+static uint32_t pattern_ms(const uint16_t *p, size_t n)
+{
+    uint32_t ms = 0;
+    for (size_t i = 0; i < n; i++) ms += p[i];
+    return ms;
+}
+
+/* The cue a role plays, in ms (0 for none). */
+static uint32_t cue_ms(const char *role)
+{
+    const snd_role_t *r = role ? snd_role(role) : NULL;
+    const snd_sound_t *s = role ? snd_for(role) : NULL;
+    return r && s ? (uint32_t)(snd_role_length(r, s) * 1000u / SND_RATE) : 0;
+}
+
+/* An alert buzzes or sounds next: the toy's microphone stops first (the speaker is silent while it
+ * records, so the cue would be lost), then the toy's own sound and buzz, and toys stay quiet until
+ * the cue and the buzz have played. */
+static void toy_yield(const uint16_t *p, size_t n, const char *role)
+{
+    uint64_t now = hal_time_us();
+    if (s_toy_mic) {
+        hal_mic_stop();
+        s_toy_mic = false;
+    }
+    if (s_toy_sound_end_us > now) hal_audio_play(NULL, 0);
+    if (s_toy_buzz_end_us > now) hal_haptic_play(NULL, 0);
+    s_toy_sound_end_us = s_toy_buzz_end_us = 0;
+    uint32_t buzz = pattern_ms(p, n), cue = cue_ms(role);
+    toy_gate_alert(&s_toy_gate, now_ms(), buzz > cue ? buzz : cue);
+}
+
+bool feedback_toy_buzz(const uint16_t *pattern, size_t n)
+{
+    toy_gate_in_t in = toy_in();
+    if (!n || !toy_gate_may_buzz(&s_toy_gate, &in, now_ms())) return false;
+    hal_haptic_play(pattern, n);
+    s_toy_buzz_end_us = hal_time_us() + 1000ull * pattern_ms(pattern, n);
+    return true;
+}
+
+bool feedback_toy_detent(void)
+{
+    toy_gate_in_t in = toy_in();
+    if (!toy_gate_may_buzz(&s_toy_gate, &in, now_ms())) return false;
+    feedback_detent();
+    return true;
+}
+
+bool feedback_toy_play(const int16_t *pcm, size_t n, uint8_t volume_pct)
+{
+    toy_gate_in_t in = toy_in();
+    if (!pcm || !n || !hal_board_info()->has_speaker ||
+        !toy_gate_may_sound(&s_toy_gate, &in, now_ms())) {
+        return false;
+    }
+    /* never louder than the stored level; the next alert cue sets that level again */
+    uint8_t stored = prefs_volume_percent();
+    hal_audio_set_volume(volume_pct < stored ? volume_pct : stored);
+    hal_audio_play(pcm, n);
+    s_toy_sound_end_us = hal_time_us() + (uint64_t)n * 1000000u / SND_RATE;
+    return true;
+}
+
+bool feedback_toy_mic(bool on)
+{
+    if (!on) {
+        if (s_toy_mic) hal_mic_stop();
+        s_toy_mic = false;
+        return false;
+    }
+    if (s_toy_mic) return true;
+    if (toy_gate_holding(&s_toy_gate, now_ms()) || !hal_mic_start()) return false;
+    s_toy_mic = true;
+    return true;
+}
+
+void feedback_toy_interrupt(void)
+{
+    uint64_t now = hal_time_us();
+    if (s_toy_sound_end_us > now) hal_audio_play(NULL, 0);
+    if (s_toy_buzz_end_us > now) hal_haptic_play(NULL, 0);
+    s_toy_sound_end_us = s_toy_buzz_end_us = 0;
+    feedback_toy_mic(false);
+}
 
 /* A watch lying face down is silent (MOTION.md): nothing buzzes or sounds until it is turned back.
  * The user's alert mode is not touched, so it applies again the moment the watch is lifted. */
@@ -31,6 +139,12 @@ void feedback_attention(att_kind_t kind)
     static const uint16_t question[] = {40, 90, 40};
     static const uint16_t error[] = {500};
     static const uint16_t done[] = {35};
+    switch (kind) {
+    case ATT_APPROVAL: toy_yield(permission, 3, "input"); break;
+    case ATT_QUESTION: toy_yield(question, 3, "input"); break;
+    case ATT_ERROR: toy_yield(error, 1, NULL); break;
+    case ATT_DONE: toy_yield(done, 1, "done"); break;
+    }
     switch (kind) {
     case ATT_APPROVAL:
         haptic(permission, 3);
@@ -152,6 +266,11 @@ void feedback_finished(bool error)
     static const uint16_t done[] = {35, 200, 35};
     static const uint16_t fail[] = {120, 90, 120, 90, 120};
     if (error) {
+        toy_yield(fail, 5, NULL);
+    } else {
+        toy_yield(done, 3, "done");
+    }
+    if (error) {
         haptic(fail, 5);
     } else {
         haptic(done, 3);
@@ -163,6 +282,7 @@ void feedback_finished(bool error)
 void feedback_usage_warn(void)
 {
     static const uint16_t warn[] = {200};
+    toy_yield(warn, 1, NULL);
     haptic(warn, 1);
 }
 

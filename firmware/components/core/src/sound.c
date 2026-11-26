@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "hal.h"
+#include "model.h" /* MODEL_EXT_BSS */
 
 #define TAU 6.28318530718f
 #define Q14 16384.0f
@@ -143,4 +144,14 @@ void sound_play(const char *role)
     last = r;
     last_us = now;
     hal_audio_play(cache[i].pcm, cache[i].n);
+}
+
+MODEL_EXT_BSS static int16_t s_toy_pcm[SOUND_TOY_SAMPLES];
+
+int16_t *sound_toy_pcm(void) { return s_toy_pcm; }
+
+size_t sound_toy_render(const snd_sound_t *s, size_t at)
+{
+    if (at >= SOUND_TOY_SAMPLES) return 0;
+    return snd_render(s, s_toy_pcm + at, SOUND_TOY_SAMPLES - at);
 }

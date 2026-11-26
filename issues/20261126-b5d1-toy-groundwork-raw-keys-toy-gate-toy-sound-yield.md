@@ -30,3 +30,5 @@ UX research 2026-11-26, owner picked it in the walkthrough; design brief in the 
 
 - 2026-11-26T05:23:34Z · claude-code/cloud@cloud · linux-x86_64 · 064af3a: filed
 - 2026-11-26T05:23:34Z · claude-code/cloud@cloud · linux-x86_64 · 064af3a: claimed
+- 2026-11-26T05:28:14Z · claude-code@cloud · linux-x86_64 · 8b7d02a: started: raw keys, toy gate, toy sound block, MODE_TOY yield and return
+- 2026-11-26T09:02:15Z · claude-code@cloud · linux-x86_64 · 8b7d02a+dirty: raw keys (gesture_set_raw_keys), toy gate (toy_gate.c, feedback_toy_*), toy sound block (sound_toy_pcm, PSRAM), MODE_TOY host and registry (ui_toy.h), yield to a request and return paused (s_resume_toy); EXPERIMENTS.md Toys; tests test_toy_gate, test_feedback, test_gesture, sim_toy_yield

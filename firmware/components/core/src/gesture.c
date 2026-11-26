@@ -24,10 +24,11 @@ void gesture_init(gesture_t *g, gesture_cb_t cb, void *ctx)
 const char *gesture_name(gesture_kind_t k)
 {
     static const char *const names[] = {
-        "press",        "release",    "tap",         "double_tap",  "long_press", "swipe_up",
-        "swipe_down",   "swipe_left", "swipe_right", "btn_a",       "btn_b",      "btn_a_long",
-        "btn_b_long",   "lift",       "shake",       "scrub_start", "scrub",      "scrub_end",
-        "btn_a_double", "chord",      "drag",        "drag_end",    "move"};
+        "press",       "release",    "tap",        "double_tap",   "long_press",
+        "swipe_up",    "swipe_down", "swipe_left", "swipe_right",  "btn_a",
+        "btn_b",       "btn_a_long", "btn_b_long", "lift",         "shake",
+        "scrub_start", "scrub",      "scrub_end",  "btn_a_double", "chord",
+        "drag",        "drag_end",   "move",       "key_down",     "key_up"};
     return (unsigned)k < sizeof names / sizeof *names ? names[k] : "?";
 }
 
@@ -62,6 +63,18 @@ void gesture_set_sectors(gesture_t *g, int n)
 bool gesture_scrubbing(const gesture_t *g) { return g->scrubbing; }
 
 void gesture_set_moves(gesture_t *g, bool on) { g->moves = on; }
+
+void gesture_set_raw_keys(gesture_t *g, bool on)
+{
+    if (g->raw_keys == on) return;
+    g->raw_keys = on;
+    g->a_pending = false;
+    for (int i = 0; i < 2; i++) {
+        /* pressed for the screen before: its release (or hold) must not reach the next one */
+        if (g->btn[i].down) g->btn[i].consumed = true;
+        g->btn[i].raw = false;
+    }
+}
 
 /* Trackpad stream: every sample's travel once the finger has left the tap slop, so a tap never
  * moves. */
@@ -254,12 +267,17 @@ void gesture_button(gesture_t *g, int btn, bool down, uint32_t t_ms)
     if (down) {
         if (b->down) return;
         b->down = true;
-        b->long_fired = b->consumed = b->second = false;
+        b->long_fired = b->consumed = b->second = b->raw = false;
         b->t_down = t_ms;
         if (o->down && !o->long_fired && !o->consumed) {
             b->consumed = o->consumed = true;
             g->a_pending = false;
             emit(g, G_CHORD, 0, 0, 0);
+            return;
+        }
+        if (g->raw_keys) {
+            b->raw = true;
+            emit(g, G_KEY_DOWN, btn, 0, 0);
             return;
         }
         if (btn == 0 && g->a_pending) {
@@ -268,8 +286,13 @@ void gesture_button(gesture_t *g, int btn, bool down, uint32_t t_ms)
         }
     } else if (b->down) {
         b->down = false;
-        if (b->consumed || b->long_fired) return;
         uint32_t dur = t_ms - b->t_down;
+        if (b->raw) { /* even after a long press or a chord: every down has its up */
+            b->raw = false;
+            emit(g, G_KEY_UP, btn, 0, dur);
+            return;
+        }
+        if (b->consumed || b->long_fired) return;
         if (btn == 1) {
             emit(g, G_BTN_B, 0, 0, dur);
         } else if (b->second) {

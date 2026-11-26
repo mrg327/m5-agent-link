@@ -66,7 +66,7 @@ exceptions are in the table at the end.
   root name: `power.c` exports `power_*`, `ui_home.c` exports `ui_home_*`, `hal.h` declares `hal_*`.
   Prefixes in use: `hal_` (the HAL, implemented by `boards/*` and `simulator/src/sim_*.c`), `core_`
   (the component API in `core/include/core.h`), `ui_` and `ui_<screen>_`, `model_`, `link_`, `nav_`,
-  `keys_`, `detail_`, `feedback_`, `gauges_`, `voice_`, `power_`, `ota_`, `gesture_`, `bench_`,
+  `keys_`, `detail_`, `feedback_`, `gauges_`, `voice_`, `power_`, `ota_`, `gesture_`, `bench_`, `toy_`,
   `graph_`, `motion_`, `prefs_`, `steps_`, `done_`, `sha256_`, `ring_`, `sim_`, and `sw_` for
   board-private functions shared between StopWatch files. `checked: scripts/check lint (lint_c.py,
   baseline 0)` for the prefix being one of the allowed module prefixes (clang-tidy
