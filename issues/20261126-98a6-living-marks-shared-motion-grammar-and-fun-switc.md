@@ -30,3 +30,4 @@ UX research 2026-11-26, owner picked it in the walkthrough; design brief in the 
 
 - 2026-11-26T05:23:33Z · claude-code/cloud@cloud · linux-x86_64 · 064af3a: filed
 - 2026-11-26T05:23:34Z · claude-code/cloud@cloud · linux-x86_64 · 064af3a: claimed
+- 2026-11-26T09:03:05Z · claude-code/cloud@cloud · linux-x86_64 · e057b0f: Built in e057b0f: persona.c gate + fun word (LABS > Personality), temper.c temperament and poses, ui_living.c on HOME and ambient sigil + hero glyph. Ring left as is (its comet/sweep/flicker already follow the grammar; pips are another issue's). Checks: sim 264/264, atlas, structure, format, docs, lint, commits pass; firmware SKIP. Device: breath visibility at 72-100 %, frame time of the hero dip, USB-only loop.
