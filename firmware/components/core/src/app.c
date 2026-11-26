@@ -284,14 +284,21 @@ static void act_deny(uint32_t sid, uint32_t rid)
 
 /* cmd_op_reply {rid, arg: option index}: a question's answer, or one of a permission's own
  * choices. */
-static void act_reply(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms)
+static void act_reply(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms,
+                      ui_reply_kind_t kind)
 {
     /* hold_ms rides along so the daemon can re-check a grant option's hold, as it does for
      * approve */
     bool sent = link_send_cmd_arg(LINK_OP_REPLY, sid, rid, opt, hold_ms);
     if (sent) {
         model_attention_set_answer(rid, ATT_ANSWER_REPLY, opt);
-        feedback_reply_sent();
+        /* what grants ends in one long pulse, what denies in two (UI-V2 §5) */
+        switch (kind) {
+        case UI_REPLY_GRANT: feedback_approved(); break;
+        case UI_REPLY_DENY: feedback_denied(); break;
+        case UI_REPLY_NEUTRAL:
+        default: feedback_reply_sent(); break;
+        }
     } else {
         feedback_reject();
     }

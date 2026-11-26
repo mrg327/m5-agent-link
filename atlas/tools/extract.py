@@ -608,7 +608,10 @@ HAPTIC_MEANING = {
     "detent": ("detent", "A click each time the rim scrub crosses into another segment"),
     "hold_ramp": ("ramp", "Pulses grow longer and the gaps shorter while the approve hold fills"),
     "deny_ramp": ("deny_ramp", "Pulses shrink and the gaps grow while the deny hold fills"),
-    "reply_sent": ("reply", "A question option went out: three ticks"),
+    "reply_sent": (
+        "sent",
+        "An answer went out that neither grants nor denies: short then long",
+    ),
     "tick": ("tick", "A light acknowledgement of a button selection"),
     "approved": ("approved", "Approve was sent: one long pulse"),
     "denied": ("denied", "Deny was sent: two medium pulses"),

@@ -106,11 +106,12 @@ void feedback_denied(void)
  * haptic). Called once per update (ota.c), never on a power-on or a USB flash. */
 void feedback_updated(void) { sound("updated"); }
 
-/* Three ticks: an answer went out that neither grants nor denies. */
+/* Short then long: an answer went out that neither grants nor denies. Two pulses, so it differs
+ * from the reject (three) by count, and from denied (two equal) by its rising rhythm. */
 void feedback_reply_sent(void)
 {
-    static const uint16_t reply[] = {35, 60, 35, 60, 35};
-    haptic(reply, 5);
+    static const uint16_t sent[] = {35, 80, 120};
+    haptic(sent, 3);
 }
 
 void feedback_reject(void)
@@ -127,8 +128,8 @@ void feedback_scroll_stop(void)
     haptic(stop, 1);
 }
 
-/* Quiet mode toggled (UI-V2 §5): two spaced pulses, unlike the tick (one) and the reject
- * (three). */
+/* Quiet mode toggled (UI-V2 §5): two equal spaced pulses, unlike the tick (one), the sent buzz
+ * (short then long) and the reject (three). */
 void feedback_quiet_toggled(void)
 {
     static const uint16_t quiet[] = {35, 100, 35};
@@ -148,7 +149,7 @@ void feedback_volume_preview(void)
  * pulses. */
 void feedback_finished(bool error)
 {
-    static const uint16_t done[] = {30, 200, 30};
+    static const uint16_t done[] = {35, 200, 35};
     static const uint16_t fail[] = {120, 90, 120, 90, 120};
     if (error) {
         haptic(fail, 5);

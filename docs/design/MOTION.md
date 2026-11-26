@@ -90,8 +90,8 @@ Two roles in the sound bank, each with two candidates for the Atlas to audition:
 C5 G5 C6, `approved-rise`) and `denied` (falling, 340 ms, triangle D5 G4 C4, `denied-fall`). They are rendered by
 the same synth on first use and cached in PSRAM (about 4.3 KB and 5.4 KB). They play from `feedback_approved`
 and `feedback_denied`, i.e. when a hold completes and the answer went out (approve, rerun, dictate send, keyboard send,
-deny, stop), only in alert mode "Sounds: on", not face down. Grant-option replies (`feedback_reply_sent`) keep their
-three ticks and have no tone.
+deny, stop), only in alert mode "Sounds: on", not face down. A permission's own options play the same: one that
+grants plays `feedback_approved`, one that refuses `feedback_denied`. A question's answer (`feedback_reply_sent`, short then long) has no tone.
 
 A third confirmation role, `updated` (`updated-flourish`, about 560 ms: FM C5 E5 G5 C6 at 80 ms each, then a bell E6 ringing
 out for 240 ms), tells you the watch flashed. `ota.c` plays it from `feedback_updated` in `ota_on_link`, at the

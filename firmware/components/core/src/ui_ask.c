@@ -1170,7 +1170,11 @@ static void commit(const attention_t *a, int idx, uint32_t hold_ms)
         if (it->unclear) { /* never from the watch */
             g_ui_actions->reject();
         } else {
-            g_ui_actions->reply(s_sid, a->rid, (uint8_t)it->opt, hold_ms);
+            /* a hold item that does not grant is deny-class (nav_ask_items) */
+            ui_reply_kind_t kind = it->grants    ? UI_REPLY_GRANT
+                                   : it->hold_ms ? UI_REPLY_DENY
+                                                 : UI_REPLY_NEUTRAL;
+            g_ui_actions->reply(s_sid, a->rid, (uint8_t)it->opt, hold_ms, kind);
         }
         break;
     case ASK_APPROVE: g_ui_actions->approve(s_sid, a->rid, hold_ms); break;

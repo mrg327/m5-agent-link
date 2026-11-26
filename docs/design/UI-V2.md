@@ -362,20 +362,25 @@ ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a deten
 | Detent (session, item, 3 scroll lines) | 15 | click | scrub, B, drag (not the glide) |
 | Select / tick (focus sent, item picked) | 35 | one short | HOME, AGENT |
 | Permission arrived | 250, 120, 250 | two long | glow, ASK |
-| Question arrived | 40, 90, 40, 90, 40 | three short | glow, ASK |
+| Question arrived | 40, 90, 40 | two short | glow, ASK |
 | Error arrived | 500 | one long | glow |
-| Done arrived | 60, 80, 60 | two short | glow |
+| Done arrived | 35 | one short | glow |
 | Approve ramp (during hold) | 35,170, 40,140, 45,110, 55,85, 65,65, 80,50, 100 | rising, gaps shrink | ASK |
 | Deny ramp (during hold) | 100,50, 80,65, 65,85, 55,110, 45 | falling, ends on a pulse | ASK |
 | **Approved** (commit) | 150 | one firm long | ASK |
 | **Denied** (commit) | 60, 90, 60 | two medium | ASK |
-| Reply sent | 35, 60, 35, 60, 35 | three ticks | ASK |
+| Permission option that grants (commit) | 150 | as Approved | ASK |
+| Permission option that denies (commit) | 60, 90, 60 | as Denied | ASK |
+| Sent (a question's answer, Send, a quick reply) | 35, 80, 120 | short then long | ASK, AGENT |
 | Reject / offline / nothing to do | 35, 70, 35, 70, 35 | three short | all |
 | Scroll stop (at bottom/top) | 40 | one thud | SCROLL |
 | Mode change (enter AGENT/SCROLL/STATUS/WATCH) | 35 | one short | all |
 | Quiet toggled | 35, 100, 35 | two spaced | STATUS |
-| **Finished: done** | 30, 200, 30 | two soft, long gap | a session moved into Done, when notify is armed or it is watched |
+| **Finished: done** | 35, 200, 35 | two soft, long gap | a session moved into Done, when notify is armed or it is watched |
 | **Finished: error** | 120, 90, 120, 90, 120 | three firm | a session moved into Error, same rule |
+| Usage warning | 200 | one long | the plan is running low |
+
+Whatever grants ends in one pulse, whatever denies in two equal ones, a refusal in three (`feedback.c`, `act_reply` in `app.c`). The sent buzz is two pulses too, told from denied by its rhythm: 35 then 120.
 
 The finished buzz needs: the session just entered Done or Error, and (its `ntf` was set, or it is the watched session), and it is not snoozed, and quiet mode is not running. A snoozed session's attentions do not buzz, glow or nag either.
 

@@ -8,7 +8,7 @@ void feedback_tick(void);       /* selection change by button, command sent */
 void feedback_detent(void);     /* one rim-scrub segment crossed: 15 ms kick only, rate limited */
 void feedback_hold_ramp(void);  /* approve hold started: escalating pulses over ~1 s */
 void feedback_deny_ramp(void);  /* deny hold started: falling pulses over ~0.6 s */
-void feedback_reply_sent(void); /* a question option went out: three ticks */
+void feedback_reply_sent(void); /* an answer went out: short then long */
 void feedback_hold_stop(void);  /* approve hold released early */
 void feedback_approved(void);   /* approve sent: one long pulse */
 void feedback_updated(void); /* first welcome after an OTA update: the "updated" tone, no haptic */

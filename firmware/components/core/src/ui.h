@@ -23,6 +23,14 @@ typedef struct {
     uint32_t fps;
 } ui_report_t;
 
+/* What a reply does, so its commit buzz matches the hold before it: a permission's own option
+ * grants or denies like Approve and Deny; a question's answer does neither. */
+typedef enum {
+    UI_REPLY_NEUTRAL, /**< a question's answer: the "sent" buzz */
+    UI_REPLY_GRANT,   /**< a permission option that grants: as Approve */
+    UI_REPLY_DENY,    /**< a permission option that refuses: as Deny */
+} ui_reply_kind_t;
+
 /* What the UI asks the app to do; the app talks to the link and feedback. */
 typedef struct {
     void (*focus)(uint32_t sid);
@@ -32,8 +40,8 @@ typedef struct {
     /* ASK: approve + save the standing rule */
     void (*grant)(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32_t rule_hash);
     void (*deny)(uint32_t sid, uint32_t rid);
-    /* ASK: answer a question / pick a grant option */
-    void (*reply)(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms);
+    /* ASK: answer a question / pick one of a permission's options */
+    void (*reply)(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms, ui_reply_kind_t kind);
     /* ASK (proto 0.18): answer every question of request rid at once, after a hold: per question
      * the options picked (a bit mask) or the recording of a free answer */
     void (*answer)(uint32_t sid, uint32_t rid, const uint32_t *picks, const uint32_t *aids, int n,

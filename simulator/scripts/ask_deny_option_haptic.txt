@@ -1,0 +1,17 @@
+# A permission option that refuses (issue 20261126-e39b): held, it replies with its index (op 5,
+# arg 2) and buzzes like Deny [60,90,60], not the "sent" buzz, so what denies ends in two pulses.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 2 input webapp feat/login
+wait 300
+attention 9 2 approval approve,deny,focus,reply 3 Run shell command|npm test -- --watch=false|Yes|Yes, don't ask again|No
+wait 400
+expect_screen ask
+btn B
+wait 150
+btn B
+wait 150
+expect_label > No HOLD
+hold 233 282 1200
+wait 400
+quit

@@ -78,6 +78,11 @@ add_executable(test_power tests/test_power.c ${FW}/core/src/power.c)
 target_include_directories(test_power PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
 target_link_libraries(test_power PRIVATE lvgl::lvgl)
 add_test(NAME power_timers COMMAND test_power)
+# UI-V2 §5 as a check: pulse counts, the 35 ms floor, 60 ms gaps, commit buzzes told apart (issue 20261126-e39b).
+add_executable(test_feedback tests/test_feedback.c ${FW}/core/src/feedback.c)
+target_include_directories(test_feedback PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_feedback PRIVATE lvgl::lvgl)
+add_test(NAME feedback_haptics COMMAND test_feedback)
 
 add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
 target_include_directories(test_ring PRIVATE ${FW}/core/src)
@@ -244,10 +249,14 @@ sim_script_test(sim_labs_trackpad labs_trackpad.txt
 # a rejected answer restores the options; a hold is bound to its request id.
 sim_script_test(sim_ask_reply ask_reply.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4"
-                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":8,\"hold_ms\":0,\"arg\":1")
+                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":8,\"hold_ms\":0,\"arg\":1.*\"pattern_ms\":\\[35,80,120\\]")
 sim_script_test(sim_ask_grant_hold ask_grant_hold.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4"
-                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":9,\"hold_ms\":1[0-9][0-9][0-9],\"arg\":1")
+                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":9,\"hold_ms\":1[0-9][0-9][0-9],\"arg\":1,([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[150\\]")
+# A permission option that refuses buzzes like Deny, a grant option like Approve (issue 20261126-e39b).
+sim_script_test(sim_ask_deny_option_haptic ask_deny_option_haptic.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4"
+                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":9,\"hold_ms\":[0-9]+,\"arg\":2,([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[60,90,60\\]")
 sim_script_test(sim_ask_grant_hold_progress ask_grant_hold_progress.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"tx_cmd\"")
 sim_script_test(sim_ask_deny_hold ask_deny_hold.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":5"
@@ -274,7 +283,7 @@ sim_script_test(sim_ask_tap_rows ask_tap_rows.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_ask_tap_option_row ask_tap_option_row.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4"
-                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":8,\"hold_ms\":0,\"arg\":1")
+                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":8,\"hold_ms\":0,\"arg\":1.*\"pattern_ms\":\\[35,80,120\\]")
 # UI-V3: swipe right goes back from AGENT, STATUS, VOICE, WATCH, SCROLL and ASK; in ASK it never answers
 # (no approve, deny or reply op), the request stays and a tap reopens it.
 sim_script_test(sim_back_swipe_right back_swipe_right.txt
@@ -544,7 +553,7 @@ sim_script_test(sim_last_message_cleared last_message_cleared.txt FAIL_REGULAR_E
 # Send is held; "Other" dictates; every answer goes out at once (cmd answer, op 19); a tap never sends one.
 sim_script_test(sim_question_single question_single.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":5"
-                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_answer\",\"rid\":31,\"n\":1,\"picks\":\\[2,")
+                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_answer\",\"rid\":31,\"n\":1,\"picks\":\\[2,.*\"pattern_ms\":\\[35,80,120\\]")
 sim_script_test(sim_question_multi question_multi.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":19.*\"op\":19"
                 PASS_REGULAR_EXPRESSION "\"ev\":\"tx_answer\",\"rid\":32,\"n\":2,\"picks\":\\[1,5,")
@@ -601,7 +610,7 @@ set_tests_properties(sim_perf_ring_display_off PROPERTIES WORKING_DIRECTORY ${CM
 
 sim_script_test(sim_finished_buzz finished_buzz.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"glow\""
-                PASS_REGULAR_EXPRESSION "\"ev\":\"mode\",\"mode\":\"watch\"([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[30,200,30\\]([^p]|p[^a]|pa[^t])*\"ev\":\"snoozed\",\"rid\":8,([^p]|p[^a]|pa[^t])*\"ev\":\"attention\",\"rid\":9.*\"pattern_ms\":\\[250,120,250\\]")
+                PASS_REGULAR_EXPRESSION "\"ev\":\"mode\",\"mode\":\"watch\"([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[35,200,35\\]([^p]|p[^a]|pa[^t])*\"ev\":\"snoozed\",\"rid\":8,([^p]|p[^a]|pa[^t])*\"ev\":\"attention\",\"rid\":9.*\"pattern_ms\":\\[250,120,250\\]")
 
 # Presence (PRESENCE.md, proto 0.12): hush holds the arrival buzz, the reminders and the finished buzz; the
 # card and ASK are as ever, and nothing is answered.
@@ -613,7 +622,7 @@ sim_script_test(sim_presence_hush_nag presence_hush_nag.txt
                 PASS_REGULAR_EXPRESSION "\"ev\":\"hush\",\"rid\":7")
 sim_script_test(sim_presence_hush_done presence_hush_done.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"glow\""
-                PASS_REGULAR_EXPRESSION "\"ev\":\"mode\",\"mode\":\"watch\"([^p]|p[^a]|pa[^t])*\"ev\":\"hush\",\"sid\":1,([^p]|p[^a]|pa[^t])*pattern_ms\":\\[30,200,30\\]")
+                PASS_REGULAR_EXPRESSION "\"ev\":\"mode\",\"mode\":\"watch\"([^p]|p[^a]|pa[^t])*\"ev\":\"hush\",\"sid\":1,([^p]|p[^a]|pa[^t])*pattern_ms\":\\[35,200,35\\]")
 
 # Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
 add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c
