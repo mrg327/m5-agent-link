@@ -313,11 +313,12 @@ set_tests_properties(sim_fun_replay_blocked PROPERTIES WORKING_DIRECTORY ${CMAKE
                      FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"act\":\"start\""
                      PASS_REGULAR_EXPRESSION "\"why\":\"gate\".*\"why\":\"gate\".*\"why\":\"still\"")
 sim_script_test(sim_labs_fun labs_fun.txt)
-# The Mote (issue 20261126-59e0): lap, a big green finish (the day counted, a cheer), settle, ember, tired,
-# night; gone on battery and at once for a request.
+# The Mote (issue 20261126-59e0), a firefly: it visits the working sessions in turn, a big green finish (the
+# day counted, a cheer), rest at 12, ember, a visit again (tired, night); gone on battery and at once for a
+# request.
 sim_script_test(sim_fun_mote fun_mote.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
-                PASS_REGULAR_EXPRESSION "\"mode\":\"lap\".*\"mote_day\",\"days\":1.*\"mode\":\"cheer\".*\"mode\":\"settle\".*\"mode\":\"ember\".*\"mode\":\"gone\".*\"mode\":\"lap\".*\"mode\":\"gone\"")
+                PASS_REGULAR_EXPRESSION "\"mode\":\"visit\".*\"mote_day\",\"days\":1.*\"mode\":\"cheer\".*\"mode\":\"rest\".*\"mode\":\"ember\".*\"mode\":\"visit\".*\"mode\":\"gone\".*\"mode\":\"visit\",\"deg\":[0-9]+,\"lum\":28,\"halo\":[0-9]+,\"night\":1.*\"mode\":\"gone\"")
 # A session in error lets the idle face come up, and the Mote hovers beside its capsule.
 sim_script_test(sim_fun_mote_error fun_mote_error.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"

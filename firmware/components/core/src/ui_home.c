@@ -344,6 +344,19 @@ static int error_deg(void)
     return -1;
 }
 
+/* Where the Mote visits: the centres of the working slots (starting or working), in ring order. */
+static int work_degs(int16_t *out, int max)
+{
+    int k = 0;
+    for (int i = 0; i < s_n && k < max; i++) {
+        const session_t *s = model_find(s_slots[i].sid);
+        if (s && !s_slots[i].n_merged && (s->state == SESS_WORK || s->state == SESS_START)) {
+            out[k++] = (int16_t)ring_slot_mid_deg(s_n, i);
+        }
+    }
+    return k;
+}
+
 void ui_home_tick(uint32_t now)
 {
     s_now = now;
@@ -367,7 +380,9 @@ void ui_home_tick(uint32_t now)
         ui_home_card_tick();
     }
     if (ui_mode() == MODE_HOME && !s_ambient) ui_graph_strip_tick(now);
-    ui_mote_tick(now, s_ambient && ui_mode() == MODE_HOME, error_deg());
+    int16_t work[RING_MAX_SEGMENTS];
+    int n_work = work_degs(work, RING_MAX_SEGMENTS);
+    ui_mote_tick(now, s_ambient && ui_mode() == MODE_HOME, error_deg(), work, n_work);
     ui_eggs_tick(now, ui_mode() == MODE_HOME ? ui_home_card_clock() : NULL);
 }
 

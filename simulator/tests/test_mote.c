@@ -1,4 +1,4 @@
-/* mote.c: the Mote's state machine (issue 20261126-59e0). */
+/* mote.c: the Mote's state machine, the firefly (issue 20261126-59e0). */
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -26,21 +26,25 @@ static mote_in_t calm(void)
     return in;
 }
 
+static void working(mote_in_t *in, int n, const int *deg)
+{
+    in->n_work = (uint8_t)n;
+    for (int i = 0; i < n; i++) in->work_deg[i] = (int16_t)deg[i];
+}
+
 static int ang_diff(int a, int b)
 {
     int d = ((a - b) % 360 + 360) % 360;
     return d > 180 ? 360 - d : d;
 }
 
-/* Runs from t0 to t1 in ticks, with minute_ms following the clock; returns the last output and
- * the largest move between two ticks (degrees). */
-static mote_out_t run(mote_t *m, mote_in_t *in, uint32_t t0, uint32_t t1, int *max_move)
+/* Runs from t0 to t1 in ticks; returns the last output and the largest move between two ticks. */
+static mote_out_t run(mote_t *m, const mote_in_t *in, uint32_t t0, uint32_t t1, int *max_move)
 {
     mote_out_t o = {0}, prev = {0};
     bool first = true;
     if (max_move) *max_move = 0;
     for (uint32_t t = t0; t <= t1; t += TICK) {
-        in->minute_ms = t % 60000u;
         o = mote_step(m, in, t);
         if (!first && max_move && o.mode != MOTE_GONE && prev.mode != MOTE_GONE) {
             int d = ang_diff(o.deg, prev.deg);
@@ -52,141 +56,163 @@ static mote_out_t run(mote_t *m, mote_in_t *in, uint32_t t0, uint32_t t1, int *m
     return o;
 }
 
+/* Runs until the firefly first stands at deg; returns that time, or 0 if it never does. Notes the
+ * largest move a tick and whether the distance to deg ever grew (not the short way). */
+static uint32_t until_at(mote_t *m, const mote_in_t *in, uint32_t t0, uint32_t t1, int deg,
+                         int *max_move, bool *short_way)
+{
+    int prev = -1;
+    if (max_move) *max_move = 0;
+    if (short_way) *short_way = true;
+    for (uint32_t t = t0; t <= t1; t += TICK) {
+        mote_out_t o = mote_step(m, in, t);
+        if (prev >= 0) {
+            int d = ang_diff(o.deg, prev);
+            if (max_move && d > *max_move) *max_move = d;
+            if (short_way && ang_diff(o.deg, deg) > ang_diff(prev, deg)) *short_way = false;
+        }
+        if (o.deg == deg) return t;
+        prev = o.deg;
+    }
+    return 0;
+}
+
 static void test_priority(void)
 {
     mote_t m = {0};
     mote_in_t in = calm();
     mote_out_t o = mote_step(&m, &in, 1000);
-    EXPECT(o.mode == MOTE_SETTLE && o.deg == 180, "nothing runs: settled at 6 o'clock");
-    EXPECT(o.size == MOTE_HEAD_PX && o.lum <= MOTE_LUM, "an 8 px head at the ambient brightness");
-    in.working = 2;
+    EXPECT(o.mode == MOTE_REST && o.deg == MOTE_REST_DEG, "nothing runs: resting at 12 o'clock");
+    EXPECT(o.look.core_r == MOTE_CORE_R && o.look.lum == MOTE_LUM, "a 7 px core, ambient bright");
+    EXPECT(o.look.halo_r >= MOTE_HALO_R && o.look.halo_r <= MOTE_HALO_R + MOTE_BREATH_PX,
+           "a halo of about 30 px");
+    EXPECT(o.rgb == MOTE_RGB && o.dx == 0 && o.dy == 0, "warm white, on its track");
+    const int d[] = {90, 270};
+    working(&in, 2, d);
     o = mote_step(&m, &in, 1030);
-    EXPECT(o.mode == MOTE_LAP, "something works: a lap");
+    EXPECT(o.mode == MOTE_VISIT, "something works: it visits");
     in.errors = 1;
-    in.error_deg = 90;
+    in.error_deg = 120;
     o = mote_step(&m, &in, 1060);
-    EXPECT(o.mode == MOTE_HOVER, "an error outranks the lap");
+    EXPECT(o.mode == MOTE_HOVER, "an error outranks a visit");
     in.may = false;
     o = mote_step(&m, &in, 1090);
-    EXPECT(o.mode == MOTE_GONE, "not allowed: gone in the same step");
+    EXPECT(o.mode == MOTE_GONE, "not allowed (anything needs you): gone in the same step");
     in.may = true;
     in.face = false;
     o = mote_step(&m, &in, 1120);
     EXPECT(o.mode == MOTE_GONE, "no idle face: gone");
 }
 
-static void test_lap_is_a_seconds_hand(void)
+static void test_visit_cycles(void)
 {
+    /* two working sessions: it appears by the nearer, lingers 8 s, crosses the short way, eased */
     mote_t m = {0};
     mote_in_t in = calm();
-    in.working = 1;
-    for (uint32_t s = 0; s < 60; s += 7) {
-        in.minute_ms = s * 1000;
-        mote_out_t o = mote_step(&m, &in, 100000 + s * 1000);
-        EXPECT(o.deg == s * 6, "appearing in a lap: angle = seconds x 6");
-        m = (mote_t){0};
-    }
-    /* following the clock: one degree at a time */
+    const int two[] = {90, 270};
+    working(&in, 2, two);
+    mote_out_t o = mote_step(&m, &in, 0);
+    EXPECT(o.mode == MOTE_VISIT && o.deg == 90, "appears by the first working session");
+    o = run(&m, &in, TICK, MOTE_VISIT_MS - TICK, NULL);
+    EXPECT(o.deg == 90, "lingers by it for 8 s");
     int mv;
-    mote_out_t o = run(&m, &in, 0, 60000, &mv);
-    EXPECT(mv <= 1, "a lap moves a degree at a time");
-    EXPECT(o.deg == 0, "on the minute: at 12");
-}
+    bool sw;
+    uint32_t t = until_at(&m, &in, MOTE_VISIT_MS, MOTE_VISIT_MS + 10000, 270, &mv, &sw);
+    uint32_t trip = MOTE_TRAVEL_MS + 180 * MOTE_TRAVEL_MS_DEG;
+    EXPECT(t && t - MOTE_VISIT_MS <= trip + 2 * TICK && t - MOTE_VISIT_MS >= trip - 4 * TICK,
+           "then on to the next, a trip of 4.4 s for half the ring");
+    EXPECT(mv <= 2, "calm: at most 2 degrees a 30 ms tick (about 62 degrees a second)");
+    o = run(&m, &in, t + TICK, t + MOTE_VISIT_MS - TICK, NULL);
+    EXPECT(o.deg == 270, "lingers by the second");
+    t = until_at(&m, &in, t + MOTE_VISIT_MS, t + MOTE_VISIT_MS + 10000, 90, NULL, NULL);
+    EXPECT(t != 0, "and back to the first: it cycles");
 
-static void test_settle_short_way(void)
-{
-    /* from either side of 6 o'clock, and from near it */
-    const int starts[] = {30, 330, 170, 190};
-    for (int i = 0; i < 4; i++) {
-        mote_t m = {0};
-        mote_in_t in = calm();
-        in.working = 1;
-        uint32_t t0 = (uint32_t)starts[i] * 1000 / 6; /* the second at that angle */
-        in.minute_ms = t0;
-        mote_out_t o = mote_step(&m, &in, t0);
-        EXPECT(o.deg == starts[i], "starts where the seconds are");
-        in.working = 0;
-        int prev = o.deg, mv = 0;
-        bool wrong = false;
-        for (uint32_t t = t0 + TICK; t < t0 + 40000; t += TICK) {
-            o = mote_step(&m, &in, t);
-            int d = ang_diff(o.deg, prev);
-            if (d > mv) mv = d;
-            /* the distance to 180 never grows: the short way */
-            if (ang_diff(o.deg, 180) > ang_diff(prev, 180)) wrong = true;
-            prev = o.deg;
-        }
-        EXPECT(o.deg == 180 && o.mode == MOTE_SETTLE, "settles at 180");
-        EXPECT(!wrong, "the short way");
-        EXPECT(mv <= 1, "settling is slow (6 degrees a second)");
-    }
-}
-
-static void test_ember(void)
-{
-    mote_t m = {0};
-    mote_in_t in = calm();
-    mote_out_t o = run(&m, &in, 1000, 1000 + MOTE_EMBER_MS - TICK, NULL);
-    EXPECT(o.mode == MOTE_SETTLE, "settled under five minutes");
-    o = mote_step(&m, &in, 1000 + MOTE_EMBER_MS);
-    EXPECT(o.mode == MOTE_EMBER && o.size == MOTE_EMBER_PX && o.lum == MOTE_LUM_EMBER,
-           "an ember after exactly five minutes");
-    EXPECT(o.tail_deg == 0, "an ember has no tail");
-    /* the ember does not pulse */
-    uint8_t lum = o.lum;
-    for (uint32_t t = 1000 + MOTE_EMBER_MS; t < 1000 + MOTE_EMBER_MS + 10000; t += TICK) {
-        o = mote_step(&m, &in, t);
-        EXPECT(o.lum == lum, "an ember is still");
-    }
-    /* a turn starts: back to a lap */
-    in.working = 1;
-    o = mote_step(&m, &in, 1000 + MOTE_EMBER_MS + 10000);
-    EXPECT(o.mode == MOTE_LAP && o.size == MOTE_HEAD_PX, "a turn wakes the ember");
-}
-
-static void test_pulse(void)
-{
-    mote_t m = {0};
-    mote_in_t in = calm();
-    int lo = 255, hi = 0;
-    for (uint32_t t = 0; t < 8000; t += TICK) {
-        mote_out_t o = mote_step(&m, &in, t);
-        if (o.lum < lo) lo = o.lum;
-        if (o.lum > hi) hi = o.lum;
-    }
-    EXPECT(hi == MOTE_LUM && lo < MOTE_LUM && lo >= MOTE_LUM * 70 / 100, "settled: a pulse");
-}
-
-static void test_speed(void)
-{
-    /* entering a lap from 6 o'clock catches up, never faster than 24 degrees a second */
-    mote_t m = {0};
-    mote_in_t in = calm();
-    in.minute_ms = 0;
-    mote_step(&m, &in, 0);
-    in.working = 1;
-    int mv;
-    mote_out_t o = run(&m, &in, 15000, 45000, &mv);
-    EXPECT(mv <= 1, "catching up: at most 24 degrees a second (under a degree a tick)");
-    EXPECT(o.deg == 45000 % 60000 * 6 / 1000, "caught up with the seconds");
-    /* the clock is set 20 s on: it catches up, it does not jump */
-    int prev = o.deg;
-    for (uint32_t t = 45030; t < 57030; t += TICK) {
-        in.minute_ms = (t + 20000) % 60000u;
-        o = mote_step(&m, &in, t);
-        EXPECT(ang_diff(o.deg, prev) <= 1, "a clock set does not make it jump");
-        prev = o.deg;
-    }
-    EXPECT(o.deg == (57000 + 20000) % 60000 * 6 / 1000, "caught up with the new time");
-    in.minute_ms = 45000;
+    /* three: in ring order, each the short way */
     m = (mote_t){0};
-    mote_step(&m, &in, 45000);
-    /* to an error and back */
-    in.errors = 1;
-    in.error_deg = 300;
-    o = run(&m, &in, 45030, 60000, &mv);
-    EXPECT(mv <= 1, "to the error at catch-up speed");
-    EXPECT(ang_diff(o.deg, 300) <= MOTE_HOVER_SWAY, "hovers at the error, swaying 3 degrees");
+    const int three[] = {60, 180, 300};
+    working(&in, 3, three);
+    o = mote_step(&m, &in, 0);
+    EXPECT(o.deg == 60, "nearest to where it appears (12 o'clock): 60");
+    uint32_t at = 0;
+    const int order[] = {180, 300, 60, 180};
+    for (int k = 0; k < 4; k++) {
+        o = run(&m, &in, at + TICK, at + MOTE_VISIT_MS - TICK, NULL);
+        EXPECT(o.deg == (k ? order[k - 1] : 60), "lingers 8 s by each");
+        at = until_at(&m, &in, at + MOTE_VISIT_MS, at + MOTE_VISIT_MS + 8000, order[k], &mv, &sw);
+        EXPECT(at != 0 && sw, "the next clockwise, the short way");
+        EXPECT(mv <= 2, "calm on the way");
+    }
+
+    /* one: it stays by that one */
+    m = (mote_t){0};
+    const int one[] = {200};
+    working(&in, 1, one);
+    run(&m, &in, 0, 30000, &mv);
+    EXPECT(mote_step(&m, &in, 30030).deg == 200 && mv == 0, "one working session: it stays by it");
+}
+
+static void test_visit_changes(void)
+{
+    mote_t m = {0};
+    mote_in_t in = calm();
+    const int two[] = {90, 270};
+    working(&in, 2, two);
+    run(&m, &in, 0, 3000, NULL);
+    /* the one it is by finishes: it goes to the one still working */
+    const int left[] = {270};
+    working(&in, 1, left);
+    bool sw;
+    uint32_t t = until_at(&m, &in, 3030, 12000, 270, NULL, &sw);
+    EXPECT(t != 0 && sw, "its session stopped: on to the one still working");
+    /* the ring re-lays (a third session): the slots move; it follows to the nearest */
+    const int moved[] = {60, 180, 300};
+    working(&in, 3, moved);
+    t = until_at(&m, &in, t + TICK, t + 8000, 300, NULL, &sw);
+    EXPECT(t != 0 && sw, "the slots moved: to the nearest of them, not a jump");
+}
+
+static void test_rest_and_ember(void)
+{
+    /* from a visit at 150 back to 12 the short way (anticlockwise) */
+    mote_t m = {0};
+    mote_in_t in = calm();
+    const int one[] = {150};
+    working(&in, 1, one);
+    mote_step(&m, &in, 0);
+    in.n_work = 0;
+    int mv;
+    bool sw;
+    uint32_t t = until_at(&m, &in, TICK, 10000, MOTE_REST_DEG, &mv, &sw);
+    EXPECT(t && sw && mv <= 2, "nothing runs: to 12 o'clock, the short way, calm");
+    EXPECT(mote_step(&m, &in, t + TICK).mode == MOTE_REST, "resting");
+    /* it breathes: the halo between its exhale and its inhale, in a few levels */
+    int lo = 255, hi = 0, changes = 0;
+    mote_out_t prev = mote_step(&m, &in, t + 2 * TICK);
+    for (uint32_t u = t + 3 * TICK; u < t + 3 * TICK + MOTE_BREATH_MS; u += TICK) {
+        mote_out_t o = mote_step(&m, &in, u);
+        if (o.look.halo_r < lo) lo = o.look.halo_r;
+        if (o.look.halo_r > hi) hi = o.look.halo_r;
+        if (o.look.halo_r != prev.look.halo_r || o.look.halo_pct != prev.look.halo_pct) changes++;
+        EXPECT(o.look.lum == MOTE_LUM && o.deg == 0, "the core holds still");
+        prev = o;
+    }
+    EXPECT(lo == MOTE_HALO_R && hi == MOTE_HALO_R + MOTE_BREATH_PX, "the halo breathes 26-30 px");
+    EXPECT(changes >= 4 && changes <= 2 * (MOTE_BREATH_STEPS - 1), "in a few steps a breath");
+    /* five minutes resting (from the first step without work, at TICK): an ember */
+    mote_out_t o = run(&m, &in, t + 4000, MOTE_EMBER_MS, NULL);
+    EXPECT(o.mode == MOTE_REST, "rested under five minutes");
+    o = mote_step(&m, &in, TICK + MOTE_EMBER_MS);
+    EXPECT(o.mode == MOTE_EMBER && o.look.core_r < MOTE_CORE_R && o.look.lum == MOTE_LUM_EMBER,
+           "an ember after exactly five minutes: smaller and dim");
+    mote_look_t k = o.look;
+    for (uint32_t u = TICK + MOTE_EMBER_MS; u < TICK + MOTE_EMBER_MS + 10000; u += TICK) {
+        o = mote_step(&m, &in, u);
+        EXPECT(o.look.halo_r == k.halo_r && o.look.halo_pct == k.halo_pct && o.deg == 0,
+               "an ember is still: no breathing");
+    }
+    working(&in, 1, one);
+    o = mote_step(&m, &in, TICK + MOTE_EMBER_MS + 10000);
+    EXPECT(o.mode == MOTE_VISIT && o.look.core_r == MOTE_CORE_R, "a turn wakes the ember");
 }
 
 static void test_hover(void)
@@ -201,36 +227,54 @@ static void test_hover(void)
         int d = (int)o.deg - 120;
         if (d < dmin) dmin = d;
         if (d > dmax) dmax = d;
-        if (o.lum < lo) lo = o.lum;
-        if (o.lum > hi) hi = o.lum;
+        if (o.look.lum < lo) lo = o.look.lum;
+        if (o.look.lum > hi) hi = o.look.lum;
     }
     EXPECT(dmin == -MOTE_HOVER_SWAY && dmax == MOTE_HOVER_SWAY, "sways 3 degrees either way");
-    EXPECT(hi == MOTE_LUM && lo == MOTE_LUM * 60 / 100, "two brightness levels");
+    EXPECT(hi == MOTE_LUM && lo == MOTE_LUM * 60 / 100, "flickers between two levels");
+    /* an error appears while it rests: it travels there, calm */
+    m = (mote_t){0};
+    in.errors = 0;
+    mote_step(&m, &in, 0);
+    in.errors = 1;
+    in.error_deg = 300;
+    int mv;
+    bool sw;
+    uint32_t t = until_at(&m, &in, TICK, 10000, 300, &mv, &sw);
+    EXPECT(t && sw && mv <= 2, "to the error the short way, calm");
 }
 
 static void test_cheer(void)
 {
     mote_t m = {0};
     mote_in_t in = calm();
-    in.working = 1;
+    const int one[] = {90};
+    working(&in, 1, one);
     run(&m, &in, 0, 3000, NULL);
     in.cheers = 1;
-    int laps = 0, prev = -1;
+    int crossings = 0, prev = -1, max_halo = 0, max_lum = 0;
     mote_out_t o;
     uint32_t t;
     for (t = 3030; t < 3030 + MOTE_CHEER_MS; t += TICK) {
-        in.minute_ms = t;
         o = mote_step(&m, &in, t);
-        EXPECT(o.mode == MOTE_CHEER && o.tail_deg == MOTE_CHEER_TAIL, "cheer: a long tail");
-        if (prev >= 0 && o.deg < prev) laps++;
+        EXPECT(o.mode == MOTE_CHEER, "cheer: a loop round the track");
+        if (prev > 180 && o.deg < 180) crossings++;
         prev = o.deg;
     }
-    EXPECT(laps == 3 || laps == 2, "three laps (crossing 12 two or three times)");
-    in.minute_ms = t + 30;
-    o = mote_step(&m, &in, t + 30);
-    EXPECT(o.mode == MOTE_CHEER && o.size == MOTE_CHEER_PX, "one large frame at the end");
-    o = run(&m, &in, t + 150, t + 3000, NULL);
-    EXPECT(o.mode == MOTE_LAP, "then on");
+    EXPECT(crossings == 1, "once round (crossing 12 once)");
+    for (; t < 3030 + MOTE_CHEER_MS + MOTE_FLARE_MS; t += TICK) {
+        o = mote_step(&m, &in, t);
+        EXPECT(o.mode == MOTE_CHEER && o.deg == 90, "the flare, back where it was");
+        if (o.look.halo_r > max_halo) max_halo = o.look.halo_r;
+        if (o.look.lum > max_lum) max_lum = o.look.lum;
+    }
+    EXPECT(max_halo >= MOTE_HALO_R + MOTE_BREATH_PX + MOTE_FLARE_PX - 1 &&
+               max_lum >= MOTE_LUM_FLARE - 2,
+           "a bright, wide flare of the halo");
+    _Static_assert(MOTE_CHEER_MS + MOTE_FLARE_MS >= 1500 && MOTE_CHEER_MS + MOTE_FLARE_MS <= 2000,
+                   "the cheer lasts 1.5-2 s");
+    o = mote_step(&m, &in, t + TICK);
+    EXPECT(o.mode == MOTE_VISIT && o.deg == 90, "then on, by its session");
     /* a cheer while gone is not kept for later */
     in.face = false;
     mote_step(&m, &in, t + 4000);
@@ -238,12 +282,32 @@ static void test_cheer(void)
     mote_step(&m, &in, t + 4030);
     in.face = true;
     o = mote_step(&m, &in, t + 4060);
-    EXPECT(o.mode == MOTE_LAP, "no cheer saved up");
+    EXPECT(o.mode == MOTE_VISIT, "no cheer saved up");
     /* reduced motion: no cheer */
     in.reduced = true;
     in.cheers = 3;
     o = mote_step(&m, &in, t + 4090);
-    EXPECT(o.mode == MOTE_LAP && o.deg == 0, "reduced: still at its resting place, no cheer");
+    EXPECT(o.mode == MOTE_VISIT && o.deg == 90, "reduced: still, no cheer");
+}
+
+static void test_reduced(void)
+{
+    mote_t m = {0};
+    mote_in_t in = calm();
+    in.reduced = true;
+    const int two[] = {120, 240};
+    working(&in, 2, two);
+    mote_out_t first = mote_step(&m, &in, 0), o = first;
+    for (uint32_t t = TICK; t < 30000; t += TICK) {
+        o = mote_step(&m, &in, t);
+        EXPECT(o.deg == 120 && o.look.halo_r == first.look.halo_r &&
+                   o.look.halo_pct == first.look.halo_pct,
+               "reduced: still by the first working session, no cycling, no breathing");
+    }
+    in.n_work = 0;
+    o = mote_step(&m, &in, 30000);
+    EXPECT(o.mode == MOTE_REST && o.deg == MOTE_REST_DEG, "reduced: at rest at once, no trip");
+    EXPECT(o.look.halo_r == MOTE_HALO_R, "reduced: the halo exhaled, still");
 }
 
 static void test_loop(void)
@@ -256,40 +320,83 @@ static void test_loop(void)
     mote_out_t o;
     for (uint32_t t = 30; t < 30 + MOTE_LOOP_MS; t += TICK) {
         o = mote_step(&m, &in, t);
-        EXPECT(o.mode == MOTE_LOOP && o.deg == 180, "the loop leaves from where it is");
+        EXPECT(o.mode == MOTE_LOOP && o.deg == MOTE_REST_DEG, "the loop leaves from where it is");
         int d = abs(o.dx) + abs(o.dy);
         if (d > far) far = d;
-        /* at 6 o'clock inside the ring is up the screen */
-        EXPECT(o.dy <= 0, "the loop is inside the ring");
+        /* at 12 o'clock inside the ring is down the screen */
+        EXPECT(o.dy >= 0, "the loop is inside the track");
     }
-    EXPECT(far >= 2 * MOTE_LOOP_R - 2, "a 40 px circle");
+    EXPECT(far >= 2 * MOTE_LOOP_R - 2, "a 32 px circle");
     o = mote_step(&m, &in, 30 + MOTE_LOOP_MS);
-    EXPECT(o.mode == MOTE_SETTLE && o.dx == 0 && o.dy == 0, "back on the track");
+    EXPECT(o.mode == MOTE_REST && o.dx == 0 && o.dy == 0, "back on the track");
 }
 
-static void test_tail_and_night(void)
+static void test_night(void)
+{
+    /* the colours that mean state (ui_theme.h): working, ask, permission, done, error, idle */
+    static const uint32_t s_state_rgb[] = {0x56b4e9, 0xf0e442, 0xe69f00,
+                                           0x009e73, 0xd55e00, 0x999999};
+    mote_t m = {0};
+    mote_in_t in = calm();
+    in.reduced = true; /* the look alone, without the breath */
+    mote_out_t day = mote_step(&m, &in, 0);
+    in.hour = 23;
+    mote_out_t o = mote_step(&m, &in, 0);
+    EXPECT(o.night && o.look.lum == MOTE_LUM_NIGHT && o.look.lum < day.look.lum,
+           "after 23:00: dimmer");
+    EXPECT(o.look.halo_pct < day.look.halo_pct, "and a dimmer halo");
+    EXPECT(o.rgb == day.rgb && o.rgb == MOTE_RGB, "the same warm white, not amber");
+    for (size_t i = 0; i < sizeof s_state_rgb / sizeof s_state_rgb[0]; i++) {
+        EXPECT(o.rgb != s_state_rgb[i] && day.rgb != s_state_rgb[i], "never a state colour");
+    }
+    in.hour = 5;
+    EXPECT(mote_step(&m, &in, 0).night, "until 06:00");
+    in.hour = 6;
+    EXPECT(!mote_step(&m, &in, 0).night, "day from 06:00");
+}
+
+/* The level is counted (test_level) but never shown: mote_in_t does not carry it, so the look
+ * never changes under the user. */
+static void test_tired(void)
 {
     mote_t m = {0};
     mote_in_t in = calm();
-    for (uint8_t l = 0; l <= MOTE_LEVEL_MAX; l++) {
-        in.level = l;
-        mote_out_t o = mote_step(&m, &in, 0);
-        EXPECT(o.tail_deg == MOTE_TAIL_DEG + MOTE_TAIL_STEP * l, "tail 14 + 6 per level");
+    /* tired: slower, dimmer breathing */
+    int fresh = 0, tired = 0, pct_fresh = 0, pct_tired = 0;
+    m = (mote_t){0};
+    mote_out_t a = mote_step(&m, &in, 0), b;
+    for (uint32_t t = TICK; t < 12000; t += TICK) {
+        b = mote_step(&m, &in, t);
+        if (b.look.halo_r != a.look.halo_r) fresh++;
+        if (b.look.halo_pct > pct_fresh) pct_fresh = b.look.halo_pct;
+        a = b;
     }
-    in.level = 7;
     in.usage = 85;
-    EXPECT(mote_step(&m, &in, 0).tail_deg == 28, "tired: the tail halves");
-    in.level = 0;
-    EXPECT(mote_step(&m, &in, 0).tail_deg == MOTE_TAIL_MIN, "tired: 8 degrees at least");
-    in.usage = 79;
-    EXPECT(mote_step(&m, &in, 0).tail_deg == MOTE_TAIL_DEG, "under 80 %: as it is");
-    in.hour = 23;
-    mote_out_t o = mote_step(&m, &in, 0);
-    EXPECT(o.amber && o.lum <= MOTE_LUM_NIGHT, "after 23:00: amber and dimmer");
-    in.hour = 5;
-    EXPECT(mote_step(&m, &in, 0).amber, "until 06:00");
-    in.hour = 6;
-    EXPECT(!mote_step(&m, &in, 0).amber, "day from 06:00");
+    m = (mote_t){0};
+    a = mote_step(&m, &in, 0);
+    for (uint32_t t = TICK; t < 12000; t += TICK) {
+        b = mote_step(&m, &in, t);
+        if (b.look.halo_r != a.look.halo_r) tired++;
+        if (b.look.halo_pct > pct_tired) pct_tired = b.look.halo_pct;
+        a = b;
+    }
+    EXPECT(tired < fresh, "tired (80 % or more): a slower breath");
+    EXPECT(pct_tired < pct_fresh, "and a dimmer one");
+}
+
+static void test_look(void)
+{
+    mote_look_t k = mote_look(100, 45, 0);
+    EXPECT(k.core_r == 7 && k.halo_r == 26 && k.lum == 45, "the idle face's firefly");
+    mote_look_t big = mote_look(200, 80, 1000);
+    EXPECT(big.core_r == 14 && big.halo_r == 60, "any size: twice as large");
+    EXPECT(big.halo_pct == MOTE_HALO_PCT && k.halo_pct == MOTE_HALO_PCT * MOTE_BREATH_LO / 100,
+           "inhaled: the halo at its peak; exhaled: 70 % of it");
+    mote_look_t tiny = mote_look(5, 10, 0);
+    EXPECT(tiny.core_r >= 1 && tiny.halo_r > tiny.core_r, "never vanishes");
+    EXPECT(mote_breath(0, MOTE_BREATH_MS) == 0, "a breath: out at 0");
+    EXPECT(mote_breath(MOTE_BREATH_MS / 2, MOTE_BREATH_MS) == 1000, "in at half the period");
+    EXPECT(mote_breath(123, 0) == 0, "no period: still");
 }
 
 static void test_level(void)
@@ -337,15 +444,16 @@ static void test_finish(void)
 int main(void)
 {
     test_priority();
-    test_lap_is_a_seconds_hand();
-    test_settle_short_way();
-    test_ember();
-    test_pulse();
-    test_speed();
+    test_visit_cycles();
+    test_visit_changes();
+    test_rest_and_ember();
     test_hover();
     test_cheer();
+    test_reduced();
     test_loop();
-    test_tail_and_night();
+    test_night();
+    test_tired();
+    test_look();
     test_level();
     test_finish();
     if (failures) {

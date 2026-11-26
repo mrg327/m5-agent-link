@@ -362,41 +362,69 @@ experiment: the Replay switch (`FUN_REPLAY`, bit 5) in LABS > Personality, off b
   over 1.1 s of a replay in which the one capsule (a full ring) changes once; under 2 k px with the switch
   off. Whether 100 ms a step reads well, and the frame time, are for the device.
 
-### 3.14 The Mote: `mote.c`, `ui_mote.c` (issue 20261126-59e0)
+### 3.14 The Mote: `mote.c`, `ui_mote.c`, `ui_orb.c` (issue 20261126-59e0)
 
-A faceless point of light on its own track of the idle (ambient) face that mirrors the fleet. It never asks,
-buzzes or sounds. Off by default: LABS > Personality, the dot (`FUN_MOTE`, bit 3).
+A faceless firefly on its own track inside the idle (ambient) face's ring that shows who is busy. It never
+asks, buzzes or sounds. Off by default: LABS > Personality, the dot (`FUN_MOTE`, bit 3). The owner chose this
+design, "Firefly" visiting busy sessions, on 2026-11-26; it replaced a head with a tail that lapped as a
+seconds hand at r 216 and settled at 6 o'clock.
 
-- **Look.** A head of 8 px and a tail of three steps (100, 55, 25 % of the head) 4 px wide, on the track at
-  r 216, between the session capsules (r 222–228) and the pips (r 205). Warm white `0xFFE2B8` at the ambient
-  45 %; from 23:00 to 06:00 amber `0xE69F00` at 30 %. The tail is 14° + 6° a level (14–56°), halved (8° at
-  least) while the 5-hour plan use is 80 % or more. It drifts with the ambient face's 1 px burn-in guard.
-- **Modes**, highest first: gone (not allowed, or the idle face is not up with its clock); hover at the first
-  error capsule (±3° at 1 Hz, two brightness levels at 600 ms); cheer, three laps in 1.8 s with a 60° tail
-  then one 12 px frame, on a big finish (not an error, tests not failed, and 10 min or more, 5 files or more,
-  or 200 lines or more: the medium and large tiers of the celebrations brief); lap while anything works, its
-  angle the seconds × 6, a seconds hand; settle at 6 o'clock when nothing runs, by the short way at 6°/s, then
-  a pulse of 4 levels every 4 s (6 s at night); an ember after five minutes settled, 4 px at 25 %, still.
-  Nothing pops: entering a lap, reaching an error or a clock that was set catches up at up to 24°/s; only the
-  cheer and the centuries egg (§3.15) move faster.
+- **Look.** No tail: a warm-white `0xFFE2B8` core of 7 px radius in a soft halo that falls off to nothing at
+  26–30 px (seven concentric alpha discs, coverage about 86 % at the core down to 8 % at the rim). The core is
+  at the ambient face's 45 %, the halo's peak at 80 % of that. Where it may loop, the halo **breathes**: 26 →
+  30 px and 70 → 100 % of its brightness over 3.6 s, sampled in 8 levels. From 23:00 to 06:00 it is the same
+  warm white, dimmer (core 28 %, halo at 70 %): colour is reserved for state, so it is never amber. It drifts
+  with the ambient face's 1 px burn-in guard.
+- **The track, r 175.** The core (r 168–182) stays clear of the usage gauges on the idle face (their
+  glyphs at 6 o'clock from r 184, beads from 187, arcs 191–197; `ui_gauges.c`), the needs-you pips (r 196–210;
+  the Mote is gone whenever one shows anyway) and the capsules (r 222–228), and the halo's inner edge (r 145)
+  stays clear of the clock's digits (56 px at y 190: corners near r 131). The faint rim of the halo may lie
+  over a gauge arc or a capsule; nothing it covers is lost.
+- **Modes**, highest first: gone (not allowed, or the idle face is not up with its clock); hover beside the
+  first error capsule (±3° at 1 Hz, two brightness levels at 600 ms, no breath); cheer on a big finish (not
+  an error, tests not failed, and 10 min or more, 5 files or more, or 200 lines or more: the medium and large
+  tiers of the celebrations brief): once round the track in 1.2 s, eased, then the halo flares to 90 % and
+  10 px wider and falls back over 0.4 s; **visit** while anything works: it goes to the centre of a working
+  session's slot (`ring_slot_mid_deg`), lingers 8 s, then moves on to the next working one clockwise (ring
+  order), so where it is tells you who is busy; with one working session it stays by that one; it starts by
+  the nearest, and when the one it is by stops, or the ring re-lays, it goes to the nearest still working;
+  **rest** at 12 o'clock (under the ring's gap) when nothing runs, breathing; an **ember** after five minutes
+  resting: 60 % of the size, 22 %, still.
+- **Travel.** Every trip is the short way, eased in and out (smoothstep), and takes 0.8 s plus 20 ms a degree
+  (half the ring in 4.4 s, at most 62°/s), so nothing pops; a new target mid-trip starts a new trip from where
+  it is. Only the cheer and the centuries egg (§3.15) move faster.
 - **Rules.** It exists only where the gate allows a loop (`persona_allow(PF_MOTE)` with `PA_LOOP`: the dock,
   the display lit, nothing waiting for you) and only on the idle face. It leaves the moment anything needs you,
-  with no exit animation: the request is the picture. With reduced motion it is a still light at its mode's
-  resting place (a lap rests at 12, seconds not shown), tail kept, no cheer. A cheer that happens while it is
-  gone is not saved for later. The deck goes ambient with a session in error (only a waiting approval or question
-  keeps it lit; owner's call, 2026-11-26), so the Mote hovers beside the red capsule (`fun_mote_error.txt`).
+  with no exit animation: the request is the picture. With reduced motion it is a still orb at its resting
+  place (by the first working session, at 12 at rest, at the error), no breath, no travel, no cheer. A cheer
+  that happens while it is gone is not saved for later. The deck goes ambient with a session in error (only a
+  waiting approval or question keeps it lit; owner's call, 2026-11-26), so the Mote hovers beside the red
+  capsule (`fun_mote_error.txt`). Plan use at 80 % or more (5-hour window): a slower (6 s) and dimmer (70 %)
+  breath.
 - **Growth.** The level is the number of local days on which a turn finished with its tests green: the done
   summary's `tp` (DONE-SUMMARY.md) is known and passed, on a session the watch saw finish (the summary may
   arrive with the finish or just after). Thresholds 1, 3, 7, 14, 30, 60, 120 days give levels 1–7. One stored
-  word, `prefs_mote_days()` (NVS `mote_days`: bits 0–15 the count, 16–31 the last day counted), written at
-  most once a day, counted whether or not the Mote is on. It never shrinks: a gap, or a clock set back, counts
-  nothing and takes nothing away. Approvals, tokens and speed are not inputs.
-- **Cost** (simulator, `fun_mote.txt`). A lap moves a degree (3.8 px) every 167 ms and repaints the boxes round
-  the head and the tail's three joints, old and new: about 9 k px in 2 s. A change of look (mode, brightness,
-  tail) repaints the light in 10° chunks of its track; the cheer repaints its 60° tail each frame for 1.8 s.
-- **Sim.** `fun_mote.txt` (shots `fun_mote_lap_a`, `_lap_b`, `_cheer`, `_settle`, `_ember`, `_tired`,
-  `_night`); the log has `"ev":"mote"` at each mode and `"ev":"mote_day"` when a day counts. The simulator's RTC
-  now runs on the script's virtual clock, so a lap moves in a headless run.
+  word, `prefs_mote_days()` (NVS `mote_days`: bits 0–15 the count, 16–31 the last day counted), written at most
+  once a day, counted whether or not the Mote is on. It never shrinks: a gap, or a clock set back, counts
+  nothing and takes nothing away. Approvals, tokens and speed are not inputs. **Counted, not shown yet**: the
+  owner decided (2026-11-26) that the Mote's look never changes under the user, so the level does not reach
+  `mote_step()` and nothing on screen grows with it.
+- **The mascot, reusable.** The Mote will appear on other screens later (boot, pairing, the empty deck,
+  celebrations), so its look and its painter are apart from the idle face's behaviour:
+  `mote_look(scale_pct, lum, breath_pm)` (pure, `mote.h`) gives the core and halo at any size,
+  brightness and breath; `mote_breath(t_ms, period_ms)` gives the breath; `ui_orb_draw(layer, x, y,
+  &look, MOTE_RGB)` (`ui_orb.h`) paints it from any draw event, and `ui_orb_area(x, y, &look, &box)` is the
+  box to invalidate round its old and new places. No other screen uses it yet.
+- **Cost** (simulator, `fun_mote.txt`). Each change repaints the orb's box, old and new (about 4–5 k px each,
+  joined where they overlap); nothing else on the face is touched. Lingering, the breath repaints it a level at
+  a time: about 53 k px a 3.6 s breath (about 15 k px a second, like a breathing sigil). A trip moves the box
+  every tick: about 485 k px over the 4.4 s of half the ring in the simulator's 30 ms ticks (about two full
+  frames' worth, spread over the trip); on the watch the frame rate bounds it. The flare's box is about 7–10 k px
+  for its 0.4 s. On battery it is gone and the face repaints nothing.
+- **Sim.** `fun_mote.txt` (shots `fun_mote_visit_a`, `_travel`, `_visit_b`, `_cheer`, `_flare`, `_rest`,
+  `_ember`, `_tired`, `_night`) and `fun_mote_error.txt` (`fun_mote_hover`); the log has `"ev":"mote"` at each
+  mode (`visit`, `rest`, `ember`, `hover`, `cheer`, `loop`, `gone`) and `"ev":"mote_day"` when a day counts.
+  The simulator's RTC runs on the script's virtual clock, so the firefly moves in a headless run.
 
 ### 3.15 Easter eggs: `eggs.c`, `ui_eggs.c` (issue 20261126-7770)
 
@@ -409,7 +437,7 @@ enters.
 | Egg | Trigger | Picture |
 |---|---|---|
 | Clock slip | the clock on show (the empty deck or the ambient face) reads 13:37 or 04:04 | the digits slip 3 px right for one 90 ms frame, back, and once more (a style translate of the label: about 25 k px a frame); once per such minute, the first moment in it the egg may play |
-| Centuries | the 100th and the 1000th turn this watch saw finish (done, not error; a session first met finished does not count) | with the Mote on the face, it loops once round a 40 px circle inside the ring and returns (1.2 s); otherwise the sigil's rings each turn once round (800 ms, `inout`), over whatever gesture it is making |
+| Centuries | the 100th and the 1000th turn this watch saw finish (done, not error; a session first met finished does not count) | with the Mote on the face, it loops once round a 32 px circle inside its track and returns (1.2 s); otherwise the sigil's rings each turn once round (800 ms, `inout`), over whatever gesture it is making |
 
 - The finish count is `prefs_finishes()` (NVS `fin_n`), stored every 5 finishes and at a century, so a reboot
   may lose the last few, never add any, and a century plays once. A century waits up to 10 minutes for a

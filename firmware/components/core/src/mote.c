@@ -1,9 +1,9 @@
 #include "mote.h"
 
 #include <math.h>
+#include <stdlib.h>
 
-#define FULL 360000    /* millidegrees in a turn */
-#define CHEER_MDPS 600 /* millidegrees a millisecond: 18° a 30 ms tick, three laps in 1.8 s */
+#define FULL 360000 /* millidegrees in a turn */
 
 static int32_t wrap(int32_t a)
 {
@@ -18,134 +18,188 @@ static int32_t short_way(int32_t a, int32_t b)
     return d > FULL / 2 ? d - FULL : d;
 }
 
-/* Moves pos toward target by at most step; true once it is there. */
-static bool approach(int32_t *pos, int32_t target, int32_t step)
-{
-    int32_t d = short_way(*pos, target);
-    if (d <= step && d >= -step) {
-        *pos = wrap(target);
-        return true;
-    }
-    *pos = wrap(*pos + (d > 0 ? step : -step));
-    return false;
-}
-
-/* 0..levels-1 and back over one period. */
-static int tri(uint32_t t, uint32_t period, int levels)
-{
-    uint32_t p = t % period * 2;
-    if (p > period) p = 2 * period - p;
-    int k = (int)(p * (uint32_t)levels / period);
-    return k >= levels ? levels - 1 : k;
-}
-
-static uint8_t tail_of(const mote_in_t *in)
-{
-    int lvl = in->level > MOTE_LEVEL_MAX ? MOTE_LEVEL_MAX : in->level;
-    int t = MOTE_TAIL_DEG + MOTE_TAIL_STEP * lvl;
-    if (in->usage != 255 && in->usage >= MOTE_TIRED_PCT) {
-        t /= 2;
-        if (t < MOTE_TAIL_MIN) t = MOTE_TAIL_MIN;
-    }
-    return (uint8_t)t;
-}
-
 static uint16_t whole_deg(int32_t mdeg) { return (uint16_t)(wrap(mdeg + 500) / 1000 % 360); }
 
-/* The cheer's laps and its one large frame, or the loop off the track; false once it is over. */
-static bool effect(mote_t *m, uint32_t now, mote_out_t *o)
+static int ang(int a, int b) { return abs((int)short_way(a * 1000, b * 1000)) / 1000; }
+
+/* Eased in and out: 0..1 to 0..1, at most 1.5 times the mean speed. */
+static float smooth(float t) { return t * t * (3.0f - 2.0f * t); }
+
+static float frac(uint32_t t, uint32_t len) { return t >= len ? 1.0f : (float)t / (float)len; }
+
+uint16_t mote_breath(uint32_t t_ms, uint32_t period_ms)
+{
+    if (!period_ms) return 0;
+    float ph = (float)(t_ms % period_ms) / (float)period_ms;
+    float b = 0.5f - 0.5f * cosf(ph * 6.2831853f);
+    long k = lroundf(b * (float)(MOTE_BREATH_STEPS - 1));
+    return (uint16_t)(k * 1000 / (MOTE_BREATH_STEPS - 1));
+}
+
+mote_look_t mote_look(uint16_t scale_pct, uint8_t lum, uint16_t breath_pm)
+{
+    if (breath_pm > 1000) breath_pm = 1000;
+    int32_t core = MOTE_CORE_R * (int32_t)scale_pct / 100;
+    int32_t halo_m = MOTE_HALO_R * 1000 + MOTE_BREATH_PX * breath_pm;
+    int32_t halo = (halo_m * (int32_t)scale_pct / 100 + 500) / 1000;
+    int32_t pct =
+        MOTE_HALO_PCT * (MOTE_BREATH_LO * 1000 + (100 - MOTE_BREATH_LO) * breath_pm) / 100000;
+    if (core < 1) core = 1;
+    if (core > 120) core = 120;
+    if (halo <= core) halo = core + 1;
+    if (halo > 255) halo = 255;
+    return (mote_look_t){(uint8_t)core, (uint8_t)halo, lum > 100 ? 100 : lum,
+                         (uint8_t)(pct > 100 ? 100 : pct)};
+}
+
+/* Where it goes among the working sessions: the nearest at first (or when the one it is by stops or
+ * moves), then after MOTE_VISIT_MS by each, the next one clockwise (ring order). */
+static int visit(const mote_t *m, const mote_in_t *in, uint32_t now)
+{
+    int n = in->n_work > MOTE_VISIT_MAX ? MOTE_VISIT_MAX : in->n_work;
+    if (in->reduced) return in->work_deg[0]; /* still, by the first */
+    int cur = m->target, at = -1;
+    for (int i = 0; i < n; i++) {
+        if (in->work_deg[i] == cur) at = i;
+    }
+    if (at < 0) {
+        int from = cur < 0 ? whole_deg(m->pos) : cur, best = 0;
+        for (int i = 1; i < n; i++) {
+            if (ang(from, in->work_deg[i]) < ang(from, in->work_deg[best])) best = i;
+        }
+        return in->work_deg[best];
+    }
+    if (n < 2 || !m->arrived || now - m->arrive_ms < MOTE_VISIT_MS) return cur;
+    int best = -1;
+    int32_t bd = FULL;
+    for (int i = 0; i < n; i++) {
+        int32_t d = wrap((in->work_deg[i] - cur) * 1000);
+        if (d > 0 && d < bd) {
+            bd = d;
+            best = i;
+        }
+    }
+    return best < 0 ? cur : in->work_deg[best];
+}
+
+/* Heads for deg: a new target starts an eased trip from where it is, the short way. */
+static void go(mote_t *m, int deg, uint32_t now, bool jump)
+{
+    int32_t to = wrap(deg * 1000);
+    if (jump || deg != m->target) {
+        bool same = deg == m->target;
+        m->target = (int16_t)deg;
+        m->from = m->pos;
+        m->to = to;
+        m->t0 = now;
+        int32_t d = jump ? 0 : short_way(m->pos, to);
+        m->dur = MOTE_TRAVEL_MS + (uint32_t)(abs((int)d) / 1000) * MOTE_TRAVEL_MS_DEG;
+        m->travelling = d != 0;
+        if (!m->travelling) {
+            m->pos = to;
+            if (!same || !m->arrived) m->arrive_ms = now;
+            m->arrived = true;
+        } else {
+            m->arrived = false;
+        }
+    }
+    if (!m->travelling) return;
+    uint32_t t = now - m->t0;
+    if (t >= m->dur) {
+        m->pos = m->to;
+        m->travelling = false;
+        m->arrived = true;
+        m->arrive_ms = now;
+        return;
+    }
+    float k = smooth(frac(t, m->dur));
+    m->pos = wrap(m->from + (int32_t)lroundf((float)short_way(m->from, m->to) * k));
+}
+
+static uint8_t base_lum(const mote_out_t *o) { return o->night ? MOTE_LUM_NIGHT : MOTE_LUM; }
+
+/* The halo's brightness for the night and a tired plan. */
+static void dim_halo(const mote_in_t *in, mote_out_t *o)
+{
+    if (o->night) o->look.halo_pct = (uint8_t)(o->look.halo_pct * MOTE_NIGHT_HALO / 100);
+    if (in->usage != 255 && in->usage >= MOTE_TIRED_PCT) {
+        o->look.halo_pct = (uint8_t)(o->look.halo_pct * MOTE_TIRED_HALO / 100);
+    }
+}
+
+/* The cheer's loop and flare, or the loop off the track; false once it is over. */
+static bool effect(mote_t *m, const mote_in_t *in, uint32_t now, mote_out_t *o)
 {
     uint32_t t = now - m->fx_ms;
-    if (m->fx == MOTE_CHEER && t < MOTE_CHEER_MS + MOTE_CHEER_HOLD_MS) {
+    uint8_t lum = base_lum(o);
+    if (m->fx == MOTE_CHEER && t < MOTE_CHEER_MS + MOTE_FLARE_MS) {
         o->mode = MOTE_CHEER;
         if (t < MOTE_CHEER_MS) {
-            o->deg = whole_deg(m->pos + (int32_t)(t * CHEER_MDPS));
-            o->tail_deg = MOTE_CHEER_TAIL;
-        } else {
+            o->deg = whole_deg(m->pos + (int32_t)lroundf(smooth(frac(t, MOTE_CHEER_MS)) * FULL));
+            o->look = mote_look(100, lum, 1000);
+        } else { /* the flare: bright and wide, falling back over MOTE_FLARE_MS */
+            uint32_t f = MOTE_FLARE_MS - (t - MOTE_CHEER_MS);
             o->deg = whole_deg(m->pos);
-            o->size = MOTE_CHEER_PX;
+            o->look =
+                mote_look(100, (uint8_t)(lum + (MOTE_LUM_FLARE - lum) * f / MOTE_FLARE_MS), 1000);
+            o->look.halo_r = (uint8_t)(o->look.halo_r + MOTE_FLARE_PX * f / MOTE_FLARE_MS);
+            o->look.halo_pct = 100;
         }
         return true;
     }
     if (m->fx == MOTE_LOOP && t < MOTE_LOOP_MS) {
         o->mode = MOTE_LOOP;
         o->deg = whole_deg(m->pos);
-        o->tail_deg = 0;
+        o->look = mote_look(100, lum, 1000);
+        dim_halo(in, o);
         float a = (float)o->deg * 0.017453292f, ph = (float)t / (float)MOTE_LOOP_MS * 6.2831853f;
-        float in = 1.0f - cosf(ph), along = sinf(ph);
-        o->dx = (int8_t)lroundf((float)MOTE_LOOP_R * (along * cosf(a) - in * sinf(a)));
-        o->dy = (int8_t)lroundf((float)MOTE_LOOP_R * (along * sinf(a) + in * cosf(a)));
+        float inw = 1.0f - cosf(ph), along = sinf(ph);
+        o->dx = (int8_t)lroundf((float)MOTE_LOOP_R * (along * cosf(a) - inw * sinf(a)));
+        o->dy = (int8_t)lroundf((float)MOTE_LOOP_R * (along * sinf(a) + inw * cosf(a)));
         return true;
     }
-    if (m->fx != MOTE_GONE) { /* over: catch up from where it left off */
-        m->fx = MOTE_GONE;
-        m->locked = false;
-        m->since = now;
-    }
+    m->fx = MOTE_GONE;
     return false;
 }
 
-/* Where the light goes in its base mode, and how bright it is there. */
-static void move(mote_t *m, const mote_in_t *in, uint32_t now, uint32_t dt, mote_out_t *o)
+/* Its look in its base mode, and the sway beside an error. */
+static void settle_look(const mote_t *m, const mote_in_t *in, uint32_t now, mote_out_t *o)
 {
-    switch (m->base) {
-    case MOTE_HOVER: {
-        int32_t target = wrap((int32_t)in->error_deg * 1000);
-        int32_t at = target;
-        if (!m->locked && approach(&m->pos, target, MOTE_CATCH_DPS * (int32_t)dt)) {
-            m->locked = true;
-            m->since = now; /* the sway starts from the error, not mid-swing */
+    uint8_t lum = base_lum(o);
+    int32_t at = m->pos;
+    uint16_t breath = 0;
+    if (m->base == MOTE_HOVER) {
+        if (m->arrived && !in->reduced) {
+            uint32_t t = now - m->arrive_ms; /* the sway starts from the error, not mid-swing */
+            float s = sinf((float)(t % 1000u) * 0.0062831853f);
+            at += (int32_t)lroundf(s * (float)(MOTE_HOVER_SWAY * 1000));
+            if (t / MOTE_FLICKER_MS % 2) lum = (uint8_t)(lum * 60 / 100);
         }
-        if (!m->locked) {
-            at = m->pos;
-        } else if (!in->reduced) {
-            float s = sinf((float)((now - m->since) % 1000u) * 0.0062831853f);
-            at = target + (int32_t)lroundf(s * (float)(MOTE_HOVER_SWAY * 1000));
-            if ((now - m->since) / MOTE_FLICKER_MS % 2) o->lum = (uint8_t)(o->lum * 60 / 100);
-        }
+    } else if (m->base == MOTE_REST && now - m->idle_ms >= MOTE_EMBER_MS) {
+        o->mode = MOTE_EMBER;
+        o->look = mote_look(MOTE_EMBER_SCALE, MOTE_LUM_EMBER, 0);
+        o->look.halo_pct /= 2;
         o->deg = whole_deg(at);
         return;
+    } else if (!in->reduced) {
+        bool tired = in->usage != 255 && in->usage >= MOTE_TIRED_PCT;
+        breath = mote_breath(now, tired ? MOTE_BREATH_TIRED_MS : MOTE_BREATH_MS);
     }
-    case MOTE_LAP: {
-        int32_t target = in->reduced ? 0 : (int32_t)(in->minute_ms % 60000u) * 6;
-        if (m->locked && short_way(m->pos, target) <= 2000 && short_way(m->pos, target) >= -2000) {
-            m->pos = target;
-        } else {
-            if (m->locked) { /* the clock was set: catch up rather than jump */
-                m->locked = false;
-                m->since = now;
-            }
-            uint32_t ramp = now - m->since > 1000 ? 1000 : now - m->since;
-            int32_t dps = MOTE_CALM_DPS + (MOTE_CATCH_DPS - MOTE_CALM_DPS) * (int32_t)ramp / 1000;
-            m->locked = approach(&m->pos, target, dps * (int32_t)dt);
-        }
-        o->deg = whole_deg(m->pos);
-        return;
-    }
-    default: /* SETTLE, EMBER */
-        if (!m->locked) {
-            m->locked = approach(&m->pos, MOTE_SETTLE_DEG * 1000, MOTE_CALM_DPS * (int32_t)dt);
-        }
-        o->deg = whole_deg(m->pos);
-        if (now - m->idle_ms >= MOTE_EMBER_MS) {
-            o->mode = MOTE_EMBER;
-            o->lum = MOTE_LUM_EMBER;
-            o->size = MOTE_EMBER_PX;
-            o->tail_deg = 0;
-        } else if (m->locked && !in->reduced) {
-            uint32_t period = o->amber ? MOTE_PULSE_NIGHT_MS : MOTE_PULSE_MS;
-            o->lum = (uint8_t)(o->lum * (70 + 10 * tri(now - m->idle_ms, period, 4)) / 100);
-        }
-        return;
-    }
+    o->look = mote_look(100, lum, breath);
+    dim_halo(in, o);
+    o->deg = whole_deg(at);
+}
+
+static int target_of(const mote_t *m, const mote_in_t *in, uint32_t now)
+{
+    if (m->base == MOTE_HOVER) return ((int)in->error_deg % 360 + 360) % 360;
+    if (m->base == MOTE_VISIT) return visit(m, in, now);
+    return MOTE_REST_DEG;
 }
 
 mote_out_t mote_step(mote_t *m, const mote_in_t *in, uint32_t now_ms)
 {
     mote_out_t o = {0};
-    uint32_t dt = m->shown ? now_ms - m->last_ms : 0;
-    if (dt > 1000) dt = 1000;
-    m->last_ms = now_ms;
     if (!m->synced || !in->face || !in->may) {
         /* gone: no exit animation (the request is the picture), and nothing saved for later */
         m->synced = true;
@@ -158,13 +212,12 @@ mote_out_t mote_step(mote_t *m, const mote_in_t *in, uint32_t now_ms)
             return o;
         }
     }
-    mote_mode_t base = in->errors ? MOTE_HOVER : in->working ? MOTE_LAP : MOTE_SETTLE;
+    mote_mode_t base = in->errors ? MOTE_HOVER : in->n_work ? MOTE_VISIT : MOTE_REST;
     bool appear = !m->shown;
     if (appear || base != m->base) {
         m->base = base;
-        m->since = now_ms;
-        m->locked = false;
-        if (base == MOTE_SETTLE) m->idle_ms = now_ms;
+        m->target = -1;
+        if (base == MOTE_REST) m->idle_ms = now_ms;
     }
     if (in->cheers != m->cheers) {
         m->cheers = in->cheers;
@@ -181,19 +234,13 @@ mote_out_t mote_step(mote_t *m, const mote_in_t *in, uint32_t now_ms)
         }
     }
     m->shown = true;
+    /* it arrives with the face, at its place; with reduced motion it never travels */
+    go(m, target_of(m, in, now_ms), now_ms, appear || in->reduced);
 
-    o.amber = in->hour != 255 && (in->hour >= 23 || in->hour < 6);
-    o.lum = o.amber ? MOTE_LUM_NIGHT : MOTE_LUM;
-    o.size = MOTE_HEAD_PX;
-    o.tail_deg = tail_of(in);
+    o.night = in->hour != 255 && (in->hour >= 23 || in->hour < 6);
+    o.rgb = MOTE_RGB;
     o.mode = base;
-    if (appear || in->reduced) { /* it arrives with the face, at its place: nothing to catch up */
-        m->pos = base == MOTE_HOVER ? wrap((int32_t)in->error_deg * 1000)
-                 : base == MOTE_LAP ? (in->reduced ? 0 : (int32_t)(in->minute_ms % 60000u) * 6)
-                                    : MOTE_SETTLE_DEG * 1000;
-        m->locked = true;
-    }
-    if (!effect(m, now_ms, &o)) move(m, in, now_ms, dt, &o);
+    if (!effect(m, in, now_ms, &o)) settle_look(m, in, now_ms, &o);
     m->mode = o.mode;
     return o;
 }

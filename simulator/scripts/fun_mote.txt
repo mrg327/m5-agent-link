@@ -1,45 +1,56 @@
-# The Mote (issue 20261126-59e0, GLYPHS.md §3.14): a light on its own track (r 216) of the idle face, on the
-# dock, with the Mote switched on (pref fun 0x3db). It laps as a seconds hand while anything works, settles at
-# 6 o'clock when nothing runs and becomes an ember after five minutes; a big finish with green tests cheers
-# (three laps) and counts the day; plan use over 80 % halves its tail; at night it is amber. It leaves at once
-# on battery and when a request arrives. The log carries each mode ("ev":"mote"); the test asserts their order.
+# The Mote (issue 20261126-59e0, GLYPHS.md §3.14): a firefly on its own track (r 175) inside the idle face's
+# ring, on the dock, with the Mote switched on (pref fun 0x3db). It visits each working session's arc in turn
+# (8 s by each, an eased trip between), rests at 12 o'clock when nothing runs and becomes an ember after five
+# minutes; a big finish with green tests cheers (once round the track and a flare) and counts the day; plan use
+# over 80 % slows and dims its breath; at night it is a dimmer warm white. It leaves at once on battery and when
+# a request arrives. The log carries each mode ("ev":"mote"); the test asserts their order.
 connect
 rtc 1800000000
 rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
 pref fun 0x3db
 session 16 work webapp feat/login Running the test suite
 session 2 work api main Indexing the repository
+# the idle face comes up at about 29.2 s: the firefly appears by the first working session (3 o'clock)
 wait 31500
-# the ambient face: a lap, one degree every 167 ms
-shot fun_mote_lap_a.png
-wait 15000
-shot fun_mote_lap_b.png
-# the cost of a lap, with Living marks off so the ambient sigil holds still: the head and the tail's joints,
-# a degree at a time, about 9 k px in 2 s (0 without the Mote)
+shot fun_mote_visit_a.png
+# the cost of lingering, with Living marks off so the ambient sigil holds still: the halo breathes a level at
+# a time and repaints the orb's box (about 4-5 k px): about 53 k px a 3.6 s breath (0 without the Mote)
 pref fun 0x3da
 px_reset
-wait 2000
-expect_px_max 10000
+wait 3600
+expect_px_max 70000
+# after 8 s it crosses to the second (9 o'clock), the short way, eased: a 4.4 s trip that moves the box each
+# tick, about 485 k px in all (two full frames' worth, spread over the trip)
+wait 2100
+px_reset
+wait 2200
+shot fun_mote_travel.png
+wait 2300
+expect_px_max 550000
 pref fun 0x3db
-# a big finish: green tests, 15 minutes, six files; the light cheers (three laps in 1.8 s)
+wait 1000
+shot fun_mote_visit_b.png
+# a big finish: green tests, 15 minutes, six files; the firefly cheers (once round the track, then a flare)
 session 16 done webapp feat/login Bash cargo test --workspace
 done 16 6 220/31 pass 900
 wait 600
 shot fun_mote_cheer.png
+wait 650
+shot fun_mote_flare.png
 wait 3000
-# nothing runs: it travels the short way to 6 o'clock, at 6 degrees a second
+# nothing runs: it drifts the short way to 12 o'clock, under the ring's gap, and breathes there
 session 2 idle api main
-wait 32000
-shot fun_mote_settle.png
+wait 6000
+shot fun_mote_rest.png
 skip 300000
 wait 600
 shot fun_mote_ember.png
-# plan use over 80 %: tired, the tail halves (the ember has none: a turn starts again)
+# plan use over 80 %: tired, a slower, dimmer breath (a turn starts again: it visits)
 usage 85 3600 - 20 86400
 session 2 work api main Indexing the repository
-wait 4000
+wait 6000
 shot fun_mote_tired.png
-# 23:30: amber and dimmer; a lap is still one a minute (it is a clock)
+# 23:30: the same warm white, dimmer (no state colour)
 rtc 1794036600
 wait 1000
 shot fun_mote_night.png

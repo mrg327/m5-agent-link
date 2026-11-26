@@ -1527,7 +1527,7 @@
     {
       "id": "attention",
       "title": "Deck · a request is waiting",
-      "source": "firmware/components/core/src/ui_home.c:392"
+      "source": "firmware/components/core/src/ui_home.c:407"
     },
     {
       "id": "agent",
@@ -6368,7 +6368,7 @@
     "ring.summary_y_px": "firmware/components/core/src/ui_home_card.c:45",
     "ring.time_dots_r_px": "firmware/components/core/src/ui_home_card.c:41",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:50",
-    "screens": "firmware/components/core/src/ui_home.c:392",
+    "screens": "firmware/components/core/src/ui_home.c:407",
     "screens.agent": "firmware/components/core/src/ui_agent.c:605",
     "screens.ask": "firmware/components/core/src/ui_ask.c:1547",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:408",

@@ -15,7 +15,7 @@ enum {
     FUN_TEMPER = 1u << 0,    /**< Living marks: the sigil's temperament and the motion grammar */
     FUN_CELEBRATE = 1u << 1, /**< right-sized celebrations (off: today's single finish) */
     FUN_MOTIF = 1u << 2,     /**< a three-note motif per project under the done cue */
-    FUN_MOTE = 1u << 3,      /**< the Mote: a light on the idle ring */
+    FUN_MOTE = 1u << 3,      /**< the Mote: a firefly inside the idle ring */
     FUN_HELLO = 1u << 4,     /**< morning hello and evening close */
     FUN_REPLAY = 1u << 5,    /**< while you were away: the last hour replayed */
     FUN_EGGS = 1u << 6,      /**< a few rare easter eggs */
