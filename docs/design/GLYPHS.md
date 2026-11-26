@@ -361,6 +361,12 @@ experiment: the Replay switch (`FUN_REPLAY`, bit 5) in LABS > Personality, off b
   `ui_home_tick()` makes the one call (`ui_replay_tick`). Cost (simulator, `fun_replay.txt`): about 144 k px
   over 1.1 s of a replay in which the one capsule (a full ring) changes once; under 2 k px with the switch
   off. Whether 100 ms a step reads well, and the frame time, are for the device.
+- **The Mote on the hand** (issue 20261126-9fe3): with the Mote on as well (`FUN_MOTE`, §3.14) and the gate
+  giving it a one-shot (`persona_allow(PF_MOTE)`), the hand's tip is the Mote at the tucked size (core 6 px,
+  halo 16 px across), lit and not breathing. It moves with the arc, 18° a step, fades with it, and leaves when
+  the replay ends, however it ends. The arc is drawn as before, so the orb is never the only sign. It adds the
+  orb's box, old and new, each step: about 148 k px for `mote_replay.txt` against 144 k px. With the Mote off
+  the replay is unchanged, frame for frame (`mote_replay_off.txt`).
 
 ### 3.14 The Mote: `mote.c`, `ui_mote.c`, `ui_orb.c` (issue 20261126-59e0)
 
@@ -414,7 +420,20 @@ seconds hand at r 216 and settled at 6 o'clock.
   `mote_look(scale_pct, lum, breath_pm)` (pure, `mote.h`) gives the core and halo at any size,
   brightness and breath; `mote_breath(t_ms, period_ms)` gives the breath; `ui_orb_draw(layer, x, y,
   &look, MOTE_RGB)` (`ui_orb.h`) paints it from any draw event, and `ui_orb_area(x, y, &look, &box)` is the
-  box to invalidate round its old and new places. No other screen uses it yet.
+  box to invalidate round its old and new places.
+- **Riding an arc** (`ui_mote_ride.c`, issue 20261126-9fe3). On another screen's arc the Mote is the profile's
+  tucked size (core 6 px, halo 16 px across), lit, no breath, in its own object the size of the orb's box, so a
+  move repaints that box, old and new, and nothing else. It sits on the arc's head and moves only when the arc
+  does; the arc is always drawn, so the orb is never the only sign of the progress. **Update**: on the
+  Updating overlay's progress arc (r 112) from 12 o'clock at 0 %, while the gate gives a pose (`PA_POSE`; a
+  request keeps it, still); while the transfer waits for the computer it dims to the ember's level (25 %) on the
+  grey arc and holds still; on success the ring closes green and it flares once at 12 o'clock (to 160 % over
+  120 ms and back over 480 ms, a one-shot: with reduced motion or a request it just stays lit) before the
+  restart. A failed or cancelled update closes the overlay at once (the toast says why), and the orb goes with
+  it. A step costs about 2.8 k px against 2.7 k px without it (`mote_ota.txt`, shots `mote_ota_20`, `_51`,
+  `_waiting`, `_flare`, `_restarting`; `"ev":"mote_ride"` at the flare). **Replay**: the hour hand's tip
+  (§3.13). With the Mote off both screens are as before, frame for frame and redraw for redraw
+  (`mote_ota_off.txt`, `mote_replay_off.txt`).
 - **Cost** (simulator, `fun_mote.txt`). Each change repaints the orb's box, old and new (about 4–5 k px each,
   joined where they overlap); nothing else on the face is touched. Lingering, the breath repaints it a level at
   a time: about 53 k px a 3.6 s breath (about 15 k px a second, like a breathing sigil). A trip moves the box

@@ -1,0 +1,40 @@
+# mote_replay.txt with the Mote off (pref fun 0x3f3, the Replay alone): the replay is as it was before the Mote
+# rode its hour hand (issue 20261126-9fe3): the same frames and the same cost as fun_replay.txt (about 144 k px),
+# and its start says "mote":0. The plain arc tip shows where the orb would be.
+connect
+rtc 1800000000
+rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+pref fun 0x3f3
+session 16 idle webapp feat/login Waiting for the next task
+wait 400
+expect_screen ring
+# 40 minutes idle, dark after a minute (run with --idle-off 61), then a finish and 20 more minutes away
+wait 2400000
+session 16 done webapp feat/login Tests pass
+wait 1200000
+tap 233 420
+wait 150
+# an hour ago: the arc has begun at 12 o'clock, a plain tip
+shot mote_replay_off_a.png
+expect_px 420 125 ffffff
+expect_px 233 17 ffffff
+# the cost: as fun_replay.txt, about 144 k px
+px_reset
+wait 1100
+expect_px_max 160000
+shot mote_replay_off_b.png
+expect_px 17 233 ffffff
+wait 1200
+# over: now, and the arc gone
+shot mote_replay_off_c.png
+expect_px 233 8 009e73
+expect_px 233 17 000000
+# away again, and a key ends the next replay at once
+wait 1100000
+tap 233 420
+wait 150
+btn B
+wait 100
+shot mote_replay_off_ended.png
+expect_px 233 17 000000
+quit

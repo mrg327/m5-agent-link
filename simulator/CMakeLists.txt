@@ -898,6 +898,24 @@ sim_script_test(sim_ota_rollback_confirm ota_rollback_confirm.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_rollback|\"ev\":\"restart\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"ota_unconfirmed\".*\"ev\":\"ota_confirm\".*\"ev\":\"ota_confirmed\"|\"ev\":\"ota_unconfirmed\".*\"ev\":\"ota_confirm\"")
 set_tests_properties(sim_ota_rollback_confirm PROPERTIES ENVIRONMENT "AGENTLINK_SIM_UNCONFIRMED=1")
+# The Mote rides the update arc and the replay's hour hand (issue 20261126-9fe3): on, it is on the head and
+# flares once on success; off, both screens are as before (the same frames and redraw costs).
+sim_script_test(sim_mote_ota mote_ota.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"mote_ride\",\"at\":\"ota\",\"act\":\"flare\",\"shown\":1.*\"ev\":\"restart\"")
+sim_script_test(sim_mote_ota_off mote_ota_off.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|mote_ride"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_done\".*\"ev\":\"restart\"")
+foreach(name mote_replay mote_replay_off)
+    add_test(NAME sim_${name}
+             COMMAND agentlink_sim --headless --no-ws --idle-off 61 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/${name}.txt)
+endforeach()
+set_tests_properties(sim_mote_replay PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"mote\":0"
+                     PASS_REGULAR_EXPRESSION "\"act\":\"start\",\"n\":1,\"changes\":1,\"mote\":1.*\"why\":\"done\".*\"why\":\"input\"")
+set_tests_properties(sim_mote_replay_off PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"mote\":1"
+                     PASS_REGULAR_EXPRESSION "\"act\":\"start\",\"n\":1,\"changes\":1,\"mote\":0.*\"why\":\"done\".*\"why\":\"input\"")
 sim_script_test(sim_ota_rollback_timeout ota_rollback_timeout.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_confirm\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"ota_rollback\".*\"ev\":\"restart\"")

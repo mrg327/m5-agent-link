@@ -522,6 +522,7 @@ void ota_cancel(uint32_t now_ms)
 
 void ota_tick(uint32_t now_ms)
 {
+    ui_ota_tick(now_ms);
     apply_step(now_ms);
     if (s.st == OTA_RECV && now_ms - s.last_ms >= OTA_IDLE_TIMEOUT_MS)
         stop("timeout", "Update timed out", ICON_UPDATE ICON_WAIT, true);

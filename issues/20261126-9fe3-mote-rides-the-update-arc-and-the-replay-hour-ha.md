@@ -30,3 +30,4 @@ Owner 2026-11-26: the Mote becomes the watch's mascot (design: research notes ma
 
 - 2026-11-26T18:50:23Z · claude-code/cloud@cloud · linux-x86_64 · eec6958: filed
 - 2026-11-26T18:50:23Z · claude-code/cloud@cloud · linux-x86_64 · eec6958: claimed
+- 2026-11-26T19:18:04Z · claude-code@cloud · linux-x86_64 · abcee00+dirty: Mote rides the update arc (ui_ota.c) and the replay hand (ui_replay.c) via new ui_mote_ride.c; FUN_MOTE off verified frame- and redraw-identical to abcee00 (14 shots, 4 px budgets)

@@ -1,0 +1,56 @@
+# The Mote rides the update arc (issue 20261126-9fe3, GLYPHS.md §3.14): with the Mote on (pref fun 0x3db),
+# a small orb (the tucked size) sits on the head of the Updating overlay's progress arc and moves only when the
+# progress does; while the link is down it dims and holds still on the grey arc; on success it flares once
+# before the restart. The arc is drawn as before, so the orb is never the only sign of the progress.
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+pref fun 0x3db
+wait 300
+fw_image 20000
+fw_begin 1.2.3
+wait 300
+expect_screen ota
+# 0 %: the orb waits at 12 o'clock, at the arc's start (r 112)
+expect_px 233 121 ffe2b8
+fw_send 0 2048 2
+wait 300
+# 20 %: on the head at 72 degrees
+shot mote_ota_20.png
+expect_px 339 198 ffe2b8
+# the cost of a step: the arc's new stretch and the orb's box, old and new (21 x 21 px each, mostly inside the
+# arc's own box): about 2.8 k px, against 2.7 k px with the Mote off (mote_ota_off.txt)
+px_reset
+fw_send 4096 2048
+wait 300
+expect_px_max 4000
+fw_send 6144 2048 2
+wait 300
+# 51 %: the head past 6 o'clock
+expect_label 51%
+shot mote_ota_51.png
+expect_px 227 345 ffe2b8
+# the link drops: the arc greys, the orb dims to the ember's level and holds still
+disconnect
+wait 300
+expect_label Waiting for the computer…
+shot mote_ota_waiting.png
+expect_px 227 345 403830
+px_reset
+wait 2000
+expect_px_max 0
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 300
+fw_begin 1.2.3
+wait 200
+expect_px 227 345 ffe2b8
+fw_send 10240 2048 5
+wait 100
+# done: the ring closes green and the orb flares once at 12 o'clock (0.6 s), then the restart
+expect_label Restarting…
+shot mote_ota_flare.png
+wait 450
+shot mote_ota_restarting.png
+expect_px 233 121 ffe2b8
+wait 1500
+expect_screen ring

@@ -1,0 +1,45 @@
+# mote_ota.txt with the Mote off (pref fun 0x3d3, the default plus the Replay): the Updating overlay is as it
+# was before the Mote rode it (issue 20261126-9fe3). The arc's head shows the arc's own colour, a step repaints
+# only the arc's new stretch, a stalled transfer repaints nothing, and the log has no "mote_ride".
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+pref fun 0x3d3
+wait 300
+fw_image 20000
+fw_begin 1.2.3
+wait 300
+expect_screen ota
+expect_px 233 121 292c29
+fw_send 0 2048 2
+wait 300
+shot mote_ota_off_20.png
+expect_px 339 198 52b6ef
+# a step repaints the arc's new stretch only: about 2.7 k px, as before
+px_reset
+fw_send 4096 2048
+wait 300
+expect_px_max 3000
+fw_send 6144 2048 2
+wait 300
+expect_label 51%
+shot mote_ota_off_51.png
+disconnect
+wait 300
+expect_label Waiting for the computer…
+shot mote_ota_off_waiting.png
+px_reset
+wait 2000
+expect_px_max 0
+connect
+rx a400020101020103a60082000601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+wait 300
+fw_begin 1.2.3
+wait 200
+fw_send 10240 2048 5
+wait 100
+expect_label Restarting…
+shot mote_ota_off_flare.png
+wait 450
+shot mote_ota_off_restarting.png
+wait 1500
+expect_screen ring
