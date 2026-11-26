@@ -362,6 +362,42 @@ experiment: the Replay switch (`FUN_REPLAY`, bit 5) in LABS > Personality, off b
   over 1.1 s of a replay in which the one capsule (a full ring) changes once; under 2 k px with the switch
   off. Whether 100 ms a step reads well, and the frame time, are for the device.
 
+### 3.14 The Mote: `mote.c`, `ui_mote.c` (issue 20261126-59e0)
+
+A faceless point of light on its own track of the idle (ambient) face that mirrors the fleet. It never asks,
+buzzes or sounds. Off by default: LABS > Personality, the dot (`FUN_MOTE`, bit 3).
+
+- **Look.** A head of 8 px and a tail of three steps (100, 55, 25 % of the head) 4 px wide, on the track at
+  r 216, between the session capsules (r 222–228) and the pips (r 205). Warm white `0xFFE2B8` at the ambient
+  45 %; from 23:00 to 06:00 amber `0xE69F00` at 30 %. The tail is 14° + 6° a level (14–56°), halved (8° at
+  least) while the 5-hour plan use is 80 % or more. It drifts with the ambient face's 1 px burn-in guard.
+- **Modes**, highest first: gone (not allowed, or the idle face is not up with its clock); hover at the first
+  error capsule (±3° at 1 Hz, two brightness levels at 600 ms); cheer, three laps in 1.8 s with a 60° tail
+  then one 12 px frame, on a big finish (not an error, tests not failed, and 10 min or more, 5 files or more,
+  or 200 lines or more: the medium and large tiers of the celebrations brief); lap while anything works, its
+  angle the seconds × 6, a seconds hand; settle at 6 o'clock when nothing runs, by the short way at 6°/s, then
+  a pulse of 4 levels every 4 s (6 s at night); an ember after five minutes settled, 4 px at 25 %, still.
+  Nothing pops: entering a lap, reaching an error or a clock that was set catches up at up to 24°/s; only the
+  cheer and the centuries egg (§3.15) move faster.
+- **Rules.** It exists only where the gate allows a loop (`persona_allow(PF_MOTE)` with `PA_LOOP`: the dock,
+  the display lit, nothing waiting for you) and only on the idle face. It leaves the moment anything needs you,
+  with no exit animation: the request is the picture. With reduced motion it is a still light at its mode's
+  resting place (a lap rests at 12, seconds not shown), tail kept, no cheer. A cheer that happens while it is
+  gone is not saved for later. Today the deck does not go ambient while a session is in error (an error needs
+  you there), so hover is drawn only if that changes; `test_mote.c` covers it.
+- **Growth.** The level is the number of local days on which a turn finished with its tests green: the done
+  summary's `tp` (DONE-SUMMARY.md) is known and passed, on a session the watch saw finish (the summary may
+  arrive with the finish or just after). Thresholds 1, 3, 7, 14, 30, 60, 120 days give levels 1–7. One stored
+  word, `prefs_mote_days()` (NVS `mote_days`: bits 0–15 the count, 16–31 the last day counted), written at
+  most once a day, counted whether or not the Mote is on. It never shrinks: a gap, or a clock set back, counts
+  nothing and takes nothing away. Approvals, tokens and speed are not inputs.
+- **Cost** (simulator, `fun_mote.txt`). A lap moves a degree (3.8 px) every 167 ms and repaints the boxes round
+  the head and the tail's three joints, old and new: about 9 k px in 2 s. A change of look (mode, brightness,
+  tail) repaints the light in 10° chunks of its track; the cheer repaints its 60° tail each frame for 1.8 s.
+- **Sim.** `fun_mote.txt` (shots `fun_mote_lap_a`, `_lap_b`, `_cheer`, `_settle`, `_ember`, `_tired`,
+  `_night`); the log has `"ev":"mote"` at each mode and `"ev":"mote_day"` when a day counts. The simulator's RTC
+  now runs on the script's virtual clock, so a lap moves in a headless run.
+
 ## 4. Reference screen: HOME
 
 Built with the primitives, as the model for the rest (`ui_home_card.c`; renders:

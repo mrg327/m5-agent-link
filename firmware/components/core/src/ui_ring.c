@@ -25,6 +25,13 @@ void ring_seg_span(int n, int i, int *a0, int *a1)
     *a1 = (i + 1) * seg / 100 - inset;
 }
 
+int ring_slot_mid_deg(int n, int i)
+{
+    int a0, a1;
+    ring_seg_span(n, i, &a0, &a1);
+    return (a0 + a1) / 2 % 360;
+}
+
 void ring_comet_span(int a0, int a1, int lvl, int *c0, int *c1)
 {
     int span = a1 - a0, len = span / 2 < COMET_DEG ? span / 2 : COMET_DEG;

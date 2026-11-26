@@ -67,5 +67,8 @@ int ring_get(lv_obj_t *ring, ring_seg_t *out, int max);
 /* Invalidates, on object o (full screen at 0, 0), the band r_in..r_out between degrees a0 and a1
  * clockwise from 12 o'clock, in small chunks: for an overlay on the ring. */
 void ring_invalidate_arc(lv_obj_t *o, int a0, int a1, int r_in, int r_out);
+/* The centre of segment i of n, degrees clockwise from 12 o'clock (what the deck's i-th slot is
+ * drawn round). */
+int ring_slot_mid_deg(int n, int i);
 /* Segment index under a screen point, or -1 when it is in the centre or off the ring. */
 int ring_hit(lv_obj_t *ring, int x, int y);

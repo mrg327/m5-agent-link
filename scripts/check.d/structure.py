@@ -180,6 +180,7 @@ TIERS = {
         "persona",
         "temper",
         "replay",
+        "mote",
     },
     "leaf": {"debug.h", "ui_icons"},
 }

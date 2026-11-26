@@ -37,6 +37,9 @@ document wins. Finding numbers (H1, R1, X2 …) refer to the profile.
    a snoozed mark droops, and the mark that wants you leans toward the hero glyph and holds still.
    Nothing loops while anything needs you, on battery, or with reduced motion; fun never starts a
    buzz or a sound (§3.12 there). Every fun feature asks `persona_allow()` first.
+9. **The Mote** (2026-11-26, issue 59e0), off by default: a silent light on its own track of the idle face
+   on the dock, a seconds hand while agents work, resting at 6 o'clock when nothing runs, three laps on a big
+   finish ([GLYPHS.md](GLYPHS.md) §3.13). It is gone the moment anything needs you.
 
 Safety invariants, unchanged and not negotiable in any later reskin: the approval card shows the
 request text; a tap never approves or denies; an approve-class commit is a 1.2 s hold bound to the

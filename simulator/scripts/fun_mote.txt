@@ -1,0 +1,60 @@
+# The Mote (issue 20261126-59e0, GLYPHS.md §3.13): a light on its own track (r 216) of the idle face, on the
+# dock, with the Mote switched on (pref fun 0x3db). It laps as a seconds hand while anything works, settles at
+# 6 o'clock when nothing runs and becomes an ember after five minutes; a big finish with green tests cheers
+# (three laps) and counts the day; plan use over 80 % halves its tail; at night it is amber. It leaves at once
+# on battery and when a request arrives. The log carries each mode ("ev":"mote"); the test asserts their order.
+connect
+rtc 1800000000
+rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+pref fun 0x3db
+session 16 work webapp feat/login Running the test suite
+session 2 work api main Indexing the repository
+wait 31500
+# the ambient face: a lap, one degree every 167 ms
+shot fun_mote_lap_a.png
+wait 15000
+shot fun_mote_lap_b.png
+# the cost of a lap, with Living marks off so the ambient sigil holds still: the head and the tail's joints,
+# a degree at a time, about 9 k px in 2 s (0 without the Mote)
+pref fun 0x3da
+px_reset
+wait 2000
+expect_px_max 10000
+pref fun 0x3db
+# a big finish: green tests, 15 minutes, six files; the light cheers (three laps in 1.8 s)
+session 16 done webapp feat/login Bash cargo test --workspace
+done 16 6 220/31 pass 900
+wait 600
+shot fun_mote_cheer.png
+wait 3000
+# nothing runs: it travels the short way to 6 o'clock, at 6 degrees a second
+session 2 idle api main
+wait 32000
+shot fun_mote_settle.png
+skip 300000
+wait 600
+shot fun_mote_ember.png
+# plan use over 80 %: tired, the tail halves (the ember has none: a turn starts again)
+usage 85 3600 - 20 86400
+session 2 work api main Indexing the repository
+wait 4000
+shot fun_mote_tired.png
+# 23:30: amber and dimmer; a lap is still one a minute (it is a clock)
+rtc 1794036600
+wait 1000
+shot fun_mote_night.png
+# on battery: gone, and the face holds still (Living marks off: nothing else moves on it)
+pref fun 0x3da
+battery 60
+wait 300
+px_reset
+wait 2000
+expect_px_max 0
+battery 80 chg
+pref fun 0x3db
+wait 300
+# a request: gone in the same step, with no exit animation; the request takes the screen
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen attention
+quit

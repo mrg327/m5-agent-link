@@ -110,6 +110,11 @@ add_test(NAME temper_poses COMMAND test_temper)
 add_executable(test_replay tests/test_replay.c ${FW}/core/src/replay.c)
 target_include_directories(test_replay PRIVATE ${FW}/core/src)
 add_test(NAME replay_hour COMMAND test_replay)
+# The Mote (issue 20261126-59e0): the light's modes, speeds, tail, night, level by green days.
+add_executable(test_mote tests/test_mote.c ${FW}/core/src/mote.c)
+target_include_directories(test_mote PRIVATE ${FW}/core/src)
+target_link_libraries(test_mote PRIVATE m)
+add_test(NAME mote_modes COMMAND test_mote)
 
 add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
 target_include_directories(test_ring PRIVATE ${FW}/core/src)
@@ -297,6 +302,11 @@ set_tests_properties(sim_fun_replay_blocked PROPERTIES WORKING_DIRECTORY ${CMAKE
                      FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"act\":\"start\""
                      PASS_REGULAR_EXPRESSION "\"why\":\"gate\".*\"why\":\"gate\".*\"why\":\"still\"")
 sim_script_test(sim_labs_fun labs_fun.txt)
+# The Mote (issue 20261126-59e0): lap, a big green finish (the day counted, a cheer), settle, ember, tired,
+# night; gone on battery and at once for a request.
+sim_script_test(sim_fun_mote fun_mote.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"mode\":\"lap\".*\"mote_day\",\"days\":1.*\"mode\":\"cheer\".*\"mode\":\"settle\".*\"mode\":\"ember\".*\"mode\":\"gone\".*\"mode\":\"lap\".*\"mode\":\"gone\"")
 # UI-V2 Phase 3: ASK. Question options reply by tap; grants and Deny are holds; a tap never approves;
 # a rejected answer restores the options; a hold is bound to its request id.
 sim_script_test(sim_ask_reply ask_reply.txt

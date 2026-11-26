@@ -22,3 +22,7 @@ void prefs_set_orient(orient_mode_t m);
  * every feature reads it through persona_allow(), never on its own. */
 uint32_t prefs_fun(void);
 void prefs_set_fun(uint32_t word);
+/* The Mote's green days (mote.h mote_note_day: bits 0-15 the count, 16-31 the last day counted);
+ * 0 until the first. Written at most once a day. */
+uint32_t prefs_mote_days(void);
+void prefs_set_mote_days(uint32_t word);

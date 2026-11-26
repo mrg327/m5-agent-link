@@ -10,6 +10,7 @@
 #include "nag.h"
 #include "ui_home_internal.h"
 #include "ui_replay.h"
+#include "ui_mote.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
 
@@ -329,6 +330,16 @@ static void nag_tick(uint32_t now)
     if (level) g_ui_actions->nag(rid, level);
 }
 
+/* Where the Mote hovers: the centre of the first slot in error, or -1. */
+static int error_deg(void)
+{
+    for (int i = 0; i < s_n; i++) {
+        const session_t *s = model_find(s_slots[i].sid);
+        if (s && s->state == SESS_ERROR) return ring_slot_mid_deg(s_n, i);
+    }
+    return -1;
+}
+
 void ui_home_tick(uint32_t now)
 {
     s_now = now;
@@ -352,6 +363,7 @@ void ui_home_tick(uint32_t now)
         ui_home_card_tick();
     }
     if (ui_mode() == MODE_HOME && !s_ambient) ui_graph_strip_tick(now);
+    ui_mote_tick(now, s_ambient && ui_mode() == MODE_HOME, error_deg());
 }
 
 bool ui_home_ambient(void) { return s_ambient; }
@@ -394,6 +406,7 @@ lv_obj_t *ui_home_init(void)
     lv_obj_set_size(s_centre, UI_SIZE, UI_SIZE);
     lv_obj_remove_flag(s_centre, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     ui_home_card_create(s_centre);
+    ui_mote_create(s_centre); /* over the card, and drifting with it */
     ui_home_animations_changed();
     return s_root;
 }
