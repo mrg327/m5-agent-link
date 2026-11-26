@@ -232,14 +232,14 @@ void hal_debug_line(const char *json)
 
 void sim_log(const char *ev, const char *fmt, ...)
 {
-    char body[200] = "";
+    char body[320] = ""; /* the frames report is about 250 */
     if (fmt) {
         va_list ap;
         va_start(ap, fmt);
         vsnprintf(body, sizeof body, fmt, ap);
         va_end(ap);
     }
-    char line[300];
+    char line[420];
     snprintf(line, sizeof line, "{\"ts_us\":%llu,\"cat\":\"sim\",\"ev\":\"%s\"%s%s}",
              (unsigned long long)hal_time_us(), ev, body[0] ? "," : "", body);
     hal_debug_line(line);

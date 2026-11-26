@@ -90,7 +90,12 @@
  *   toy_seed N                      restart the decision toys' random source from N (ui_decide.h): repeatable throws
  *   px_reset | expect_px_max PX     redraw budget: pixels flushed since px_reset must stay within PX
  *                                   (the log line also reports core_step host CPU as cpu_us, not
- * asserted) */
+ *                                   asserted, and the per-frame figures of `frames`)
+ *   frames [all]                    log the frames since px_reset (BENCH.md §9): their count, the pixels
+ *                                   and areas per frame (p50, p95, max), the gap between frames, host CPU;
+ *                                   all: each frame too ("ev":"frame", t in ms since px_reset)
+ *   expect_frame_px_max PX [AREAS]  no frame since px_reset flushed more than PX pixels (or rendered more
+ *                                   than AREAS joined areas) */
 /* clang-format on */
 #include <stdio.h>
 #include <math.h>
@@ -145,6 +150,8 @@ typedef enum {
     E_DELTA,
     E_PX_RESET,
     E_EXPECT_PX_MAX,
+    E_FRAMES,
+    E_EXPECT_FRAME_PX_MAX,
     E_EXPECT_PX,
     E_MIC,
     E_TRANSCRIPT,
@@ -195,6 +202,7 @@ static size_t s_n, s_cap, s_next;
 static uint32_t s_t0;
 static bool s_started, s_failed;
 static uint32_t s_px0;
+static uint64_t s_px_t0_us;
 static uint64_t s_cpu0;
 
 bool sim_script_failed(void) { return s_failed; }
@@ -626,6 +634,20 @@ static bool parse_line(char *line, uint32_t *t)
         add(*t, E_PX_RESET, 0, 0, 0, NULL);
     } else if (!strcmp(cmd, "expect_px_max") && sscanf(rest, "%d", &a) == 1) {
         add(*t, E_EXPECT_PX_MAX, a, 0, 0, NULL);
+    } else if (!strcmp(cmd, "frames")) {
+        add(*t, E_FRAMES, !strcmp(arg, "all"), 0, 0, NULL);
+    } else if (!strcmp(cmd, "expect_frame_px_max") && arg[0]) {
+        /* expect_frame_px_max PX [AREAS] */
+        char *end = NULL;
+        long px = strtol(rest, &end, 10), areas = -1;
+        if (end == rest) return false;
+        while (*end == ' ') end++;
+        if (*end) {
+            char *num = end;
+            areas = strtol(num, &end, 10);
+            if (end == num || *end) return false;
+        }
+        add(*t, E_EXPECT_FRAME_PX_MAX, (int)px, (int)areas, 0, NULL);
     } else if (!strcmp(cmd, "expect_px") && arg[0]) {
         /* expect_px X Y RRGGBB: one pixel, about that colour */
         char *end = NULL;
@@ -1898,6 +1920,64 @@ static void run_clear(int rid, const char *spec)
     inject_env(&env, "clear");
 }
 
+/* The frames since px_reset (sim_frames, BENCH.md §9): p50 / p95 / max by nearest rank. */
+typedef struct {
+    size_t n;
+    uint32_t lost, window_ms, px_p50, px_p95, px_max, ar_p95, ar_max, strips_max, gap_p50, gap_max,
+        cpu_p95, cpu_max;
+} frame_stats_t;
+
+static int cmp_u32(const void *a, const void *b)
+{
+    uint32_t x = *(const uint32_t *)a, y = *(const uint32_t *)b;
+    return x < y ? -1 : x > y;
+}
+
+/* Sorts v and returns its pct-th percentile by nearest rank. */
+static uint32_t rank(uint32_t *v, size_t n, int pct)
+{
+    if (!n) return 0;
+    qsort(v, n, sizeof *v, cmp_u32);
+    size_t i = (n * (size_t)pct + 99) / 100;
+    return v[i ? i - 1 : 0];
+}
+
+static frame_stats_t frame_stats(void)
+{
+    static uint32_t v[8192];
+    frame_stats_t st = {0};
+    const sim_frame_t *f = sim_frames(&st.n, &st.lost);
+    st.window_ms = (uint32_t)((hal_time_us() - s_px_t0_us) / 1000);
+    size_t n = st.n < 8192 ? st.n : 8192;
+    for (size_t i = 0; i < n; i++) v[i] = f[i].px;
+    st.px_p50 = rank(v, n, 50);
+    st.px_p95 = rank(v, n, 95);
+    st.px_max = rank(v, n, 100);
+    for (size_t i = 0; i < n; i++) v[i] = f[i].areas;
+    st.ar_p95 = rank(v, n, 95);
+    st.ar_max = rank(v, n, 100);
+    for (size_t i = 0; i < n; i++) v[i] = f[i].strips;
+    st.strips_max = rank(v, n, 100);
+    for (size_t i = 0; i < n; i++) v[i] = f[i].cpu_us;
+    st.cpu_p95 = rank(v, n, 95);
+    st.cpu_max = rank(v, n, 100);
+    for (size_t i = 1; i < n; i++) v[i - 1] = f[i].t_ms - f[i - 1].t_ms;
+    st.gap_p50 = n > 1 ? rank(v, n - 1, 50) : 0;
+    st.gap_max = n > 1 ? rank(v, n - 1, 100) : 0;
+    return st;
+}
+
+static void log_frames(int max_px)
+{
+    frame_stats_t st = frame_stats();
+    sim_log("frames",
+            "\"frames\":%zu,\"window_ms\":%u,\"px_p50\":%u,\"px_p95\":%u,\"px_max\":%u,"
+            "\"areas_p95\":%u,\"areas_max\":%u,\"strips_max\":%u,\"gap_p50\":%u,"
+            "\"gap_max\":%u,\"cpu_p95\":%u,\"cpu_max\":%u,\"lost\":%u,\"max\":%d",
+            st.n, st.window_ms, st.px_p50, st.px_p95, st.px_max, st.ar_p95, st.ar_max,
+            st.strips_max, st.gap_p50, st.gap_max, st.cpu_p95, st.cpu_max, st.lost, max_px);
+}
+
 static void fail(const char *what, const char *want)
 {
     fprintf(stderr, "SCRIPT FAIL: %s '%s' (screen=%s)\n", what, want, core_screen_name());
@@ -1957,7 +2037,33 @@ static void run(const ev_t *e)
     case E_PX_RESET:
         s_px0 = core_px_flushed();
         s_cpu0 = sim_core_cpu_us();
+        s_px_t0_us = hal_time_us();
+        sim_frames_reset();
         break;
+    case E_FRAMES: {
+        size_t n;
+        const sim_frame_t *f = sim_frames(&n, NULL);
+        for (size_t i = 0; e->a && i < n; i++) {
+            sim_log("frame", "\"t\":%u,\"px\":%u,\"areas\":%u,\"strips\":%u,\"cpu_us\":%u",
+                    (unsigned)(f[i].t_ms - (uint32_t)(s_px_t0_us / 1000)), f[i].px, f[i].areas,
+                    f[i].strips, f[i].cpu_us);
+        }
+        log_frames(-1);
+        break;
+    }
+    case E_EXPECT_FRAME_PX_MAX: {
+        frame_stats_t st = frame_stats();
+        log_frames(e->a);
+        char buf[64];
+        if (st.px_max > (uint32_t)e->a) {
+            snprintf(buf, sizeof buf, "%u px in one frame", (unsigned)st.px_max);
+            fail("frame over budget", buf);
+        } else if (e->b >= 0 && st.ar_max > (uint32_t)e->b) {
+            snprintf(buf, sizeof buf, "%u areas in one frame", (unsigned)st.ar_max);
+            fail("frame over budget", buf);
+        }
+        break;
+    }
     case E_EXPECT_PX_MAX: {
         uint32_t px = core_px_flushed() - s_px0;
         sim_log("px", "\"flushed\":%u,\"max\":%d,\"cpu_us\":%llu", (unsigned)px, e->a,
@@ -1968,6 +2074,7 @@ static void run(const ev_t *e)
             snprintf(buf, sizeof buf, "%u px", (unsigned)px);
             fail("redraw over budget", buf);
         }
+        log_frames(-1);
         break;
     }
     case E_SESSION: run_session(e->text); break;

@@ -35,6 +35,13 @@ int sim_fb_flipped_match_pct(void);
 /* % of pixels equal to the marked frame turned 180 degrees */ /* current framebuffer, round
                                                                   mask applied */
 
+/* One LVGL refresh that flushed pixels: when it began (the script's clock), the pixels flushed,
+ * the areas rendered after LVGL joined the invalidated ones, the 48-row strips those take in the
+ * watch's buffers, and the host CPU the refresh took (not the watch's). */
+typedef struct { uint32_t t_ms, px, areas, strips, cpu_us; } sim_frame_t;
+void sim_frames_reset(void);
+const sim_frame_t *sim_frames(size_t *n, uint32_t *lost); /* since the last reset, in order */
+
 /* sim_link.c */
 void sim_link_enable_ws(bool enable);
 void sim_link_poll(uint32_t now_ms);
