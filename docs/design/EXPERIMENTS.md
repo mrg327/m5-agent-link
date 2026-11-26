@@ -45,7 +45,8 @@ The watch drives the pointer of the machine `agentlinkd` runs on (protocol §6g,
 - The link is held interactive while the trackpad is open (`hal_link_interactive`).
 - **Failures.** The daemon answers a failure at most once a second. The hint shows its message (on macOS, "Allow
   agentlinkd in Privacy & Security > Accessibility"), with a toast and the reject haptic.
-- **Arrivals.** An arriving attention still takes the watch to HOME, as on every other screen.
+- **Arrivals.** LABS and the trackpad keep their work (`ui.c` `mode_keeps_work()`): an arriving request does
+  not take the screen; it waits as the rim pip until you leave, as on KEYS, VOICE, READ, GRAPH and STATUS.
 
 ## Daemon
 
