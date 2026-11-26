@@ -372,10 +372,6 @@ def extract_gesture():
     return g
 
 
-# Ring constants UI-V3 §3.1 removed (the underline, the error dots, the permission tracks).
-REMOVED_IN_V3 = {"UNDERLINE_W", "UNDERLINE_GAP", "DOT_STEP_DEG", "TRACK_W"}
-
-
 def extract_ring():
     # the deck is two files: ui_home.c (slots, selection, timers) and ui_home_card.c (the centre card);
     # the ring's constants live in its private header, shared by ui_ring.c and ui_ring_draw.c
@@ -388,10 +384,6 @@ def extract_ring():
         ("nag_max", "NAG_MAX"),
     ]:
         r[key] = int(find(home, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
-    # key badges beside the buttons (UI-V2 §4.1); the fact keys keep their old names for the Atlas
-    # Sigil (GLYPHS.md §4): the card no longer spells the project's name, it draws its sigil. The Atlas still
-    # reads repo_w_px, so the key stays, as 0 (like the ring constants UI-V3 removed); the new card facts follow.
-    r["repo_w_px"] = 0
     r["summary_w_px"] = int(find(card, r"#define SUMMARY_W\s+(\d+)", "ring.summary_w_px").group(1))
     for key, macro in [("sigil_r_px", "SIGIL_R"), ("time_dots_r_px", "DOTS_R")]:
         r[key] = int(find(card, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
@@ -414,18 +406,6 @@ def extract_ring():
             CORE + "ui_theme.h", r"#define FONT_ICON_HERO \(&font_phosphor_(\d+)\)", "ring.hero_px"
         ).group(1)
     )
-    for key, tok in [("repo_px", "FONT_TITLE"), ("repo_small_px", "FONT_HEAD")]:
-        r[key] = int(
-            find(
-                CORE + "ui_theme.h", rf"#define {tok} \(&font_figtree_(\d+)_", f"ring.{key}"
-            ).group(1)
-        )
-    for key, macro in [
-        ("hint_a_deg", "UI_BADGE_A_DEG"),
-        ("hint_b_deg", "UI_BADGE_B_DEG"),
-        ("hint_r_px", "UI_BADGE_R"),
-    ]:
-        r[key] = int(find(CORE + "ui_theme.h", rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
     for key, macro in [
         ("band_out_px", "BAND_OUT"),
         ("band_w_px", "BAND_W"),
@@ -433,10 +413,6 @@ def extract_ring():
         ("sel_w_px", "SEL_W"),
         ("seg_gap_deg", "SEG_GAP_DEG"),
         ("others_pct", "OTHERS_PCT"),
-        ("underline_w_px", "UNDERLINE_W"),
-        ("underline_gap_px", "UNDERLINE_GAP"),
-        ("dot_step_deg", "DOT_STEP_DEG"),
-        ("track_w_px", "TRACK_W"),
         ("prog_out_px", "PROG_OUT"),
         ("prog_w_px", "PROG_W"),
         ("work_period_ms", "WORK_PERIOD_MS"),
@@ -446,11 +422,7 @@ def extract_ring():
         ("error_flicker_ms", "ERROR_FLICKER_MS"),
     ]:
         m = re.search(rf"#define {macro}\s+(\d+)", text(ring))
-        if not m and macro in REMOVED_IN_V3:
-            r[key] = (
-                0  # no such element any more; the Atlas lab still reads the key (restyled in UI-V3 stage C)
-            )
-        elif not m and macro == "OTHERS_PCT":
+        if not m and macro == "OTHERS_PCT":
             r[key] = int(find(ring, r"#define REST_PCT\s+(\d+)", f"ring.{key}").group(1))
         else:
             r[key] = int(find(ring, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
@@ -465,17 +437,6 @@ def extract_ring():
         f"{CORE}ui_ring.h:{line_of(CORE + 'ui_ring.h', find(CORE + 'ui_ring.h', r'RING_WORK,').start())}"
     )
     r["kinds"] = kinds
-    # no action pill (UI-V3 §4.1), and in Sigil no button either: a tap on the hero glyph of a session that needs
-    # you opens ASK; the report still names it Review / Answer, and A's hint is "Open" (drawn as a glyph). The
-    # `pills` fact keeps its key for the Atlas.
-    find(card, r'"Review" : "Answer"', "ring.pill_approve")
-    find(card, r'static const char \*const words\[2\] = \{"Open", "Next"\};', "ring.pill_done")
-    r["pills"] = {"approve": "Review / Answer", "done": "Open", "default": "Open"}
-    words = find(
-        card, r'static const char \*const words\[2\] = \{"(\w+)", "(\w+)"\};', "ring.edge_hint_a"
-    )
-    SOURCES["ring.edge_hint_b"] = SOURCES["ring.edge_hint_a"]
-    r["edge_hints"] = {"a": words.group(1), "b": words.group(2)}
     find(home, r"Nothing else needs you", "ring.nothing_else")
     return r
 
