@@ -1605,6 +1605,9 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         if cmd.hold_ms.unwrap_or(0) < MIN_APPROVE_HOLD_MS {
             return fail(ResultErr::Denied, "hold-to-confirm too short");
         }
+        if !stoppable(&session, shared.broker.open_for(session.sid)) {
+            return fail(ResultErr::Stale, "not working");
+        }
         None
     };
     if let (true, Some(text)) = (busy, &text) {
@@ -1629,6 +1632,15 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         json!({"cmd": detail, "ok": res.is_ok()}),
     );
     typing_result(res)
+}
+
+/// Whether Esc would stop a running turn (issue 20261126-9ecf). Checked when the stop arrives,
+/// not when the watch offered it: the turn may have ended during the hold. Only `start` and `work`
+/// count, the states the watch offers Stop in (nav.c). At an idle prompt Esc does nothing useful
+/// (a second one opens rewind) and in a permission or question dialog it picks "No", a decision
+/// that belongs to Deny; an open request is such a dialog even before the state says so.
+fn stoppable(session: &Session, request_open: bool) -> bool {
+    !request_open && matches!(session.st, Some(SessState::Start | SessState::Work))
 }
 
 /// Holds `text` until the session can take input (queue.rs). The terminal must at least be one
@@ -2315,6 +2327,43 @@ mod tests {
         let r = handle_cmd(&shared, &type_cmd_of(CmdOp::Cancel, sid, None, Some(1250))).await;
         assert!(r.ok, "{r:?}");
         assert_eq!(*term.sent.lock().unwrap(), vec!["\\x1b"]);
+    }
+
+    #[tokio::test]
+    async fn stop_reaches_only_a_working_session() {
+        let term = Arc::new(FakeTerm::default());
+        let shared = shared_typing(Arc::clone(&term));
+        let sid = add_session(&shared);
+        let stop = type_cmd_of(CmdOp::Cancel, sid, None, Some(1250));
+        // the turn ended during the hold, or a dialog is up: Esc would land on the prompt or say No
+        for st in [SessState::Done, SessState::Idle, SessState::Error] {
+            set_state(&shared, st);
+            let r = handle_cmd(&shared, &stop).await;
+            assert_eq!(r.err, Some(ResultErr::Stale), "{st:?}");
+        }
+        set_asking(&shared);
+        assert_eq!(handle_cmd(&shared, &stop).await.err, Some(ResultErr::Stale));
+        set_state(&shared, SessState::Work);
+        let payload = json!({"tool_name": "Bash", "tool_input": {"command": "ls"}});
+        let req = crate::broker::request_of(
+            sid,
+            "claude:s".into(),
+            "claude",
+            "PermissionRequest",
+            &payload,
+            std::time::Duration::from_secs(15),
+        )
+        .unwrap();
+        let (rid, _wait) = shared.broker.open(req);
+        let r = handle_cmd(&shared, &stop).await;
+        assert_eq!(r.err, Some(ResultErr::Stale), "an open request is a dialog");
+        assert!(term.sent.lock().unwrap().is_empty(), "no Esc typed");
+        shared.broker.cancel(rid, ClearWhy::Cancelled);
+        for st in [SessState::Start, SessState::Work] {
+            set_state(&shared, st);
+            assert!(handle_cmd(&shared, &stop).await.ok, "{st:?}");
+        }
+        assert_eq!(term.sent.lock().unwrap().len(), 2);
     }
 
     #[tokio::test]

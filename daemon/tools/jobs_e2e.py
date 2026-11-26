@@ -1,6 +1,7 @@
 # Jobs end to end (docs/design/JOBS.md): a real bash in a pty with the shell-init snippet -> agentlink-hook ->
 # agentlinkd -> a fake proto-0.9 device on WebSocket. Checks surfacing, Stop (a real SIGINT), exit status,
-# dismiss, the estimate, hidden and interactive commands, and that no command text reaches the daemon's files.
+# dismiss, the estimate, hidden and interactive commands, Stop on an agent session only while it works,
+# and that no command text reaches the daemon's files.
 # It starts its own daemon on another port with a scratch AGENTLINK_HOME; the user's daemon is not touched.
 #
 #   cd daemon && cargo build --workspace
@@ -9,6 +10,8 @@
 # Takes about a minute. Needs bash and a Unix.
 import asyncio, json, os, pty, subprocess, sys, tempfile, time, shutil, signal
 import cbor2, websockets
+from collections.abc import Callable
+from typing import Any
 
 REPO = sys.argv[1]
 BIN = f"{REPO}/daemon/target/debug"
@@ -51,11 +54,11 @@ if pid == 0:
     )
 
 
-def sh(line):
+def sh(line: str) -> None:
     os.write(fd, (line + "\n").encode())
 
 
-def drain():
+def drain() -> None:
     import select
 
     while select.select([fd], [], [], 0)[0]:
@@ -67,6 +70,22 @@ def drain():
 
 sh(f"source {INIT}")
 
+
+def hook(event: str, **payload: object) -> None:
+    """agentlink-hook claude <event> for an agent session beside the shell's jobs."""
+    body = dict(payload, session_id="e2e-agent", cwd=REPO, hook_event_name=event)
+    subprocess.run(
+        [f"{BIN}/agentlink-hook", "claude", event],
+        env=env,
+        cwd=REPO,
+        input=json.dumps(body),
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+
 got = []
 
 
@@ -74,13 +93,13 @@ async def main():
     async with websockets.connect(f"ws://127.0.0.1:{PORT}/") as ws:
         mid = [1]
 
-        async def send(t, b):
+        async def send(t: int, b: dict[int, Any]) -> None:
             mid[0] += 1
             await ws.send(cbor2.dumps({0: t, 1: mid[0], 3: b}))
 
         await ws.send(cbor2.dumps(hello))
 
-        async def rx(want, timeout):
+        async def rx(want: Callable[[Any], object], timeout: float) -> Any:
             end = time.time() + timeout
             while time.time() < end:
                 try:
@@ -96,7 +115,7 @@ async def main():
 
         ok = True
 
-        def check(name, cond):
+        def check(name: str, cond: object) -> None:
             nonlocal ok
             print(("PASS " if cond else "FAIL ") + name)
             ok &= bool(cond)
@@ -174,6 +193,29 @@ async def main():
         await rx(lambda m: False, 3)
         os.write(fd, b"q")
         check("less never surfaces", not any(is_sess(x) and x[3].get(1) == 3 for x in got))
+        # 6. Stop on an agent session types Esc only while it works (issue 20261126-9ecf)
+        got.clear()
+        hook("SessionStart")
+        m = await rx(lambda m: is_sess(m) and m[3].get(1) == 1, 3)  # agent claude
+        asid = m[3][0] if m else 0
+        hook("UserPromptSubmit", prompt="build it")
+        hook("Stop", stop_hook_active=False)
+        await rx(lambda m: is_sess(m) and m[3].get(0) == asid and m[3].get(2) == 4, 3)
+        await send(8, {0: 6, 1: asid, 4: 1250})
+        r = await rx(lambda m: 2 in m and m.get(0) != 4, 3)
+        check(
+            "Stop on a finished agent turn is stale (not working)",
+            asid and r and r[3].get(1) == 0 and r[3].get(2) == "not working",
+        )
+        hook("UserPromptSubmit", prompt="again")
+        await rx(lambda m: is_sess(m) and m[3].get(0) == asid and m[3].get(2) == 1, 3)
+        await send(8, {0: 6, 1: asid, 4: 1250})
+        r = await rx(lambda m: 2 in m and m.get(0) != 4, 3)
+        check(
+            "Stop on a working agent gets past the state check (ok, or unsupported without kitty)",
+            r and (r[3].get(0) is True or r[3].get(1) == 2),
+        )
+        print("  agent stop result:", r and r[3])
         return ok
 
 
