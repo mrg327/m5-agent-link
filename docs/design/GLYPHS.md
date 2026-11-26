@@ -383,8 +383,8 @@ buzzes or sounds. Off by default: LABS > Personality, the dot (`FUN_MOTE`, bit 3
   the display lit, nothing waiting for you) and only on the idle face. It leaves the moment anything needs you,
   with no exit animation: the request is the picture. With reduced motion it is a still light at its mode's
   resting place (a lap rests at 12, seconds not shown), tail kept, no cheer. A cheer that happens while it is
-  gone is not saved for later. Today the deck does not go ambient while a session is in error (an error needs
-  you there), so hover is drawn only if that changes; `test_mote.c` covers it.
+  gone is not saved for later. The deck goes ambient with a session in error (only a waiting approval or question
+  keeps it lit; owner's call, 2026-11-26), so the Mote hovers beside the red capsule (`fun_mote_error.txt`).
 - **Growth.** The level is the number of local days on which a turn finished with its tests green: the done
   summary's `tp` (DONE-SUMMARY.md) is known and passed, on a session the watch saw finish (the summary may
   arrive with the finish or just after). Thresholds 1, 3, 7, 14, 30, 60, 120 days give levels 1–7. One stored

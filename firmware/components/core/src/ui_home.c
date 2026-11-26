@@ -301,10 +301,13 @@ bool ui_home_act(nav_action_t a, const gesture_evt_t *g)
 
 /* ───────── per-step ───────── */
 
+/* What keeps the deck from going ambient: a request that waits (an approval or a question). A
+ * session in error does not (owner's call, 2026-11-26): its red capsule stays on the dim face and
+ * the Mote, where it is on, hovers beside it (GLYPHS.md §3.14). */
 static bool needs_you(void)
 {
     model_counts_t c = model_counts();
-    return c.waiting > 0 || c.error > 0;
+    return c.waiting > 0 || model_attention_first() != NULL;
 }
 
 /* Unanswered requests (approvals and questions) are reminded three times, louder each time, until

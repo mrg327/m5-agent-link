@@ -318,6 +318,10 @@ sim_script_test(sim_labs_fun labs_fun.txt)
 sim_script_test(sim_fun_mote fun_mote.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"mode\":\"lap\".*\"mote_day\",\"days\":1.*\"mode\":\"cheer\".*\"mode\":\"settle\".*\"mode\":\"ember\".*\"mode\":\"gone\".*\"mode\":\"lap\".*\"mode\":\"gone\"")
+# A session in error lets the idle face come up, and the Mote hovers beside its capsule.
+sim_script_test(sim_fun_mote_error fun_mote_error.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"mode\":\"hover\"")
 # Easter eggs (issue 20261126-7770): the clock slip at 13:37 (once) and 04:04; the 100th finish spins the sigil,
 # held while a request waits and played after it; the 1000th loops the Mote.
 sim_script_test(sim_fun_eggs fun_eggs.txt
