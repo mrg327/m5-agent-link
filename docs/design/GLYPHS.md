@@ -362,8 +362,8 @@ Built with the primitives, as the model for the rest (`ui_home_card.c`; renders:
   other sessions that need you; B = caret (next), shown when there is more than one session. A tap on
   a shown hint presses its key. The session menu opens by a tap, as before.
 - **The session ring** at the bezel is unchanged, except that a needs-you pip is a shape per kind: dot
-  (question), bar along the ring (permission), triangle pointing in (error); UI-V3 §3.1. The mark at 12
-  o'clock that says a request waits behind the screen takes the same shapes.
+  (question), bar along the ring (permission), triangle pointing in (error); UI-V3 §3.1. What waits behind the
+  screen is a badge at 12 o'clock: the kind's glyph, or how many wait (UI-V2 §4.3).
 
 ## 5. The other screens
 

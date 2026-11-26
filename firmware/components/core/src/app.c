@@ -625,7 +625,9 @@ static void finished_all(bool error, uint32_t sid)
         s_finish_ms = ms;
         s_finished = true;
     }
-    if (!motion_face_down()) power_attention(error ? RGB_ERROR : RGB_DONE, ms);
+    if (!motion_face_down()) {
+        power_attention(error ? RGB_ERROR : RGB_DONE, sid, error ? ICON_ERROR : ICON_DONE, ms);
+    }
 }
 
 /* A session moved into done or error. It buzzes when it was armed with Notify, is a job or is open

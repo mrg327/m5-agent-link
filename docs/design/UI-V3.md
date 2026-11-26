@@ -175,9 +175,9 @@ carries black text. `theme_dim(rgb, pct)` mixes toward black (ring segments at r
   permission, a **triangle** pointing at the centre (base 16 on r 210, point at r 196) for an error.
   They differ in outline and length, not in corners, so they read without hue and while the ring is
   still. The selected one is already wide and bright and its hero glyph says the kind, so it has none.
-  The mark that says a request waits behind the open screen (12 o'clock, every screen but HOME, the
-  queue of UI-V2 §4) takes the same three shapes at size 16, with a 2 px black edge over the ring;
-  the report reads `waiting 3 · approval`. Dots and twin tracks are gone. A pip never sits under a key hint: within 9° of 315° or 45°
+  What waits behind the open screen (12 o'clock, every screen but HOME, the queue of UI-V2 §4) is
+  the count badge of issue 20261126-0a74: the next request's colour, its kind's glyph when one waits
+  (hand, question mark, error), the count when more do, and a tap opens it. Dots and twin tracks are gone. A pip never sits under a key hint: within 9° of 315° or 45°
   it moves along its capsule to 9° away, on the side with room (`ring_pip_deg`); a capsule too short
   for that puts it at its end.
 - The ring shows the index on **every** screen. While a hold is in progress the index drops to

@@ -176,6 +176,7 @@ TIERS = {
         "sha256",
         "sound_bank",
         "toy_gate",
+        "nag",
         "persona",
         "temper",
     },

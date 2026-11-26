@@ -165,7 +165,6 @@ sim_script_test(sim_ring_one one_session.txt)
 sim_script_test(sim_ring_busy busy.txt)
 sim_script_test(sim_ring_states ring_states.txt)
 sim_script_test(sim_ring_pips ring_pips.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
-sim_script_test(sim_wait_pip_shapes wait_pip_shapes.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_hint_tap_home hint_tap_home.txt
                 FAIL_REGULAR_EXPRESSION "\"via\":\"tap\"|SCRIPT FAIL")
 sim_script_test(sim_hint_badge hint_badge.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
