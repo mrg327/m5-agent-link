@@ -36,3 +36,4 @@ mobile overlaps, favicon and CONTRACT.md stale.
 
 - 2026-11-26T03:11:46Z · claude-code/cloud@cloud · linux-x86_64 · 87e3670: filed
 - 2026-11-26T03:11:46Z · claude-code/cloud@cloud · linux-x86_64 · 87e3670: claimed
+- 2026-11-26T03:28:00Z · claude-code/cloud@cloud · linux-x86_64 · b09c731: Done: L1 L3 L4 L5 L6 L10, C1-C10, C11 (Start), C13 (favicon, CONTRACT, wording), S1 minimum (Flow after Touch, Start, Inside), S3 (Sound folded), S5 (Flow/Replay ledes). Commits 683a972 ddfb700 b09c731; checks format docs lint atlas pass. Open: S2 hero story, S7 phone nav/Next links, S8 mobile overlaps, C12 Build hardware rows + keys spotlight, L7 jargon (nav.c action text, sound role text), L9 titles, S9 glyph strip; dead ring facts (pills, edge_hints, hint_*_deg, repo_w_px 0).
