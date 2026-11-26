@@ -1,0 +1,33 @@
+# Issue 20261126-d95a: only a new rid alerts. The daemon re-sends an open request after a resync and
+# after a reconnect (its welcome drops every card first); the watch updates the card silently: no
+# second arrival pattern, no second takeover. ASK, closed when the welcome dropped the card, comes
+# back on it without an alert. A new rid after the reconnect still alerts.
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 2 work api main Working
+session 3 work cli main Working
+wait 300
+session 2 input api main
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 600
+expect_screen ask
+expect_label Run shell command
+# a resync re-sends it while ASK shows it
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 600
+expect_screen ask
+expect_label Run shell command
+# a reconnect: the welcome drops the cards, the daemon re-sends the open one
+disconnect
+wait 300
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 600
+expect_screen ask
+expect_label Run shell command
+# a new request still alerts
+session 3 input cli main
+attention 8 3 approval approve,deny,focus 0 Edit file|src/main.rs
+wait 300
+quit

@@ -491,8 +491,18 @@ static void on_link(bool welcomed)
     preport_on_link(welcomed, app_now_ms());
 }
 
-static void on_attention(const attention_t *a)
+static void on_attention(const attention_t *a, bool is_new)
 {
+    if (!is_new) {
+        /* A re-send (a resync, a reconnect) of a request the watch holds: the card has the new
+         * time left and hush; nothing buzzes, glows or takes over again (issue 20261126-d95a). */
+        dbg_event("ui", "resent", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
+        if ((a->kind == ATT_APPROVAL || a->kind == ATT_QUESTION) && !a->answer_sent &&
+            power_display_on() && !ui_glow_active()) {
+            ui_resent_attention(a->sid, a->rid, a->kind == ATT_QUESTION ? RGB_ASK : RGB_PERMISSION);
+        }
+        return;
+    }
     uint32_t rgb = a->kind == ATT_ERROR      ? RGB_ERROR
                    : a->kind == ATT_DONE     ? RGB_DONE
                    : a->kind == ATT_QUESTION ? RGB_ASK

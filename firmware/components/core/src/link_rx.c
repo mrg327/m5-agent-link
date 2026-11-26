@@ -318,7 +318,7 @@ static void on_attention(const struct attention *in, uint32_t now_ms)
                                  in->attention_uint14uint.attention_uint14uint,
                                  in->attention_uint15bool_present &&
                                      in->attention_uint15bool.attention_uint15bool);
-    model_attention_add(&a);
+    bool is_new = model_attention_add(&a);
     /* Multiple-choice questions (proto 0.18), kept with the request in PSRAM; a request without
      * valid ones is shown as before (title, text, opts). */
     if (model_peer_minor() >= 18 && in->attention_ask_q_m_l_present) {
@@ -346,7 +346,7 @@ static void on_attention(const struct attention *in, uint32_t now_ms)
         if (n == (int)l->attention_ask_q_m_l_ask_q_m_count)
             model_attention_set_questions(a.rid, qs, n);
     }
-    if (g_link.hooks.on_attention) g_link.hooks.on_attention(model_attention_find(a.rid));
+    if (g_link.hooks.on_attention) g_link.hooks.on_attention(model_attention_find(a.rid), is_new);
 }
 
 static void on_result(const struct msg_result *m, uint32_t re_id, bool has_re)

@@ -289,14 +289,19 @@ typedef void (*model_session_hook_t)(const session_t *before, const session_t *n
 void model_set_session_hook(model_session_hook_t hook);
 model_counts_t model_counts(void);
 
-void model_attention_add(const attention_t *a);
+/* Stores request `a`; true when its rid is new on this watch. A re-sent request (a resync, or the
+ * daemon re-sending its open requests after a welcome) replaces the stored one in place, keeps the
+ * answer already given, and returns false: only a new request alerts (issue 20261126-d95a). */
+bool model_attention_add(const attention_t *a);
 /* The questions of request `rid` (proto 0.18), stored with it: call after model_attention_add(); n
  * is clamped to MODEL_MAX_QS and the request's n_qs set to it. */
 void model_attention_set_questions(uint32_t rid, const ask_q_t *qs, int n);
 /* Question i of request `rid`, or NULL. */
 const ask_q_t *model_attention_question(uint32_t rid, int i);
 bool model_attention_clear(uint32_t rid);
-/* Drops every request (a new link: the daemon re-sends the open ones after its welcome). */
+/* Drops every request (a new link: the daemon re-sends the open ones after its welcome). Each is
+ * remembered until the next call: the same rid on the same session with the same title and text,
+ * re-sent, counts as known (model_attention_add returns false) and keeps its answer. */
 void model_attention_clear_all(void);
 const attention_t *model_attention_for_sid(uint32_t sid);
 const attention_t *model_attention_find(uint32_t rid);

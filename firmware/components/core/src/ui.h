@@ -106,6 +106,9 @@ void ui_show_attention(uint32_t sid);
 void ui_offer_attention(uint32_t sid, bool error, uint32_t rgb);
 /* The same, but it only waits (the display is dark or glowing): see ui_reveal_attention. */
 void ui_wait_attention(uint32_t sid, bool error, uint32_t rgb);
+/* Request rid on session sid was re-sent (not new): nothing alerts; ASK reopens on it only when it
+ * was open on it when a new link dropped the cards, and the user has not moved since. */
+void ui_resent_attention(uint32_t sid, uint32_t rid, uint32_t rgb);
 /* The display woke: what waits opens now, unless the open screen keeps it waiting. */
 void ui_reveal_attention(void);
 /* Counts mode changes: a change the user did not make swallows a finger already down. */

@@ -221,12 +221,21 @@ static bool s_voice_queue;   /* VOICE queues the dictation (ui_go_voice) */
 static int s_voice_qi = -1;  /* VOICE answers that question of s_voice_rid (ui_go_voice_answer) */
 static bool s_voice_qlast;
 
+/* ASK closed because its request went from the model (a new link drops every card, issue
+ * 20261126-d95a): the rid, and the mode change that closed it. */
+static uint32_t s_ask_lost_rid, s_ask_lost_seq;
+
 static void enter_mode(nav_mode_t m)
 {
     if (m != MODE_ASK && m != MODE_SCROLL) s_resume_watch_sid = 0;
     if (m == s_mode) return;
     if (s_mode == MODE_AGENT) ui_agent_close();
-    if (s_mode == MODE_ASK) ui_ask_close();
+    if (s_mode == MODE_ASK) {
+        uint32_t rid = ui_ask_rid();
+        s_ask_lost_rid = rid && !model_attention_find(rid) ? rid : 0;
+        s_ask_lost_seq = s_mode_seq + 1;
+        ui_ask_close();
+    }
     if (s_mode == MODE_SCROLL) ui_scroll_close();
     if (s_mode == MODE_STATUS) ui_status_close();
     if (s_mode == MODE_WATCH) ui_watch_close();
@@ -433,6 +442,18 @@ void ui_offer_attention(uint32_t sid, bool error, uint32_t rgb)
     } else {
         take_over(sid, error);
     }
+}
+
+void ui_resent_attention(uint32_t sid, uint32_t rid, uint32_t rgb)
+{
+    /* ASK was open on it when the link dropped the cards, and the user has not moved since: it
+     * comes back as it was, without an alert */
+    if (!rid || rid != s_ask_lost_rid || s_mode_seq != s_ask_lost_seq || s_mode != MODE_HOME) {
+        return;
+    }
+    s_ask_lost_rid = 0;
+    dbg_event("ui", "ask_restored", "\"rid\":%u", (unsigned)rid);
+    ui_offer_attention(sid, false, rgb);
 }
 
 void ui_reveal_attention(void)

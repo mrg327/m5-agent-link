@@ -67,6 +67,11 @@ add_executable(test_detail tests/test_detail.c ${FW}/core/src/detail.c ${FW}/cor
 target_include_directories(test_detail PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
 target_link_libraries(test_detail PRIVATE m)
 add_test(NAME detail_model COMMAND test_detail)
+# The request store: new or re-sent (issue 20261126-d95a).
+add_executable(test_model tests/test_model.c ${FW}/core/src/model.c ${FW}/core/src/steps.c)
+target_include_directories(test_model PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_model PRIVATE m)
+add_test(NAME request_model COMMAND test_model)
 # GRAPH.md: the agent graph through the codec, the one-session store and the fetch schedule.
 add_executable(test_graph tests/test_graph.c ${FW}/core/src/graph.c)
 target_include_directories(test_graph PRIVATE ${FW}/core/src)
@@ -364,6 +369,11 @@ sim_script_test(sim_takeover_late_err takeover_late_err.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
   PASS_REGULAR_EXPRESSION "\"result\",\"ok\":false,\"err\":0,\"op\":3.*\"mode\":\"ask\".*\"text\":\"Out of date\"")
 sim_script_test(sim_takeover_finger_carry takeover_finger_carry.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"action\":\"back\"")
+# Only a new rid alerts (issue 20261126-d95a): a resync's and a reconnect's re-send of the open request
+# gives one arrival pattern in all, and ASK comes back after the welcome; the new rid 8 still buzzes.
+sim_script_test(sim_seen_resend_silent seen_resend_silent.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\].*\"rid\":8,\"sid\":3"
+  PASS_REGULAR_EXPRESSION "\"ev\":\"resent\".*\"ev\":\"ask_restored\".*\"rid\":8,\"sid\":3,\"kind\":0,\"new\":true.*pattern_ms\":\\[250,120,250\\]")
 add_test(NAME sim_takeover_glow_missed
          COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/takeover_glow_missed.txt)
 set_tests_properties(sim_takeover_glow_missed PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
