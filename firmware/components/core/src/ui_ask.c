@@ -6,7 +6,7 @@
  * what can be done, as shapes:
  *   - a request without options of its own (a bare permission) is discs in fixed places: the first
  *     item is the primary disc, the other hold items (Deny, Always allow) stand left of it, a tap
- *     item (Dictate) sits between the key hints, and Open on PC is button A's key hint itself;
+ *     item (Dictate) sits in the bottom slot, and Open on PC is button A's key hint itself;
  *   - a request with options (the agent's own words: content) is a short list down a spine of
  *     discs: the selected row in the middle with its disc, its neighbours above and below as thin
  *     rings.
@@ -34,10 +34,12 @@
  * ───────── */
 #define SIGIL_Y 50 /* as on HOME: the same mark in the same place */
 #define SIGIL_R 22
-#define MARK_DX 40  /* the marks beside the sigil: remote (left), the agent (right) */
-#define BLOCK_Y0 72 /* what is asked: title and text, centred as a block in y 72..176 */
-#define BLOCK_H 104
-#define TITLE_W 256
+#define MARK_DX 40 /* the marks beside the sigil: remote (left), the agent (right) */
+/* what is asked: title and text, centred as a block in y 96..192; the title's line is level with
+ * the key hints (y 81..121), so it is no wider than the gap between them */
+#define BLOCK_Y0 96
+#define BLOCK_H 96
+#define TITLE_W 216
 /* a permission's text: the width it has always been measured at (UI-V3 §4.3a) */
 #define TEXT_W 292
 #define TEXT_W_Q 312 /* a question's */
@@ -57,7 +59,7 @@
 #define LEFT2_X 146 /* two: smaller, and clear of button A's hint */
 #define LEFT2_DY 44
 #define LEFT2_R 36
-#define DOCK_Y 378 /* tap items, between the key hints */
+#define DOCK_Y 378 /* tap items, in the bottom slot */
 #define DOCK_R 26
 #define DOCK_PITCH 62
 /* rows (a request with options): the selected row, and one neighbour above and below */
@@ -117,8 +119,8 @@ static bool s_more_on;
  * last page has been shown. A cut text the watch cannot fetch (an older daemon, privacy meta, over
  * DETAIL_CAP, a refused or failed transfer) can be read and denied here but only approved on the
  * PC. */
-#define READ_TITLE_Y 74
-#define READ_Y 104
+#define READ_TITLE_Y 98 /* level with the key hints: TITLE_W */
+#define READ_Y 124
 #define READ_W 320
 #define READ_LINES 7
 #define LOAD_Y 290
@@ -717,7 +719,7 @@ static void question_prep(const ask_q_t *q)
 /* ───────── the items: discs in fixed places, or rows down a spine ───────── */
 
 /* Where each item's disc stands (a request without options): the first item is the primary disc;
- * the other hold items stand left of it; tap items sit between the key hints; Open on PC is button
+ * the other hold items stand left of it; tap items sit in the bottom slot; Open on PC is button
  * A's key hint. */
 static void place_discs(void)
 {

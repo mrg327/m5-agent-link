@@ -8,7 +8,7 @@ attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watc
 wait 400
 expect_screen ask
 expect_label > Approve HOLD
-tap 101 365
+tap 101 101
 wait 300
 expect_screen attention
 quit

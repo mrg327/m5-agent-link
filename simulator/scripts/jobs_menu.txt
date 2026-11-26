@@ -16,7 +16,7 @@ tap 233 226
 wait 300
 expect_label Hold to stop
 expect_screen agent
-hold 233 83 1500
+hold 233 383 1500
 wait 400
 expect_screen ring
 quit

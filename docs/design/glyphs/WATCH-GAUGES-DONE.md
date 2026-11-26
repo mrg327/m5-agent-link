@@ -78,16 +78,17 @@ An arc along the bottom of the bezel, between the two key hints: r 196, 6 px wid
 6 o'clock. It fills from the left. Grey while there is room, amber from 70 %, vermillion from 90 %; unknown draws
 nothing.
 
-It keeps this place whatever holds the slot between the key hints (the graph strip, the book disc): it is below
+It keeps this place whatever holds the bottom slot (the graph strip, the book disc): it is below
 both. HOME still moves the parent it gives the gauge (`CTX_Y`, `CTX_Y_LOW` in `ui_home_card.c`); the arc undoes
 that move, so those two constants no longer matter.
 
 ### 2.2 Plan usage (the empty and ambient faces, STATUS)
 
-A pair of arcs that start at 12 o'clock, each under its 20 px glyph:
+A pair of arcs that start at 6 o'clock, each over its 20 px glyph (the key hints are on the upper rim, issue
+20261125-d8b5):
 
-- the **5 hours** (a clock) run down the left side, the **week** (a calendar) down the right;
-- r 194, 6 px wide, from 11 to 118 degrees from 12 o'clock on each side.
+- the **5 hours** (a clock) run up the left side, the **week** (a calendar) up the right;
+- r 194, 6 px wide, from 11 to 118 degrees from 6 o'clock on each side.
 
 One arc is two scales at once:
 

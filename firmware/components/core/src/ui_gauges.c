@@ -5,12 +5,13 @@
  *   key hints. It fills from the left; grey while there is room, amber from 70 %, vermillion from
  *   90 %.
  * - The empty and ambient faces, and STATUS: the plan's two windows as a pair of arcs that start at
- *   12 o'clock, each under its glyph: the 5 hours (a clock) run down the left side, the week (a
- *   calendar) down the right. An arc is two scales at once. The fill is the usage. The bead on it
- *   is the time: how far through the window the clock is, so the arc beyond the bead is the time
- *   left until the reset, and a fill that has passed the bead is ahead of the clock. When the
- *   daemon says the window runs out before it resets, a ring marks that moment on the same scale.
- *   STATUS adds the two figures under its clock (rule 4: a figure a gauge shows).
+ *   6 o'clock, each over its glyph: the 5 hours (a clock) run up the left side, the week (a
+ *   calendar) up the right (the key hints are on the upper rim). An arc is two scales at once. The
+ * fill is the usage. The bead on it is the time: how far through the window the clock is, so the
+ * arc beyond the bead is the time left until the reset, and a fill that has passed the bead is
+ * ahead of the clock. When the daemon says the window runs out before it resets, a ring marks that
+ * moment on the same scale. STATUS adds the two figures under its clock (rule 4: a figure a gauge
+ * shows).
  * - AGENT: the model's name (content from the agent), the permission mode as a glyph and the pull
  *   request as a glyph with its number, in the colour of its state.
  *
@@ -103,8 +104,8 @@ static uint32_t usage_rgb(int pct)
 
 /* ── session card: the context arc ── */
 
-/* About the screen centre, whatever parent the card gives: the bottom of the bezel, between the key
- * hints (their rings begin 39 degrees either side of 6 o'clock). Its centre line is r 196: inside
+/* About the screen centre, whatever parent the card gives: the bottom of the bezel (the key hints
+ * are on the upper rim). Its centre line is r 196: inside
  * the content circle and the ring's pips (r 200), and below the graph strip (its discs end at y
  * 401) and the book disc (y 404): the arc's upper edge is at y 400 at its ends and y 404 under the
  * strip's outermost disc. */
@@ -179,14 +180,16 @@ void ui_gauges_card_report(ui_report_t *r)
 /* ── the plan's two windows: a pair of arcs from 12 o'clock ── */
 
 /* Centre line r 194, 6 px wide: inside the content circle and clear of the ring's pips (r 200-210).
- * Each arc runs from 11 to 118 degrees from 12 o'clock on its side, so its end (y 324) stays above
- * the key hints. */
+ * Each arc runs up its side from 6 o'clock, 11 to 118 degrees from it, so its end (y 142) stays
+ * below the key hints on the upper rim (issue 20261125-d8b5). Angles below are measured from
+ * 6 o'clock; MIR() turns them into the clockwise-from-12 angles arc() and polar() take. */
+#define MIR(a) (180 - (a))
 #define USE_R 194
 #define USE_W 6
 #define USE_A0 11
 #define USE_A1 118
 #define USE_SPAN (USE_A1 - USE_A0)
-/* the two glyphs sit side by side at 12 o'clock, each at the start of its arc */
+/* the two glyphs sit side by side at 6 o'clock, each at the start of its arc */
 #define USE_GLYPH_DX 13
 #define USE_BEAD_R 5
 #define USE_HALF (USE_R + USE_W + USE_BEAD_R + 2) /* the object's half side */
@@ -221,27 +224,27 @@ static void usage_draw(lv_event_t *e)
         int side = i ? 1 : -1;
         bool live = w->pct >= 0;
         uint32_t rgb = live ? usage_rgb(w->pct) : 0;
-        ui_glyph_draw(l, FONT_ICON_S, glyph[i], cx + side * USE_GLYPH_DX, cy - USE_R,
+        ui_glyph_draw(l, FONT_ICON_S, glyph[i], cx + side * USE_GLYPH_DX, cy + USE_R,
                       live ? tone(0xa0a0a8, u->dim) : tone(0x6c6c73, u->dim), LV_OPA_COVER);
-        /* the left arc runs anticlockwise: its angles are the right one's, negated */
-        if (i) arc(l, cx, cy, USE_R, USE_W, USE_A0, USE_A1, tone(0x2c2c2e, u->dim));
-        else arc(l, cx, cy, USE_R, USE_W, -USE_A1, -USE_A0, tone(0x2c2c2e, u->dim));
+        /* from 6 o'clock: the right arc runs anticlockwise up its side, the left one clockwise */
+        if (i) arc(l, cx, cy, USE_R, USE_W, MIR(USE_A1), MIR(USE_A0), tone(0x2c2c2e, u->dim));
+        else arc(l, cx, cy, USE_R, USE_W, -MIR(USE_A0), -MIR(USE_A1), tone(0x2c2c2e, u->dim));
         if (!live) continue;
         int span = USE_SPAN * w->pct / 100;
         /* 0 % known: a round dot at the start, so known reads unlike unknown */
         if (span < 1) span = 1;
-        if (i) arc(l, cx, cy, USE_R, USE_W, USE_A0, USE_A0 + span, tone(rgb, u->dim));
-        else arc(l, cx, cy, USE_R, USE_W, -USE_A0 - span, -USE_A0, tone(rgb, u->dim));
+        if (i) arc(l, cx, cy, USE_R, USE_W, MIR(USE_A0 + span), MIR(USE_A0), tone(rgb, u->dim));
+        else arc(l, cx, cy, USE_R, USE_W, -MIR(USE_A0), -MIR(USE_A0 + span), tone(rgb, u->dim));
         int x, y;
         if (w->out >= 0) { /* where it runs out: a ring in the warning colour */
-            polar(cx, cy, USE_R, side * (USE_A0 + w->out), &x, &y);
+            polar(cx, cy, USE_R, side * MIR(USE_A0 + w->out), &x, &y);
             disc(l, x, y, USE_BEAD_R + 2, COL_BG);
             disc(l, x, y, USE_BEAD_R, tone(rgb == RGB_USAGE_OK ? RGB_AMBER : rgb, u->dim));
             disc(l, x, y, USE_BEAD_R - 2, COL_BG);
         }
         if (w->now >= 0) {
             /* the clock: a bead with a black rim, so it reads on the fill and on the track */
-            polar(cx, cy, USE_R, side * (USE_A0 + w->now), &x, &y);
+            polar(cx, cy, USE_R, side * MIR(USE_A0 + w->now), &x, &y);
             disc(l, x, y, USE_BEAD_R + 2, COL_BG);
             disc(l, x, y, USE_BEAD_R, tone(0xffffff, u->dim));
         }

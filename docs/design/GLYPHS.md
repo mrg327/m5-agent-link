@@ -48,7 +48,8 @@ word by word.
    - A menu is an orbit of discs around its subject (§3.5).
    - No rows of labels, no pills with words.
 6. **Button hints sit at the buttons.** What A and B do is a glyph in a thin ring at the rim, next to
-   the physical button: A lower left in amber, B lower right in blue (issue 20261125-d8b5: whether these sit beside the keys depends on which way up the watch is held). No letters.
+   the physical button: A upper left in amber, B upper right in blue, as the StopWatch's keys sit on its upper
+   rim when it is upright with USB at the bottom (issue 20261125-d8b5). No letters.
 7. **A result is a burst.** Approved, denied, sent, handed back to the computer: one hero glyph
    filling the centre, in its colour, then the screen moves on. No words.
 8. **An error is a sign.** One or two glyphs side by side ("computer, refused"). A rare diagnostic
@@ -157,11 +158,13 @@ leaves r 0 to 105 free.
 - Up to 8 items are spread evenly from 12 o'clock. More are shown 8 to a page, 45 degrees apart; the page
   of the selection is the one on screen, and pips under the subject say which.
 - `ui_orbit_set_geometry(o, radius, phase_deg)`: with key hints on the screen and 8 items use phase 22, so
-  the two lower discs straddle the hints.
-- `ui_orbit_set_arch(o, span_deg, max_pitch_deg)`: an arch instead of the whole circle, open at the bottom. The
-  discs of a page sit on an arc of `span_deg` centred on 12 o'clock, the first at its left end, no further apart
-  than `max_pitch_deg`. AGENT and READ use 222 and 50: the arc ends 24 degrees short of each key hint, and the
-  slot between the hints stays free for a row of content (`docs/design/glyphs/AGENT-READ.md`).
+  the two upper discs straddle the hints. An arch whose phase is in the lower half runs left to right along
+  the bottom.
+- `ui_orbit_set_arch(o, span_deg, max_pitch_deg)`: an arch instead of the whole circle. The discs of a page
+  sit on an arc of `span_deg` centred on the phase, the first at its left end, no further apart than
+  `max_pitch_deg`. AGENT and READ centre it on 6 o'clock (phase 180) with 222 and 50: open at the top, the arc
+  ends 24 degrees short of each key hint, and the subject and its text sit above it
+  (`docs/design/glyphs/AGENT-READ.md`).
 - The screen maps its input: the dial and button B to `ui_orbit_step(o, ±1)` (wraps, turns the page), a tap to
   `ui_orbit_hit(o, x, y)` (select that item, or run it when it is `ui_orbit_selected(o)`), button A to
   running the selection, a hold to `ui_orbit_set_hold(o, permille)`. `ui_orbit_count(o)`, `ui_orbit_select(o, i)`.
@@ -170,11 +173,14 @@ leaves r 0 to 105 free.
 
 Rule 6: the glyph for A and for B, each in a thin ring at the rim.
 
-- `ui_key_hint_create(parent, UI_KEY_A | UI_KEY_B)`, `ui_key_hint_set(hint, icon)`. A is at (101, 365) in amber
-  (`RGB_KEY_A`), B at (365, 365) in blue (`RGB_KEY_B`); the ring is r 20 and reaches r 207 from the screen
-  centre, clear of the countdown (r 213) and the index ring (r 218).
+- `ui_key_hint_create(parent, UI_KEY_A | UI_KEY_B)`, `ui_key_hint_set(hint, icon)`. A is at (101, 101) in amber
+  (`RGB_KEY_A`), B at (365, 101) in blue (`RGB_KEY_B`), beside the keys on the upper rim; the ring is r 20 and
+  reaches r 207 from the screen centre, clear of the countdown (r 213) and the index ring (r 218). KEYS uses
+  the same places: its candidates begin below them.
 - A hint is a disc: hide and show it like one; `ui_disc_set_hold()` fills a ring round it for a hold on the button.
-- The slot between the two hints is x 129 to 337 (208 px). Below y 345 a row is only that wide.
+- Above y 121 a row level with the hints is only as wide as the gap between them (x 125 to 341; ASK's title
+  and AGENT's question are 216 px). The bottom slot, x 129 to 337 below y 345, is as narrow by the round
+  glass alone: the toast, page dots and docks live there.
 - `theme_key_badge()` and `theme_key_badge_set_word()` keep their signatures and draw this: the word is
   looked up in the vocabulary (§3.8); a word without a glyph draws a dot, never letters. So every screen
   that has not been rebuilt already shows the hints. A rebuilt screen calls `ui_key_hint_*` directly.
@@ -191,9 +197,9 @@ Rule 6: the glyph for A and for B, each in a thin ring at the rim.
   side in a thin outlined capsule, both in `rgb`, 56 px high. `text` is content shown after them in white
   (what was sent, a short number), or NULL.
 - `ui_toast(words, rgb)` keeps its signature and its words (rule 9) and shows a sign from the vocabulary
-  between the key hints for 1.8 s. `Sent "…"` shows the glyph and what was sent. Words that have no glyph yet
+  in the bottom slot for 1.8 s. `Sent "…"` shows the glyph and what was sent. Words that have no glyph yet
   draw the info glyph: add a row to the vocabulary instead.
-- A screen that keeps content between the key hints (HOME does) is blanked there while a toast shows, so
+- A screen that keeps content in the bottom slot (HOME does) is blanked there while a toast shows, so
   the sign never sits on half a row: add the screen's mode to `toast_blanks_slot()` in `ui.c`.
 
 ### 3.8 Vocabulary: `theme_glyph(word)`
@@ -268,10 +274,10 @@ Built with the primitives, as the model for the rest (`ui_home_card.c`; renders:
   - A job: its progress is an arc inside the dot circle (r 76).
   - The summary below, two rows (text: rule 1), the first 300 px wide, the second 240. A finished session
     shows the done line there (`ui_done.c`), or its last message. On a request: the request's title and
-    two rows of its text (240 and 200 px: the last one is between the key hints).
+    two rows of its text (240 and 200 px: the last one is in the bottom slot).
   - A session that needs you: the hero glyph is the hand or the question, and a tap on it opens ASK (any
     tap in the centre does). No Answer / Review button; the report still says `Review` / `Answer`.
-  - Between the key hints, under the text: the agent graph strip (the summary then keeps one row), or the
+  - In the bottom slot, under the text: the agent graph strip (the summary then keeps one row), or the
     book disc (r 24) of a finished session with a last message, which opens READ; and the context gauge
     (`ui_gauges.c`), under whichever of them shows.
 - **Empty deck:** the clock in digits, alone.

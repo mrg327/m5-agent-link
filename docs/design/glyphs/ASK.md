@@ -48,8 +48,8 @@ A bare permission, or a question the watch can only dictate to or hand back.
 | the first item (Approve; Dictate; Open on PC when it is alone) | (304, 262); (233, 262) with no hold item beside it | r 74 | tick, orange; microphone, yellow; desktop, grey |
 | Deny | (140, 262) | r 52 | cross, vermillion |
 | Deny and Always allow together | (146, 218) and (146, 306) | r 36 | cross; double tick, orange |
-| a tap item that is not first (Dictate) | (233, 378), between the key hints | r 26 | microphone, yellow |
-| Open on PC | button A's hint (101, 365) | r 20 | desktop; ringed when selected |
+| a tap item that is not first (Dictate) | (233, 378), in the bottom slot | r 26 | microphone, yellow |
+| Open on PC | button A's hint (101, 101) | r 20 | desktop; ringed when selected |
 
 Unselected discs are grey with a light glyph. A grant that is still shut (the text has not been read,
 or the rule does not fit) is dim: it wakes in its colour when the last page has been on screen.

@@ -188,13 +188,14 @@ void ui_orbit_set_items(lv_obj_t *o, const ui_orbit_item_t *items, int n);
 /* the selected disc's colour: the session's state colour */
 void ui_orbit_set_accent(lv_obj_t *o, uint32_t rgb);
 /* Radius of the circle and where the first item sits. With key hints on the screen and 8 items use
- * phase 22: the two lower discs then straddle the hints instead of covering them. */
+ * phase 22: the two upper discs then straddle the hints instead of covering them. An arch whose
+ * phase is in the lower half (90 < phase < 270) runs left to right along the bottom. */
 void ui_orbit_set_geometry(lv_obj_t *o, int radius, int phase_deg);
 /* An arch instead of the whole circle: the discs of a page sit on an arc of `span_deg` centred on
  * the phase (12 o'clock by default), the first at its left end and the rest clockwise, no further
  * apart than `max_pitch_deg`; a few discs then sit together at the top. The orbit is open at the
- * bottom, where the key hints and a row of content are: AGENT and READ use 222 degrees, which ends
- * 24 degrees short of each hint. span 0 (the default) is the whole circle again. */
+ * top, where the key hints are: AGENT and READ centre it at 6 o'clock (phase 180) over 222 degrees,
+ * which ends 24 degrees short of each hint. span 0 (the default) is the whole circle again. */
 void ui_orbit_set_arch(lv_obj_t *o, int span_deg, int max_pitch_deg);
 void ui_orbit_select(lv_obj_t *o, int i);
 /* +1 / -1, wraps, turns the page; returns the new selection */
@@ -207,11 +208,12 @@ void ui_orbit_set_hold(lv_obj_t *o, int permille); /* the hold ring of the selec
 /* ── §3.6 key hints ── */
 
 typedef enum { UI_KEY_A, UI_KEY_B } ui_key_t;
-/* Hint positions: whether these sit beside the physical keys depends on which way up rotation 0 is
- * on the watch (issue 20261125-d8b5); the colours follow the keys (A yellow, B blue). */
-#define UI_KEY_A_X 101 /* lower left */
-#define UI_KEY_B_X 365 /* lower right */
-#define UI_KEY_Y 365
+/* Upright (USB at the bottom) the StopWatch's keys sit on the upper rim: A yellow at about 10:30, B
+ * blue at about 1:30 (M5Stack's photos; checked on the watch, issue 20261125-d8b5). Each hint sits
+ * just inside its key, in its colour. */
+#define UI_KEY_A_X 101 /* upper left, beside button A */
+#define UI_KEY_B_X 365 /* upper right, beside button B */
+#define UI_KEY_Y 101
 #define RGB_KEY_A 0xe69f00 /* the physical button is yellow-amber */
 #define RGB_KEY_B 0x2f7fe0 /* the physical button is blue */
 

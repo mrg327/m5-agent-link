@@ -37,8 +37,8 @@
 #include "ui_kit.h"
 #include "ui_theme.h"
 
-/* Geometry: centres. The content circle is r 205; the key hints sit at (101, 365) and (365,
- * 365). */
+/* Geometry: centres. The content circle is r 205; the key hints sit at (101, 101) and (365,
+ * 101), on the upper rim. */
 #define SIGIL_Y 50
 #define SIGIL_R 22
 #define MARK_Y 84
@@ -63,7 +63,7 @@
 #define LINE1_Y 316 /* the argument: two rows, as the deck's summary */
 #define LINE2_Y 340
 #define LINE1_W 300
-#define LINE2_W 220 /* its ends stop short of the key hints' rings */
+#define LINE2_W 220 /* its ends stay inside the round glass */
 #define DOTS_R 88   /* not working: the time in state round the glyph */
 #define DONE_ROW_Y 320
 

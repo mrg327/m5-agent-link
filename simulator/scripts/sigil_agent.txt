@@ -5,8 +5,8 @@
 connect
 rx a400020101020103a70082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f5
 rtc 1800000000
-# ── a working session: six discs, left to right: Activity (93,287), Graph (95,173), Notify (176,94),
-#    Snooze (290,94), Reply now (371,173), Stop (373,287)
+# ── a working session: six discs along the bottom, left to right: Activity (93,179), Graph (95,293),
+#    Notify (176,372), Snooze (290,372), Reply now (371,293), Stop (373,179)
 session 1 work webapp feat/login Running the test suite
 wait 300
 tap 233 233
@@ -22,7 +22,7 @@ px_reset
 wait 2000
 expect_px_max 0
 # a tap on Stop (a hold item, beyond the centre zone) selects it and says why it did nothing more
-tap 373 287
+tap 373 179
 wait 300
 expect_screen agent
 expect_label > Stop
@@ -30,7 +30,7 @@ expect_label Hold to stop
 shot sigil_agent_stop_toast.png
 wait 2200
 # the hold fills the disc's ring and the bezel; letting go early stops nothing
-press 373 287
+press 373 179
 wait 800
 shot sigil_agent_hold.png
 release
@@ -110,7 +110,7 @@ btn B long
 wait 300
 remote 1 0
 # ── the agent asked something: Reply lists its own answers first, under the question, then the user's replies,
-#    then Dictate and Keyboard as discs between the key hints
+#    then Dictate and Keyboard as discs at the bottom
 rx a30004010603a500010204081a6aee3224117653686f756c64204920666c617368206974206e6f773f12826d5965732c20676f206168656164624e6f
 wait 300
 tap 233 233
@@ -166,7 +166,7 @@ wait 300
 expect_screen ring
 expect_label Sent "No"
 wait 2200
-# ── READ: a finished session's last message, three pages; the page dots sit between the key hints
+# ── READ: a finished session's last message, three pages; the page dots sit at the bottom
 session 2 done api main
 message 2 7 Built and flashed the new reader. The watch now shows what the agent said when a turn ends.\n\nWhat changed:\n• the daemon keeps the final message of each session\n• the finished card shows its first lines\n• Read opens all of it in pages\n• Reply and Dictate wait at the end\n\nChecks:\n  cargo test --workspace\n  ctest --test-dir build/sim\n\nThe firmware build fits: 183 KB of internal RAM left for BLE.\n\nShould I also show it on the Activity screen?
 wait 400
@@ -205,7 +205,7 @@ expect_label Reading 4 of 4
 shot sigil_read_last.png
 btn B
 wait 350
-# the end: Dictate (88,194), Reply (170,97), Read again (296,97), Open on PC (378,194)
+# the end: Dictate (88,272), Reply (170,369), Read again (296,369), Open on PC (378,272)
 expect_label Answer it
 expect_label > Dictate
 expect_label Reply
@@ -217,7 +217,7 @@ wait 150
 expect_label > Reply
 shot sigil_read_end_reply.png
 # Read again is the disc you touch: back to the first page
-tap 296 97
+tap 296 369
 wait 400
 expect_screen read
 expect_label Last message

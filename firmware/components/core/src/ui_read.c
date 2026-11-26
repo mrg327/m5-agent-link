@@ -32,18 +32,19 @@
 #define READ_Y 124
 #define READ_W 320
 #define READ_LINES 7
-#define PIPS_Y UI_KEY_Y /* the page dots: on the key-hint row, between the two hints */
-#define LOAD_R 9        /* the ring that fills as the message arrives */
+#define PIPS_Y 365 /* the page dots: at the bottom, clear of the key hints */
+#define LOAD_R 9   /* the ring that fills as the message arrives */
 #define LOAD_W 3
 #define LOAD_GAP 20                     /* from the last page dot to the ring's centre */
 #define LOAD_HALF (LOAD_R + LOAD_W + 2) /* half the side of the ring's own small parent */
-/* the end: an orbit over the sigil, the message's last lines under it */
+/* the end: the sigil and the message's last lines under it, an orbit along the bottom (open at the
+ * top, where the key hints are) */
 #define ARCH_SPAN 222
 #define ARCH_PITCH 50
-#define END_SIGIL_Y 204
+#define END_SIGIL_Y 140
 #define END_SIGIL_R 40
-#define TAIL_Y 262 /* top of three lines */
-#define TAIL_W 250
+#define TAIL_Y 196 /* top of three lines */
+#define TAIL_W 220
 #define TAIL_LINES 3
 
 enum { END_DICTATE = 1, END_REPLY, END_AGAIN, END_OPEN };
@@ -522,6 +523,7 @@ lv_obj_t *ui_read_init(lv_obj_t *screen)
     /* the end: the actions arched over the sigil, the message's last lines under it */
     s_end_box = box(s_root, 0, 0, UI_SIZE, UI_SIZE);
     s_orbit = ui_orbit_create(s_end_box);
+    ui_orbit_set_geometry(s_orbit, UI_ORBIT_R, 180); /* open at the top: the key hints */
     ui_orbit_set_arch(s_orbit, ARCH_SPAN, ARCH_PITCH);
     s_end_sigil = ui_sigil_create(s_end_box, UI_CX, END_SIGIL_Y, END_SIGIL_R);
     s_tail = lv_label_create(s_end_box);

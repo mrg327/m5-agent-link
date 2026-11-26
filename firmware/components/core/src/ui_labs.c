@@ -16,7 +16,7 @@
 #include "ui_theme.h"
 
 #define SUBJECT_Y 233
-/* between the key hints: the toast a refused tap shows is the same sign, in the same place */
+/* in the bottom slot: the toast a refused tap shows is the same sign, in the same place */
 #define SIGN_Y UI_Y_TOAST
 
 enum { LAB_TRACKPAD, LAB_COUNT };

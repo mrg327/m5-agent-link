@@ -14,7 +14,7 @@ shot job_menu_ended.png
 tap 233 226
 wait 300
 expect_label Hold to run again
-hold 170 97 1500
+hold 170 369 1500
 wait 400
 expect_screen ring
 quit

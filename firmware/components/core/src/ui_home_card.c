@@ -8,7 +8,7 @@
  *   - its state as one hero glyph in the state colour, the time in that state as dots round it, a
  *     job's progress as an arc inside the dots;
  *   - what it says: the summary, the done line or the last message, or what it asks (text: rule 1);
- *   - between the two key hints: the agent graph, the context gauge, the book disc that opens READ.
+ *   - in the bottom slot: the agent graph, the context gauge, the book disc that opens READ.
  * A tap on the hero glyph of a session that needs you opens ASK (nav.c: any centre tap does), as
  * the Answer / Review button did; the report still names it so. The empty deck is the clock alone;
  * the ambient face is the clock, dim, with the sigil and a small state glyph under it.
@@ -28,8 +28,9 @@
 #include "ui_kit.h"
 #include "ui_theme.h"
 
-/* Geometry: centres, top to bottom. The content circle is r 205; the key hints sit at (101, 365)
- * and (365, 365), so below y 345 a row is only as wide as the gap between them. */
+/* Geometry: centres, top to bottom. The content circle is r 205; the key hints sit at (101, 101)
+ * and (365, 101), on the upper rim. Below y 345 the round glass leaves the bottom slot about as
+ * wide as it was between the old lower hints, x 129..337, and the rows keep that width. */
 #define SIGIL_Y 50
 #define SIGIL_R 22
 #define MARK_Y 84 /* the marks row: 20 px glyphs, grey */
@@ -44,9 +45,9 @@
 #define LINE2_Y 340
 #define LINE3_Y 364   /* only a request has a third row */
 #define SUMMARY_W 300 /* the first row */
-#define LINE2_W 240   /* its ends stop short of the key hints' rings, which begin at y 345 */
-#define LINE3_W 200   /* between the key hints */
-#define SLOT_X 129    /* the slot between the key hints: x 129..337 */
+#define LINE2_W 240   /* its ends stay inside the round glass above the bottom slot */
+#define LINE3_W 200   /* the bottom slot */
+#define SLOT_X 129    /* the bottom slot: x 129..337 */
 #define SLOT_W 208
 #define STRIP_Y 374 /* the agent graph, under a one-line summary */
 /* ui_graph.c: the strip is 300 x 56, its newest call at the right edge */
@@ -187,7 +188,7 @@ static bool has_message(const session_t *s, const home_slot_t *sl)
 
 bool ui_home_read_hit(int x, int y) { return s_read_shown && ui_disc_hit(s_read, x, y); }
 
-/* The graph strip, where it shows: its window between the key hints (the strip itself is wider). */
+/* The graph strip, where it shows: its window in the bottom slot (the strip itself is wider). */
 bool ui_home_strip_hit(int x, int y)
 {
     return x >= SLOT_X - UI_DISC_SLACK && x <= SLOT_X + SLOT_W + UI_DISC_SLACK &&
@@ -520,7 +521,7 @@ void ui_home_card_update(void)
         /* DONE-SUMMARY.md: the done line takes the stale last step's place. LAST-MESSAGE.md: a
          * finished agent shows the start of what it said, in its own words, and the book disc */
         bool done_line = ui_done_update(s, !msg && !sl->n_merged && !back && !theme_is_job(s), off);
-        /* the agent graph (GRAPH.md §5): between the key hints, when nothing else holds the slot */
+        /* the agent graph (GRAPH.md §5): in the bottom slot, when nothing else holds it */
         strip = ui_graph_strip_update(s, !msg && !sl->n_merged);
         /* a job says what runs: its command line, or just the program when the daemon withholds
          * that */
@@ -643,7 +644,7 @@ void ui_home_card_create(lv_obj_t *centre)
     s_done_box = box(s_centre, 0, LINE1_Y - DONE_OWN_Y, UI_SIZE, UI_SIZE);
     ui_done_create(s_done_box);
     /* the graph strip is 300 px wide and fills from its right edge: it sits in a window as wide as
-     * the gap between the key hints, its right edge on the window's, so the newest calls are the
+     * the bottom slot, its right edge on the window's, so the newest calls are the
      * ones in sight */
     s_strip_clip = box(s_centre, SLOT_X, STRIP_Y - STRIP_H / 2, SLOT_W, STRIP_H);
     lv_obj_t *strip_at = box(s_strip_clip, SLOT_W - (UI_CX + STRIP_W / 2), 0, UI_SIZE, STRIP_H);

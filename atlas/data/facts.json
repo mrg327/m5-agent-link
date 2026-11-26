@@ -1387,7 +1387,7 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:179"
+      "source": "firmware/components/core/src/ui.c:178"
     },
     {
       "id": "attention",
@@ -1397,12 +1397,12 @@
     {
       "id": "agent",
       "title": "Agent wheel",
-      "source": "firmware/components/core/src/ui_agent.c:604"
+      "source": "firmware/components/core/src/ui_agent.c:605"
     },
     {
       "id": "ask",
       "title": "Ask · the request and its options",
-      "source": "firmware/components/core/src/ui_ask.c:1518"
+      "source": "firmware/components/core/src/ui_ask.c:1520"
     },
     {
       "id": "scroll",
@@ -1412,7 +1412,7 @@
     {
       "id": "status",
       "title": "Status · link, battery, quiet mode",
-      "source": "firmware/components/core/src/ui_status.c:531"
+      "source": "firmware/components/core/src/ui_status.c:532"
     }
   ],
   "haptics": {
@@ -5769,8 +5769,8 @@
     "gesture.swipe_max_ms": "firmware/components/core/src/gesture.h:9",
     "gesture.swipe_min_px": "firmware/components/core/src/gesture.h:8",
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
-    "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:1481",
-    "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:1413",
+    "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:1483",
+    "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:1415",
     "gesture_map.chord": "firmware/components/core/src/app.c:646",
     "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:199",
     "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:216",
@@ -5828,8 +5828,8 @@
     "ring.band_out_px": "firmware/components/core/src/ui_ring_internal.h:16",
     "ring.band_w_px": "firmware/components/core/src/ui_ring_internal.h:17",
     "ring.done_sweep_ms": "firmware/components/core/src/ui_ring_internal.h:41",
-    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:665",
-    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:665",
+    "ring.edge_hint_a": "firmware/components/core/src/ui_home_card.c:666",
+    "ring.edge_hint_b": "firmware/components/core/src/ui_home_card.c:666",
     "ring.error_flicker_ms": "firmware/components/core/src/ui_ring_internal.h:42",
     "ring.hero_px": "firmware/components/core/src/ui_theme.h:37",
     "ring.hint_a_deg": "firmware/components/core/src/ui_theme.h:80",
@@ -5843,8 +5843,8 @@
     "ring.nothing_else": "firmware/components/core/src/ui_home.c:219",
     "ring.others_pct": "firmware/components/core/src/ui_ring_internal.h:23",
     "ring.perm_period_ms": "firmware/components/core/src/ui_ring_internal.h:40",
-    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:542",
-    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:665",
+    "ring.pill_approve": "firmware/components/core/src/ui_home_card.c:543",
+    "ring.pill_done": "firmware/components/core/src/ui_home_card.c:666",
     "ring.prog_out_px": "firmware/components/core/src/ui_ring_internal.h:31",
     "ring.prog_w_px": "firmware/components/core/src/ui_ring_internal.h:32",
     "ring.repo_px": "firmware/components/core/src/ui_theme.h:26",
@@ -5852,16 +5852,16 @@
     "ring.seg_gap_deg": "firmware/components/core/src/ui_ring_internal.h:20",
     "ring.sel_out_px": "firmware/components/core/src/ui_ring_internal.h:18",
     "ring.sel_w_px": "firmware/components/core/src/ui_ring_internal.h:19",
-    "ring.sigil_r_px": "firmware/components/core/src/ui_home_card.c:34",
-    "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:46",
-    "ring.time_dots_r_px": "firmware/components/core/src/ui_home_card.c:39",
+    "ring.sigil_r_px": "firmware/components/core/src/ui_home_card.c:35",
+    "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:47",
+    "ring.time_dots_r_px": "firmware/components/core/src/ui_home_card.c:40",
     "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:38",
     "screens": "firmware/components/core/src/ui_home.c:358",
-    "screens.agent": "firmware/components/core/src/ui_agent.c:604",
-    "screens.ask": "firmware/components/core/src/ui_ask.c:1518",
+    "screens.agent": "firmware/components/core/src/ui_agent.c:605",
+    "screens.ask": "firmware/components/core/src/ui_ask.c:1520",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:408",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:95",
-    "screens.status": "firmware/components/core/src/ui_status.c:531",
+    "screens.status": "firmware/components/core/src/ui_status.c:532",
     "sounds.approved-chime": "firmware/components/core/src/sound_bank.c:163",
     "sounds.approved-rise": "firmware/components/core/src/sound_bank.c:161",
     "sounds.denied-drop": "firmware/components/core/src/sound_bank.c:165",

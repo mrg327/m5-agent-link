@@ -1,5 +1,5 @@
 # Safety (UI-V3 §3.3): a hold acts on the disc under the finger. Discs of a working session: Activity
-# (selected, at 88,194), Notify when done (170,97), Snooze (296,97), Stop (378,194, a hold item). Holding 1.5 s on
+# (selected, at 88,272), Notify when done (170,369), Snooze (296,369), Stop (378,272, a hold item). Holding 1.5 s on
 # the Stop disc while Activity is selected must not stop the session (op 6); with Stop selected, a hold
 # on the Notify disc must not stop it either.
 connect
@@ -10,14 +10,14 @@ tap 233 233
 wait 400
 expect_screen agent
 expect_label > Activity
-hold 378 194 1500
+hold 378 272 1500
 wait 300
 expect_screen agent
 expect_label > Activity
-tap 378 194
+tap 378 272
 wait 300
 expect_label > Stop
-hold 170 97 1500
+hold 170 369 1500
 wait 300
 expect_screen agent
 expect_label > Stop
