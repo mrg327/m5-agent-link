@@ -113,3 +113,4 @@
 #define ICON_LABS "\xEE\x97\xA4"       /* atom e5e4: the experiments */
 #define ICON_CURSOR "\xEE\x87\x9C"     /* cursor e1dc: the pointer of the PC */
 #define ICON_LEFT_CLICK "\xEE\x8C\xB4" /* mouse-left-click e334 */
+#define ICON_DICE "\xEE\x87\xAE"       /* dice-five e1ee: the toys (coin, die, oracle) */
