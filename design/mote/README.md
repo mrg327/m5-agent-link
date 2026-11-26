@@ -22,8 +22,10 @@ Generated files (S-GEN-01: never edit them; change `mote.toml` or `gen.py`, reru
 | `atlas/css/mote.generated.css` | `--mote-*` custom properties, the orb and halo gradients, `@keyframes mote-breath` |
 | `atlas/img/mote.svg` | The orb at size M (60 px), halo as a radial gradient |
 | `atlas/img/favicon-{16,32,96}.svg` | The favicon: a black disc, a grey rim, the orb at about 1:30 |
+| `atlas/img/favicon-{32,180}.png` | The same favicon as PNG, for browsers without SVG icons and the iOS home screen |
 | `daemon/crates/agentlink/src/mote.rs` | `MOTE_RGB` and `MOTE_ANSI256` (223) for the CLI's status mark |
 
-Nothing reads the outputs yet: the firmware renderer, the Atlas page, the favicon in `index.html` and
-the CLI are wired to them in later changes. The breath scales the halo's alpha only, so one sprite per
+The Atlas page reads the CSS and the favicons (the brand mark, the caption light and the hero drift,
+issue 20261126-b92e) and the root `README.md` shows `favicon-96.svg`; the firmware renderer and the CLI
+are wired to their outputs in later changes. The breath scales the halo's alpha only, so one sprite per
 size serves every frame and the core stays crisp; the renderer draws the core over the sprite.

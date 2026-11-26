@@ -23,6 +23,7 @@ atlas/css/tokens.generated.css linguist-generated=true
 atlas/css/mote.generated.css linguist-generated=true
 atlas/img/mote.svg linguist-generated=true
 atlas/img/favicon-*.svg linguist-generated=true
+atlas/img/favicon-*.png linguist-generated=true
 firmware/components/core/src/mote_look.h linguist-generated=true
 daemon/crates/agentlink/src/mote.rs linguist-generated=true
 atlas/vendor/watch.* linguist-generated=true

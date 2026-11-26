@@ -221,6 +221,7 @@ GENERATED = [
     "atlas/css/mote.generated.css",
     "atlas/img/mote.svg",
     "atlas/img/favicon-*.svg",
+    "atlas/img/favicon-*.png",
     f"{CORE}/src/mote_look.h",
     "daemon/crates/agentlink/src/mote.rs",
     "atlas/vendor/watch.*",

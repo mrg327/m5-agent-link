@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import argparse
 import math
+import struct
 import sys
 import tomllib
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -31,6 +33,7 @@ OUT_C = "firmware/components/core/src/mote_look.h"
 OUT_CSS = "atlas/css/mote.generated.css"
 OUT_SVG = "atlas/img/mote.svg"
 OUT_FAVICON = "atlas/img/favicon-{size}.svg"
+OUT_FAVICON_PNG = "atlas/img/favicon-{size}.png"
 OUT_RUST = "daemon/crates/agentlink/src/mote.rs"
 
 SUPERSAMPLE = 4  # samples per pixel side when rendering a sprite
@@ -38,6 +41,16 @@ SIZE_ORDER = ("s", "tucked", "m", "l", "ember")
 _LEVELS = ("lit", "idle", "night", "ember")
 _BREATH = ("period_ms", "halo_min", "halo_max")
 _FLARE = ("halo_scale", "rise_ms", "fall_ms")
+_FAVICON_KEYS = (
+    "sizes",
+    "png_sizes",
+    "disc",
+    "rim",
+    "rim_ratio",
+    "orb_clock",
+    "orb_offset",
+    "core_ratio",
+)
 
 
 class ProfileError(ValueError):
@@ -132,7 +145,7 @@ def load(path: Path) -> Look:
         sizes[name] = Size(name, core_r, halo_r, sprite)
     brand = _table(doc, "brand")
     fav = _table(doc, "favicon")
-    for key in ("sizes", "disc", "rim", "rim_ratio", "orb_clock", "orb_offset", "core_ratio"):
+    for key in _FAVICON_KEYS:
         _get(fav, key, (list, str, int, float), "favicon")
     for key in ("size", "svg_size"):
         if brand.get(key) not in sizes:
@@ -396,18 +409,47 @@ def gen_svg(look: Look) -> str:
     return "\n".join(lines) + "\n"
 
 
-def gen_favicon(look: Look, size: int) -> str:
-    """The favicon at one size: a black disc, a thin grey rim, the orb at about 1:30."""
+@dataclass(frozen=True)
+class FaviconGeom:
+    """The favicon's shapes at one size, in px."""
+
+    c: float  # the centre, on both axes
+    rim: float  # rim width
+    disc_r: float  # the rim stroke's centre line
+    inner_r: float  # the disc inside the rim
+    ox: float  # the orb's centre
+    oy: float
+    core_r: float
+    halo_r: float
+
+
+def favicon_geom(look: Look, size: int) -> FaviconGeom:
+    """Lay out the favicon at one size: the disc, its rim and the orb at about 1:30."""
     fav = look.favicon
     c = size / 2
     rim = max(1.0, size * float(fav["rim_ratio"]))
-    disc_r = c - rim / 2
     inner_r = c - rim
     angle = math.radians(30 * float(fav["orb_clock"]))
     off = float(fav["orb_offset"]) * inner_r
-    ox, oy = c + off * math.sin(angle), c - off * math.cos(angle)
     core_r = max(1.5, size * float(fav["core_ratio"]))
-    halo_r = core_r * look.halo_ratio
+    return FaviconGeom(
+        c=c,
+        rim=rim,
+        disc_r=c - rim / 2,
+        inner_r=inner_r,
+        ox=c + off * math.sin(angle),
+        oy=c - off * math.cos(angle),
+        core_r=core_r,
+        halo_r=core_r * look.halo_ratio,
+    )
+
+
+def gen_favicon(look: Look, size: int) -> str:
+    """The favicon at one size: a black disc, a thin grey rim, the orb at about 1:30."""
+    fav = look.favicon
+    g = favicon_geom(look, size)
+    c, rim, disc_r, inner_r = g.c, g.rim, g.disc_r, g.inner_r
+    ox, oy, core_r, halo_r = g.ox, g.oy, g.core_r, g.halo_r
     disc = _hex(_rgb(str(fav["disc"]), "favicon.disc"))
     rim_col = _hex(_rgb(str(fav["rim"]), "favicon.rim"))
     lines = [
@@ -435,6 +477,63 @@ def gen_favicon(look: Look, size: int) -> str:
     return "\n".join(lines) + "\n"
 
 
+def gen_favicon_png(look: Look, size: int) -> bytes:
+    """The favicon as an RGBA PNG, for browsers without SVG icons and the iOS home screen.
+
+    Rendered from the same layout as the SVG with the exact falloff, SUPERSAMPLE x SUPERSAMPLE
+    samples per pixel. Deterministic, so --check can compare bytes.
+    """
+    fav = look.favicon
+    g = favicon_geom(look, size)
+    disc = _rgb(str(fav["disc"]), "favicon.disc")
+    rim_col = _rgb(str(fav["rim"]), "favicon.rim")
+    n = SUPERSAMPLE
+    rows = bytearray()
+    for y in range(size):
+        rows.append(0)  # filter: none
+        for x in range(size):
+            acc = [0.0, 0.0, 0.0, 0.0]  # premultiplied r, g, b and the alpha
+            for j in range(n):
+                for i in range(n):
+                    px = x + (i + 0.5) / n
+                    py = y + (j + 0.5) / n
+                    d = math.hypot(px - g.c, py - g.c)
+                    if d > g.c:
+                        continue
+                    if d > g.inner_r:
+                        col: tuple[float, float, float] = rim_col
+                    else:
+                        do = math.hypot(px - g.ox, py - g.oy)
+                        a = 1.0 if do <= g.core_r else halo_alpha(look, do, g.core_r, g.halo_r)
+                        col = (
+                            disc[0] + (look.rgb[0] - disc[0]) * a,
+                            disc[1] + (look.rgb[1] - disc[1]) * a,
+                            disc[2] + (look.rgb[2] - disc[2]) * a,
+                        )
+                    acc[0] += col[0]
+                    acc[1] += col[1]
+                    acc[2] += col[2]
+                    acc[3] += 1.0
+            cover = acc[3]
+            if cover == 0:
+                rows += b"\0\0\0\0"
+                continue
+            rows += bytes(round(acc[k] / cover) for k in range(3))
+            rows.append(round(255 * cover / (n * n)))
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        body = kind + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
+
+    ihdr = struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0)  # 8-bit RGBA
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", ihdr)
+        + chunk(b"IDAT", zlib.compress(bytes(rows), 9))
+        + chunk(b"IEND", b"")
+    )
+
+
 def gen_rust(look: Look) -> str:
     """The CLI's colour constants (not yet in the module tree)."""
     r, g, b = look.rgb
@@ -450,9 +549,9 @@ def gen_rust(look: Look) -> str:
     )
 
 
-def outputs(look: Look) -> dict[str, str]:
-    """Every output, as repository-relative path -> text."""
-    out = {
+def outputs(look: Look) -> dict[str, str | bytes]:
+    """Every output, as repository-relative path -> text, or bytes for an image."""
+    out: dict[str, str | bytes] = {
         OUT_C: gen_c(look),
         OUT_CSS: gen_css(look),
         OUT_SVG: gen_svg(look),
@@ -462,7 +561,19 @@ def outputs(look: Look) -> dict[str, str]:
         if not isinstance(size, int) or isinstance(size, bool):
             raise ProfileError(f"favicon.sizes: expected px as integers, got {size!r}")
         out[OUT_FAVICON.format(size=size)] = gen_favicon(look, size)
+    for size in look.favicon["png_sizes"]:
+        if not isinstance(size, int) or isinstance(size, bool):
+            raise ProfileError(f"favicon.png_sizes: expected px as integers, got {size!r}")
+        out[OUT_FAVICON_PNG.format(size=size)] = gen_favicon_png(look, size)
     return out
+
+
+def _same(path: Path, data: str | bytes) -> bool:
+    if not path.exists():
+        return False
+    if isinstance(data, bytes):
+        return path.read_bytes() == data
+    return path.read_text(encoding="utf-8") == data
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -476,21 +587,20 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{SRC}:1: S-GEN-01 {e} - fix the profile", file=sys.stderr)
         return 1
     if args.check:
-        stale = [
-            p
-            for p, text in files.items()
-            if not (ROOT / p).exists() or (ROOT / p).read_text(encoding="utf-8") != text
-        ]
+        stale = [p for p, data in files.items() if not _same(ROOT / p, data)]
         for p in stale:
             print(f"{p}:1: S-GEN-01 stale Mote output - run: python3 {SELF}", file=sys.stderr)
         if stale:
             return 1
         print(f"mote look up to date ({len(files)} files)")
         return 0
-    for p, text in files.items():
+    for p, data in files.items():
         dest = ROOT / p
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(text, encoding="utf-8")
+        if isinstance(data, bytes):
+            dest.write_bytes(data)
+        else:
+            dest.write_text(data, encoding="utf-8")
     print(f"wrote {len(files)} files from {SRC}")
     return 0
 

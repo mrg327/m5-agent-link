@@ -1,4 +1,5 @@
-# m5-agent-link
+<!-- markdownlint-disable-next-line MD033 -- the Mote mark: Markdown images cannot set a size -->
+# <img src="atlas/img/favicon-96.svg" width="44" height="44" alt=""> m5-agent-link
 
 A wearable control surface for AI coding agents. A small device (initially the
 **M5Stack StopWatch**) shows the state of your GitHub Copilot CLI, Copilot cloud

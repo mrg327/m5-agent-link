@@ -222,7 +222,7 @@ code follows today; the include script makes them visible.
 | `protocol/fixtures/ota/{base,new}.bin`, `python.patch` | `uv run protocol/fixtures/ota/gen.py` | none |
 | `protocol/fixtures/ota/rust.patch` | the `agentlink-delta` test | `checked: cargo test` (compares) |
 | `atlas/data/facts.json`, `atlas/css/tokens.generated.css` | `python3 atlas/tools/extract.py` (firmware, protocol, daemon sources) | `checked: atlas.yml` (`--check`) |
-| `firmware/components/core/src/mote_look.h`, `atlas/css/mote.generated.css`, `atlas/img/{mote,favicon-*}.svg`, `daemon/crates/agentlink/src/mote.rs` | `python3 design/mote/gen.py` (`design/mote/mote.toml`) | `checked: scripts/check structure` (`--check`) |
+| `firmware/components/core/src/mote_look.h`, `atlas/css/mote.generated.css`, `atlas/img/{mote,favicon-*}.svg`, `atlas/img/favicon-*.png`, `daemon/crates/agentlink/src/mote.rs` | `python3 design/mote/gen.py` (`design/mote/mote.toml`) | `checked: scripts/check structure` (`--check`) |
 | `atlas/vendor/watch.{js,wasm}` | `atlas/wasm/build.sh` (core + LVGL, Emscripten) | none (needs Emscripten) |
 | `firmware/components/core/src/fonts/font_*.c` | `firmware/tools/fonts/gen.mjs` (lv_font_conv, `tabular.py`) | partial: `test_fonts` (equal-width digits) |
 | `daemon/crates/agentlink-keys/data/english.txt` | `data/build_lexicon.py` (a SCOWL checkout) | none (input not in the repo) |

@@ -12,7 +12,10 @@
 <meta property="og:description" content="Agent hooks → daemon → USB/BLE → a round watch. It buzzes when an agent needs you; press a key and its terminal comes forward. An interactive tour.">
 <meta property="og:site_name" content="AgentLink Atlas">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3CradialGradient id='g' cx='40%25' cy='35%25' r='70%25'%3E%3Cstop offset='0' stop-color='%2358a6ff'/%3E%3Cstop offset='1' stop-color='%2305060a'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='32' cy='32' r='30' fill='%23181a20'/%3E%3Ccircle cx='32' cy='32' r='24' fill='url(%23g)'/%3E%3Crect x='3' y='14' width='6' height='10' rx='3' fill='%23f0c419' transform='rotate(-30 6 19)'/%3E%3Crect x='55' y='14' width='6' height='10' rx='3' fill='%232f7fe0' transform='rotate(30 58 19)'/%3E%3C/svg%3E">
+<!-- The Mote favicon (design/mote/gen.py): SVG where supported, PNG for the rest and iOS -->
+<link rel="icon" href="atlas/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="atlas/img/favicon-96.svg" sizes="any" type="image/svg+xml">
+<link rel="apple-touch-icon" href="atlas/img/favicon-180.png">
 <link rel="stylesheet" href="atlas/css/base.css">
 <link rel="stylesheet" href="atlas/css/stage.css">
 <link rel="stylesheet" href="atlas/css/chapters.css">
@@ -37,7 +40,7 @@
 </div>
 
 <header class="topbar" id="topbar">
-  <a class="topbar__brand" href="#intro" aria-label="AgentLink Atlas, back to top"><i class="topbar__dot" aria-hidden="true"></i>AgentLink<span> Atlas</span></a>
+  <a class="topbar__brand" href="#intro" aria-label="AgentLink Atlas, back to top"><i class="mote mote--breath" aria-hidden="true"></i>AgentLink<span> Atlas</span></a>
   <nav class="rail" aria-label="Chapters">
     <ol>
       <li><a href="#intro" data-nav="intro"><b>00</b><span>Hello</span></a></li>
@@ -66,6 +69,7 @@
 <main id="main">
 
   <section class="chapter chapter--hero" data-chapter="intro" data-layout="hero" id="intro" aria-labelledby="intro-title">
+    <span class="hero__mote" aria-hidden="true"><i class="mote mote--m mote--breath"></i></span>
     <div class="chapter__inner hero">
       <div class="hero__copy">
         <p class="chapter__eyebrow"><span class="mono">M5Stack StopWatch</span> · AgentLink</p>
@@ -78,7 +82,7 @@
           <li title="Hold to approve">✓</li>
           <li title="Done, key A">A</li>
         </ol>
-        <p class="hero__caption" aria-live="polite"><i class="hero__led" aria-hidden="true"></i><span id="hero-caption">Waiting for the watch…</span></p>
+        <p class="hero__caption" aria-live="polite"><i class="hero__led mote" data-ember aria-hidden="true"></i><span id="hero-caption">Waiting for the watch…</span></p>
         <div class="hero__tools">
           <button class="btn" type="button" id="hero-replay">Replay demo</button>
           <span class="hero__hint">Tap the watch.<span class="hero__hint-keys"> Keys <kbd class="kbd">A</kbd> and <kbd class="kbd">B</kbd> on your keyboard press its two keys.</span> Home: hold <kbd class="kbd">A</kbd>+<kbd class="kbd">B</kbd>, or swipe →.</span>

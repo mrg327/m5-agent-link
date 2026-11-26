@@ -57,6 +57,7 @@ svg_size = "m" # atlas/img/mote.svg
 # A black disc with a thin grey rim and the orb off-centre at about 1:30.
 [favicon]
 sizes = [16, 32, 96]
+png_sizes = [32, 180] # the same icon as PNG: browsers without SVG icons, the iOS home screen
 disc = "#000000"
 rim = "#3A3A3C"
 rim_ratio = 0.03125 # rim width / icon size, at least 1 px

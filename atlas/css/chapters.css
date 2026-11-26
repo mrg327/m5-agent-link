@@ -78,7 +78,9 @@
 .hero__beats li[data-past] { opacity: .85; color: var(--c); border-color: color-mix(in srgb, var(--c) 45%, transparent); }
 .hero__beats li[data-on] { opacity: 1; color: #05060a; background: var(--c); border-color: var(--c); box-shadow: 0 0 14px -2px var(--c); }
 .hero__caption { display: flex; align-items: center; gap: .7rem; font: 500 var(--t-sm)/1.3 var(--font-mono); color: var(--paper-2); margin-bottom: var(--s-5); min-height: 1.4em; }
-.hero__led { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--glow); box-shadow: 0 0 10px 1px var(--glow); transition: background var(--dur-3); }
+/* the caption light is the Mote (base.css): an ember while the watch loads, lit once it shows a screen */
+.hero__led { margin: 0 .15rem; }
+.hero__led[data-ember] { margin: 0 calc(.15rem + (var(--mote-brand-core) - var(--mote-ember-core)) / 2); } /* the text stays put when it lights */
 .hero__tools { display: flex; flex-wrap: wrap; gap: var(--s-4); align-items: center; }
 .hero__hint { color: var(--muted); font-size: var(--t-sm); }
 .hero__note { color: var(--muted); font-size: var(--t-sm); max-width: 28rem; margin: calc(-1 * var(--s-5)) 0 var(--s-6); }
@@ -87,7 +89,34 @@
 .hero__scroll { position: absolute; left: 0; bottom: 0; display: flex; align-items: center; gap: .8rem; font: 500 var(--t-xs)/1 var(--font-sans); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
 .hero__scroll i { width: 1px; height: 2.6rem; background: linear-gradient(var(--paper), transparent); transform-origin: top; animation: drip 2.4s var(--ease-io) infinite; }
 @keyframes drip { 0% { transform: scaleY(0); } 60% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
+/* The hero's Mote (intro.js): it drifts in once, settles by the watch's rim, leaves on the story's
+   request beat and fades back afterwards. --mx/--my: its place, from the watch's centre in the stage's
+   600 px frame (stage.css --sx/--sy/--ss), outside the rim between key A (10:30) and 12. Absolute in the
+   hero, so it scrolls away with the copy and stays under the stage: it never covers text or the screen.
+   [data-state]: unset hidden, "in" here, "away" gone (fast), "back" here again (slow fade only). */
+.hero__mote {
+  --mx: -132px; --my: -318px;
+  position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; opacity: 0;
+  transform: translate(calc(var(--sx) + var(--mx) * var(--ss)), calc(var(--sy) + var(--my) * var(--ss))) translate(-50%, -50%);
+  transition: opacity 320ms ease-out, visibility 0s 320ms; visibility: hidden;
+}
+.hero__mote .mote { display: block; }
+.hero__mote[data-state] { visibility: visible; transition: opacity 320ms ease-out; }
+.hero__mote[data-state="in"], .hero__mote[data-state="back"] { opacity: 1; }
+.hero__mote[data-state="in"] .mote { animation: hero-mote-in 3.2s var(--ease-out) both; }
+.hero__mote[data-state="back"] { transition: opacity 2.4s ease-in-out 900ms; }
+body:not([data-stage="hero"]) .hero__mote { opacity: 0; transition: opacity 320ms ease-out; } /* past the hero: gone */
+@keyframes hero-mote-in {
+  from { translate: -220px 90px; opacity: 0; }
+  45% { translate: -70px -18px; opacity: 1; }
+  to { translate: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero__mote[data-state="in"] .mote { animation: none; } /* no drift: it is simply there */
+}
 @media (max-width: 900px) {
+  /* the watch fills the width: rest at about 9:40, in the margin outside the rim, below the top bar */
+  .hero__mote { --mx: -300px; --my: -112px; }
   .chapter--hero { padding-top: calc(var(--topbar-h) + 600px * var(--ss) + 44px); align-items: flex-start; }
   .hero__copy { max-width: none; }
   .hero__scroll { display: none; }

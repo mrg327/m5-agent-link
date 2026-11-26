@@ -1,5 +1,8 @@
 // Hero: the watch plays a four-beat story (work, ask, hold to approve, done + key A) while the
 // page waits for a first touch. The page performs the hold and the key press on the real watch.
+// The Mote (design/mote) keeps it company: the caption light is an ember until the watch shows a
+// screen, and the hero's Mote drifts in by the rim, leaves on the request beat and only fades back
+// once the story has moved on: never as a reward for answering (issue 20261126-b92e).
 
 /** @typedef {{[k: string]: unknown}} Detail */
 /**
@@ -17,6 +20,8 @@
 const STORY = 'story';
 const KEY_TAP_MS = 160;
 const A_PRESS_AFTER_MS = 1800;
+const BEAT_REQUEST = 1; // "!": an agent waits for you, so the Mote leaves
+const BEAT_DONE = 3;
 
 /**
  * Captions per beat; the hold time comes from the firmware.
@@ -42,6 +47,7 @@ export function mount(section, ctx) {
   const caption = /** @type {HTMLElement} */ (section.querySelector('#hero-caption'));
   const replay = /** @type {HTMLButtonElement} */ (section.querySelector('#hero-replay'));
   const led = /** @type {HTMLElement} */ (section.querySelector('.hero__led'));
+  const mote = /** @type {HTMLElement | null} */ (section.querySelector('.hero__mote'));
   const beatEls = [...section.querySelectorAll('.hero__beats li')];
   const g = ctx.facts.gesture ?? {};
   const holdMs = g.hold_confirm_ms ?? 1200;
@@ -52,6 +58,7 @@ export function mount(section, ctx) {
 
   let inHero = true;
   let approved = false;
+  let away = false; // the story is between its request and done: no Mote
   /** @type {Set<ReturnType<typeof setTimeout>>} */
   const timers = new Set();
   /**
@@ -76,6 +83,16 @@ export function mount(section, ctx) {
       li.toggleAttribute('data-on', i === beat);
       li.toggleAttribute('data-past', beat >= 0 && i < beat);
     });
+  };
+
+  /**
+   * Moves the hero's Mote; the CSS draws each state (chapters.css .hero__mote).
+   * @param {'in' | 'away' | 'back'} state where it is
+   */
+  const moteTo = (state) => {
+    if (!mote?.dataset.state) return; // not arrived yet: the first screen brings it
+    if (state === 'back' && mote.dataset.state !== 'away') return;
+    mote.dataset.state = state;
   };
 
   // The page drives the watch only while the hero is on screen and the story is the scenario.
@@ -113,6 +130,8 @@ export function mount(section, ctx) {
   ctx.bus.on('scenario:step', (s) => {
     if (s.name !== STORY) {
       light(-1);
+      away = false;
+      moteTo('back');
       if (typeof s.text === 'string' && s.text) caption.textContent = s.text;
       return;
     }
@@ -120,6 +139,9 @@ export function mount(section, ctx) {
     if (beat > 3) return;
     light(beat);
     caption.textContent = lines[beat];
+    if (beat === BEAT_REQUEST) away = true;
+    else if (beat === 0 || beat === BEAT_DONE) away = false;
+    moteTo(away ? 'away' : 'back');
     if (beat === 0) approved = false;
     if (beat === 2) hold();
     if (beat === 3) later(pressA, A_PRESS_AFTER_MS);
@@ -128,9 +150,14 @@ export function mount(section, ctx) {
     const msg = /** @type {{t?: string, b?: {op?: string}} | undefined} */ (d.msg);
     if (msg?.t === 'cmd' && msg.b?.op === 'approve') approved = true;
   });
-  ctx.bus.on('watch:screen', () => {
-    led.dataset.live = '1';
-  });
+  // The page is ready once every chapter is mounted; the real watch has booted by then. A stub
+  // watch keeps the ember: the firmware is not running.
+  const wake = () => {
+    if (ctx.watch.kind === 'wasm') led.removeAttribute('data-ember');
+    if (mote && !mote.dataset.state) mote.dataset.state = away ? 'away' : 'in';
+  };
+  ctx.bus.on('atlas:ready', wake);
+  ctx.bus.on('watch:screen', wake);
   ctx.bus.on('chapter:enter', (d) => {
     inHero = d.id === 'intro';
   });

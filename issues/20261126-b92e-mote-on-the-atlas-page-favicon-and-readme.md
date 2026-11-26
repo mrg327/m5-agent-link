@@ -30,3 +30,4 @@ Owner 2026-11-26: the Mote becomes the watch's mascot (design: research notes ma
 
 - 2026-11-26T18:50:23Z · claude-code/cloud@cloud · linux-x86_64 · eec6958: filed
 - 2026-11-26T18:50:23Z · claude-code/cloud@cloud · linux-x86_64 · eec6958: claimed
+- 2026-11-26T19:18:42Z · claude-code@cloud · linux-x86_64 · abcee00+dirty: atlas: Mote brand mark (breathing, still under reduced motion), favicon from gen.py (SVG + new PNG 32/180 fallback), caption ember->lit on atlas:ready, hero drift by the rim that leaves on the '!' beat and fades back 0.9 s after done; README header mark (favicon-96.svg). Playwright 1280x900 + 390x844, light/dark, reduced motion: no console errors, no overflow.

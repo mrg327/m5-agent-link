@@ -2,6 +2,7 @@
    Layered over the firmware palette: tokens.generated.css defines --fw-*.
    If that file is missing the @import 404s harmlessly and the fallbacks below win. */
 @import url("tokens.generated.css");
+@import url("mote.generated.css"); /* the Mote's look, from design/mote/mote.toml */
 
 :root {
   /* firmware palette (fallbacks mirror firmware/components/core/src/ui_theme.h) */
@@ -92,7 +93,7 @@ button { font: inherit; color: inherit; }
 }
 .topbar__brand { font: 600 var(--t-sm)/1 var(--font-sans); letter-spacing: .02em; text-decoration: none; display: flex; align-items: center; gap: .55rem; white-space: nowrap; }
 .topbar__brand span { color: var(--muted); font-weight: 400; }
-.topbar__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--glow); box-shadow: 0 0 12px 1px var(--glow); transition: background var(--dur-3), box-shadow var(--dur-3); }
+.topbar__brand .mote { margin-right: .15rem; }
 .rail ol { display: flex; gap: .15rem; list-style: none; margin: 0; padding: 0; }
 .rail a { display: flex; align-items: baseline; gap: .45rem; padding: .5rem .6rem; border-radius: 999px; text-decoration: none; color: var(--muted); font-size: var(--t-xs); letter-spacing: .06em; text-transform: uppercase; transition: color var(--dur-2), background var(--dur-2); }
 .rail a b { font: 500 .68rem var(--font-mono); opacity: .7; }
@@ -116,6 +117,19 @@ button { font: inherit; color: inherit; }
   .rail a { padding: .5rem .3rem; }
 }
 
+/* --- the Mote (design/mote): a warm-white orb, never a state colour -------
+   <i class="mote"> is as wide as the core, so it lines up like a dot; the halo spills past it.
+   ::before is the halo (it breathes with .mote--breath), ::after the core over it.
+   Sizes: default S (the brand size), .mote--m; [data-ember] is small, dim and still. */
+.mote { --core: var(--mote-brand-core); --halo: var(--mote-brand-halo); position: relative; flex: none; display: inline-block; width: var(--core); height: var(--core); pointer-events: none; transition: width var(--dur-3), height var(--dur-3), opacity var(--dur-3); }
+.mote::before, .mote::after { content: ""; position: absolute; left: 50%; top: 50%; border-radius: 50%; }
+.mote::before { width: var(--halo); height: var(--halo); margin: calc(var(--halo) / -2) 0 0 calc(var(--halo) / -2); background: var(--mote-halo); opacity: var(--mote-breath-max); }
+.mote::after { width: var(--core); height: var(--core); margin: calc(var(--core) / -2) 0 0 calc(var(--core) / -2); background: var(--mote-colour); transition: inherit; }
+.mote--m { --core: var(--mote-m-core); --halo: var(--mote-m-halo); }
+.mote--breath::before { animation: mote-breath var(--mote-breath-period) ease-in-out infinite; }
+.mote[data-ember] { --core: var(--mote-ember-core); --halo: var(--mote-ember-halo); opacity: var(--mote-level-ember); }
+.mote[data-ember]::before { display: none; }
+
 /* --- film grain (cheap: one tiled SVG feTurbulence) ------------------- */
 .grain {
   position: fixed; inset: 0; z-index: 90; pointer-events: none; opacity: .07; mix-blend-mode: screen;
@@ -129,4 +143,5 @@ button { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+  .mote--breath::before { animation: none; } /* the Mote is still: full halo, no breath */
 }
