@@ -157,3 +157,13 @@
 .truth p { color: var(--paper-2); margin-bottom: var(--s-3); max-width: 38rem; }
 .truth__badges { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: var(--s-4); }
 @media (max-width: 560px) { .softmap__grid { grid-template-columns: 1fr; } }
+
+/* Start: what you need, three steps, the keys, privacy and safety */
+.start__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4); margin-bottom: var(--s-6); }
+.start__grid .panel h3 { margin: 0 0 var(--s-3); font: 500 var(--t-lg)/1.25 var(--font-sans); color: var(--paper); }
+.start__grid .panel p, .start__grid .panel li { color: var(--paper-2); }
+.start__steps { margin: 0; padding-left: 1.2em; display: grid; gap: var(--s-2); }
+.start__keys { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.start__keys li { display: flex; gap: var(--s-3); align-items: baseline; }
+.start__key { flex: none; width: .9em; height: .9em; border-radius: 50%; background: var(--k); transform: translateY(.1em); }
+@media (max-width: 760px) { .start__grid { grid-template-columns: 1fr; } }

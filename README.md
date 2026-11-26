@@ -3,7 +3,8 @@
 A wearable control surface for AI coding agents. A small device (initially the
 **M5Stack StopWatch**) shows the state of your GitHub Copilot CLI, Copilot cloud
 agent, and Claude Code sessions. When an agent finishes or needs input, it buzzes,
-and a double-tap brings that agent's terminal to the front on your PC.
+you hold to approve or deny on the watch, and key A brings that agent's terminal
+to the front on your PC.
 
 ```text
  agents ──hooks──► agentlinkd (PC, Rust) ──BLE / USB / WebSocket──► device firmware (ESP32 + LVGL)

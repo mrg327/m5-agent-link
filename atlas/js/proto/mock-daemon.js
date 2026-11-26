@@ -59,7 +59,7 @@ const SCENARIOS = {
       ],
       [
         5000,
-        'A second Copilot session boots up',
+        'A second Copilot session starts',
         (d) => d.addSession(session(3, 'copilot', 'docs-site', 'main', 'start')),
       ],
       [

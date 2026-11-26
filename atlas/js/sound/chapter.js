@@ -179,11 +179,12 @@ export function mount(section, ctx) {
     h(
       'p',
       { class: 'snd__lede' },
-      'Short game cues, from 8-bit blips to FM chimes and layered fanfares: square, triangle, saw, ',
-      `noise, sine and FM voices, up to ${Math.max(...bank.bank.map((s) => s.tracks.length))} at once, with echo, at ${bank.rate / 1000} kHz. `,
-      'Press a card to hear it and pick one for each moment. ',
+      `The watch plays a sound at ${bank.roles.length} moments: an agent needs you, a session finishes, `,
+      'your answer goes out (rising for approve, falling for deny), and the first start after an update. ',
+      'Open a moment to hear its candidates and pick one; the one the watch plays is marked. ',
+      `They are short game cues: up to ${Math.max(...bank.bank.map((s) => s.tracks.length))} synth voices at ${bank.rate / 1000} kHz. `,
       h('i', { text: 'Watch speaker' }),
-      ' approximates the little speaker; turn it off to hear the raw synth.',
+      ' imitates the little speaker; turn it off to hear the raw synth.',
     ),
     h('div', { class: 'snd__bar' }, smallBtn, h('label', { class: 'snd__vol' }, 'Volume ', vol)),
   );
@@ -243,17 +244,19 @@ export function mount(section, ctx) {
       card.append(btn, h('label', { class: 'snd__pick' }, radio, ' Pick', chosen));
       grid.append(card);
     }
+    // closed by default: five moments read at a glance, the candidates are one click away
     root.append(
       h(
-        'section',
-        { class: 'snd__role', 'aria-labelledby': `snd-role-${role.id}` },
+        'details',
+        { class: 'snd__role' },
         h(
-          'h3',
-          { class: 'snd__role-t', id: `snd-role-${role.id}` },
+          'summary',
+          { class: 'snd__role-t' },
           h('span', { class: 'mono', text: role.id }),
           ' ',
           role.when,
-          role.repeat > 1 ? ` (plays ${role.repeat}×, ${role.gap_ms} ms apart)` : '',
+          role.repeat > 1 ? ` (plays ${role.repeat} times)` : '',
+          h('span', { class: 'snd__count', text: ` · ${sounds.length} candidates` }),
         ),
         grid,
       ),

@@ -212,7 +212,7 @@ export function mount(section, ctx) {
       stat(String(sc), sc === 1 ? 'session' : 'sessions'),
       stat(fmt(t.duration), 'duration'),
       stat(String(changes), 'state changes'),
-      stat(String(t.focus.length), 'focus taps'),
+      stat(String(t.focus.length), 'terminals brought forward'),
       name
         ? h(
             'div',

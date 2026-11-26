@@ -65,8 +65,6 @@ export function mount(section, ctx) {
   slot.append(root);
 
   root.innerHTML = `
-    <p class="flow__lede">An agent does something and runs a hook: a small program it calls on every event. The hook tells <code>agentlinkd</code>, the daemon (a background program) on your PC, which turns the event into a few bytes and sends them over whichever link is up. <b>Watch the beads. Click one to open the packet.</b></p>
-
     <div class="flow__bar" role="group" aria-label="Scenario controls">
       <button type="button" class="fx-btn fx-btn--play" data-r="play" aria-pressed="true"><span class="fx-ico" aria-hidden="true"></span><span data-r="playTxt">Pause</span></button>
       <div class="fx-pills" role="radiogroup" aria-label="Scenario" data-r="scen"></div>

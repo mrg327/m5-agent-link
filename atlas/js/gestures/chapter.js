@@ -64,7 +64,7 @@ export function mount(section, ctx) {
     block(
       'B',
       'Haptic seismograph',
-      'Ten patterns, one motor. This is what each buzz looks like, and what it means.',
+      `${Object.keys(ctx.facts.haptics).length} patterns, one motor. This is what each buzz looks like and what it means; on a phone that allows it, the page buzzes too.`,
       hapRoot,
     ),
     block(

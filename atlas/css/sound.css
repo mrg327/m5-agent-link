@@ -32,3 +32,11 @@
 @media (prefers-reduced-motion: reduce) {
   .snd__card[data-playing="1"]::after { animation: none; }
 }
+/* each moment is a closed disclosure: the summary is the moment, the grid its candidates */
+details.snd__role { border-top: 1px solid var(--line); padding: var(--s-3) 0; }
+details.snd__role > summary { cursor: pointer; list-style: none; margin-bottom: 0; }
+details.snd__role > summary::-webkit-details-marker { display: none; }
+details.snd__role > summary::before { content: '+'; display: inline-block; width: 1.2em; color: var(--muted); }
+details.snd__role[open] > summary::before { content: '−'; }
+details.snd__role[open] > summary { margin-bottom: var(--s-3); }
+.snd__count { color: var(--muted); font-size: var(--t-sm); }

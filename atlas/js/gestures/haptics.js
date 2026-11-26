@@ -3,18 +3,24 @@
 // no longer than the kick, like the rim detent, is all kick).
 import { h, svg, cssVar } from './dom.js';
 
+// Reader labels and tones, alerts first. A pattern in facts.haptics that is missing here still gets a
+// card, named from its key, so a new pattern in the firmware cannot be left off the page.
 const ORDER = [
-  ['detent', 'Detent', 'accent'],
-  ['hold_ramp', 'Approve ramp', 'amber'],
-  ['approved', 'Approved', 'success'],
-  ['denied', 'Denied', 'danger'],
-  ['reject', 'Reject', 'danger'],
-  ['permission', 'Permission', 'amber'],
-  ['question', 'Question', 'amber'],
+  ['permission', 'Needs approval', 'amber'],
+  ['question', 'Has a question', 'amber'],
   ['done', 'Done', 'success'],
   ['error', 'Error', 'danger'],
+  ['hold_ramp', 'Approve hold', 'amber'],
+  ['deny_ramp', 'Deny hold', 'danger'],
+  ['approved', 'Approved', 'success'],
+  ['denied', 'Denied', 'danger'],
+  ['reply_sent', 'Reply sent', 'success'],
+  ['reject', 'Could not send', 'danger'],
+  ['detent', 'Rim click', 'accent'],
   ['tick', 'Tick', null],
-  ['hello', 'Hello', 'accent'],
+  ['scroll_stop', 'Scroll end', null],
+  ['quiet_toggled', 'Quiet mode', null],
+  ['hello', 'Link up', 'accent'],
 ];
 
 // deterministic ripple so the trace looks like a real motor, and never changes between renders
@@ -38,7 +44,14 @@ export function createSeismograph(root, ctx) {
   const Y = (duty) => base - (duty / 100) * (base - top);
 
   const cards = [];
-  for (const [name, label, tone] of ORDER) {
+  const known = new Set(ORDER.map(([k]) => k));
+  const rows = [
+    ...ORDER,
+    ...Object.keys(f.haptics)
+      .filter((k) => !known.has(k))
+      .map((k) => [k, k.replace(/_/g, ' '), null]),
+  ];
+  for (const [name, label, tone] of rows) {
     const steps = f.haptics[name];
     if (!steps) continue;
     const X = axis(steps);
