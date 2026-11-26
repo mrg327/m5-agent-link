@@ -1,11 +1,11 @@
 ---
-id: 20261126-7770
+id: 20261126-f5be
 title: Mote at boot and on the empty deck
-status: open
+status: claimed
 severity: med
 area: firmware
 platforms: any
-owner:
+owner: claude-code/cloud@cloud
 created: 2026-11-26T18:50:22Z
 reporter: claude-code/cloud@cloud
 reported_on: linux-x86_64
@@ -29,3 +29,4 @@ Owner 2026-11-26: the Mote becomes the watch's mascot (design: research notes ma
 ## Log
 
 - 2026-11-26T18:50:22Z · claude-code/cloud@cloud · linux-x86_64 · eec6958: filed
+- 2026-11-26T18:50:36Z · claude-code/cloud@cloud · linux-x86_64 · 15cd38b: claimed
