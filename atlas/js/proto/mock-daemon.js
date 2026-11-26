@@ -8,7 +8,17 @@ import { encodeMsg, decodeMsg } from './messages.js';
 const MIN_APPROVE_HOLD_MS = 1000; // device.rs MIN_APPROVE_HOLD_MS
 const clip = (s, n) => (s.length <= n ? s : s.slice(0, n - 1) + '…');
 
-const S = (sid, ag, repo, br, st, extra = {}) => ({
+/**
+ * A session as the daemon sends it in a snapshot.
+ * @param {number} sid session id
+ * @param {string} ag agent
+ * @param {string} repo repository name
+ * @param {string} br branch
+ * @param {string} st state
+ * @param {object} [extra] more fields (sub, tool, sum, ...)
+ * @returns {object} the session
+ */
+const session = (sid, ag, repo, br, st, extra = {}) => ({
   sid,
   ag,
   repo,
@@ -30,7 +40,7 @@ const SCENARIOS = {
         'Copilot CLI starts working on m5-agent-link',
         (d) =>
           d.addSession(
-            S(1, 'copilot', 'm5-agent-link', 'main', 'work', {
+            session(1, 'copilot', 'm5-agent-link', 'main', 'work', {
               tool: 'bash',
               sum: 'Running tests',
             }),
@@ -41,7 +51,7 @@ const SCENARIOS = {
         'Claude Code joins in webapp',
         (d) =>
           d.addSession(
-            S(2, 'claude', 'webapp', 'feat/login', 'work', {
+            session(2, 'claude', 'webapp', 'feat/login', 'work', {
               tool: 'Edit',
               sum: 'Editing login form',
             }),
@@ -50,7 +60,7 @@ const SCENARIOS = {
       [
         5000,
         'A second Copilot session boots up',
-        (d) => d.addSession(S(3, 'copilot', 'docs-site', 'main', 'start')),
+        (d) => d.addSession(session(3, 'copilot', 'docs-site', 'main', 'start')),
       ],
       [
         6500,
@@ -113,7 +123,7 @@ const SCENARIOS = {
         'Copilot CLI starts',
         (d) =>
           d.addSession(
-            S(1, 'copilot', 'm5-agent-link', 'main', 'work', {
+            session(1, 'copilot', 'm5-agent-link', 'main', 'work', {
               tool: 'view',
               sum: 'Reading the code',
             }),
@@ -134,7 +144,7 @@ const SCENARIOS = {
         'Claude Code starts',
         (d) =>
           d.addSession(
-            S(1, 'claude', 'webapp', 'feat/login', 'work', {
+            session(1, 'claude', 'webapp', 'feat/login', 'work', {
               tool: 'Edit',
               sum: 'Editing login form',
             }),
@@ -145,20 +155,27 @@ const SCENARIOS = {
         'Copilot CLI is busy in api',
         (d) =>
           d.addSession(
-            S(2, 'copilot', 'api', 'main', 'work', { tool: 'bash', sum: 'Running migrations' }),
+            session(2, 'copilot', 'api', 'main', 'work', {
+              tool: 'bash',
+              sum: 'Running migrations',
+            }),
           ),
       ],
       [
         1200,
         'docs-site finished earlier',
-        (d) => d.addSession(S(3, 'copilot', 'docs-site', 'main', 'done', { sum: 'Docs updated' })),
+        (d) =>
+          d.addSession(session(3, 'copilot', 'docs-site', 'main', 'done', { sum: 'Docs updated' })),
       ],
       [
         1800,
         'infra has a question',
         (d) =>
           d.addSession(
-            S(4, 'claude', 'infra', 'main', 'input', { sub: 'question', sum: 'Which region?' }),
+            session(4, 'claude', 'infra', 'main', 'input', {
+              sub: 'question',
+              sum: 'Which region?',
+            }),
           ),
       ],
       [
@@ -185,7 +202,7 @@ const SCENARIOS = {
         'Working',
         (d) =>
           d.addSession(
-            S(1, 'copilot', 'm5-agent-link', 'main', 'work', {
+            session(1, 'copilot', 'm5-agent-link', 'main', 'work', {
               tool: 'bash',
               sum: 'Running tests',
             }),
@@ -196,7 +213,7 @@ const SCENARIOS = {
         'Has a question',
         (d) =>
           d.addSession(
-            S(2, 'claude', 'webapp', 'feat/login', 'input', {
+            session(2, 'claude', 'webapp', 'feat/login', 'input', {
               sub: 'question',
               sum: 'Which version to document?',
             }),
@@ -205,23 +222,27 @@ const SCENARIOS = {
       [
         0,
         'Needs permission',
-        (d) => d.addSession(S(3, 'claude', 'api', 'main', 'work', { tool: 'bash' })),
+        (d) => d.addSession(session(3, 'claude', 'api', 'main', 'work', { tool: 'bash' })),
       ],
       [
         0,
         'Done',
-        (d) => d.addSession(S(4, 'copilot', 'docs-site', 'main', 'done', { sum: 'Docs updated' })),
+        (d) =>
+          d.addSession(session(4, 'copilot', 'docs-site', 'main', 'done', { sum: 'Docs updated' })),
       ],
       [
         0,
         'Error',
-        (d) => d.addSession(S(5, 'copilot', 'infra', 'main', 'error', { sum: 'Build failed' })),
+        (d) =>
+          d.addSession(session(5, 'copilot', 'infra', 'main', 'error', { sum: 'Build failed' })),
       ],
       [
         0,
         'Idle',
         (d) =>
-          d.addSession(S(6, 'claude', 'blog', 'main', 'idle', { sum: 'Waiting for a prompt' })),
+          d.addSession(
+            session(6, 'claude', 'blog', 'main', 'idle', { sum: 'Waiting for a prompt' }),
+          ),
       ],
       [
         100,
@@ -236,6 +257,39 @@ const SCENARIOS = {
       ],
     ],
   },
+  // The ring with one session in every state and no live request, so the watch stays on the ring
+  // (a request takes it over to the request screen). Glance points at parts of this screen.
+  states: {
+    title: 'The ring, one session in every state',
+    length: 3600000,
+    steps: [
+      [
+        'Working',
+        session(1, 'copilot', 'm5-agent-link', 'main', 'work', {
+          tool: 'bash',
+          sum: 'Running tests',
+        }),
+      ],
+      [
+        'Has a question',
+        session(2, 'claude', 'webapp', 'feat/login', 'input', {
+          sub: 'question',
+          sum: 'Which version to document?',
+        }),
+      ],
+      [
+        'Needs approval',
+        session(3, 'claude', 'api', 'main', 'input', {
+          sub: 'approval',
+          tool: 'bash',
+          sum: 'Run npm test',
+        }),
+      ],
+      ['Done', session(4, 'copilot', 'docs-site', 'main', 'done', { sum: 'Docs updated' })],
+      ['Error', session(5, 'copilot', 'infra', 'main', 'error', { sum: 'Build failed' })],
+      ['Idle', session(6, 'claude', 'blog', 'main', 'idle', { sum: 'Waiting for a prompt' })],
+    ].map(([label, s]) => [0, label, (d) => d.addSession(structuredClone(s))]),
+  },
   busy: {
     title: 'Eight sessions at once',
     length: 24000,
@@ -245,7 +299,7 @@ const SCENARIOS = {
         `Session ${i + 1} starts`,
         (d) =>
           d.addSession(
-            S(
+            session(
               i + 1,
               i % 2 ? 'claude' : 'copilot',
               ['api', 'webapp', 'docs', 'infra', 'mobile', 'cli', 'ml-train', 'blog'][i],

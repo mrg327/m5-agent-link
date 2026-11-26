@@ -44,7 +44,7 @@ def line_of(rel, pos):
     return text(rel).count("\n", 0, pos) + 1
 
 
-def find(rel, pattern, key=None, flags=0):
+def find(rel: str, pattern: str, key: str | None = None, flags: int = 0) -> re.Match[str]:
     """Return the first regex match in `rel`; record file:line under `key`."""
     m = re.search(pattern, text(rel), flags)
     if not m:
@@ -395,6 +395,20 @@ def extract_ring():
     r["summary_w_px"] = int(find(card, r"#define SUMMARY_W\s+(\d+)", "ring.summary_w_px").group(1))
     for key, macro in [("sigil_r_px", "SIGIL_R"), ("time_dots_r_px", "DOTS_R")]:
         r[key] = int(find(card, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
+    # where the card's parts sit (centres, canvas px): the Atlas anchors its callouts there
+    for key, macro in [
+        ("sigil_y_px", "SIGIL_Y"),
+        ("hero_y_px", "HERO_Y"),
+        ("summary_y_px", "LINE1_Y"),
+    ]:
+        r[key] = int(find(card, rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
+    # the key hints beside the physical keys on the upper rim (GLYPHS.md §3.6, issue 20261125-d8b5)
+    for key, macro in [
+        ("key_a_x_px", "UI_KEY_A_X"),
+        ("key_b_x_px", "UI_KEY_B_X"),
+        ("key_y_px", "UI_KEY_Y"),
+    ]:
+        r[key] = int(find(CORE + "ui_kit.h", rf"#define {macro}\s+(\d+)", f"ring.{key}").group(1))
     r["hero_px"] = int(
         find(
             CORE + "ui_theme.h", r"#define FONT_ICON_HERO \(&font_phosphor_(\d+)\)", "ring.hero_px"

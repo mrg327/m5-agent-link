@@ -274,7 +274,7 @@ export function createMatrix(root, ctx) {
     const tk = ++token;
     try {
       // back to the ring with one session in every state, so each gesture starts from the same screen
-      ctx.daemon?.play?.('ring');
+      ctx.daemon?.play?.('states');
       await sleep(1700);
       if (tk !== token) return;
       ctx.stage?.focus?.('screen');
