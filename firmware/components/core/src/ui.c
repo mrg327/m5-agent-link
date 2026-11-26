@@ -728,6 +728,30 @@ static void say_session_ended(nav_mode_t was, uint32_t sid)
     if (!s || s->state == SESS_ENDED) { ui_toast("Session ended", RGB_IDLE); }
 }
 
+/* The model changed: every open screen refreshes, and one whose subject is gone closes. */
+static void refresh_screens(uint32_t now_ms)
+{
+    nav_mode_t was = s_mode;
+    uint32_t was_sid = s_mode_sid; /* the deck may move off a session that left */
+    ui_home_refresh(now_ms);
+    if (s_mode == MODE_AGENT && !ui_agent_refresh(now_ms)) enter_mode(MODE_HOME);
+    if (s_mode == MODE_ASK && !ui_ask_refresh(now_ms)) leave_mode();
+    /* the session is gone */
+    if (s_mode == MODE_SCROLL && !ui_scroll_refresh(now_ms)) enter_mode(MODE_HOME);
+    if (s_mode == MODE_STATUS) ui_status_refresh(now_ms);
+    if (s_mode == MODE_VOICE && !ui_voice_refresh(now_ms)) enter_mode(MODE_HOME);
+    if (s_mode == MODE_KEYS && !ui_keys_refresh(now_ms)) enter_mode(MODE_HOME);
+    if (s_mode == MODE_READ && !ui_read_refresh(now_ms)) enter_mode(MODE_HOME);
+    if (s_mode == MODE_GRAPH && !ui_graph_refresh(now_ms)) enter_mode(MODE_HOME);
+    if (s_mode == MODE_LABS) ui_labs_refresh(now_ms);
+    if (s_mode == MODE_TRACKPAD) ui_trackpad_refresh(now_ms);
+    if (s_mode == MODE_WATCH && !ui_watch_refresh(now_ms)) {
+        enter_mode(MODE_HOME);
+        ui_toast("Session ended", RGB_IDLE);
+    }
+    say_session_ended(was, was_sid);
+}
+
 void ui_tick(uint32_t now_ms)
 {
     s_now_ms = now_ms;
@@ -741,25 +765,7 @@ void ui_tick(uint32_t now_ms)
     pair_tick(now_ms);
     if (model_rev() != s_seen_rev) {
         s_seen_rev = model_rev();
-        nav_mode_t was = s_mode;
-        uint32_t was_sid = s_mode_sid; /* the deck may move off a session that left */
-        ui_home_refresh(now_ms);
-        if (s_mode == MODE_AGENT && !ui_agent_refresh(now_ms)) enter_mode(MODE_HOME);
-        if (s_mode == MODE_ASK && !ui_ask_refresh(now_ms)) leave_mode();
-        /* the session is gone */
-        if (s_mode == MODE_SCROLL && !ui_scroll_refresh(now_ms)) enter_mode(MODE_HOME);
-        if (s_mode == MODE_STATUS) ui_status_refresh(now_ms);
-        if (s_mode == MODE_VOICE && !ui_voice_refresh(now_ms)) enter_mode(MODE_HOME);
-        if (s_mode == MODE_KEYS && !ui_keys_refresh(now_ms)) enter_mode(MODE_HOME);
-        if (s_mode == MODE_READ && !ui_read_refresh(now_ms)) enter_mode(MODE_HOME);
-        if (s_mode == MODE_GRAPH && !ui_graph_refresh(now_ms)) enter_mode(MODE_HOME);
-        if (s_mode == MODE_LABS) ui_labs_refresh(now_ms);
-        if (s_mode == MODE_TRACKPAD) ui_trackpad_refresh(now_ms);
-        if (s_mode == MODE_WATCH && !ui_watch_refresh(now_ms)) {
-            enter_mode(MODE_HOME);
-            ui_toast("Session ended", RGB_IDLE);
-        }
-        say_session_ended(was, was_sid);
+        refresh_screens(now_ms);
     }
     ui_home_tick(now_ms);
     if (s_mode == MODE_AGENT && ui_agent_tick(now_ms)) enter_mode(MODE_HOME);
