@@ -30,3 +30,4 @@ UX research 2026-11-26, owner picked it in the walkthrough; design brief in the 
 
 - 2026-11-26T05:23:34Z · claude-code/cloud@cloud · linux-x86_64 · 064af3a: filed
 - 2026-11-26T09:16:06Z · claude-code/cloud@cloud · linux-x86_64 · 4433ae1: claimed
+- 2026-11-26T09:33:44Z · claude-code/cloud@cloud · linux-x86_64 · 7088415+dirty: built: replay.c (16x20 history, away = dark >= 15 min), ui_replay.c on ring_override(); LABS bit 5; tests test_replay, fun_replay, fun_replay_blocked; device look and frame time unchecked

@@ -52,5 +52,20 @@ void ring_tick(lv_obj_t *ring, uint32_t now_ms);
  * (RING_ERROR). Nothing for any other kind. The ring's pips are size 10; the waiting-request mark
  * (ui.c) uses it too. */
 void ring_pip_paint(lv_layer_t *l, uint8_t kind, int r_mid, int deg, int size, lv_color_t c);
+/* While you were away (ui_replay.c): segment i is drawn as `kind` in `rgb` (dimmed when `dim`),
+ * settled and still, instead of as set, until ring_override_end(); RING_HOLLOW draws it as an
+ * empty track (the session had not started), RING_LIVE ends its override. Selection stays the
+ * live one's. Change-only: a changed segment repaints its own arc. */
+#define RING_LIVE 0xFE
+#define RING_HOLLOW 0xFF
+void ring_override(lv_obj_t *ring, int i, uint8_t kind, uint32_t rgb, bool dim);
+/* Every segment as set again; the overridden ones repaint. */
+void ring_override_end(lv_obj_t *ring);
+/* Copies up to `max` of the segments as last set (never the override) into out; returns how many.
+ */
+int ring_get(lv_obj_t *ring, ring_seg_t *out, int max);
+/* Invalidates, on object o (full screen at 0, 0), the band r_in..r_out between degrees a0 and a1
+ * clockwise from 12 o'clock, in small chunks: for an overlay on the ring. */
+void ring_invalidate_arc(lv_obj_t *o, int a0, int a1, int r_in, int r_out);
 /* Segment index under a screen point, or -1 when it is in the centre or off the ring. */
 int ring_hit(lv_obj_t *ring, int x, int y);

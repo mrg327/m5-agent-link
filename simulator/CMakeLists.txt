@@ -106,6 +106,10 @@ add_executable(test_temper tests/test_temper.c ${FW}/core/src/temper.c ${FW}/cor
 target_include_directories(test_temper PRIVATE ${FW}/core/src)
 target_link_libraries(test_temper PRIVATE m)
 add_test(NAME temper_poses COMMAND test_temper)
+# While you were away (issue 20261126-9f99): the ring's last hour, the away detector, the 2 s clock.
+add_executable(test_replay tests/test_replay.c ${FW}/core/src/replay.c)
+target_include_directories(test_replay PRIVATE ${FW}/core/src)
+add_test(NAME replay_hour COMMAND test_replay)
 
 add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
 target_include_directories(test_ring PRIVATE ${FW}/core/src)
@@ -280,6 +284,18 @@ sim_script_test(sim_labs_trackpad labs_trackpad.txt
 # off and while needed; the one-shots of done, error and snooze; LABS > Personality and the stored word.
 sim_script_test(sim_fun_temper fun_temper.txt)
 sim_script_test(sim_fun_temper_states fun_temper_states.txt)
+# While you were away (issue 20261126-9f99): the first look after 15 min dark replays the hour on the
+# bezel, and a key ends it at once; a waiting request, reduced motion or the switch off skip it.
+add_test(NAME sim_fun_replay
+         COMMAND agentlink_sim --headless --no-ws --idle-off 61 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/fun_replay.txt)
+set_tests_properties(sim_fun_replay PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]"
+                     PASS_REGULAR_EXPRESSION "\"replay\",\"act\":\"start\".*\"why\":\"done\".*\"act\":\"start\".*\"why\":\"input\"")
+add_test(NAME sim_fun_replay_blocked
+         COMMAND agentlink_sim --headless --no-ws --idle-off 61 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/fun_replay_blocked.txt)
+set_tests_properties(sim_fun_replay_blocked PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"act\":\"start\""
+                     PASS_REGULAR_EXPRESSION "\"why\":\"gate\".*\"why\":\"gate\".*\"why\":\"still\"")
 sim_script_test(sim_labs_fun labs_fun.txt)
 # UI-V2 Phase 3: ASK. Question options reply by tap; grants and Deny are holds; a tap never approves;
 # a rejected answer restores the options; a hold is bound to its request id.

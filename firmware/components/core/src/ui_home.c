@@ -9,6 +9,7 @@
 #include "debug.h"
 #include "nag.h"
 #include "ui_home_internal.h"
+#include "ui_replay.h"
 #include "ui_ring.h"
 #include "ui_theme.h"
 
@@ -342,6 +343,8 @@ void ui_home_tick(uint32_t now)
         ring_set_ambient(s_ring, amb);
         ui_home_card_set_ambient(amb);
     }
+    /* while you were away: the bezel replays the last hour (FUN_REPLAY, ui_replay.h) */
+    ui_replay_tick(s_ring, now, s_last_input);
 
     /* The card is hidden outside HOME; entering HOME refreshes it. */
     if (ui_mode() == MODE_HOME && now - s_last_elapsed >= 500) {

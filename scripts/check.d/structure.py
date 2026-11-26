@@ -179,6 +179,7 @@ TIERS = {
         "nag",
         "persona",
         "temper",
+        "replay",
     },
     "leaf": {"debug.h", "ui_icons"},
 }

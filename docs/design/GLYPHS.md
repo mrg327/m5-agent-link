@@ -332,6 +332,36 @@ NVS key `fun`) has a bit per feature: `FUN_TEMPER` 0 (on), `FUN_CELEBRATE` 1 (on
 8 (on), `FUN_TOYS` 9 (on), and `FUN_REDUCED` 15 (off). It is set in LABS > Personality until STATUS has rows
 ([EXPERIMENTS.md](EXPERIMENTS.md)); a script sets it with `pref fun 0x3d3`.
 
+### 3.13 While you were away: `replay.c`, `ui_replay.c` (issue 20261126-9f99)
+
+When you come back to the watch, the bezel replays the last hour and the centre shows now at once. A LABS
+experiment: the Replay switch (`FUN_REPLAY`, bit 5) in LABS > Personality, off by default.
+
+- **Away** is the display dark (off, or only the alert glow) for at least 15 minutes (`REPLAY_AWAY_MS`): a
+  quarter of the hour replayed, and longer than a glance away. It is measured from when the display went
+  dark, so on the dock (dark after 10 minutes idle) a replay needs about 25 minutes without input, on battery
+  about 16. The **first look** is the first lit step after it, whatever lit it: a touch, a key or a raise.
+- **The replay**: 20 steps of 3 minutes, 100 ms each (2 s; an hour in 2 s is 1800×). Each capsule shows its
+  past state, settled and still, in its state's colour; a session not yet started is the empty ring's thin
+  track. A thin white arc at r 216 (between the pips and the capsules) grows 18° a step from 12 o'clock, the
+  hour's hand that marks the ring as a replay; at 2 s the capsules are now and the arc fades over 200 ms.
+  The card, the hero glyph and everything in the centre show now from the first frame.
+- **Skipped** unless `persona_allow(PF_REPLAY)` gives a one-shot (§3.12: anything that needs you, reduced
+  motion, the switch off, a dark display), the deck is up and awake, and the hour holds at least one change.
+  **Ended at once** by any touch, key or raise, by anything that comes to need you, or by leaving the deck. It
+  only draws, so it never holds input back. No sound, no buzz.
+- **History** (`replay.c`, pure, `test_replay.c`): 16 sessions × 20 columns of 3 minutes, about 470 bytes of
+  static RAM (PSRAM on the watch). A column keeps the most telling state the capsule showed in its 3 minutes
+  (error, then a request, then done, then work, then idle), so an orange flash that resolved itself is seen.
+  The ring merges finished sessions from 9 on, so more than 16 capsules within an hour is rare; a session
+  without a track replays as it is now, and the track of the session gone longest is reused first. It lives
+  in RAM: after a deep sleep or a reboot the hour starts empty, and steps before the watch recorded show now.
+- **On the ring**: `ring_override()` draws a segment in a past look without touching the model; it is
+  change-only, so a step repaints only the capsules whose state differs plus the 18° of arc it adds.
+  `ui_home_tick()` makes the one call (`ui_replay_tick`). Cost (simulator, `fun_replay.txt`): about 144 k px
+  over 1.1 s of a replay in which the one capsule (a full ring) changes once; under 2 k px with the switch
+  off. Whether 100 ms a step reads well, and the frame time, are for the device.
+
 ## 4. Reference screen: HOME
 
 Built with the primitives, as the model for the rest (`ui_home_card.c`; renders:

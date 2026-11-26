@@ -47,18 +47,21 @@ static int tri_level(uint32_t t, uint32_t period, int levels)
     return (int)(p * (uint32_t)levels / period);
 }
 
+int ring_settled_level(uint8_t kind, int span)
+{
+    switch (kind) {
+    case RING_WORK: return span / 2 / COMET_STEP_DEG;
+    case RING_ASK:
+    case RING_PERM: return PULSE_LEVELS - 1;
+    case RING_DONE: return DONE_STEPS;
+    case RING_ERROR: return 2;
+    default: return 0;
+    }
+}
+
 int ring_anim_level(const ring_data_t *d, const ring_slot_t *s, int span, uint32_t now)
 {
-    if (d->ambient || d->still) {
-        switch (s->s.kind) {
-        case RING_WORK: return span / 2 / COMET_STEP_DEG;
-        case RING_ASK:
-        case RING_PERM: return PULSE_LEVELS - 1;
-        case RING_DONE: return DONE_STEPS;
-        case RING_ERROR: return 2;
-        default: return 0;
-        }
-    }
+    if (d->ambient || d->still) return ring_settled_level(s->s.kind, span);
     uint32_t t = now - s->entry_ms;
     switch (s->s.kind) {
     case RING_WORK:
@@ -134,6 +137,19 @@ void ring_draw_slot(lv_layer_t *l, const ring_data_t *d, int i)
     int a0, a1;
     ring_seg_span(d->n, i, &a0, &a1);
     int span = a1 - a0;
+    ring_slot_t as; /* a replayed look (ring_override): the past state, settled */
+    if (s->ovr) {
+        if (s->ovr_kind == RING_HOLLOW) { /* not started yet: the empty ring's track */
+            ring_arc(l, BAND_OUT - 2, 3, a0, a1, COL_FILL2);
+            return;
+        }
+        as = *s;
+        as.s.kind = s->ovr_kind;
+        as.s.rgb = s->ovr_rgb;
+        as.s.dim = s->ovr_dim;
+        as.lvl = (int16_t)ring_settled_level(s->ovr_kind, span);
+        s = &as;
+    }
     bool sel = s->s.selected && d->n > 1;
     int out = sel ? SEL_OUT : BAND_OUT, w = sel ? SEL_W : BAND_W;
     bool needs = needs_you(s->s.kind), holding = s->s.selected && d->prog > 0;

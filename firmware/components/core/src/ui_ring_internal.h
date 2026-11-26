@@ -62,6 +62,10 @@ typedef struct {
     uint32_t entry_ms;
     /* quantised animation state last drawn: a repaint is only needed when it changes */
     int16_t lvl;
+    /* ring_override(): drawn as ovr_kind / ovr_rgb / ovr_dim, settled, while ovr */
+    bool ovr, ovr_dim;
+    uint8_t ovr_kind;
+    uint32_t ovr_rgb;
 } ring_slot_t;
 
 typedef struct {
@@ -110,5 +114,7 @@ lv_color_t ring_mix(uint32_t rgb, int pct);
 void ring_arc(lv_layer_t *l, int r_out, int w, int a0, int a1, lv_color_t c);
 /* Animation state for a slot at time now; the value is only compared, never shown. */
 int ring_anim_level(const ring_data_t *d, const ring_slot_t *s, int span, uint32_t now);
+/* The settled level of `kind` (still or ambient: no motion) on a capsule `span` degrees long. */
+int ring_settled_level(uint8_t kind, int span);
 /* One segment, in its kind's shape, selection and dimming. */
 void ring_draw_slot(lv_layer_t *l, const ring_data_t *d, int i);
