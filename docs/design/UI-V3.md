@@ -576,6 +576,9 @@ oldest row.
   (233, 20)) in the colour of the next request holds the number waiting in black, or with one the kind's glyph
   (20 px); it enters with one 160 ms pulse and is a 72 × 56 target that opens the request (not in KEYS or
   TRACKPAD). It replaces the 16 px dot.
+- **The next request slides in** (issue 20261126-74c0). After an answer the queue's next request (least time left
+  first) opens as soon as the answered state has shown, entering from the right (48 px, 160 ms, ease-out) with one
+  tick, never under a finger; the badge on ASK counts the others. Each card still arms for 300 ms.
 
 ## 5. Interaction changes (`nav.c`)
 

@@ -414,6 +414,11 @@ sim_script_test(sim_seen_resend_silent seen_resend_silent.txt
 # The request queue (issue 20261126-aa28): every pending request opens in turn, least time left first;
 # one the user went back from is skipped; none opens under a finger, and that finger approves nothing.
 sim_script_test(sim_queue_three queue_three.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# The next request slides in after an answer (issue 20261126-74c0): from the right, with a tick, no quiet
+# wait; the badge counts the others. Exactly one approve per hold.
+sim_script_test(sim_queue_slide queue_slide.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3,\"sid\":[0-9]+,\"rid\":7.*\"op\":3,\"sid\":[0-9]+,\"rid\":7"
+  PASS_REGULAR_EXPRESSION "\"op\":3,\"sid\":2,\"rid\":7.*\"slide_in\",\"rid\":9.*\"op\":3,\"sid\":4,\"rid\":9.*\"slide_in\",\"rid\":8.*\"op\":3,\"sid\":3,\"rid\":8")
 sim_script_test(sim_queue_skip_back queue_skip_back.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
 sim_script_test(sim_queue_finger_down queue_finger_down.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3,\"sid\":3"

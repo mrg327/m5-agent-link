@@ -1,0 +1,46 @@
+# Issue 20261126-74c0: after an answer the next request slides in from the right, with a tick, as
+# soon as the answered state has shown (no 1.5 s quiet time: the user is answering in turn), least
+# time left first; the badge at 12 o'clock counts how many others wait and ticks down.
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 2 work api main Working
+session 3 work cli main Working
+session 4 work web main Working
+wait 300
+session 2 input api main
+attention_win 90000 90000 - 7 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 600
+expect_screen ask
+session 3 input cli main
+attention_win 60000 90000 - 8 3 approval approve,deny,focus 0 Edit file|src/main.rs
+wait 300
+session 4 input web main
+attention_win 30000 90000 - 9 4 approval approve,deny,focus 0 Fetch|https://example.com
+wait 300
+expect_label Run shell command
+expect_label 2 waiting
+hold 233 282 1500
+wait 200
+result ok
+clear 7 answered
+wait 800
+expect_screen ask
+expect_label Fetch
+expect_label 1 waiting
+shot queue_slide.png
+hold 233 282 1500
+wait 200
+result ok
+clear 9 answered
+wait 800
+expect_screen ask
+expect_label Edit file
+expect_no_label waiting
+hold 233 282 1500
+wait 200
+result ok
+clear 8 answered
+wait 1500
+expect_no_label Edit file
+expect_no_label waiting
+quit

@@ -517,8 +517,37 @@ static void settle_step(void)
     }
 }
 
+/* ASK closed itself (an answer went out and the daemon cleared it, or its window ran out): the
+ * queue's next request slides in from the right, with a tick, at once (no quiet time: the user is
+ * answering in turn), as long as the user has not moved since (issue 20261126-74c0). */
+static bool s_slide;
+static uint32_t s_slide_seq;
+
+static bool slide_pending(void) { return s_slide && s_mode_seq == s_slide_seq; }
+
+static void anim_translate_x(void *o, int32_t v) { lv_obj_set_style_translate_x(o, v, 0); }
+
+/* The next one, not the same one: it enters from the right instead of rising. */
+static void enter_from_right(lv_obj_t *o)
+{
+    lv_anim_delete(o, NULL); /* the rise enter_mode started */
+    lv_obj_set_style_translate_y(o, 0, 0);
+    lv_obj_set_style_translate_x(o, 0, 0);
+    if (!ui_animations_allowed()) return;
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, o);
+    lv_anim_set_exec_cb(&a, anim_translate_x);
+    lv_anim_set_values(&a, UI_MOTION_SLIDE, 0);
+    lv_anim_set_duration(&a, UI_MOTION_MS);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    lv_anim_start(&a);
+}
+
 static void take_over(uint32_t sid, bool error)
 {
+    bool slide = slide_pending() && !error;
+    s_slide = false;
     if (error) { s_wait_err = 0; }
     s_wait_quiet = false;
     lv_obj_add_flag(s_badge, LV_OBJ_FLAG_HIDDEN);
@@ -529,6 +558,11 @@ static void take_over(uint32_t sid, bool error)
         ui_show_attention(sid);
     }
     if (from_toy && s_mode == MODE_ASK) { s_resume_toy = true; }
+    if (slide && s_mode == MODE_ASK) {
+        enter_from_right(s_ask);
+        g_ui_actions->tick(); /* the wrist knows there is another */
+        dbg_event("ui", "slide_in", "\"rid\":%u", (unsigned)ui_ask_rid());
+    }
     s_settle_on = true;
     s_settle_ms = lv_tick_get(); /* now: this runs while the link drains, before ui_tick */
     s_settle_seq = s_mode_seq;
@@ -655,13 +689,14 @@ static void wait_step(void)
     if (!next) { s_wait_req = false; /* answered, gone, gone back from, or open in ASK */ }
     if (!next && !s_wait_err) {
         s_wait_quiet = false;
+        s_slide = false;
         badge_show(false, 0, 0, "");
         return;
     }
     uint32_t sid = next ? next->sid : s_wait_err;
     if ((s_mode_seq != s_wait_seq || s_wait_quiet) && !input_down() &&
-        (s_mode == MODE_TOY ||
-         ((s_mode == MODE_HOME || s_mode == MODE_WATCH) && quiet_for_takeover()))) {
+        (s_mode == MODE_TOY || ((s_mode == MODE_HOME || s_mode == MODE_WATCH) &&
+                                (quiet_for_takeover() || slide_pending())))) {
         if (next) { dbg_event("ui", "queue_next", "\"rid\":%u", (unsigned)next->rid); }
         take_over(sid, !next);
         return;
@@ -871,6 +906,15 @@ static void say_session_ended(nav_mode_t was, uint32_t sid)
     if (!s || s->state == SESS_ENDED) { ui_toast("Session ended", RGB_IDLE); }
 }
 
+/* ASK closed itself: back to the deck or WATCH, and the queue's next slides in from there. */
+static void ask_done(void)
+{
+    leave_mode();
+    s_slide = true;
+    s_slide_seq = s_mode_seq;
+    s_wait_req = true; /* every pending request is in the queue, also one that never waited */
+}
+
 /* The model changed: every open screen refreshes, and one whose subject is gone closes. */
 static void refresh_screens(uint32_t now_ms)
 {
@@ -878,7 +922,7 @@ static void refresh_screens(uint32_t now_ms)
     uint32_t was_sid = s_mode_sid; /* the deck may move off a session that left */
     ui_home_refresh(now_ms);
     if (s_mode == MODE_AGENT && !ui_agent_refresh(now_ms)) enter_mode(MODE_HOME);
-    if (s_mode == MODE_ASK && !ui_ask_refresh(now_ms)) leave_mode();
+    if (s_mode == MODE_ASK && !ui_ask_refresh(now_ms)) ask_done();
     /* the session is gone */
     if (s_mode == MODE_SCROLL && !ui_scroll_refresh(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_STATUS) ui_status_refresh(now_ms);
@@ -912,7 +956,7 @@ void ui_tick(uint32_t now_ms)
     }
     ui_home_tick(now_ms);
     if (s_mode == MODE_AGENT && ui_agent_tick(now_ms)) enter_mode(MODE_HOME);
-    if (s_mode == MODE_ASK && ui_ask_tick(now_ms)) leave_mode();
+    if (s_mode == MODE_ASK && ui_ask_tick(now_ms)) ask_done();
     if (s_mode == MODE_SCROLL && ui_scroll_tick(now_ms)) leave_mode(); /* idle: back to WATCH */
     if (s_mode == MODE_STATUS && ui_status_tick(now_ms)) enter_mode(MODE_HOME);
     if (s_mode == MODE_WATCH) ui_watch_tick(now_ms);
