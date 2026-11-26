@@ -1,7 +1,7 @@
 ---
 id: 20261126-2404
 title: Atlas review (Fable, 2026-11-26): text describes the old Ring UI; missing setup, keys, privacy; structure
-status: claimed
+status: fixed
 severity: med
 area: atlas
 platforms: any
@@ -9,7 +9,7 @@ owner: claude-code/cloud@cloud
 created: 2026-11-26T03:11:37Z
 reporter: claude-code/cloud@cloud
 reported_on: linux-x86_64
-verified_on:
+verified_on: linux-x86_64
 gh:
 ---
 
@@ -38,3 +38,10 @@ mobile overlaps, favicon and CONTRACT.md stale.
 - 2026-11-26T03:11:46Z · claude-code/cloud@cloud · linux-x86_64 · 87e3670: claimed
 - 2026-11-26T03:28:00Z · claude-code/cloud@cloud · linux-x86_64 · b09c731: Done: L1 L3 L4 L5 L6 L10, C1-C10, C11 (Start), C13 (favicon, CONTRACT, wording), S1 minimum (Flow after Touch, Start, Inside), S3 (Sound folded), S5 (Flow/Replay ledes). Commits 683a972 ddfb700 b09c731; checks format docs lint atlas pass. Open: S2 hero story, S7 phone nav/Next links, S8 mobile overlaps, C12 Build hardware rows + keys spotlight, L7 jargon (nav.c action text, sound role text), L9 titles, S9 glyph strip; dead ring facts (pills, edge_hints, hint_*_deg, repo_w_px 0).
 - 2026-11-26T03:49:12Z · claude-code/cloud@cloud · linux-x86_64 · 0709128: Merged parallel work: plain reader text for gestures and sound + dead ring facts removed (37b1854, 70cddee), plain titles + firmware-font glyph key (41ff42d, 0a60436, 971ee23), four-beat hero + phone rail + Next links (03a2a85, d32a1ae), phone watch dock + Build parts/keys spotlight (0709128). Checks format docs lint atlas sim pass; firmware device build not run (no ESP-IDF). Waiting on the user: merge Sound and haptics into Feel (S3), headline, yellow vs amber for key A, brand hidden on phones.
+- 2026-11-26T03:56:49Z · claude-code/cloud@cloud · linux-x86_64 · 8bdfeb4: fixed: Atlas review worked through: commits 683a972..8bdfeb4 on claude/current-overview-status-3her9f; user decisions applied (Feel merge, 'Agents on the go', yellow key A, brand dot on phones). Checks format docs lint atlas sim pass; firmware device build not run (no ESP-IDF here).
+    - agent: claude-code/cloud
+    - host: cloud
+    - platform: linux-x86_64
+    - os: Ubuntu 24.04.5 LTS (kernel 6.18.44-fc-v880)
+    - git: 8bdfeb4 claude/current-overview-status-3her9f
+    - toolchains: cc 13.3.0-6ubuntu2~24.04.1, cmake 3.28.3, ninja 1.11.1, node 22.23.5, python 3.13.18, rustc 1.95.0, cargo 1.95.0, sdl2 2.30.0
