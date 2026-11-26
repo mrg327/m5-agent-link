@@ -9,19 +9,11 @@
  * What the key reads of facts.glyphs.
  * @typedef {{ px: number, icons: Record<string, Glyph>, states: Record<string, string | Record<string, string>>, keys: { a: { icon: string, color: string }, b: { icon: string, color: string }, r_px: number, ring_w_px: number }, agents: { id: string, name: string, icon: string }[] }} GlyphFacts
  */
-import { STATE_ROWS, rowColor } from '../../gestures/actions.js';
+import { STATE_ROWS, rowColor, stateLabel } from '../../gestures/actions.js';
 
 const NS = 'http://www.w3.org/2000/svg';
-// one or two words per glyph (the watch itself shows none)
-const STATE_WORD = /** @type {Record<string, string>} */ ({
-  work: 'Working',
-  ask: 'Question',
-  perm: 'Approval',
-  done: 'Done',
-  error: 'Error',
-  idle: 'Idle',
-});
-const KEY_WORD = { a: 'On PC', b: 'Next' };
+// states are named as the firmware names them (facts.states, via stateLabel); keys in two words
+const KEY_WORD = { a: 'Terminal forward', b: 'Next session' };
 
 /**
  * The SVG paths of a glyph: one path per alpha level, each a set of one-pixel-high runs, laid out
@@ -125,7 +117,7 @@ export function mountGlyphKey(slot, facts) {
   };
   const states = STATE_ROWS.map((row) => ({
     svg: glyphSvg(gf, stateIcon(gf, row.fact), rowColor(row, facts)),
-    word: STATE_WORD[row.id] ?? row.label,
+    word: stateLabel(row, facts),
   }));
   const keys = /** @type {const} */ (['a', 'b']).map((k) => ({
     svg: glyphSvg(gf, gf.keys[k].icon, gf.keys[k].color, true),
