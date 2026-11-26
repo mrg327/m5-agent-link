@@ -103,7 +103,7 @@ They are pure functions with tests in `atlas/test/` (`node --test atlas/test/*.t
 ## Stage API (owned by **shell**)
 
 ```js
-ctx.stage.focus(region)        // 'screen'|'buttons'|'motor'|'usb'|'antenna'|null: spotlight a hardware part
+ctx.stage.focus(region)        // 'screen'|'buttons'|'keya'|'keyb'|'power'|'grove'|'motor'|'usb'|'antenna'|null: spotlight a part (atlas/js/stage/art.js)
 ctx.stage.annotate(id, {x, y, text} | null)  // callout on the watch, in canvas coords
 ctx.stage.trace(points)        // draw a fading finger trail over the screen [{x,y,t}]
 ctx.stage.pulse(kind)          // visual haptic/radio pulse: 'haptic'|'usb'|'ble'

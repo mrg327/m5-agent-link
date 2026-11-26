@@ -15,7 +15,6 @@ TS2339	atlas/js/gestures/lab.js	23
 TS2339	atlas/js/main.js	4
 TS2339	atlas/js/proto/messages.js	7
 TS2339	atlas/js/proto/mock-daemon.js	6
-TS2339	atlas/js/stage/chapters/build.js	3
 TS2339	atlas/js/stage/stage.js	3
 TS2339	atlas/js/stage/stub-watch.js	1
 TS2339	atlas/js/watch-runtime.js	3
@@ -86,7 +85,6 @@ TS7006	atlas/js/replay/chapter.js	50
 TS7006	atlas/js/replay/trace.js	9
 TS7006	atlas/js/sound/chapter.js	23
 TS7006	atlas/js/sound/synth.js	15
-TS7006	atlas/js/stage/chapters/build.js	13
 TS7006	atlas/js/stage/chapters/glance.js	14
 TS7006	atlas/js/stage/fx.js	16
 TS7006	atlas/js/stage/stage.js	23
@@ -152,7 +150,6 @@ TS7053	atlas/js/proto/mock-daemon.js	3
 TS7053	atlas/js/replay/trace.js	1
 TS7053	atlas/js/sound/chapter.js	2
 TS7053	atlas/js/sound/synth.js	2
-TS7053	atlas/js/stage/chapters/build.js	1
 TS7053	atlas/js/stage/stage.js	5
 TS7053	atlas/js/watch-runtime.js	6
 TS7053	atlas/test/sound_synth.test.mjs	2
@@ -180,7 +177,6 @@ jsdoc/require-jsdoc	atlas/js/replay/trace.js	4
 jsdoc/require-jsdoc	atlas/js/sound/chapter.js	2
 jsdoc/require-jsdoc	atlas/js/sound/synth.js	4
 jsdoc/require-jsdoc	atlas/js/stage/art.js	5
-jsdoc/require-jsdoc	atlas/js/stage/chapters/build.js	3
 jsdoc/require-jsdoc	atlas/js/stage/chapters/glance.js	2
 jsdoc/require-jsdoc	atlas/js/stage/fx.js	1
 jsdoc/require-jsdoc	atlas/js/stage/stage.js	1

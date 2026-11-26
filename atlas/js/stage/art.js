@@ -15,14 +15,20 @@ export const REGIONS = {
     holes: [{ x: 300, y: 300, r: 262 }],
     tag: { x: 300, y: 300 },
   },
+  // Key holes sit on the caps (.key--a/--b/--pwr in stage.css, drawn about 64 px behind the face): the
+  // tilt lifts them a little above their 88 px corner, so the centres are nudged up from it.
   buttons: {
     label: 'Keys A · B',
     holes: [
-      { x: 98, y: 92, r: 58 },
-      { x: 502, y: 92, r: 58 },
+      { x: 104, y: 80, r: 56 },
+      { x: 516, y: 80, r: 56 },
     ],
     tag: { x: 300, y: 10 },
   },
+  keya: { label: 'Key A', holes: [{ x: 104, y: 80, r: 56 }], tag: { x: 104, y: 80 } },
+  keyb: { label: 'Key B', holes: [{ x: 516, y: 80, r: 56 }], tag: { x: 516, y: 80 } },
+  power: { label: 'Power · M5PM1', holes: [{ x: 104, y: 494, r: 50 }], tag: { x: 104, y: 494 } },
+  grove: { label: 'HY2.0-4P', holes: [{ x: 546, y: 473, r: 52 }], tag: { x: 546, y: 473 } },
   motor: {
     label: 'Vibration motor',
     holes: [{ x: 300, y: 505, r: 70 }],

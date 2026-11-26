@@ -18,9 +18,20 @@ body[data-stage="mini"] { --sx: calc(100vw - var(--gutter) - 64px); --sy: calc(1
 @media (min-width: 1200px) {
   body[data-layout="wide"][data-stage="mini"] { --sx: calc(100vw - var(--gutter) - 70px); --sy: calc(100vh - 80px); --ss: .17; }
 }
+/* Phones and narrow tablets: past the hero the watch docks in a bar along the bottom edge. The bar is
+   opaque and the page keeps its height clear at the end, so content passes behind the dock the way it
+   passes behind the top bar and is never covered while it is in view (S8). */
 @media (max-width: 900px) {
   body[data-stage] { --ss: calc(.9 * var(--fit)); --sx: 50vw; --sy: calc(var(--topbar-h) + 300px * var(--ss) + 14px); }
-  body[data-stage="side"], body[data-stage="mini"] { --sx: calc(100vw - 14px - 58px); --sy: calc(100vh - 14px - 58px); --ss: .19; }
+  body[data-stage="side"], body[data-stage="mini"] { --sx: 50vw; --sy: calc(100vh - 64px); --ss: .19; }
+  html { scroll-padding-bottom: 128px; }
+  body { padding-bottom: 128px; }
+  .stage::before {
+    content: ""; position: fixed; left: 0; right: 0; bottom: 0; height: 128px; opacity: 0; transition: opacity 400ms;
+    background: color-mix(in srgb, var(--ink) 94%, transparent); border-top: 1px solid var(--line);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  }
+  body[data-stage="side"] .stage::before, body[data-stage="mini"] .stage::before { opacity: 1; }
 }
 
 .stage { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
@@ -119,7 +130,9 @@ body[data-stage="mini"] { --sx: calc(100vw - var(--gutter) - 64px); --sy: calc(1
 .usb__tongue { width: 76%; height: 7px; border-radius: 2px; background: linear-gradient(90deg, #3a3d45, #6b7080, #3a3d45); }
 
 /* spotlight, ring, labels, effects */
-.spot, .fx { left: -100px; top: -100px; width: 800px; height: 800px; pointer-events: none; transform: translateZ(3px); overflow: visible; }
+/* max-width: none, or base.css (svg { max-width: 100% }) squeezes the 800 px box into the 600 px face and
+   every hole, ring and effect lands off its part */
+.spot, .fx { max-width: none; left: -100px; top: -100px; width: 800px; height: 800px; pointer-events: none; transform: translateZ(3px); overflow: visible; }
 .spot__dim { opacity: 0; transition: opacity 420ms var(--ease-out); }
 .spot.is-on .spot__dim { opacity: .74; }
 .spot__ring circle { fill: none; stroke: #fff; stroke-opacity: .8; stroke-width: 1.5; stroke-dasharray: 2 7; transform-box: fill-box; transform-origin: center; animation: spin 14s linear infinite; }
