@@ -162,7 +162,10 @@ export function mount(section, ctx) {
   }
 
   // ───────── scenario controls ─────────
-  const scenarios = ctx.daemon?.scenarios ?? [];
+  // scenarios a chapter plays for its own demo (`stage`) are not offered here
+  const scenarios = (ctx.daemon?.scenarios ?? []).filter(
+    (/** @type {{ stage?: string }} */ s) => !s.stage,
+  );
   let playing = ctx.daemon?.playing ?? true;
   let current = ctx.daemon?.scenario ?? scenarios[0]?.name;
   scenarios.forEach((s) => {

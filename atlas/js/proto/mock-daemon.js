@@ -272,6 +272,7 @@ const SCENARIOS = {
   // (a request takes it over to the request screen). Glance points at parts of this screen.
   states: {
     title: 'The ring, one session in every state',
+    stage: 'glance', // played by a chapter for its own demo; Flow's picker leaves it out
     length: 3600000,
     steps: [
       [
@@ -357,6 +358,7 @@ const SCENARIOS = {
   // The hero's four beats, one step each (the page performs the hold and the key press).
   story: {
     title: 'Work, ask, approve, done',
+    stage: 'intro', // the hero's four beats
     length: 21000,
     steps: [
       [
@@ -444,7 +446,11 @@ export function createMockDaemon({
   const self = {
     host: { id: 'a1a2a3a4a5a6a7a8', name: hostName, os: 'mac' },
     get scenarios() {
-      return Object.entries(SCENARIOS).map(([name, s]) => ({ name, title: s.title }));
+      return Object.entries(SCENARIOS).map(([name, s]) => ({
+        name,
+        title: s.title,
+        stage: /** @type {{ stage?: string }} */ (s).stage,
+      }));
     },
     get sessions() {
       return [...sessions.values()];
