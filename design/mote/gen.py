@@ -251,7 +251,7 @@ def gen_c(look: Look) -> str:
     r, g, b = look.rgb
     lines = [
         f"/* {BANNER} */",
-        "/* The Mote's look (design/mote/README.md). Not yet read by the renderer. Sizes are",
+        "/* The Mote's look (design/mote/README.md), read by mote.h and ui_orb.c. Sizes are",
         " * diameters in px; a level or an alpha is 0 to 255; times in ms. */",
         "#pragma once",
         "",

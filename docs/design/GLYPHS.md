@@ -375,12 +375,13 @@ asks, buzzes or sounds. Off by default: LABS > Personality, the dot (`FUN_MOTE`,
 design, "Firefly" visiting busy sessions, on 2026-11-26; it replaced a head with a tail that lapped as a
 seconds hand at r 216 and settled at 6 o'clock.
 
-- **Look.** No tail: a warm-white `0xFFE2B8` core of 7 px radius in a soft halo that falls off to nothing at
-  26–30 px (seven concentric alpha discs, coverage about 86 % at the core down to 8 % at the rim). The core is
-  at the ambient face's 45 %, the halo's peak at 80 % of that. Where it may loop, the halo **breathes**: 26 →
-  30 px and 70 → 100 % of its brightness over 3.6 s, sampled in 8 levels. From 23:00 to 06:00 it is the same
-  warm white, dimmer (core 28 %, halo at 70 %): colour is reserved for state, so it is never amber. It drifts
-  with the ambient face's 1 px burn-in guard.
+- **Look.** No tail: the profile's size M (see Profile below): a warm-white `0xFFE2B8` core of 7 px radius
+  in a soft halo that falls off to nothing at 30 px, alpha 0.40 × (1 − t)² from the core's edge (drawn as 8
+  concentric alpha rings, one per 3 px band, so each pixel is blended once: stacked discs tinted a faint
+  halo green in RGB565). The whole orb is at the ambient level, 45 %. Where it may loop, the halo
+  **breathes**: its alpha 60 → 100 % over 4 s, sampled in 8 levels; its radius holds. From 23:00 to 06:00 it
+  is the same warm white, dimmer (30 %, the halo at 70 %): colour is reserved for state, so it is never
+  amber. It drifts with the ambient face's 1 px burn-in guard.
 - **The track, r 175.** The core (r 168–182) stays clear of the usage gauges on the idle face (their
   glyphs at 6 o'clock from r 184, beads from 187, arcs 191–197; `ui_gauges.c`), the needs-you pips (r 196–210;
   the Mote is gone whenever one shows anyway) and the capsules (r 222–228), and the halo's inner edge (r 145)
@@ -399,7 +400,7 @@ seconds hand at r 216 and settled at 6 o'clock.
   order), so where it is tells you who is busy; with one working session it stays by that one; it starts by
   the nearest, and when the one it is by stops, or the ring re-lays, it goes to the nearest still working;
   **rest** at 12 o'clock (under the ring's gap) when nothing runs, breathing; an **ember** after five minutes
-  resting: 60 % of the size, 22 %, still.
+  resting: a 4 px core at 25 %, no halo, still.
 - **Travel.** Every trip is the short way, eased in and out (smoothstep), and takes 0.8 s plus 20 ms a degree
   (half the ring in 4.4 s, at most 62°/s), so nothing pops; a new target mid-trip starts a new trip from where
   it is. Only the loops (the big finish's and the centuries egg's, §3.15) move faster.
@@ -451,8 +452,8 @@ seconds hand at r 216 and settled at 6 o'clock.
   orb's box (about 0.3 M px over its 450 ms in the simulator's ticks).
 - **Cost** (simulator, `fun_mote.txt`). Each change repaints the orb's box, old and new (about 4–5 k px each,
   joined where they overlap); nothing else on the face is touched. Lingering, the breath repaints it a level at
-  a time: about 53 k px a 3.6 s breath (about 15 k px a second, like a breathing sigil). A trip moves the box
-  every tick: about 485 k px over the 4.4 s of half the ring in the simulator's 30 ms ticks (about two full
+  a time: about 51 k px in 3.6 s (about 14 k px a second, like a breathing sigil). A trip moves the box
+  every tick: about 555 k px over the 4.4 s of half the ring in the simulator's 30 ms ticks (about two full
   frames' worth, spread over the trip); on the watch the frame rate bounds it. A big finish is a trip (about
   0.5 M px for half the ring), then the loop's box (about 4 k px) and the flare's (up to about 10 k px): about
   0.4 M px over the loop, the flare and the linger's first 0.4 s. On battery it is gone and the face repaints
@@ -465,8 +466,9 @@ seconds hand at r 216 and settled at 6 o'clock.
   The simulator's RTC runs on the script's virtual clock, so the firefly moves in a headless run.
 - **Profile.** The look (colour, halo falloff, levels, breath, flare, sizes) has one source,
   `design/mote/mote.toml`; `design/mote/gen.py` writes the firmware header `mote_look.h`, the Atlas CSS and
-  SVGs, the favicon and the CLI colour from it (`design/mote/README.md`, issue 20261126-0163). The idle-face Firefly is size M (core 7 px, halo to 30 px);
-  nothing reads the outputs yet.
+  SVGs, the favicon and the CLI colour from it (`design/mote/README.md`, issue 20261126-0163). The idle-face
+  Firefly is size M (core 7 px, halo to 30 px). The firmware reads the header (issue 20261126-f5be): `mote.h`
+  takes the colour, levels, breath and sizes (`mote_look()` scale 100 is M, 200 is L), `ui_orb.c` the falloff.
 
 ### 3.15 Easter eggs: `eggs.c`, `ui_eggs.c` (issue 20261126-7770)
 

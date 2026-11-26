@@ -318,7 +318,7 @@ sim_script_test(sim_labs_fun labs_fun.txt)
 # request.
 sim_script_test(sim_fun_mote fun_mote.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
-                PASS_REGULAR_EXPRESSION "\"mode\":\"visit\".*\"mote_day\",\"days\":1.*\"mode\":\"cheer\",\"deg\":90.*\"mote_finish\",\"deg\":270,\"arc\":270.*\"mode\":\"visit\",\"deg\":270.*\"mode\":\"rest\".*\"mode\":\"ember\".*\"mode\":\"visit\".*\"mode\":\"gone\".*\"mode\":\"visit\",\"deg\":[0-9]+,\"lum\":28,\"halo\":[0-9]+,\"night\":1.*\"mode\":\"gone\"")
+                PASS_REGULAR_EXPRESSION "\"mode\":\"visit\".*\"mote_day\",\"days\":1.*\"mode\":\"cheer\",\"deg\":90.*\"mote_finish\",\"deg\":270,\"arc\":270.*\"mode\":\"visit\",\"deg\":270.*\"mode\":\"rest\".*\"mode\":\"ember\".*\"mode\":\"visit\".*\"mode\":\"gone\".*\"mode\":\"visit\",\"deg\":[0-9]+,\"lum\":30,\"halo\":[0-9]+,\"night\":1.*\"mode\":\"gone\"")
 # The Mote at pairing (issue 20261126-2de2): a still orb at 12 while the passkey shows, clear of the digits;
 # one flare on done (the screen goes after it), nothing on fail; reduced motion: no flare; off: no orb.
 sim_script_test(sim_mote_pair mote_pair.txt

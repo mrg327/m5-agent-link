@@ -39,11 +39,12 @@ uint16_t mote_breath(uint32_t t_ms, uint32_t period_ms)
 mote_look_t mote_look(uint16_t scale_pct, uint8_t lum, uint16_t breath_pm)
 {
     if (breath_pm > 1000) breath_pm = 1000;
-    int32_t core = MOTE_CORE_R * (int32_t)scale_pct / 100;
-    int32_t halo_m = MOTE_HALO_R * 1000 + MOTE_BREATH_PX * breath_pm;
-    int32_t halo = (halo_m * (int32_t)scale_pct / 100 + 500) / 1000;
-    int32_t pct =
-        MOTE_HALO_PCT * (MOTE_BREATH_LO * 1000 + (100 - MOTE_BREATH_LO) * breath_pm) / 100000;
+    /* sizes are diameters in the profile: size M at scale 100, rounded to whole radii */
+    int32_t core = (MOTE_LOOK_M_CORE_D * (int32_t)scale_pct + 100) / 200;
+    int32_t halo = (MOTE_LOOK_M_HALO_D * (int32_t)scale_pct + 100) / 200;
+    int32_t alpha = MOTE_LOOK_BREATH_MIN +
+                    (MOTE_LOOK_BREATH_MAX - MOTE_LOOK_BREATH_MIN) * (int32_t)breath_pm / 1000;
+    int32_t pct = (alpha * 100 + 127) / 255;
     if (core < 1) core = 1;
     if (core > 120) core = 120;
     if (halo <= core) halo = core + 1;
@@ -218,8 +219,7 @@ static void settle_look(const mote_t *m, const mote_in_t *in, uint32_t now, mote
         }
     } else if (m->base == MOTE_REST && now - m->idle_ms >= MOTE_EMBER_MS) {
         o->mode = MOTE_EMBER;
-        o->look = mote_look(MOTE_EMBER_SCALE, MOTE_LUM_EMBER, 0);
-        o->look.halo_pct /= 2;
+        o->look = (mote_look_t){MOTE_EMBER_R, MOTE_EMBER_R, MOTE_LUM_EMBER, 0}; /* no halo */
         o->deg = whole_deg(at);
         return;
     } else if (!in->reduced) {

@@ -26,6 +26,8 @@ Generated files (S-GEN-01: never edit them; change `mote.toml` or `gen.py`, reru
 | `daemon/crates/agentlink/src/mote.rs` | `MOTE_RGB` and `MOTE_ANSI256` (223) for the CLI's status mark |
 
 The Atlas page reads the CSS and the favicons (the brand mark, the caption light and the hero drift,
-issue 20261126-b92e) and the root `README.md` shows `favicon-96.svg`; the firmware renderer and the CLI
-are wired to their outputs in later changes. The breath scales the halo's alpha only, so one sprite per
+issue 20261126-b92e) and the root `README.md` shows `favicon-96.svg`; the firmware reads `mote_look.h`
+(`mote.h` for the levels, sizes, breath and flare, `ui_orb.c` for the falloff, drawn as concentric
+rings; issue 20261126-f5be); the CLI is wired to its output in a later change. The breath scales the
+halo's alpha only, so one sprite per
 size serves every frame and the core stays crisp; the renderer draws the core over the sprite.

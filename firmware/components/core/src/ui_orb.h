@@ -1,7 +1,8 @@
 /* The orb: the Mote's firefly drawn anywhere (issue 20261126-59e0, GLYPHS.md §3.14). A core and a
- * halo of seven precomputed concentric alpha discs, so it costs a few small fills and no image or
- * blur. Apart from the idle face's behaviour (mote.c, ui_mote.c), so the mascot can appear on other
- * screens at any position and size: build a look with mote_look() (and mote_breath()), paint it
+ * halo that follows the shared profile's falloff (mote_look.h), as concentric alpha rings about 3
+ * px apart (8 for size M), so it costs a few small fills and no image or blur. Apart from the idle
+ * face's behaviour (mote.c, ui_mote.c), so the mascot can appear on other screens at any position
+ * and size: build a look with mote_look() (and mote_breath()), paint it
  * from a draw event with ui_orb_draw(), and invalidate ui_orb_area() round its old and new places.
  */
 #pragma once

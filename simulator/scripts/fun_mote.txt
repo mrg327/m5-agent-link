@@ -14,19 +14,19 @@ session 2 work api main Indexing the repository
 wait 31500
 shot fun_mote_visit_a.png
 # the cost of lingering, with Living marks off so the ambient sigil holds still: the halo breathes a level at
-# a time and repaints the orb's box (about 4-5 k px): about 53 k px a 3.6 s breath (0 without the Mote)
+# a time and repaints the orb's box (about 4-5 k px): about 51 k px in 3.6 s of its 4 s breath (0 without the Mote)
 pref fun 0x3da
 px_reset
 wait 3600
 expect_px_max 70000
 # after 8 s it crosses to the second (9 o'clock), the short way, eased: a 4.4 s trip that moves the box each
-# tick, about 485 k px in all (two full frames' worth, spread over the trip)
+# tick, about 555 k px in all (under three full frames' worth, spread over the trip; the halo holds r 30)
 wait 2100
 px_reset
 wait 2200
 shot fun_mote_travel.png
 wait 2300
-expect_px_max 550000
+expect_px_max 620000
 pref fun 0x3db
 wait 1000
 shot fun_mote_visit_b.png

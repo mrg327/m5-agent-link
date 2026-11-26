@@ -84,8 +84,7 @@ static void test_priority(void)
     mote_out_t o = mote_step(&m, &in, 1000);
     EXPECT(o.mode == MOTE_REST && o.deg == MOTE_REST_DEG, "nothing runs: resting at 12 o'clock");
     EXPECT(o.look.core_r == MOTE_CORE_R && o.look.lum == MOTE_LUM, "a 7 px core, ambient bright");
-    EXPECT(o.look.halo_r >= MOTE_HALO_R && o.look.halo_r <= MOTE_HALO_R + MOTE_BREATH_PX,
-           "a halo of about 30 px");
+    EXPECT(o.look.halo_r == MOTE_HALO_R, "a halo to 30 px (size M)");
     EXPECT(o.rgb == MOTE_RGB && o.dx == 0 && o.dy == 0, "warm white, on its track");
     const int d[] = {90, 270};
     working(&in, 2, d);
@@ -185,25 +184,28 @@ static void test_rest_and_ember(void)
     uint32_t t = until_at(&m, &in, TICK, 10000, MOTE_REST_DEG, &mv, &sw);
     EXPECT(t && sw && mv <= 2, "nothing runs: to 12 o'clock, the short way, calm");
     EXPECT(mote_step(&m, &in, t + TICK).mode == MOTE_REST, "resting");
-    /* it breathes: the halo between its exhale and its inhale, in a few levels */
+    /* it breathes: the halo's alpha between its exhale and its inhale, in a few levels; its radius
+     * holds (the profile's breath) */
     int lo = 255, hi = 0, changes = 0;
     mote_out_t prev = mote_step(&m, &in, t + 2 * TICK);
     for (uint32_t u = t + 3 * TICK; u < t + 3 * TICK + MOTE_BREATH_MS; u += TICK) {
         mote_out_t o = mote_step(&m, &in, u);
-        if (o.look.halo_r < lo) lo = o.look.halo_r;
-        if (o.look.halo_r > hi) hi = o.look.halo_r;
-        if (o.look.halo_r != prev.look.halo_r || o.look.halo_pct != prev.look.halo_pct) changes++;
-        EXPECT(o.look.lum == MOTE_LUM && o.deg == 0, "the core holds still");
+        if (o.look.halo_pct < lo) lo = o.look.halo_pct;
+        if (o.look.halo_pct > hi) hi = o.look.halo_pct;
+        if (o.look.halo_pct != prev.look.halo_pct) changes++;
+        EXPECT(o.look.lum == MOTE_LUM && o.deg == 0 && o.look.halo_r == MOTE_HALO_R,
+               "the core and the halo's size hold still");
         prev = o;
     }
-    EXPECT(lo == MOTE_HALO_R && hi == MOTE_HALO_R + MOTE_BREATH_PX, "the halo breathes 26-30 px");
+    EXPECT(lo == 60 && hi == 100, "the halo breathes 60-100 % of the profile's alpha");
     EXPECT(changes >= 4 && changes <= 2 * (MOTE_BREATH_STEPS - 1), "in a few steps a breath");
     /* five minutes resting (from the first step without work, at TICK): an ember */
     mote_out_t o = run(&m, &in, t + 4000, MOTE_EMBER_MS, NULL);
     EXPECT(o.mode == MOTE_REST, "rested under five minutes");
     o = mote_step(&m, &in, TICK + MOTE_EMBER_MS);
-    EXPECT(o.mode == MOTE_EMBER && o.look.core_r < MOTE_CORE_R && o.look.lum == MOTE_LUM_EMBER,
-           "an ember after exactly five minutes: smaller and dim");
+    EXPECT(o.mode == MOTE_EMBER && o.look.core_r == MOTE_EMBER_R && o.look.lum == MOTE_LUM_EMBER &&
+               o.look.halo_pct == 0 && MOTE_LUM_EMBER == 25,
+           "an ember after exactly five minutes: a 4 px core at 25 %, no halo");
     mote_look_t k = o.look;
     for (uint32_t u = TICK + MOTE_EMBER_MS; u < TICK + MOTE_EMBER_MS + 10000; u += TICK) {
         o = mote_step(&m, &in, u);
@@ -291,8 +293,8 @@ static void test_cheer(void)
         if (o.look.halo_pct > max_pct) max_pct = o.look.halo_pct;
     }
     EXPECT(still_on, "the flare, in place on the track");
-    EXPECT(max_halo >= (MOTE_HALO_R + MOTE_BREATH_PX) * MOTE_FLARE_PCT / 100 - 2 &&
-               max_lum >= MOTE_LUM_FLARE - 5 && max_pct >= 95,
+    EXPECT(max_halo >= MOTE_HALO_R * MOTE_FLARE_PCT / 100 - 2 && max_lum >= MOTE_LUM_FLARE - 5 &&
+               max_pct >= 95,
            "a bright flare, the halo 1.6 times as wide");
     _Static_assert(MOTE_FIN_LOOP_MS + MOTE_FLARE_MS == 1200, "loop and flare in 1.2 s");
     /* it lingers 8 s by the finished arc, breathing, then goes on to the working one */
@@ -378,7 +380,8 @@ static void test_reduced(void)
     in.n_work = 0;
     o = mote_step(&m, &in, 30000);
     EXPECT(o.mode == MOTE_REST && o.deg == MOTE_REST_DEG, "reduced: at rest at once, no trip");
-    EXPECT(o.look.halo_r == MOTE_HALO_R, "reduced: the halo exhaled, still");
+    EXPECT(o.look.halo_r == MOTE_HALO_R && o.look.halo_pct == 60,
+           "reduced: the halo exhaled, still");
 }
 
 static void test_loop(void)
@@ -438,7 +441,7 @@ static void test_tired(void)
     mote_out_t a = mote_step(&m, &in, 0), b;
     for (uint32_t t = TICK; t < 12000; t += TICK) {
         b = mote_step(&m, &in, t);
-        if (b.look.halo_r != a.look.halo_r) fresh++;
+        if (b.look.halo_pct != a.look.halo_pct) fresh++;
         if (b.look.halo_pct > pct_fresh) pct_fresh = b.look.halo_pct;
         a = b;
     }
@@ -447,7 +450,7 @@ static void test_tired(void)
     a = mote_step(&m, &in, 0);
     for (uint32_t t = TICK; t < 12000; t += TICK) {
         b = mote_step(&m, &in, t);
-        if (b.look.halo_r != a.look.halo_r) tired++;
+        if (b.look.halo_pct != a.look.halo_pct) tired++;
         if (b.look.halo_pct > pct_tired) pct_tired = b.look.halo_pct;
         a = b;
     }
@@ -458,11 +461,13 @@ static void test_tired(void)
 static void test_look(void)
 {
     mote_look_t k = mote_look(100, 45, 0);
-    EXPECT(k.core_r == 7 && k.halo_r == 26 && k.lum == 45, "the idle face's firefly");
+    EXPECT(k.core_r == 7 && k.halo_r == 30 && k.lum == 45, "the idle face's firefly: size M");
     mote_look_t big = mote_look(200, 80, 1000);
-    EXPECT(big.core_r == 14 && big.halo_r == 60, "any size: twice as large");
-    EXPECT(big.halo_pct == MOTE_HALO_PCT && k.halo_pct == MOTE_HALO_PCT * MOTE_BREATH_LO / 100,
-           "inhaled: the halo at its peak; exhaled: 70 % of it");
+    EXPECT(big.core_r == MOTE_LOOK_L_CORE_D / 2 && big.halo_r == MOTE_LOOK_L_HALO_D / 2,
+           "scale 200: size L");
+    EXPECT(big.halo_pct == 100 && k.halo_pct == 60, "inhaled: the halo at its peak; exhaled: 60 %");
+    EXPECT(MOTE_LUM == 45 && MOTE_LUM_NIGHT == 30 && MOTE_LUM_LIT == 100 && MOTE_RGB == 0xFFE2B8,
+           "the profile's levels and colour");
     mote_look_t tiny = mote_look(5, 10, 0);
     EXPECT(tiny.core_r >= 1 && tiny.halo_r > tiny.core_r, "never vanishes");
     EXPECT(mote_breath(0, MOTE_BREATH_MS) == 0, "a breath: out at 0");

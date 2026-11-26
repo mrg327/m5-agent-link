@@ -18,30 +18,36 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "mote_look.h"
+
 /* The track's centre line, inside the ring: the core (r 168-182) clears the usage gauges' glyphs
  * at 6 o'clock (r 184 and out), their beads (187) and arcs (191-197), the needs-you pips (196-210)
  * and the capsules (222-228); the halo's inner edge (r 145) clears the ambient clock's digits. */
 #define MOTE_TRACK_R 175
-#define MOTE_RGB 0xFFE2B8 /* warm white, day and night: colour is for state */
-#define MOTE_CORE_R 7     /* the core's radius at scale 100 */
-#define MOTE_HALO_R 26    /* the halo's outer radius, exhaled; +MOTE_BREATH_PX inhaled */
-#define MOTE_HALO_PCT 80  /* the halo's peak, % of the core's brightness */
-#define MOTE_BREATH_PX 4
-#define MOTE_BREATH_LO 70 /* the halo exhaled, % of its brightness inhaled */
-#define MOTE_BREATH_MS 3600u
+/* The look comes from the shared profile (design/mote/mote.toml, generated into mote_look.h): the
+ * idle face's firefly is size M (core r 7, halo to r 30), its levels and breath are the profile's.
+ */
+#define MOTE_RGB MOTE_LOOK_RGB               /* warm white, day and night: colour is for state */
+#define MOTE_CORE_R (MOTE_LOOK_M_CORE_D / 2) /* the core's radius at scale 100 */
+#define MOTE_HALO_R (MOTE_LOOK_M_HALO_D / 2) /* the halo's outer radius at scale 100 */
+#define MOTE_BREATH_MS MOTE_LOOK_BREATH_MS
 #define MOTE_BREATH_TIRED_MS 6000u /* plan use MOTE_TIRED_PCT or more: slower */
 #define MOTE_BREATH_STEPS 8        /* levels a breath is sampled in: at most 14 repaints a breath */
 #define MOTE_TIRED_PCT 80
 #define MOTE_TIRED_HALO 70 /* tired: the halo at this % (dimmer) */
 #define MOTE_NIGHT_HALO 70 /* 23:00 to 06:00: the halo at this % (the core at MOTE_LUM_NIGHT) */
-#define MOTE_LUM 45        /* % of full: the ambient face's brightness */
-#define MOTE_LUM_NIGHT 28
-#define MOTE_LUM_EMBER 22
-#define MOTE_LUM_FLARE 100 /* the flare's peak, from MOTE_LUM (in proportion at night) */
-#define MOTE_EMBER_SCALE 60
-#define MOTE_EMBER_MS 300000u /* rested this long: an ember */
-#define MOTE_REST_DEG 0       /* 12 o'clock: under the ring's gap, clear of the gauges below */
-#define MOTE_VISIT_MS 8000u   /* it lingers this long by each working session */
+/** A profile level (0..255) as a percentage of full. */
+#define MOTE_LEVEL_PCT(level) (((level) * 100 + 127) / 255)
+#define MOTE_LUM_LIT MOTE_LEVEL_PCT(MOTE_LOOK_LEVEL_LIT) /* the lit deck: full */
+#define MOTE_LUM MOTE_LEVEL_PCT(MOTE_LOOK_LEVEL_IDLE)    /* the ambient face's brightness */
+#define MOTE_LUM_NIGHT MOTE_LEVEL_PCT(MOTE_LOOK_LEVEL_NIGHT)
+#define MOTE_LUM_EMBER MOTE_LEVEL_PCT(MOTE_LOOK_LEVEL_EMBER)
+/* the flare's peak, from MOTE_LUM (in proportion at night): the profile's lit level */
+#define MOTE_LUM_FLARE MOTE_LUM_LIT
+#define MOTE_EMBER_R (MOTE_LOOK_EMBER_CORE_D / 2) /* the ember: this core and no halo */
+#define MOTE_EMBER_MS 300000u                     /* rested this long: an ember */
+#define MOTE_REST_DEG 0     /* 12 o'clock: under the ring's gap, clear of the gauges below */
+#define MOTE_VISIT_MS 8000u /* it lingers this long by each working session */
 #define MOTE_VISIT_MAX 16
 #define MOTE_TRAVEL_MS 800u    /* a trip takes this plus MOTE_TRAVEL_MS_DEG a degree, eased */
 #define MOTE_TRAVEL_MS_DEG 20u /* 180 degrees in 4.4 s: at most 62 degrees a second */
@@ -54,10 +60,10 @@
 #define MOTE_FIN_LINGER_MS 8000u /* = MOTE_VISIT_MS: by the finished arc, then on */
 /* The flare (the profile's [flare], design/mote/mote.toml): the halo to 1.6 times its radius and
  * full strength, and the core to its peak, in 120 ms; back in 480 ms, easing out. */
-#define MOTE_FLARE_RISE_MS 120u
-#define MOTE_FLARE_FALL_MS 480u
+#define MOTE_FLARE_RISE_MS ((uint32_t)MOTE_LOOK_FLARE_RISE_MS)
+#define MOTE_FLARE_FALL_MS ((uint32_t)MOTE_LOOK_FLARE_FALL_MS)
 #define MOTE_FLARE_MS (MOTE_FLARE_RISE_MS + MOTE_FLARE_FALL_MS)
-#define MOTE_FLARE_PCT 160
+#define MOTE_FLARE_PCT MOTE_LOOK_FLARE_SCALE_PCT
 #define MOTE_LOOP_MS 1200u /* the centuries egg: once round a circle inside the track */
 #define MOTE_LOOP_R 16
 #define MOTE_LEVEL_MAX 7
@@ -77,8 +83,8 @@ typedef enum {
 typedef struct {
     uint8_t core_r;   /**< the core's radius, px */
     uint8_t halo_r;   /**< the halo's outer radius, px (from the centre) */
-    uint8_t lum;      /**< the core's brightness, % of full */
-    uint8_t halo_pct; /**< the halo's peak, % of the core's brightness; 0 none */
+    uint8_t lum;      /**< the whole orb's brightness (its level), % of full */
+    uint8_t halo_pct; /**< the halo's alpha, % of the profile's falloff (mote_look.h); 0 none */
 } mote_look_t;
 
 /** The moment, as the screen sees it. */
@@ -143,9 +149,10 @@ mote_out_t mote_step(mote_t *m, const mote_in_t *in, uint32_t now_ms);
 
 /**
  * @brief The firefly's look at a size, a brightness and a breath.
- * @param[in] scale_pct 100 for the idle face's firefly (core r 7, halo r 26-30); any size.
- * @param[in] lum       The core's brightness, % of full.
- * @param[in] breath_pm The breath, 0 (exhaled) to 1000 (inhaled): the halo grows and brightens.
+ * @param[in] scale_pct 100 for size M, the idle face's firefly (core r 7, halo r 30); 200 for L.
+ * @param[in] lum       The orb's level, % of full.
+ * @param[in] breath_pm The breath, 0 (exhaled) to 1000 (inhaled): the halo's alpha only, 60 to
+ *                      100 % (the profile's breath), never its radius.
  */
 mote_look_t mote_look(uint16_t scale_pct, uint8_t lum, uint16_t breath_pm);
 
