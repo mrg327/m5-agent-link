@@ -5,8 +5,8 @@
 [look]
 colour = "#FFE2B8" # warm white at every hour; never a state colour
 halo_ratio = [30, 7] # halo radius = core radius x 30 / 7
-halo_peak = 0.40 # halo alpha at the core's edge
-halo_exponent = 2 # alpha = peak x (1 - t)^exponent; t is 0 at the core's edge, 1 at the halo's
+halo_peak = 0.78 # halo alpha at the core's edge (fitted to the approved Firefly, issue 20261126-f5be)
+halo_exponent = 1.2 # alpha = peak x (1 - t)^exponent; t is 0 at the core's edge, 1 at the halo's
 falloff_steps = 64 # entries - 1 in the firmware's falloff table
 css_stops = 6 # gradient stops across the halo in the CSS and SVG
 

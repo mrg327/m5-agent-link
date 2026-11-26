@@ -4,7 +4,7 @@
 # has "ev":"mote_boot","end":"input".
 rtc 1800000000
 # the orb is at the centre: its halo lights the deck below the clock
-expect_px 233 258 312c21
+expect_px 233 258 7b6d5a
 tap 233 400
 wait 40
 # cut: the deck below the clock is black again, the Mote at 12

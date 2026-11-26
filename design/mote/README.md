@@ -11,7 +11,7 @@ python3 design/mote/gen.py --check   # run by scripts/check structure: fails whi
 
 | Path | Concern |
 |---|---|
-| `mote.toml` | The profile. Colour `#FFE2B8` at every hour; halo radius = core radius × 30 / 7; halo alpha = 0.40 × (1 − t)², t 0 at the core's edge, 1 at the halo's; levels lit 100 %, idle 45 %, night 30 %, ember 25 %; breath 4 s, halo alpha 60–100 %; sizes S, tucked, M, L, ember |
+| `mote.toml` | The profile. Colour `#FFE2B8` at every hour; halo radius = core radius × 30 / 7; halo alpha = 0.78 × (1 − t)^1.2 (fitted to the approved Firefly), t 0 at the core's edge, 1 at the halo's; levels lit 100 %, idle 45 %, night 30 %, ember 25 %; breath 4 s, halo alpha 60–100 %; sizes S, tucked, M, L, ember |
 | `gen.py` | The generator (Python 3.11 stdlib, `tomllib`) |
 
 Generated files (S-GEN-01: never edit them; change `mote.toml` or `gen.py`, rerun, commit both):

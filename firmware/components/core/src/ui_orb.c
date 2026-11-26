@@ -1,5 +1,5 @@
-/* The orb: see ui_orb.h. The halo follows the shared profile's falloff (mote_look.h: alpha 0.40 x
- * (1 - t)^2 from the core's edge to the halo's), drawn as concentric rings of one colour, each
+/* The orb: see ui_orb.h. The halo follows the shared profile's falloff (mote_look.h: alpha 0.78 x
+ * (1 - t)^1.2 from the core's edge to the halo's), drawn as concentric rings of one colour, each
  * band about 3 px wide at the falloff's alpha at its middle, so the deck shows through it. The core
  * goes on top. */
 #include "ui_orb.h"

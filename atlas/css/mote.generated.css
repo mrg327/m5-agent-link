@@ -26,8 +26,8 @@
   --mote-flare-scale: 1.6;
   --mote-flare-rise: 120ms;
   --mote-flare-fall: 480ms;
-  --mote-orb: radial-gradient(circle closest-side, #ffe2b8 0 23.33%, rgb(255 226 184 / 0.4) 23.33%, rgb(255 226 184 / 0.278) 36.11%, rgb(255 226 184 / 0.178) 48.89%, rgb(255 226 184 / 0.1) 61.67%, rgb(255 226 184 / 0.044) 74.44%, rgb(255 226 184 / 0.011) 87.22%, transparent 100%);
-  --mote-halo: radial-gradient(circle closest-side, rgb(255 226 184 / 0.4) 0 23.33%, rgb(255 226 184 / 0.278) 36.11%, rgb(255 226 184 / 0.178) 48.89%, rgb(255 226 184 / 0.1) 61.67%, rgb(255 226 184 / 0.044) 74.44%, rgb(255 226 184 / 0.011) 87.22%, transparent 100%);
+  --mote-orb: radial-gradient(circle closest-side, #ffe2b8 0 23.33%, rgb(255 226 184 / 0.78) 23.33%, rgb(255 226 184 / 0.627) 36.11%, rgb(255 226 184 / 0.479) 48.89%, rgb(255 226 184 / 0.34) 61.67%, rgb(255 226 184 / 0.209) 74.44%, rgb(255 226 184 / 0.091) 87.22%, transparent 100%);
+  --mote-halo: radial-gradient(circle closest-side, rgb(255 226 184 / 0.78) 0 23.33%, rgb(255 226 184 / 0.627) 36.11%, rgb(255 226 184 / 0.479) 48.89%, rgb(255 226 184 / 0.34) 61.67%, rgb(255 226 184 / 0.209) 74.44%, rgb(255 226 184 / 0.091) 87.22%, transparent 100%);
 }
 
 /* The breath: put it on a halo-only layer, so the core stays steady. */

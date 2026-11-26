@@ -376,7 +376,7 @@ design, "Firefly" visiting busy sessions, on 2026-11-26; it replaced a head with
 seconds hand at r 216 and settled at 6 o'clock.
 
 - **Look.** No tail: the profile's size M (see Profile below): a warm-white `0xFFE2B8` core of 7 px radius
-  in a soft halo that falls off to nothing at 30 px, alpha 0.40 × (1 − t)² from the core's edge (drawn as 8
+  in a soft halo that falls off to nothing at 30 px, alpha 0.78 × (1 − t)^1.2 from the core's edge (drawn as 8
   concentric alpha rings, one per 3 px band, so each pixel is blended once: stacked discs tinted a faint
   halo green in RGB565). The whole orb is at the ambient level, 45 %. Where it may loop, the halo
   **breathes**: its alpha 60 → 100 % over 4 s, sampled in 8 levels; its radius holds. From 23:00 to 06:00 it
