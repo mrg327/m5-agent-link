@@ -165,7 +165,9 @@ carries black text. `theme_dim(rgb, pct)` mixes toward black (ring segments at r
   pulse.
 - Not colour alone: an *unselected* session that needs you carries a **pip**, a filled 10 px dot in
   its colour at r 205 on the capsule's midpoint (the selected one is already wide and bright, so it has
-  none). Dots and twin tracks are gone.
+  none). Dots and twin tracks are gone. A pip never sits under a key hint: within 9° of 315° or 45°
+  it moves along its capsule to 9° away, on the side with room (`ring_pip_deg`); a capsule too short
+  for that puts it at its end.
 - The ring shows the index on **every** screen. While a hold is in progress the index drops to
   20 % and the hold arc (10 px, the item's colour, from 12 o'clock) is drawn over it.
 - SCROLL keeps its position track (4 px `COL_FILL2` circle, accent arc).

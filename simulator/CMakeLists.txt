@@ -83,6 +83,11 @@ add_executable(test_feedback tests/test_feedback.c ${FW}/core/src/feedback.c)
 target_include_directories(test_feedback PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
 target_link_libraries(test_feedback PRIVATE lvgl::lvgl)
 add_test(NAME feedback_haptics COMMAND test_feedback)
+# Needs-you pips keep clear of the key hints at 315° and 45° (issue 20261126-54d7).
+add_executable(test_ring_pip tests/test_ring_pip.c ${FW}/core/src/ui_ring.c ${FW}/core/src/ui_ring_draw.c)
+target_include_directories(test_ring_pip PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_ring_pip PRIVATE agentlink_proto lvgl::lvgl m)
+add_test(NAME ring_pip_clearance COMMAND test_ring_pip)
 
 add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
 target_include_directories(test_ring PRIVATE ${FW}/core/src)

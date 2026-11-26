@@ -6,7 +6,12 @@
 
 #include <math.h>
 
+#include "ui_kit.h"
 #include "ui_theme.h"
+
+/* PIP_KEY_*_DEG are where ui_kit.h puts the key hints: on the diagonals through the centre */
+_Static_assert(UI_KEY_A_X - CX == UI_KEY_Y - CY && UI_KEY_A_X < CX, "hint A is at 315 degrees");
+_Static_assert(UI_KEY_B_X - CX == CY - UI_KEY_Y && UI_KEY_B_X > CX, "hint B is at 45 degrees");
 
 lv_color_t ring_mix(uint32_t rgb, int pct) { return theme_dim(rgb, pct); }
 
@@ -129,5 +134,5 @@ void ring_draw_slot(lv_layer_t *l, const ring_data_t *d, int i)
     default: ring_arc(l, out, w, a0, a1, theme_dim(rgb, rest)); break;
     }
     if (needs && !s->s.selected && !d->ambient)
-        dot(l, PIP_R, PIP_D, (a0 + a1) / 2, theme_dim(rgb, 100));
+        dot(l, PIP_R, PIP_D, ring_pip_deg(a0, a1), theme_dim(rgb, 100));
 }

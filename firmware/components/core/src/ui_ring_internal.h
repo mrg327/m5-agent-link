@@ -25,6 +25,12 @@
 /* needs-you pip: centre radius and diameter (10 px across); drawn on unselected segments only */
 #define PIP_R 205
 #define PIP_D 10
+/* The key hints (ui_kit.h §3.6, centre r 187, ring r 20) sit at these angles, and a pip at r 205
+ * under one would be painted over. A pip keeps this far from either: at 9° its centre is 36 px from
+ * the hint's, 11 px clear of hint and pip together (they touch at 5°). */
+#define PIP_KEY_A_DEG 315
+#define PIP_KEY_B_DEG 45
+#define PIP_KEEP_OUT_DEG 9
 /* ring_set_solid: the display-off alert glow is wider than the index band */
 #define GLOW_W 14
 #define TRACK_RING_W 4 /* ring_set_track: the grey track and the position arc share this width */
@@ -71,6 +77,25 @@ typedef struct {
 void ring_seg_span(int n, int i, int *a0, int *a1);
 /* Degrees spanned by the comet of a working segment a0..a1 at animation level lvl. */
 void ring_comet_span(int a0, int a1, int lvl, int *c0, int *c1);
+
+/* Where on capsule a0..a1 its pip goes: the midpoint, or, within PIP_KEEP_OUT_DEG of a key hint,
+ * moved along the capsule to that distance on the side with more room. A capsule too short for
+ * that puts it at its end, as far from the hint as it can. */
+static inline int ring_pip_deg(int a0, int a1)
+{
+    static const int keys[] = {PIP_KEY_A_DEG, PIP_KEY_B_DEG};
+    int p = (a0 + a1) / 2;
+    for (int i = 0; i < 2; i++) {
+        int k = keys[i], d = p - k;
+        if (d <= -PIP_KEEP_OUT_DEG || d >= PIP_KEEP_OUT_DEG) continue;
+        int hi = k + PIP_KEEP_OUT_DEG < a1 ? k + PIP_KEEP_OUT_DEG : a1;
+        int lo = k - PIP_KEEP_OUT_DEG > a0 ? k - PIP_KEEP_OUT_DEG : a0;
+        int far_hi = hi - k, far_lo = k - lo;
+        /* ties go to the side of the capsule the midpoint was on */
+        p = far_hi > far_lo || (far_hi == far_lo && d >= 0) ? hi : lo;
+    }
+    return p;
+}
 
 /* ── painting (ui_ring_draw.c) ── */
 /* rgb at pct % brightness over black. */
