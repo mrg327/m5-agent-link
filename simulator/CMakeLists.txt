@@ -336,7 +336,7 @@ sim_script_test(sim_fun_mote fun_mote.txt
 # one flare on done (the screen goes after it), nothing on fail; reduced motion: no flare; off: no orb.
 sim_script_test(sim_mote_pair mote_pair.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|042917|551200"
-                PASS_REGULAR_EXPRESSION "\"act\":\"still\".*\"act\":\"flare\".*\"text\":\"Paired\".*\"shown\":false.*\"act\":\"still\".*\"shown\":false.*\"Pairing failed\".*\"act\":\"still\".*\"shown\":false.*\"text\":\"Paired\"")
+                PASS_REGULAR_EXPRESSION "\"act\":\"still\".*\"act\":\"flare\".*\"shown\":false.*\"text\":\"Paired\".*\"act\":\"still\".*\"shown\":false.*\"Pairing failed\".*\"act\":\"still\".*\"shown\":false.*\"text\":\"Paired\"")
 # A session in error lets the idle face come up, and the Mote hovers beside its capsule.
 sim_script_test(sim_fun_mote_error fun_mote_error.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"

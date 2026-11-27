@@ -184,17 +184,33 @@ static void pair_tick(uint32_t now_ms)
     }
 }
 
+static bool s_paired_pending; /* "Paired" waits for the Mote's flare to end (owner, 2026-11-27) */
+
+static void paired_sign(void)
+{ ui_toast_sign("Paired", ICON_BLUETOOTH ICON_CHECK, NULL, RGB_DONE); }
+
 void ui_pair_done(void)
 {
-    /* the Mote's one flare keeps the digits up for its 600 ms; otherwise they go at once */
-    if (lv_obj_has_flag(s_pair, LV_OBJ_FLAG_HIDDEN) || !ui_mote_pair_done(s_now_ms)) ui_pair_hide();
+    /* the Mote's one flare keeps the digits up for its 600 ms, and the "Paired" sign is drawn only
+     * once they go, so the flare does not pay for a sign hidden under it; otherwise both at once */
+    if (!lv_obj_has_flag(s_pair, LV_OBJ_FLAG_HIDDEN) && ui_mote_pair_done(s_now_ms)) {
+        s_paired_pending = true;
+        return;
+    }
+    ui_pair_hide();
+    paired_sign();
 }
 
 void ui_pair_hide(void)
 {
-    if (lv_obj_has_flag(s_pair, LV_OBJ_FLAG_HIDDEN)) { return; }
-    lv_obj_add_flag(s_pair, LV_OBJ_FLAG_HIDDEN);
-    dbg_event("ui", "pair", "\"shown\":false");
+    if (!lv_obj_has_flag(s_pair, LV_OBJ_FLAG_HIDDEN)) {
+        lv_obj_add_flag(s_pair, LV_OBJ_FLAG_HIDDEN);
+        dbg_event("ui", "pair", "\"shown\":false");
+    }
+    if (s_paired_pending) { /* the flare ended, or something closed the screen first */
+        s_paired_pending = false;
+        paired_sign();
+    }
 }
 
 void ui_init(const ui_actions_t *actions)

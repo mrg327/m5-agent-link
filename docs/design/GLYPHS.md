@@ -445,7 +445,8 @@ seconds hand at r 216 and settled at 6 o'clock.
   still: no breath, no drift, because the PC is waiting for you (pairing asks `persona_allow(PF_MOTE)` as
   something that needs you, so only `PA_POSE` comes back). Its box (y 30–86, y 14–102 at the flare) keeps
   clear of the Bluetooth glyph (from y 131) and the digits (y 243–282). `pair done`: one flare (600 ms, a
-  `PA_ONESHOT`), then the screen goes and the "paired" sign shows (`ui_pair_done`); with reduced motion, a
+  `PA_ONESHOT`), then the screen goes and only then is the "Paired" sign drawn (`ui_pair_done`; owner,
+  2026-11-27: not under the screen, so the flare costs only the orb's box); with reduced motion, a
   request waiting or the Mote off, the screen goes at once. `pair fail` or the 60 s guard: nothing. It adds
   no buzz and no sound (the passkey's own tick is the screen's). `mote_pair.txt` (shots `mote_pair_wait`,
   `_flare`, `_after`, `_off`) checks pixels: the orb is at 12, the space above the glyph and round the digits

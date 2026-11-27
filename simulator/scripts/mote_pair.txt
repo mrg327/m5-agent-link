@@ -2,6 +2,7 @@
 # orb at 12 o'clock while the digits show (stillness: the PC waits for you), one flare when pairing completes
 # (600 ms, then the screen goes), nothing when it fails; with the Mote off or reduced motion, no orb or no
 # flare. The digits stay out of the log; the test reads the pair and mote_pair events.
+rtc 1800000000
 pref fun 0x3db
 wait 1500
 pair 042917
@@ -30,8 +31,7 @@ expect_px 200 225 000000
 expect_px 266 225 000000
 expect_px 321 262 ffffff
 wait 300
-# per frame, while the digits are up: the orb's box at the flare and the "paired" sign the toast draws under
-# the screen (about 21 k px, 2 areas; BENCH.md §9)
+# per frame, while the digits are up: the orb's box at the flare only; the "Paired" sign is drawn after it
 expect_frame_px_max 23000 2
 wait 150
 # the flare repaints the orb's box, old and new, each tick (up to about 2 x 8 k px; about 0.3 M px over the
@@ -42,6 +42,10 @@ shot mote_pair_after.png
 # the screen is gone (no digits); the deck under it is empty, so the Mote rests at 12 there (issue
 # 20261126-f5be: the empty deck is its home)
 expect_px 321 262 000000
+# only now the "Paired" sign (owner, 2026-11-27: drawn after the flare, not hidden under it); it covers the
+# rest spot, and once it goes the Mote rests at 12 on the empty deck
+expect_label Paired
+wait 1900
 expect_px 233 58 ffe2b8
 # a failure: no flare, the screen goes at once
 pair 551200

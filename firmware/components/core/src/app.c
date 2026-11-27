@@ -169,14 +169,12 @@ static void pair_step(uint32_t now)
         return;
     }
     bool done = v == HAL_PAIR_DONE;
-    if (done) {
+    if (done) { /* the UI shows "Paired" once the passkey screen is gone (after the Mote's flare) */
         ui_pair_done();
-    } else {
-        ui_pair_hide();
+        return;
     }
-    ui_toast_sign(done ? "Paired" : "Pairing failed",
-                  done ? ICON_BLUETOOTH ICON_CHECK : ICON_BLUETOOTH ICON_X, NULL,
-                  done ? RGB_DONE : RGB_DANGER);
+    ui_pair_hide();
+    ui_toast_sign("Pairing failed", ICON_BLUETOOTH ICON_X, NULL, RGB_DANGER);
 }
 
 static lv_indev_read_cb_t s_hal_touch_read;

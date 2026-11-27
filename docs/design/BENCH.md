@@ -264,8 +264,9 @@ What it says:
   about as much as a full frame: predicted 27-57 ms (up to 96). The 1.2 s move then plays at about 18-25 fps
   from 0.3 to 0.9 s. It delays nothing else: the deck is up and takes input under it, and any input or request
   ends it in that step.
-- **Borderline: the pairing flare** (about 21 k px, 28 ms predicted, up to 47): half of each frame is the
-  "Paired" sign, which the toast draws hidden under the passkey screen while the flare holds it up.
+- **The pairing flare, fixed** (was about 21 k px, 28 ms predicted, up to 47, because the toast drew the
+  "Paired" sign hidden under the passkey screen): the sign is now drawn only once the screen goes (owner,
+  2026-11-27), so the flare is the orb's box alone, about 10 k px a frame (`mote_pair.txt`).
 - **Beside the Mote, not of it** (issue 20261126-3385): the replay's step where a capsule changes (one 113 k px
   frame, inside its 100 ms step), the ring's done sweep (115 k px every other frame), the done card's change,
   the ambient face's 1 px burn-in move each minute (one full frame), and a request's ring pulse.
@@ -286,7 +287,8 @@ What it says:
 on 46 shots) cut the blended pixels by a third but made each frame slower in the simulator, because each band
 is a draw task with its own masks. The orb is drawn as before.
 
-**Options for the boot move**, each of which changes its look or its drawing, so they are the owner's: (a)
+**Decided (owner, 2026-11-27):** the boot move stays as it is, accepting about 20 fps for 0.6 s at power-on
+(option (a)); the pairing flare's sign moves after the flare. The options were: (a)
 accept about 20 fps for 0.6 s at boot, the floor docs/research/ui-animation.md §9 sets for transitions; (b) draw
 the halo from an alpha map computed once per look into PSRAM (about 38 KB at the flare) and blended once a
 pixel instead of about five masked passes: the same falloff with different anti-aliasing, to compare on the
