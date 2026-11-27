@@ -77,8 +77,14 @@ void sim_sleep_us(uint64_t us)
 
 void sim_skip_time(uint32_t ms) { s_skip_us += (uint64_t)ms * 1000u; }
 
+/* A scripted run starts its RTC here, not at the host's wall clock, so a test reads the same time
+ * of day whenever it runs (the Mote's night look and the eggs depend on it); a script sets another
+ * with `rtc`. Unix 1800000000 is 08:00 UTC, a weekday morning. */
+#define SIM_SCRIPT_EPOCH 1800000000
+
 /* The RTC runs on hal_time_us() (the virtual clock in a headless script, `skip` included), from the
- * wall clock at the first read: a script's seconds pass as its milliseconds do. */
+ * wall clock at the first read (the fixed epoch in a scripted run): a script's seconds pass as its
+ * milliseconds do. */
 static int64_t rtc_now(void)
 {
     static bool init;
@@ -86,7 +92,7 @@ static int64_t rtc_now(void)
     int64_t up = (int64_t)(hal_time_us() / 1000000u);
     if (!init) {
         init = true;
-        base = (int64_t)time(NULL) - up;
+        base = (s_virtual ? (int64_t)SIM_SCRIPT_EPOCH : (int64_t)time(NULL)) - up;
     }
     return base + up;
 }
