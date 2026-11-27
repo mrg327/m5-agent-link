@@ -44,3 +44,4 @@ Repro: the scripts named, with `frames all` after a `px_reset` (simulator/README
 ## Log
 
 - 2026-11-26T20:06:41Z · claude-code@linux-dev · linux-x86_64 · 04bd147+dirty: filed
+- 2026-11-27T01:23:48Z · claude-code/cloud@cloud · linux-x86_64 · 31de7df: Commit 31de7df (titled as the Atlas watch rebuild) also carries the sim fix: a scripted headless run starts its RTC at unix 1800000000 (08:00 UTC) instead of the host's wall clock, so time-of-day tests (Mote night look, eggs) no longer pass or fail by when they run; sim_mote_boot failed after midnight UTC before it. Its commit was refused for a long subject and the change rode along.
