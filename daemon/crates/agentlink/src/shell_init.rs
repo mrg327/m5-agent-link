@@ -100,6 +100,25 @@ case $- in
     }
     _agentlink_arm() {
       local _agentlink_st=$?
+      # a prompt hook added after ours (kitty adds its own once the rc files ran) would run after
+      # the arm and take it: move ours back to the end for the next prompt, and leave this one to
+      # PS0
+      if [ ${#PROMPT_COMMAND[@]} -gt 1 ]; then
+        if [ "${PROMPT_COMMAND[-1]}" != _agentlink_arm ]; then
+          local _agentlink_e
+          local -a _agentlink_pc=()
+          # `+=(…)` on our string makes it element 0, `…;_agentlink_arm` included
+          for _agentlink_e in "${PROMPT_COMMAND[@]}"; do
+            _agentlink_e=${_agentlink_e//;_agentlink_arm/}
+            [ "$_agentlink_e" = _agentlink_arm ] || _agentlink_pc+=("$_agentlink_e")
+          done
+          PROMPT_COMMAND=("${_agentlink_pc[@]}" _agentlink_arm)
+          return $_agentlink_st
+        fi
+      elif [[ $PROMPT_COMMAND != *_agentlink_arm ]]; then
+        PROMPT_COMMAND="${PROMPT_COMMAND//;_agentlink_arm/};_agentlink_arm"
+        return $_agentlink_st
+      fi
       _agentlink_armed=1
       return $_agentlink_st
     }
@@ -120,6 +139,11 @@ case $- in
       PROMPT_COMMAND=(_agentlink_prompt "${PROMPT_COMMAND[@]}" _agentlink_arm)
     else
       PROMPT_COMMAND="_agentlink_prompt${PROMPT_COMMAND:+;$PROMPT_COMMAND};_agentlink_arm"
+    fi
+    # bash 4.4+ expands PS0 after a line is read and before it runs, after every prompt hook: arm
+    # there too (the subscript assigns, the expansion is empty)
+    if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 4))); then
+      PS0='${_agentlink_z[_agentlink_armed=1]-}'"${PS0-}"
     fi
   fi
   ;;
@@ -369,6 +393,66 @@ mod tests {
             assert!(q.contains(&("end".to_owned(), n)), "{shell}: {q:?}");
         }
         assert!(!q.contains(&("end".to_owned(), 4)), "{shell}: {q:?}");
+    }
+
+    /// A prompt hook added after the snippet (kitty adds its own once the rc files ran) is never
+    /// reported, and the typed lines still are.
+    fn check_late_hook(name: &str, pre: &str, add: &str) {
+        if !has("bash") {
+            eprintln!("skipped: bash is not installed");
+            return;
+        }
+        let script = format!("{add}\necho one\necho two\ntrue");
+        let (_, log) = drive("bash", name, pre, &script, true);
+        let l = lines(&log);
+        assert!(
+            !log.contains("-- builtin declare"),
+            "{name}: late hook reported: {l:?}"
+        );
+        for w in ["start -- echo one", "start -- echo two", "start -- true"] {
+            assert!(l.iter().any(|x| x == w), "{name}: missing '{w}' in {l:?}");
+        }
+        let count = |p: &str| l.iter().filter(|x| x.starts_with(p)).count();
+        // the hook line, three lines and the final `exit` start; all but `exit` end
+        assert_eq!((count("start"), count("end")), (5, 4), "{name}: {l:?}");
+    }
+
+    #[test]
+    fn bash_ignores_a_prompt_hook_added_later_to_an_array() {
+        check_late_hook(
+            "bash-late-array",
+            "",
+            "PROMPT_COMMAND+=('builtin declare -F _late > /dev/null 2> /dev/null && _late')",
+        );
+    }
+
+    #[test]
+    fn bash_ignores_a_prompt_hook_added_later_to_a_string() {
+        check_late_hook(
+            "bash-late-string",
+            "PROMPT_COMMAND=:",
+            "PROMPT_COMMAND+='; builtin declare -F _late > /dev/null 2> /dev/null && _late'",
+        );
+    }
+
+    /// Without PS0 (bash before 4.4, or a PS0 replaced later) the snippet still recovers from a
+    /// late hook: at most the line right after it goes unreported, and the hook never is.
+    #[test]
+    fn bash_moves_its_arm_back_to_the_end_without_ps0() {
+        if !has("bash") {
+            eprintln!("skipped: bash is not installed");
+            return;
+        }
+        let script = "PS0=\nPROMPT_COMMAND+=('builtin declare -F _late > /dev/null 2> /dev/null && _late')\necho one\necho two\ntrue";
+        let (_, log) = drive("bash", "bash-late-nops0", "", script, true);
+        let l = lines(&log);
+        assert!(
+            !log.contains("-- builtin declare"),
+            "late hook reported: {l:?}"
+        );
+        for w in ["start -- echo two", "start -- true"] {
+            assert!(l.iter().any(|x| x == w), "missing '{w}' in {l:?}");
+        }
     }
 
     #[test]
