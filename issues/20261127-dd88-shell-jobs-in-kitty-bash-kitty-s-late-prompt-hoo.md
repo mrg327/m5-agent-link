@@ -1,7 +1,7 @@
 ---
 id: 20261127-dd88
 title: Shell jobs in kitty bash: kitty's late prompt hook is reported as an endless job and real commands go unreported
-status: claimed
+status: fixed
 severity: med
 area: daemon
 platforms: linux,macos
@@ -9,7 +9,7 @@ owner: claude-code@linux-dev
 created: 2026-11-27T03:30:14Z
 reporter: claude-code@linux-dev
 reported_on: linux-x86_64
-verified_on:
+verified_on: linux-x86_64
 gh:
 ---
 
@@ -50,3 +50,10 @@ after it (older bash, or a PS0 that gets overwritten). Test with a late hook, ar
 
 - 2026-11-27T03:30:15Z · claude-code@linux-dev · linux-x86_64 · 2d3dc41: filed
 - 2026-11-27T03:30:15Z · claude-code@linux-dev · linux-x86_64 · 2d3dc41: claimed
+- 2026-11-27T03:34:55Z · claude-code@linux-dev · linux-x86_64 · 12f4a36: fixed: commit 12f4a36; checks format structure commits lint daemon PASS (shell_init 9/9). Verified on linux with kitty's own kitty.bash sourced after the snippet: old snippet reported _ksi_prompt_command and dropped the typed lines, fixed one reports exactly the typed lines. Not tried on macOS bash 3.2 (PS0 path off there; the move-to-end fallback covers it, untested on that shell).
+    - agent: claude-code
+    - host: linux-dev
+    - platform: linux-x86_64
+    - os: Ubuntu 24.04.4 LTS (kernel 7.0.0-43-generic)
+    - git: 12f4a36 main
+    - toolchains: cc 13.3.0-6ubuntu2~24.04.1, cmake 3.28.3, ninja 1.11.1, node 22.23.2, python 3.12.3, rustc 1.95.0, cargo 1.95.0, sdl2 2.30.0
