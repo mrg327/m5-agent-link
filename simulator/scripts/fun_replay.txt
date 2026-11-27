@@ -1,0 +1,47 @@
+# While you were away (issue 20261126-9f99, GLYPHS.md §3.13): after 15 min or more with the display dark,
+# the first look replays the last hour on the bezel in 20 steps of 3 min over 2 s, a thin white arc at r 216
+# growing round as the hour's hand, while the centre shows now. Here session 16 sat idle (grey) for 40 min
+# and finished 20 min ago (green): the capsule (a full ring, at r 225) is grey early in the replay and green
+# after it. A key mid-replay ends it at once. The feature is a LABS switch: bit 5 of `fun`.
+connect
+rtc 1800000000
+rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+pref fun 0x3f3
+session 16 idle webapp feat/login Waiting for the next task
+wait 400
+expect_screen ring
+expect_px 233 8 999999
+# 40 minutes idle; the display goes dark after a minute (run with --idle-off 61)
+wait 2400000
+session 16 done webapp feat/login Tests pass
+# 20 more minutes away
+wait 1200000
+tap 233 420
+wait 150
+# an hour ago: idle, grey; the arc has begun at 12 o'clock
+shot fun_replay_a.png
+expect_px 233 8 999999
+expect_px 233 17 ffffff
+# the cost: each step repaints the 18 degrees of arc it adds and the capsules that changed (here the one
+# capsule is the whole ring, about 100 k px once); about 144 k px in all, under 2 k px with the switch off
+px_reset
+wait 1100
+expect_px_max 160000
+# about 20 min ago it finished: green, and the arc is past half
+shot fun_replay_b.png
+expect_px 233 8 009e73
+wait 1200
+# over: now, and the arc gone
+shot fun_replay_c.png
+expect_px 233 8 009e73
+expect_px 233 17 000000
+# away again, and a key ends the next replay at once: the ring is now and the arc is gone
+wait 1100000
+tap 233 420
+wait 150
+expect_px 233 8 999999
+btn B
+wait 100
+expect_px 233 8 009e73
+expect_px 233 17 000000
+quit

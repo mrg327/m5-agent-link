@@ -23,6 +23,14 @@ typedef struct {
     uint32_t fps;
 } ui_report_t;
 
+/* What a reply does, so its commit buzz matches the hold before it: a permission's own option
+ * grants or denies like Approve and Deny; a question's answer does neither. */
+typedef enum {
+    UI_REPLY_NEUTRAL, /**< a question's answer: the "sent" buzz */
+    UI_REPLY_GRANT,   /**< a permission option that grants: as Approve */
+    UI_REPLY_DENY,    /**< a permission option that refuses: as Deny */
+} ui_reply_kind_t;
+
 /* What the UI asks the app to do; the app talks to the link and feedback. */
 typedef struct {
     void (*focus)(uint32_t sid);
@@ -32,8 +40,8 @@ typedef struct {
     /* ASK: approve + save the standing rule */
     void (*grant)(uint32_t sid, uint32_t rid, uint32_t hold_ms, uint32_t rule_hash);
     void (*deny)(uint32_t sid, uint32_t rid);
-    /* ASK: answer a question / pick a grant option */
-    void (*reply)(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms);
+    /* ASK: answer a question / pick one of a permission's options */
+    void (*reply)(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms, ui_reply_kind_t kind);
     /* ASK (proto 0.18): answer every question of request rid at once, after a hold: per question
      * the options picked (a bit mask) or the recording of a free answer */
     void (*answer)(uint32_t sid, uint32_t rid, const uint32_t *picks, const uint32_t *aids, int n,
@@ -70,12 +78,25 @@ typedef struct {
     void (*reject)(void);         /* nothing to do: buzz */
     void (*sent)(void);           /* KEYS: the composed text went out: the approve pattern */
     bool (*button_down)(int btn); /* KEYS: is physical button 0 (A) / 1 (B) still held */
-    void (*nag)(void);            /* unanswered permission request: remind */
-    void (*sectors)(int n);       /* the rim now has n selectable segments */
+    bool (*touching)(void);       /* a finger is on the glass (no card opens under it) */
+    /* unanswered request rid: remind at level 1 (soft), 2 (its pattern, the glow) or 3 (the
+     * pattern twice, the sound, the glow); nag.h */
+    void (*nag)(uint32_t rid, int level);
+    void (*sectors)(int n); /* the rim now has n selectable segments */
     /* TRACKPAD (proto 0.20, EXPERIMENTS.md): one cmd_op_pointer (btn -1 = no click); false when it
      * could not go out */
     bool (*pointer)(int dx, int dy, int btn, int n, int wheel);
     void (*moves)(bool on); /* TRACKPAD: the recognizer streams G_MOVE while on */
+    /* Toys (EXPERIMENTS.md "Toys", ui_toy.h). The host turns raw keys on for a toy that asks
+     * (G_KEY_DOWN / G_KEY_UP at once, no double-press wait) and off when it closes. */
+    void (*raw_keys)(bool on);
+    /* Through the toy gate (feedback.h): false when an alert, the alert mode, the pose or the
+     * volume says no. A toy never calls the alert feedback above for its own effects. */
+    bool (*toy_buzz)(const uint16_t *pattern, size_t n);
+    bool (*toy_detent)(void);
+    bool (*toy_play)(const int16_t *pcm, size_t n, uint8_t volume_pct);
+    bool (*toy_mic)(bool on);
+    void (*toy_interrupt)(void); /* the toy closes: its sound, buzz and microphone stop */
 } ui_actions_t;
 
 void ui_init(const ui_actions_t *actions);
@@ -93,13 +114,29 @@ void ui_show_session(uint32_t sid);
 void ui_show_attention(uint32_t sid);
 /* A request (with error: an error) on session sid, in colour rgb, as it arrives: open it (ASK, or
  * the card for an error) unless that would lose work (KEYS, VOICE, READ, GRAPH, STATUS, LABS,
- * TRACKPAD) or hide another request open in ASK. Then it waits, a dot on the rim, and opens when
- * the user is back on the deck or WATCH (issue 20261122-883f). */
+ * TRACKPAD, AGENT, SCROLL) or hide another request open in ASK. Then it waits, a badge on the rim,
+ * and opens when the user is back on the deck or WATCH (issue 20261122-883f). On the deck or WATCH
+ * it waits until the user has left them alone for TAKEOVER_QUIET_MS (issue 20261126-0a74). */
 void ui_offer_attention(uint32_t sid, bool error, uint32_t rgb);
+/* A request the daemon refused the answer to comes back: the user is waiting for that answer, so
+ * it opens at once on the deck or WATCH (no quiet time); elsewhere it waits as a new one would. */
+void ui_restore_attention(uint32_t sid, uint32_t rgb);
 /* The same, but it only waits (the display is dark or glowing): see ui_reveal_attention. */
 void ui_wait_attention(uint32_t sid, bool error, uint32_t rgb);
+/* Request rid on session sid was re-sent (not new): nothing alerts; ASK reopens on it only when it
+ * was open on it when a new link dropped the cards, and the user has not moved since. */
+void ui_resent_attention(uint32_t sid, uint32_t rid, uint32_t rgb);
 /* The display woke: what waits opens now, unless the open screen keeps it waiting. */
 void ui_reveal_attention(void);
+/* A takeover's screen settles this long: input that began before it, or within this after it, does
+ * not act on it (issue 20261126-86cd). A tap that starts later acts at once. */
+#define TAKEOVER_SETTLE_MS 400
+/* A request takes over HOME or WATCH only once the user has not touched the glass or a button for
+ * this long, and no finger or button is down (issue 20261126-0a74). A raise does not count. */
+#define TAKEOVER_QUIET_MS 1500
+/* True when input that began at began_ms (app_now_ms clock) must not act: the screen in front was
+ * opened by a takeover (a request, the queue's next one, an error card) at or after that. */
+bool ui_input_settling(uint32_t began_ms);
 /* Counts mode changes: a change the user did not make swallows a finger already down. */
 uint32_t ui_mode_seq(void);
 /* ASK is open on session sid. */
@@ -121,12 +158,16 @@ void ui_scroll_failed(void);
 void ui_pointer_failed(int err, const char *msg);
 void ui_scroll_pos(uint32_t sid, uint32_t lines_above, bool at_bottom, bool has_total,
                    uint32_t total, const char *preview);
-/* Brief dim ring for alerts while the display is otherwise idle; text-free by design. */
-void ui_glow(uint32_t rgb);
+/* The alert glow on a display that was dark (issue 20261126-0ca0): a dim ring in the kind's colour
+ * (rgb), the sigil of session sid (grey) and the kind's hero glyph (icon, an ICON_* literal), no
+ * text. Called again while it shows, it takes the new content. */
+void ui_glow(uint32_t rgb, uint32_t sid, const char *icon);
 /* BLE pairing (PROTOCOL.md §8): the passkey the PC asks for, as the Bluetooth glyph over six
  * digits, above everything until ui_pair_hide() (or 60 s). */
 void ui_pair_show(uint32_t passkey);
 void ui_pair_hide(void);
+/* Pairing completed: as ui_pair_hide(), after the Mote's one flare when it is on (FUN_MOTE). */
+void ui_pair_done(void);
 void ui_glow_hide(void);
 bool ui_glow_active(void);
 /* The wrist was raised: counts as looking at the watch (ends the ambient dim and the nagging), like

@@ -1,6 +1,7 @@
 # UI-V3 §4.1: every look of HOME for screenshots. One session (no Next legend, no chip), a permission
 # (Review button), a question (Answer button), the Offline chip, the empty deck with the clock,
 # (the ambient face is in deck_v3_ambient.txt).
+# the user leaves the deck alone 1.5 s before a request takes it over (issue 20261126-0a74)
 connect
 rtc 1800000000
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
@@ -10,6 +11,7 @@ expect_label Working
 expect_no_label Review
 shot home_one.png
 session 2 ask api main
+wait 1500
 attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
 wait 400
 expect_screen ask
@@ -20,6 +22,7 @@ expect_label Needs approval
 expect_label Review
 shot home_review.png
 clear 7
+wait 1500
 attention 8 2 question reply,focus 0 Which framework?|Pick the UI library for the new dashboard|React|Vue|Keep vanilla
 wait 400
 btn B long

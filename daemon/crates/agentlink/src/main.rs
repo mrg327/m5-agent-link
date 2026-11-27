@@ -6,6 +6,7 @@ mod bench;
 mod devices;
 mod graph;
 mod hooks;
+mod notify;
 mod ota;
 mod power;
 mod remote;
@@ -127,6 +128,13 @@ enum Cmd {
         /// Battery capacity for the mA estimates.
         #[arg(long, default_value_t = 450.0)]
         capacity_mah: f64,
+    },
+    /// Which finished sessions buzz on the watch: `all` (the default: turns of 30 s or more, and every
+    /// error) or `armed` (only sessions armed with Notify, jobs and the open session). With no
+    /// argument, print the setting.
+    Notify {
+        #[arg(value_enum)]
+        mode: Option<notify::Mode>,
     },
     /// Inspect or drive the connected device.
     Device {
@@ -274,6 +282,7 @@ fn main() -> Result<()> {
         Cmd::Trace { follow, sid } => trace::run(cli.json, follow, sid),
         Cmd::Graph { sid } => graph::run(cli.json, sid),
         Cmd::Decode { hex } => decode(&hex, cli.json),
+        Cmd::Notify { mode } => notify::run(cli.json, mode),
         Cmd::Hooks { cmd } => match cmd {
             HooksCmd::Print => hooks::print(cli.json),
             HooksCmd::Pi => hooks::pi(),

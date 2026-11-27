@@ -1,0 +1,28 @@
+# Issue 20261126-0a74: what waits behind STATUS is a badge at 12 o'clock in the colour of the most
+# urgent request, with how many wait. A tap on it goes to that request (ASK); it answers nothing.
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 2 work api main Working
+session 3 work cli main Working
+wait 300
+swipe 233 150 233 330 200
+wait 300
+expect_screen status
+session 2 input api main
+attention_win 90000 90000 - 7 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 300
+expect_label waiting 2
+expect_label 1 waiting
+session 3 ask cli main
+attention_win 40000 40000 - 8 3 question focus 0 Which branch?|main or dev
+wait 300
+expect_screen status
+expect_label waiting 3
+expect_label 2 waiting
+shot takeover_badge_count.png
+tap 233 20
+wait 400
+expect_screen ask
+expect_label Which branch?
+expect_label 1 waiting
+quit

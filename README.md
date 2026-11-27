@@ -1,4 +1,5 @@
-# m5-agent-link
+<!-- markdownlint-disable-next-line MD033 -- the Mote mark: Markdown images cannot set a size -->
+# <img src="atlas/img/favicon-96.svg" width="44" height="44" alt=""> m5-agent-link
 
 A wearable control surface for AI coding agents. A small device (initially the
 **M5Stack StopWatch**) shows the state of your GitHub Copilot CLI, Copilot cloud
@@ -37,7 +38,7 @@ scripts/atlas --open        # serves index.html at http://localhost:8700/
 | `issues/` | The shared work log: one Markdown file per issue (`scripts/issue`, `issues/README.md`) |
 | `scripts/` | `check` (every check, `docs/conventions/`), `issue`, `atlas`, `fetch_docs.py` |
 | `tools/` | Host helpers: `board/` (the design board), `linux/` (a Bluetooth driver fix for one Linux laptop chipset) |
-| `design/` | Design board sources (`design/board/`) |
+| `design/` | Design board sources (`design/board/`); the Mote's look profile and generator (`design/mote/`) |
 
 ## Principles
 

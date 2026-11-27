@@ -1,0 +1,11 @@
+{
+  "desc": "Device settings (proto 0.25): every turn of 30 s or more buzzes, not only armed ones",
+  "symbolic": {
+    "t": "cfg",
+    "id": 16,
+    "b": {
+      "done_buzz": "all"
+    }
+  },
+  "cbor_hex": "a3000b011003a10501"
+}

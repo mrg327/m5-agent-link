@@ -210,8 +210,13 @@ static void apply_cfg(const struct device_cfg *c)
     }
     if (c->device_cfg_uint4tstr_present)
         STR(c->device_cfg_uint4tstr.device_cfg_uint4tstr, s->handle);
-    dbg_event("link", "cfg", "\"privacy\":%d,\"alert\":%d,\"quiet_until\":%u", (int)s->privacy,
-              (int)s->alert, (unsigned)s->quiet_until);
+    /* proto 0.25: a value this build does not know leaves the setting as it was */
+    if (c->device_cfg_uint5uint_present &&
+        c->device_cfg_uint5uint.device_cfg_uint5uint <= DONE_BUZZ_ALL) {
+        s->done_buzz = (done_buzz_t)c->device_cfg_uint5uint.device_cfg_uint5uint;
+    }
+    dbg_event("link", "cfg", "\"privacy\":%d,\"alert\":%d,\"quiet_until\":%u,\"done_buzz\":%d",
+              (int)s->privacy, (int)s->alert, (unsigned)s->quiet_until, (int)s->done_buzz);
     if (g_link.hooks.on_cfg) g_link.hooks.on_cfg();
 }
 
@@ -233,6 +238,8 @@ static void on_welcome(const struct welcome *w)
     dbg_event("link", "welcome", "\"host\":%s,\"unix\":%u,\"tz_off\":%d", dbg_q(host),
               (unsigned)w->welcome_time_sync_m.time_sync_uint0uint,
               (int)w->welcome_time_sync_m.time_sync_uint1int);
+    /* a daemon before 0.25 sends no done_buzz: finishes buzz as they did before it */
+    model_settings()->done_buzz = DONE_BUZZ_ARMED;
     apply_cfg(&w->welcome_device_cfg_m);
     /* Quick replies (proto 0.4): their presence means the daemon can type into terminals. */
     {
@@ -304,6 +311,7 @@ static void on_attention(const struct attention *in, uint32_t now_ms)
         a.deadline_ms = now_ms + (left < win ? left : win);
         if (!a.deadline_ms) a.deadline_ms = 1; /* 0 means "no window" */
     }
+    a.arrived_ms = now_ms;
     a.len_known = model_peer_minor() >= 11;
     if (in->attention_uint11uint_present)
         a.full_len = in->attention_uint11uint.attention_uint11uint;
@@ -318,7 +326,7 @@ static void on_attention(const struct attention *in, uint32_t now_ms)
                                  in->attention_uint14uint.attention_uint14uint,
                                  in->attention_uint15bool_present &&
                                      in->attention_uint15bool.attention_uint15bool);
-    model_attention_add(&a);
+    bool is_new = model_attention_add(&a);
     /* Multiple-choice questions (proto 0.18), kept with the request in PSRAM; a request without
      * valid ones is shown as before (title, text, opts). */
     if (model_peer_minor() >= 18 && in->attention_ask_q_m_l_present) {
@@ -346,7 +354,7 @@ static void on_attention(const struct attention *in, uint32_t now_ms)
         if (n == (int)l->attention_ask_q_m_l_ask_q_m_count)
             model_attention_set_questions(a.rid, qs, n);
     }
-    if (g_link.hooks.on_attention) g_link.hooks.on_attention(model_attention_find(a.rid));
+    if (g_link.hooks.on_attention) g_link.hooks.on_attention(model_attention_find(a.rid), is_new);
 }
 
 static void on_result(const struct msg_result *m, uint32_t re_id, bool has_re)

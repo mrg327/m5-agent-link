@@ -144,6 +144,9 @@ struct Conn {
     /// The device's board and firmware as its hello named them, for the power log.
     board: String,
     fw: String,
+    /// The notify setting this link last gave the device (`device_cfg.done_buzz`); `None` before
+    /// proto 0.25.
+    done_buzz: Option<DoneBuzz>,
 }
 
 /// Terminal content leaves the daemon only when the device may show it (UI-V2 §4.4).
@@ -236,6 +239,24 @@ impl Conn {
             (s.pr, s.prs) = (None, None);
         }
         s
+    }
+
+    /// A changed notify setting, to a device that can decode it (proto 0.25), before the finish it
+    /// decides: an edit of `~/.agentlink/notify` reaches the watch with the next finish.
+    async fn send_notify(&mut self, mode: DoneBuzz) -> Result<()> {
+        if self.peer_minor < NOTIFY_MINOR || self.done_buzz == Some(mode) {
+            return Ok(());
+        }
+        self.done_buzz = Some(mode);
+        let cfg = DeviceCfg {
+            privacy: None,
+            alert: None,
+            quiet_until: None,
+            brightness: None,
+            badge_handle: None,
+            done_buzz: Some(mode),
+        };
+        self.send(None, Message::Cfg(cfg)).await
     }
 
     /// The plan's usage windows, to a device that can decode them (proto 0.10).
@@ -429,6 +450,8 @@ const ANSWER_MINOR: u64 = 18;
 const POINTER_MINOR: u64 = 20;
 /// The agent graph: `cmd graph` and its `graph` answer (GRAPH.md).
 const GRAPH_MINOR: u64 = 22;
+/// Which finishes buzz: `device_cfg.done_buzz` in `welcome` and `cfg` (notify.rs, PROTOCOL.md §6j).
+const NOTIFY_MINOR: u64 = 25;
 /// `agent_pi`; an older device's decoder rejects an agent value it does not know.
 const PI_MINOR: u64 = 23;
 
@@ -442,6 +465,7 @@ fn welcome(
     voice: Option<bool>,
     keys: Option<bool>,
     pointer: Option<bool>,
+    done_buzz: Option<DoneBuzz>,
 ) -> Welcome {
     let tz = chrono::Local::now().offset().local_minus_utc() / 60;
     Welcome {
@@ -457,6 +481,7 @@ fn welcome(
             quiet_until: None,
             brightness: None,
             badge_handle: None,
+            done_buzz,
         },
         replies,
         voice,
@@ -485,6 +510,7 @@ pub async fn run_link(
         linked: None,
         board: String::new(),
         fw: String::new(),
+        done_buzz: None,
     };
 
     let hello = loop {
@@ -637,7 +663,8 @@ async fn handshake(
         && c.peer_minor >= DICTATE_MINOR
         && hello.1.caps.feats.contains(&Feature::Voice);
     let pointer = (c.peer_minor >= POINTER_MINOR && shared.pointer.available()).then_some(true);
-    let w = welcome(&shared.host, replies, voice, keys, pointer);
+    c.done_buzz = (c.peer_minor >= NOTIFY_MINOR).then(crate::notify::mode);
+    let w = welcome(&shared.host, replies, voice, keys, pointer, c.done_buzz);
     c.privacy = w.cfg.privacy.unwrap_or(Privacy::Meta);
     c.send(Some(hello.0), Message::Welcome(w)).await?;
     let sessions = c.sessions_for_peer(sessions);
@@ -789,6 +816,9 @@ async fn serve(
                 // held for the bench: dropped here, the resync at the end brings the watch up to date
                 Ok(_) | Err(RecvError::Lagged(_)) if held => {}
                 Ok(Update::Upsert(mut s)) => {
+                    if enters_finished(&s) {
+                        c.send_notify(crate::notify::mode()).await?;
+                    }
                     if c.peer_minor >= PRESENCE_MINOR {
                         s.hush = finished_hush(shared, &s).await;
                     }
@@ -1605,6 +1635,9 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         if cmd.hold_ms.unwrap_or(0) < MIN_APPROVE_HOLD_MS {
             return fail(ResultErr::Denied, "hold-to-confirm too short");
         }
+        if !stoppable(&session, shared.broker.open_for(session.sid)) {
+            return fail(ResultErr::Stale, "not working");
+        }
         None
     };
     if let (true, Some(text)) = (busy, &text) {
@@ -1629,6 +1662,15 @@ async fn type_cmd(shared: &Shared, cmd: &Cmd) -> CmdResult {
         json!({"cmd": detail, "ok": res.is_ok()}),
     );
     typing_result(res)
+}
+
+/// Whether Esc would stop a running turn (issue 20261126-9ecf). Checked when the stop arrives,
+/// not when the watch offered it: the turn may have ended during the hold. Only `start` and `work`
+/// count, the states the watch offers Stop in (nav.c). At an idle prompt Esc does nothing useful
+/// (a second one opens rewind) and in a permission or question dialog it picks "No", a decision
+/// that belongs to Deny; an open request is such a dialog even before the state says so.
+fn stoppable(session: &Session, request_open: bool) -> bool {
+    !request_open && matches!(session.st, Some(SessState::Start | SessState::Work))
 }
 
 /// Holds `text` until the session can take input (queue.rs). The terminal must at least be one
@@ -2031,6 +2073,7 @@ mod tests {
                 linked: None,
                 board: String::new(),
                 fw: String::new(),
+                done_buzz: None,
             };
             let out = c.for_peer(s.clone());
             assert_eq!(
@@ -2273,6 +2316,7 @@ mod tests {
                 linked: None,
                 board: String::new(),
                 fw: String::new(),
+                done_buzz: None,
             };
             assert_eq!(c.for_peer(s.clone()).qd.as_deref(), want, "minor {minor}");
         }
@@ -2292,6 +2336,7 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         };
         s.qd = Some(String::new());
         assert_eq!(
@@ -2315,6 +2360,43 @@ mod tests {
         let r = handle_cmd(&shared, &type_cmd_of(CmdOp::Cancel, sid, None, Some(1250))).await;
         assert!(r.ok, "{r:?}");
         assert_eq!(*term.sent.lock().unwrap(), vec!["\\x1b"]);
+    }
+
+    #[tokio::test]
+    async fn stop_reaches_only_a_working_session() {
+        let term = Arc::new(FakeTerm::default());
+        let shared = shared_typing(Arc::clone(&term));
+        let sid = add_session(&shared);
+        let stop = type_cmd_of(CmdOp::Cancel, sid, None, Some(1250));
+        // the turn ended during the hold, or a dialog is up: Esc would land on the prompt or say No
+        for st in [SessState::Done, SessState::Idle, SessState::Error] {
+            set_state(&shared, st);
+            let r = handle_cmd(&shared, &stop).await;
+            assert_eq!(r.err, Some(ResultErr::Stale), "{st:?}");
+        }
+        set_asking(&shared);
+        assert_eq!(handle_cmd(&shared, &stop).await.err, Some(ResultErr::Stale));
+        set_state(&shared, SessState::Work);
+        let payload = json!({"tool_name": "Bash", "tool_input": {"command": "ls"}});
+        let req = crate::broker::request_of(
+            sid,
+            "claude:s".into(),
+            "claude",
+            "PermissionRequest",
+            &payload,
+            std::time::Duration::from_secs(15),
+        )
+        .unwrap();
+        let (rid, _wait) = shared.broker.open(req);
+        let r = handle_cmd(&shared, &stop).await;
+        assert_eq!(r.err, Some(ResultErr::Stale), "an open request is a dialog");
+        assert!(term.sent.lock().unwrap().is_empty(), "no Esc typed");
+        shared.broker.cancel(rid, ClearWhy::Cancelled);
+        for st in [SessState::Start, SessState::Work] {
+            set_state(&shared, st);
+            assert!(handle_cmd(&shared, &stop).await.ok, "{st:?}");
+        }
+        assert_eq!(term.sent.lock().unwrap().len(), 2);
     }
 
     #[tokio::test]
@@ -2929,6 +3011,7 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         };
         c.send(
             None,
@@ -3499,6 +3582,7 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         };
         let mut s = Session::delta(1);
         (s.snz, s.ntf, s.n, s.ok, s.sum) = (
@@ -3535,7 +3619,50 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         }
+    }
+
+    #[tokio::test]
+    async fn notify_setting_goes_only_to_0_25_and_only_when_it_changes() {
+        let sent = |minor: u64, modes: &[DoneBuzz]| {
+            let modes = modes.to_vec();
+            async move {
+                let (_tx, rx) = mpsc::unbounded_channel();
+                let (tx, mut out) = mpsc::unbounded_channel();
+                let mut c = Conn {
+                    link: Box::new(ChanLink { rx, tx }),
+                    ..test_conn(minor)
+                };
+                c.done_buzz = (minor >= NOTIFY_MINOR).then_some(DoneBuzz::All); // as the welcome gave it
+                for m in modes {
+                    c.send_notify(m).await.unwrap();
+                }
+                drop(c);
+                let mut got = vec![];
+                while let Some(b) = out.recv().await {
+                    let Message::Cfg(cfg) = Envelope::from_bytes(&b).unwrap().msg else {
+                        panic!("not a cfg")
+                    };
+                    assert_eq!(cfg.privacy, None, "a partial update: only done_buzz");
+                    got.push(cfg.done_buzz.unwrap());
+                }
+                got
+            }
+        };
+        let flip = [
+            DoneBuzz::All,
+            DoneBuzz::Armed,
+            DoneBuzz::Armed,
+            DoneBuzz::All,
+        ];
+        assert_eq!(sent(25, &flip).await, [DoneBuzz::Armed, DoneBuzz::All]);
+        assert!(
+            sent(24, &flip).await.is_empty(),
+            "an older watch cannot decode cfg.5"
+        );
+        let w = welcome(&host_info(), None, None, None, None, None);
+        assert_eq!(w.cfg.done_buzz, None);
     }
 
     #[test]
@@ -3758,6 +3885,7 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         };
         let mut s = Session::delta(1);
         (s.eta, s.exit) = (Some(60), Some(1));
@@ -3786,6 +3914,7 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         };
         let mut s = Session::delta(1);
         (s.ctx, s.mdl, s.pm, s.pr, s.prs) = (
@@ -3825,6 +3954,7 @@ mod tests {
             linked: None,
             board: String::new(),
             fw: String::new(),
+            done_buzz: None,
         };
         let mut s = Session::delta(1);
         (s.fc, s.la, s.lr, s.tp, s.dur) = (Some(3), Some(120), Some(14), Some(false), Some(252));

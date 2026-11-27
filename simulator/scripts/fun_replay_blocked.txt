@@ -1,0 +1,45 @@
+# While you were away (issue 20261126-9f99): what skips the replay. A request waiting for you (alerts win),
+# reduced motion, an hour in which nothing changed, and the switch off. Each time the display is dark for
+# 16 min (run with --idle-off 61) before a tap wakes it; the ring then shows now at once, with no time arc.
+connect
+rtc 1800000000
+rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+pref fun 0x3f3
+session 16 idle webapp feat/login Waiting for the next task
+session 3 work api main Indexing the repository
+wait 400
+# 1. a permission request waits: the gate says no
+wait 600000
+session 3 input api main
+attention 7 3 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 960000
+tap 233 420
+wait 300
+expect_px 233 17 000000
+clear 7
+session 3 work api main Indexing the repository
+wait 400
+btn B long
+wait 400
+expect_screen ring
+# 2. reduced motion: the end frame only, which is now
+pref fun 0x83f3
+session 16 done webapp feat/login Tests pass
+wait 1000000
+tap 233 420
+wait 300
+expect_px 233 17 000000
+# 3. nothing changed in the last hour
+pref fun 0x3f3
+wait 3700000
+tap 233 420
+wait 300
+expect_px 233 17 000000
+# 4. the switch off: nothing is even considered
+pref fun 0x3d3
+session 3 done api main Indexed
+wait 1000000
+tap 233 420
+wait 300
+expect_px 233 17 000000
+quit

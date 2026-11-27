@@ -1,5 +1,6 @@
 # GLYPHS.md §4: HOME in Sigil, every state of the card as a render, and the words each one still says in the
 # report (rule 9). The ambient face is in deck_v3_ambient.txt (it needs 30 s without input).
+# the user leaves the deck alone 1.5 s before a request takes it over (issue 20261126-0a74)
 connect
 rtc 1800000000
 rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
@@ -41,6 +42,7 @@ wait 1900
 expect_no_label Nothing else needs you
 # needs approval: the hand, the request's title and text; a tap on the hero opens ASK and answers nothing
 session 16 input webapp feat/login
+wait 1500
 attention 7 16 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
 wait 400
 expect_screen ask
@@ -58,6 +60,7 @@ btn B long
 wait 300
 clear 7
 # a question
+wait 1500
 attention 8 16 question reply,focus 0 Which framework?|Pick the UI library for the new dashboard|React|Vue|Keep vanilla
 wait 400
 btn B long

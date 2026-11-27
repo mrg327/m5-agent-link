@@ -28,7 +28,7 @@ static void usage(const char *argv0)
 {
     fprintf(stderr,
             "usage: %s [--headless] [--no-ws] [--script FILE] [--idle-off SECONDS] [--battery] "
-            "[--deep-after SECONDS]\n"
+            "[--deep-after SECONDS] [--pref KEY=VALUE]\n"
             "          [--wake timer|button [--tries N] [--slept S]]\n"
             "  --headless   no window (framebuffer still rendered, screenshots work)\n"
             "  --no-ws      do not connect to ws://127.0.0.1:7878 (scripts can inject frames)\n"
@@ -37,8 +37,26 @@ static void usage(const char *argv0)
             "  --battery    no USB power, so DEEP is allowed (with no link)\n"
             "  --deep-after S  display-off seconds before DEEP (default 600)\n"
             "  --wake W     boot as if a DEEP ended by W; --tries N = retained retry count\n"
-            "  --slept S    with --wake: that DEEP lasted S seconds (power report)\n",
+            "  --slept S    with --wake: that DEEP lasted S seconds (power report)\n"
+            "  --pref K=V   a stored preference before boot, as NVS would hold it (fun=0x3db)\n",
             argv0);
+}
+
+/* Stores each --pref KEY=VALUE before boot, as NVS would hold it, and takes it out of argv; returns
+ * the new argc. The key stays in argv, which outlives the run (hal_pref_set keeps the pointer). */
+static int take_prefs(int argc, char **argv)
+{
+    int n = 1;
+    for (int i = 1; i < argc; i++) {
+        char *eq = i + 1 < argc && !strcmp(argv[i], "--pref") ? strchr(argv[i + 1], '=') : NULL;
+        if (!eq) {
+            argv[n++] = argv[i];
+            continue;
+        }
+        *eq = '\0';
+        hal_pref_set(argv[++i], (uint32_t)strtoul(eq + 1, NULL, 0));
+    }
+    return n;
 }
 
 int main(int argc, char **argv)
@@ -48,6 +66,7 @@ int main(int argc, char **argv)
     uint32_t idle_s = 0, deep_s = 0, tries = 0, slept_s = 0;
     hal_wake_t wake = HAL_WAKE_POWER_ON;
     bool battery = false;
+    argc = take_prefs(argc, argv);
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--headless")) headless = true;
         else if (!strcmp(argv[i], "--no-ws")) no_ws = true;
@@ -71,14 +90,16 @@ int main(int argc, char **argv)
     sim_set_battery(battery);
     sim_set_wake(wake, tries);
     sim_set_deep_slept_ms(slept_s * 1000u);
+    /* Nobody watches a headless scripted run and nothing outside it keeps time, so its clock is
+     * virtual: the script's timeline holds however slow the machine is (issue 6eb4). It is virtual
+     * from before the core starts, so start-up takes no time on it and every run of a script sees
+     * the same clock, frame for frame (BENCH.md §9). */
+    if (script && headless && no_ws && !getenv("AGENTLINK_SIM_REAL_CLOCK")) sim_clock_virtual();
     hal_board_init();
     core_init();
     core_set_idle_timeout_ms(idle_s * 1000);
     if (deep_s) core_set_deep_after_ms(deep_s * 1000);
     if (script && !sim_script_load(script)) return 2;
-    /* Nobody watches a headless scripted run and nothing outside it keeps time, so its clock is
-     * virtual: the script's timeline holds however slow the machine is (issue 6eb4). */
-    if (script && headless && no_ws && !getenv("AGENTLINK_SIM_REAL_CLOCK")) sim_clock_virtual();
 
     bool script_running = script != NULL;
     while (!sim_display_quit_requested()) {

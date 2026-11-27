@@ -1,0 +1,9 @@
+# The Mote switched off (the default; issue 20261126-f5be): no boot move and no Mote on the empty deck; the
+# log has nothing of it.
+rtc 1800000000
+wait 1500
+expect_screen ring
+px_reset
+wait 3000
+expect_px_max 0
+quit

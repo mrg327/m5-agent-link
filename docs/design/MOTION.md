@@ -79,7 +79,7 @@ Three stored values (`prefs.c`, key `orient`): `normal` (default), `flipped`, `a
 The CST820B datasheet has no contact-size or palm field; the controller reports positions (one point plus
 a documented "real two-point" capability). The nearest safe signal is **two or more simultaneous contacts**
 (`hal_touch_covered`, register 0x02 finger count). On that edge `app.c` stops the motor and speaker
-(`feedback_silence_now`) and records the request currently on top as muted, so its 15 s reminders are
+(`feedback_silence_now`) and records the request whose buzz is running as muted, so its reminders are
 dropped; the next request alerts normally. It answers, dismisses and selects nothing. Unverified on hardware:
 whether a palm reports two points, one point or none. If it reports one, the cover does nothing (a one-finger
 touch behaves as always: it wakes, and touching ends the nag).
@@ -90,8 +90,8 @@ Two roles in the sound bank, each with two candidates for the Atlas to audition:
 C5 G5 C6, `approved-rise`) and `denied` (falling, 340 ms, triangle D5 G4 C4, `denied-fall`). They are rendered by
 the same synth on first use and cached in PSRAM (about 4.3 KB and 5.4 KB). They play from `feedback_approved`
 and `feedback_denied`, i.e. when a hold completes and the answer went out (approve, rerun, dictate send, keyboard send,
-deny, stop), only in alert mode "Sounds: on", not face down. Grant-option replies (`feedback_reply_sent`) keep their
-three ticks and have no tone.
+deny, stop), only in alert mode "Sounds: on", not face down. A permission's own options play the same: one that
+grants plays `feedback_approved`, one that refuses `feedback_denied`. A question's answer (`feedback_reply_sent`, short then long) has no tone.
 
 A third confirmation role, `updated` (`updated-flourish`, about 560 ms: FM C5 E5 G5 C6 at 80 ms each, then a bell E6 ringing
 out for 240 ms), tells you the watch flashed. `ota.c` plays it from `feedback_updated` in `ota_on_link`, at the
@@ -116,7 +116,7 @@ halving -6 dB) and the speaker task applies it before each sound; step 0 plays n
 `sim_motion_face_up_restores`, `sim_motion_orientation` (dwell, hysteresis, no turn during a touch, raw swipe
 through the turned UI, framebuffer equals the 180-degree turn of the upright one), `sim_motion_orientation_stored`,
 `sim_motion_cover_mute` and `_control`, `sim_tone_approved`, `sim_tone_denied`, `sim_tone_quiet`, `sim_volume_step`,
-`sim_volume_zero`. Simulator script commands: `pose NAME|X Y Z`, `cover`, `uncover`, `pref orient|volume V`,
+`sim_volume_zero`. Simulator script commands: `pose NAME|X Y Z`, `cover`, `uncover`, `pref orient|volume|fun V`,
 `fb_mark`, `expect_fb_flipped`, `expect_flipped 0|1`.
 
 ## Unverified (needs a wrist)

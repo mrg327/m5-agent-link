@@ -4,6 +4,7 @@
 #include <SDL.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "lvgl.h"
 #include "sim.h"
@@ -51,6 +52,8 @@ static uint32_t rgb565_to_rgb888(uint16_t c)
 static lv_display_t *s_disp;
 static uint16_t s_mark[W * H];
 void sim_fb_mark(void) { memcpy(s_mark, s_fb, sizeof s_fb); }
+uint32_t sim_fb_rgb(int x, int y)
+{ return x < 0 || y < 0 || x >= W || y >= H ? 0 : rgb565_to_rgb888(s_fb[y * W + x]); }
 int sim_fb_flipped_match_pct(void)
 {
     long same = 0;
@@ -79,6 +82,87 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px)
     for (int y = a->y1; y <= a->y2; y++, src += w) memcpy(&s_fb[y * W + a->x1], src, (size_t)w * 2);
     if (lv_display_flush_is_last(disp)) s_dirty = true;
     lv_display_flush_ready(disp);
+}
+
+/* ── Per-frame redraw (the scripts' `frames` report, BENCH.md §9) ──
+ * One record per LVGL refresh that flushed something, as the bench's frame record on the watch:
+ * the pixels flushed, the areas LVGL rendered (after it joined the invalidated ones: LVGL flushes
+ * an area top to bottom in buffer-high pieces of its full width, so a piece that does not continue
+ * the one before starts a new area), the 48-row strips those areas take in the watch's partial
+ * buffers, and the host CPU the refresh took (informational). Read only: it changes nothing the
+ * core draws. */
+#define FRAMES_MAX 8192
+#define WATCH_BUF_ROWS 48 /* the StopWatch's two 466x48 buffers (FIRMWARE.md §5) */
+
+static sim_frame_t s_frames[FRAMES_MAX];
+static size_t s_frames_n;
+static uint32_t s_frames_lost;
+static sim_frame_t s_cur;
+static lv_area_t s_cur_area; /* the area being flushed; y2 < y1 before the first */
+static uint64_t s_cur_cpu_ns;
+
+static uint64_t cpu_ns(void)
+{
+    struct timespec t;
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t);
+    return (uint64_t)t.tv_sec * 1000000000u + (uint64_t)t.tv_nsec;
+}
+
+static void close_area(void)
+{
+    int32_t h = s_cur_area.y2 - s_cur_area.y1 + 1;
+    if (h > 0) s_cur.strips += (uint32_t)((h + WATCH_BUF_ROWS - 1) / WATCH_BUF_ROWS);
+    s_cur_area = (lv_area_t){0, 0, 0, -1};
+}
+
+static void on_frame_event(lv_event_t *e)
+{
+    switch (lv_event_get_code(e)) {
+    case LV_EVENT_REFR_START:
+        s_cur = (sim_frame_t){.t_ms = (uint32_t)(hal_time_us() / 1000)};
+        s_cur_area = (lv_area_t){0, 0, 0, -1};
+        s_cur_cpu_ns = cpu_ns();
+        break;
+    case LV_EVENT_FLUSH_START: {
+        const lv_area_t *a = lv_event_get_param(e);
+        if (!a) break;
+        s_cur.px += (uint32_t)lv_area_get_size(a);
+        bool more = s_cur_area.y2 >= s_cur_area.y1 && a->x1 == s_cur_area.x1 &&
+                    a->x2 == s_cur_area.x2 && a->y1 == s_cur_area.y2 + 1;
+        if (more) {
+            s_cur_area.y2 = a->y2;
+        } else {
+            close_area();
+            s_cur_area = *a;
+            s_cur.areas++;
+        }
+        break;
+    }
+    case LV_EVENT_REFR_READY:
+        if (!s_cur.px) break;
+        close_area();
+        s_cur.cpu_us = (uint32_t)((cpu_ns() - s_cur_cpu_ns) / 1000);
+        if (s_frames_n < FRAMES_MAX) {
+            s_frames[s_frames_n++] = s_cur;
+        } else {
+            s_frames_lost++;
+        }
+        break;
+    default: break;
+    }
+}
+
+void sim_frames_reset(void)
+{
+    s_frames_n = 0;
+    s_frames_lost = 0;
+}
+
+const sim_frame_t *sim_frames(size_t *n, uint32_t *lost)
+{
+    *n = s_frames_n;
+    if (lost) { *lost = s_frames_lost; }
+    return s_frames;
 }
 
 static void pointer_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
@@ -111,6 +195,9 @@ lv_display_t *hal_display_create(void)
     lv_display_set_color_format(d, LV_COLOR_FORMAT_RGB565);
     lv_display_set_buffers(d, s_buf1, s_buf2, sizeof s_buf1, LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(d, flush_cb);
+    lv_display_add_event_cb(d, on_frame_event, LV_EVENT_REFR_START, NULL);
+    lv_display_add_event_cb(d, on_frame_event, LV_EVENT_FLUSH_START, NULL);
+    lv_display_add_event_cb(d, on_frame_event, LV_EVENT_REFR_READY, NULL);
     return d;
 }
 

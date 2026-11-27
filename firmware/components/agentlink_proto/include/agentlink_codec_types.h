@@ -186,6 +186,10 @@ struct device_cfg_uint4tstr {
 	struct zcbor_string device_cfg_uint4tstr;
 };
 
+struct device_cfg_uint5uint {
+	uint32_t device_cfg_uint5uint;
+};
+
 struct device_cfg {
 	struct device_cfg_privacy_m device_cfg_privacy_m;
 	bool device_cfg_privacy_m_present;
@@ -197,6 +201,8 @@ struct device_cfg {
 	bool device_cfg_uint3uint_present;
 	struct device_cfg_uint4tstr device_cfg_uint4tstr;
 	bool device_cfg_uint4tstr_present;
+	struct device_cfg_uint5uint device_cfg_uint5uint;
+	bool device_cfg_uint5uint_present;
 };
 
 struct welcome_tstr_l_r {

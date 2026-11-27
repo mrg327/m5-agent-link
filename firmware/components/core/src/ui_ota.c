@@ -12,12 +12,21 @@
  * The words (Updating, the percentage, Waiting for the computer…, Hold B to cancel, Restarting…)
  * are in the report (rule 9). A percent step repaints only the piece of arc it adds (ui_arc_set):
  * the overlay is full screen, and redrawing all of it from PSRAM on each percent slowed a delta
- * update's flash writes by half (issue 203f). */
+ * update's flash writes by half (issue 203f).
+ *
+ * With the Mote on (FUN_MOTE, issue 20261126-9fe3, GLYPHS.md §3.14), a small orb rides the arc's
+ * head: it moves only when the progress does (one orb box repainted per step), dims and holds still
+ * while the transfer waits for the computer, and flares once on success before the restart. The
+ * arc is drawn either way, so the orb is never the only sign of the progress. */
 #include <stdio.h>
 #include <string.h>
 
 #include "ui_internal.h"
+#include "debug.h"
+#include "persona.h"
 #include "ui_kit.h"
+#include "ui_living.h"
+#include "ui_mote_ride.h"
 #include "ui_ota.h"
 #include "ui_theme.h"
 
@@ -31,6 +40,9 @@ static lv_obj_t *s_root, *s_arc, *s_hero, *s_ver, *s_cancel;
 static unsigned s_pct_v;
 static bool s_waiting, s_restarting;
 static char s_ver_txt[24];
+static ui_mote_ride_t s_mote;
+static uint32_t s_now_ms, s_flare_t0;
+static bool s_flare_on, s_flare_over;
 
 void ui_ota_init(lv_obj_t *layer)
 {
@@ -42,6 +54,7 @@ void ui_ota_init(lv_obj_t *layer)
     lv_obj_set_style_bg_opa(s_root, LV_OPA_COVER, 0);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE);
     s_arc = ui_arc_create(s_root, UI_CX, HERO_Y, ARC_R, ARC_W);
+    ui_mote_ride_create(&s_mote, s_root); /* above the arc */
     s_hero = ui_glyph_create(s_root, FONT_ICON_HERO, UI_CX, HERO_Y);
     s_ver = lv_label_create(s_root);
     lv_obj_set_style_text_font(s_ver, FONT_CAPTION, 0);
@@ -59,6 +72,33 @@ void ui_ota_init(lv_obj_t *layer)
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
 }
 
+/* The Mote on the arc's head, when the gate lets it be there: a pose (PA_POSE) rides, the flare
+ * is a one-shot (PA_ONESHOT; reduced motion or a request shows its end frame, the lit orb). */
+static void mote_update(void)
+{
+    unsigned allow = ui_ota_visible() ? ui_living_allow(PF_MOTE) : 0;
+    if (!(allow & PA_POSE)) {
+        ui_mote_ride_hide(&s_mote);
+        return;
+    }
+    bool stalled = s_waiting && !s_restarting;
+    uint16_t scale = 100;
+    if (s_restarting) {
+        if (!s_flare_on) {
+            s_flare_on = true;
+            s_flare_t0 = s_now_ms;
+            dbg_event("fun", "mote_ride", "\"at\":\"ota\",\"act\":\"flare\",\"shown\":%d",
+                      (allow & PA_ONESHOT) ? 1 : 0);
+        }
+        if ((allow & PA_ONESHOT) && !s_flare_over) {
+            scale = ui_mote_ride_flare(s_now_ms - s_flare_t0, &s_flare_over);
+        }
+    }
+    int pm = s_restarting ? 1000 : (int)s_pct_v * 10;
+    mote_look_t k = ui_mote_ride_look(scale, stalled ? UI_MOTE_RIDE_DIM : UI_MOTE_RIDE_LIT);
+    ui_mote_ride_at(&s_mote, UI_CX, HERO_Y, ARC_R, 360 * pm / 1000, &k); /* the arc's own end */
+}
+
 /* Every setter is change-only: a percent step is the new piece of the arc and nothing else. */
 static void refresh(void)
 {
@@ -73,12 +113,14 @@ static void refresh(void)
         if (s_restarting) lv_obj_add_flag(s_cancel, LV_OBJ_FLAG_HIDDEN);
         else lv_obj_remove_flag(s_cancel, LV_OBJ_FLAG_HIDDEN);
     }
+    mote_update();
 }
 
 void ui_ota_show(const char *ver)
 {
     s_pct_v = 0;
     s_waiting = s_restarting = false;
+    s_flare_on = s_flare_over = false;
     theme_set_text(s_ver, s_ver_txt, sizeof s_ver_txt, ver ? ver : "");
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     refresh();
@@ -99,7 +141,17 @@ void ui_ota_restarting(void)
     refresh();
 }
 
-void ui_ota_hide(void) { lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN); }
+void ui_ota_tick(uint32_t now_ms)
+{
+    s_now_ms = now_ms;
+    if (ui_ota_visible() || s_mote.shown) mote_update();
+}
+
+void ui_ota_hide(void)
+{
+    lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
+    ui_mote_ride_hide(&s_mote);
+}
 bool ui_ota_visible(void) { return s_root && !lv_obj_has_flag(s_root, LV_OBJ_FLAG_HIDDEN); }
 
 void ui_ota_report(ui_report_t *r)

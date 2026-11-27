@@ -50,6 +50,9 @@ typedef enum {
 } att_action_t;
 typedef enum { PRIVACY_META = 0, PRIVACY_PREVIEW = 1, PRIVACY_FULL = 2 } privacy_t;
 typedef enum { ALERT_FULL = 0, ALERT_QUIET = 1, ALERT_SILENT = 2 } alert_mode_t;
+/* Which finishes buzz (device_cfg.done_buzz, proto 0.25): only armed ones, jobs and the watched
+ * session (a daemon before 0.25), or also every other long turn and every error. */
+typedef enum { DONE_BUZZ_ARMED = 0, DONE_BUZZ_ALL = 1 } done_buzz_t;
 
 /* Large static tables go to PSRAM on the device (internal DRAM is what BLE needs at boot). In the
  * simulator they get a section of their own, so simulator/tools/ram_budget.py can count everything
@@ -235,6 +238,11 @@ typedef struct {
     bool answer_sent;   /* an answer (approve/deny/reply/dictate) is out; waiting for clear */
     uint8_t answer;     /* what was sent: ATT_ANSWER_* */
     uint8_t answer_opt; /* option index for ATT_ANSWER_REPLY */
+    /* not on the wire: the user went back from it in ASK, so the queue passes over it (it stays on
+     * the ring and opens from its card; issue 20261126-aa28) */
+    bool skipped;
+    /* not on the wire: when it reached the watch (app_now_ms); a re-send keeps the first */
+    uint32_t arrived_ms;
 } attention_t;
 enum {
     ATT_ANSWER_NONE = 0,
@@ -263,6 +271,7 @@ typedef struct {
     uint32_t quiet_until;
     int32_t tz_off_min;
     char handle[25];
+    done_buzz_t done_buzz; /* DONE_BUZZ_ARMED until a 0.25 daemon's welcome or cfg says otherwise */
 } settings_t;
 
 void model_init(void);
@@ -289,18 +298,35 @@ typedef void (*model_session_hook_t)(const session_t *before, const session_t *n
 void model_set_session_hook(model_session_hook_t hook);
 model_counts_t model_counts(void);
 
-void model_attention_add(const attention_t *a);
+/* Stores request `a`; true when its rid is new on this watch. A re-sent request (a resync, or the
+ * daemon re-sending its open requests after a welcome) replaces the stored one in place, keeps the
+ * answer already given, and returns false: only a new request alerts (issue 20261126-d95a). */
+bool model_attention_add(const attention_t *a);
 /* The questions of request `rid` (proto 0.18), stored with it: call after model_attention_add(); n
  * is clamped to MODEL_MAX_QS and the request's n_qs set to it. */
 void model_attention_set_questions(uint32_t rid, const ask_q_t *qs, int n);
 /* Question i of request `rid`, or NULL. */
 const ask_q_t *model_attention_question(uint32_t rid, int i);
 bool model_attention_clear(uint32_t rid);
-/* Drops every request (a new link: the daemon re-sends the open ones after its welcome). */
+/* Drops every request (a new link: the daemon re-sends the open ones after its welcome). Each is
+ * remembered until the next call: the same rid on the same session with the same title and text,
+ * re-sent, counts as known (model_attention_add returns false) and keeps its answer. */
 void model_attention_clear_all(void);
 const attention_t *model_attention_for_sid(uint32_t sid);
 const attention_t *model_attention_find(uint32_t rid);
 const attention_t *model_attention_first(void);
+/* The request in slot i (0 to MODEL_MAX_ATTENTION - 1), or NULL when the slot is free. */
+const attention_t *model_attention_at(int i);
+/* The user went back from request rid without answering it (model_attention_next passes over it).
+ */
+void model_attention_skip(uint32_t rid);
+/* The request the queue opens next (issue 20261126-aa28): an unanswered approval or question the
+ * user has not gone back from, other than except_rid; least time left first, then the requests
+ * without a window, oldest rid first. NULL when none. */
+const attention_t *model_attention_next(uint32_t now_ms, uint32_t except_rid);
+/* How many unanswered approvals and questions wait, other than except_rid (skipped ones too; not
+ * those whose window is over). */
+int model_attention_pending(uint32_t now_ms, uint32_t except_rid);
 /* Records the answer that went out (ATT_ANSWER_*); ATT_ANSWER_NONE restores the unanswered state
  * (the daemon rejected the command). */
 void model_attention_set_answer(uint32_t rid, uint8_t answer, uint8_t opt);

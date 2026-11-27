@@ -1,4 +1,4 @@
-# Finished buzz (UI-V2 §5): a session that moves into done buzzes [30,200,30] when it is the watched
+# Finished buzz (UI-V2 §5): a session that moves into done buzzes [35,200,35] when it is the watched
 # one; armed with Notify it buzzes too; an unwatched, unarmed one stays silent. A snoozed session's
 # attention neither buzzes nor glows, an unsnoozed one still buzzes [250,120,250].
 connect

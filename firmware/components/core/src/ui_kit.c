@@ -13,6 +13,7 @@
 
 #include "debug.h"
 #include "sha256.h"
+#include "temper.h"
 #include "ui_theme.h"
 
 #define DEG2RAD 0.017453292f
@@ -299,7 +300,11 @@ typedef struct {
     bool named, keyed;
     int16_t r;
     lv_color_t col;
+    temper_pose_t pose; /* Living marks: where the mark is drawn, relative to its rest */
 } sigil_t;
+
+/* The object reaches this far past the outer radius: the stroke's antialiasing and a pose. */
+#define SIGIL_PAD (2 + TEMPER_REACH)
 
 static int sigil_w(int r) { return r <= 24 ? 3 : r <= 40 ? 4 : (r + 5) / 10; }
 
@@ -316,7 +321,7 @@ void ui_sigil_hash(const char *name, uint8_t h[UI_SIGIL_HASH])
 /* Ring i of a sigil (0 outermost): one byte picks the sectors, two more force at least two;
  * neighbours merge into one arc. */
 static void sigil_ring(lv_layer_t *l, const uint8_t h[UI_SIGIL_HASH], int i, int cx, int cy, int r,
-                       int w, lv_color_t c)
+                       int w, lv_color_t c, int rot)
 {
     unsigned bits = h[i] | 1u << (h[3 + i] % 8) | 1u << (h[6 + i] % 8);
     int rr = (int)lroundf((float)r * (1.0f - (float)i * 0.3f));
@@ -327,17 +332,20 @@ static void sigil_ring(lv_layer_t *l, const uint8_t h[UI_SIGIL_HASH], int i, int
         }
         int b = a;
         while (b + 1 < 8 && (bits >> (b + 1) & 1)) b++;
-        arc(l, cx, cy, rr, w, a * 45 + 9, (b + 1) * 45 - 9, c);
+        arc(l, cx, cy, rr, w, a * 45 + 9 + rot, (b + 1) * 45 - 9 + rot, c);
         a = b + 1;
     }
 }
 
-void ui_sigil_paint(lv_layer_t *l, const uint8_t h[UI_SIGIL_HASH], int cx, int cy, int r, int w,
-                    lv_color_t c)
+/* The mark with rings 0 (outer) and 1 (middle) turned by rot_out and rot_mid degrees. */
+static void sigil_paint_turned(lv_layer_t *l, const uint8_t h[UI_SIGIL_HASH], int cx, int cy, int r,
+                               int w, lv_color_t c, int rot_out, int rot_mid)
 {
     if (w <= 0) w = sigil_w(r);
     if (!in_clip(l, cx, cy, r + 1)) return;
-    for (int i = 0; i < 3; i++) sigil_ring(l, h, i, cx, cy, r, w, c);
+    for (int i = 0; i < 3; i++) {
+        sigil_ring(l, h, i, cx, cy, r, w, c, i == 0 ? rot_out : i == 1 ? rot_mid : 0);
+    }
     if (h[9] & 1) { /* the core: a dot, or a bar */
         int cr = (int)lroundf((float)r * 0.12f);
         dot(l, cx, cy, cr < 2 ? 2 : cr, c);
@@ -353,6 +361,10 @@ void ui_sigil_paint(lv_layer_t *l, const uint8_t h[UI_SIGIL_HASH], int cx, int c
     }
 }
 
+void ui_sigil_paint(lv_layer_t *l, const uint8_t h[UI_SIGIL_HASH], int cx, int cy, int r, int w,
+                    lv_color_t c)
+{ sigil_paint_turned(l, h, cx, cy, r, w, c, 0, 0); }
+
 static void sigil_draw(lv_event_t *e)
 {
     lv_obj_t *o = lv_event_get_target_obj(e);
@@ -360,15 +372,22 @@ static void sigil_draw(lv_event_t *e)
     int cx, cy;
     centre_of(o, &cx, &cy);
     lv_layer_t *l = lv_event_get_layer(e);
+    const temper_pose_t *p = &s->pose;
+    cx += p->dx;
+    cy += p->dy;
+    int r = s->r + p->dr; /* the stroke stays the one of the rest size */
+    lv_color_t c = p->lum >= 100
+                       ? s->col
+                       : lv_color_mix(s->col, lv_color_black(), (uint8_t)(p->lum * 255 / 100));
     if (s->named) {
-        ui_sigil_paint(l, s->h, cx, cy, s->r, 0, s->col);
+        sigil_paint_turned(l, s->h, cx, cy, r, sigil_w(s->r), c, p->rot_out, p->rot_mid);
     } else if (s->keyed) { /* no folder: the dashed folder, ringed by the session's own arcs */
-        if (in_clip(l, cx, cy, s->r + 1))
-            sigil_ring(l, s->h, 0, cx, cy, s->r, sigil_w(s->r), s->col);
-        ui_glyph_draw(l, ui_glyph_font(ICON_NO_FOLDER, s->r * 3 / 2), ICON_NO_FOLDER, cx, cy,
-                      s->col, LV_OPA_COVER);
+        if (in_clip(l, cx, cy, r + 1))
+            sigil_ring(l, s->h, 0, cx, cy, r, sigil_w(s->r), c, p->rot_out);
+        ui_glyph_draw(l, ui_glyph_font(ICON_NO_FOLDER, s->r * 3 / 2), ICON_NO_FOLDER, cx, cy, c,
+                      LV_OPA_COVER);
     } else {
-        ui_glyph_draw(l, ui_glyph_font(ICON_NO_FOLDER, s->r * 2), ICON_NO_FOLDER, cx, cy, s->col,
+        ui_glyph_draw(l, ui_glyph_font(ICON_NO_FOLDER, s->r * 2), ICON_NO_FOLDER, cx, cy, c,
                       LV_OPA_COVER);
     }
 }
@@ -379,7 +398,8 @@ lv_obj_t *ui_sigil_create(lv_obj_t *parent, int cx, int cy, int r)
     sigil_t *s = lv_obj_get_user_data(o);
     s->r = (int16_t)r;
     s->col = COL_TEXT;
-    place(o, cx, cy, r + 2);
+    s->pose = temper_neutral;
+    place(o, cx, cy, r + SIGIL_PAD);
     return o;
 }
 
@@ -388,12 +408,10 @@ void ui_sigil_set_session(lv_obj_t *o, const char *name, uint32_t sid)
     sigil_t *s = lv_obj_get_user_data(o);
     uint8_t h[UI_SIGIL_HASH] = {0};
     bool named = name && name[0], keyed = !named && sid;
-    if (named) ui_sigil_hash(name, h);
-    if (keyed) { /* a key no folder name can have: the session's own number */
-        char k[16];
-        snprintf(k, sizeof k, "\x01sid %u", (unsigned)sid);
-        ui_sigil_hash(k, h);
-    }
+    /* The key rule is temper.c's, so a mark's shape and its temperament never disagree. With no
+     * folder it is a key no folder name can have: the session's own number. */
+    char k[96];
+    if (temper_key(name, sid, k, sizeof k)) ui_sigil_hash(k, h);
     if (named == s->named && keyed == s->keyed && !memcmp(h, s->h, sizeof h)) return;
     s->named = named;
     s->keyed = keyed;
@@ -414,7 +432,15 @@ void ui_sigil_set_color(lv_obj_t *o, lv_color_t c)
 void ui_sigil_set_pos(lv_obj_t *o, int cx, int cy)
 {
     sigil_t *s = lv_obj_get_user_data(o);
-    place(o, cx, cy, s->r + 2);
+    place(o, cx, cy, s->r + SIGIL_PAD);
+}
+
+void ui_sigil_set_pose(lv_obj_t *o, const temper_pose_t *p)
+{
+    sigil_t *s = lv_obj_get_user_data(o);
+    if (!memcmp(&s->pose, p, sizeof *p)) return;
+    s->pose = *p;
+    lv_obj_invalidate(o);
 }
 
 /* ───────── §3.3 time dots ───────── */
@@ -874,6 +900,11 @@ void ui_pips_set(lv_obj_t *o, int n, int current)
 #define KEY_HOLD_GAP 3
 #define KEY_HOLD_W 3
 #define KEY_RING_W 2
+/* the count badge on a key hint: a white disc on the hint's inner lower edge, inside the disc's box
+ * (half 28: 15 + 11 = 26) */
+#define KEY_BADGE_DX 15
+#define KEY_BADGE_R 11
+#define KEY_FLASH_MS 150
 
 typedef struct {
     int16_t r, cx, cy, hold;
@@ -881,6 +912,7 @@ typedef struct {
     uint8_t state;
     /* the hold ring's path is drawn, dim, under the ring: this disc is held, not tapped */
     bool track;
+    uint8_t count; /* a key hint's badge: 0 = none (ui_key_hint_set_count) */
     const char *glyph;
     const lv_font_t *font;
 } disc_t;
@@ -926,6 +958,12 @@ static void disc_draw(lv_event_t *e)
     if (d->hold > 0)
         arc(l, cx, cy, d->r + disc_hold_gap(d) + disc_hold_w(d), disc_hold_w(d), 0,
             d->hold * 360 / 1000, COL_TEXT);
+    if (disc_is_key(d) && d->count > 0) { /* white, not a state colour: a hint is never one */
+        char digit[2] = {(char)('0' + d->count), 0};
+        dot(l, cx + KEY_BADGE_DX, cy + KEY_BADGE_DX, KEY_BADGE_R, COL_TEXT);
+        ui_glyph_draw(l, FONT_CAPTION, digit, cx + KEY_BADGE_DX, cy + KEY_BADGE_DX, COL_ON_ACCENT,
+                      LV_OPA_COVER);
+    }
 }
 
 lv_obj_t *ui_disc_create(lv_obj_t *parent, int cx, int cy, int r)
@@ -1212,6 +1250,52 @@ lv_obj_t *ui_key_hint_create(lv_obj_t *parent, ui_key_t key)
 }
 
 void ui_key_hint_set(lv_obj_t *hint, const char *icon) { ui_disc_set_glyph(hint, icon); }
+
+bool ui_key_hint_hit(lv_obj_t *hint, int x, int y)
+{
+    if (!hint || !lv_obj_is_visible(hint)) return false;
+    int cx, cy;
+    centre_of(hint, &cx, &cy);
+    int dx = x - cx, dy = y - cy;
+    return dx * dx + dy * dy <= UI_KEY_HIT_R * UI_KEY_HIT_R;
+}
+
+void ui_key_hint_set_count(lv_obj_t *hint, int n)
+{
+    disc_t *d = lv_obj_get_user_data(hint);
+    n = n < 0 ? 0 : n > 9 ? 9 : n;
+    if (d->count == n) return;
+    d->count = (uint8_t)n;
+    int cx, cy;
+    centre_of(hint, &cx, &cy);
+    lv_area_t a = {cx + KEY_BADGE_DX - KEY_BADGE_R - 2, cy + KEY_BADGE_DX - KEY_BADGE_R - 2,
+                   cx + KEY_BADGE_DX + KEY_BADGE_R + 2, cy + KEY_BADGE_DX + KEY_BADGE_R + 2};
+    lv_obj_invalidate_area(hint, &a);
+}
+
+int ui_key_hint_count(lv_obj_t *hint)
+{
+    const disc_t *d = lv_obj_get_user_data(hint);
+    return d->count;
+}
+
+static lv_obj_t *s_flash_hint; /* the hint whose ring is lit for a press, until s_flash_until */
+static uint32_t s_flash_until;
+
+void ui_key_hint_flash(lv_obj_t *hint, uint32_t now_ms)
+{
+    if (s_flash_hint && s_flash_hint != hint) ui_disc_set_hold(s_flash_hint, 0);
+    s_flash_hint = hint;
+    s_flash_until = now_ms + KEY_FLASH_MS;
+    ui_disc_set_hold(hint, 1000);
+}
+
+void ui_key_hint_tick(uint32_t now_ms)
+{
+    if (!s_flash_hint || (int32_t)(now_ms - s_flash_until) < 0) return;
+    ui_disc_set_hold(s_flash_hint, 0);
+    s_flash_hint = NULL;
+}
 
 /* ───────── §3.7 burst ───────── */
 

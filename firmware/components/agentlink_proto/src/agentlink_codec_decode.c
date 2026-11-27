@@ -49,6 +49,7 @@ static bool decode_repeated_device_cfg_alert_mode_m(zcbor_state_t *state, struct
 static bool decode_repeated_device_cfg_uint2uint(zcbor_state_t *state, struct device_cfg_uint2uint *result);
 static bool decode_repeated_device_cfg_uint3uint(zcbor_state_t *state, struct device_cfg_uint3uint *result);
 static bool decode_repeated_device_cfg_uint4tstr(zcbor_state_t *state, struct device_cfg_uint4tstr *result);
+static bool decode_repeated_device_cfg_uint5uint(zcbor_state_t *state, struct device_cfg_uint5uint *result);
 static bool decode_device_cfg(zcbor_state_t *state, struct device_cfg *result);
 static bool decode_repeated_welcome_tstr_l(zcbor_state_t *state, struct welcome_tstr_l_r *result);
 static bool decode_repeated_welcome_uint5bool(zcbor_state_t *state, struct welcome_uint5bool *result);
@@ -620,6 +621,18 @@ static bool decode_repeated_device_cfg_uint4tstr(
 	return res;
 }
 
+static bool decode_repeated_device_cfg_uint5uint(
+		zcbor_state_t *state, struct device_cfg_uint5uint *result)
+{
+	zcbor_log("%s\r\n", __func__);
+
+	bool res = ((((zcbor_uint32_expect(state, (5))))
+	&& (zcbor_uint32_decode(state, (&(*result).device_cfg_uint5uint)))));
+
+	log_result(state, res, __func__);
+	return res;
+}
+
 static bool decode_device_cfg(
 		zcbor_state_t *state, struct device_cfg *result)
 {
@@ -629,7 +642,8 @@ static bool decode_device_cfg(
 	&& zcbor_present_decode(&((*result).device_cfg_alert_mode_m_present), (zcbor_decoder_t *)decode_repeated_device_cfg_alert_mode_m, state, (&(*result).device_cfg_alert_mode_m))
 	&& zcbor_present_decode(&((*result).device_cfg_uint2uint_present), (zcbor_decoder_t *)decode_repeated_device_cfg_uint2uint, state, (&(*result).device_cfg_uint2uint))
 	&& zcbor_present_decode(&((*result).device_cfg_uint3uint_present), (zcbor_decoder_t *)decode_repeated_device_cfg_uint3uint, state, (&(*result).device_cfg_uint3uint))
-	&& zcbor_present_decode(&((*result).device_cfg_uint4tstr_present), (zcbor_decoder_t *)decode_repeated_device_cfg_uint4tstr, state, (&(*result).device_cfg_uint4tstr))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
+	&& zcbor_present_decode(&((*result).device_cfg_uint4tstr_present), (zcbor_decoder_t *)decode_repeated_device_cfg_uint4tstr, state, (&(*result).device_cfg_uint4tstr))
+	&& zcbor_present_decode(&((*result).device_cfg_uint5uint_present), (zcbor_decoder_t *)decode_repeated_device_cfg_uint5uint, state, (&(*result).device_cfg_uint5uint))) || (zcbor_list_map_end_force_decode(state), false)) && zcbor_map_end_decode(state))));
 
 	if (false) {
 		/* For testing that the types of the arguments are correct.
@@ -640,6 +654,7 @@ static bool decode_device_cfg(
 		decode_repeated_device_cfg_uint2uint(state, (&(*result).device_cfg_uint2uint));
 		decode_repeated_device_cfg_uint3uint(state, (&(*result).device_cfg_uint3uint));
 		decode_repeated_device_cfg_uint4tstr(state, (&(*result).device_cfg_uint4tstr));
+		decode_repeated_device_cfg_uint5uint(state, (&(*result).device_cfg_uint5uint));
 	}
 
 	log_result(state, res, __func__);

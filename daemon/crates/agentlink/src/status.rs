@@ -45,6 +45,9 @@ pub fn run(json: bool) -> Result<()> {
         v["uptime_s"]
     );
     print_presence(&v["presence"]);
+    if let Some(n) = v["notify"].as_str() {
+        println!("notify: {}", crate::notify::parse(n).describe());
+    }
     print_keep_awake(&v["keep_awake"]);
     let devices = v["devices"].as_array().cloned().unwrap_or_default();
     println!("devices: {}", devices.len());

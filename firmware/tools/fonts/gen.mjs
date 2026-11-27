@@ -112,6 +112,8 @@ const ICONS = {
   atom: 0xe5e4,
   cursor: 0xe1dc,
   'mouse-left-click': 0xe334,
+  // The toys in LABS (EXPERIMENTS.md "Toys"): coin, die and oracle.
+  'dice-five': 0xe1ee,
 };
 // The GRAPH screen's node and lane glyphs (GRAPH.md §4): drawn inside a node disc, so 20 px only.
 const GRAPH_ICONS = {

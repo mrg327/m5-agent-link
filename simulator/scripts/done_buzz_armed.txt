@@ -1,0 +1,28 @@
+# done_buzz armed (`agentlink notify armed`, proto 0.25): as before 0.25, an unwatched, unarmed session's
+# 40 s turn ends in silence; armed with Notify it buzzes. A cfg done_buzz all then makes the next long turn
+# buzz, and a 5 s turn still ends in silence.
+connect
+rx a400020101020103a4008200181901a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a3000101000500
+rtc 1800000000
+session 1 work webapp feat/login
+session 2 work api main
+session 4 work api main
+wait 300
+# session 1 done, dur 40 s: silent
+rx a30004010a03a30001020418221828
+wait 300
+notify 4 on
+wait 300
+# session 4 done, dur 45 s, armed: buzzes
+rx a30004010d03a3000402041822182d
+wait 4000
+session 1 work webapp feat/login
+cfg done_buzz all
+wait 300
+# session 2 done, dur 5 s: silent
+rx a30004010b03a300020204182205
+wait 300
+# session 1 done, dur 40 s: buzzes
+rx a30004010e03a30001020418221828
+wait 300
+quit

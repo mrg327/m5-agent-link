@@ -24,7 +24,7 @@ approve here", because the watch only ever had the first 160 characters.
 | When the window ends | ASK shows `On your computer` with `Time ran out here` / `Answer it there` for 3 s, then the deck; the card says `On your computer` · `Answer it there` until the session moves on. Nothing vanishes silently. |
 | Open on PC (button A, or the row) | The request goes back to the terminal at once: its prompt appears now, not at the end of the window. The card says `On your computer` · `Answer it there`. |
 | A long request | `Read all` opens the reader, which fetches the full text and pages through it as it arrives (`3 of 12+`, then `3 of 20`). Approve can be held once the last page of the whole text has been shown. |
-| Reminders | The three reminder buzzes spread over the window (60 s: 15, 30, 45 s, as before; 5 min: 75, 150, 225 s), none in its last 5 s. |
+| Reminders | Three reminders that grow louder, scaled to the window (60 s: 25, 40, 50 s; 5 min: 25, 150, 290 s), none in its last 5 s (issue 20261126-a909, UI-V2 §4.3). |
 
 ## 2. What Claude Code does (checked 2026-11-11)
 
@@ -62,7 +62,7 @@ denies) and makes the window a setting.
   request without a restart). Clamped to 5-300 s; `0` means never hold (the terminal asks at once and the watch
   is not offered the request). `AGENTLINK_WAIT_MS` set in a hook's own environment still wins for that hook
   (`pinned`), as before.
-- **Default: 60 s.** The arrival buzz and the three 15-second reminders (UI-V2 §4.3) all fall inside it; it is
+- **Default: 60 s.** The arrival buzz and the three reminders (25, 40, 50 s; UI-V2 §4.3) all fall inside it; it is
   four times the old window, long enough to reach the watch from the next room; and a user who is at the
   keyboard waits at most a minute, and not at all if they press A (below). Field practice runs from 60 s
   (ClaudeDeck, then the normal prompt) to 120 s (agentsd, then auto-deny) to hours; a longer default should

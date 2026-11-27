@@ -42,7 +42,9 @@ is logged to stdout as one JSON object per line (`hal_debug_line`), including ha
 One command per line, `#` comments. Input is replayed on the script's timeline through the same paths
 as real input, so gesture recognition is exercised. With `--headless --no-ws` the clock is virtual: it
 advances only while the main loop sleeps, so a run takes as long as its drawing, not its `wait`s, and
-a loaded machine cannot stretch a tap into a hold. Set `AGENTLINK_SIM_REAL_CLOCK=1` for wall-clock time.
+a loaded machine cannot stretch a tap into a hold. It is virtual from before the core starts, and the
+clock reads one hour at start-up whatever the host's uptime, so every run of a script sees the same clock and
+draws the same frames. Set `AGENTLINK_SIM_REAL_CLOCK=1` for wall-clock time.
 With a window or a WebSocket link the clock is real.
 
 ```text
@@ -52,7 +54,8 @@ lift | shake | connect | disconnect | rx HEX | ui | shot FILE.png
 attention RID SID approval|question|error|done ACTS GRANT_MASK TITLE|TEXT|OPT|OPT...
 result ok | result err stale|denied|... | clear RID [WHY]
 graph SID KIND:STATE:LANE[:f][:m]... [la=K,K..] [drop=N] [gen=N] | graph off
-expect_screen NAME | expect_label TEXT | expect_no_label TEXT | px_reset | expect_px_max PX | kit N | quit
+expect_screen NAME | expect_label TEXT | expect_no_label TEXT | px_reset | expect_px_max PX | expect_px X Y RRGGBB | kit N | quit
+frames [all] | expect_frame_px_max PX [AREAS]
 touch DT X Y [X Y...] | bench start|stop|mark N|save FILE|expect KIND MIN | expect_cmd OP
 pair NNNNNN | pair done | pair fail
 ```
@@ -73,6 +76,13 @@ exits with code 1. `shot` writes a PNG of the framebuffer (round mask applied); 
 `px_reset` / `expect_px_max` bound the pixels LVGL flushed in between (`core_px_flushed()`); see
 `perf_four_agents.txt` for the redraw budget with four busy agents. The log line also reports
 `cpu_us` (host CPU inside `core_step`), informational only since it varies with machine load.
+`frames` logs the frames since `px_reset` one by one (`"ev":"frames"`; `all` adds a `"ev":"frame"` line
+each): how many, the pixels and the areas LVGL rendered per frame (p50, p95, max, after it joined them), the
+48-row strips they take in the watch's buffers, the gap between frames and the host CPU per frame.
+`expect_frame_px_max PX [AREAS]` fails when one frame since `px_reset` flushed more than PX pixels (or more
+than AREAS areas); `expect_px_max` logs the same figures. BENCH.md §9 turns them into watch frame times.
+`expect_px X Y RRGGBB` checks one framebuffer pixel, within 24 a channel (RGB565 and edge
+anti-aliasing): `ring_pips.txt` tells the needs-you pip shapes apart with it.
 
 Firmware update (OTA) commands: `fw_image SIZE [unsigned|badhdr|badsha]` synthesises a fake image
 (0xE9 header, 0xE7 0x02 signature marker in the last 4 KiB) and its SHA-256; `fw_begin [VER]` sends

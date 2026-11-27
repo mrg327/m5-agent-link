@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #include "lvgl.h"
+#include "temper.h"
 #include "ui_internal.h"
 
 /* ── glyphs ── */
@@ -50,6 +51,10 @@ void ui_sigil_set_name(lv_obj_t *s, const char *name); /* "" (no folder): the da
 void ui_sigil_set_session(lv_obj_t *s, const char *name, uint32_t sid);
 void ui_sigil_set_color(lv_obj_t *s, lv_color_t c); /* white until set */
 void ui_sigil_set_pos(lv_obj_t *s, int cx, int cy);
+/* Living marks (temper.h): draw the mark moved, resized, turned and dimmed by a pose; neutral
+ * until set. Change-only: one redraw of the object (r + 6 each side) per new pose. The shape is the
+ * name's, whatever the pose. */
+void ui_sigil_set_pose(lv_obj_t *s, const temper_pose_t *p);
 /* The same mark inside a screen's own draw callback (screen coordinates; w 0 = the stroke for
  * r). */
 void ui_sigil_hash(const char *name, uint8_t h[UI_SIGIL_HASH]);
@@ -224,6 +229,20 @@ typedef enum { UI_KEY_A, UI_KEY_B } ui_key_t;
 lv_obj_t *ui_key_hint_create(lv_obj_t *parent, ui_key_t key);
 /* an ICON_* literal; "" or NULL: the ring alone */
 void ui_key_hint_set(lv_obj_t *hint, const char *icon);
+/* On HOME and WATCH a tap this close to a shown hint presses its key (issue 20261126-34e5): the r
+ * 20 ring plus 16 px, 6.9 mm across. Its inner edge is at r 151 from the screen centre, outside the
+ * centre zone (NAV_CENTRE_R 150). */
+#define UI_KEY_HIT_R 36
+/* The point is within UI_KEY_HIT_R of the hint's centre. False while the hint is hidden. */
+bool ui_key_hint_hit(lv_obj_t *hint, int x, int y);
+/* A count in a badge (GLYPHS rule 4): a white disc r 11 on the hint's inner lower edge with the
+ * digit in black; 0 hides it, more than 9 shows 9. Change-only: a change repaints the badge. */
+void ui_key_hint_set_count(lv_obj_t *hint, int n);
+int ui_key_hint_count(lv_obj_t *hint);
+/* A press, by the key or by a tap on its hint: the hint's ring lights full for 150 ms. One hint at
+ * a time; ui_key_hint_tick() puts it out. */
+void ui_key_hint_flash(lv_obj_t *hint, uint32_t now_ms);
+void ui_key_hint_tick(uint32_t now_ms);
 
 /* ── §3.7 burst and sign ── */
 

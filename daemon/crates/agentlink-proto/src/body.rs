@@ -115,6 +115,8 @@ body!(
         #[n(2)] #[serde(skip_serializing_if = "Option::is_none")] quiet_until: Option<u64>,
         #[n(3)] #[serde(skip_serializing_if = "Option::is_none")] brightness: Option<u64>,
         #[n(4)] #[serde(skip_serializing_if = "Option::is_none")] badge_handle: Option<String>,
+        /// Which finishes buzz (proto 0.25): only to a device that can decode it.
+        #[n(5)] #[serde(skip_serializing_if = "Option::is_none")] done_buzz: Option<DoneBuzz>,
     }
 );
 

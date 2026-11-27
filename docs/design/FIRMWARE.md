@@ -72,7 +72,7 @@ Measured rails (from vendor docs): **L0** = M5PM1 only. **L1** = + IMU + RTC. **
   - The connection interval is negotiated to about 1 s with slave latency, so the radio wakes rarely.
   - AMOLED rail (L3B) **off**, touch controller in sleep, audio rail off.
   - Wake sources: the BLE event, the button GPIOs, and **G12** (M5PM1 IRQ chained from the IMU INT1 on PMG0).
-- **Alert at rest:** a BLE `attention` arrives during STANDBY. The device vibrates (PYG9 PWM). If the user is in quiet mode the speaker stays off; otherwise it plays the chime. It then turns on L3B and shows the **dim ring glow** for about 2 s, then turns L3B off again.
+- **Alert at rest:** a BLE `attention` arrives during STANDBY. The device vibrates (PYG9 PWM). If the user is in quiet mode the speaker stays off; otherwise it plays the chime. It then turns on L3B and shows the **dim ring glow** (with the session's sigil and the kind's glyph) for 3 s, then turns L3B off again.
 - **Lift detection on a lanyard:** plain any-motion would fire constantly while walking. Instead we use BMI270 features:
   - **orientation/flat change** plus a **"tilt toward face"** heuristic. When hanging, gravity runs along the screen's −Y axis. When lifted to read, the screen normal points roughly up or toward the user.
   - It must be held for ≥ 300 ms.

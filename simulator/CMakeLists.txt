@@ -47,6 +47,15 @@ add_executable(test_gesture tests/test_gesture.c ${FW}/core/src/gesture.c)
 target_include_directories(test_gesture PRIVATE ${FW}/core/src)
 target_link_libraries(test_gesture PRIVATE m)
 add_test(NAME gesture_recognizer COMMAND test_gesture)
+# EXPERIMENTS.md "Toys": a toy never buzzes or sounds over an alert, nor where alerts would not.
+add_executable(test_toy_gate tests/test_toy_gate.c ${FW}/core/src/toy_gate.c)
+target_include_directories(test_toy_gate PRIVATE ${FW}/core/src)
+add_test(NAME toy_gate COMMAND test_toy_gate)
+# Issue 20261126-74ee: the coin, the die and the oracle, their random source and the flick.
+add_executable(test_decide tests/test_decide.c ${FW}/core/src/decide.c ${FW}/core/src/toy_rand.c
+               ${FW}/core/src/toy_motion.c)
+target_include_directories(test_decide PRIVATE ${FW}/core/src)
+add_test(NAME decide COMMAND test_decide)
 
 add_executable(test_steps tests/test_steps.c ${FW}/core/src/steps.c)
 target_include_directories(test_steps PRIVATE ${FW}/core/src)
@@ -67,6 +76,11 @@ add_executable(test_detail tests/test_detail.c ${FW}/core/src/detail.c ${FW}/cor
 target_include_directories(test_detail PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
 target_link_libraries(test_detail PRIVATE m)
 add_test(NAME detail_model COMMAND test_detail)
+# The request store: new or re-sent (issue 20261126-d95a); the queue's order (issue 20261126-aa28).
+add_executable(test_model tests/test_model.c ${FW}/core/src/model.c ${FW}/core/src/steps.c)
+target_include_directories(test_model PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_model PRIVATE m)
+add_test(NAME request_model COMMAND test_model)
 # GRAPH.md: the agent graph through the codec, the one-session store and the fetch schedule.
 add_executable(test_graph tests/test_graph.c ${FW}/core/src/graph.c)
 target_include_directories(test_graph PRIVATE ${FW}/core/src)
@@ -78,6 +92,40 @@ add_executable(test_power tests/test_power.c ${FW}/core/src/power.c)
 target_include_directories(test_power PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
 target_link_libraries(test_power PRIVATE lvgl::lvgl)
 add_test(NAME power_timers COMMAND test_power)
+# UI-V2 §5 as a check: pulse counts, the 35 ms floor, 60 ms gaps, commit buzzes told apart (issue 20261126-e39b).
+add_executable(test_feedback tests/test_feedback.c ${FW}/core/src/feedback.c ${FW}/core/src/toy_gate.c
+               ${FW}/core/src/persona.c)
+target_include_directories(test_feedback PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_feedback PRIVATE lvgl::lvgl)
+add_test(NAME feedback_haptics COMMAND test_feedback)
+# Needs-you pips keep clear of the key hints at 315° and 45° (issue 20261126-54d7).
+add_executable(test_ring_pip tests/test_ring_pip.c ${FW}/core/src/ui_ring.c ${FW}/core/src/ui_ring_draw.c)
+target_include_directories(test_ring_pip PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
+target_link_libraries(test_ring_pip PRIVATE agentlink_proto lvgl::lvgl m)
+add_test(NAME ring_pip_clearance COMMAND test_ring_pip)
+
+# Living marks (issue 20261126-98a6): the personality gate's guardrails; the temperament and its poses.
+add_executable(test_persona tests/test_persona.c ${FW}/core/src/persona.c)
+target_include_directories(test_persona PRIVATE ${FW}/core/src)
+add_test(NAME persona_gate COMMAND test_persona)
+add_executable(test_temper tests/test_temper.c ${FW}/core/src/temper.c ${FW}/core/src/sha256.c)
+target_include_directories(test_temper PRIVATE ${FW}/core/src)
+target_link_libraries(test_temper PRIVATE m)
+add_test(NAME temper_poses COMMAND test_temper)
+# While you were away (issue 20261126-9f99): the ring's last hour, the away detector, the 2 s clock.
+add_executable(test_replay tests/test_replay.c ${FW}/core/src/replay.c)
+target_include_directories(test_replay PRIVATE ${FW}/core/src)
+add_test(NAME replay_hour COMMAND test_replay)
+# The Mote (issue 20261126-59e0): the light's modes, speeds, tail, night, level by green days.
+add_executable(test_mote tests/test_mote.c ${FW}/core/src/mote.c)
+target_include_directories(test_mote PRIVATE ${FW}/core/src)
+target_link_libraries(test_mote PRIVATE m)
+add_test(NAME mote_modes COMMAND test_mote)
+# Easter eggs (issue 20261126-7770): the clock slip's minutes and frames, the centuries, the spin.
+add_executable(test_eggs tests/test_eggs.c ${FW}/core/src/eggs.c)
+target_include_directories(test_eggs PRIVATE ${FW}/core/src)
+target_link_libraries(test_eggs PRIVATE m)
+add_test(NAME eggs_triggers COMMAND test_eggs)
 
 add_executable(test_ring tests/test_ring.c ${FW}/core/src/ring.c)
 target_include_directories(test_ring PRIVATE ${FW}/core/src)
@@ -91,6 +139,10 @@ add_test(NAME sha256 COMMAND test_sha256)
 add_executable(test_nav tests/test_nav.c ${FW}/core/src/nav.c)
 target_include_directories(test_nav PRIVATE ${FW}/core/src)
 add_test(NAME nav_model COMMAND test_nav)
+# Reminders that grow louder (issue 20261126-a909): the schedule, one ladder, the floor, the tail.
+add_executable(test_nag tests/test_nag.c ${FW}/core/src/nag.c)
+target_include_directories(test_nag PRIVATE ${FW}/core/src)
+add_test(NAME nag_ladder COMMAND test_nag)
 
 add_executable(test_sound tests/test_sound.c ${FW}/core/src/sound.c ${FW}/core/src/sound_bank.c)
 target_include_directories(test_sound PRIVATE ${FW}/core/src ${FW}/agentlink_hal/include)
@@ -132,6 +184,10 @@ sim_script_test(sim_strings_clip strings_clip.txt)
 sim_script_test(sim_ring_one one_session.txt)
 sim_script_test(sim_ring_busy busy.txt)
 sim_script_test(sim_ring_states ring_states.txt)
+sim_script_test(sim_ring_pips ring_pips.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_hint_tap_home hint_tap_home.txt
+                FAIL_REGULAR_EXPRESSION "\"via\":\"tap\"|SCRIPT FAIL")
+sim_script_test(sim_hint_badge hint_badge.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 sim_script_test(sim_ring_scrub ring_scrub.txt
                 PASS_REGULAR_EXPRESSION "\"ev\":\"scrub\".*\"phase\":\"start\""
                 FAIL_REGULAR_EXPRESSION "\"ev\":\"tx_cmd\"|SCRIPT FAIL")
@@ -172,6 +228,19 @@ foreach(t agent_back watch status labs busy arrival)
     set_tests_properties(sim_task_${t} PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
                          FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 endforeach()
+# The Mote's frame-cost tasks (BENCH.md §9): on the watch the Mote is switched on by hand; here the
+# switch is stored before boot, and the check is that the Mote showed in the mode the task measures.
+function(bench_mote_task name pass)
+    add_test(NAME sim_task_${name}
+             COMMAND agentlink_sim --headless --no-ws --pref fun=0x3db
+                     --script ${CMAKE_CURRENT_SOURCE_DIR}/../bench/tasks/${name}.txt)
+    set_tests_properties(sim_task_${name} PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                         FAIL_REGULAR_EXPRESSION "SCRIPT FAIL" PASS_REGULAR_EXPRESSION "${pass}")
+endfunction()
+bench_mote_task(mote_visit "\"mode\":\"visit\".*\"ev\":\"bench_dump\"")
+bench_mote_task(mote_hover "\"mode\":\"hover\".*\"ev\":\"bench_dump\"")
+bench_mote_task(mote_empty "\"mode\":\"rest\".*\"ev\":\"bench_dump\"")
+bench_mote_task(mote_alert "\"mode\":\"visit\".*\"mode\":\"gone\".*\"ev\":\"attention\",\"rid\":7")
 # Approval safety: the card shows the request; a short or low swipe never denies; a hold before
 # the card has been visible never approves.
 sim_script_test(sim_approve_card approve_card.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
@@ -240,14 +309,82 @@ sim_script_test(sim_agent_timeout agent_timeout.txt)
 sim_script_test(sim_labs_trackpad labs_trackpad.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"wheel\":-"
                 PASS_REGULAR_EXPRESSION "\"btn\":0,\"n\":2.*\"btn\":1,\"n\":1.*\"wheel\":1")
+# Living marks (issue 20261126-98a6): the breath on the dock and its stillness on battery, with reduced motion,
+# off and while needed; the one-shots of done, error and snooze; LABS > Personality and the stored word.
+sim_script_test(sim_fun_temper fun_temper.txt)
+sim_script_test(sim_fun_temper_states fun_temper_states.txt)
+# While you were away (issue 20261126-9f99): the first look after 15 min dark replays the hour on the
+# bezel, and a key ends it at once; a waiting request, reduced motion or the switch off skip it.
+add_test(NAME sim_fun_replay
+         COMMAND agentlink_sim --headless --no-ws --idle-off 61 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/fun_replay.txt)
+set_tests_properties(sim_fun_replay PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]"
+                     PASS_REGULAR_EXPRESSION "\"replay\",\"act\":\"start\".*\"why\":\"done\".*\"act\":\"start\".*\"why\":\"input\"")
+add_test(NAME sim_fun_replay_blocked
+         COMMAND agentlink_sim --headless --no-ws --idle-off 61 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/fun_replay_blocked.txt)
+set_tests_properties(sim_fun_replay_blocked PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"act\":\"start\""
+                     PASS_REGULAR_EXPRESSION "\"why\":\"gate\".*\"why\":\"gate\".*\"why\":\"still\"")
+sim_script_test(sim_labs_fun labs_fun.txt)
+# The Mote (issue 20261126-59e0), a firefly: it visits the working sessions in turn, a big green finish (the
+# day counted; issue 20261126-2de2: it drifts to the finished arc, loops, flares and lingers), rest at 12, ember, a visit again (tired, night); gone on battery and at once for a
+# request.
+sim_script_test(sim_fun_mote fun_mote.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"mode\":\"visit\".*\"mote_day\",\"days\":1.*\"mode\":\"cheer\",\"deg\":90.*\"mote_finish\",\"deg\":270,\"arc\":270.*\"mode\":\"visit\",\"deg\":270.*\"mode\":\"rest\".*\"mode\":\"ember\".*\"mode\":\"visit\".*\"mode\":\"gone\".*\"mode\":\"visit\",\"deg\":[0-9]+,\"lum\":30,\"halo\":[0-9]+,\"night\":1.*\"mode\":\"gone\"")
+# The Mote at pairing (issue 20261126-2de2): a still orb at 12 while the passkey shows, clear of the digits;
+# one flare on done (the screen goes after it), nothing on fail; reduced motion: no flare; off: no orb.
+sim_script_test(sim_mote_pair mote_pair.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|042917|551200"
+                PASS_REGULAR_EXPRESSION "\"act\":\"still\".*\"act\":\"flare\".*\"shown\":false.*\"text\":\"Paired\".*\"act\":\"still\".*\"shown\":false.*\"Pairing failed\".*\"act\":\"still\".*\"shown\":false.*\"text\":\"Paired\"")
+# A session in error lets the idle face come up, and the Mote hovers beside its capsule.
+sim_script_test(sim_fun_mote_error fun_mote_error.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"mode\":\"hover\"")
+# The Mote as the mascot (issue 20261126-f5be), with it stored on before boot (--pref, as NVS holds it):
+# the boot move plays and lands on the empty deck; a touch or a request cuts it at once; reduced motion skips
+# it (a still Mote at its place); switched off, nothing of it. The empty deck: rest, wander, ember, still on
+# battery, gone with a session.
+function(sim_mote_test name script prefs)
+    add_test(NAME ${name}
+             COMMAND agentlink_sim --headless --no-ws ${prefs}
+                     --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/${script})
+    set_tests_properties(${name} PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30 ${ARGN})
+endfunction()
+sim_mote_test(sim_mote_boot mote_boot.txt "--pref;fun=0x3db"
+              FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"mote_boot\",\"start\".*\"ev\":\"(haptic|sound)\""
+              PASS_REGULAR_EXPRESSION "\"mote_boot\",\"start\":[0-9]+.*\"mote_boot\",\"end\":\"done\",\"ms\":1200.*\"mode\":\"rest\",\"deg\":0,\"lum\":100")
+sim_mote_test(sim_mote_boot_touch mote_boot_cut.txt "--pref;fun=0x3db"
+              FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+              PASS_REGULAR_EXPRESSION "\"mote_boot\",\"end\":\"input\".*\"gesture\":\"tap\"")
+sim_mote_test(sim_mote_boot_request mote_boot_request.txt "--pref;fun=0x3db"
+              FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+              PASS_REGULAR_EXPRESSION "\"ev\":\"attention\",\"rid\":7.*\"mote_boot\",\"end\":\"request\"")
+sim_mote_test(sim_mote_boot_reduced mote_boot_still.txt "--pref;fun=0x83db"
+              FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"mote_boot\""
+              PASS_REGULAR_EXPRESSION "\"mode\":\"rest\",\"deg\":0")
+sim_mote_test(sim_mote_boot_off mote_boot_off.txt ""
+              FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"cat\":\"fun\",\"ev\":\"mote")
+sim_mote_test(sim_mote_empty mote_empty.txt "--pref;fun=0x3db"
+              FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+              PASS_REGULAR_EXPRESSION "\"mode\":\"rest\",\"deg\":0,\"lum\":100.*\"mode\":\"ember\",\"deg\":0,\"lum\":25.*\"mode\":\"rest\".*\"mode\":\"gone\"")
+# Easter eggs (issue 20261126-7770): the clock slip at 13:37 (once) and 04:04; the 100th finish spins the sigil,
+# held while a request waits and played after it; the 1000th loops the Mote.
+sim_script_test(sim_fun_eggs fun_eggs.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"hm\":1337.*\"hm\":1337"
+                PASS_REGULAR_EXPRESSION "\"hm\":1337.*\"hm\":404.*\"egg\":\"century\",\"n\":100,\"by\":\"sigil\".*\"ev\":\"century\",\"n\":100.*\"ev\":\"state\",\"screen\":\"ask\".*\"egg\":\"century\",\"n\":100,\"by\":\"sigil\".*\"egg\":\"century\",\"n\":1000,\"by\":\"mote\".*\"mode\":\"loop\"")
 # UI-V2 Phase 3: ASK. Question options reply by tap; grants and Deny are holds; a tap never approves;
 # a rejected answer restores the options; a hold is bound to its request id.
 sim_script_test(sim_ask_reply ask_reply.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4"
-                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":8,\"hold_ms\":0,\"arg\":1")
+                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":8,\"hold_ms\":0,\"arg\":1.*\"pattern_ms\":\\[35,80,120\\]")
 sim_script_test(sim_ask_grant_hold ask_grant_hold.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4"
-                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":9,\"hold_ms\":1[0-9][0-9][0-9],\"arg\":1")
+                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":9,\"hold_ms\":1[0-9][0-9][0-9],\"arg\":1,([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[150\\]")
+# A permission option that refuses buzzes like Deny, a grant option like Approve (issue 20261126-e39b).
+sim_script_test(sim_ask_deny_option_haptic ask_deny_option_haptic.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4"
+                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":9,\"hold_ms\":[0-9]+,\"arg\":2,([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[60,90,60\\]")
 sim_script_test(sim_ask_grant_hold_progress ask_grant_hold_progress.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"tx_cmd\"")
 sim_script_test(sim_ask_deny_hold ask_deny_hold.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":5"
@@ -274,7 +411,7 @@ sim_script_test(sim_ask_tap_rows ask_tap_rows.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4|\"op\":5")
 sim_script_test(sim_ask_tap_option_row ask_tap_option_row.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0|\"op\":3|\"op\":4"
-                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":8,\"hold_ms\":0,\"arg\":1")
+                PASS_REGULAR_EXPRESSION "\"op\":5,\"sid\":2,\"rid\":8,\"hold_ms\":0,\"arg\":1.*\"pattern_ms\":\\[35,80,120\\]")
 # UI-V3: swipe right goes back from AGENT, STATUS, VOICE, WATCH, SCROLL and ASK; in ASK it never answers
 # (no approve, deny or reply op), the request stays and a tap reopens it.
 sim_script_test(sim_back_swipe_right back_swipe_right.txt
@@ -349,12 +486,77 @@ sim_script_test(sim_takeover_agent_keeps_item takeover_agent_keeps_item.txt FAIL
 sim_script_test(sim_takeover_late_err takeover_late_err.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
   PASS_REGULAR_EXPRESSION "\"result\",\"ok\":false,\"err\":0,\"op\":3.*\"mode\":\"ask\".*\"text\":\"Out of date\"")
-sim_script_test(sim_takeover_finger_carry takeover_finger_carry.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"action\":\"back\"")
+# Requests stop yanking open screens (issue 20261126-0a74): AGENT and SCROLL keep the work and show the
+# badge, opening the request when they close themselves; on the deck a request waits until the user has
+# left it alone 1.5 s; a tap on the badge goes to the most urgent request and answers nothing.
+sim_script_test(sim_takeover_scroll_waits takeover_scroll_waits.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]")
+sim_script_test(sim_takeover_agent_waits takeover_agent_waits.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[3456]")
+sim_script_test(sim_takeover_home_settle takeover_home_settle.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"settling\"|\"op\":[345]"
+  PASS_REGULAR_EXPRESSION "\"mode\":\"home\",\"gesture\":\"btn_b\".*\"ev\":\"wait\",\"sid\":3.*\"mode\":\"home\",\"gesture\":\"btn_b\".*\"queue_next\",\"rid\":8.*\"mode\":\"ask\"")
+sim_script_test(sim_takeover_badge_tap takeover_badge_tap.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]"
+  PASS_REGULAR_EXPRESSION "\"badge_tap\",\"rid\":8.*\"mode\":\"ask\"")
+# Only a new rid alerts (issue 20261126-d95a): a resync's and a reconnect's re-send of the open request
+# gives one arrival pattern in all, and ASK comes back after the welcome; the new rid 8 still buzzes.
+sim_script_test(sim_seen_resend_silent seen_resend_silent.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\].*\"rid\":8,\"sid\":3"
+  PASS_REGULAR_EXPRESSION "\"ev\":\"resent\".*\"ev\":\"ask_restored\".*\"rid\":8,\"sid\":3,\"kind\":0,\"new\":true.*pattern_ms\":\\[250,120,250\\]")
+# The request queue (issue 20261126-aa28): every pending request opens in turn, least time left first;
+# one the user went back from is skipped; none opens under a finger, and that finger approves nothing.
+sim_script_test(sim_queue_three queue_three.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# The next request slides in after an answer (issue 20261126-74c0): from the right, with a tick, no quiet
+# wait; the badge counts the others. Exactly one approve per hold.
+sim_script_test(sim_queue_slide queue_slide.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3,\"sid\":[0-9]+,\"rid\":7.*\"op\":3,\"sid\":[0-9]+,\"rid\":7"
+  PASS_REGULAR_EXPRESSION "\"op\":3,\"sid\":2,\"rid\":7.*\"slide_in\",\"rid\":9.*\"op\":3,\"sid\":4,\"rid\":9.*\"slide_in\",\"rid\":8.*\"op\":3,\"sid\":3,\"rid\":8")
+sim_script_test(sim_queue_skip_back queue_skip_back.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3")
+sim_script_test(sim_queue_finger_down queue_finger_down.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3,\"sid\":3"
+  PASS_REGULAR_EXPRESSION "\"op\":3,\"sid\":2,\"rid\":7.*\"queue_next\",\"rid\":8")
+# A takeover's screen settles (issue 20261126-86cd): a tap or button A begun before, or just after, a
+# request opens ASK does not act on it; a deliberate one after TAKEOVER_SETTLE_MS does at once.
+sim_script_test(sim_takeover_settle_tap takeover_settle_tap.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+  PASS_REGULAR_EXPRESSION "\"settling\",\"gesture\":\"tap\".*\"mode\":\"ask\",\"gesture\":\"tap\",\"action\":\"commit\"")
+sim_script_test(sim_takeover_settle_button takeover_settle_button.txt
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":0,.*\"op\":0,"
+  PASS_REGULAR_EXPRESSION "\"settling\",\"gesture\":\"btn_a\".*\"op\":0,\"sid\":3,\"rid\":8")
 add_test(NAME sim_takeover_glow_missed
          COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/takeover_glow_missed.txt)
 set_tests_properties(sim_takeover_glow_missed PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
                      FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3"
-                     PASS_REGULAR_EXPRESSION "\"ev\":\"glow\".*\"wake_input\",\"touch\":true")
+                     PASS_REGULAR_EXPRESSION "\"ev\":\"glow\".*\"display_off\".*\"wake_input\",\"touch\":true")
+# The glow says who and what (issue 20261126-0ca0): the sigil and the kind's glyph for 3 s, one glow
+# per alert, and a reminder lights the dark display again; the touch after it only reveals.
+add_test(NAME sim_glow_who_what
+         COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/glow_who_what.txt)
+set_tests_properties(sim_glow_who_what PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]"
+                     PASS_REGULAR_EXPRESSION "\"glow\",\"rgb\":[0-9]+,\"sid\":2.*\"display_off\".*\"sid\":3.*\"display_off\".*\"sid\":4.*\"display_off\".*\"glow\",\"rgb\":[0-9]+,\"sid\":2.*\"wake_input\",\"touch\":true")
+# Reminders grow louder (issue 20261126-a909): on a dark display the soft pulse leaves it dark, the
+# second and third light the glow; a question is reminded with its own pattern; one ladder at a time,
+# for the request with the least time left, then the next one's, 10 s apart at least.
+add_test(NAME sim_nag_glow_dark
+         COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/nag_glow_dark.txt)
+set_tests_properties(sim_nag_glow_dark PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]|\"level\":4"
+                     PASS_REGULAR_EXPRESSION "\"level\":1}([^g]|g[^l]|gl[^o])*\"level\":2.*pattern_ms\":\\[250,120,250\\].*\"ev\":\"glow\".*\"level\":3.*pattern_ms\":\\[250,120,250,400,250,120,250\\].*\"ev\":\"sound\".*\"ev\":\"glow\"")
+add_test(NAME sim_nag_question
+         COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/nag_question.txt)
+set_tests_properties(sim_nag_question PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]"
+                     PASS_REGULAR_EXPRESSION "\"nag\",\"rid\":8,\"level\":1.*pattern_ms\":\\[60\\].*\"level\":2.*pattern_ms\":\\[40,90,40\\].*\"level\":3.*pattern_ms\":\\[40,90,40,400,40,90,40\\]")
+add_test(NAME sim_nag_two_requests
+         COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/nag_two_requests.txt)
+set_tests_properties(sim_nag_two_requests PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"nag\",\"rid\":7.*\"nag\",\"rid\":8|\"nag\",\"rid\":7,\"level\":1"
+                     PASS_REGULAR_EXPRESSION "\"nag\",\"rid\":8,\"level\":1.*\"nag\",\"rid\":8,\"level\":2.*\"nag\",\"rid\":8,\"level\":3.*\"nag\",\"rid\":7,\"level\":2")
+add_test(NAME sim_nag_wake_stops
+         COMMAND agentlink_sim --headless --no-ws --idle-off 3 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/nag_wake_stops.txt)
+set_tests_properties(sim_nag_wake_stops PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]|\"level\":2"
+                     PASS_REGULAR_EXPRESSION "\"nag\",\"rid\":7,\"level\":1.*\"wake_input\".*\"display_off\"")
 # Quick replies and interrupt (issue b150): reply 1 goes out as op 11 with arg 1; a tap on Interrupt
 # sends nothing; the hold sends op 6 with hold_ms >= 1000.
 sim_script_test(sim_quick_replies quick_replies.txt
@@ -381,6 +583,13 @@ set_tests_properties(sim_agent_items PROPERTIES TIMEOUT 60)
 sim_script_test(sim_watch watch.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_watch PROPERTIES TIMEOUT 60)
 sim_script_test(sim_watch_ask_return watch_ask_return.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# EXPERIMENTS.md "Toys" (issue 20261126-b5d1): raw keys, the toy gate, yield to a request and return.
+sim_script_test(sim_toy_yield toy_yield.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+# Issue 20261126-74ee: the coin (a request mid-toss and the return), the die (blocked while a request
+# waits, the fun word's toys bit) and the oracle (finger, key and still holds).
+sim_script_test(sim_decide_coin decide_coin.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_decide_die decide_die.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
+sim_script_test(sim_decide_oracle decide_oracle.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_watch_ask_return PROPERTIES TIMEOUT 60)
 sim_script_test(sim_watch_states watch_states.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
 set_tests_properties(sim_watch_states PROPERTIES TIMEOUT 60)
@@ -463,10 +672,11 @@ sim_script_test(sim_window_handback window_handback.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3"
   PASS_REGULAR_EXPRESSION "\"tx_cmd\",\"id\":[0-9]+,\"op\":0,\"sid\":2,\"rid\":7")
 sim_script_test(sim_window_old_daemon window_old_daemon.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
-# reminders spread over the window: arrival, nothing by 16 s (the `ui` dump), the first reminder at 30 s
+# reminders grow louder over the window (issue 20261126-a909): nothing by 24 s (the `ui` dump), a soft
+# pulse at 25 s, the pattern at 60 s, the pattern twice and the sound at 110 s
 sim_script_test(sim_window_nag window_nag.txt
-  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\].*\"ev\":\"state\""
-  PASS_REGULAR_EXPRESSION "\"ev\":\"state\".*pattern_ms\":\\[250,120,250\\]")
+  FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"nag\".*\"ev\":\"state\""
+  PASS_REGULAR_EXPRESSION "\"ev\":\"state\".*\"nag\",\"rid\":7,\"level\":1.*pattern_ms\":\\[60\\].*\"nag\",\"rid\":7,\"level\":2.*pattern_ms\":\\[250,120,250\\].*\"nag\",\"rid\":7,\"level\":3.*pattern_ms\":\\[250,120,250,400,250,120,250\\].*\"ev\":\"sound\"")
 set_tests_properties(sim_window_nag PROPERTIES TIMEOUT 60)
 sim_script_test(sim_window_nag_short window_nag_short.txt
   FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]"
@@ -544,7 +754,7 @@ sim_script_test(sim_last_message_cleared last_message_cleared.txt FAIL_REGULAR_E
 # Send is held; "Other" dictates; every answer goes out at once (cmd answer, op 19); a tap never sends one.
 sim_script_test(sim_question_single question_single.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":5"
-                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_answer\",\"rid\":31,\"n\":1,\"picks\":\\[2,")
+                PASS_REGULAR_EXPRESSION "\"ev\":\"tx_answer\",\"rid\":31,\"n\":1,\"picks\":\\[2,.*\"pattern_ms\":\\[35,80,120\\]")
 sim_script_test(sim_question_multi question_multi.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":19.*\"op\":19"
                 PASS_REGULAR_EXPRESSION "\"ev\":\"tx_answer\",\"rid\":32,\"n\":2,\"picks\":\\[1,5,")
@@ -601,7 +811,21 @@ set_tests_properties(sim_perf_ring_display_off PROPERTIES WORKING_DIRECTORY ${CM
 
 sim_script_test(sim_finished_buzz finished_buzz.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"glow\""
-                PASS_REGULAR_EXPRESSION "\"ev\":\"mode\",\"mode\":\"watch\"([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[30,200,30\\]([^p]|p[^a]|pa[^t])*\"ev\":\"snoozed\",\"rid\":8,([^p]|p[^a]|pa[^t])*\"ev\":\"attention\",\"rid\":9.*\"pattern_ms\":\\[250,120,250\\]")
+                PASS_REGULAR_EXPRESSION "\"ev\":\"mode\",\"mode\":\"watch\"([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[35,200,35\\]([^p]|p[^a]|pa[^t])*\"ev\":\"snoozed\",\"rid\":8,([^p]|p[^a]|pa[^t])*\"ev\":\"attention\",\"rid\":9.*\"pattern_ms\":\\[250,120,250\\]")
+
+# Finishes buzz by default (issue 20261126-27b7, proto 0.25 done_buzz): under all, a long turn or an error
+# buzzes and a dark display glows, a burst buzzes once, a turn under 30 s is silent; armed is the old rule.
+add_test(NAME sim_done_buzz_all
+         COMMAND agentlink_sim --headless --no-ws --idle-off 1 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/done_buzz_all.txt)
+set_tests_properties(sim_done_buzz_all PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|finish_burst.*pattern_ms"
+                     PASS_REGULAR_EXPRESSION "\"done_buzz\":1.*\"display_off\".*\"pattern_ms\":\\[35,200,35\\].*\"ev\":\"glow\".*\"pattern_ms\":\\[120,90,120,90,120\\].*\"ev\":\"glow\".*\"ev\":\"finish_burst\",\"sid\":4")
+sim_script_test(sim_done_buzz_short done_buzz_short.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"ev\":\"glow\"|pattern_ms\":\\[35,200,35\\].*pattern_ms\":\\[35"
+                PASS_REGULAR_EXPRESSION "\"short_turn\",\"sid\":2,\"secs\":5([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[35,200,35\\]")
+sim_script_test(sim_done_buzz_armed done_buzz_armed.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4"
+                PASS_REGULAR_EXPRESSION "\"done_buzz\":0([^p]|p[^a]|pa[^t])*\"sid\":4,\"st\":\"done\"([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[35,200,35\\]([^p]|p[^a]|pa[^t])*\"done_buzz\":1([^p]|p[^a]|pa[^t])*\"short_turn\",\"sid\":2([^p]|p[^a]|pa[^t])*\"pattern_ms\":\\[35,200,35\\]")
 
 # Presence (PRESENCE.md, proto 0.12): hush holds the arrival buzz, the reminders and the finished buzz; the
 # card and ASK are as ever, and nothing is answered.
@@ -609,11 +833,11 @@ sim_script_test(sim_presence_hush_ask presence_hush_ask.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":3|\"op\":4|\"ev\":\"glow\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"hush\",\"rid\":7,([^p]|p[^a]|pa[^t])*\"ev\":\"attention\",\"rid\":8.*pattern_ms\":\\[250,120,250\\]")
 sim_script_test(sim_presence_hush_nag presence_hush_nag.txt
-                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\]|\"op\":3"
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|pattern_ms\":\\[250,120,250\\]|\"ev\":\"nag\"|\"op\":3"
                 PASS_REGULAR_EXPRESSION "\"ev\":\"hush\",\"rid\":7")
 sim_script_test(sim_presence_hush_done presence_hush_done.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"glow\""
-                PASS_REGULAR_EXPRESSION "\"ev\":\"mode\",\"mode\":\"watch\"([^p]|p[^a]|pa[^t])*\"ev\":\"hush\",\"sid\":1,([^p]|p[^a]|pa[^t])*pattern_ms\":\\[30,200,30\\]")
+                PASS_REGULAR_EXPRESSION "\"ev\":\"mode\",\"mode\":\"watch\"([^p]|p[^a]|pa[^t])*\"ev\":\"hush\",\"sid\":1,([^p]|p[^a]|pa[^t])*pattern_ms\":\\[35,200,35\\]")
 
 # Link arbitration (hello on every up transport, first welcome wins) against a stubbed HAL.
 add_executable(test_link_arb tests/test_link_arb.c ${FW}/core/src/link.c ${FW}/core/src/link_rx.c
@@ -657,13 +881,13 @@ sim_script_test(sim_motion_orientation motion_orientation.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
                 PASS_REGULAR_EXPRESSION "\"ev\":\"orientation\",\"flipped\":true.*\"ev\":\"orientation\",\"flipped\":false")
 sim_script_test(sim_motion_orientation_stored motion_orientation_stored.txt FAIL_REGULAR_EXPRESSION "SCRIPT FAIL")
-# Palm cover: the motor and speaker stop and the 15 s reminder is dropped; the request is not answered.
+# Palm cover: the motor and speaker stop and the reminders are dropped; the request is not answered.
 sim_script_test(sim_motion_cover_mute motion_cover_mute.txt
-                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]"
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"op\":[345]|pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]|\"ev\":\"nag\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"sound\".*pattern_ms\":\\[\\].*\"ev\":\"sound_stop\".*\"ev\":\"cover_mute\"")
 sim_script_test(sim_motion_cover_control motion_cover_nag_control.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"ev\":\"cover_mute\""
-                PASS_REGULAR_EXPRESSION "pattern_ms\":\\[250,120,250\\].*pattern_ms\":\\[250,120,250\\]")
+                PASS_REGULAR_EXPRESSION "pattern_ms\":\\[250,120,250\\].*\"nag\",\"rid\":7,\"level\":1.*pattern_ms\":\\[60\\].*\"nag\",\"rid\":7,\"level\":2.*pattern_ms\":\\[250,120,250\\]")
 # Confirmation tones: rising on an approve hold, falling on a deny hold; none with Sounds off.
 sim_script_test(sim_tone_approved approve_hold.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
@@ -719,6 +943,24 @@ sim_script_test(sim_ota_rollback_confirm ota_rollback_confirm.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_rollback|\"ev\":\"restart\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"ota_unconfirmed\".*\"ev\":\"ota_confirm\".*\"ev\":\"ota_confirmed\"|\"ev\":\"ota_unconfirmed\".*\"ev\":\"ota_confirm\"")
 set_tests_properties(sim_ota_rollback_confirm PROPERTIES ENVIRONMENT "AGENTLINK_SIM_UNCONFIRMED=1")
+# The Mote rides the update arc and the replay's hour hand (issue 20261126-9fe3): on, it is on the head and
+# flares once on success; off, both screens are as before (the same frames and redraw costs).
+sim_script_test(sim_mote_ota mote_ota.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL"
+                PASS_REGULAR_EXPRESSION "\"mote_ride\",\"at\":\"ota\",\"act\":\"flare\",\"shown\":1.*\"ev\":\"restart\"")
+sim_script_test(sim_mote_ota_off mote_ota_off.txt
+                FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|mote_ride"
+                PASS_REGULAR_EXPRESSION "\"ev\":\"ota_done\".*\"ev\":\"restart\"")
+foreach(name mote_replay mote_replay_off)
+    add_test(NAME sim_${name}
+             COMMAND agentlink_sim --headless --no-ws --idle-off 61 --script ${CMAKE_CURRENT_SOURCE_DIR}/scripts/${name}.txt)
+endforeach()
+set_tests_properties(sim_mote_replay PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"mote\":0"
+                     PASS_REGULAR_EXPRESSION "\"act\":\"start\",\"n\":1,\"changes\":1,\"mote\":1.*\"why\":\"done\".*\"why\":\"input\"")
+set_tests_properties(sim_mote_replay_off PROPERTIES WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 30
+                     FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|\"mote\":1"
+                     PASS_REGULAR_EXPRESSION "\"act\":\"start\",\"n\":1,\"changes\":1,\"mote\":0.*\"why\":\"done\".*\"why\":\"input\"")
 sim_script_test(sim_ota_rollback_timeout ota_rollback_timeout.txt
                 FAIL_REGULAR_EXPRESSION "SCRIPT FAIL|ota_confirm\""
                 PASS_REGULAR_EXPRESSION "\"ev\":\"ota_rollback\".*\"ev\":\"restart\"")

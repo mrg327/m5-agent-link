@@ -1,0 +1,50 @@
+# Living marks (issue 20261126-98a6, GLYPHS.md §3.11): one session through the grammar's one-shots, each
+# shot mid-gesture. Done: the sigil dips and overshoots, the hero glyph dips with it and eight sparks leave it
+# in the done colour; error: the sigil and the hero shiver; snoozed: the mark droops (dim, outer ring turned).
+# Every gesture ends at rest: the last window repaints nothing but the comet-free deck's own ticks.
+connect
+rtc 1800000000
+rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+session 16 work webapp feat/login Running the test suite
+wait 600
+expect_label Working
+# done: dip (r x 0.9), then the overshoot and the burst half way out
+session 16 done webapp feat/login Bash cargo test --workspace
+wait 50
+shot fun_done_dip.png
+wait 80
+shot fun_done_over.png
+wait 100
+shot fun_done_joy.png
+wait 600
+expect_label Done
+shot fun_done_rest.png
+# error: a shiver, the temper's way first
+session 16 error webapp feat/login Bash cargo test --workspace
+wait 30
+shot fun_error_a.png
+wait 40
+shot fun_error_b.png
+wait 600
+expect_label Error
+# snoozed: the droop, which holds
+session 16 work webapp feat/login Running the test suite
+wait 400
+snooze 16 1800003600
+wait 400
+shot fun_snoozed.png
+# at rest: a done session that already settled repaints nothing (the dots move once a minute)
+snooze 16 off
+session 16 done webapp feat/login Bash cargo test --workspace
+wait 1000
+lift
+px_reset
+wait 3000
+expect_px_max 3000
+# scrolling onto a finished session does not dip it: a new session on the card starts at rest
+session 2 done api main Bash make
+wait 300
+btn B
+wait 20
+shot fun_select_rest.png
+quit

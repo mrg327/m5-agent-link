@@ -1,0 +1,91 @@
+# Toys (issue 20261126-b5d1, EXPERIMENTS.md "Toys"), with the simulator's stub toy. Raw keys reach a
+# toy at once (no double-press wait); a finish holds its sound and buzz while the cue plays; a
+# request takes over at once, the toy pauses, and answering (or going back) returns to it, paused;
+# LABS then opens on it. The Trackpad keeps its waiting dot (labs_trackpad, takeover_*).
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login Running the test suite
+toy_stub
+wait 300
+swipe 233 300 233 180 160
+wait 300
+expect_screen labs
+btn B
+wait 100
+btn B
+wait 100
+btn B
+wait 100
+expect_label > Stub
+tap 233 233
+wait 300
+expect_screen toy
+expect_label opens 1 pauses 0
+shot toy_stub.png
+# raw keys: the down arrives at once, not 300 ms after the release
+btn A down
+wait 40
+expect_label keys 1 0
+btn A up
+wait 40
+expect_label keys 1 1
+expect_label played 1 refused 0
+btn B
+wait 100
+expect_label played 2 refused 0
+# a finish does not take the screen, but the toy stays quiet while its cue plays
+session 1 done webapp feat/login
+attention 30 1 done ack 0 Done|Tests pass
+wait 200
+expect_screen toy
+btn A
+btn B
+wait 100
+expect_label keys 4 4
+expect_label played 2 refused 2
+wait 1500
+btn A
+wait 100
+expect_label played 3 refused 2
+clear 30 answered_pc
+# a request takes over at once; the toy pauses
+session 1 input webapp feat/login
+attention 31 1 approval approve,deny,focus 0 Run shell command|npm test
+wait 300
+expect_screen ask
+expect_label Run shell command
+clear 31 answered_pc
+session 1 work webapp feat/login Running the test suite
+wait 1200
+expect_screen toy
+expect_label paused
+expect_label opens 2 pauses 1
+expect_label keys 5 5
+# the request's cue has played: the toy may sound again
+btn A
+wait 100
+expect_label played 4 refused 2
+# going back from a request also returns to the toy, and the request waits as a dot
+session 1 input webapp feat/login
+attention 32 1 approval approve,deny,focus 0 Edit file|src/main.rs
+wait 300
+expect_screen ask
+btn B long
+wait 300
+expect_screen toy
+expect_label opens 3 pauses 2
+wait 600
+expect_screen toy
+# a tap resumes; B held leaves for LABS, which opens on the paused toy
+tap 233 233
+wait 100
+expect_label running
+btn B long
+wait 300
+expect_screen labs
+expect_label > Stub
+chord
+wait 300
+expect_screen attention
+quit

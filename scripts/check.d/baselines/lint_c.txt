@@ -1,7 +1,7 @@
 # clang-tidy and nm findings held by scripts/check.d/lint_c.py: counts may only go down.
 # RULE<TAB>path<TAB>count, sorted. Regenerate with --update-baseline.
 bugprone-assignment-in-if-condition	firmware/components/core/src/ui_scroll.c	1
-bugprone-assignment-in-if-condition	simulator/src/sim_script.c	3
+bugprone-assignment-in-if-condition	simulator/src/sim_script.c	2
 bugprone-branch-clone	firmware/components/core/src/ui_ring_draw.c	1
 bugprone-branch-clone	simulator/src/sim_script.c	1
 bugprone-float-loop-counter	firmware/components/core/src/ui_ring.c	2
@@ -23,7 +23,7 @@ bugprone-suspicious-string-compare	firmware/components/core/src/ui_home_card.c	2
 bugprone-suspicious-string-compare	firmware/components/core/src/ui_watch.c	1
 bugprone-suspicious-string-compare	firmware/components/core/src/ui_wheel.c	2
 bugprone-suspicious-string-compare	simulator/src/sim_fw_image.c	1
-bugprone-suspicious-string-compare	simulator/src/sim_script.c	13
+bugprone-suspicious-string-compare	simulator/src/sim_script.c	12
 bugprone-suspicious-string-compare	simulator/tests/test_sha256.c	1
 bugprone-switch-missing-default-case	firmware/components/core/src/ui_read.c	1
 bugprone-unchecked-string-to-number-conversion	simulator/src/main.c	4
@@ -75,7 +75,7 @@ readability-braces-around-statements	firmware/components/core/src/ui_home.c	2
 readability-braces-around-statements	firmware/components/core/src/ui_home_card.c	10
 readability-braces-around-statements	firmware/components/core/src/ui_keys.c	12
 readability-braces-around-statements	firmware/components/core/src/ui_kit.c	22
-readability-braces-around-statements	firmware/components/core/src/ui_labs.c	6
+readability-braces-around-statements	firmware/components/core/src/ui_labs.c	2
 readability-braces-around-statements	firmware/components/core/src/ui_ota.c	4
 readability-braces-around-statements	firmware/components/core/src/ui_read.c	8
 readability-braces-around-statements	firmware/components/core/src/ui_ring.c	7
@@ -131,7 +131,6 @@ readability-identifier-naming	firmware/components/core/src/ota.c	1
 readability-identifier-naming	firmware/components/core/src/sha256.c	1
 readability-identifier-naming	firmware/components/core/src/sound_bank.c	54
 readability-identifier-naming	firmware/components/core/src/ui_agent.c	2
-readability-identifier-naming	firmware/components/core/src/ui_labs.c	2
 readability-identifier-naming	firmware/components/core/src/ui_theme.c	1
 readability-identifier-naming	firmware/components/core/src/ui_trackpad.c	1
 readability-identifier-naming	firmware/components/core/src/ui_watch.c	1

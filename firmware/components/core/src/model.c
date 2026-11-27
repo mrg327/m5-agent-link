@@ -13,6 +13,14 @@ MODEL_EXT_BSS static attention_t s_att[MODEL_MAX_ATTENTION];
 /* each request's questions, by slot: ~3.4 KB */
 MODEL_EXT_BSS static ask_q_t s_att_qs[MODEL_MAX_ATTENTION][MODEL_MAX_QS];
 static bool s_att_used[MODEL_MAX_ATTENTION];
+/* What model_attention_clear_all() dropped, so the daemon's re-sends after a welcome are known. */
+typedef struct {
+    uint32_t rid, sid, hash;
+    bool sent, skipped;
+    uint8_t answer, answer_opt;
+} att_known_t;
+static att_known_t s_known[MODEL_MAX_ATTENTION];
+static int s_n_known;
 static settings_t s_settings;
 static uint32_t s_rev;
 
@@ -26,6 +34,7 @@ void model_init(void)
 {
     memset(s_used, 0, sizeof s_used);
     memset(s_att_used, 0, sizeof s_att_used);
+    s_n_known = 0;
     memset(&s_settings, 0, sizeof s_settings);
     s_host[0] = 0;
     s_n_replies = 0;
@@ -419,7 +428,33 @@ model_counts_t model_counts(void)
 
 /* ───────── attention ───────── */
 
-void model_attention_add(const attention_t *a)
+/* FNV-1a 32 over what the user reads of a request: a restarted daemon may reuse a rid for another
+ * request (issue 20261109-1173). */
+static uint32_t att_hash(const attention_t *a)
+{
+    uint32_t h = 2166136261u;
+    for (const char *p = a->title; *p; p++) h = (h ^ (uint8_t)*p) * 16777619u;
+    h = (h ^ 0u) * 16777619u;
+    for (const char *p = a->text; *p; p++) h = (h ^ (uint8_t)*p) * 16777619u;
+    return h ^ (uint32_t)a->kind;
+}
+
+/* A request dropped by the last welcome comes back: take what the watch knew of it. */
+static const att_known_t *known_take(const attention_t *a)
+{
+    uint32_t h = att_hash(a);
+    for (int i = 0; i < s_n_known; i++) {
+        if (s_known[i].rid == a->rid && s_known[i].sid == a->sid && s_known[i].hash == h) {
+            static att_known_t k;
+            k = s_known[i];
+            s_known[i] = s_known[--s_n_known]; /* once */
+            return &k;
+        }
+    }
+    return NULL;
+}
+
+bool model_attention_add(const attention_t *a)
 {
     int slot = -1;
     for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
@@ -429,22 +464,35 @@ void model_attention_add(const attention_t *a)
         if (!s_att_used[i]) slot = i;
     if (slot < 0) slot = 0; /* queue full: oldest is least likely to still be live */
     bool had = s_att_used[slot] && s_att[slot].rid == a->rid;
-    /* only these three, not a copy: attention_t is ~0.5 KB of stack */
-    bool sent = s_att[slot].answer_sent;
+    /* only these, not a copy: attention_t is ~0.5 KB of stack */
+    bool sent = s_att[slot].answer_sent, skipped = s_att[slot].skipped;
     uint8_t answer = s_att[slot].answer, answer_opt = s_att[slot].answer_opt;
+    uint32_t arrived_ms = s_att[slot].arrived_ms;
+    const att_known_t *k = had ? NULL : known_take(a);
+    if (k) { /* re-sent after a welcome */
+        sent = k->sent;
+        answer = k->answer;
+        answer_opt = k->answer_opt;
+        skipped = k->skipped;
+    }
     s_att[slot] = *a;
     s_att[slot].n_qs = 0; /* the questions follow with model_attention_set_questions() */
-    if (had) {            /* a re-sent request keeps the answer already given */
+    if (had || k) {       /* a re-sent request keeps the answer already given */
         s_att[slot].answer_sent = sent;
         s_att[slot].answer = answer;
         s_att[slot].answer_opt = answer_opt;
+        s_att[slot].skipped = skipped;
     }
+    if (had) s_att[slot].arrived_ms = arrived_ms;
     s_att_used[slot] = true;
     int ss = find_slot(a->sid);
-    if (ss >= 0 && !had) s_sessions[ss].back = false; /* a new request is on the watch again */
+    if (ss >= 0 && !had && !k) {
+        s_sessions[ss].back = false; /* a new request is on the watch again */
+    }
     s_rev++;
-    dbg_event("model", "attention", "\"rid\":%u,\"sid\":%u,\"kind\":%d", (unsigned)a->rid,
-              (unsigned)a->sid, (int)a->kind);
+    dbg_event("model", "attention", "\"rid\":%u,\"sid\":%u,\"kind\":%d,\"new\":%s",
+              (unsigned)a->rid, (unsigned)a->sid, (int)a->kind, had || k ? "false" : "true");
+    return !had && !k;
 }
 
 void model_attention_set_questions(uint32_t rid, const ask_q_t *qs, int n)
@@ -484,7 +532,18 @@ bool model_attention_clear(uint32_t rid)
 void model_attention_clear_all(void)
 {
     int n = 0;
+    s_n_known = 0;
     for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
+        if (s_att_used[i]) {
+            const attention_t *a = &s_att[i];
+            s_known[s_n_known++] = (att_known_t){.rid = a->rid,
+                                                 .sid = a->sid,
+                                                 .hash = att_hash(a),
+                                                 .sent = a->answer_sent,
+                                                 .skipped = a->skipped,
+                                                 .answer = a->answer,
+                                                 .answer_opt = a->answer_opt};
+        }
         n += s_att_used[i];
         s_att_used[i] = false;
     }
@@ -512,6 +571,50 @@ const attention_t *model_attention_first(void)
     for (int i = 0; i < MODEL_MAX_ATTENTION; i++)
         if (s_att_used[i]) return &s_att[i];
     return NULL;
+}
+
+const attention_t *model_attention_at(int i)
+{ return i >= 0 && i < MODEL_MAX_ATTENTION && s_att_used[i] ? &s_att[i] : NULL; }
+
+void model_attention_skip(uint32_t rid)
+{
+    for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
+        if (s_att_used[i] && s_att[i].rid == rid && !s_att[i].skipped) {
+            s_att[i].skipped = true;
+            dbg_event("model", "attention_skip", "\"rid\":%u", (unsigned)rid);
+        }
+    }
+}
+
+const attention_t *model_attention_next(uint32_t now_ms, uint32_t except_rid)
+{
+    const attention_t *best = NULL;
+    uint32_t best_left = 0;
+    for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
+        const attention_t *a = &s_att[i];
+        if (!s_att_used[i] || a->rid == except_rid || a->answer_sent || a->skipped) continue;
+        if (a->kind != ATT_APPROVAL && a->kind != ATT_QUESTION) continue;
+        uint32_t left = model_attention_left_ms(a, now_ms);
+        if (left == 0) continue; /* its window is over: it goes back to the computer */
+        if (!best || left < best_left || (left == best_left && a->rid < best->rid)) {
+            best = a;
+            best_left = left;
+        }
+    }
+    return best;
+}
+
+int model_attention_pending(uint32_t now_ms, uint32_t except_rid)
+{
+    int n = 0;
+    for (int i = 0; i < MODEL_MAX_ATTENTION; i++) {
+        const attention_t *a = &s_att[i];
+        if (!s_att_used[i] || a->rid == except_rid || a->answer_sent) continue;
+        if (a->kind != ATT_APPROVAL && a->kind != ATT_QUESTION) continue;
+        if (model_attention_left_ms(a, now_ms) == 0) continue;
+        n++;
+    }
+    return n;
 }
 
 void model_attention_set_answer(uint32_t rid, uint8_t answer, uint8_t opt)

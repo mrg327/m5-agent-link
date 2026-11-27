@@ -75,6 +75,10 @@ bool ui_home_askable(void);
 bool ui_home_read_hit(int x, int y);
 /* the point is on the card's graph strip, which opens GRAPH (GRAPH.md §5) */
 bool ui_home_strip_hit(int x, int y);
+/* the key hint of key 0 (A) or 1 (B): a tap on it presses that key (issue 20261126-34e5) */
+lv_obj_t *ui_home_key_hint(int key);
+/* sessions other than the selected one that need you: the pips on the ring, A's badge */
+int ui_home_pip_count(void);
 uint32_t ui_home_sel_sid(void);
 /* the selected session's unanswered permission or question */
 const attention_t *ui_home_sel_request(void);
@@ -84,6 +88,9 @@ void ui_home_rim_mode(bool dial);
 void ui_home_set_card_shown(bool shown);
 void ui_home_select_sid(uint32_t sid, const char *via);
 void ui_home_report(ui_report_t *r);
+/* The centre of the session's own slot on the ring, degrees clockwise from 12; -1 when it has none
+ * (not on the ring, or inside a merged Done group): where the Mote goes for a big finish. */
+int ui_home_slot_deg(uint32_t sid);
 void ui_home_animations_changed(void);
 
 /* The AGENT screen (ui_agent.c). */
@@ -124,6 +131,8 @@ bool ui_ask_tick(uint32_t now_ms); /* true: wants to close */
 void ui_ask_report(ui_report_t *r);
 /* The request ASK shows and can still be answered (its countdown runs), or NULL. */
 const attention_t *ui_ask_request(void);
+/* The rid ASK last showed (0: none yet), whether or not it is still there. */
+uint32_t ui_ask_rid(void);
 /* The point is on one of ASK's items (a disc, a row, button A's hint): a tap there is let through
  * although some of them reach past the centre zone (GLYPHS.md §3.4). */
 bool ui_ask_target_hit(int x, int y);
@@ -177,6 +186,7 @@ void ui_labs_refresh(uint32_t now_ms);
 bool ui_labs_act(nav_action_t a, const gesture_evt_t *g);
 bool ui_labs_tick(uint32_t now_ms); /* true: wants to close */
 void ui_labs_report(ui_report_t *r);
+bool ui_labs_back(void); /* true: a view inside LABS (Personality) closed, LABS stays */
 void ui_go_trackpad(void);
 
 /* The TRACKPAD screen (ui_trackpad.c): the glass drives the PC's pointer (proto 0.20). */
@@ -198,4 +208,5 @@ bool ui_watch_refresh(uint32_t now_ms); /* false: the session is gone */
 bool ui_watch_act(nav_action_t a, const gesture_evt_t *g);
 void ui_watch_tick(uint32_t now_ms); /* the clock; WATCH never closes by itself */
 uint32_t ui_watch_sid(void);
+lv_obj_t *ui_watch_key_hint(int key); /* as ui_home_key_hint */
 void ui_watch_report(ui_report_t *r);

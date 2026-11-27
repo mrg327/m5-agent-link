@@ -66,12 +66,13 @@ exceptions are in the table at the end.
   root name: `power.c` exports `power_*`, `ui_home.c` exports `ui_home_*`, `hal.h` declares `hal_*`.
   Prefixes in use: `hal_` (the HAL, implemented by `boards/*` and `simulator/src/sim_*.c`), `core_`
   (the component API in `core/include/core.h`), `ui_` and `ui_<screen>_`, `model_`, `link_`, `nav_`,
-  `keys_`, `detail_`, `feedback_`, `gauges_`, `voice_`, `power_`, `ota_`, `gesture_`, `bench_`,
-  `graph_`, `motion_`, `prefs_`, `steps_`, `done_`, `sha256_`, `ring_`, `sim_`, and `sw_` for
-  board-private functions shared between StopWatch files. `checked: scripts/check lint (lint_c.py,
-  baseline 0)` for the prefix being one of the allowed module prefixes (clang-tidy
-  `GlobalFunctionPrefix` sentinel with the allowlist in `GlobalFunctionIgnoredRegexp`, and an `nm`
-  pass over the simulator's core objects, `nm-prefix`); `review` for the prefix matching the file.
+  `keys_`, `detail_`, `feedback_`, `gauges_`, `voice_`, `power_`, `ota_`, `gesture_`, `bench_`, `toy_`, `decide_`,
+  `graph_`, `motion_`, `nag_`, `persona_`, `temper_`, `mote_`, `eggs_`, `prefs_`, `replay_`, `steps_`, `done_`,
+  `sha256_`, `ring_`, `sim_`, and `sw_` for board-private functions shared between StopWatch files. `checked:
+  scripts/check lint (lint_c.py, baseline 0)` for the prefix being one of the allowed module prefixes
+  (clang-tidy `GlobalFunctionPrefix` sentinel with the allowlist in `GlobalFunctionIgnoredRegexp`, and
+  an `nm` pass over the simulator's core objects, `nm-prefix`); `review` for the prefix matching the
+  file.
 - **C-NAME-02** Anything used in one file is `static`. File-scope variables, `const` tables included,
   are named `s_<name>`: `static hal_power_state_t s_power_state`. The one exception is ESP-IDF's log
   tag, `static const char *TAG = "sw-board";`. No `g_`, `k` or Hungarian prefixes. `checked: scripts/check

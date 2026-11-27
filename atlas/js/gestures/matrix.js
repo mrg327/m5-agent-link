@@ -44,7 +44,7 @@ const GESTURES = {
 const ORDER = Object.keys(GESTURES);
 
 /** @type {Record<string, string>} */
-const ZONE = { centre: 'centre', rim: 'rim', any: '' };
+const ZONE = { centre: 'centre', rim: 'rim', key_a: "on A's hint", key_b: "on B's hint", any: '' };
 
 /**
  * Rows for one screen: one per gesture, each with every case (zone and condition) the firmware binds.

@@ -1,0 +1,13 @@
+# The boot move is cut at once by a touch (issue 20261126-f5be), run with --pref fun=0x3db: about 290 ms in
+# (the orb at the centre, waking), a tap on the deck ends it in the step the touch lands; the deck takes the
+# touch as it would without the Mote (nothing held back), and the Mote is simply at its place at 12. The log
+# has "ev":"mote_boot","end":"input".
+rtc 1800000000
+# the orb is at the centre: its halo lights the deck below the clock
+expect_px 233 258 7b6d5a
+tap 233 400
+wait 40
+# cut: the deck below the clock is black again, the Mote at 12
+expect_px 233 258 000000
+shot mote_boot_cut.png
+quit

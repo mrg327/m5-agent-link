@@ -164,6 +164,40 @@ int main(void)
                "a centre drag scrolls");
         EXPECT(!strcmp(nav_mode_name(MODE_GRAPH), "graph"), "ui_state names it graph");
     }
+    {
+        /* issue 20261126-34e5: on HOME and WATCH a tap on a key hint is that key's short press,
+         * whatever the selected session is waiting for */
+        const nav_mode_t keyed[] = {MODE_HOME, MODE_WATCH};
+        for (int i = 0; i < 2; i++) {
+            nav_mode_t m = keyed[i];
+            for (int st = 0; st < 4; st++) {
+                bool req = st & 1, ask = st & 2;
+                EXPECT(nav_lookup(m, G_TAP, ZONE_KEY_A, req, ask) ==
+                           nav_lookup(m, G_BTN_A, ZONE_ANY, req, ask),
+                       "a tap on A's hint is A");
+                EXPECT(nav_lookup(m, G_TAP, ZONE_KEY_B, req, ask) ==
+                           nav_lookup(m, G_BTN_B, ZONE_ANY, req, ask),
+                       "a tap on B's hint is B");
+            }
+            EXPECT(nav_lookup(m, G_TAP, ZONE_KEY_A, false, false) == NAV_FOCUS, "A: open on PC");
+            EXPECT(nav_lookup(m, G_TAP, ZONE_KEY_B, false, false) == NAV_NEXT, "B: next");
+            /* only a tap: a long press or a drag that starts on a hint is what it was */
+            EXPECT(nav_lookup(m, G_LONG_PRESS, ZONE_KEY_A, false, false) !=
+                       nav_lookup(m, G_BTN_A, ZONE_ANY, false, false),
+                   "a long press on a hint is not a key");
+            EXPECT(nav_lookup(m, G_SCRUB_START, ZONE_KEY_A, false, false) == NAV_SCRUB,
+                   "a slide from a hint still scrubs");
+        }
+        /* no other screen has a key-zone row, and none of them commits anything */
+        for (int i = 0; i < nav_n_bindings; i++) {
+            const nav_binding_t *b = &nav_bindings[i];
+            if (b->zone != ZONE_KEY_A && b->zone != ZONE_KEY_B) continue;
+            EXPECT(b->mode == MODE_HOME || b->mode == MODE_WATCH, "key zones on HOME, WATCH only");
+            EXPECT(b->gesture == G_TAP, "a key zone takes a tap only");
+            EXPECT(b->action == NAV_FOCUS || b->action == NAV_NEXT, "a hint never commits");
+        }
+        /* (ui.c sets a key zone on HOME and WATCH only; elsewhere a hint is rim) */
+    }
 
     printf("%s\n", failures ? "nav: FAILED" : "nav: ok");
     return failures ? 1 : 0;

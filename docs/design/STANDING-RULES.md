@@ -152,7 +152,9 @@ single trailing wildcard (`npm test:*`, `Read(//srv/data/**)`) is offered and **
 
 ## 7. Other agents
 
-Copilot CLI has no hook that takes a decision; its prompt is read off the screen and answered by typing. Its
+Copilot CLI's prompt is read off the screen and answered by typing. (GitHub's docs now describe a
+`permissionRequest` hook that can approve, deny and interrupt; not yet tried on a real install or used here,
+issue 20261126-0c43.) Its
 `Yes, and don't ask again for … in this repo` names the rule in Copilot's own words, which the daemon cannot
 verify or show as a rule, so that option is **not offered on the watch** any more (`prompt.rs`): the card offers
 `Yes` and `No`, and the terminal keeps the rest. Any agent without suggestions: no row.

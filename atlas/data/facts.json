@@ -116,8 +116,10 @@
   "ring": {
     "merge_at": 9,
     "ambient_ms": 30000,
-    "nag_ms": 15000,
-    "nag_max": 3,
+    "nag_steps": 3,
+    "nag_r1_ms": 25000,
+    "nag_r2_ms": 40000,
+    "nag_floor_ms": 10000,
     "summary_w_px": 300,
     "sigil_r_px": 22,
     "time_dots_r_px": 88,
@@ -144,11 +146,11 @@
     "max_segments": 32,
     "kinds": {
       "work": "dim capsule + a comet sweeping along it",
-      "ask": "full capsule, gentle pulse",
-      "perm": "two thin round tracks, faster pulse",
+      "ask": "1 Hz pulse; pip: a dot",
+      "perm": "1 Hz pulse; pip: a bar along the ring",
       "done": "one sweep, then solid; dim once acknowledged",
-      "error": "a row of round dots; one fast flicker, then solid",
-      "idle": "thin, dim, still"
+      "error": "one fast flicker, then solid; pip: a triangle pointing at the centre",
+      "idle": "dim, still"
     }
   },
   "gesture_map": {
@@ -192,11 +194,29 @@
       {
         "gesture": "G_TAP",
         "mode": "home",
+        "zone": "key_a",
+        "when": "",
+        "nav": "NAV_FOCUS",
+        "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
+        "source": "firmware/components/core/src/nav.c:15"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "home",
+        "zone": "key_b",
+        "when": "",
+        "nav": "NAV_NEXT",
+        "action": "Selects the next session, item or page",
+        "source": "firmware/components/core/src/nav.c:16"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "home",
         "zone": "rim",
         "when": "",
         "nav": "NAV_PICK_RIM",
         "action": "Selects the session under your finger",
-        "source": "firmware/components/core/src/nav.c:15"
+        "source": "firmware/components/core/src/nav.c:17"
       },
       {
         "gesture": "G_DOUBLE_TAP",
@@ -205,7 +225,7 @@
         "when": "",
         "nav": "NAV_PICK_RIM",
         "action": "Selects the session under your finger",
-        "source": "firmware/components/core/src/nav.c:16"
+        "source": "firmware/components/core/src/nav.c:18"
       },
       {
         "gesture": "G_SWIPE_UP",
@@ -214,7 +234,7 @@
         "when": "",
         "nav": "NAV_OPEN_LABS",
         "action": "Opens Experiments; the first is the Trackpad",
-        "source": "firmware/components/core/src/nav.c:17"
+        "source": "firmware/components/core/src/nav.c:19"
       },
       {
         "gesture": "G_SWIPE_DOWN",
@@ -223,28 +243,10 @@
         "when": "",
         "nav": "NAV_OPEN_STATUS",
         "action": "Opens Status: link, battery, quiet mode, sounds",
-        "source": "firmware/components/core/src/nav.c:18"
-      },
-      {
-        "gesture": "G_SCRUB_START",
-        "mode": "home",
-        "zone": "any",
-        "when": "",
-        "nav": "NAV_SCRUB",
-        "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:19"
-      },
-      {
-        "gesture": "G_SCRUB",
-        "mode": "home",
-        "zone": "any",
-        "when": "",
-        "nav": "NAV_SCRUB",
-        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:20"
       },
       {
-        "gesture": "G_SCRUB_END",
+        "gesture": "G_SCRUB_START",
         "mode": "home",
         "zone": "any",
         "when": "",
@@ -253,13 +255,31 @@
         "source": "firmware/components/core/src/nav.c:21"
       },
       {
+        "gesture": "G_SCRUB",
+        "mode": "home",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "Sliding round the rim moves the selection, one tick per step",
+        "source": "firmware/components/core/src/nav.c:22"
+      },
+      {
+        "gesture": "G_SCRUB_END",
+        "mode": "home",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "Sliding round the rim moves the selection, one tick per step",
+        "source": "firmware/components/core/src/nav.c:23"
+      },
+      {
         "gesture": "G_BTN_A",
         "mode": "home",
         "zone": "any",
         "when": "",
         "nav": "NAV_FOCUS",
         "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
-        "source": "firmware/components/core/src/nav.c:22"
+        "source": "firmware/components/core/src/nav.c:24"
       },
       {
         "gesture": "G_BTN_A_DOUBLE",
@@ -268,7 +288,7 @@
         "when": "",
         "nav": "NAV_NEXT_ATTENTION",
         "action": "Jumps to the next session that needs you",
-        "source": "firmware/components/core/src/nav.c:23"
+        "source": "firmware/components/core/src/nav.c:25"
       },
       {
         "gesture": "G_BTN_B",
@@ -277,7 +297,7 @@
         "when": "",
         "nav": "NAV_NEXT",
         "action": "Selects the next session, item or page",
-        "source": "firmware/components/core/src/nav.c:24"
+        "source": "firmware/components/core/src/nav.c:26"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -286,7 +306,7 @@
         "when": "",
         "nav": "NAV_PREV",
         "action": "Selects the previous session",
-        "source": "firmware/components/core/src/nav.c:25"
+        "source": "firmware/components/core/src/nav.c:27"
       },
       {
         "gesture": "G_PRESS",
@@ -295,7 +315,7 @@
         "when": "",
         "nav": "NAV_HOLD_PRESS",
         "action": "Starts a hold on the selected item, if it needs one",
-        "source": "firmware/components/core/src/nav.c:27"
+        "source": "firmware/components/core/src/nav.c:29"
       },
       {
         "gesture": "G_RELEASE",
@@ -304,7 +324,7 @@
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
         "action": "Lifting the finger cancels a hold",
-        "source": "firmware/components/core/src/nav.c:28"
+        "source": "firmware/components/core/src/nav.c:30"
       },
       {
         "gesture": "G_TAP",
@@ -313,7 +333,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:29"
+        "source": "firmware/components/core/src/nav.c:31"
       },
       {
         "gesture": "G_DOUBLE_TAP",
@@ -322,7 +342,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:30"
+        "source": "firmware/components/core/src/nav.c:32"
       },
       {
         "gesture": "G_DRAG",
@@ -331,7 +351,7 @@
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
         "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
-        "source": "firmware/components/core/src/nav.c:31"
+        "source": "firmware/components/core/src/nav.c:33"
       },
       {
         "gesture": "G_LONG_PRESS",
@@ -340,7 +360,7 @@
         "when": "",
         "nav": "NAV_HOLD_LONG",
         "action": "Holding still away from the items goes back",
-        "source": "firmware/components/core/src/nav.c:32"
+        "source": "firmware/components/core/src/nav.c:34"
       },
       {
         "gesture": "G_SWIPE_RIGHT",
@@ -349,28 +369,10 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:33"
-      },
-      {
-        "gesture": "G_SCRUB_START",
-        "mode": "agent",
-        "zone": "any",
-        "when": "",
-        "nav": "NAV_SCRUB",
-        "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:34"
-      },
-      {
-        "gesture": "G_SCRUB",
-        "mode": "agent",
-        "zone": "any",
-        "when": "",
-        "nav": "NAV_SCRUB",
-        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:35"
       },
       {
-        "gesture": "G_SCRUB_END",
+        "gesture": "G_SCRUB_START",
         "mode": "agent",
         "zone": "any",
         "when": "",
@@ -379,13 +381,31 @@
         "source": "firmware/components/core/src/nav.c:36"
       },
       {
+        "gesture": "G_SCRUB",
+        "mode": "agent",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "Sliding round the rim moves the selection, one tick per step",
+        "source": "firmware/components/core/src/nav.c:37"
+      },
+      {
+        "gesture": "G_SCRUB_END",
+        "mode": "agent",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "Sliding round the rim moves the selection, one tick per step",
+        "source": "firmware/components/core/src/nav.c:38"
+      },
+      {
         "gesture": "G_BTN_A",
         "mode": "agent",
         "zone": "any",
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:37"
+        "source": "firmware/components/core/src/nav.c:39"
       },
       {
         "gesture": "G_BTN_B",
@@ -394,7 +414,7 @@
         "when": "",
         "nav": "NAV_NEXT",
         "action": "Selects the next session, item or page",
-        "source": "firmware/components/core/src/nav.c:38"
+        "source": "firmware/components/core/src/nav.c:40"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -403,7 +423,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:39"
+        "source": "firmware/components/core/src/nav.c:41"
       },
       {
         "gesture": "G_CHORD",
@@ -412,7 +432,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "Goes straight back to the ring",
-        "source": "firmware/components/core/src/nav.c:40"
+        "source": "firmware/components/core/src/nav.c:42"
       },
       {
         "gesture": "G_PRESS",
@@ -421,7 +441,7 @@
         "when": "",
         "nav": "NAV_HOLD_PRESS",
         "action": "Starts a hold on the selected item, if it needs one",
-        "source": "firmware/components/core/src/nav.c:43"
+        "source": "firmware/components/core/src/nav.c:45"
       },
       {
         "gesture": "G_RELEASE",
@@ -430,7 +450,7 @@
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
         "action": "Lifting the finger cancels a hold",
-        "source": "firmware/components/core/src/nav.c:44"
+        "source": "firmware/components/core/src/nav.c:46"
       },
       {
         "gesture": "G_TAP",
@@ -439,7 +459,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:45"
+        "source": "firmware/components/core/src/nav.c:47"
       },
       {
         "gesture": "G_DOUBLE_TAP",
@@ -448,7 +468,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:46"
+        "source": "firmware/components/core/src/nav.c:48"
       },
       {
         "gesture": "G_LONG_PRESS",
@@ -457,7 +477,7 @@
         "when": "",
         "nav": "NAV_HOLD_LONG",
         "action": "Holding still away from the items goes back",
-        "source": "firmware/components/core/src/nav.c:47"
+        "source": "firmware/components/core/src/nav.c:49"
       },
       {
         "gesture": "G_DRAG",
@@ -466,7 +486,7 @@
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
         "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
-        "source": "firmware/components/core/src/nav.c:48"
+        "source": "firmware/components/core/src/nav.c:50"
       },
       {
         "gesture": "G_SWIPE_RIGHT",
@@ -475,28 +495,10 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:49"
-      },
-      {
-        "gesture": "G_SCRUB_START",
-        "mode": "ask",
-        "zone": "any",
-        "when": "",
-        "nav": "NAV_SCRUB",
-        "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:50"
-      },
-      {
-        "gesture": "G_SCRUB",
-        "mode": "ask",
-        "zone": "any",
-        "when": "",
-        "nav": "NAV_SCRUB",
-        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:51"
       },
       {
-        "gesture": "G_SCRUB_END",
+        "gesture": "G_SCRUB_START",
         "mode": "ask",
         "zone": "any",
         "when": "",
@@ -505,13 +507,31 @@
         "source": "firmware/components/core/src/nav.c:52"
       },
       {
+        "gesture": "G_SCRUB",
+        "mode": "ask",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "Sliding round the rim moves the selection, one tick per step",
+        "source": "firmware/components/core/src/nav.c:53"
+      },
+      {
+        "gesture": "G_SCRUB_END",
+        "mode": "ask",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "Sliding round the rim moves the selection, one tick per step",
+        "source": "firmware/components/core/src/nav.c:54"
+      },
+      {
         "gesture": "G_BTN_A",
         "mode": "ask",
         "zone": "any",
         "when": "",
         "nav": "NAV_FOCUS",
         "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
-        "source": "firmware/components/core/src/nav.c:53"
+        "source": "firmware/components/core/src/nav.c:55"
       },
       {
         "gesture": "G_BTN_B",
@@ -520,7 +540,7 @@
         "when": "",
         "nav": "NAV_NEXT",
         "action": "Selects the next session, item or page",
-        "source": "firmware/components/core/src/nav.c:54"
+        "source": "firmware/components/core/src/nav.c:56"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -529,7 +549,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:55"
+        "source": "firmware/components/core/src/nav.c:57"
       },
       {
         "gesture": "G_CHORD",
@@ -538,7 +558,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "Goes straight back to the ring",
-        "source": "firmware/components/core/src/nav.c:56"
+        "source": "firmware/components/core/src/nav.c:58"
       },
       {
         "gesture": "G_PRESS",
@@ -547,7 +567,7 @@
         "when": "",
         "nav": "NAV_SCROLL_CATCH",
         "action": "A new touch stops the scrolling",
-        "source": "firmware/components/core/src/nav.c:59"
+        "source": "firmware/components/core/src/nav.c:61"
       },
       {
         "gesture": "G_DRAG",
@@ -556,7 +576,7 @@
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
         "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
-        "source": "firmware/components/core/src/nav.c:60"
+        "source": "firmware/components/core/src/nav.c:62"
       },
       {
         "gesture": "G_DRAG_END",
@@ -565,7 +585,7 @@
         "when": "",
         "nav": "NAV_SCROLL_FLING",
         "action": "A quick flick keeps the terminal scrolling, slowing down like a trackpad",
-        "source": "firmware/components/core/src/nav.c:61"
+        "source": "firmware/components/core/src/nav.c:63"
       },
       {
         "gesture": "G_TAP",
@@ -574,7 +594,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:62"
+        "source": "firmware/components/core/src/nav.c:64"
       },
       {
         "gesture": "G_SWIPE_RIGHT",
@@ -583,7 +603,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:63"
+        "source": "firmware/components/core/src/nav.c:65"
       },
       {
         "gesture": "G_BTN_A",
@@ -592,7 +612,7 @@
         "when": "",
         "nav": "NAV_TO_BOTTOM",
         "action": "Jumps to the newest output and leaves Scroll",
-        "source": "firmware/components/core/src/nav.c:64"
+        "source": "firmware/components/core/src/nav.c:66"
       },
       {
         "gesture": "G_BTN_B",
@@ -601,7 +621,7 @@
         "when": "",
         "nav": "NAV_PAGE_NEWER",
         "action": "Scrolls one page toward newer output",
-        "source": "firmware/components/core/src/nav.c:65"
+        "source": "firmware/components/core/src/nav.c:67"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -610,7 +630,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:66"
+        "source": "firmware/components/core/src/nav.c:68"
       },
       {
         "gesture": "G_CHORD",
@@ -619,7 +639,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "Goes straight back to the ring",
-        "source": "firmware/components/core/src/nav.c:67"
+        "source": "firmware/components/core/src/nav.c:69"
       },
       {
         "gesture": "G_TAP",
@@ -628,7 +648,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:71"
+        "source": "firmware/components/core/src/nav.c:73"
       },
       {
         "gesture": "G_DOUBLE_TAP",
@@ -637,7 +657,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:72"
+        "source": "firmware/components/core/src/nav.c:74"
       },
       {
         "gesture": "G_SWIPE_UP",
@@ -646,7 +666,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:73"
+        "source": "firmware/components/core/src/nav.c:75"
       },
       {
         "gesture": "G_LONG_PRESS",
@@ -655,7 +675,7 @@
         "when": "",
         "nav": "NAV_HOLD_LONG",
         "action": "Holding still away from the items goes back",
-        "source": "firmware/components/core/src/nav.c:74"
+        "source": "firmware/components/core/src/nav.c:76"
       },
       {
         "gesture": "G_SWIPE_RIGHT",
@@ -664,28 +684,10 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:75"
-      },
-      {
-        "gesture": "G_SCRUB_START",
-        "mode": "status",
-        "zone": "any",
-        "when": "",
-        "nav": "NAV_SCRUB",
-        "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:76"
-      },
-      {
-        "gesture": "G_SCRUB",
-        "mode": "status",
-        "zone": "any",
-        "when": "",
-        "nav": "NAV_SCRUB",
-        "action": "Sliding round the rim moves the selection, one tick per step",
         "source": "firmware/components/core/src/nav.c:77"
       },
       {
-        "gesture": "G_SCRUB_END",
+        "gesture": "G_SCRUB_START",
         "mode": "status",
         "zone": "any",
         "when": "",
@@ -694,13 +696,31 @@
         "source": "firmware/components/core/src/nav.c:78"
       },
       {
+        "gesture": "G_SCRUB",
+        "mode": "status",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "Sliding round the rim moves the selection, one tick per step",
+        "source": "firmware/components/core/src/nav.c:79"
+      },
+      {
+        "gesture": "G_SCRUB_END",
+        "mode": "status",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "Sliding round the rim moves the selection, one tick per step",
+        "source": "firmware/components/core/src/nav.c:80"
+      },
+      {
         "gesture": "G_BTN_A",
         "mode": "status",
         "zone": "any",
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:79"
+        "source": "firmware/components/core/src/nav.c:81"
       },
       {
         "gesture": "G_BTN_B",
@@ -709,7 +729,7 @@
         "when": "",
         "nav": "NAV_NEXT",
         "action": "Selects the next session, item or page",
-        "source": "firmware/components/core/src/nav.c:80"
+        "source": "firmware/components/core/src/nav.c:82"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -718,7 +738,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:81"
+        "source": "firmware/components/core/src/nav.c:83"
       },
       {
         "gesture": "G_CHORD",
@@ -727,7 +747,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "Goes straight back to the ring",
-        "source": "firmware/components/core/src/nav.c:82"
+        "source": "firmware/components/core/src/nav.c:84"
       },
       {
         "gesture": "G_TAP",
@@ -736,7 +756,7 @@
         "when": "when the session waits for your answer",
         "nav": "NAV_OPEN_ASK",
         "action": "Opens the request screen. Opening answers nothing",
-        "source": "firmware/components/core/src/nav.c:87"
+        "source": "firmware/components/core/src/nav.c:89"
       },
       {
         "gesture": "G_TAP",
@@ -745,7 +765,25 @@
         "when": "when nothing waits for you",
         "nav": "NAV_FOCUS",
         "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
-        "source": "firmware/components/core/src/nav.c:88"
+        "source": "firmware/components/core/src/nav.c:90"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "watch",
+        "zone": "key_a",
+        "when": "",
+        "nav": "NAV_FOCUS",
+        "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
+        "source": "firmware/components/core/src/nav.c:91"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "watch",
+        "zone": "key_b",
+        "when": "",
+        "nav": "NAV_NEXT",
+        "action": "Selects the next session, item or page",
+        "source": "firmware/components/core/src/nav.c:92"
       },
       {
         "gesture": "G_TAP",
@@ -754,7 +792,7 @@
         "when": "",
         "nav": "NAV_PICK_RIM",
         "action": "Selects the session under your finger",
-        "source": "firmware/components/core/src/nav.c:89"
+        "source": "firmware/components/core/src/nav.c:93"
       },
       {
         "gesture": "G_DRAG",
@@ -763,7 +801,7 @@
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
         "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
-        "source": "firmware/components/core/src/nav.c:90"
+        "source": "firmware/components/core/src/nav.c:94"
       },
       {
         "gesture": "G_SCRUB_START",
@@ -772,7 +810,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:91"
+        "source": "firmware/components/core/src/nav.c:95"
       },
       {
         "gesture": "G_SCRUB",
@@ -781,7 +819,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:92"
+        "source": "firmware/components/core/src/nav.c:96"
       },
       {
         "gesture": "G_SCRUB_END",
@@ -790,7 +828,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:93"
+        "source": "firmware/components/core/src/nav.c:97"
       },
       {
         "gesture": "G_BTN_A",
@@ -799,7 +837,7 @@
         "when": "",
         "nav": "NAV_FOCUS",
         "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
-        "source": "firmware/components/core/src/nav.c:94"
+        "source": "firmware/components/core/src/nav.c:98"
       },
       {
         "gesture": "G_BTN_B",
@@ -808,7 +846,7 @@
         "when": "",
         "nav": "NAV_NEXT",
         "action": "Selects the next session, item or page",
-        "source": "firmware/components/core/src/nav.c:95"
+        "source": "firmware/components/core/src/nav.c:99"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -817,7 +855,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:96"
+        "source": "firmware/components/core/src/nav.c:100"
       },
       {
         "gesture": "G_LONG_PRESS",
@@ -826,7 +864,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:97"
+        "source": "firmware/components/core/src/nav.c:101"
       },
       {
         "gesture": "G_SWIPE_RIGHT",
@@ -835,7 +873,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:98"
+        "source": "firmware/components/core/src/nav.c:102"
       },
       {
         "gesture": "G_CHORD",
@@ -844,7 +882,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "Goes straight back to the ring",
-        "source": "firmware/components/core/src/nav.c:99"
+        "source": "firmware/components/core/src/nav.c:103"
       },
       {
         "gesture": "G_PRESS",
@@ -853,7 +891,7 @@
         "when": "",
         "nav": "NAV_HOLD_PRESS",
         "action": "Starts a hold on the selected item, if it needs one",
-        "source": "firmware/components/core/src/nav.c:102"
+        "source": "firmware/components/core/src/nav.c:106"
       },
       {
         "gesture": "G_RELEASE",
@@ -862,7 +900,7 @@
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
         "action": "Lifting the finger cancels a hold",
-        "source": "firmware/components/core/src/nav.c:103"
+        "source": "firmware/components/core/src/nav.c:107"
       },
       {
         "gesture": "G_TAP",
@@ -871,7 +909,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:104"
+        "source": "firmware/components/core/src/nav.c:108"
       },
       {
         "gesture": "G_SWIPE_DOWN",
@@ -880,7 +918,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:105"
+        "source": "firmware/components/core/src/nav.c:109"
       },
       {
         "gesture": "G_SWIPE_RIGHT",
@@ -889,7 +927,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:106"
+        "source": "firmware/components/core/src/nav.c:110"
       },
       {
         "gesture": "G_BTN_A",
@@ -898,7 +936,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:107"
+        "source": "firmware/components/core/src/nav.c:111"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -907,7 +945,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:108"
+        "source": "firmware/components/core/src/nav.c:112"
       },
       {
         "gesture": "G_CHORD",
@@ -916,7 +954,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "Goes straight back to the ring",
-        "source": "firmware/components/core/src/nav.c:109"
+        "source": "firmware/components/core/src/nav.c:113"
       },
       {
         "gesture": "G_BTN_A",
@@ -925,7 +963,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:113"
+        "source": "firmware/components/core/src/nav.c:117"
       },
       {
         "gesture": "G_BTN_A_LONG",
@@ -934,7 +972,7 @@
         "when": "",
         "nav": "NAV_HOLD_PRESS",
         "action": "Starts a hold on the selected item, if it needs one",
-        "source": "firmware/components/core/src/nav.c:114"
+        "source": "firmware/components/core/src/nav.c:118"
       },
       {
         "gesture": "G_BTN_B",
@@ -943,7 +981,7 @@
         "when": "",
         "nav": "NAV_ERASE",
         "action": "Deletes the last typed word",
-        "source": "firmware/components/core/src/nav.c:115"
+        "source": "firmware/components/core/src/nav.c:119"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -952,7 +990,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:116"
+        "source": "firmware/components/core/src/nav.c:120"
       },
       {
         "gesture": "G_CHORD",
@@ -961,7 +999,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "Goes straight back to the ring",
-        "source": "firmware/components/core/src/nav.c:117"
+        "source": "firmware/components/core/src/nav.c:121"
       },
       {
         "gesture": "G_PRESS",
@@ -970,7 +1008,7 @@
         "when": "",
         "nav": "NAV_HOLD_PRESS",
         "action": "Starts a hold on the selected item, if it needs one",
-        "source": "firmware/components/core/src/nav.c:121"
+        "source": "firmware/components/core/src/nav.c:125"
       },
       {
         "gesture": "G_RELEASE",
@@ -979,7 +1017,7 @@
         "when": "",
         "nav": "NAV_HOLD_RELEASE",
         "action": "Lifting the finger cancels a hold",
-        "source": "firmware/components/core/src/nav.c:122"
+        "source": "firmware/components/core/src/nav.c:126"
       },
       {
         "gesture": "G_TAP",
@@ -988,7 +1026,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:123"
+        "source": "firmware/components/core/src/nav.c:127"
       },
       {
         "gesture": "G_DOUBLE_TAP",
@@ -997,7 +1035,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:124"
+        "source": "firmware/components/core/src/nav.c:128"
       },
       {
         "gesture": "G_DRAG",
@@ -1006,7 +1044,7 @@
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
         "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
-        "source": "firmware/components/core/src/nav.c:125"
+        "source": "firmware/components/core/src/nav.c:129"
       },
       {
         "gesture": "G_LONG_PRESS",
@@ -1015,7 +1053,7 @@
         "when": "",
         "nav": "NAV_HOLD_LONG",
         "action": "Holding still away from the items goes back",
-        "source": "firmware/components/core/src/nav.c:126"
+        "source": "firmware/components/core/src/nav.c:130"
       },
       {
         "gesture": "G_SWIPE_RIGHT",
@@ -1024,7 +1062,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:127"
+        "source": "firmware/components/core/src/nav.c:131"
       },
       {
         "gesture": "G_SCRUB_START",
@@ -1033,7 +1071,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:128"
+        "source": "firmware/components/core/src/nav.c:132"
       },
       {
         "gesture": "G_SCRUB",
@@ -1042,7 +1080,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:129"
+        "source": "firmware/components/core/src/nav.c:133"
       },
       {
         "gesture": "G_SCRUB_END",
@@ -1051,7 +1089,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:130"
+        "source": "firmware/components/core/src/nav.c:134"
       },
       {
         "gesture": "G_BTN_A",
@@ -1060,7 +1098,7 @@
         "when": "",
         "nav": "NAV_FOCUS",
         "action": "Brings the session's terminal to the front on the PC; on the request screen it never approves",
-        "source": "firmware/components/core/src/nav.c:131"
+        "source": "firmware/components/core/src/nav.c:135"
       },
       {
         "gesture": "G_BTN_B",
@@ -1069,7 +1107,7 @@
         "when": "",
         "nav": "NAV_NEXT",
         "action": "Selects the next session, item or page",
-        "source": "firmware/components/core/src/nav.c:132"
+        "source": "firmware/components/core/src/nav.c:136"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -1078,7 +1116,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:133"
+        "source": "firmware/components/core/src/nav.c:137"
       },
       {
         "gesture": "G_CHORD",
@@ -1087,7 +1125,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "Goes straight back to the ring",
-        "source": "firmware/components/core/src/nav.c:134"
+        "source": "firmware/components/core/src/nav.c:138"
       },
       {
         "gesture": "G_TAP",
@@ -1096,7 +1134,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:136"
+        "source": "firmware/components/core/src/nav.c:140"
       },
       {
         "gesture": "G_DOUBLE_TAP",
@@ -1105,7 +1143,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:137"
+        "source": "firmware/components/core/src/nav.c:141"
       },
       {
         "gesture": "G_SWIPE_DOWN",
@@ -1114,7 +1152,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:138"
+        "source": "firmware/components/core/src/nav.c:142"
       },
       {
         "gesture": "G_SWIPE_RIGHT",
@@ -1123,7 +1161,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:139"
+        "source": "firmware/components/core/src/nav.c:143"
       },
       {
         "gesture": "G_LONG_PRESS",
@@ -1132,7 +1170,7 @@
         "when": "",
         "nav": "NAV_HOLD_LONG",
         "action": "Holding still away from the items goes back",
-        "source": "firmware/components/core/src/nav.c:140"
+        "source": "firmware/components/core/src/nav.c:144"
       },
       {
         "gesture": "G_SCRUB_START",
@@ -1141,7 +1179,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:141"
+        "source": "firmware/components/core/src/nav.c:145"
       },
       {
         "gesture": "G_SCRUB",
@@ -1150,7 +1188,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:142"
+        "source": "firmware/components/core/src/nav.c:146"
       },
       {
         "gesture": "G_SCRUB_END",
@@ -1159,7 +1197,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:143"
+        "source": "firmware/components/core/src/nav.c:147"
       },
       {
         "gesture": "G_BTN_A",
@@ -1168,7 +1206,7 @@
         "when": "",
         "nav": "NAV_COMMIT",
         "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
-        "source": "firmware/components/core/src/nav.c:144"
+        "source": "firmware/components/core/src/nav.c:148"
       },
       {
         "gesture": "G_BTN_B",
@@ -1177,7 +1215,7 @@
         "when": "",
         "nav": "NAV_NEXT",
         "action": "Selects the next session, item or page",
-        "source": "firmware/components/core/src/nav.c:145"
+        "source": "firmware/components/core/src/nav.c:149"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -1186,7 +1224,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:146"
+        "source": "firmware/components/core/src/nav.c:150"
       },
       {
         "gesture": "G_CHORD",
@@ -1195,7 +1233,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "Goes straight back to the ring",
-        "source": "firmware/components/core/src/nav.c:147"
+        "source": "firmware/components/core/src/nav.c:151"
       },
       {
         "gesture": "G_MOVE",
@@ -1204,7 +1242,7 @@
         "when": "",
         "nav": "NAV_POINTER",
         "action": "Moves the PC's pointer; tap clicks, hold right-clicks",
-        "source": "firmware/components/core/src/nav.c:150"
+        "source": "firmware/components/core/src/nav.c:154"
       },
       {
         "gesture": "G_TAP",
@@ -1213,7 +1251,7 @@
         "when": "",
         "nav": "NAV_POINTER",
         "action": "Moves the PC's pointer; tap clicks, hold right-clicks",
-        "source": "firmware/components/core/src/nav.c:151"
+        "source": "firmware/components/core/src/nav.c:155"
       },
       {
         "gesture": "G_DOUBLE_TAP",
@@ -1222,7 +1260,7 @@
         "when": "",
         "nav": "NAV_POINTER",
         "action": "Moves the PC's pointer; tap clicks, hold right-clicks",
-        "source": "firmware/components/core/src/nav.c:152"
+        "source": "firmware/components/core/src/nav.c:156"
       },
       {
         "gesture": "G_LONG_PRESS",
@@ -1231,7 +1269,7 @@
         "when": "",
         "nav": "NAV_POINTER",
         "action": "Moves the PC's pointer; tap clicks, hold right-clicks",
-        "source": "firmware/components/core/src/nav.c:153"
+        "source": "firmware/components/core/src/nav.c:157"
       },
       {
         "gesture": "G_SCRUB_START",
@@ -1240,7 +1278,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:154"
+        "source": "firmware/components/core/src/nav.c:158"
       },
       {
         "gesture": "G_SCRUB",
@@ -1249,7 +1287,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:155"
+        "source": "firmware/components/core/src/nav.c:159"
       },
       {
         "gesture": "G_SCRUB_END",
@@ -1258,7 +1296,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:156"
+        "source": "firmware/components/core/src/nav.c:160"
       },
       {
         "gesture": "G_BTN_A",
@@ -1267,7 +1305,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:157"
+        "source": "firmware/components/core/src/nav.c:161"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -1276,7 +1314,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:158"
+        "source": "firmware/components/core/src/nav.c:162"
       },
       {
         "gesture": "G_CHORD",
@@ -1285,7 +1323,115 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "Goes straight back to the ring",
-        "source": "firmware/components/core/src/nav.c:159"
+        "source": "firmware/components/core/src/nav.c:163"
+      },
+      {
+        "gesture": "G_KEY_DOWN",
+        "mode": "toy",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_TOY_KEY",
+        "action": "In a toy, a key acts the moment it goes down or up",
+        "source": "firmware/components/core/src/nav.c:166"
+      },
+      {
+        "gesture": "G_KEY_UP",
+        "mode": "toy",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_TOY_KEY",
+        "action": "In a toy, a key acts the moment it goes down or up",
+        "source": "firmware/components/core/src/nav.c:167"
+      },
+      {
+        "gesture": "G_TAP",
+        "mode": "toy",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_COMMIT",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
+        "source": "firmware/components/core/src/nav.c:168"
+      },
+      {
+        "gesture": "G_BTN_A",
+        "mode": "toy",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_COMMIT",
+        "action": "Chooses the selected item. Approve, deny and stop need a hold instead",
+        "source": "firmware/components/core/src/nav.c:169"
+      },
+      {
+        "gesture": "G_BTN_B",
+        "mode": "toy",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_NEXT",
+        "action": "Selects the next session, item or page",
+        "source": "firmware/components/core/src/nav.c:170"
+      },
+      {
+        "gesture": "G_SCRUB_START",
+        "mode": "toy",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "Sliding round the rim moves the selection, one tick per step",
+        "source": "firmware/components/core/src/nav.c:171"
+      },
+      {
+        "gesture": "G_SCRUB",
+        "mode": "toy",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "Sliding round the rim moves the selection, one tick per step",
+        "source": "firmware/components/core/src/nav.c:172"
+      },
+      {
+        "gesture": "G_SCRUB_END",
+        "mode": "toy",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_SCRUB",
+        "action": "Sliding round the rim moves the selection, one tick per step",
+        "source": "firmware/components/core/src/nav.c:173"
+      },
+      {
+        "gesture": "G_SWIPE_DOWN",
+        "mode": "toy",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Goes back one screen. A request stays open: going back never denies",
+        "source": "firmware/components/core/src/nav.c:174"
+      },
+      {
+        "gesture": "G_SWIPE_RIGHT",
+        "mode": "toy",
+        "zone": "centre",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Goes back one screen. A request stays open: going back never denies",
+        "source": "firmware/components/core/src/nav.c:175"
+      },
+      {
+        "gesture": "G_BTN_B_LONG",
+        "mode": "toy",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_BACK",
+        "action": "Goes back one screen. A request stays open: going back never denies",
+        "source": "firmware/components/core/src/nav.c:176"
+      },
+      {
+        "gesture": "G_CHORD",
+        "mode": "toy",
+        "zone": "any",
+        "when": "",
+        "nav": "NAV_HOME",
+        "action": "Goes straight back to the ring",
+        "source": "firmware/components/core/src/nav.c:177"
       },
       {
         "gesture": "G_DRAG",
@@ -1294,7 +1440,7 @@
         "when": "",
         "nav": "NAV_SCROLL_DRAG",
         "action": "Moves the list with your finger; in Scroll, each 10 px is one line of the terminal",
-        "source": "firmware/components/core/src/nav.c:161"
+        "source": "firmware/components/core/src/nav.c:179"
       },
       {
         "gesture": "G_SCRUB_START",
@@ -1303,7 +1449,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:162"
+        "source": "firmware/components/core/src/nav.c:180"
       },
       {
         "gesture": "G_SCRUB",
@@ -1312,7 +1458,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:163"
+        "source": "firmware/components/core/src/nav.c:181"
       },
       {
         "gesture": "G_SCRUB_END",
@@ -1321,7 +1467,7 @@
         "when": "",
         "nav": "NAV_SCRUB",
         "action": "Sliding round the rim moves the selection, one tick per step",
-        "source": "firmware/components/core/src/nav.c:164"
+        "source": "firmware/components/core/src/nav.c:182"
       },
       {
         "gesture": "G_LONG_PRESS",
@@ -1330,7 +1476,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:165"
+        "source": "firmware/components/core/src/nav.c:183"
       },
       {
         "gesture": "G_SWIPE_RIGHT",
@@ -1339,7 +1485,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:166"
+        "source": "firmware/components/core/src/nav.c:184"
       },
       {
         "gesture": "G_BTN_B",
@@ -1348,7 +1494,7 @@
         "when": "",
         "nav": "NAV_NEXT",
         "action": "Selects the next session, item or page",
-        "source": "firmware/components/core/src/nav.c:167"
+        "source": "firmware/components/core/src/nav.c:185"
       },
       {
         "gesture": "G_BTN_B_LONG",
@@ -1357,7 +1503,7 @@
         "when": "",
         "nav": "NAV_BACK",
         "action": "Goes back one screen. A request stays open: going back never denies",
-        "source": "firmware/components/core/src/nav.c:168"
+        "source": "firmware/components/core/src/nav.c:186"
       },
       {
         "gesture": "G_CHORD",
@@ -1366,7 +1512,7 @@
         "when": "",
         "nav": "NAV_HOME",
         "action": "Goes straight back to the ring",
-        "source": "firmware/components/core/src/nav.c:169"
+        "source": "firmware/components/core/src/nav.c:187"
       }
     ],
     "chord": "A + B held together: Home from any mode (logged on the deck, no action there)",
@@ -1376,12 +1522,12 @@
     {
       "id": "ring",
       "title": "Deck",
-      "source": "firmware/components/core/src/ui.c:178"
+      "source": "firmware/components/core/src/ui.c:236"
     },
     {
       "id": "attention",
       "title": "Deck · a request is waiting",
-      "source": "firmware/components/core/src/ui_home.c:358"
+      "source": "firmware/components/core/src/ui_home.c:416"
     },
     {
       "id": "agent",
@@ -1391,7 +1537,7 @@
     {
       "id": "ask",
       "title": "Ask · the request and its options",
-      "source": "firmware/components/core/src/ui_ask.c:1520"
+      "source": "firmware/components/core/src/ui_ask.c:1547"
     },
     {
       "id": "scroll",
@@ -1505,20 +1651,13 @@
     "reply_sent": [
       {
         "on_ms": 35,
-        "off_ms": 60,
+        "off_ms": 80,
         "duty": 85,
         "kick_ms": 15,
         "kick_duty": 100
       },
       {
-        "on_ms": 35,
-        "off_ms": 60,
-        "duty": 85,
-        "kick_ms": 15,
-        "kick_duty": 100
-      },
-      {
-        "on_ms": 35,
+        "on_ms": 120,
         "off_ms": 0,
         "duty": 85,
         "kick_ms": 15,
@@ -1660,6 +1799,75 @@
       },
       {
         "on_ms": 35,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ],
+    "reminder_soft": [
+      {
+        "on_ms": 60,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ],
+    "reminder_permission": [
+      {
+        "on_ms": 250,
+        "off_ms": 120,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 250,
+        "off_ms": 400,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 250,
+        "off_ms": 120,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 250,
+        "off_ms": 0,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      }
+    ],
+    "reminder_question": [
+      {
+        "on_ms": 40,
+        "off_ms": 90,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 40,
+        "off_ms": 400,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 40,
+        "off_ms": 90,
+        "duty": 85,
+        "kick_ms": 15,
+        "kick_duty": 100
+      },
+      {
+        "on_ms": 40,
         "off_ms": 0,
         "duty": 85,
         "kick_ms": 15,
@@ -2433,6 +2641,13 @@
           "type": "tstr",
           "note": "badge_handle  <= 24 bytes",
           "name": "badge_handle"
+        },
+        {
+          "key": 5,
+          "optional": true,
+          "type": "uint",
+          "note": "done_buzz  which finishes buzz, a done_buzz value (proto 0.25, PROTOCOL.md §6j)",
+          "name": "done_buzz"
         }
       ],
       "source": "protocol/agentlink.cddl:78"
@@ -5887,7 +6102,7 @@
     "detent": "A click each time the rim scrub crosses into another segment",
     "hold_ramp": "Pulses grow longer and the gaps shorter while the approve hold fills",
     "deny_ramp": "Pulses shrink and the gaps grow while the deny hold fills",
-    "reply_sent": "A question option went out: three ticks",
+    "reply_sent": "An answer went out that neither grants nor denies: short then long",
     "tick": "A light acknowledgement of a button selection",
     "approved": "Approve was sent: one long pulse",
     "denied": "Deny was sent: two medium pulses",
@@ -5898,7 +6113,10 @@
     "question": "An agent is asking a question",
     "permission": "An agent needs approval",
     "scroll_stop": "SCROLL reached the bottom or the top of the scrollback: one thud",
-    "quiet_toggled": "Quiet mode turned on, extended or off: two spaced pulses"
+    "quiet_toggled": "Quiet mode turned on, extended or off: two spaced pulses",
+    "reminder_soft": "First reminder of an unanswered request: one soft pulse",
+    "reminder_permission": "Last reminder of an unanswered approval: its pattern twice (with the sound)",
+    "reminder_question": "Last reminder of an unanswered question: its pattern twice (with the sound)"
   },
   "haptic_motor": {
     "hold_duty": 85,
@@ -5917,48 +6135,48 @@
     "display.height": "firmware/boards/stopwatch/board_priv.h:28",
     "display.shape": "firmware/boards/stopwatch/display.cpp:1",
     "display.width": "firmware/boards/stopwatch/board_priv.h:27",
-    "gesture.agent_timeout_ms": "firmware/components/core/src/nav.h:111",
+    "gesture.agent_timeout_ms": "firmware/components/core/src/nav.h:115",
     "gesture.ask_hold_x_px": "firmware/components/core/src/ui_ask.c:52",
     "gesture.ask_hold_y_px": "firmware/components/core/src/ui_ask.c:53",
-    "gesture.b_immediate": "firmware/components/core/src/gesture.c:273",
+    "gesture.b_immediate": "firmware/components/core/src/gesture.c:296",
     "gesture.btn_double_ms": "firmware/components/core/src/gesture.h:12",
-    "gesture.card_arm_ms": "firmware/components/core/src/nav.h:108",
-    "gesture.centre_r_px": "firmware/components/core/src/nav.h:93",
+    "gesture.card_arm_ms": "firmware/components/core/src/nav.h:112",
+    "gesture.centre_r_px": "firmware/components/core/src/nav.h:97",
     "gesture.cx_px": "firmware/components/core/src/gesture.h:22",
     "gesture.cy_px": "firmware/components/core/src/gesture.h:23",
-    "gesture.deny_hold_ms": "firmware/components/core/src/nav.h:96",
+    "gesture.deny_hold_ms": "firmware/components/core/src/nav.h:100",
     "gesture.drag_step_px": "firmware/components/core/src/gesture.h:15",
     "gesture.flick_px_per_s": "firmware/components/core/src/gesture.h:17",
     "gesture.flick_window_ms": "firmware/components/core/src/gesture.h:18",
-    "gesture.hold_confirm_ms": "firmware/components/core/src/nav.h:94",
-    "gesture.hold_show_ms": "firmware/components/core/src/nav.h:101",
+    "gesture.hold_confirm_ms": "firmware/components/core/src/nav.h:98",
+    "gesture.hold_show_ms": "firmware/components/core/src/nav.h:105",
     "gesture.long_press_ms": "firmware/components/core/src/gesture.h:7",
-    "gesture.long_swipe_px": "firmware/components/core/src/nav.h:110",
-    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:259",
-    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:260",
+    "gesture.long_swipe_px": "firmware/components/core/src/nav.h:114",
+    "gesture.quiet_step1_s": "firmware/components/core/src/nav.h:263",
+    "gesture.quiet_step2_s": "firmware/components/core/src/nav.h:264",
     "gesture.rim_in_px": "firmware/components/core/src/gesture.h:24",
     "gesture.rim_out_px": "firmware/components/core/src/gesture.h:26",
     "gesture.rim_track_in_px": "firmware/components/core/src/gesture.h:28",
     "gesture.rim_track_out_px": "firmware/components/core/src/gesture.h:29",
-    "gesture.scroll_coalesce_ms": "firmware/components/core/src/nav.h:135",
-    "gesture.scroll_lines_per_step": "firmware/components/core/src/nav.h:133",
-    "gesture.scroll_timeout_ms": "firmware/components/core/src/nav.h:112",
+    "gesture.scroll_coalesce_ms": "firmware/components/core/src/nav.h:139",
+    "gesture.scroll_lines_per_step": "firmware/components/core/src/nav.h:137",
+    "gesture.scroll_timeout_ms": "firmware/components/core/src/nav.h:116",
     "gesture.scrub_hyst_deg": "firmware/components/core/src/gesture.h:32",
-    "gesture.scrub_hysteresis_cap": "firmware/components/core/src/gesture.c:94",
+    "gesture.scrub_hysteresis_cap": "firmware/components/core/src/gesture.c:107",
     "gesture.scrub_start_deg": "firmware/components/core/src/gesture.h:30",
-    "gesture.status_timeout_ms": "firmware/components/core/src/nav.h:113",
+    "gesture.status_timeout_ms": "firmware/components/core/src/nav.h:117",
     "gesture.swipe_max_ms": "firmware/components/core/src/gesture.h:9",
     "gesture.swipe_min_px": "firmware/components/core/src/gesture.h:8",
     "gesture.tap_slop_px": "firmware/components/core/src/gesture.h:10",
-    "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:1483",
-    "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:1415",
-    "gesture_map.chord": "firmware/components/core/src/app.c:646",
-    "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:199",
-    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:216",
-    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:493",
-    "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:18",
+    "gesture_map.ask_hold_cancels_on_change": "firmware/components/core/src/ui_ask.c:1510",
+    "gesture_map.ask_tap_never_commits_hold": "firmware/components/core/src/ui_ask.c:1442",
+    "gesture_map.chord": "firmware/components/core/src/app.c:769",
+    "gesture_map.done_acks": "firmware/components/core/src/ui_home.c:191",
+    "gesture_map.hold_bound_to_rid": "firmware/components/core/src/nav.c:234",
+    "gesture_map.quiet_holds_alerts": "firmware/components/core/src/app.c:562",
+    "gesture_map.swipe_down_status": "firmware/components/core/src/nav.c:20",
     "gesture_map.tap_never_approves": "firmware/components/core/src/nav.c:11",
-    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:681",
+    "gesture_map.wake_swallow": "firmware/components/core/src/app.c:822",
     "glyphs.agents": "firmware/components/core/src/ui_theme.c:70",
     "glyphs.agents.name": "firmware/components/core/src/ui_theme.c:202",
     "glyphs.font": "firmware/components/core/src/fonts/font_phosphor_44.c:3",
@@ -5986,6 +6204,7 @@
     "glyphs.icons.ICON_COMPUTER": "firmware/components/core/src/ui_icons.h:16",
     "glyphs.icons.ICON_CURSOR": "firmware/components/core/src/ui_icons.h:114",
     "glyphs.icons.ICON_DENIED": "firmware/components/core/src/ui_icons.h:12",
+    "glyphs.icons.ICON_DICE": "firmware/components/core/src/ui_icons.h:116",
     "glyphs.icons.ICON_DONE": "firmware/components/core/src/ui_icons.h:9",
     "glyphs.icons.ICON_DONT_ASK": "firmware/components/core/src/ui_icons.h:112",
     "glyphs.icons.ICON_DOWN": "firmware/components/core/src/ui_icons.h:96",
@@ -6060,93 +6279,98 @@
     "glyphs.icons.ICON_WINDOW": "firmware/components/core/src/ui_icons.h:94",
     "glyphs.icons.ICON_WORKING": "firmware/components/core/src/ui_icons.h:6",
     "glyphs.icons.ICON_X": "firmware/components/core/src/ui_icons.h:69",
-    "glyphs.keys.a": "firmware/components/core/src/ui_home_card.c:670",
-    "glyphs.keys.a.color": "firmware/components/core/src/ui_kit.h:217",
+    "glyphs.keys.a": "firmware/components/core/src/ui_home_card.c:685",
+    "glyphs.keys.a.color": "firmware/components/core/src/ui_kit.h:222",
     "glyphs.keys.b": "firmware/components/core/src/ui_theme.c:90",
-    "glyphs.keys.b.color": "firmware/components/core/src/ui_kit.h:218",
-    "glyphs.keys.r_px": "firmware/components/core/src/ui_kit.h:137",
-    "glyphs.keys.ring_w_px": "firmware/components/core/src/ui_kit.c:876",
+    "glyphs.keys.b.color": "firmware/components/core/src/ui_kit.h:223",
+    "glyphs.keys.r_px": "firmware/components/core/src/ui_kit.h:142",
+    "glyphs.keys.ring_w_px": "firmware/components/core/src/ui_kit.c:902",
     "glyphs.px": "firmware/components/core/src/ui_theme.h:31",
     "glyphs.states": "firmware/components/core/src/ui_theme.c:57",
     "glyphs.states.input": "firmware/components/core/src/ui_theme.c:59",
-    "haptics.approved": "firmware/components/core/src/feedback.c:93",
-    "haptics.denied": "firmware/components/core/src/feedback.c:100",
-    "haptics.deny_ramp": "firmware/components/core/src/feedback.c:80",
-    "haptics.detent": "firmware/components/core/src/feedback.c:61",
-    "haptics.detent_min_gap_ms": "firmware/components/core/src/feedback.c:8",
-    "haptics.done": "firmware/components/core/src/feedback.c:33",
+    "haptics.approved": "firmware/components/core/src/feedback.c:235",
+    "haptics.denied": "firmware/components/core/src/feedback.c:242",
+    "haptics.deny_ramp": "firmware/components/core/src/feedback.c:222",
+    "haptics.detent": "firmware/components/core/src/feedback.c:203",
+    "haptics.detent_min_gap_ms": "firmware/components/core/src/feedback.c:10",
+    "haptics.done": "firmware/components/core/src/feedback.c:148",
     "haptics.duty": "firmware/boards/stopwatch/input.cpp:17",
-    "haptics.error": "firmware/components/core/src/feedback.c:32",
-    "haptics.hello": "firmware/components/core/src/feedback.c:170",
-    "haptics.hold_ramp": "firmware/components/core/src/feedback.c:72",
+    "haptics.error": "firmware/components/core/src/feedback.c:147",
+    "haptics.hello": "firmware/components/core/src/feedback.c:319",
+    "haptics.hold_ramp": "firmware/components/core/src/feedback.c:214",
     "haptics.kick_duty": "firmware/boards/stopwatch/input.cpp:18",
     "haptics.kick_ms": "firmware/boards/stopwatch/input.cpp:20",
     "haptics.kick_only_rule": "firmware/boards/stopwatch/input.cpp:130",
     "haptics.kick_rule": "firmware/boards/stopwatch/input.cpp:114",
-    "haptics.permission": "firmware/components/core/src/feedback.c:30",
-    "haptics.question": "firmware/components/core/src/feedback.c:31",
-    "haptics.quiet_toggled": "firmware/components/core/src/feedback.c:134",
-    "haptics.reject": "firmware/components/core/src/feedback.c:118",
-    "haptics.reply_sent": "firmware/components/core/src/feedback.c:112",
-    "haptics.scroll_stop": "firmware/components/core/src/feedback.c:125",
-    "haptics.tick": "firmware/components/core/src/feedback.c:53",
+    "haptics.permission": "firmware/components/core/src/feedback.c:145",
+    "haptics.question": "firmware/components/core/src/feedback.c:146",
+    "haptics.quiet_toggled": "firmware/components/core/src/feedback.c:277",
+    "haptics.reject": "firmware/components/core/src/feedback.c:261",
+    "haptics.reminder_permission": "firmware/components/core/src/feedback.c:178",
+    "haptics.reminder_question": "firmware/components/core/src/feedback.c:179",
+    "haptics.reminder_soft": "firmware/components/core/src/feedback.c:177",
+    "haptics.reply_sent": "firmware/components/core/src/feedback.c:255",
+    "haptics.scroll_stop": "firmware/components/core/src/feedback.c:268",
+    "haptics.tick": "firmware/components/core/src/feedback.c:195",
     "link.hello_retry_ms": "firmware/components/core/src/link.c:12",
     "link.idle_ping_ms": "firmware/components/core/src/link.c:18",
     "link.ping_interval_ms": "daemon/crates/agentlinkd/src/usb.rs:26",
     "link.silence_timeout_ms": "firmware/boards/stopwatch/link_usb.cpp:32",
     "messages": "protocol/agentlink.cddl:1",
-    "palette.accent": "firmware/components/core/src/ui_theme.h:77",
-    "palette.amber": "firmware/components/core/src/ui_theme.h:74",
-    "palette.ask": "firmware/components/core/src/ui_theme.h:69",
+    "palette.accent": "firmware/components/core/src/ui_theme.h:79",
+    "palette.amber": "firmware/components/core/src/ui_theme.h:76",
+    "palette.ask": "firmware/components/core/src/ui_theme.h:71",
     "palette.bg": "firmware/components/core/src/ui_theme.h:40",
-    "palette.danger": "firmware/components/core/src/ui_theme.h:75",
-    "palette.done": "firmware/components/core/src/ui_theme.h:71",
-    "palette.error": "firmware/components/core/src/ui_theme.h:72",
+    "palette.danger": "firmware/components/core/src/ui_theme.h:77",
+    "palette.done": "firmware/components/core/src/ui_theme.h:73",
+    "palette.error": "firmware/components/core/src/ui_theme.h:74",
     "palette.fill1": "firmware/components/core/src/ui_theme.h:44",
     "palette.fill2": "firmware/components/core/src/ui_theme.h:45",
-    "palette.idle": "firmware/components/core/src/ui_theme.h:73",
+    "palette.idle": "firmware/components/core/src/ui_theme.h:75",
     "palette.muted": "firmware/components/core/src/ui_theme.h:48",
-    "palette.permission": "firmware/components/core/src/ui_theme.h:70",
-    "palette.success": "firmware/components/core/src/ui_theme.h:76",
+    "palette.permission": "firmware/components/core/src/ui_theme.h:72",
+    "palette.success": "firmware/components/core/src/ui_theme.h:78",
     "palette.surface": "firmware/components/core/src/ui_theme.h:49",
     "palette.surface2": "firmware/components/core/src/ui_theme.h:50",
     "palette.text": "firmware/components/core/src/ui_theme.h:41",
     "palette.text2": "firmware/components/core/src/ui_theme.h:42",
     "palette.text3": "firmware/components/core/src/ui_theme.h:43",
-    "palette.working": "firmware/components/core/src/ui_theme.h:68",
-    "ring.ambient_ms": "firmware/components/core/src/ui_home.c:14",
-    "ring.ask_period_ms": "firmware/components/core/src/ui_ring_internal.h:39",
+    "palette.working": "firmware/components/core/src/ui_theme.h:70",
+    "ring.ambient_ms": "firmware/components/core/src/ui_home.c:18",
+    "ring.ask_period_ms": "firmware/components/core/src/ui_ring_internal.h:51",
     "ring.band_out_px": "firmware/components/core/src/ui_ring_internal.h:16",
     "ring.band_w_px": "firmware/components/core/src/ui_ring_internal.h:17",
-    "ring.done_sweep_ms": "firmware/components/core/src/ui_ring_internal.h:41",
-    "ring.error_flicker_ms": "firmware/components/core/src/ui_ring_internal.h:42",
+    "ring.done_sweep_ms": "firmware/components/core/src/ui_ring_internal.h:53",
+    "ring.error_flicker_ms": "firmware/components/core/src/ui_ring_internal.h:54",
     "ring.hero_px": "firmware/components/core/src/ui_theme.h:37",
-    "ring.hero_y_px": "firmware/components/core/src/ui_home_card.c:39",
-    "ring.key_a_x_px": "firmware/components/core/src/ui_kit.h:214",
-    "ring.key_b_x_px": "firmware/components/core/src/ui_kit.h:215",
-    "ring.key_y_px": "firmware/components/core/src/ui_kit.h:216",
-    "ring.kinds": "firmware/components/core/src/ui_ring.h:15",
+    "ring.hero_y_px": "firmware/components/core/src/ui_home_card.c:40",
+    "ring.key_a_x_px": "firmware/components/core/src/ui_kit.h:219",
+    "ring.key_b_x_px": "firmware/components/core/src/ui_kit.h:220",
+    "ring.key_y_px": "firmware/components/core/src/ui_kit.h:221",
+    "ring.kinds": "firmware/components/core/src/ui_ring.h:16",
     "ring.max_segments": "firmware/components/core/src/ui_ring.h:11",
-    "ring.merge_at": "firmware/components/core/src/ui_home.c:15",
-    "ring.nag_max": "firmware/components/core/src/ui_home.c:17",
-    "ring.nag_ms": "firmware/components/core/src/ui_home.c:16",
-    "ring.nothing_else": "firmware/components/core/src/ui_home.c:219",
+    "ring.merge_at": "firmware/components/core/src/ui_home.c:19",
+    "ring.nag_floor_ms": "firmware/components/core/src/nag.h:30",
+    "ring.nag_r1_ms": "firmware/components/core/src/nag.h:22",
+    "ring.nag_r2_ms": "firmware/components/core/src/nag.h:23",
+    "ring.nag_steps": "firmware/components/core/src/nag.h:21",
+    "ring.nothing_else": "firmware/components/core/src/ui_home.c:211",
     "ring.others_pct": "firmware/components/core/src/ui_ring_internal.h:23",
-    "ring.perm_period_ms": "firmware/components/core/src/ui_ring_internal.h:40",
-    "ring.prog_out_px": "firmware/components/core/src/ui_ring_internal.h:31",
-    "ring.prog_w_px": "firmware/components/core/src/ui_ring_internal.h:32",
+    "ring.perm_period_ms": "firmware/components/core/src/ui_ring_internal.h:52",
+    "ring.prog_out_px": "firmware/components/core/src/ui_ring_internal.h:42",
+    "ring.prog_w_px": "firmware/components/core/src/ui_ring_internal.h:43",
     "ring.seg_gap_deg": "firmware/components/core/src/ui_ring_internal.h:20",
     "ring.sel_out_px": "firmware/components/core/src/ui_ring_internal.h:18",
     "ring.sel_w_px": "firmware/components/core/src/ui_ring_internal.h:19",
-    "ring.sigil_r_px": "firmware/components/core/src/ui_home_card.c:35",
-    "ring.sigil_y_px": "firmware/components/core/src/ui_home_card.c:34",
-    "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:47",
-    "ring.summary_y_px": "firmware/components/core/src/ui_home_card.c:44",
-    "ring.time_dots_r_px": "firmware/components/core/src/ui_home_card.c:40",
-    "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:38",
-    "screens": "firmware/components/core/src/ui_home.c:358",
+    "ring.sigil_r_px": "firmware/components/core/src/ui_home_card.c:36",
+    "ring.sigil_y_px": "firmware/components/core/src/ui_home_card.c:35",
+    "ring.summary_w_px": "firmware/components/core/src/ui_home_card.c:48",
+    "ring.summary_y_px": "firmware/components/core/src/ui_home_card.c:45",
+    "ring.time_dots_r_px": "firmware/components/core/src/ui_home_card.c:41",
+    "ring.work_period_ms": "firmware/components/core/src/ui_ring_internal.h:50",
+    "screens": "firmware/components/core/src/ui_home.c:416",
     "screens.agent": "firmware/components/core/src/ui_agent.c:605",
-    "screens.ask": "firmware/components/core/src/ui_ask.c:1520",
+    "screens.ask": "firmware/components/core/src/ui_ask.c:1547",
     "screens.scroll": "firmware/components/core/src/ui_scroll.c:408",
     "screens.scroll_preview_privacy": "firmware/components/core/src/ui_scroll.c:95",
     "screens.status": "firmware/components/core/src/ui_status.c:532",

@@ -41,11 +41,21 @@ static uint64_t s_skip_us; /* `skip`: the clock jumps, to test long timeouts */
 static bool s_virtual;
 static uint64_t s_virtual_us;
 
+/* The clock reads as if the process started an hour after boot, so its phase does not depend on
+ * how long the host has been up. A periodic animation keyed to the clock (a breath, a pulse) then
+ * starts at the same phase in every run, and so do the frames a script's redraw budget counts:
+ * with the host's uptime as the origin, sim_fun_temper's 6.5 s window on the pulsing ring varied
+ * from 3.76 to 4.15 M px between runs (BENCH.md §9). */
+#define SIM_CLOCK_BASE_US 3600000000ull
+
 static uint64_t real_us(void)
 {
+    static uint64_t s_start;
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000u + (uint64_t)ts.tv_nsec / 1000u;
+    uint64_t now = (uint64_t)ts.tv_sec * 1000000u + (uint64_t)ts.tv_nsec / 1000u;
+    if (!s_start) s_start = now;
+    return SIM_CLOCK_BASE_US + (now - s_start);
 }
 
 uint64_t hal_time_us(void) { return (s_virtual ? s_virtual_us : real_us()) + s_skip_us; }
@@ -67,14 +77,33 @@ void sim_sleep_us(uint64_t us)
 
 void sim_skip_time(uint32_t ms) { s_skip_us += (uint64_t)ms * 1000u; }
 
+/* A scripted run starts its RTC here, not at the host's wall clock, so a test reads the same time
+ * of day whenever it runs (the Mote's night look and the eggs depend on it); a script sets another
+ * with `rtc`. Unix 1800000000 is 08:00 UTC, a weekday morning. */
+#define SIM_SCRIPT_EPOCH 1800000000
+
+/* The RTC runs on hal_time_us() (the virtual clock in a headless script, `skip` included), from the
+ * wall clock at the first read (the fixed epoch in a scripted run): a script's seconds pass as its
+ * milliseconds do. */
+static int64_t rtc_now(void)
+{
+    static bool init;
+    static int64_t base;
+    int64_t up = (int64_t)(hal_time_us() / 1000000u);
+    if (!init) {
+        init = true;
+        base = (s_virtual ? (int64_t)SIM_SCRIPT_EPOCH : (int64_t)time(NULL)) - up;
+    }
+    return base + up;
+}
+
 /* set to 0: the clock stays unknown, as on a board whose RTC was never set */
 static bool s_rtc_unknown;
-uint32_t hal_rtc_get_unix(void)
-{ return s_rtc_unknown ? 0 : (uint32_t)((int64_t)time(NULL) + s_rtc_offset); }
+uint32_t hal_rtc_get_unix(void) { return s_rtc_unknown ? 0 : (uint32_t)(rtc_now() + s_rtc_offset); }
 void hal_rtc_set_unix(uint32_t unix_s)
 {
     s_rtc_unknown = unix_s == 0;
-    s_rtc_offset = (int64_t)unix_s - (int64_t)time(NULL);
+    s_rtc_offset = (int64_t)unix_s - rtc_now();
 }
 
 void hal_buttons_set_callback(hal_button_cb_t cb) { s_button_cb = cb; }
@@ -219,14 +248,14 @@ void hal_debug_line(const char *json)
 
 void sim_log(const char *ev, const char *fmt, ...)
 {
-    char body[200] = "";
+    char body[320] = ""; /* the frames report is about 250 */
     if (fmt) {
         va_list ap;
         va_start(ap, fmt);
         vsnprintf(body, sizeof body, fmt, ap);
         va_end(ap);
     }
-    char line[300];
+    char line[420];
     snprintf(line, sizeof line, "{\"ts_us\":%llu,\"cat\":\"sim\",\"ev\":\"%s\"%s%s}",
              (unsigned long long)hal_time_us(), ev, body[0] ? "," : "", body);
     hal_debug_line(line);

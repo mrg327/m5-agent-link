@@ -1,5 +1,6 @@
 # GAUGES.md §4.2-4.3: the session card's context capsule (the job bar's row) with colour steps at 70 % and
 # 90 %, and the AGENT header's readout (model · mode · pull request). Unknown context draws nothing.
+# the user leaves the deck alone 1.5 s before a request takes it over (issue 20261126-0a74)
 connect
 rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
 rtc 1800000000
@@ -54,6 +55,7 @@ expect_label Opus 4.7 · Bypass · PR 7 changes
 btn B long
 wait 300
 session 1 input webapp feat/login
+wait 1500
 attention 7 1 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
 wait 400
 expect_screen ask

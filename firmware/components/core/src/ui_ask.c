@@ -88,6 +88,7 @@ static lv_obj_t *s_root, *s_sigil, *s_mark[2], *s_pips, *s_title, *s_text, *s_mo
 static lv_obj_t *s_disc[ASK_MAX_ITEMS], *s_seldisc, *s_nb[2], *s_row[3];
 static lv_obj_t *s_hero, *s_res, *s_resmarks, *s_key[2];
 static uint32_t s_sid, s_rid, s_shown_ms, s_now;
+static uint32_t s_says; /* what the card on screen says (card_says), to see a re-send change it */
 static ask_item_t s_items[ASK_MAX_ITEMS];
 static int s_n, s_sel, s_listed; /* s_listed: the item count the selection belongs to */
 static bool s_rows, s_items_on;
@@ -906,6 +907,21 @@ const attention_t *ui_ask_request(void)
     return a && !a->answer_sent && !s_back_ms ? a : NULL;
 }
 
+uint32_t ui_ask_rid(void) { return s_rid; }
+
+/* FNV-1a 32 over what a request says: a re-send of the same rid that says something else (another
+ * rule, text or set of questions) is a new card to read (issue 20261126-d95a). */
+static uint32_t card_says(const attention_t *a)
+{
+    uint32_t h = 2166136261u;
+    for (const char *p = a->title; *p; p++) h = (h ^ (uint8_t)*p) * 16777619u;
+    h = (h ^ 0u) * 16777619u;
+    for (const char *p = a->text; *p; p++) h = (h ^ (uint8_t)*p) * 16777619u;
+    uint32_t v[] = {a->has_rule ? a->rule_hash : 0, a->n_qs, a->acts, a->n_opts, a->grant_mask};
+    for (size_t i = 0; i < sizeof v / sizeof v[0]; i++) h = (h ^ v[i]) * 16777619u;
+    return h;
+}
+
 /* Returns false when there is nothing left to ask (request cleared or session gone). */
 bool ui_ask_refresh(uint32_t now)
 {
@@ -935,7 +951,14 @@ bool ui_ask_refresh(uint32_t now)
         s_back_ms = 0;
         s_rid = 0;
     }
-    if (a->rid != s_rid) { /* a different request: re-arm, start at the default, drop any hold */
+    /* a different request, or the same one re-sent saying something else: re-arm, start at the
+     * default, drop any hold */
+    if (a->rid != s_rid || card_says(a) != s_says) {
+        if (a->rid == s_rid) {
+            s_q.rid = 0; /* its questions start over too */
+            dbg_event("ui", "ask_changed", "\"rid\":%u", (unsigned)a->rid);
+        }
+        s_says = card_says(a);
         hold_cancel();
         s_reading = false;
         s_read_ok = false;
@@ -1170,7 +1193,11 @@ static void commit(const attention_t *a, int idx, uint32_t hold_ms)
         if (it->unclear) { /* never from the watch */
             g_ui_actions->reject();
         } else {
-            g_ui_actions->reply(s_sid, a->rid, (uint8_t)it->opt, hold_ms);
+            /* a hold item that does not grant is deny-class (nav_ask_items) */
+            ui_reply_kind_t kind = it->grants    ? UI_REPLY_GRANT
+                                   : it->hold_ms ? UI_REPLY_DENY
+                                                 : UI_REPLY_NEUTRAL;
+            g_ui_actions->reply(s_sid, a->rid, (uint8_t)it->opt, hold_ms, kind);
         }
         break;
     case ASK_APPROVE: g_ui_actions->approve(s_sid, a->rid, hold_ms); break;

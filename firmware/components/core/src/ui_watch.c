@@ -634,7 +634,10 @@ static void render(void)
     s_done_row = ui_done_watch_update(s, !work);
     render_time(s);
     show(s_badge[1], ui_home_slot_count() > 1);
+    ui_key_hint_set_count(s_badge[0], ui_home_pip_count()); /* who else needs you (issue 34e5) */
 }
+
+lv_obj_t *ui_watch_key_hint(int key) { return s_badge[key ? 1 : 0]; }
 
 uint32_t ui_watch_sid(void) { return s_sid; }
 
@@ -756,6 +759,9 @@ void ui_watch_report(ui_report_t *r)
         if (sub[0]) ui_report_add(r, "%s", sub);
     }
     if (s_needs) ui_report_add(r, "Answer");
+    if (ui_key_hint_count(s_badge[0])) {
+        ui_report_add(r, "%d more need you", ui_key_hint_count(s_badge[0]));
+    }
     if (s_done_row) ui_done_watch_report(r);
     else if (s) {
         char foot[96];

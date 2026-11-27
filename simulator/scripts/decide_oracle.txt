@@ -1,0 +1,79 @@
+# The oracle (issue 20261126-74ee, EXPERIMENTS.md "Toys"): held 2 s (a finger in the middle, key A,
+# or the watch held face up and still after a move) while a grey ring fills, then one of six glyphs
+# rises into place. Let go early and nothing comes. A request during a hold ends it; the watch comes
+# back to the oracle paused, and the oracle never answers by itself on a desk.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login Running the test suite
+toy_seed 5
+pose face_up
+wait 300
+swipe 233 300 233 180 160
+wait 300
+btn B
+wait 100
+btn B
+wait 100
+expect_label > Decide
+tap 233 233
+wait 300
+expect_screen toy
+btn B
+wait 100
+btn B
+wait 200
+expect_label oracle
+expect_label ready
+shot decide_oracle_ready.png
+# let go early: nothing
+press 233 233
+wait 1000
+expect_label holding
+shot decide_oracle_holding.png
+release
+wait 200
+expect_label ready
+# held 2 s: an answer rises
+press 233 233
+wait 2100
+release
+wait 50
+expect_label shown
+expect_label result unclear
+shot decide_oracle_answer.png
+# key A held 2 s asks again
+btn A down
+wait 2100
+btn A up
+wait 400
+expect_label result no
+# left face up on the desk it stays as it is
+wait 3000
+expect_label shown
+expect_label result no
+# picked up and held face up and still: it answers
+pose reading
+wait 2600
+expect_label result unclear
+# a request during a hold ends the hold; back on the oracle, paused
+press 233 233
+wait 800
+expect_label holding
+session 1 input webapp feat/login
+attention 51 1 approval approve,deny,focus 0 Run shell command|npm test
+wait 300
+expect_screen ask
+release
+clear 51 answered_pc
+session 1 work webapp feat/login Running the test suite
+wait 1200
+expect_screen toy
+expect_label paused
+expect_label result unclear
+shot decide_oracle_paused.png
+tap 233 233
+wait 2500
+expect_label shown
+expect_label result unclear
+quit

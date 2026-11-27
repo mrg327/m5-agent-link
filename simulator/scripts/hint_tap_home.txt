@@ -1,0 +1,62 @@
+# Issue 20261126-34e5: on HOME and WATCH a tap on a shown key hint presses its key. A tap on A's
+# hint (101, 101) opens the session on the computer (cmd focus) at once; a tap on B's (365, 101)
+# selects the next session, as the key does ("via":"btn"). Before, both were rim taps that picked
+# whichever session lay at 315 or 45 degrees, or nothing. CMake fails the test on a rim pick.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+session 1 work ember
+session 2 work fjord
+session 3 work grove
+session 4 work juniper
+session 5 work prairie
+wait 600
+expect_screen ring
+expect_label ember
+tap 101 101
+wait 50
+# the press lights A's ring (r 26 round the hint) for 150 ms
+expect_px 101 75 ffffff
+wait 300
+expect_px 101 75 000000
+expect_cmd focus
+expect_screen ring
+expect_label ember
+tap 365 101
+wait 300
+expect_label fjord
+# the edge of the zone: 30 px out along the diagonal is still the hint
+tap 122 122
+wait 300
+expect_cmd focus
+# a slide that starts on a hint still scrubs the ring
+scrub 315 20 400
+wait 400
+expect_screen ring
+# WATCH (Activity): the same two taps
+tap 233 233
+wait 400
+expect_screen agent
+expect_label > Activity
+btn A
+wait 500
+expect_screen watch
+tap 101 101
+wait 300
+expect_cmd focus
+expect_screen watch
+tap 365 101
+wait 300
+expect_screen watch
+# one session (the watched one went, so WATCH closed): B's hint is hidden, so a tap there is a rim
+# tap again, on the selected session: nothing happens
+drop 1
+drop 2
+drop 3
+drop 4
+wait 600
+expect_screen ring
+tap 365 101
+wait 300
+expect_screen ring
+expect_label prairie
+quit

@@ -38,7 +38,7 @@ typedef enum {
  */
 
 /* The proto minor this firmware speaks in hello; its history is the comment in link_tx.c. */
-#define LINK_PROTO_MINOR 24
+#define LINK_PROTO_MINOR 25
 
 /* fw_status: the state a fw_ack reports (proto 0.15, agentlink.cddl). */
 typedef enum {
@@ -53,7 +53,9 @@ typedef enum {
 /* Notifications from the link to the app; all run inside link_on_frame()/link_tick(). */
 typedef struct {
     void (*on_link)(bool welcomed);
-    void (*on_attention)(const attention_t *att);
+    /* is_new: the rid is new on this watch; false for a re-send of a request it holds, which only
+     * updates the card (issue 20261126-d95a) */
+    void (*on_attention)(const attention_t *att, bool is_new);
     void (*on_cleared)(uint32_t rid, int why);
     /* op is LINK_OP_UNKNOWN when the result does not match a command we sent. */
     void (*on_result)(int op, uint32_t sid, uint32_t rid, bool ok, int err, const char *msg);

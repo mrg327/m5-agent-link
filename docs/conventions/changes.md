@@ -68,10 +68,11 @@ commit, or the next agent's check fails on a change it did not make.
 |---|---|---|
 | firmware C read by the Atlas (`nav.c`, screens, gestures, palette) | `python3 atlas/tools/extract.py` | `atlas/data/facts.json` |
 | firmware UI that the Atlas watch runs | `atlas/wasm/build.sh` | `atlas/vendor/watch.*` |
+| `design/mote/mote.toml` or `gen.py` (the Mote's look) | `python3 design/mote/gen.py` | the files it lists (`design/mote/README.md`) |
 | `protocol/agentlink.cddl` or the vector generator | `uv run protocol/tools/gen_vectors.py` | `protocol/vectors/*.json` |
 
-The verify side of each is `python3 atlas/tools/extract.py --check` and
-`git diff --exit-code protocol/vectors` (see [issues/README.md](../../issues/README.md#checks-to-run-before-closing)).
+The verify side of each is `python3 atlas/tools/extract.py --check`,
+`python3 design/mote/gen.py --check` and `git diff --exit-code protocol/vectors` (see [issues/README.md](../../issues/README.md#checks-to-run-before-closing)).
 Marking generated files with a header and `linguist-generated` is in [structure.md](structure.md).
 `planned: phase 2`
 

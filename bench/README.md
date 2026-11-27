@@ -21,6 +21,7 @@ try a daemon build beside the service, see BENCH.md §7 and [AGENTS.md](AGENTS.m
 | `reply.txt` | A closing question; open it, go to Reply and send the first answer |
 | `switch.txt` | Two agents; drag along the rim to the other and bring its terminal forward |
 | `agent_back.txt`, `watch.txt`, `status.txt`, `labs.txt`, `busy.txt`, `arrival.txt` | Screen tasks from the UX profile ([UX-PROFILE.md](../docs/design/UX-PROFILE.md)); their `expect_screen` lines are the check |
+| `mote_visit.txt`, `mote_hover.txt`, `mote_empty.txt`, `mote_alert.txt` | The Mote's frame cost ([BENCH.md](../docs/design/BENCH.md) §9): the idle face's linger and trip, the hover at an error, the empty deck, a request during a trip. Switch the Mote on first (LABS > Personality, the dot) and run on USB |
 
 The script language is the simulator's ([simulator/README.md](../simulator/README.md)): `touch` and
 `bench start|stop|mark|save` are the bench's own commands. Each script begins with `connect` and a

@@ -1,0 +1,120 @@
+# The Mote (issue 20261126-59e0, GLYPHS.md §3.14): a firefly on its own track (r 175) inside the idle face's
+# ring, on the dock, with the Mote switched on (pref fun 0x3db). It visits each working session's arc in turn
+# (8 s by each, an eased trip between), rests at 12 o'clock when nothing runs and becomes an ember after five
+# minutes; a big finish with green tests counts the day and cheers (to its arc, one loop, a flare, a linger); plan use
+# over 80 % slows and dims its breath; at night it is a dimmer warm white. It leaves at once on battery and when
+# a request arrives. The log carries each mode ("ev":"mote"); the test asserts their order.
+connect
+rtc 1800000000
+rx a400020101020103a60082001601a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048168436f6e74696e756505f5
+pref fun 0x3db
+session 16 work webapp feat/login Running the test suite
+session 2 work api main Indexing the repository
+# the idle face comes up at about 29.2 s: the firefly appears by the first working session (3 o'clock)
+wait 31500
+shot fun_mote_visit_a.png
+# the cost of lingering, with Living marks off so the ambient sigil holds still: the halo breathes a level at
+# a time and repaints the orb's box (about 4-5 k px): about 51 k px in 3.6 s of its 4 s breath (0 without the Mote)
+pref fun 0x3da
+px_reset
+wait 3600
+expect_px_max 70000
+# one frame is the orb's box, old and new: about 4.2 k px, a breath level at a time
+expect_frame_px_max 5000 1
+# after 8 s it crosses to the second (9 o'clock), the short way, eased: a 4.4 s trip that moves the box each
+# tick, about 590 k px in all (under three full frames' worth, spread over the trip; the halo holds r 30, and it
+# moves a pixel at a time rather than a degree)
+wait 2100
+px_reset
+wait 2200
+shot fun_mote_travel.png
+wait 2300
+expect_px_max 700000
+# each frame of the trip: the box, old and new, joined (about 4.6-5 k px), one area
+expect_frame_px_max 5500 1
+pref fun 0x3db
+wait 1000
+shot fun_mote_visit_b.png
+# back by the first (3 o'clock) after 8 s, then a big finish there (issue 20261126-2de2): green tests, 15
+# minutes, six files; the other still works. The ring lays the finished one after the working one, at 9
+# o'clock, and the firefly drifts there (an ordinary 4.4 s trip, the short way), loops
+# once round a 40 px circle inside its track (600 ms), flares (the halo 1.6 times as wide, 120 ms up, 480 ms
+# back), lingers 8 s by the finished arc and goes back to the working one. It adds no buzz and no sound: the
+# finish's own alert is all there is.
+wait 12000
+session 16 done webapp feat/login Bash cargo test --workspace
+done 16 6 220/31 pass 900
+px_reset
+wait 2200
+shot fun_mote_cheer.png
+wait 2150
+# the drift: like any trip, the box moves every tick, a pixel at a time (about 0.6 M px, the finish's own
+# ring change included)
+expect_px_max 700000
+# the drift: the box (about 4.6 k px); the finish's own ring change makes the larger frames
+expect_frame_px_max 8500 2
+# (the ambient face's burn-in guard moves it 1 px at the minute, 58 ms in: one full frame, not the Mote's)
+wait 70
+px_reset
+wait 80
+shot fun_mote_loop.png
+wait 420
+shot fun_mote_flare.png
+wait 1030
+# the loop (boxes of about 4-5 k px) and the flare (up to about 10 k px): about 0.17 M px in 1.5 s
+expect_px_max 200000
+# a frame of the loop is the box, old and new (up to about 10 k px); of the flare, the wider halo
+expect_frame_px_max 11500 1
+wait 4000
+shot fun_mote_linger.png
+px_reset
+wait 4000
+# lingering by the finished arc: the breath, a level at a time
+expect_frame_px_max 5000 1
+wait 5000
+# nothing runs: it drifts the short way to 12 o'clock, under the ring's gap, and breathes there
+session 2 idle api main
+wait 6000
+shot fun_mote_rest.png
+px_reset
+wait 4000
+# resting at 12: the breath
+expect_frame_px_max 5000 1
+skip 300000
+wait 600
+shot fun_mote_ember.png
+px_reset
+wait 3000
+expect_px_max 0
+# plan use over 80 %: tired, a slower, dimmer breath (a turn starts again: it visits)
+usage 85 3600 - 20 86400
+session 2 work api main Indexing the repository
+wait 6000
+shot fun_mote_tired.png
+px_reset
+wait 6000
+# tired: the same box, at a slower breath (about 3 frames a second)
+expect_frame_px_max 5000 1
+# 23:30: the same warm white, dimmer (no state colour)
+rtc 1794036600
+wait 1000
+shot fun_mote_night.png
+px_reset
+wait 4000
+# night: the same box
+expect_frame_px_max 5000 1
+# on battery: gone, and the face holds still (Living marks off: nothing else moves on it)
+pref fun 0x3da
+battery 60
+wait 300
+px_reset
+wait 2000
+expect_px_max 0
+battery 80 chg
+pref fun 0x3db
+wait 300
+# a request: gone in the same step, with no exit animation; the request takes the screen
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test -- --watch=false
+wait 400
+expect_screen attention
+quit

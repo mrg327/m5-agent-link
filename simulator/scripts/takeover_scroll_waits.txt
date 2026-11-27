@@ -1,0 +1,30 @@
+# Issue 20261126-0a74: a request does not take SCROLL over (it lost the place in the terminal, issue
+# 09b8 swallowed a finger that carried into ASK). It waits behind the badge at 12 o'clock while the user
+# keeps scrolling; SCROLL closes itself after 8 s idle, back to WATCH, and the request opens then.
+connect
+rx a400020101020103a8008200181801a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a200010100048368436f6e74696e7565635965736d52756e2074686520746573747305f506f507f5
+session 1 work webapp feat/login Running
+wait 300
+tap 233 233
+wait 300
+btn A
+wait 300
+drag 233 260 -30
+wait 300
+expect_screen scroll
+session 2 input api main
+attention 7 2 approval approve,deny,focus 0 Run shell command|npm test
+wait 400
+expect_screen scroll
+expect_label waiting 2
+expect_label 1 waiting
+shot takeover_scroll_badge.png
+drag 233 260 -30
+wait 300
+expect_screen scroll
+expect_label waiting 2
+wait 8800
+expect_screen ask
+expect_label Run shell command
+expect_no_label waiting
+quit

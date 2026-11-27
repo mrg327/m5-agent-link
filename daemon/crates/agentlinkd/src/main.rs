@@ -18,6 +18,7 @@ mod jobs;
 mod keepawake;
 mod keys;
 mod lastmsg;
+mod notify;
 mod ota;
 mod paths;
 mod pointer;
@@ -96,6 +97,7 @@ async fn main() -> Result<()> {
                 "remotes": shared.registry.remotes(),
                 "attaches": shared.registry.attaches(),
                 "presence": presence_status(&shared.registry),
+                "notify": notify::name(notify::mode()),
                 "keep_awake": keepawake::status_json(),
             })
         })

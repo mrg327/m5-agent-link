@@ -1,0 +1,17 @@
+# The 30 s minimum (issue 20261126-27b7): under done_buzz all, an unwatched, unarmed turn of 5 s (session.dur)
+# ends done in silence, with no glow. A session first seen already done buzzes for nothing either. Without
+# session.dur the turn is the time since the last state change: session 1 worked for over a minute, so it buzzes.
+connect
+rx a400020101020103a4008200181901a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a3000101000501
+rtc 1800000000
+session 1 work webapp feat/login
+session 2 work api main
+wait 300
+# session 2 done, dur 5 s
+rx a30004010b03a300020204182205
+wait 300
+session 5 done api main Seen for the first time
+wait 300
+session 1 done webapp feat/login All done
+wait 300
+quit

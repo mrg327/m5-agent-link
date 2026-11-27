@@ -62,6 +62,8 @@ LV_FONT_DECLARE(font_phosphor_128)
 #define UI_PLATTER_R 18
 #define UI_MOTION_MS 160 /* ease-out; see ui_motion_enter() */
 #define UI_MOTION_RISE 20
+#define UI_MOTION_SLIDE \
+    48 /* the queue's next request enters from the right (issue 20261126-74c0) */
 #define UI_TOAST_RISE 10
 /* State colours: Okabe-Ito, colour-blind safe (docs/design/UI-RING.md §4). The old Primer names
  * keep their roles. */

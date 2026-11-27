@@ -29,8 +29,17 @@ bool link_connected(void) { return true; }
 bool motion_face_down(void) { return g_face_down; }
 void preport_save(uint32_t now_ms) { (void)now_ms; }
 void preport_unsave(void) {}
-void ui_glow(uint32_t rgb) { (void)rgb; }
-void ui_glow_hide(void) {}
+static int g_glows;
+static uint32_t g_glow_sid;
+static bool g_glow_shown;
+void ui_glow(uint32_t rgb, uint32_t sid, const char *icon)
+{
+    (void)rgb, (void)icon;
+    g_glows++;
+    g_glow_sid = sid;
+    g_glow_shown = true;
+}
+void ui_glow_hide(void) { g_glow_shown = false; }
 void dbg_event(const char *cat, const char *ev, const char *fields_fmt, ...)
 { (void)cat, (void)ev, (void)fields_fmt; }
 
@@ -64,6 +73,43 @@ static void desk_mode(void)
     g_usb = false;
 }
 
+/* The glow (issue 20261126-0ca0): 3 s, taken over by a second alert, ended by the touch that only
+ * reveals. */
+static void glow_timers(void)
+{
+    /* a request on a dark display glows (no idle check while it glows), then goes dark again */
+    power_attention(0xff8800, 2, "", 400000);
+    CHECK(power_display_on());
+    CHECK(power_glowing() && g_glow_shown && g_glow_sid == 2);
+    power_tick(400000);
+    CHECK(power_display_on());
+    power_tick(402999); /* 3 s (issue 20261126-0ca0) */
+    CHECK(power_display_on());
+    power_tick(403000);
+    CHECK(!power_display_on());
+    CHECK(!g_glow_shown);
+
+    /* a second alert while it glows takes the glow over and restarts its 3 s */
+    power_attention(0xff8800, 2, "", 500000);
+    power_tick(502000);
+    int glows = g_glows;
+    power_attention(0xf0e442, 3, "", 502000);
+    CHECK(g_glows == glows + 1 && g_glow_sid == 3);
+    power_tick(504999);
+    CHECK(power_display_on() && power_glowing());
+    power_tick(505000);
+    CHECK(!power_display_on());
+
+    /* a touch during the glow only reveals: it is spent, and the glow ends */
+    power_attention(0xff8800, 2, "", 600000);
+    CHECK(power_activity(600500));
+    CHECK(power_display_on() && !power_glowing() && !g_glow_shown);
+    /* on a lit display an alert is only activity: no glow */
+    glows = g_glows;
+    power_attention(0xff8800, 2, "", 601000);
+    CHECK(g_glows == glows && !power_glowing());
+}
+
 int main(void)
 {
     power_init();
@@ -83,7 +129,7 @@ int main(void)
 
     /* f724: a request stamped 5 ms after this step's clock; the step's own power_tick must not read
      * that as 49 days idle */
-    power_attention(0xff8800, 80005);
+    power_attention(0xff8800, 2, "", 80005);
     power_tick(80000);
     CHECK(power_display_on());
     CHECK(g_panel);
@@ -107,13 +153,7 @@ int main(void)
     CHECK(!power_display_on());
     g_face_down = false;
 
-    /* a request on a dark display glows (no idle check while it glows), then goes dark again */
-    power_attention(0xff8800, 400000);
-    CHECK(power_display_on());
-    power_tick(400000);
-    CHECK(power_display_on());
-    power_tick(402000);
-    CHECK(!power_display_on());
+    glow_timers();
 
     if (!g_fail) printf("power timers: ok\n");
     desk_mode();

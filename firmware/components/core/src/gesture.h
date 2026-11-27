@@ -54,7 +54,10 @@ typedef enum {
     /* only with gesture_set_moves(): a finger that started inside the rim and left the
      *                                    tap slop moved; x,y = where it is, dx,dy = travel since the previous G_MOVE
      *                                    (the first counts from where it left the slop). The trackpad (EXPERIMENTS.md) */
-    G_MOVE
+    G_MOVE,
+    /* only with gesture_set_raw_keys(): a key went down / up, at once (x = 0 for A, 1 for B;
+     *                                    dur_ms = how long it was held, on the up). A toy (EXPERIMENTS.md "Toys") */
+    G_KEY_DOWN, G_KEY_UP
 } gesture_kind_t;
 /* clang-format on */
 
@@ -66,13 +69,15 @@ typedef struct {
     int16_t dx, dy; /* swipes: whole travel; G_DRAG: travel since the previous G_DRAG */
     /* G_DRAG_END: release velocity over GESTURE_FLICK_WINDOW_MS, px/s */
     int16_t vy;
-    bool flick; /* swipes: released at flick speed */
+    bool flick;    /* swipes: released at flick speed */
+    bool injected; /* from the debug channel (app_inject_gesture), not a contact or a press */
 } gesture_evt_t;
 
 typedef void (*gesture_cb_t)(const gesture_evt_t *evt, void *ctx);
 
 typedef struct {
     bool down, long_fired, consumed, second;
+    bool raw; /* its G_KEY_DOWN went out: the release sends G_KEY_UP */
     uint32_t t_down;
 } gesture_btn_t;
 
@@ -97,6 +102,7 @@ typedef struct {
     bool drag_armed; /* the finger left the tap slop: drag steps count from drag_y */
     int16_t drag_y;  /* y at the last G_DRAG */
     bool moves;      /* G_MOVE wanted (gesture_set_moves) */
+    bool raw_keys;   /* key edges at once (gesture_set_raw_keys) */
     /* the finger left the tap slop: G_MOVE counts from move_x/move_y */
     bool move_armed;
     int16_t move_x, move_y;              /* where the last G_MOVE left off */
@@ -120,6 +126,11 @@ bool gesture_scrubbing(const gesture_t *g);
 /* G_MOVE on every sample of a centre drag (the trackpad); off by default, the other screens need no
  * stream. */
 void gesture_set_moves(gesture_t *g, bool on);
+/* Raw keys, for a toy: while on, every key edge goes out at once as G_KEY_DOWN / G_KEY_UP, and
+ * G_BTN_A, G_BTN_B and G_BTN_A_DOUBLE are not produced, so nothing waits GESTURE_BTN_DOUBLE_MS.
+ * G_BTN_A_LONG, G_BTN_B_LONG and G_CHORD still are (B held goes back, A+B goes Home). Off by
+ * default. A key held while this changes makes nothing more, not even its release. */
+void gesture_set_raw_keys(gesture_t *g, bool on);
 const char *gesture_name(gesture_kind_t k);
 /* Angle of a point around the centre, 0..360 degrees from 12 o'clock, clockwise; radius in px. */
 float gesture_angle_deg(int x, int y, float *radius);

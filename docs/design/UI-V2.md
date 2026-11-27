@@ -28,7 +28,7 @@ Six modes, one screen each. HOME is the only place you can stay, except WATCH, w
                  lift / button / touch-wake              attention arrives
    ┌─────┐ ──────────────────────────────► ┌──────────┐ ───────────────────► ┌──────────┐
    │ OFF │ ◄──────── 10 s idle ─────────── │   HOME   │ ◄── commit/back ──── │   ASK    │
-   │glow │   (glow 2 s on attention,       │  (deck)  │                      │ card+list│
+   │glow │   (glow 3 s on attention,       │  (deck)  │                      │ card+list│
    └─────┘    first touch = wake only)     └──────────┘                      └──────────┘
                                           │  ▲    │  ▲
                         tap centre /      │  │    │  │ swipe down
@@ -50,7 +50,7 @@ Six modes, one screen each. HOME is the only place you can stay, except WATCH, w
 
 - **HOME (deck).** One session card in the centre, a thin pinned index ring at the rim. Scrub, B or a side swipe changes the session. Button A does the state's default action (Focus). Tap centre opens AGENT; swipe up opens Experiments ([EXPERIMENTS.md](EXPERIMENTS.md), issue 61ce).
 - **AGENT.** The per-agent screen (user decision §9.1): a curved list ("wheel") of that session's actions, default item preselected, with gesture shortcuts layered on it. Scrub moves, tap commits a safe item, hold commits a destructive one.
-- **ASK.** Opened automatically when an attention (question, permission) arrives while the display is on, or on the first touch during a glow. It is AGENT with the agent's prompt text above the wheel and the agent's options as items. Done/error attentions do not open ASK; they update the card and buzz.
+- **ASK.** Opened automatically when an attention (question, permission) arrives while the display is on and the user is on HOME or WATCH and has left it alone for 1.5 s, or on the first touch during a glow (issue 20261126-0a74, §4.3). It is AGENT with the agent's prompt text above the wheel and the agent's options as items. Done/error attentions do not open ASK; they update the card and buzz.
 - **STATUS.** Link, host, battery, quiet mode, sounds. Swipe down from HOME; the empty deck points at it (§4.5).
 - **SCROLL.** Vertical drags drive the watched session's terminal scrollback. Entered only by a drag on WATCH; it returns to WATCH (§4.4).
 - **WATCH.** A live monitor for one session: its current step, the steps before it, the step count and the time. Opened by the "Watch" item; B or the rim moves to the next session (§4.7).
@@ -217,12 +217,16 @@ Items in *italics* need a daemon that types into terminals (decision 28: the wel
 - Order: `attention.opts` verbatim with the first option selected (the agent's own default); a bare permission shows Approve · Deny; "Open on PC" is always the last item. In a permission, an option that does not grant (the agent's "No") is a deny-class hold (0.8 s), never a tap.
 - Colour says what an item does, never alone: orange grants, vermillion denies, yellow answers a question, sky blue goes to the PC; the arc and the haptic ramp follow the item.
 - Opening ASK: a permission or question that arrives while the display is on opens it directly; during a glow the first touch reveals it; on the deck a tap or double tap on a request's card opens it (the pill reads `TAP › ANSWER`). The deck itself has no hold: nothing on HOME can approve.
+- Only a new `rid` alerts (issue 20261126-d95a). The daemon re-sends its open requests after a resync and after a welcome (which drops every card); a re-send of a request the watch holds, or held before that welcome (same rid, session, title and text), updates the card in place: no buzz, glow or takeover, and an answer already sent stays sent. If the welcome closed ASK on it and the user has not moved since, ASK comes back on it silently. A re-send that says something else (another rule, text or questions) re-arms the card at its default item, as a new one would.
+- The queue (issue 20261126-aa28). A request that cannot open at once (ASK shows another, the user works in KEYS, VOICE, READ, GRAPH, STATUS, LABS, TRACKPAD, AGENT or SCROLL, or the display is dark) waits with every other pending request. When ASK closes after an answer, or the user comes back to HOME or WATCH, or wakes the display, the next one opens: least time left first, then those without a window, oldest first. Going back from a request in ASK (to HOME or WATCH) skips it: the queue passes over it, and it stays on the ring and opens from its card. No card opens while a finger is on the glass or a button is held; it opens on the release. After an answer (issue 20261126-74c0) the next one opens as soon as the answered state has shown, with no quiet time, and enters **from the right** (`translate_x` 48 px to 0 over 160 ms, ease-out) instead of rising, with one tick (35 ms): the direction says it is the next request, not the same one; no pass through the deck is drawn. The badge at 12 o'clock counts the others while ASK is open and ticks down with each answer. Each card arms for 300 ms and a hold never runs on from one card to the next, as before. There is no "A twice" to skip in ASK: a single A there is Open on PC, which hands the request back; back (B held, swipe right) and the badge do it.
+- Requests stop yanking open screens (issue 20261126-0a74). AGENT (a hold on Stop or Run again) and SCROLL (the place in the terminal) keep their work like the screens above; both close themselves after 8 s idle and the request opens then. On HOME or WATCH a request opens only once the user has not touched the glass or a button for 1.5 s (`TAKEOVER_QUIET_MS`) and nothing is held; a raise does not count, and a waking touch reveals at once as before. A refused answer (`result.ok = false`) comes back at once. What waits shows as a **badge** at 12 o'clock on any screen but HOME (whose ring already shows it): a disc r 14 at (233, 20) in the colour of the request that opens next (orange, yellow; vermillion for an error card), with the number of unanswered requests in black, or with one its kind's glyph; it enters with one pulse (1.4× to 1× over 160 ms). A tap on it (a 72 × 56 target, not in KEYS or TRACKPAD, where the glass records strokes or moves the pointer) goes to that request in ASK; it answers nothing. The report says `waiting <sid>` and `<n> waiting`. Haptics and sound are unchanged: the arrival buzz plays whether or not ASK opens.
+- A takeover settles (issue 20261126-86cd). Input that began before a request (or the queue's next one, or an error card) took over the screen, or within `TAKEOVER_SETTLE_MS` (400 ms) after, was aimed at the screen before: it is dropped, so a tap meant for HOME or button A pressed on HOME (whose single press is emitted 300 ms later, where ASK reads it as Open on PC) does nothing on ASK. A finger still down is swallowed to its release, as before. A tap that starts later acts at once; the hold and its 300 ms arming are unchanged. Input injected over the debug channel is not held back.
 - **Approve-class options (anything that grants permission, including "don't ask again" variants, and `Always allow` with a longer 1.6 s hold, [STANDING-RULES.md](STANDING-RULES.md)) commit only by hold.** The hold starts after 250 ms, and only once the card has been on screen 300 ms (`CARD_ARM_MS`); it fills a 10 px arc in the item's colour from 12 o'clock over the index ring, with the escalating haptic ramp; early release cancels; the hold is bound to `rid` and cancels if the attention changes or is cleared.
 - Deny commits by hold (0.8 s, falling haptic) **or** by the strict swipe down (≥ 120 px, starting above the centre line). Both answer with `cmd_op_deny`.
 - Question options (`attention.opts`, ≤ 4 × 24 chars) commit by tap or A; they are not destructive. The reply is `cmd_op_reply` with `arg = option index`.
 - Toasts on ASK (`Hold to confirm`, `Out of date`, `Offline`) take the hint line under the key badges (`UI_TOAST_LOW_Y`; the hint hides meanwhile), not the action-pill slot the deck uses, which would sit on the wheel's selected row. STATUS does the same.
 - After an answer: the wheel collapses to one line `Approved · waiting for PC` (or `Denied`, `Sent "Yes" · waiting for PC`) in the answer's colour (green, vermillion, yellow); the index ring shows one dim capsule; the card stays until `clear`, then HOME returns. A `result.ok = false` shows the error as a toast, restores the options and buzzes the reject pattern.
-- Nag: up to 3 re-buzzes every 15 s while a permission is unanswered and the display is off; any input stops it. (2026-11-12: spread over the answer window, at least 15 s apart, none in its last 5 s: [ANSWER-WINDOW.md](ANSWER-WINDOW.md) §1. A request the daemon marks `hush` (the user is looking at its terminal, [PRESENCE.md](PRESENCE.md)) is not nagged, and does not buzz or glow.)
+- Reminders that grow louder (issue 20261126-a909, `nag.c`). An unanswered approval or question is reminded three times, never a fourth: **R1** one soft pulse (60 ms), the display stays dark; **R2** the kind's arrival pattern and the glow (who and what, §4.6) on a dark display; **R3** the pattern twice, 400 ms apart, the `input` sound and the glow. They are counted from the start of the answer window `win`: R1 at 25 s, R2 at max(40 s, win / 2), R3 at max(R2 + 10 s, win − 10 s) (60 s: 25, 40, 50; 120 s: 25, 60, 110; 300 s: 25, 150, 290). A window under 40 s gets R1 only, at its half; under 20 s none; nothing in a window's last 5 s; without a window (a daemon before 0.11) 25, 40, 55 s. One ladder runs at a time, for the request with the least time left; when it is answered or gone the next one starts its own, skipping its steps already past, never within 10 s of the last reminder. Any touch, press, raise or the wake that lights the display ends the ladders of every request that arrived before it (a takeover does not: it is not the user looking); a palm cover drops that request's; Quiet, snooze and `hush` ([PRESENCE.md](PRESENCE.md)) hold them; face down they are silent and still advance. The screen adds nothing: the countdown ring turns white in the last 10 s, about when R3 comes.
 
 ### 4.4 SCROLL: the terminal's scrollback
 
@@ -291,6 +295,8 @@ While quiet runs (`model_quiet_active()`), an attention that arrives neither buz
 
 Unchanged intent, two fixes carried from `2702775`: the first touch after a glow or a dark display only wakes (`power_activity()` returns true while `s_glowing`), and the glow colour follows the attention kind. Lifting during a glow (IMU, later) opens ASK directly.
 
+The glow says who and what, without a word (issue 20261126-0ca0): the ring (r 219–233, the kind's colour at 55 %), the session's sigil (r 40, grey, at y 112) and the kind's hero glyph (128 px: hand, question, error or done, the kind's colour at 55 %, at y 262). It is drawn once and does not move. It lasts 3 s (`GLOW_MS`); a second alert while it shows takes it over and starts the 3 s again. A reminder on a dark display lights the same glow again (not face down, not for a request the palm cover muted). The words are in the report: `Glow`, the folder name, `Needs approval` / `Question` / `Error` / `Done`.
+
 ### 4.7 WATCH
 
 A live monitor for one running session on the small screen. Opened by the "Watch" item (§4.2). The watched session is the deck's selection: B and the rim move the deck, and the watch follows. Only one session is watched at a time, and only while this screen is open.
@@ -355,29 +361,37 @@ A swipe keyboard for one session, for fine edits or when speaking is not possibl
 
 ## 5. Haptic vocabulary
 
-ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a detent only. Distinguish by **count and rhythm, never by 10 ms differences**; gaps ≥ 60 ms; at most 3 pulses outside ramps. The approve/deny/reject triple is already in `feedback.c` (`2702775`).
+ERM motor, 1 ms resolution, 35 ms floor for a felt pulse, 15 ms kick for a detent only. Distinguish by **count and rhythm, never by 10 ms differences**; gaps ≥ 60 ms; at most 3 pulses outside ramps (the last reminder, an arrival pattern played twice, is the one exception). The approve/deny/reject triple is already in `feedback.c` (`2702775`).
 
 | Event | Pattern (on/off ms) | Shape | Where |
 |---|---|---|---|
 | Detent (session, item, 3 scroll lines) | 15 | click | scrub, B, drag (not the glide) |
 | Select / tick (focus sent, item picked) | 35 | one short | HOME, AGENT |
 | Permission arrived | 250, 120, 250 | two long | glow, ASK |
-| Question arrived | 40, 90, 40, 90, 40 | three short | glow, ASK |
+| Question arrived | 40, 90, 40 | two short | glow, ASK |
 | Error arrived | 500 | one long | glow |
-| Done arrived | 60, 80, 60 | two short | glow |
+| Done arrived | 35 | one short | glow |
 | Approve ramp (during hold) | 35,170, 40,140, 45,110, 55,85, 65,65, 80,50, 100 | rising, gaps shrink | ASK |
 | Deny ramp (during hold) | 100,50, 80,65, 65,85, 55,110, 45 | falling, ends on a pulse | ASK |
 | **Approved** (commit) | 150 | one firm long | ASK |
 | **Denied** (commit) | 60, 90, 60 | two medium | ASK |
-| Reply sent | 35, 60, 35, 60, 35 | three ticks | ASK |
+| Permission option that grants (commit) | 150 | as Approved | ASK |
+| Permission option that denies (commit) | 60, 90, 60 | as Denied | ASK |
+| Sent (a question's answer, Send, a quick reply) | 35, 80, 120 | short then long | ASK, AGENT |
 | Reject / offline / nothing to do | 35, 70, 35, 70, 35 | three short | all |
 | Scroll stop (at bottom/top) | 40 | one thud | SCROLL |
 | Mode change (enter AGENT/SCROLL/STATUS/WATCH) | 35 | one short | all |
 | Quiet toggled | 35, 100, 35 | two spaced | STATUS |
-| **Finished: done** | 30, 200, 30 | two soft, long gap | a session moved into Done, when notify is armed or it is watched |
+| **Finished: done** | 35, 200, 35 | two soft, long gap | a session moved into Done, when notify is armed or it is watched |
 | **Finished: error** | 120, 90, 120, 90, 120 | three firm | a session moved into Error, same rule |
+| Usage warning | 200 | one long | the plan is running low |
+| Reminder 1 | 60 | one soft | an unanswered request, 25 s in (§4.3) |
+| Reminder 2 | the arrival pattern | as arrived | half the window, at least 40 s |
+| Reminder 3 | the arrival pattern, 400 ms, the pattern again | twice | near the window's end, with the sound |
 
-The finished buzz needs: the session just entered Done or Error, and (its `ntf` was set, or it is the watched session), and it is not snoozed, and quiet mode is not running. A snoozed session's attentions do not buzz, glow or nag either.
+Whatever grants ends in one pulse, whatever denies in two equal ones, a refusal in three (`feedback.c`, `act_reply` in `app.c`). The sent buzz is two pulses too, told from denied by its rhythm: 35 then 120.
+
+The finished buzz needs: the session just entered Done or Error, and (its `ntf` was set, or it is the watched session), and it is not snoozed, and quiet mode is not running. Since proto 0.25 the PC's notify setting widens this by default (`all`): every error and every done after a turn of 30 s or more buzzes too, and a dark display glows ([PROTOCOL.md](PROTOCOL.md) §6j, issue 20261126-27b7). A snoozed session's attentions do not buzz, glow or nag either.
 
 Three controls (§4.5): the alert mode `silent` suppresses every haptic but `hello`; the alert mode `quiet` ("Sounds: off") suppresses sound only (the speaker plays the sound bank's `done` pick when a session finishes and its `input` pick when an agent asks a question or needs approval, `core/src/sound.c`); the timed **Quiet** (`quiet_until`) suppresses the *alerts* (attention arrival, glow, nag) while leaving the detents, ticks and commit haptics, which answer the user's own input.
 

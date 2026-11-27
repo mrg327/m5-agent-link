@@ -110,7 +110,8 @@ bool link_tx_hello(hal_link_kind_t to)
      * 0.20: trackpad (welcome.pointer, cmd_op_pointer);
      * 0.21: delta firmware update (fw_begin.patch);
      * 0.22: agent graph (cmd graph, graph);
-     * 0.23: agent_pi; 0.24: bench (dbg_touch, dbg_bench, dbg_frames) */
+     * 0.23: agent_pi; 0.24: bench (dbg_touch, dbg_bench, dbg_frames);
+     * 0.25: which finishes buzz (device_cfg.done_buzz) */
     h->hello_major_l_minor = LINK_PROTO_MINOR;
     h->hello_device_info_m.device_info_device_class_m.device_class_choice = device_class(bi);
     h->hello_device_info_m.device_info_uint1tstr = zstr(bi->board);

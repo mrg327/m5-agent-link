@@ -9,6 +9,8 @@ void ui_ota_show(const char *ver);
 /* waiting: the link is down, the transfer resumes when the computer is back. */
 void ui_ota_progress(unsigned pct, bool waiting);
 void ui_ota_restarting(void);
+/* One call a step: the Mote on the arc's head follows the gate and plays its flare. */
+void ui_ota_tick(uint32_t now_ms);
 void ui_ota_hide(void);
 bool ui_ota_visible(void);
 void ui_ota_report(ui_report_t *r);

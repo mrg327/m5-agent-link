@@ -26,6 +26,7 @@
 #include "ui_gauges.h"
 #include "ui_home_internal.h"
 #include "ui_kit.h"
+#include "ui_living.h"
 #include "ui_theme.h"
 
 /* Geometry: centres, top to bottom. The content circle is r 205; the key hints sit at (101, 101)
@@ -359,6 +360,8 @@ static void draw_clock(void)
     theme_set_text(s_clock, s_clock_txt, sizeof s_clock_txt, buf);
 }
 
+lv_obj_t *ui_home_card_clock(void) { return s_clock_set && shown(s_clock) ? s_clock : NULL; }
+
 void ui_home_card_set_ambient(bool ambient)
 {
     s_ambient = ambient;
@@ -453,6 +456,10 @@ void ui_home_card_update(void)
              : !base[0]   ? "(no folder)"
                           : base);
     snprintf(s_state_words, sizeof s_state_words, "%s", word);
+    /* Living marks (ui_living.h): what the mark on show is doing, so it moves accordingly */
+    ui_living_show(dark ? UI_LIVING_AMBIENT : UI_LIVING_HOME, base, s->sid,
+                   ui_living_state(s, req != NULL, model_session_snoozed(s, theme_now_unix()),
+                                   sl->n_merged || back || offline()));
 
     if (dark) { /* ambient: the clock, the sigil and the state, all dim: "webapp · Working" */
         set_looks(LOOK_AMBIENT);
@@ -553,6 +560,7 @@ void ui_home_card_update(void)
     ui_gauges_card_update(s, !sl->n_merged && !req && !theme_is_job(s), off);
     show(s_badge[0], true);
     show(s_badge[1], n > 1);
+    ui_key_hint_set_count(s_badge[0], ui_home_pip_count()); /* who else needs you (issue 34e5) */
     apply_dim();
     apply_shift();
 }
@@ -612,7 +620,12 @@ void ui_home_card_report(ui_report_t *r)
     if (s_look == LOOK_CARD && s_btn_word[0]) ui_report_add(r, "%s", s_btn_word);
     ui_graph_strip_report(r);
     if (s_quiet_shown) ui_report_add(r, "quiet");
+    if (shown(s_badge[0]) && ui_key_hint_count(s_badge[0])) {
+        ui_report_add(r, "%d more need you", ui_key_hint_count(s_badge[0]));
+    }
 }
+
+lv_obj_t *ui_home_key_hint(int key) { return s_badge[key ? 1 : 0]; }
 
 void ui_home_card_create(lv_obj_t *centre)
 {
@@ -659,6 +672,8 @@ void ui_home_card_create(lv_obj_t *centre)
     s_ready = ui_glyph_create(s_centre, FONT_ICON_XL, UI_CX, CLOCK_Y);
     s_amb_sigil = ui_sigil_create(s_centre, UI_CX - AMBIENT_DX, AMBIENT_Y, SIGIL_R);
     s_amb_glyph = ui_glyph_create(s_centre, FONT_ICON_M, UI_CX + AMBIENT_DX, AMBIENT_Y);
+    ui_living_bind(UI_LIVING_HOME, s_sigil, SIGIL_R, s_hero, UI_CX, HERO_Y, false);
+    ui_living_bind(UI_LIVING_AMBIENT, s_amb_sigil, SIGIL_R, NULL, 0, 0, true);
 
     /* rule 6: what the buttons do, at the buttons. A opens the session on the computer (the desktop
      * glyph: the vocabulary's "Open" is the dots of a menu, and the session menu is a tap, not A);

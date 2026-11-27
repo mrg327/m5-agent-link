@@ -54,13 +54,13 @@ the detail (what is not yet verified on the device, for example).
 | Doc | What it covers | Status | Issue | Reviewed |
 |---|---|---|---|---|
 | [DONE-SUMMARY.md](DONE-SUMMARY.md) | What the turn did, at a glance (protocol 0.14) | implemented | [d01e](../../issues/20261112-d01e-done-summary-on-the-finished-card-files-changed.md) | 2026-11-22 |
-| [EXPERIMENTS.md](EXPERIMENTS.md) | LABS and the Trackpad | implemented | [61ce](../../issues/20261113-61ce-experiments-menu-swipe-up-on-home-with-a-trackpa.md) | 2026-11-13 |
-| [GLYPHS.md](GLYPHS.md) | "Sigil": the glyph-first design system | implemented | [8c3d](../../issues/20261114-8c3d-glyph-pass-replace-words-with-glyphs-on-every-wa.md) | 2026-11-22 |
+| [EXPERIMENTS.md](EXPERIMENTS.md) | LABS, the Trackpad, the Personality switches, the toys' groundwork and the decision toys | implemented | [61ce](../../issues/20261113-61ce-experiments-menu-swipe-up-on-home-with-a-trackpa.md) | 2026-11-26 |
+| [GLYPHS.md](GLYPHS.md) | "Sigil": the glyph-first design system | implemented | [8c3d](../../issues/20261114-8c3d-glyph-pass-replace-words-with-glyphs-on-every-wa.md) | 2026-11-26 |
 | [GRAPH.md](GRAPH.md) | The agent graph: tool calls as glyphs on lanes (protocol 0.22) | implemented | [e3d4](../../issues/20261113-e3d4-agent-graph-git-style-graph-of-one-session-s-too.md) | 2026-11-22 |
 | [UI-PROFILE.md](UI-PROFILE.md) | Audit of the watch as it stood before v3 (2026-11-10) | accepted | [7732](../../issues/20261111-7732-ui-v3-full-visual-and-ux-overhaul-of-the-watch-b.md) | 2026-11-10 |
 | [UI-RING.md](UI-RING.md) | "Ring": select a session, act with one gesture | superseded by [UI-V2.md](UI-V2.md) | – | 2026-11-22 |
 | [UI-V2.md](UI-V2.md) | "Deck": switch context, pick from a list, answer from the watch; its interaction and safety rules stand | superseded by [UI-V3.md](UI-V3.md) | – | 2026-11-22 |
-| [UI-V3.md](UI-V3.md) | "Halo": the Apple-style overhaul; its look is replaced by GLYPHS.md, its gestures and safety rules stand | implemented | [7732](../../issues/20261111-7732-ui-v3-full-visual-and-ux-overhaul-of-the-watch-b.md) | 2026-11-22 |
+| [UI-V3.md](UI-V3.md) | "Halo": the Apple-style overhaul; its look is replaced by GLYPHS.md, its gestures and safety rules stand | implemented | [7732](../../issues/20261111-7732-ui-v3-full-visual-and-ux-overhaul-of-the-watch-b.md) | 2026-11-26 |
 | [UX-PROFILE.md](UX-PROFILE.md) | The watch as the user meets it: speed, content, interruptions (2026-11-22) | accepted | [761f](../../issues/20261122-761f-ux-profile-every-screen-and-flow-on-the-watch-ed.md) | 2026-11-22 |
 | [glyphs/AGENT-READ.md](glyphs/AGENT-READ.md) | Sigil AGENT and READ screens as built | implemented | [8c3d](../../issues/20261114-8c3d-glyph-pass-replace-words-with-glyphs-on-every-wa.md) | 2026-11-14 |
 | [glyphs/ASK.md](glyphs/ASK.md) | Sigil ASK screen as built | implemented | [8c3d](../../issues/20261114-8c3d-glyph-pass-replace-words-with-glyphs-on-every-wa.md) | 2026-11-14 |
@@ -71,7 +71,7 @@ the detail (what is not yet verified on the device, for example).
 
 | Doc | What it covers | Status | Issue | Reviewed |
 |---|---|---|---|---|
-| [BENCH.md](BENCH.md) | Drive the real watch like a finger and measure what the user feels | implemented | [bb2e](../../issues/20261122-bb2e-bench-drive-the-real-watch-like-a-finger-and-mea.md) | 2026-11-22 |
+| [BENCH.md](BENCH.md) | Drive the real watch like a finger and measure what the user feels | implemented | [bb2e](../../issues/20261122-bb2e-bench-drive-the-real-watch-like-a-finger-and-mea.md), [59e0](../../issues/20261126-59e0-the-mote-a-light-on-the-idle-ring.md) | 2026-11-26 |
 | [BOARD.md](BOARD.md) | The design board (tools/board) | accepted | – | 2026-11-22 |
 
 <!-- index:end -->

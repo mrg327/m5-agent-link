@@ -2,7 +2,7 @@
 status: implemented
 owner: ui
 issue: 20261114-8c3d
-last_reviewed: 2026-11-22
+last_reviewed: 2026-11-26
 summary: '"Sigil": the glyph-first design system'
 ---
 
@@ -49,7 +49,8 @@ word by word.
    - No rows of labels, no pills with words.
 6. **Button hints sit at the buttons.** What A and B do is a glyph in a thin ring at the rim, next to
    the physical button: A upper left in amber, B upper right in blue, as the StopWatch's keys sit on its upper
-   rim when it is upright with USB at the bottom (issue 20261125-d8b5). No letters.
+   rim when it is upright with USB at the bottom (issue 20261125-d8b5). No letters. Where the key is
+   safe (HOME, WATCH) a tap on the hint presses it (§3.6).
 7. **A result is a burst.** Approved, denied, sent, handed back to the computer: one hero glyph
    filling the centre, in its colour, then the screen moves on. No words.
 8. **An error is a sign.** One or two glyphs side by side ("computer, refused"). A rare diagnostic
@@ -101,6 +102,8 @@ is a dot or a bar). Round caps. An empty name (no folder) draws the dashed-folde
 - Inside a screen's own draw callback: `ui_sigil_hash(name, h)` once, then
   `ui_sigil_paint(layer, h, cx, cy, r, w, colour)` (`w` 0 = the stroke for `r`).
 - Sizes in use: r 22 on HOME (top) and the ambient face; r 52 as the subject of an orbit.
+- `ui_sigil_set_pose(s, pose)`: the mark moved, resized, turned and dimmed by a Living-marks pose (§3.11); the
+  shape stays the name's.
 
 ### 3.2 Glyphs: `ui_glyph_*`, `FONT_ICON_HERO` (128 px), `FONT_ICON_XXL` (96 px), `FONT_ICON_XL` (64 px)
 
@@ -178,6 +181,11 @@ Rule 6: the glyph for A and for B, each in a thin ring at the rim.
   reaches r 207 from the screen centre, clear of the countdown (r 213) and the index ring (r 218). KEYS uses
   the same places: its candidates begin below them.
 - A hint is a disc: hide and show it like one; `ui_disc_set_hold()` fills a ring round it for a hold on the button.
+- On HOME and WATCH a hint is also the key (issue 20261126-34e5): `ui_key_hint_hit()` (within `UI_KEY_HIT_R` 36
+  of its centre, while shown) makes a tap `ZONE_KEY_A` / `ZONE_KEY_B`, and `ui_key_hint_flash()` lights its ring
+  for 150 ms on a tap or a press of the key. `ui_key_hint_set_count(hint, n)`: a white badge r 11 on the
+  hint's inner lower edge with the digit in black (rule 4), 0 hides it, 9 at most. A's counts the other
+  sessions that need you, the pips on the ring; finished sessions are not counted.
 - Above y 121 a row level with the hints is only as wide as the gap between them (x 125 to 341; ASK's title
   and AGENT's question are 216 px). The bottom slot, x 129 to 337 below y 345, is as narrow by the round
   glass alone: the toast, page dots and docks live there.
@@ -256,6 +264,265 @@ Rule 4, a quantity as geometry.
   and white: which page of a reader or a transcript. One page draws nothing; more than 12 show 12 and the
   position in proportion. The orbit draws its pages with the same pips.
 
+### 3.11 Living marks: `temper.c`, `persona.c`, `ui_living.c` (issue 20261126-98a6)
+
+No character is added. The marks the watch already draws move by one grammar, so after a week a project is
+known by how its mark breathes. Colour still means state only: a mark is never given a colour of its own.
+
+| Meaning | Gesture | Sigil | Hero glyph | Duration |
+|---|---|---|---|---|
+| alive, working | breath | brightness `cos8` 72–100 % and the middle ring swayed 2–6° | still (too large to loop) | 3–6 s loop |
+| idle | slow breath | brightness 80–100 % at twice the period, no sway | still | loop |
+| wants you | lean, then **still** | 3 px toward the hero glyph (1, 2, 3 px over 200 ms), full bright | still | 200 ms, then nothing |
+| arrived (done) | dip and settle | r × 0.90, × 1.06, back (`out3`) | 3 px down, 2 up, back | 300 ms |
+| joy (done) | radial | — | eight sparks in the done colour leave it, r 70 → 104, fading | 450 ms |
+| wrong (error) | shiver | sideways +2 −2 +2 −1 +1 0 px, 40 ms each, first the temper's way | the same at 3 px | 240 ms |
+| asleep (snoozed) | droop | 60 % and the outer ring turned 6° the temper's way | still | static |
+| ended, offline, handed back | still | as drawn | still | — |
+
+Rules: one gesture at a time per mark (a new state cuts the old one); **nothing loops while anything needs
+you**, so stillness says "waiting for you"; loops are slow and small, one-shots under 900 ms; the same name and
+the same event always give the same gesture. A scale breath is invisible at r 22 (±0.66 px), so the breath is
+brightness and sway; the radius moves only in the dip.
+
+- **Temperament** (`temper.c`, pure): bytes 10..19 of the same SHA-256 the shape uses (bytes 0..9), from the
+  same key (`temper_key()`: the folder name, or `"\x01sid N"` with none; `ui_sigil_set_session` uses it).
+  t[5] the period (3.0–6.0 s in 250 ms steps), t[6] the sway (2–6°), t[7] bit 0 the sway period (3/2 or 2
+  breaths), bit 1 the direction, t[8] the phase, t[9] the sparks' rotation. `temper_pose()`, `temper_hero()`
+  and `temper_joy()` turn a state and the time in it into a pose; a pose never reaches more than 4 px past the
+  rest, and the loop is sampled in sixteenths of a breath, so a breathing mark repaints at most 16 times a
+  breath.
+- **The gate** (`persona.c`, pure): see §3.12.
+- **On screen** (`ui_living.c`): a screen binds its sigil and hero glyph to a slot (`ui_living_bind`) and says
+  in its update what the slot shows (`ui_living_show`, `ui_living_state`); `app.c` hands the step's persona
+  context to `ui_living_tick()` after `ui_tick()`. A mark out of sight rests; a newly selected session starts
+  at rest, so scrolling onto a finished one does not dip it. `ui_sigil_set_pose()` is change-only; the sigil
+  object is r + 6 px a side to hold a pose.
+- Bound today: HOME's sigil (r 22) and hero glyph, and the ambient face's sigil (it breathes at 32–45 % on the
+  dock; it helps burn-in rather than hurting it). AGENT and ASK hold still by rule; WATCH is not bound yet.
+- **The ring** keeps its own motion, which already speaks the grammar: the comet is the working loop, done is
+  one sweep then solid (settle), error one flicker then solid (shiver), idle thin and still, and the ambient
+  ring is still. Its pulses on a request are the alert, not fun, so they stay; no fun gesture is drawn on the
+  ring.
+- Cost (simulator, `fun_temper.txt`): a breathing r 22 sigil adds about 95 k px in 6.5 s, about 15 k px a
+  second (7 % of one full frame a second); the comet alone is about 500 k px in the same window. A finish
+  repaints the hero glyph's box (about 12 k px) for 10 frames and the sparks' dots (about 1.6 k px a frame).
+  Frame time and the AMOLED's look at desk distance are for the device (open questions in the issue).
+
+### 3.12 The fun switchboard: `persona_allow()`, the `fun` word
+
+Every fun feature asks `persona_allow(feature, ctx)` (or `ui_living_allow(feature)` from a screen) what it may
+do now, and tests none of the conditions itself. It returns `PA_POSE` (a static pose), `PA_ONESHOT`,
+`PA_LOOP`, `PA_HAPTIC`, `PA_SOUND`:
+
+| Condition | Result |
+|---|---|
+| the feature's bit off in `fun`, or the display dark or only glowing | nothing |
+| anything needs you (a request, a session waiting for input) | a finish keeps its buzz and sound, not its picture; the asking mark keeps its lean (`alerting`); all else a static pose at most |
+| face down, silent, hush | no buzz, no sound |
+| quiet (mode or setting) | no sound; a buzz only when the user started it or the event alerts |
+| on battery | no loop (one-shots stay) |
+| `FUN_REDUCED` | no loop, no one-shot: the end frame |
+| neither started by the user nor riding on an alert | no buzz, no sound: fun never initiates |
+
+The glue (`app.c`) fills the context once a step from the model, power, motion and `prefs_fun()`; a feature
+copies it and sets `user_started` / `alerting` / `hush` for its own event. The stored word (`prefs_fun()`,
+NVS key `fun`) has a bit per feature: `FUN_TEMPER` 0 (on), `FUN_CELEBRATE` 1 (on), `FUN_MOTIF` 2 (off),
+`FUN_MOTE` 3 (off), `FUN_HELLO` 4 (on), `FUN_REPLAY` 5 (off), `FUN_EGGS` 6 (on), `FUN_TRAIL` 7 (on), `FUN_CUP`
+8 (on), `FUN_TOYS` 9 (on), and `FUN_REDUCED` 15 (off). It is set in LABS > Personality until STATUS has rows
+([EXPERIMENTS.md](EXPERIMENTS.md)); a script sets it with `pref fun 0x3d3`.
+
+### 3.13 While you were away: `replay.c`, `ui_replay.c` (issue 20261126-9f99)
+
+When you come back to the watch, the bezel replays the last hour and the centre shows now at once. A LABS
+experiment: the Replay switch (`FUN_REPLAY`, bit 5) in LABS > Personality, off by default.
+
+- **Away** is the display dark (off, or only the alert glow) for at least 15 minutes (`REPLAY_AWAY_MS`): a
+  quarter of the hour replayed, and longer than a glance away. It is measured from when the display went
+  dark, so on the dock (dark after 10 minutes idle) a replay needs about 25 minutes without input, on battery
+  about 16. The **first look** is the first lit step after it, whatever lit it: a touch, a key or a raise.
+- **The replay**: 20 steps of 3 minutes, 100 ms each (2 s; an hour in 2 s is 1800×). Each capsule shows its
+  past state, settled and still, in its state's colour; a session not yet started is the empty ring's thin
+  track. A thin white arc at r 216 (between the pips and the capsules) grows 18° a step from 12 o'clock, the
+  hour's hand that marks the ring as a replay; at 2 s the capsules are now and the arc fades over 200 ms.
+  The card, the hero glyph and everything in the centre show now from the first frame.
+- **Skipped** unless `persona_allow(PF_REPLAY)` gives a one-shot (§3.12: anything that needs you, reduced
+  motion, the switch off, a dark display), the deck is up and awake, and the hour holds at least one change.
+  **Ended at once** by any touch, key or raise, by anything that comes to need you, or by leaving the deck. It
+  only draws, so it never holds input back. No sound, no buzz.
+- **History** (`replay.c`, pure, `test_replay.c`): 16 sessions × 20 columns of 3 minutes, about 470 bytes of
+  static RAM (PSRAM on the watch). A column keeps the most telling state the capsule showed in its 3 minutes
+  (error, then a request, then done, then work, then idle), so an orange flash that resolved itself is seen.
+  The ring merges finished sessions from 9 on, so more than 16 capsules within an hour is rare; a session
+  without a track replays as it is now, and the track of the session gone longest is reused first. It lives
+  in RAM: after a deep sleep or a reboot the hour starts empty, and steps before the watch recorded show now.
+- **On the ring**: `ring_override()` draws a segment in a past look without touching the model; it is
+  change-only, so a step repaints only the capsules whose state differs plus the 18° of arc it adds.
+  `ui_home_tick()` makes the one call (`ui_replay_tick`). Cost (simulator, `fun_replay.txt`): about 144 k px
+  over 1.1 s of a replay in which the one capsule (a full ring) changes once; under 2 k px with the switch
+  off. Whether 100 ms a step reads well, and the frame time, are for the device.
+- **The Mote on the hand** (issue 20261126-9fe3): with the Mote on as well (`FUN_MOTE`, §3.14) and the gate
+  giving it a one-shot (`persona_allow(PF_MOTE)`), the hand's tip is the Mote at the tucked size (core 6 px,
+  halo 16 px across), lit and not breathing. It moves with the arc, 18° a step, fades with it, and leaves when
+  the replay ends, however it ends. The arc is drawn as before, so the orb is never the only sign. It adds the
+  orb's box, old and new, each step: about 148 k px for `mote_replay.txt` against 144 k px. With the Mote off
+  the replay is unchanged, frame for frame (`mote_replay_off.txt`).
+
+### 3.14 The Mote: `mote.c`, `ui_mote.c`, `ui_orb.c` (issue 20261126-59e0)
+
+A faceless firefly on its own track inside the idle (ambient) face's ring that shows who is busy. It never
+asks, buzzes or sounds. Off by default: LABS > Personality, the dot (`FUN_MOTE`, bit 3). The owner chose this
+design, "Firefly" visiting busy sessions, on 2026-11-26; it replaced a head with a tail that lapped as a
+seconds hand at r 216 and settled at 6 o'clock.
+
+- **Look.** No tail: the profile's size M (see Profile below): a warm-white `0xFFE2B8` core of 7 px radius
+  in a soft halo that falls off to nothing at 30 px, alpha 0.78 × (1 − t)^1.2 from the core's edge (drawn as 8
+  concentric alpha rings, one per 3 px band, so each pixel is blended once: stacked discs tinted a faint
+  halo green in RGB565). The whole orb is at the ambient level, 45 %. Where it may loop, the halo
+  **breathes**: its alpha 60 → 100 % over 4 s, sampled in 8 levels; its radius holds. From 23:00 to 06:00 it
+  is the same warm white, dimmer (30 %, the halo at 70 %): colour is reserved for state, so it is never
+  amber. It drifts with the ambient face's 1 px burn-in guard.
+- **The track, r 175.** The core (r 168–182) stays clear of the usage gauges on the idle face (their
+  glyphs at 6 o'clock from r 184, beads from 187, arcs 191–197; `ui_gauges.c`), the needs-you pips (r 196–210;
+  the Mote is gone whenever one shows anyway) and the capsules (r 222–228), and the halo's inner edge (r 145)
+  stays clear of the clock's digits (56 px at y 190: corners near r 131). The faint rim of the halo may lie
+  over a gauge arc or a capsule; nothing it covers is lost.
+- **Modes**, highest first: gone (not allowed, or the idle face is not up with its clock); hover beside the
+  first error capsule (±3° at 1 Hz, two brightness levels at 600 ms, no breath); **cheer** on a big finish (not
+  an error, tests not failed, and 10 min or more, 5 files or more, or 200 lines or more: the medium and large
+  tiers of the celebrations brief; issue 20261126-2de2): it drifts to the finished session's arc (an ordinary
+  trip, below), loops once round a 40 px circle tangent to its place, inside the track (600 ms, eased), flares
+  (the core to 100 %, the halo 1.6 times as wide and at full strength in 120 ms, back in 480 ms, easing out:
+  the profile's `[flare]`), lingers 8 s by the arc, breathing, then goes back to visiting. When the finished
+  session has no slot of its own (inside a merged Done group) it loops and flares where it is. It rides the
+  finish's own buzz and sound and adds none; on the lit deck the finish's picture stays the sigil's; **visit** while anything works: it goes to the centre of a working
+  session's slot (`ring_slot_mid_deg`), lingers 8 s, then moves on to the next working one clockwise (ring
+  order), so where it is tells you who is busy; with one working session it stays by that one; it starts by
+  the nearest, and when the one it is by stops, or the ring re-lays, it goes to the nearest still working;
+  **rest** at 12 o'clock (under the ring's gap) when nothing runs, breathing; an **ember** after five minutes
+  resting: a 4 px core at 25 %, no halo, still.
+- **Travel.** Every trip is the short way, eased in and out (smoothstep), and takes 0.8 s plus 20 ms a degree
+  (half the ring in 4.4 s, at most 62°/s), so nothing pops; a new target mid-trip starts a new trip from where
+  it is. Only the loops (the big finish's and the centuries egg's, §3.15) move faster.
+- **Rules.** On the idle face it exists only where the gate allows a loop (`persona_allow(PF_MOTE)` with
+  `PA_LOOP`: the dock, the display lit, nothing waiting for you); its other places are under Mascot
+  appearances below. It leaves the moment anything needs you,
+  with no exit animation: the request is the picture. With reduced motion it is a still orb at its resting
+  place (by the first working session, at 12 at rest, at the error), no breath, no travel, no cheer. A cheer
+  that happens while it is gone is not saved for later, and an error during one ends it (it goes to hover). The deck goes ambient with a session in error (only a
+  waiting approval or question keeps it lit; owner's call, 2026-11-26), so the Mote hovers beside the red
+  capsule (`fun_mote_error.txt`). Plan use at 80 % or more (5-hour window): a slower (6 s) and dimmer (70 %)
+  breath.
+- **Growth.** The level is the number of local days on which a turn finished with its tests green: the done
+  summary's `tp` (DONE-SUMMARY.md) is known and passed, on a session the watch saw finish (the summary may
+  arrive with the finish or just after). Thresholds 1, 3, 7, 14, 30, 60, 120 days give levels 1–7. One stored
+  word, `prefs_mote_days()` (NVS `mote_days`: bits 0–15 the count, 16–31 the last day counted), written at most
+  once a day, counted whether or not the Mote is on. It never shrinks: a gap, or a clock set back, counts
+  nothing and takes nothing away. Approvals, tokens and speed are not inputs. **Counted, not shown yet**: the
+  owner decided (2026-11-26) that the Mote's look never changes under the user, so the level does not reach
+  `mote_step()` and nothing on screen grows with it.
+- **The mascot, reusable.** The Mote will appear on other screens later (boot, pairing, the empty deck,
+  celebrations), so its look and its painter are apart from the idle face's behaviour:
+  `mote_look(scale_pct, lum, breath_pm)` (pure, `mote.h`) gives the core and halo at any size,
+  brightness and breath; `mote_breath(t_ms, period_ms)` gives the breath; `ui_orb_draw(layer, x, y,
+  &look, MOTE_RGB)` (`ui_orb.h`) paints it from any draw event, and `ui_orb_area(x, y, &look, &box)` is the
+  box to invalidate round its old and new places; `mote_flare(look, peak, t_ms)` gives the flare.
+- **Riding an arc** (`ui_mote_ride.c`, issue 20261126-9fe3). On another screen's arc the Mote is the profile's
+  tucked size (core 6 px, halo 16 px across), lit, no breath, in its own object the size of the orb's box, so a
+  move repaints that box, old and new, and nothing else. It sits on the arc's head and moves only when the arc
+  does; the arc is always drawn, so the orb is never the only sign of the progress. **Update**: on the
+  Updating overlay's progress arc (r 112) from 12 o'clock at 0 %, while the gate gives a pose (`PA_POSE`; a
+  request keeps it, still); while the transfer waits for the computer it dims to the ember's level (25 %) on the
+  grey arc and holds still; on success the ring closes green and it flares once at 12 o'clock (to 160 % over
+  120 ms and back over 480 ms, a one-shot: with reduced motion or a request it just stays lit) before the
+  restart. A failed or cancelled update closes the overlay at once (the toast says why), and the orb goes with
+  it. A step costs about 2.8 k px against 2.7 k px without it (`mote_ota.txt`, shots `mote_ota_20`, `_51`,
+  `_waiting`, `_flare`, `_restarting`; `"ev":"mote_ride"` at the flare). **Replay**: the hour hand's tip
+  (§3.13). With the Mote off both screens are as before, frame for frame and redraw for redraw
+  (`mote_ota_off.txt`, `mote_replay_off.txt`).
+- **At pairing** (`ui_mote_pair.c`, issue 20261126-2de2). With the Mote on, the passkey screen
+  (`ui_pair_show`) has the orb at 12 o'clock (y 58, where it rests on the idle face), at full brightness and
+  still: no breath, no drift, because the PC is waiting for you (pairing asks `persona_allow(PF_MOTE)` as
+  something that needs you, so only `PA_POSE` comes back). Its box (y 30–86, y 14–102 at the flare) keeps
+  clear of the Bluetooth glyph (from y 131) and the digits (y 243–282). `pair done`: one flare (600 ms, a
+  `PA_ONESHOT`), then the screen goes and only then is the "Paired" sign drawn (`ui_pair_done`; owner,
+  2026-11-27: not under the screen, so the flare costs only the orb's box); with reduced motion, a
+  request waiting or the Mote off, the screen goes at once. `pair fail` or the 60 s guard: nothing. It adds
+  no buzz and no sound (the passkey's own tick is the screen's). `mote_pair.txt` (shots `mote_pair_wait`,
+  `_flare`, `_after`, `_off`) checks pixels: the orb is at 12, the space above the glyph and round the digits
+  stays black and the digits white; nothing repaints while the digits wait; the flare repaints only the
+  orb's box (about 0.3 M px over its 450 ms in the simulator's ticks).
+- **Cost** (simulator, `fun_mote.txt`). Each change repaints the orb's box, old and new (about 4–5 k px each,
+  joined where they overlap); nothing else on the face is touched. Lingering, the breath repaints it a level at
+  a time: about 51 k px in 3.6 s (about 14 k px a second, like a breathing sigil). A trip moves the box
+  every tick: about 590 k px over the 4.4 s of half the ring in the simulator's 30 ms ticks (under three
+  full frames' worth, spread over the trip); on the watch the frame rate bounds it. A big finish is a trip (about
+  0.6 M px for half the ring), then the loop's box (about 4-5 k px) and the flare's (up to about 10 k px):
+  about 0.17 M px over the loop and the flare. On battery it is gone and the face repaints nothing.
+  **Per frame** (BENCH.md §9): one area of 4-5 k px in every mode (about 10 k px at the loop and the flare),
+  predicted at 8-16 ms on the watch, so the 30 fps trips and the hover keep their cadence; the boot move at
+  size L (up to 39 k px a frame, predicted 27-57 ms) and the pairing flare (about 21 k px, 28 ms) are over or
+  near the 33 ms period. The scripts hold these with `expect_frame_px_max`; `bench/tasks/mote_*.txt`
+  measure them on the watch.
+- **Sim.** `fun_mote.txt` (shots `fun_mote_visit_a`, `_travel`, `_visit_b`, `_cheer` (the drift), `_loop`,
+  `_flare`, `_linger`, `_rest`, `_ember`, `_tired`, `_night`) and `fun_mote_error.txt` (`fun_mote_hover`); the
+  log has `"ev":"mote"` at each mode (`visit`, `rest`, `ember`, `hover`, `cheer`, `loop`, `gone`),
+  `"ev":"mote_finish"` when a cheer reaches its arc, `"ev":"mote_pair"` on the pairing screen and
+  `"ev":"mote_day"` when a day counts.
+  The simulator's RTC runs on the script's virtual clock, so the firefly moves in a headless run.
+- **Mascot appearances** (issue 20261126-f5be; design: the owner's mascot notes, 2026-11-26). The Mote is
+  becoming the watch's mascot. Owner's rules: off by default (`FUN_MOTE`) until a week on a device; absent
+  from the lit deck with sessions and from ASK; never talks or nags; never starts a buzz or a sound; alerts
+  always win; never the only sign of anything; reduced motion respected; growth not shown. Where it is today:
+
+  | Where | What it does | Gate |
+  |---|---|---|
+  | Idle face (sessions) | the Firefly above: visit, hover, cheer, rest, ember | `PA_LOOP` |
+  | **Empty deck** (no sessions), lit or ambient | rests at 12 on the track (r 175), at the lit level (100 %) on the lit deck and 45 % on the ambient face, breathing; **wanders** ±12° round 12 in one slow sine of 150 s (at most 0.5°/s, a pixel at a time); an **ember** after 5 minutes resting, back at 12 (two wanders make the five minutes); a touch that lights the deck wakes an ember to rest afresh. It needs no clock | `PA_LOOP` to move; with `PA_POSE` only (battery, reduced motion) a **still** orb at 12; gone while a request waits or a full-screen overlay (pairing, the update, the glow) covers the deck |
+  | **Boot** | `mote_boot()`: an ember at the centre (core r 2, 25 %) wakes to size L at full level (0–500 ms, `out3`), one flare (the profile's: the halo ×1.6 in 120 ms, back in 480 ms), and from 620 ms rises to its place at 12, shrinking to size M and dimming to the deck's level (smoothstep), 1.2 s in all; then the empty deck's Mote takes over where it landed (absent if sessions arrived meanwhile). Silent | `PA_ONESHOT` within 300 ms of the first step (else never); reduced motion: no move, it is simply at its place |
+
+  The boot move only draws, over the deck, which is up and takes input from the first frame: it adds no boot
+  time (in the simulator the first screen, the link's `hello` and a tap 350 ms in land on the same steps with
+  it on or off). It ends at once (in the step the cause lands, with no exit animation) on any input anywhere
+  (`"end":"input"`), on a request or a waiting session, read from the model so it does not wait a step for the
+  gate's context (`"request"`), on the gate refusing a one-shot or leaving HOME (`"gate"`), or at 1.2 s
+  (`"done"`). It never starts in a dark boot (a reconnect attempt). Cost (simulator): the boot repaints the
+  orb's box, old and new, each frame, up to about 38 k px at the flare and about 450 k px from 290 ms to the
+  end in 10 ms steps; the empty deck about 22 k px a second lit (breath and wander) and about 16 k px a second
+  ambient; nothing on battery or as an ember. Sim: `mote_boot.txt` (shots `mote_boot_wake`, `_flare`, `_rise`,
+  `_end`), `mote_boot_cut.txt` (a tap cuts it; `mote_boot_cut`), `mote_boot_request.txt`,
+  `mote_boot_still.txt` (reduced motion; `mote_boot_still`), `mote_boot_off.txt`, `mote_empty.txt` (shots
+  `mote_empty_lit`, `_ambient`, `_wander`, `_ember`, `_woken`, `_battery`); the simulator's `--pref fun=0x3db` stores the switch before boot as NVS would. The log
+  has `"ev":"mote_boot"` with `"start"` and `"end"`.
+- **Profile.** The look (colour, halo falloff, levels, breath, flare, sizes) has one source,
+  `design/mote/mote.toml`; `design/mote/gen.py` writes the firmware header `mote_look.h`, the Atlas CSS and
+  SVGs, the favicon and the CLI colour from it (`design/mote/README.md`, issue 20261126-0163). The idle-face
+  Firefly is size M (core 7 px, halo to 30 px). The firmware reads the header (issue 20261126-f5be): `mote.h`
+  takes the colour, levels, breath and sizes (`mote_look()` scale 100 is M, 200 is L), `ui_orb.c` the falloff.
+
+### 3.15 Easter eggs: `eggs.c`, `ui_eggs.c` (issue 20261126-7770)
+
+Small surprises with a date or a number behind them. Each is under 2 s, silent, without haptic, once per
+trigger, never while anything needs you and never waking the display: the screen asks `persona_allow(PF_EGGS)`
+for `PA_ONESHOT`, so a request, a dark or glowing display and reduced motion all hold them. On by default
+(`FUN_EGGS`, bit 6, the asterisk in LABS > Personality). The table stays short: an egg leaves when a new one
+enters.
+
+| Egg | Trigger | Picture |
+|---|---|---|
+| Clock slip | the clock on show (the empty deck or the ambient face) reads 13:37 or 04:04 | the digits slip 3 px right for one 90 ms frame, back, and once more (a style translate of the label: about 25 k px a frame); once per such minute, the first moment in it the egg may play |
+| Centuries | the 100th and the 1000th turn this watch saw finish (done, not error; a session first met finished does not count) | with the Mote on the face, it loops once round a 32 px circle inside its track and returns (1.2 s); otherwise the sigil's rings each turn once round (800 ms, `inout`), over whatever gesture it is making |
+
+- The finish count is `prefs_finishes()` (NVS `fin_n`), stored every 5 finishes and at a century, so a reboot
+  may lose the last few, never add any, and a century plays once. A century waits up to 10 minutes for a
+  moment it may play in (a request answered, the display lit), then lapses: nothing is saved up for later.
+- `temper_pose_t`'s ring turns are 16-bit so a whole turn fits; `ui_living_spin()` adds the turn to the mark on
+  show.
+- Left out, from the brief: the scatter on a shake (the accelerometer's x/y mapping is unverified), the
+  anniversary ring (needs the daemon to keep first-seen dates), the tumbleweed and the key code (dropped).
+- Sim: `fun_eggs.txt` (shots `fun_eggs_slip`, `_slip_after`, `_spin`, `_loop`); the log has `"ev":"egg"` with
+  `"egg":"clock-slip"` or `"century"`, and `"ev":"century"` when the count reaches one.
+
 ## 4. Reference screen: HOME
 
 Built with the primitives, as the model for the rest (`ui_home_card.c`; renders:
@@ -282,9 +549,12 @@ Built with the primitives, as the model for the rest (`ui_home_card.c`; renders:
     (`ui_gauges.c`), under whichever of them shows.
 - **Empty deck:** the clock in digits, alone.
 - **Ambient:** the clock, dim, with the selected session's sigil and a small state glyph under it.
-- **Keys:** A = the desktop (it opens the session on the computer, as before), B = caret (next), shown
-  when there is more than one session. The session menu opens by a tap, as before.
-- **The session ring** at the bezel is unchanged.
+- **Keys:** A = the desktop (it opens the session on the computer, as before), with a count badge of the
+  other sessions that need you; B = caret (next), shown when there is more than one session. A tap on
+  a shown hint presses its key. The session menu opens by a tap, as before.
+- **The session ring** at the bezel is unchanged, except that a needs-you pip is a shape per kind: dot
+  (question), bar along the ring (permission), triangle pointing in (error); UI-V3 §3.1. What waits behind the
+  screen is a badge at 12 o'clock: the kind's glyph, or how many wait (UI-V2 §4.3).
 
 ## 5. The other screens
 
@@ -303,7 +573,8 @@ owner's, inside the rules.
 | **VOICE** (`ui_voice.c`) | Record, level, stop, transcribing, the transcript with pages, use / send (hold), try again, queued, not sent | The microphone hero with a live level ring; the transcript is text (rule 1); discs for send, retry; page dots |
 | **KEYS** (`ui_keys.c`) | Swipe typing, candidates, space, delete, send (hold), errors | Text entry (rule 1): keys and candidates stay letters. Space, delete and send are glyph keys. Errors are signs |
 | **SCROLL** (`ui_scroll.c`) | Scroll the terminal by dial and drag, live / lines up, bottom, page, preview | A scroll track as an arc with a thumb; the live glyph at the bottom; the count of lines up as the thumb's position, not a number. The preview is text (terminal content) |
-| **TRACKPAD, LABS** (`ui_trackpad.c`, `ui_labs.c`) | Move, click, right click, double click, wheel; how-to; refusal; the experiments list | The pad is the screen: a faint cursor glyph; the how-to is three pictograms. Labs is an orbit |
+| **TRACKPAD, LABS** (`ui_trackpad.c`, `ui_labs.c`) | Move, click, right click, double click, wheel; how-to; refusal; the experiments list; the fun switches (`ui_fun.c`) | The pad is the screen: a faint cursor glyph; the how-to is three pictograms. Labs is an orbit; Personality an orbit of toggle discs, the off ones dim |
+| **Decide toy** (`ui_decide.c`, `decide.c`) | Coin, die, oracle; which of the three; throwing, landed, paused; refused while a request waits | LABS disc: the dice. The coin a turning white disc with a black tick or cross; the die a ring in as many pieces as sides, filled to the number; the oracle a hold ring, then one of six 128 px glyphs (tick, cross, hourglass, arrows, moon, speech bubble; all white, to be tried on people); three pips; the hand sign when refused |
 | **OTA** (`ui_ota.c`, `ota.c` toasts) | Updating with progress, restarting, waiting for the computer, hold B to cancel, the errors | The download hero inside a progress arc; restarting is the working glyph; cancel is B's key hint with a cross and a hold ring; an error is the error glyph and a number (rule 8) |
 | **Toasts, glow** (`ui.c`, `app.c`) | Every toast | Signs through the vocabulary (§3.7) |
 | **GRAPH** (`ui_graph.c`) | unchanged | Already the reference for lanes and nodes; only its key hints change |

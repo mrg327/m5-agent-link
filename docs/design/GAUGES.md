@@ -125,7 +125,7 @@ a card) and never lets it answer or cancel a request.
 - **STATUS** (UI-V3 §4.6b). Arcs of 240° through 12 o'clock, centre lines r 192 and 182, 4 px, round caps,
   `COL_FILL2` track. Fill white below 80 %, amber from 80 %, vermillion from 95 %: chrome, not a state colour,
   so the arcs never read as session segments of the ring. The ends sit at y 329, above the legends; r 192 + 2
-  stays clear of the ring's pips (r 200-210). With a usage reading the clock is `FONT_TITLE` at y 84, the
+  stays clear of the ring's pips (r 196-210). With a usage reading the clock is `FONT_TITLE` at y 84, the
   chips at y 120, the rows at y 152 and 180 (`FONT_BODY_STRONG` figure, `FONT_BODY` detail). Without any
   reading (not a subscriber, an older daemon) STATUS is exactly as before.
 - **Faces.** `5h 42%` in `FONT_BODY` at y 304 on the empty deck (`COL_TEXT2`) and the ambient face (45 %

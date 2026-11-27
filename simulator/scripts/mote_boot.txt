@@ -1,0 +1,21 @@
+# The Mote at boot (issue 20261126-f5be, GLYPHS.md §3.14), run with --pref fun=0x3db (the Mote on, stored
+# before boot as on the watch) on the dock: the ember at the centre wakes to size L, flares once and rises to
+# its place at 12 as the deck comes up, in 1.2 s, silent; then it rests there on the empty deck. It only draws
+# over the deck, which is up from the first frame. A script starts 300 ms after the first step, so the move is
+# about 290 ms in at its first line. The log has "ev":"mote_boot" with "start" and "end":"done".
+# its cost from here (290 ms) to the end: the orb's box, old and new, each frame (up to about 38 k px at the
+# flare): about 450 k px in the simulator's 10 ms steps, about two full frames (217 k px each)
+px_reset
+shot mote_boot_wake.png
+wait 90
+shot mote_boot_flare.png
+wait 160
+shot mote_boot_rise.png
+wait 300
+# done: at its place on the empty deck, at the lit level; no buzz or sound came of it
+shot mote_boot_end.png
+expect_px_max 520000
+# per frame: up to about 39 k px (size L at the flare, and the first steps of the rise)
+expect_frame_px_max 42000 1
+expect_screen ring
+quit

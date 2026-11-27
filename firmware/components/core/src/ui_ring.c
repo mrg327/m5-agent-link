@@ -25,6 +25,13 @@ void ring_seg_span(int n, int i, int *a0, int *a1)
     *a1 = (i + 1) * seg / 100 - inset;
 }
 
+int ring_slot_mid_deg(int n, int i)
+{
+    int a0, a1;
+    ring_seg_span(n, i, &a0, &a1);
+    return (a0 + a1) / 2 % 360;
+}
+
 void ring_comet_span(int a0, int a1, int lvl, int *c0, int *c1)
 {
     int span = a1 - a0, len = span / 2 < COMET_DEG ? span / 2 : COMET_DEG;
@@ -174,7 +181,10 @@ void ring_set(lv_obj_t *ring, const ring_seg_t *segs, int n, uint32_t now_ms)
             bool keep =
                 i < d->n && d->seg[i].s.id == segs[i].id && d->seg[i].s.kind == segs[i].kind;
             d->seg[i].s = segs[i];
-            if (!keep) d->seg[i].entry_ms = now_ms;
+            if (!keep) {
+                d->seg[i].entry_ms = now_ms;
+                d->seg[i].ovr = false; /* another session now: the replay sets it again */
+            }
             {
                 int a0, a1;
                 ring_seg_span(n, i, &a0, &a1);
@@ -191,6 +201,7 @@ void ring_set(lv_obj_t *ring, const ring_seg_t *segs, int n, uint32_t now_ms)
             s->s.selected == segs[i].selected && s->s.dim == segs[i].dim)
             continue;
         if (s->s.id != segs[i].id || s->s.kind != segs[i].kind) s->entry_ms = now_ms;
+        if (s->s.id != segs[i].id) s->ovr = false;
         s->s = segs[i];
         int a0, a1;
         ring_seg_span(n, i, &a0, &a1);
@@ -279,7 +290,7 @@ void ring_tick(lv_obj_t *ring, uint32_t now_ms)
     d->last_tick = now_ms;
     for (int i = 0; i < d->n; i++) {
         ring_slot_t *s = &d->seg[i];
-        if (s->s.kind == RING_IDLE) continue;
+        if (s->s.kind == RING_IDLE || s->ovr) continue; /* a replayed look is still */
         int a0, a1;
         ring_seg_span(d->n, i, &a0, &a1);
         int lvl = ring_anim_level(d, s, a1 - a0, now_ms);
@@ -292,6 +303,46 @@ void ring_tick(lv_obj_t *ring, uint32_t now_ms)
             inval_seg(ring, d->n, i);
         }
     }
+}
+
+void ring_override(lv_obj_t *ring, int i, uint8_t kind, uint32_t rgb, bool dim)
+{
+    ring_data_t *d = lv_obj_get_user_data(ring);
+    if (i < 0 || i >= d->n) return;
+    ring_slot_t *s = &d->seg[i];
+    if (kind == RING_LIVE) {
+        if (!s->ovr) return;
+        s->ovr = false;
+        int a0, a1;
+        ring_seg_span(d->n, i, &a0, &a1);
+        s->lvl = (int16_t)ring_anim_level(d, s, a1 - a0, d->last_tick);
+    } else {
+        if (s->ovr && s->ovr_kind == kind && s->ovr_rgb == rgb && s->ovr_dim == dim) return;
+        s->ovr = true;
+        s->ovr_kind = kind;
+        s->ovr_rgb = rgb;
+        s->ovr_dim = dim;
+    }
+    inval_seg(ring, d->n, i);
+}
+
+void ring_override_end(lv_obj_t *ring)
+{
+    ring_data_t *d = lv_obj_get_user_data(ring);
+    for (int i = 0; i < d->n; i++) ring_override(ring, i, RING_LIVE, 0, false);
+}
+
+int ring_get(lv_obj_t *ring, ring_seg_t *out, int max)
+{
+    const ring_data_t *d = lv_obj_get_user_data(ring);
+    int n = d->n < max ? d->n : max;
+    for (int i = 0; i < n; i++) out[i] = d->seg[i].s;
+    return n;
+}
+
+void ring_invalidate_arc(lv_obj_t *o, int a0, int a1, int r_in, int r_out)
+{
+    if (a1 > a0) inval_band(o, (float)a0, (float)a1, r_in, r_out);
 }
 
 int ring_hit(lv_obj_t *ring, int x, int y)

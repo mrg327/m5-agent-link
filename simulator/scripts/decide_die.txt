@@ -1,0 +1,91 @@
+# The die (issue 20261126-74ee, EXPERIMENTS.md "Toys"): B steps from the coin to the die, the bezel
+# picks its sides, A rattles it through nine numbers and lands. While a request waits nothing is
+# thrown (the hand sign). With the fun word's toys bit off LABS lists no toys.
+connect
+rx a400020101020103a40082000101a30048a1a2a3a4a5a6a7a801676465762d6d6163020002a2001a6aee31c0013901df03a4000101000318a00465406f63746f
+rtc 1800000000
+session 1 work webapp feat/login Running the test suite
+toy_seed 11
+pose face_up
+wait 300
+swipe 233 300 233 180 160
+wait 300
+btn B
+wait 100
+btn B
+wait 100
+expect_label > Decide
+tap 233 233
+wait 300
+expect_screen toy
+btn B
+wait 200
+expect_label die d6
+expect_label ready
+shot decide_die_ready.png
+# the bezel picks the die: far round clockwise is the d20
+scrub 0 180
+wait 300
+expect_label die d20
+btn A
+wait 500
+expect_label throwing
+shot decide_die_rattle.png
+wait 1100
+expect_label shown
+expect_label result 12
+shot decide_die_landed.png
+# turned back one step: the d12, and the number of the d20 is gone
+scrub 120 60
+wait 300
+expect_label die d12
+expect_label ready
+btn A
+wait 1600
+expect_label result 12
+# a request arrives; going back from it returns to the die while it waits as a dot
+session 1 input webapp feat/login
+attention 41 1 approval approve,deny,focus 0 Run shell command|npm test
+wait 300
+expect_screen ask
+btn B long
+wait 300
+expect_screen toy
+expect_label paused
+tap 233 233
+wait 100
+expect_label shown
+# nothing is thrown on a request
+btn A
+wait 200
+expect_label shown
+expect_label result 12
+expect_label Answer the request first
+shot decide_die_blocked.png
+clear 41 answered_pc
+session 1 work webapp feat/login Running the test suite
+wait 1600
+btn A
+wait 1600
+expect_label result 6
+# the fun word without the toys bit: LABS lists the Trackpad and Personality only
+btn B long
+wait 300
+expect_screen labs
+pref fun 0x1d3
+wait 200
+chord
+wait 300
+swipe 233 300 233 180 160
+wait 300
+expect_screen labs
+expect_no_label Decide
+shot decide_fun_off.png
+pref fun 0x3d3
+wait 200
+chord
+wait 300
+swipe 233 300 233 180 160
+wait 300
+expect_label Decide
+quit

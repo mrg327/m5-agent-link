@@ -1,0 +1,29 @@
+{
+  "desc": "Welcome (proto 0.25): the PC's notify setting is armed only, as before 0.25",
+  "symbolic": {
+    "t": "welcome",
+    "id": 1,
+    "re": 1,
+    "b": {
+      "proto": [
+        0,
+        25
+      ],
+      "host": {
+        "id": "a1a2a3a4a5a6a7a8",
+        "name": "dev-linux",
+        "os": "linux"
+      },
+      "time": {
+        "unix": 1793995200,
+        "tz_off": -480
+      },
+      "cfg": {
+        "privacy": "preview",
+        "alert": "full",
+        "done_buzz": "armed"
+      }
+    }
+  },
+  "cbor_hex": "a400020101020103a4008200181901a30048a1a2a3a4a5a6a7a801696465762d6c696e7578020202a2001a6aee31c0013901df03a3000101000500"
+}

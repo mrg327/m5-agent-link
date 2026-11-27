@@ -23,6 +23,9 @@
 #include "ota.h"
 #include "prefs.h"
 #include "ui.h"
+#include "ui_eggs.h"
+#include "ui_living.h"
+#include "ui_mote.h"
 #include "ui_theme.h"
 
 #define FRAME_MAX 4096
@@ -97,7 +100,12 @@ void app_clock_resync(void)
 
 static uint32_t tick_cb(void) { return app_now_ms(); }
 
-void app_inject_gesture(const gesture_evt_t *g) { ring_push(&s_gestures, g); }
+void app_inject_gesture(const gesture_evt_t *g)
+{
+    gesture_evt_t e = *g;
+    e.injected = true;
+    ring_push(&s_gestures, &e);
+}
 void app_set_sectors(int n) { gesture_set_sectors(&s_gesture, n); }
 
 /* ── HAL callbacks (any context) ── */
@@ -160,11 +168,13 @@ static void pair_step(uint32_t now)
         feedback_tick();
         return;
     }
-    ui_pair_hide();
     bool done = v == HAL_PAIR_DONE;
-    ui_toast_sign(done ? "Paired" : "Pairing failed",
-                  done ? ICON_BLUETOOTH ICON_CHECK : ICON_BLUETOOTH ICON_X, NULL,
-                  done ? RGB_DONE : RGB_DANGER);
+    if (done) { /* the UI shows "Paired" once the passkey screen is gone (after the Mote's flare) */
+        ui_pair_done();
+        return;
+    }
+    ui_pair_hide();
+    ui_toast_sign("Pairing failed", ICON_BLUETOOTH ICON_X, NULL, RGB_DANGER);
 }
 
 static lv_indev_read_cb_t s_hal_touch_read;
@@ -284,14 +294,21 @@ static void act_deny(uint32_t sid, uint32_t rid)
 
 /* cmd_op_reply {rid, arg: option index}: a question's answer, or one of a permission's own
  * choices. */
-static void act_reply(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms)
+static void act_reply(uint32_t sid, uint32_t rid, uint8_t opt, uint32_t hold_ms,
+                      ui_reply_kind_t kind)
 {
     /* hold_ms rides along so the daemon can re-check a grant option's hold, as it does for
      * approve */
     bool sent = link_send_cmd_arg(LINK_OP_REPLY, sid, rid, opt, hold_ms);
     if (sent) {
         model_attention_set_answer(rid, ATT_ANSWER_REPLY, opt);
-        feedback_reply_sent();
+        /* what grants ends in one long pulse, what denies in two (UI-V2 §5) */
+        switch (kind) {
+        case UI_REPLY_GRANT: feedback_approved(); break;
+        case UI_REPLY_DENY: feedback_denied(); break;
+        case UI_REPLY_NEUTRAL:
+        default: feedback_reply_sent(); break;
+        }
     } else {
         feedback_reject();
     }
@@ -402,6 +419,7 @@ static void act_dictate(uint32_t sid, uint32_t rid, uint32_t aid, uint32_t hold_
 }
 
 static bool act_button_down(int btn) { return btn >= 0 && btn < 2 && s_gesture.btn[btn].down; }
+static bool act_touching(void) { return s_gesture.pressed; }
 
 static bool sid_snoozed(uint32_t sid)
 { return model_session_snoozed(model_find(sid), app_now_unix()); }
@@ -426,18 +444,55 @@ static void act_scroll(uint32_t sid, nav_scroll_unit_t unit, int delta)
 static bool act_pointer(int dx, int dy, int btn, int n, int wheel)
 { return link_send_pointer(dx, dy, btn, n, wheel); }
 static void act_moves(bool on) { gesture_set_moves(&s_gesture, on); }
+static void act_raw_keys(bool on) { gesture_set_raw_keys(&s_gesture, on); }
+
+/* What an alert of this kind looks like: its colour, and its hero glyph on the glow. */
+static uint32_t att_rgb(att_kind_t kind)
+{
+    return kind == ATT_ERROR      ? RGB_ERROR
+           : kind == ATT_DONE     ? RGB_DONE
+           : kind == ATT_QUESTION ? RGB_ASK
+                                  : RGB_PERMISSION;
+}
+
+static const char *att_icon(att_kind_t kind)
+{
+    return kind == ATT_ERROR      ? ICON_ERROR
+           : kind == ATT_DONE     ? ICON_DONE
+           : kind == ATT_QUESTION ? ICON_QUESTION
+                                  : ICON_PERMISSION;
+}
+
+/* The glow (who and what) on a dark display, or the glow that shows taken over; face down nobody
+ * sees it. */
+static void glow_for(const attention_t *a)
+{
+    if (motion_face_down()) return;
+    if (!power_display_on() || power_glowing()) {
+        power_attention(att_rgb(a->kind), a->sid, att_icon(a->kind), app_now_ms());
+    }
+}
 
 /* The nag is an alert too: quiet mode holds it as it holds the arrival buzz. */
 static uint32_t s_muted_rid, s_muted_sid; /* the request a palm cover silenced (0 = none) */
 
-static void act_nag(void)
+static uint32_t s_alert_rid; /* the request that buzzed last: the one a palm cover silences */
+
+static void act_nag(uint32_t rid, int level)
 {
-    const attention_t *first = model_attention_first();
-    if (first && sid_snoozed(first->sid)) return;
-    /* covered: no reminders */
-    if (first && s_muted_rid && first->rid == s_muted_rid && first->sid == s_muted_sid) return;
-    if (first && first->hush) return; /* the user is looking at its terminal (PRESENCE.md) */
-    if (!model_quiet_active(app_now_unix())) feedback_attention(ATT_APPROVAL);
+    const attention_t *a = model_attention_find(rid);
+    if (!a || sid_snoozed(a->sid)) return;
+    if (s_muted_rid && a->rid == s_muted_rid && a->sid == s_muted_sid) return; /* covered */
+    if (a->hush) return; /* the user is looking at its terminal (PRESENCE.md) */
+    if (model_quiet_active(app_now_unix())) return;
+    /* No exception for a request open in ASK on a lit display: a takeover opens it whether or not
+     * anyone is there (a watch on the desk stays lit for 10 min), and a user who looks has touched
+     * or raised it, which ends the ladder (nag_note_input). */
+    dbg_event("ui", "nag", "\"rid\":%u,\"level\":%d", (unsigned)rid, level);
+    s_alert_rid = rid;
+    feedback_reminder(a->kind, level);
+    /* the second and third light a dark display: who and what (issue 20261126-0ca0) */
+    if (level >= 2) glow_for(a);
 }
 
 static const ui_actions_t s_actions = {.focus = act_focus,
@@ -470,9 +525,16 @@ static const ui_actions_t s_actions = {.focus = act_focus,
                                        .nag = act_nag,
                                        .sent = feedback_approved,
                                        .button_down = act_button_down,
+                                       .touching = act_touching,
                                        .sectors = app_set_sectors,
                                        .pointer = act_pointer,
-                                       .moves = act_moves};
+                                       .moves = act_moves,
+                                       .raw_keys = act_raw_keys,
+                                       .toy_buzz = feedback_toy_buzz,
+                                       .toy_detent = feedback_toy_detent,
+                                       .toy_play = feedback_toy_play,
+                                       .toy_mic = feedback_toy_mic,
+                                       .toy_interrupt = feedback_toy_interrupt};
 
 /* ── link → app ── */
 
@@ -484,12 +546,19 @@ static void on_link(bool welcomed)
     preport_on_link(welcomed, app_now_ms());
 }
 
-static void on_attention(const attention_t *a)
+static void on_attention(const attention_t *a, bool is_new)
 {
-    uint32_t rgb = a->kind == ATT_ERROR      ? RGB_ERROR
-                   : a->kind == ATT_DONE     ? RGB_DONE
-                   : a->kind == ATT_QUESTION ? RGB_ASK
-                                             : RGB_PERMISSION;
+    if (!is_new) {
+        /* A re-send (a resync, a reconnect) of a request the watch holds: the card has the new
+         * time left and hush; nothing buzzes, glows or takes over again (issue 20261126-d95a). */
+        dbg_event("ui", "resent", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
+        if ((a->kind == ATT_APPROVAL || a->kind == ATT_QUESTION) && !a->answer_sent &&
+            power_display_on() && !ui_glow_active()) {
+            ui_resent_attention(a->sid, a->rid, a->kind == ATT_QUESTION ? RGB_ASK : RGB_PERMISSION);
+        }
+        return;
+    }
+    uint32_t rgb = att_rgb(a->kind);
     if (model_quiet_active(hal_rtc_get_unix())) {
         /* once per attention; atlas extract.py matches this line */
         /* Quiet (UI-V2 §4.5): no buzz, no glow, no nag. The card and the ring still change, and a
@@ -503,8 +572,9 @@ static void on_attention(const attention_t *a)
         dbg_event("ui", "hush", "\"rid\":%u,\"kind\":%d", (unsigned)a->rid, (int)a->kind);
     } else {
         feedback_attention(a->kind);
+        s_alert_rid = a->rid;
         /* face down nobody sees a glow */
-        if (!motion_face_down()) power_attention(rgb, app_now_ms());
+        if (!motion_face_down()) power_attention(rgb, a->sid, att_icon(a->kind), app_now_ms());
         /* a new request */
         if (a->rid != s_muted_rid || a->sid != s_muted_sid) s_muted_rid = s_muted_sid = 0;
     }
@@ -529,22 +599,75 @@ static void on_attention(const attention_t *a)
     ui_offer_attention(a->sid, error, rgb);
 }
 
-/* A session moved into done or error: buzz when it was armed with Notify, or the watch is on it. */
+/* Under DONE_BUZZ_ALL (issue 20261126-27b7): a turn shorter than this ends silently, unless it was
+ * armed, a job or watched; an error always buzzes. Finishes closer together than DONE_BURST_MS buzz
+ * once (the ring shows the rest). */
+#define DONE_MIN_S 30
+#define DONE_BURST_MS 3000u
+static uint32_t s_finish_ms; /* when the last finish buzzed */
+static bool s_finished;      /* one has buzzed since boot */
+
+/* How long the turn that just ended ran, in seconds: the daemon's count (session.dur, proto 0.14),
+ * which comes with the delta that enters done, else the time since the last state change. -1 =
+ * unknown (no clock, or no earlier state). */
+static int64_t turn_secs(const session_t *before, const session_t *now, uint32_t unix_now)
+{
+    if (now->sum.secs_known) return now->sum.secs;
+    if (!before || !before->tst || !unix_now) return -1;
+    return (int64_t)unix_now - (int64_t)before->tst;
+}
+
+/* Under DONE_BUZZ_ALL: one buzz per burst of finishes, and a dark display glows as for a request
+ * (face down nobody sees it). No takeover and no reminders: the card and the ring say the rest. */
+static void finished_all(bool error, uint32_t sid)
+{
+    uint32_t ms = app_now_ms();
+    if (s_finished && ms - s_finish_ms < DONE_BURST_MS) {
+        dbg_event("ui", "finish_burst", "\"sid\":%u", (unsigned)sid);
+    } else {
+        feedback_finished(error);
+        s_finish_ms = ms;
+        s_finished = true;
+    }
+    if (!motion_face_down()) {
+        power_attention(error ? RGB_ERROR : RGB_DONE, sid, error ? ICON_ERROR : ICON_DONE, ms);
+    }
+}
+
+/* A session moved into done or error. It buzzes when it was armed with Notify, is a job or is open
+ * in WATCH; under DONE_BUZZ_ALL also when it failed or its turn ran DONE_MIN_S or more. Quiet,
+ * snooze and presence hush hold it. */
 static void on_session(const session_t *before, const session_t *now, uint32_t present)
 {
+    ui_mote_on_session(before, now, present); /* green days and big finishes (issue 59e0) */
+    ui_eggs_on_session(before, now, present); /* the finish count (issue 7770) */
     if (!(present & SF_STATE)) return;
     if (now->state != SESS_DONE && now->state != SESS_ERROR) return;
     if (before && before->state == now->state) return;
+    bool error = now->state == SESS_ERROR;
     bool armed = before && before->ntf;
     bool job = now->agent == AGENT_SHELL; /* a job is on the watch to say when it ends (JOBS.md) */
-    if (!armed && !job && now->sid != ui_watched_sid()) return;
+    bool all = model_settings()->done_buzz == DONE_BUZZ_ALL;
     uint32_t unix_now = app_now_unix();
+    if (!armed && !job && now->sid != ui_watched_sid()) {
+        /* no earlier state: a session first seen finished buzzes for nothing it did meanwhile */
+        if (!all || !before) return;
+        int64_t secs = turn_secs(before, now, unix_now);
+        if (!error && secs >= 0 && secs < DONE_MIN_S) {
+            dbg_event("ui", "short_turn", "\"sid\":%u,\"secs\":%d", (unsigned)now->sid, (int)secs);
+            return;
+        }
+    }
     if (model_session_snoozed(now, unix_now) || model_quiet_active(unix_now)) return;
     if ((present & SF_HUSH) && now->hush) { /* the user is looking at its terminal (PRESENCE.md) */
         dbg_event("ui", "hush", "\"sid\":%u,\"state\":%d", (unsigned)now->sid, (int)now->state);
         return;
     }
-    feedback_finished(now->state == SESS_ERROR);
+    if (all) {
+        finished_all(error, now->sid);
+    } else {
+        feedback_finished(error); /* as before proto 0.25 */
+    }
 }
 
 static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, const char *msg)
@@ -571,7 +694,7 @@ static void on_result(int op, uint32_t sid, uint32_t rid, bool ok, int err, cons
         if (a && !ui_asking(a->sid)) {
             uint32_t rgb = a->kind == ATT_QUESTION ? RGB_ASK : RGB_PERMISSION;
             if (!power_display_on() || ui_glow_active()) ui_wait_attention(a->sid, false, rgb);
-            else ui_offer_attention(a->sid, false, rgb);
+            else ui_restore_attention(a->sid, rgb);
         }
     }
     if (op == LINK_OP_SCROLL && sid) {
@@ -651,7 +774,8 @@ static void log_gesture(const gesture_evt_t *g)
 static bool is_touch_gesture(gesture_kind_t k)
 {
     return !(k == G_BTN_A || k == G_BTN_B || k == G_BTN_A_LONG || k == G_BTN_B_LONG ||
-             k == G_BTN_A_DOUBLE || k == G_CHORD || k == G_LIFT || k == G_SHAKE);
+             k == G_BTN_A_DOUBLE || k == G_CHORD || k == G_LIFT || k == G_SHAKE ||
+             k == G_KEY_DOWN || k == G_KEY_UP);
 }
 
 /* The touch that wakes the display (or reveals a glow) is spent on that: every later touch event of
@@ -667,6 +791,23 @@ static void swallow_if_moved(uint32_t seq)
     if (ui_mode_seq() != seq && s_gesture.pressed) s_swallow_touch = true;
 }
 
+/* When the contact or the press behind gesture g began, on the app_now_ms clock. */
+static uint32_t gesture_began(const gesture_evt_t *g)
+{
+    const gesture_btn_t *a = &s_gesture.btn[0], *b = &s_gesture.btn[1];
+    switch (g->kind) {
+    case G_BTN_A:
+    case G_BTN_A_LONG:
+    case G_BTN_A_DOUBLE: return a->t_down;
+    case G_BTN_B:
+    case G_BTN_B_LONG: return b->t_down;
+    case G_CHORD: return (int32_t)(a->t_down - b->t_down) < 0 ? a->t_down : b->t_down;
+    case G_KEY_DOWN:
+    case G_KEY_UP: return g->x ? b->t_down : a->t_down;
+    default: return s_gesture.t_down;
+    }
+}
+
 static void dispatch(const gesture_evt_t *g)
 {
     log_gesture(g);
@@ -679,7 +820,9 @@ static void dispatch(const gesture_evt_t *g)
     }
     if (g->kind == G_PRESS) s_swallow_touch = false; /* a new contact */
     if (power_activity(app_now_ms())) {
-        /* first touch only wakes the display and shows what buzzed while it was dark */
+        /* first touch only wakes the display and shows what buzzed while it was dark; it is
+         * looking, as a raise is: the ambient dim and the reminders end */
+        ui_note_motion();
         ui_reveal_attention();
         if (touch && s_gesture.pressed) s_swallow_touch = true;
         dbg_event("power", "wake_input", "\"touch\":%s", touch ? "true" : "false");
@@ -687,6 +830,14 @@ static void dispatch(const gesture_evt_t *g)
     }
     if (ota_active()) { /* the Updating overlay owns the screen: only B held does anything */
         if (g->kind == G_BTN_B_LONG) ota_cancel(app_now_ms());
+        return;
+    }
+    /* A request took over just now: what began before, or in the first moments after, was aimed
+     * at the screen it replaced (issue 20261126-86cd). */
+    if (!g->injected && g->kind != G_SHAKE && ui_input_settling(gesture_began(g))) {
+        if (g->kind != G_PRESS && g->kind != G_RELEASE && g->kind != G_MOVE) {
+            dbg_event("input", "settling", "\"gesture\":\"%s\"", gesture_name(g->kind));
+        }
         return;
     }
     ui_on_gesture(g);
@@ -761,10 +912,12 @@ static void cover_step(void)
     bool cov = hal_touch_covered();
     if (cov && !was) {
         feedback_silence_now();
-        const attention_t *first = model_attention_first();
-        if (first) {
-            s_muted_rid = first->rid;
-            s_muted_sid = first->sid;
+        /* the request whose buzz is running, else the first */
+        const attention_t *a = s_alert_rid ? model_attention_find(s_alert_rid) : NULL;
+        if (!a) a = model_attention_first();
+        if (a) {
+            s_muted_rid = a->rid;
+            s_muted_sid = a->sid;
         }
         dbg_event("ui", "cover_mute", "\"rid\":%u", (unsigned)s_muted_rid);
     }
@@ -847,6 +1000,24 @@ void core_init(void)
     s_fps_t0 = app_now_ms();
 }
 
+/* Living marks (issue 20261126-98a6): the persona gate's view of this step, from the glue that can
+ * see power, motion and the model; the marks then move by it. */
+static void persona_step(uint32_t now)
+{
+    persona_ctx_t c = {0};
+    model_counts_t n = model_counts();
+    uint32_t unix_now = app_now_unix();
+    c.needs_you = (uint8_t)((model_attention_first() ? 1 : 0) + (n.waiting ? 1 : 0));
+    c.alert = (uint8_t)model_settings()->alert;
+    c.quiet = model_quiet_active(unix_now);
+    c.face_down = motion_face_down();
+    c.usb = hal_battery_read().usb_present;
+    c.display_on = power_display_on() && !ui_glow_active();
+    c.ambient = ui_dimmed();
+    c.fun = prefs_fun();
+    ui_living_tick(&c, now);
+}
+
 uint32_t core_step(void)
 {
     uint32_t now = app_now_ms();
@@ -877,6 +1048,7 @@ uint32_t core_step(void)
     if (voice_state() == VOICE_REC || voice_state() == VOICE_WAIT) power_activity(now);
     seq = ui_mode_seq();
     ui_tick(now);
+    persona_step(now);
     swallow_if_moved(seq);
     orientation_step();
     dbg_tick(now);

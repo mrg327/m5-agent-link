@@ -98,7 +98,7 @@ device                                 daemon
 
 ```cddl
 hello = {
-  proto: [uint, uint],             ; [major, minor] = [0, 24]
+  proto: [uint, uint],             ; [major, minor] = [0, 25]
   dev: { class: tstr,              ; "watch" | "desk" | "pad" | "sim" | ...
          board: tstr,              ; "m5stopwatch"
          fw: tstr,                 ; semver
@@ -124,7 +124,8 @@ welcome = {
   time: { unix: uint, tz_off: int },   ; device RTC sync (RX8130CE)
   cfg: { privacy: "meta"/"preview"/"full",
          alert: "full"/"quiet"/"silent",
-         quiet_until?: uint },
+         quiet_until?: uint,
+         done_buzz?: "armed"/"all" },   ; key 5 (proto 0.25): which finishes buzz (§6j)
   ? replies: [0*6 tstr],      ; quick replies, each ≤ 24 chars (proto 0.4)
   ? pointer: bool             ; key 7 (proto 0.20): the daemon drives its machine's pointer (§6g)
 }
@@ -283,7 +284,7 @@ scroll_pos = { lines_above: uint, at_bottom: bool, ? total: uint, ? preview: tst
   decision, the terminal prompt appears, and devices get `clear` `handed_back`. It answers nothing.
 - `scroll` (UI-V2 §6): the daemon moves the session's terminal scrollback (tmux copy mode first, else kitty remote control; other terminals answer `unsupported` and the device hides the item for that session). The daemon sums a burst into one move while the previous one runs, answers at most one `result` per 250 ms and only when the position changed or the move failed, and clamps `delta` to ±500 lines / ±20 pages. `pos.preview` is the terminal's top visible line, ≤ 48 chars, sent only when the device's privacy is `preview` or `full`; it is never written to the audit log or the trace. Scroll is read-only on the PC and is not audited.
 - `type` (proto 0.4, issue b150): `arg` is an index into `welcome.replies`, or, from 100 up, into the session's own answers `session.rp` (proto 0.5: `arg` 101 = `rp[1]`); the daemon types that reply and Enter into the session's terminal (kitty only today, else `unsupported`). The device never sends text. Refused with `denied` while the session has an open request, while it is `input` with `sub` approval or question, or while a numbered selection list is on screen: Enter there would pick the dialog's highlighted option. Audited with the index, not the text.
-- `cancel` (proto 0.4): interrupts the session's running turn by sending Esc to its terminal. It needs a hold like `approve` (`hold_ms` ≥ 1000, else `denied`). Audited.
+- `cancel` (proto 0.4): interrupts the session's running turn by sending Esc to its terminal. It needs a hold like `approve` (`hold_ms` ≥ 1000, else `denied`). The daemon checks the state when the command arrives and answers `stale` ("not working") unless the session is `start` or `work` with no open request: after the turn ends Esc lands on the idle prompt, and in a permission or question dialog it picks "No", which is Deny's job (issue 20261126-9ecf). Audited.
 - `cancel` on a job (`ag: "shell"`) sends SIGINT to the foreground process group of the shell's tty instead of
   Esc; `stale` when nothing runs there.
 - `rerun` (proto 0.9): types a finished job's command line and Enter into its terminal, after a hold
@@ -518,6 +519,31 @@ dbg_frames (72) device → daemon  { seq, recs: bstr, last, lost }   after stop:
 ```
 
 The record layout and kinds (frame, down, up, gesture, mark, cmd) are in BENCH.md §3.
+
+## 6j. Which finishes buzz (proto 0.25, issue 20261126-27b7)
+
+`device_cfg.done_buzz` (key 5, a uint: `0` armed, `1` all) says which sessions buzz when they enter `done` or
+`error`. The PC chooses: `~/.agentlink/notify` (or `AGENTLINK_NOTIFY`) holds `all` (the default) or `armed`, and
+`agentlink notify [all|armed]` writes it. The daemon puts it in every `welcome` and sends a `cfg` with only
+this key before the next finish after the file changed; it reaches only devices with proto ≥ 0.25 (gate
+`NOTIFY_MINOR` in `device.rs`).
+
+| Session that enters done / error | `armed` (and every daemon below 0.25) | `all` |
+|---|---|---|
+| Armed with Notify, a job, or open in WATCH | buzz | buzz, and a dark display glows |
+| Error | silent | buzz, and a dark display glows |
+| Done after a turn of 30 s or more | silent | buzz, and a dark display glows |
+| Done after a shorter turn, or a session first seen finished | silent | silent |
+
+- **Turn length.** The watch reads `session.dur` (key 34, proto 0.14), which comes with the delta that enters
+  done; without it, the time since the session's last state change (`tst`). The 30 s minimum is the watch's
+  (`DONE_MIN_S` in `app.c`); nothing new is on the wire for it.
+- **Unchanged gates.** Quiet, snooze, alert mode, face down and presence `hush` (§4) hold the buzz as before:
+  a finish in front of the focused terminal stays silent. Finishes within 3 s of a buzz buzz once (the ring
+  shows the rest). No takeover and no reminders for a finish.
+- **Compatibility.** A device below 0.25 never gets key 5 and behaves as before. A daemon below 0.25 sends
+  none, so the watch resets to `armed` at each welcome and keeps the old rule. A value the watch does not
+  know leaves its setting unchanged.
 
 ## 7. Misc
 

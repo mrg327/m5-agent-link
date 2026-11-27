@@ -2,7 +2,7 @@
 status: implemented
 owner: ui
 issue: 20261111-7732
-last_reviewed: 2026-11-22
+last_reviewed: 2026-11-26
 summary: '"Halo": the Apple-style overhaul; its look is replaced by GLYPHS.md, its gestures and safety rules stand'
 ---
 
@@ -31,6 +31,23 @@ document wins. Finding numbers (H1, R1, X2 …) refer to the profile.
    colour, shape or position wherever one can carry it. Use a word only when no glyph can. Check
    every new screen against this first, and when a screen changes, look for text a glyph can
    replace. The agent graph ([GRAPH.md](GRAPH.md)) is the reference: lanes and glyphs, no text.
+8. **Living marks, and stillness means "waiting for you"** (2026-11-26, issue 98a6). The sigil, the
+   hero glyph and the ring move by one grammar ([GLYPHS.md](GLYPHS.md) §3.11): a working mark
+   breathes by its own temperament on the dock, a finish dips and throws sparks, an error shivers,
+   a snoozed mark droops, and the mark that wants you leans toward the hero glyph and holds still.
+   Nothing loops while anything needs you, on battery, or with reduced motion; fun never starts a
+   buzz or a sound (§3.12 there). Every fun feature asks `persona_allow()` first.
+9. **The Mote** (2026-11-26, issue 59e0), off by default: a silent firefly (a warm-white orb with a
+   breathing halo) on its own track inside the idle face's ring on the dock. It visits each working session's
+   arc in turn, rests at 12 o'clock when nothing runs, and loops once and flares on a big finish
+   ([GLYPHS.md](GLYPHS.md) §3.14; the owner chose the firefly on 2026-11-26). It is gone the moment anything
+   needs you. As the watch's mascot (issue f5be) it also rests at 12 on the empty deck, lit or ambient
+   (wandering a little, an ember after 5 minutes, still on battery), and wakes at boot: an ember at the centre,
+   one flare, a rise to its place, 1.2 s over the deck as it comes up, cut by any touch or request. It is
+   absent from the lit deck with sessions and from ASK.
+10. **A few rare easter eggs** (2026-11-26, issue 7770), on by default: the clock's digits slip at 13:37 and
+    04:04; the 100th and 1000th finish turn the sigil once, or loop the Mote (§3.15 there). Silent, never
+    while anything needs you.
 
 Safety invariants, unchanged and not negotiable in any later reskin: the approval card shows the
 request text; a tap never approves or denies; an approve-class commit is a 1.2 s hold bound to the
@@ -163,9 +180,17 @@ carries black text. `theme_dim(rgb, pct)` mixes toward black (ring segments at r
 - Colour: the selected session and any session that needs you (question, permission, error) at
   100 %; everything else at 40 %. Working keeps its comet, Done its one sweep, needs-you its 1 Hz
   pulse.
-- Not colour alone: an *unselected* session that needs you carries a **pip**, a filled 10 px dot in
-  its colour at r 205 on the capsule's midpoint (the selected one is already wide and bright, so it has
-  none). Dots and twin tracks are gone.
+- Not colour alone: an *unselected* session that needs you carries a **pip** in its colour on the
+  capsule's midpoint, whose shape says what it needs (issue 20261126-38fa; `ring_pip_paint`): a
+  **dot** (Ø 10 at r 205) for a question, a **bar** along the ring (18 × 8, r 200–208) for a
+  permission, a **triangle** pointing at the centre (base 16 on r 210, point at r 196) for an error.
+  They differ in outline and length, not in corners, so they read without hue and while the ring is
+  still. The selected one is already wide and bright and its hero glyph says the kind, so it has none.
+  What waits behind the open screen (12 o'clock, every screen but HOME, the queue of UI-V2 §4) is
+  the count badge of issue 20261126-0a74: the next request's colour, its kind's glyph when one waits
+  (hand, question mark, error), the count when more do, and a tap opens it. Dots and twin tracks are gone. A pip never sits under a key hint: within 9° of 315° or 45°
+  it moves along its capsule to 9° away, on the side with room (`ring_pip_deg`); a capsule too short
+  for that puts it at its end.
 - The ring shows the index on **every** screen. While a hold is in progress the index drops to
   20 % and the hold arc (10 px, the item's colour, from 12 o'clock) is drawn over it.
 - SCROLL keeps its position track (4 px `COL_FILL2` circle, accent arc).
@@ -222,7 +247,8 @@ anywhere else in the centre behaves as in v2. A tap still never commits a hold i
   (prominent, the state colour, 160 × 44, centred on y 320, `Review` for a permission and `Answer` for a question)
   when the session needs you › the agent graph strip (proto 0.22, [GRAPH.md](GRAPH.md) §5) › a lone `ICON_QUIET`
   in `COL_TEXT3` while quiet runs › nothing.
-- Legends: A `Open`, B `Next` (hidden with one session).
+- Legends: A `Open`, B `Next` (hidden with one session). A tap on a shown hint presses its key (§5). A white
+  badge on A counts the other sessions that need you, the pips on the ring (issue 20261126-34e5).
 - Offline: the card drops to 50 % as in v2.
 - **Empty**: the time in `FONT_NUM` at y 200 and `Nothing running` in `FONT_BODY` `COL_TEXT2` at
   y 262; before the clock is set, `Ready` in `FONT_TITLE`. No "swipe down for status" (M1).
@@ -416,7 +442,7 @@ chord (`Running the test suite` fits; longer ends in dots); its argument in `FON
 two lines, top at y 252. Footer on y 322 in `FONT_CAPTION` `COL_TEXT3`: `Step 3 · 1:37`. No hint
 line. When the session is not working: the state icon at 44 px on y 176, the state word in
 `FONT_TITLE` on y 236, a caption on y 278 (`Finished 3m ago`), and for a session that needs you the
-**Answer** button on y 318. Legends: A `Open`, B `Next`.
+**Answer** button on y 318. Legends: A `Open`, B `Next`, tappable and with A's count badge as on HOME.
 
 ### 4.5 SCROLL
 
@@ -544,6 +570,27 @@ oldest row.
 - The rim (one detent per row) and a centre drag scroll the rows; B moves one row older. Back is swipe right,
   B held or a finger held still (to HOME); A+B is Home. The session going away returns HOME.
 
+### 4.12 Alerts: the glow (2026-11-26)
+
+- **The glow says who and what** (issue 20261126-0ca0). A request, an error or a done on a dark display
+  lights, for 3 s, the ring in the kind's colour at 55 % (r 219–233), the session's sigil (r 40, `COL_TEXT2`,
+  y 112) and the kind's hero glyph (`FONT_ICON_HERO`: hand, question, error, done; the kind's colour at 55 %,
+  y 262). No text, no motion. A second alert while it shows takes it over and starts the 3 s again; a reminder
+  lights it again on a dark display. The first touch or raise during it only reveals (ASK, or the card).
+- **Reminders grow louder** (issue 20261126-a909, UI-V2 §4.3): a soft pulse at 25 s that leaves a dark display
+  dark, then the kind's pattern with the glow, then the pattern twice with the sound and the glow, scaled to
+  the answer window; questions too; one ladder at a time, for the request with the least time left. No new
+  drawing.
+- **Requests stop yanking open screens** (issue 20261126-0a74). A request opens ASK by itself only from HOME or
+  WATCH once the user has left them alone for 1.5 s, or on the wake of a dark display; AGENT and SCROLL now keep
+  their work like KEYS, VOICE, READ, GRAPH, STATUS and LABS. Elsewhere a **badge** at 12 o'clock (r 14 at
+  (233, 20)) in the colour of the next request holds the number waiting in black, or with one the kind's glyph
+  (20 px); it enters with one 160 ms pulse and is a 72 × 56 target that opens the request (not in KEYS or
+  TRACKPAD). It replaces the 16 px dot.
+- **The next request slides in** (issue 20261126-74c0). After an answer the queue's next request (least time left
+  first) opens as soon as the answered state has shown, entering from the right (48 px, 160 ms, ease-out) with one
+  tick, never under a finger; the badge on ASK counts the others. Each card still arms for 300 ms.
+
 ## 5. Interaction changes (`nav.c`)
 
 | Change | Rows | Why |
@@ -552,6 +599,7 @@ oldest row.
 | Every v2 way back stays as an alias | none removed | principle 6 |
 | A tap on a list row acts on that row | handled in the screen via `wheel_hit`; the binding stays `NAV_COMMIT` | X3 |
 | `NAV_PICK_RIM` leaves AGENT and ASK | two rows removed | the rim no longer shows rows (§3.1) |
+| **A tap on a key hint presses its key** on HOME and WATCH (issue 20261126-34e5) | `{MODE_HOME, G_TAP, ZONE_KEY_A, WHEN_ALWAYS, NAV_FOCUS}`, `ZONE_KEY_B` → `NAV_NEXT`, the same two for `MODE_WATCH`, before the `ZONE_RIM` rows | A tap within `UI_KEY_HIT_R` (36) of a shown hint was a rim tap that picked the session at 315° or 45°, or nothing. Only a tap, acting at once (no touch "A twice"); a slide from a hint still scrubs; a hidden hint is rim. The hint's ring lights for 150 ms on a tap and on the key. Other screens keep their own rules |
 
 Nothing else in the gesture table changes. HOME keeps left/right for sessions; KEYS keeps touch for
 strokes and B held for back.
