@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Linux BLE dependencies
         run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.120.0
         with:
           components: clippy
           targets: aarch64-apple-darwin, x86_64-pc-windows-msvc
